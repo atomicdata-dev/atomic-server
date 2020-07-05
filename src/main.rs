@@ -156,7 +156,13 @@ fn get_model(subject: String, store: &mut Store) -> Model {
 
 fn read_mapping_from_file() -> Mapping {
     let mut mapping: Mapping = HashMap::new();
-    let mapping_path = Path::new("./default_mapping.amp");
+    let default_mapping_path = Path::new("./default_mapping.amp");
+    let user_mapping_path = Path::new("./user_mapping.amp");
+    let mut mapping_path = default_mapping_path;
+
+    if user_mapping_path.exists() {
+        mapping_path = user_mapping_path;
+    }
 
     match std::fs::read_to_string(mapping_path) {
         Ok(contents) => {
@@ -262,13 +268,15 @@ fn prompt_bookmark(mapping: &mut Mapping, subject: &String) {
     loop {
         match shortname {
             Some(sn) => {
-                if re.is_match(&*sn) {
+                if mapping.contains_key(&*sn) {
+                    let msg = format!(
+                        "You're already using that shortname for {:?}, try something else",
+                        mapping.get(&*sn).unwrap()
+                    );
+                    shortname = prompt_opt(msg).unwrap();
+                } else if re.is_match(&*sn) {
                     &mut mapping.insert(sn, String::from(subject));
                     break;
-                } else if mapping.contains_key(&*sn) {
-                    shortname =
-                        prompt_opt("You're already using that shortname, try something else")
-                            .unwrap();
                 } else {
                     shortname =
                         prompt_opt("Not a valid bookmark, only use letters, numbers, and '-'")
