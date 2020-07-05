@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 promptly = "0.3.0"
+serde_json = "1.0.56"

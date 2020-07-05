@@ -15,6 +15,15 @@ atomicli setup
 atomicli install https://atomicdata.dev/ontologies/meetings
 # when no URL is given, use the Ontola repo's ontologies
 atomicli install meetings
+```
 
+## Install
 
+## Mapping
+
+The Mapping refers to your user specific set of shortname-URL combinations.
+This Mapping lives as a simple text file in `~/.atomic/map`.
+
+```
+person=https://atomicdata.dev/classes/Person
 ```
