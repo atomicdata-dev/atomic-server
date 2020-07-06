@@ -1,5 +1,6 @@
 [package]
-name = "atomic-cli"
+name = "atomic"
+description = "Create, share and standardize linked atomic data!"
 version = "0.1.0"
 authors = ["Joep Meindertsma <joep@argu.co>"]
 edition = "2018"

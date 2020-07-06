@@ -31,7 +31,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cff77d8686867eceff3105329d4698d96c2391c176d5d03adc90c7389162b5b8"
 
 [[package]]
-name = "atomic-cli"
+name = "atomic"
 version = "0.1.0"
 dependencies = [
  "clap",
