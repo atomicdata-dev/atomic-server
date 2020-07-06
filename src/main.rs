@@ -1,9 +1,9 @@
+use clap::{App, Arg, SubCommand, ArgMatches};
 use promptly::{prompt, prompt_opt};
 use regex::Regex;
 use serde_json::de::from_str;
 use std::{collections::HashMap, fs, path::Path};
 use uuid;
-
 struct Model {
     requires: Vec<Property>,
     recommends: Vec<Property>,
@@ -27,14 +27,54 @@ type Store = HashMap<String, Resource>;
 /// The first string represents the URL of the Property, the second one its Value.
 type Resource = HashMap<String, String>;
 
+struct Context<'a> {
+    store: Store,
+    mapping: Mapping,
+    matches: ArgMatches<'a>,
+}
+
 fn main() {
+    let matches = App::new("Atomicli")
+        .version("0.1")
+        .author("Joep Meindertsma <joep@ontola.io>")
+        .about("Create, share and standardize linked atomic data!")
+        .subcommand(
+            SubCommand::with_name("new")
+                .about("Create a Resource")
+                .arg(
+                    Arg::with_name("class")
+                        .help("Select the class URL or shortname"),
+                ),
+        )
+        .get_matches();
+
     // Reads the shortname + URL map
     let mut mapping = read_mapping_from_file();
-    println!("mapping: {:?}", mapping);
     let mut store: Store = HashMap::new();
     // The store contains the classes and properties
     read_store_from_file(&mut store);
-    let model = get_model("https://example.com/Person".into(), &mut store);
+
+    let mut context = Context {
+        mapping,
+        store,
+        matches,
+    };
+
+    match context.matches.subcommand_name() {
+        Some("new") => {
+            new(&mut context);
+        }
+        Some(cmd) => {println!("cmd: {}", cmd)}
+        None => {println!("no command...")}
+    }
+
+}
+
+fn new(context: &mut Context) {
+    if let class = context.matches.subcommand_matches("new").unwrap().value_of("class").unwrap() {
+        println!("{:?}", class );
+    };
+    let model = get_model("https://example.com/Person".into(), &mut context.store);
 
     let mut new_resource: Resource = HashMap::new();
 
@@ -73,15 +113,15 @@ fn main() {
     let subject = format!("https://example.com/{}", uuid::Uuid::new_v4());
     println!("Resource created with URL: {}", &subject);
 
-    prompt_bookmark(&mut mapping, &subject);
+    prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
-    store.insert(subject, new_resource);
+    context.store.insert(subject, new_resource);
     // Publish new resource to IPFS
     // TODO!
     // Save the store locally
-    write_store_to_disk(&store);
-    write_mapping_to_disk(&mapping);
+    write_store_to_disk(&context.store);
+    write_mapping_to_disk(&context.mapping);
 }
 
 pub mod URL {

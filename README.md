@@ -22,7 +22,7 @@ atomicli install meetings
 ## Mapping
 
 The Mapping refers to your user specific set of shortname-URL combinations.
-This Mapping lives as a simple text file in `~/.atomic/map`.
+This Mapping lives as a simple text file in `./user_mappping.amp`.
 
 ```
 person=https://atomicdata.dev/classes/Person
