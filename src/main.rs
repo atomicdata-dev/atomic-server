@@ -4,6 +4,8 @@ use regex::Regex;
 use serde_json::de::from_str;
 use std::{collections::HashMap, fs, path::Path};
 use uuid;
+use colored::*;
+
 struct Model {
     requires: Vec<Property>,
     recommends: Vec<Property>,
@@ -46,6 +48,10 @@ fn main() {
                         .help("Select the class URL or shortname"),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("list")
+                .about("List all bookmarks")
+        )
         .get_matches();
 
     // Reads the shortname + URL map
@@ -64,17 +70,30 @@ fn main() {
         Some("new") => {
             new(&mut context);
         }
+        Some("list") => {
+            list(&mut context);
+        }
         Some(cmd) => {println!("cmd: {}", cmd)}
         None => {println!("no command...")}
     }
 
 }
 
+fn list(context: &mut Context) {
+    let mut string = String::new();
+    for (shortname, url) in context.mapping.iter() {
+        string.push_str(&*format!("{0: <15}{1: <10} \n", shortname.blue().bold(), url));
+    }
+    println!("{}", string)
+}
+
 fn new(context: &mut Context) {
-    if let class = context.matches.subcommand_matches("new").unwrap().value_of("class").unwrap() {
-        println!("{:?}", class );
-    };
-    let model = get_model("https://example.com/Person".into(), &mut context.store);
+    let class_input = context.matches.subcommand_matches("new")
+        .expect("Add a class").value_of("class").expect("Add a class value");
+    let class_url = context.mapping.get(class_input)
+        .expect(&*format!("Could not find class {} in mapping", class_input));
+    // let class_url = "https://example.com/Person";
+    let model = get_model(class_url.into(), &mut context.store);
 
     let mut new_resource: Resource = HashMap::new();
 
