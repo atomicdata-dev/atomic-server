@@ -1,5 +1,12 @@
 # Atomic CLI
 
+_Disclaimer: this project primarily serves as a project for me to learn Rust, and to check whether
+the [Atomic Data spec](https://docs.atomicdata.dev) I'm workong on actually makes some sense._
+
+_Status: buggy, pre-alpha_
+
+Create, share, fetch and model linked [Atomic Data](https://docs.atomicdata.dev)!
+
 ```sh
 # Add a mapping, and store the Atomic Class locally
 atomic map person https://example.com/person
@@ -18,6 +25,35 @@ atomic install meetings
 ```
 
 ## Install
+
+Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
+
+```sh
+git clone git@github.com:joepio/atomic-cli.git
+cd atomic-cli
+cargo install --path ./
+```
+
+## Quick start
+
+After installing `atomic`, create yourself a class:
+
+```sh
+atomic new class
+```
+
+Let's create the Person class.
+Or get creative, of course.
+
+```sh
+shortname: person
+description: a real human being
+recommends: name description birthdate
+```
+
+## Config
+
+Atomic creates a `~/.config/atomic` folder, which contains a `mapping.amp` and a
 
 ## Mapping
 

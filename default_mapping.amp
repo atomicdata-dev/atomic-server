@@ -1,2 +1,8 @@
-person=https://example.com/Person
+# Classes
 class=https://atomicdata.dev/classes/Class
+
+# Datatypes
+string=https://atomicdata.dev/datatypes/string
+slug=https://atomicdata.dev/datatypes/slug
+atomicurl=https://atomicdata.dev/datatypes/atomicURL
+integer=https://atomicdata.dev/datatypes/integer
