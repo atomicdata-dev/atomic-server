@@ -95,25 +95,13 @@ pub fn get_path(atomic_path: &str, store: &Store, mapping: &Mapping) -> String {
 }
 
 pub fn resolve_property_shortname(shortname: &String, resource: &Resource, store: &Store) -> Result<String> {
-    // Find first class of resource
-    // Get classes array
-    let classes_resource_array: Vec<String> = from_str(resource.get(urls::IS_A).ok_or("Resource has no isA relation")?)?;
-
-    // Iterate over the classes
-    for class_url in classes_resource_array {
-        let class_resource = store.get(&*class_url).ok_or("Class not found")?;
-        let recommended_props: Vec<String> = from_str(class_resource.get(urls::RECOMMENDS).ok_or("No recommended props in class")?)?;
-        let required_props: Vec<String> = from_str(class_resource.get(urls::REQUIRES).ok_or("No required props in class")?)?;
-        let all_prop_urls: Vec<String> = [recommended_props, required_props].concat();
-        // Iterate over both recommended and required resources, and check their shortnames
-        for prop_url in all_prop_urls {
-            let prop_resource = store.get(&*prop_url).ok_or("Class not found")?;
-            let prop_shortname = prop_resource.get(urls::SHORTNAME).ok_or("Class not found")?;
-            if prop_shortname == shortname {
-                return Ok(prop_url)
-            }
+    // Iterate over the properties
+    for (prop_url, _value) in resource.iter() {
+        let prop_resource = store.get(&*prop_url).ok_or(format!("Property '{}' not found", prop_url))?;
+        let prop_shortname = prop_resource.get(urls::SHORTNAME).ok_or(format!("Property shortname for '{}' not found", prop_url))?;
+        if prop_shortname == shortname {
+            return Ok(prop_url.clone())
         }
-        return Err(format!("no match... class: {}, shortname: {}", class_url, shortname).into())
     }
     // Iterate over all required & recommended properties
     // Did you find the shortname? Nice, return it.
