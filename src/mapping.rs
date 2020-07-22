@@ -4,13 +4,13 @@ use std::{collections::HashMap, fs, path::PathBuf};
 /// Maps shortanmes to URLs
 pub type Mapping = HashMap<String, String>;
 
-pub fn try_mapping_or_url(mapping_or_url: &String, context: &Context) -> Option<String> {
-    let maybe = context.mapping.get(mapping_or_url);
+pub fn try_mapping_or_url(mapping_or_url: &String, mapping: &Mapping) -> Option<String> {
+    let maybe = mapping.get(mapping_or_url);
     match maybe {
         Some(hit) => return Some(hit.clone()),
         None => {
             // Currently only accept HTTP(S) protocol
-            if mapping_or_url.starts_with("http") {
+            if is_url(mapping_or_url) {
                 return Some(mapping_or_url.clone());
             }
             return None;
@@ -52,4 +52,9 @@ pub fn write_mapping_to_disk(mapping: &Mapping, path: &PathBuf) {
     fs::create_dir_all(path.parent().expect("Could not find parent folder"))
         .expect("Unable to create dirs");
     fs::write(path, file_string).expect("Unable to write file");
+}
+
+/// Check if something is a shortname or URL
+pub fn is_url(string: &String) -> bool {
+    string.starts_with("http")
 }

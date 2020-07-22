@@ -1,7 +1,7 @@
 # Atomic CLI
 
 _Disclaimer: this project primarily serves as a project for me to learn Rust, and to check whether
-the [Atomic Data spec](https://docs.atomicdata.dev) I'm workong on actually makes some sense._
+the [Atomic Data spec](https://docs.atomicdata.dev) I'm working on actually makes some sense._
 
 _Status: buggy, pre-alpha_
 

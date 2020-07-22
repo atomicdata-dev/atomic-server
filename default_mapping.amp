@@ -1,6 +1,9 @@
 # Classes
 class=https://atomicdata.dev/classes/Class
 
+# Properties
+shortname=https://atomicdata.dev/properties/shortname
+
 # Datatypes
 string=https://atomicdata.dev/datatypes/string
 slug=https://atomicdata.dev/datatypes/slug

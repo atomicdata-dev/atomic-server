@@ -9,6 +9,7 @@ use uuid;
 
 mod mapping;
 mod store;
+mod serialization;
 
 struct Model {
     requires: Vec<Property>,
@@ -58,7 +59,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("get")
                 .about("Fetches and shows a Resource")
-                .arg(Arg::with_name("subject").help("The subject URL or shortname to be fetched")),
+                .arg(Arg::with_name("path").help("The subject URL, shortname or path to be fetched")),
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
         .get_matches();
@@ -102,6 +103,9 @@ fn main() {
         Some("list") => {
             list(&mut context);
         }
+        Some("get") => {
+            get(&mut context);
+        }
         Some(cmd) => println!("{} is not a valid command. Run atomic --help", cmd),
         None => println!("Run atomic --help for available commands"),
     }
@@ -117,6 +121,17 @@ fn list(context: &mut Context) {
         ));
     }
     println!("{}", string)
+}
+
+fn get(context: &mut Context) {
+    let path_string = context
+    .matches
+    .subcommand_matches("get")
+    .unwrap()
+    .value_of("path")
+    .expect("Add a URL, shortname or path");
+
+    store::get_path(path_string, &context.store, &context.mapping);
 }
 
 fn new(context: &mut Context) {
@@ -237,7 +252,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             match url {
                 Some(u) => {
                     // TODO: Check if string or if map
-                    input = mapping::try_mapping_or_url(&u, context);
+                    input = mapping::try_mapping_or_url(&u, &context.mapping);
                     return input
                 }
                 None => (),
@@ -253,7 +268,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                     let mut urls: Vec<String> = Vec::new();
                     let length = string_items.clone().count();
                     for item in string_items.into_iter() {
-                        match mapping::try_mapping_or_url(&item.into(), context) {
+                        match mapping::try_mapping_or_url(&item.into(), &context.mapping) {
                             Some(url) => {
                                 urls.push(url);
                             }
