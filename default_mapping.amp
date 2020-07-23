@@ -5,7 +5,9 @@ class=https://atomicdata.dev/classes/Class
 shortname=https://atomicdata.dev/properties/shortname
 
 # Datatypes
-string=https://atomicdata.dev/datatypes/string
-slug=https://atomicdata.dev/datatypes/slug
 atomicurl=https://atomicdata.dev/datatypes/atomicURL
+date=https://atomicdata.dev/datatypes/date
+datetime=https://atomicdata.dev/datatypes/dateTime
 integer=https://atomicdata.dev/datatypes/integer
+slug=https://atomicdata.dev/datatypes/slug
+string=https://atomicdata.dev/datatypes/string

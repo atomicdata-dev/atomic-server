@@ -8,8 +8,8 @@ use std::{collections::HashMap, path::PathBuf};
 use uuid;
 
 mod mapping;
-mod store;
 mod serialization;
+mod store;
 
 struct Model {
     requires: Vec<Property>,
@@ -47,9 +47,10 @@ pub struct Context<'a> {
 
 fn main() {
     let matches = App::new("atomic")
-        .version("0.1.1")
+        .version("0.1.3")
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model linked atomic data!")
+        .after_help("Visit https://github.com/joepio/atomic-cli for more info")
         .subcommand(
             SubCommand::with_name("new").about("Create a Resource").arg(
                 Arg::with_name("class")
@@ -58,8 +59,20 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("get")
-                .about("Fetches and shows a Resource")
-                .arg(Arg::with_name("path").help("The subject URL, shortname or path to be fetched")),
+                .about(
+                    "\
+                Traverses a Path and prints the resulting Resource or Value. \
+                Examples: \natomic get \"class description\"\natomic get \"https://example.com\"\n\
+                Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
+                ",
+                )
+                .arg(Arg::with_name("path").help(
+                    "\
+                    The subject URL, shortname or path to be fetched. \
+                    Use quotes for paths. \
+                    You can use Bookmarks instead of a full subjet URL. \
+                    ",
+                )),
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
         .get_matches();
@@ -125,13 +138,26 @@ fn list(context: &mut Context) {
 
 fn get(context: &mut Context) {
     let path_string = context
-    .matches
-    .subcommand_matches("get")
-    .unwrap()
-    .value_of("path")
-    .expect("Add a URL, shortname or path");
+        .matches
+        .subcommand_matches("get")
+        .unwrap()
+        .value_of("path")
+        .expect("Add a URL, shortname or path");
 
-    store::get_path(path_string, &context.store, &context.mapping);
+    // Returns a URL or Value
+    let result = store::get_path(path_string, &context.store, &context.mapping);
+    match result {
+        Ok(good) => {
+            if mapping::is_url(&good) {
+                pretty_print_resource(&good, &context.store);
+            } else {
+                println!("{}", &good);
+            }
+        }
+        Err(e) => {
+            println!("{}", e);
+        }
+    }
 }
 
 fn new(context: &mut Context) {
@@ -201,7 +227,7 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
 // Checks the property and its datatype, and issues a prompt that performs validation.
 fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> Option<String> {
     let mut input: Option<String> = None;
-    let mut msg_appendix = "";
+    let msg_appendix;
     if optional {
         msg_appendix = " (optional)";
     } else {
@@ -224,11 +250,10 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                         return Some(slug);
                     }
                     println!("Only letters, numbers and dashes - no spaces or special characters.");
-                    return None
+                    return None;
                 }
-                None => (),
+                None => (return None),
             }
-            return input;
         }
         urls::INTEGER => {
             let msg = format!("integer{}", msg_appendix);
@@ -237,10 +262,24 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 Some(nr) => {
                     input = Some(nr.to_string());
                 }
-                None => (),
+                None => (return None),
             }
         }
-        urls::ATOMIC_URL => {
+        urls::DATE => {
+            let msg = format!("date YY-MM-DDDD{}", msg_appendix);
+            let date: Option<String> = prompt_opt(&msg).unwrap();
+            let re = Regex::new(r"([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))").unwrap();
+            match date {
+                Some(date_val) => loop {
+                    if re.is_match(&*date_val) {
+                        return Some(date_val);
+                    }
+                    println!("Not a valid date.");
+                },
+                None => (return None),
+            }
+        }
+        urls::ATOMIC_URL => loop {
             let msg = format!("URL{}", msg_appendix);
             let url: Option<String> = prompt_opt(msg).unwrap();
             // If a classtype is present, the given URL must be an instance of that Class
@@ -253,14 +292,24 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 Some(u) => {
                     // TODO: Check if string or if map
                     input = mapping::try_mapping_or_url(&u, &context.mapping);
-                    return input
+                    match input {
+                        Some(url) => {
+                            return Some(url)
+                        }
+                        None => {
+                            println!("Shortname not found, try again.");
+                            return None
+                        }
+                    }
                 }
                 None => (),
             };
         }
         urls::RESOURCE_ARRAY => loop {
             let msg = format!(
-                "resource array - Add the URLs or Shortnames, separated by spacebars{}", msg_appendix);
+                "resource array - Add the URLs or Shortnames, separated by spacebars{}",
+                msg_appendix
+            );
             let option_string: Option<String> = prompt_opt(msg).unwrap();
             match option_string {
                 Some(string) => {
@@ -321,6 +370,8 @@ pub mod urls {
     pub const INTEGER: &str = "https://atomicdata.dev/datatypes/integer";
     pub const RESOURCE_ARRAY: &str = "https://atomicdata.dev/datatypes/resourceArray";
     pub const BOOLEAN: &str = "https://atomicdata.dev/datatypes/boolean";
+    pub const DATE: &str = "https://atomicdata.dev/datatypes/date";
+    pub const DATETIME: &str = "https://atomicdata.dev/datatypes/dateTime";
 }
 
 /// Retrieves a model from the store by subject URL and converts it into a model useful for forms
@@ -333,10 +384,8 @@ fn get_model(subject: String, store: &Store) -> Model {
     let description = model_strings
         .get(urls::DESCRIPTION)
         .expect("Model has no description");
-    let requires_string = model_strings
-        .get(urls::REQUIRES);
-    let recommends_string = model_strings
-        .get(urls::RECOMMENDS);
+    let requires_string = model_strings.get(urls::REQUIRES);
+    let recommends_string = model_strings.get(urls::RECOMMENDS);
 
     let mut requires: Vec<Property> = Vec::new();
     let mut recommends: Vec<Property> = Vec::new();
@@ -391,8 +440,7 @@ fn get_model(subject: String, store: &Store) -> Model {
 // Asks for and saves the bookmark. Returns the shortname.
 fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<String> {
     let re = Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").unwrap();
-    let mut shortname: Option<String> =
-        prompt_opt(format!("Local Bookmark (optional)")).unwrap();
+    let mut shortname: Option<String> = prompt_opt(format!("Local Bookmark (optional)")).unwrap();
     loop {
         match shortname {
             Some(sn) => {
@@ -414,4 +462,18 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
             None => return None,
         }
     }
+}
+
+fn pretty_print_resource(url: &String, store: &Store) {
+    let mut output = String::new();
+    for (prop_url, val) in store.get(url).unwrap() {
+        let prop_shortname = store::property_url_to_shortname(prop_url, store).unwrap();
+        output.push_str(&*format!(
+            "{0: <15}{1: <10} \n",
+            prop_shortname.blue().bold(),
+            val
+        ));
+    }
+    output.push_str(&*format!("{0: <15}{1: <10} \n", "url".blue().bold(), url));
+    println!("{}", output)
 }

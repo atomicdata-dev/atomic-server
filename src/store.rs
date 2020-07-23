@@ -1,9 +1,9 @@
 use crate::{Resource, Store};
-use std::{path::PathBuf, fs, collections::HashMap, error::Error};
+use std::{path::PathBuf, fs, collections::HashMap};
 use serde_json::from_str;
 use crate::mapping;
 use crate::urls;
-use mapping::{try_mapping_or_url, Mapping};
+use mapping::Mapping;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
@@ -65,37 +65,63 @@ pub fn write_store_to_disk(store: &Store, path: &PathBuf) {
   fs::write(path, file_string).expect("Unable to write file");
 }
 
-/// Accepts an Atomic Path string, returns the result
+pub fn property_url_to_shortname (url: &String, store: &Store) -> Result<String> {
+    let property_resource = store
+        .get(url)
+        .ok_or(format!("Could not find property for {}", url))?
+        .get(urls::SHORTNAME)
+        .ok_or(format!("Could not get shortname prop for {}", url))?;
+
+    return Ok(property_resource.into())
+}
+
+/// Accepts an Atomic Path string, returns the result value
 /// https://docs.atomicdata.dev/core/paths.html
-pub fn get_path(atomic_path: &str, store: &Store, mapping: &Mapping) -> String {
+/// Todo: return something more useful, give more context.
+pub fn get_path(atomic_path: &str, store: &Store, mapping: &Mapping) -> Result<String> {
     // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
     let path_items: Vec<&str> = atomic_path.split(' ').collect();
-    let mut current_resource;
     // For the first item, check the user mapping
     let id_url = mapping::try_mapping_or_url(&String::from(path_items[0]), mapping)
-        .expect(&*format!("No url found for {}", path_items[0]));
-    current_resource = store.get(&id_url).expect("not found");
+        .ok_or(&*format!("No url found for {}", path_items[0]))?;
+    if path_items.len() == 1 {
+        return Ok(id_url);
+    }
+    // Set a parent, which starts as the root of the search
+    let mut parent = store.get(&id_url);
+    // The URL of the next resource
+    let mut found_property_url = id_url;
     // Loops over every item in the list, traverses the graph
-    // Skip the first one
+    // Skip the first one, for that is the subject (i.e. first parent) and not a property
     for item in path_items[1..].iter().cloned() {
         // Get the shortname or use the URL
         if mapping::is_url(&String::from(item)) {
-            let next_item = current_resource.get(item).expect(&*format!("property '{}' not found", item));
+            // found_value = current_resource.get(item).expect(&*format!("property '{}' not found", item)).clone();
+            found_property_url = item.into();
         } else {
             // Traverse relations, don't use mapping here, but do use classes
-            let property_url = &resolve_property_shortname(&String::from(item), current_resource, &store)
-                .expect(&*format!("URL not found for {}", item));
-            current_resource = store.get(property_url)
-                .expect(&*format!("Resource not found not found for {}", property_url))
+            let property_url = property_shortname_to_url(
+                &String::from(item),
+                parent.ok_or("Relation not found")?, &store
+            )?;
+            found_property_url = property_url;
         }
-        store.get(&String::from(item));
+        // Set the parent for the next loop equal to the next node.
+        let value = parent.unwrap().get(&found_property_url).unwrap();
+        match store.get(value) {
+            Some(resource) => { parent = Some(resource);
+            }
+            None => {
+                // If the value is something different than a resolvable URL, don't do anything
+            }
+        }
     }
-    println!("{:?}", current_resource);
-    return String::from("SomeResult")
+    let value = parent.ok_or(format!("Resource not found: {:?}", &parent))?
+        .get(&found_property_url).ok_or(format!("Property not found: {:?}", &found_property_url))?;
+    return Ok(value.into());
 }
 
-pub fn resolve_property_shortname(shortname: &String, resource: &Resource, store: &Store) -> Result<String> {
-    // Iterate over the properties
+pub fn property_shortname_to_url(shortname: &String, resource: &Resource, store: &Store) -> Result<String> {
     for (prop_url, _value) in resource.iter() {
         let prop_resource = store.get(&*prop_url).ok_or(format!("Property '{}' not found", prop_url))?;
         let prop_shortname = prop_resource.get(urls::SHORTNAME).ok_or(format!("Property shortname for '{}' not found", prop_url))?;
@@ -103,7 +129,5 @@ pub fn resolve_property_shortname(shortname: &String, resource: &Resource, store
             return Ok(prop_url.clone())
         }
     }
-    // Iterate over all required & recommended properties
-    // Did you find the shortname? Nice, return it.
-    return Err("Should not end here...".into())
+    return Err(format!("Could not find shortname {}", shortname).into())
 }

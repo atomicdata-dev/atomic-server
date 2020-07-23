@@ -54,7 +54,7 @@ pub fn write_mapping_to_disk(mapping: &Mapping, path: &PathBuf) {
     fs::write(path, file_string).expect("Unable to write file");
 }
 
-/// Check if something is a shortname or URL
+/// Check if something is a URL
 pub fn is_url(string: &String) -> bool {
     string.starts_with("http")
 }
