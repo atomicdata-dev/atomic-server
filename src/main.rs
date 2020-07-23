@@ -333,13 +333,18 @@ fn get_model(subject: String, store: &Store) -> Model {
         .get(urls::DESCRIPTION)
         .expect("Model has no description");
     let requires_string = model_strings
-        .get(urls::REQUIRES)
-        .expect("No required props");
+        .get(urls::REQUIRES);
     let recommends_string = model_strings
-        .get(urls::RECOMMENDS)
-        .expect("No recommended props");
-    let requires: Vec<Property> = get_properties(requires_string.into(), &store);
-    let recommends: Vec<Property> = get_properties(recommends_string.into(), &store);
+        .get(urls::RECOMMENDS);
+
+    let mut requires: Vec<Property> = Vec::new();
+    let mut recommends: Vec<Property> = Vec::new();
+    if requires_string.is_some() {
+        requires = get_properties(requires_string.unwrap().into(), &store);
+    }
+    if recommends_string.is_some() {
+        recommends = get_properties(recommends_string.unwrap().into(), &store);
+    }
 
     fn get_properties(resource_array: String, store: &Store) -> Vec<Property> {
         let mut properties: Vec<Property> = vec![];
