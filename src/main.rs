@@ -235,7 +235,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             let number: Option<u32> = prompt_opt(&msg).unwrap();
             match number {
                 Some(nr) => {
-                    Some(nr.to_string());
+                    input = Some(nr.to_string());
                 }
                 None => (),
             }
@@ -285,6 +285,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                         }
                     }
                     if length == urls.len() {
+                        input = Some(serde_json::to_string(&urls).unwrap());
                         break;
                     }
                 }
