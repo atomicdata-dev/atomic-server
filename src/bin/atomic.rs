@@ -1,15 +1,15 @@
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, AppSettings,Arg, ArgMatches, SubCommand};
 use colored::*;
 use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
 use serde_json::de::from_str;
 use std::{collections::HashMap, path::PathBuf};
+use atomic::store::{Store, Resource};
+use atomic::store;
+use atomic::urls;
+use atomic::mapping;
 use uuid;
-
-mod mapping;
-mod serialization;
-mod store;
 
 struct Model {
     requires: Vec<Property>,
@@ -30,12 +30,6 @@ struct Property {
     description: String,
 }
 
-/// The in-memory store of data, containing the Resources, Properties and Classes
-type Store = HashMap<String, Resource>;
-
-/// The first string represents the URL of the Property, the second one its Value.
-type Resource = HashMap<String, String>;
-
 pub struct Context<'a> {
     store: Store,
     mapping: mapping::Mapping,
@@ -51,6 +45,7 @@ fn main() {
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model linked atomic data!")
         .after_help("Visit https://github.com/joepio/atomic-cli for more info")
+        .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("new").about("Create a Resource").arg(
                 Arg::with_name("class")
@@ -58,20 +53,17 @@ fn main() {
             ),
         )
         .subcommand(
-            SubCommand::with_name("get")
-                .about(
-                    "\
+            SubCommand::with_name("get").about("\
                 Traverses a Path and prints the resulting Resource or Value. \
                 Examples: \natomic get \"class description\"\natomic get \"https://example.com\"\n\
                 Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
                 ",
                 )
-                .arg(Arg::with_name("path").help(
-                    "\
-                    The subject URL, shortname or path to be fetched. \
-                    Use quotes for paths. \
-                    You can use Bookmarks instead of a full subjet URL. \
-                    ",
+                .arg(Arg::with_name("path").help("\
+                The subject URL, shortname or path to be fetched. \
+                Use quotes for paths. \
+                You can use Bookmarks instead of a full subjet URL. \
+                ",
                 )),
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
@@ -293,18 +285,16 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                     // TODO: Check if string or if map
                     input = mapping::try_mapping_or_url(&u, &context.mapping);
                     match input {
-                        Some(url) => {
-                            return Some(url)
-                        }
+                        Some(url) => return Some(url),
                         None => {
                             println!("Shortname not found, try again.");
-                            return None
+                            return None;
                         }
                     }
                 }
                 None => (),
             };
-        }
+        },
         urls::RESOURCE_ARRAY => loop {
             let msg = format!(
                 "resource array - Add the URLs or Shortnames, separated by spacebars{}",
@@ -346,33 +336,6 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
     return input;
 }
 
-pub mod urls {
-    // Classes
-    pub const CLASS: &str = "https://atomicdata.dev/classes/Class";
-    pub const PROPERTY: &str = "https://atomicdata.dev/classes/Property";
-    pub const DATATYPE_CLASS: &str = "https://atomicdata.dev/classes/Datatype";
-
-    // Properties
-    pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
-    pub const DESCRIPTION: &str = "https://atomicdata.dev/properties/description";
-    // ... for Properties
-    pub const IS_A: &str = "https://atomicdata.dev/properties/isA";
-    pub const DATATYPE_PROP: &str = "https://atomicdata.dev/properties/datatype";
-    pub const CLASSTYPE_PROP: &str = "https://atomicdata.dev/properties/classtype";
-    // ... for Classes
-    pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
-    pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
-
-    // Datatypes
-    pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
-    pub const SLUG: &str = "https://atomicdata.dev/datatypes/slug";
-    pub const ATOMIC_URL: &str = "https://atomicdata.dev/datatypes/atomicURL";
-    pub const INTEGER: &str = "https://atomicdata.dev/datatypes/integer";
-    pub const RESOURCE_ARRAY: &str = "https://atomicdata.dev/datatypes/resourceArray";
-    pub const BOOLEAN: &str = "https://atomicdata.dev/datatypes/boolean";
-    pub const DATE: &str = "https://atomicdata.dev/datatypes/date";
-    pub const DATETIME: &str = "https://atomicdata.dev/datatypes/dateTime";
-}
 
 /// Retrieves a model from the store by subject URL and converts it into a model useful for forms
 fn get_model(subject: String, store: &Store) -> Model {

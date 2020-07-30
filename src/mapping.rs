@@ -1,4 +1,5 @@
-use crate::Context;
+// Mapping - This is for managing and using local shortnames / bookmarks that map to URLs.
+
 use std::{collections::HashMap, fs, path::PathBuf};
 
 /// Maps shortanmes to URLs

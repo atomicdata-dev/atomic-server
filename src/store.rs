@@ -1,11 +1,20 @@
-use crate::{Resource, Store};
+// Store - this is an in-memory store of Atomic data.
+// Currently, it writes everything as .ad3 (NDJSON arrays) to disk, but this should change later on.
+// Perhaps we'll use some database, or something very specific to rust: https://github.com/TheNeikos/rustbreak
+
 use std::{path::PathBuf, fs, collections::HashMap};
 use serde_json::from_str;
 use crate::mapping;
-use crate::urls;
 use mapping::Mapping;
+use crate::urls;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+/// The first string represents the URL of the Property, the second one its Value.
+pub type Resource = HashMap<String, String>;
+
+/// The in-memory store of data, containing the Resources, Properties and Classes
+pub type Store = HashMap<String, Resource>;
 
 /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
 pub fn read_store_from_file<'a>(store: &'a mut Store, path: &'a PathBuf) -> &'a Store {
