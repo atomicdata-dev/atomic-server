@@ -99,12 +99,36 @@ Progress:
 ### `atomic-server`
 
 A lightweight HTTP server that shares created Atomic data on the web.
-Its primary goal is to resolve Atomic Resources.
-Its secondary goal is to provide some useful query options to find Atoms.
-Maybe it should act as a personal store for Atomic data.
 
-It currently does nothing.
+For setting up the server:
+
+```sh
+# Create a new .env using the template
+cp default.env .env
+# Run the server. It loads the .ad3 store that you point towards
+atomic-server
+```
+
+- [ ] Respond to GET request for individual resources
+- [ ] Content-type negotiation
+- [ ] RDF serialization
+- [ ] HTML serialization
+- [ ] TPF endpoint
+- [ ] HTTPS
+- [ ] Write / Mutations support
 
 ## Library
 
-The `atomic` CLI and `atomic-server` both use
+The `atomic` CLI and `atomic-server` both use the Atomic library from this same repository.
+This library does the following:
+
+- [ ] Serialization to [AtomicTriples (.ad3)](https://docs.atomicdata.dev/core/serialization.html)
+- [ ] Read / write / resolve mappings
+- [ ] Resolve Atomic Paths
+
+## Development
+
+```sh
+# You can pass arguments to binaries using cargo run like this
+$ cargo run --bin atomic -- get class
+```

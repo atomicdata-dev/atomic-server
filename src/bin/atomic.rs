@@ -53,18 +53,23 @@ fn main() {
             ),
         )
         .subcommand(
-            SubCommand::with_name("get").about("\
-                Traverses a Path and prints the resulting Resource or Value. \
-                Examples: \natomic get \"class description\"\natomic get \"https://example.com\"\n\
-                Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
-                ",
+            SubCommand::with_name("get")
+                    .about("Traverses a Path and prints the resulting Resource or Value.",
+                    )
+                    .after_help("\
+                    Traverses a Path and prints the resulting Resource or Value. \
+                    Examples: \natomic get \"class description\"\natomic get \"https://example.com\"\n\
+                    Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
+                    ")
+                .arg(Arg::with_name("path")
+                    .help("\
+                    The subject URL, shortname or path to be fetched. \
+                    Use quotes for paths. \
+                    You can use Bookmarks instead of a full subjet URL. \
+                    ",
+                    )
+                    .required(true)
                 )
-                .arg(Arg::with_name("path").help("\
-                The subject URL, shortname or path to be fetched. \
-                Use quotes for paths. \
-                You can use Bookmarks instead of a full subjet URL. \
-                ",
-                )),
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
         .get_matches();
@@ -88,7 +93,7 @@ fn main() {
         store_path = &user_store_path;
     }
 
-    let mut store: Store = HashMap::new();
+    let mut store: Store = store::init();
     // The store contains the classes and properties
     store = store::read_store_from_file(&mut store, &store_path).clone();
 
