@@ -6,7 +6,7 @@ the [Atomic Data spec](https://docs.atomicdata.dev) I'm working on actually make
 _Status: buggy, pre-alpha_
 
 Create, share, fetch and model linked [Atomic Data](https://docs.atomicdata.dev)!
-This project consists of a CLI, a server and a library for Rust.
+This project consists of a [CLI](#atomic-cli), a [server](#atomic-server) and a [library](#atomic-lib) for Rust.
 
 ## Install
 
@@ -39,19 +39,6 @@ $ atomic setup
 $ atomic install https://atomicdata.dev/ontologies/meetings
 # when no URL is given, use the Ontola repo's ontologies
 $ atomic install meetings
-```
-
-## Config
-
-Atomic creates a `~/.config/atomic` folder, which contains a `mapping.amp` and a
-
-## Mapping
-
-The Mapping refers to your user specific set of shortname-URL combinations.
-This Mapping lives as a simple text file in `./user_mappping.amp`.
-
-```
-person=https://atomicdata.dev/classes/Person
 ```
 
 ## Binaries
@@ -96,6 +83,19 @@ Progress:
 - [ ] A `map` command for creating a bookmark and storing a copy
 - [ ] An `edit` command for manipulating existing resources
 
+#### Config
+
+Atomic creates a `~/.config/atomic` folder, which contains a `mapping.amp` and a
+
+#### Mapping
+
+The Mapping refers to your user specific set of shortname-URL combinations.
+This Mapping lives as a simple text file in `./user_mappping.amp`.
+
+```
+person=https://atomicdata.dev/classes/Person
+```
+
 ### `atomic-server`
 
 A lightweight HTTP server that shares created Atomic data on the web.
@@ -107,6 +107,7 @@ For setting up the server:
 cp default.env .env
 # Run the server. It loads the .ad3 store that you point towards
 atomic-server
+# Visit http://localhost:8080/test
 ```
 
 - [ ] Respond to GET request for individual resources
@@ -117,9 +118,9 @@ atomic-server
 - [ ] HTTPS
 - [ ] Write / Mutations support
 
-## Library
+## `atomic-lib`
 
-The `atomic` CLI and `atomic-server` both use the Atomic library from this same repository.
+The `atomic` CLI and `atomic-server` both use the `atomic-lib` Rust library from this same repository.
 This library does the following:
 
 - [ ] Serialization to [AtomicTriples (.ad3)](https://docs.atomicdata.dev/core/serialization.html)

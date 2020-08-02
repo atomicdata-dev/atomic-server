@@ -3,7 +3,7 @@ use serde::Serialize;
 
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-// More strict error type
+// More strict error type, supports HTTP responses
 pub type BetterResult<T> = std::result::Result<T, AppError>;
 
 #[derive(Debug)]
