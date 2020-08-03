@@ -30,7 +30,7 @@ jobs:
       uses: svenstaro/upload-release-action@v1-release
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: target/release/atomic
+        file: ./target/release/atomic
         asset_name: atomic
         tag: ${{ steps.bump_version.outputs.new_tag }}
         overwrite: true
