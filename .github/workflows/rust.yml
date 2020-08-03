@@ -25,12 +25,13 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         WITH_V: true
+        DEFAULT_BUMP: none
       id: bump_version
     - name: Upload binary to release
       uses: svenstaro/upload-release-action@v1-release
       with:
         repo_token: ${{ secrets.GITHUB_TOKEN }}
-        file: target/release/atomic
-        asset_name: atomic
+        file: target/release/atomic*
         tag: ${{ steps.bump_version.outputs.new_tag }}
         overwrite: true
+        file_glob: true
