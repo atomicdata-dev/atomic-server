@@ -1,6 +1,6 @@
 use atomic::store;
 use atomic::store::Store;
-use atomic::{errors::AppError, serialize};
+use atomic::{errors::BetterResult, serialize};
 use dotenv::dotenv;
 use std::env;
 use std::{io, path::PathBuf, sync::Mutex};
@@ -64,13 +64,13 @@ pub async fn get_resource(
     _id: web::Path<String>,
     data: web::Data<Mutex<Context>>,
     req: HttpRequest,
-) -> Result<HttpResponse, AppError> {
+) -> BetterResult<HttpResponse> {
     // Some logging, should be handled properly later.
     println!("{:?}", _id);
     println!("method: {:?}", req.method());
     let context = data.lock().unwrap();
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let subject = format!("_:{}", _id);
-let body = serialize::resource_to_ad3(&subject, &context.store, &context.domain)?;
+    let body = serialize::resource_to_ad3(&subject, &context.store, Some(&context.domain))?;
     Ok(HttpResponse::Ok().body(body))
 }

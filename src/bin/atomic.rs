@@ -5,10 +5,10 @@ use promptly::prompt_opt;
 use regex::Regex;
 use serde_json::de::from_str;
 use std::{collections::HashMap, path::PathBuf};
-use atomic::store::{Store, Resource};
-use atomic::store;
+use atomic::store::{self, Store, Resource, Property};
 use atomic::urls;
 use atomic::mapping;
+use atomic::serialize;
 use uuid;
 
 struct Model {
@@ -18,16 +18,6 @@ struct Model {
     description: String,
     /// URL
     subject: String,
-}
-
-struct Property {
-    // URL of the class
-    class_type: Option<String>,
-    // URL of the datatype
-    data_type: String,
-    shortname: String,
-    identifier: String,
-    description: String,
 }
 
 pub struct Context<'a> {
@@ -69,6 +59,11 @@ fn main() {
                     ",
                     )
                     .required(true)
+                )
+                .arg(Arg::with_name("as")
+                    .long("as")
+                    .help("Serialization option (pretty=default, json, ad3)")
+                    .takes_value(true)
                 )
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
@@ -134,25 +129,45 @@ fn list(context: &mut Context) {
 }
 
 fn get(context: &mut Context) {
-    let path_string = context
+    let subcommand_matches = context
         .matches
         .subcommand_matches("get")
-        .unwrap()
-        .value_of("path")
+        .unwrap();
+    let path_string = subcommand_matches.value_of("path")
         .expect("Add a URL, shortname or path");
+    let serialization: Option<serialize::SerialializationFormats> = match subcommand_matches.value_of("as") {
+        Some("json") => Some(serialize::SerialializationFormats::JSON),
+        Some("ad3") => Some(serialize::SerialializationFormats::AD3),
+        Some(format) => {
+            panic!("As {} not supported. Try 'json' or 'ad3'.", format);
+        }
+        None => None
+    };
 
     // Returns a URL or Value
     let result = store::get_path(path_string, &context.store, &context.mapping);
     match result {
-        Ok(good) => {
-            if mapping::is_url(&good) {
-                pretty_print_resource(&good, &context.store);
+        Ok(url) => {
+            if mapping::is_url(&url) {
+                match serialization {
+                    Some(serialize::SerialializationFormats::JSON) => {
+                        let out = serialize::resource_to_json(&url, &context.store, 1).unwrap();
+                        println!("{}", out);
+                    }
+                    Some(serialize::SerialializationFormats::AD3) => {
+                        let out = serialize::resource_to_ad3(&url, &context.store, None).unwrap();
+                        println!("{}", out);
+                    }
+                    None => {
+                        pretty_print_resource(&url, &context.store);
+                    }
+                }
             } else {
-                println!("{}", &good);
+                println!("{}", &url);
             }
         }
         Err(e) => {
-            println!("{}", e);
+            eprintln!("{}", e);
         }
     }
 }
@@ -341,7 +356,6 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
     return input;
 }
 
-
 /// Retrieves a model from the store by subject URL and converts it into a model useful for forms
 fn get_model(subject: String, store: &Store) -> Model {
     // The string representation of the model
@@ -368,28 +382,7 @@ fn get_model(subject: String, store: &Store) -> Model {
         let mut properties: Vec<Property> = vec![];
         let string_vec: Vec<String> = from_str(&*resource_array).unwrap();
         for prop_url in string_vec {
-            let property_resource = store
-                .get(&*prop_url)
-                .expect(&*format!("Model not found {}", &*prop_url));
-            let property = Property {
-                data_type: property_resource
-                    .get(urls::DATATYPE_PROP)
-                    .expect("Datatype not found")
-                    .into(),
-                shortname: property_resource
-                    .get(urls::SHORTNAME)
-                    .expect("Shortname not found")
-                    .into(),
-                description: property_resource
-                    .get(urls::DESCRIPTION)
-                    .expect("Description not found")
-                    .into(),
-                class_type: property_resource
-                    .get(urls::CLASSTYPE_PROP)
-                    .map(|s| s.clone()),
-                identifier: prop_url.into(),
-            };
-            properties.push(property)
+            properties.push(store::get_property(&prop_url, &store).unwrap());
         }
         return properties;
     }
@@ -432,6 +425,7 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
     }
 }
 
+/// Prints a resource to the terminal with readble formatting and colors
 fn pretty_print_resource(url: &String, store: &Store) {
     let mut output = String::new();
     for (prop_url, val) in store.get(url).unwrap() {

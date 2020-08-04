@@ -10,6 +10,13 @@ This project consists of a [CLI](#atomic-cli), a [server](#atomic-server) and a 
 
 ## Install
 
+### Using binaries
+
+You can find the binaries on the [Releases page](https://github.com/joepio/atomic/releases/tag/v0.3.1).
+Currently only builds for debian / ubuntu.
+
+### From source
+
 Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
 
 ```sh
@@ -74,11 +81,17 @@ SUBCOMMANDS:
 Visit https://github.com/joepio/atomic-cli for more info
 ```
 
-Progress:
+#### Progress
 
+- [x] Stores & reads stuff from and to .ad3 user files on disk
 - [x] A `new` command for instantiating [Atomic Classes](https://docs.atomicdata.dev/schema/classes.html)
 - [x] A `list` command for showing local bookmarks (mappings)
-- [x] A `get` command for finding resources and parts of data using Atomic Paths
+- [x] A `get` command for finding resources and parts of data using Atomic Paths with...
+  - [x] AD3 Serialization
+  - [x] Basic JSON Serialization
+  - [ ] Actually good JSON Serialization
+  - [ ] RDF (Turtle / N-Triples / RDF/XML) Serialization
+- [ ] Works with `atomic-server` (stores there, uses domain etc.)
 - [ ] Fetch data from the interwebs with `get` commands
 - [ ] A `map` command for creating a bookmark and storing a copy
 - [ ] An `edit` command for manipulating existing resources
@@ -110,22 +123,24 @@ atomic-server
 # Visit http://localhost:8080/test
 ```
 
-- [ ] Respond to GET request for individual resources
+- [x] Respond to GET request for individual resources
 - [ ] Content-type negotiation
-- [ ] RDF serialization
 - [ ] HTML serialization
 - [ ] TPF endpoint
 - [ ] HTTPS
 - [ ] Write / Mutations support
+- [ ] Collections / dynamic resources
 
 ## `atomic-lib`
 
-The `atomic` CLI and `atomic-server` both use the `atomic-lib` Rust library from this same repository.
-This library does the following:
+A rust library for handling Atomic Data.
+The `atomic` CLI and `atomic-server` applications both use this `atomic-lib` library.
+This library should do the following:
 
-- [ ] Serialization to [AtomicTriples (.ad3)](https://docs.atomicdata.dev/core/serialization.html)
-- [ ] Read / write / resolve mappings
-- [ ] Resolve Atomic Paths
+- [x] Serialization to [AtomicTriples (.ad3)](https://docs.atomicdata.dev/core/serialization.html)
+- [x] Read / write / resolve mappings
+- [x] Resolve Atomic Paths
+- [ ] [Validate]() Atomic Graphs
 
 ## Development
 

@@ -16,8 +16,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose --bins --release
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    - uses: actions-rs/cargo@v1
+      with:
+        use-cross: true
+        command: build
+        args: --target armv7-unknown-linux-gnueabihf
+    # - name: Build
+    #   run: cargo build --verbose --bins --release
     - name: Run tests
       run: cargo test --verbose
     - name: Bump version and push tag/create release point

@@ -12,6 +12,16 @@ use std::{collections::HashMap, fs, path::PathBuf};
 /// The first string represents the URL of the Property, the second one its Value.
 pub type Resource = HashMap<String, String>;
 
+pub struct Property {
+    // URL of the class
+    pub class_type: Option<String>,
+    // URL of the datatype
+    pub data_type: String,
+    pub shortname: String,
+    pub identifier: String,
+    pub description: String,
+}
+
 /// The in-memory store of data, containing the Resources, Properties and Classes
 pub type Store = HashMap<String, Resource>;
 
@@ -89,6 +99,30 @@ pub fn property_url_to_shortname(url: &String, store: &Store) -> Result<String> 
     return Ok(property_resource.into());
 }
 
+pub fn get_property(url: &String, store: &Store) -> Result<Property> {
+    let property_resource = store.get(url).ok_or("Property not found")?;
+    let property = Property {
+        data_type: property_resource
+            .get(urls::DATATYPE_PROP)
+            .ok_or(format!("Datatype not found for property {}", url))?
+            .into(),
+        shortname: property_resource
+            .get(urls::SHORTNAME)
+            .ok_or(format!("Shortname not found for property {}", url))?
+            .into(),
+        description: property_resource
+            .get(urls::DESCRIPTION)
+            .ok_or(format!("Description not found for property {}", url))?
+            .into(),
+        class_type: property_resource
+            .get(urls::CLASSTYPE_PROP)
+            .map(|s| s.clone()),
+        identifier: url.into(),
+    };
+
+    return Ok(property)
+}
+
 /// Accepts an Atomic Path string, returns the result value
 /// https://docs.atomicdata.dev/core/paths.html
 /// Todo: return something more useful, give more context.
@@ -164,7 +198,7 @@ pub fn validate_store(store: &Store) -> Result<String> {
         // Are all property URLs accessible?
         // Do the datatypes of the properties match the datatypes of the
         // if they are instances of a class, do they have the required fields?
-        println!("{:?}", url);
+        println!("{:?}: {:?}", url, properties);
     }
     return Err("Whoops".into());
 }
