@@ -31,7 +31,7 @@ pub struct Context<'a> {
 
 fn main() {
     let matches = App::new("atomic")
-        .version("0.1.3")
+        .version("0.4.2")
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model linked atomic data!")
         .after_help("Visit https://github.com/joepio/atomic-cli for more info")
