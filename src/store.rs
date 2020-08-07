@@ -2,28 +2,30 @@
 // Currently, it writes everything as .ad3 (NDJSON arrays) to disk, but this should change later on.
 // Perhaps we'll use some database, or something very specific to rust: https://github.com/TheNeikos/rustbreak
 
-use crate::errors::Result;
+use crate::errors::{Result, BetterResult};
 use crate::mapping;
-use crate::{serialize::deserialize_json_array, urls};
+use crate::{serialize, serialize::deserialize_json_array, urls};
 use mapping::Mapping;
 use regex::Regex;
 use serde_json::from_str;
+use serde::Serialize;
 use std::{collections::HashMap, fs, path::PathBuf};
 
 /// The first string represents the URL of the Property, the second one its Value.
 pub type Resource = HashMap<String, String>;
 
+#[derive(Serialize)]
 pub struct Property {
     // URL of the class
     pub class_type: Option<String>,
     // URL of the datatype
     pub data_type: DataType,
     pub shortname: String,
-    pub identifier: String,
+    pub subject: String,
     pub description: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum DataType {
     AtomicUrl,
     Date,
@@ -56,6 +58,7 @@ pub struct UnkownValue {
     pub datatype: String,
 }
 
+#[derive(Debug)]
 pub struct Atom {
     pub subject: String,
     pub property: String,
@@ -68,6 +71,23 @@ pub type Store = HashMap<String, Resource>;
 
 pub fn init() -> Store {
     return HashMap::new();
+}
+
+pub fn add(atoms: Vec<&Atom>, store: &mut Store) -> Result<()> {
+    for atom in atoms {
+        match store.get_mut(&atom.subject) {
+            Some(resource) => {
+                resource.insert(atom.property.clone(), atom.value.clone())
+                    .ok_or(&*format!("Failed to add atom"))?;
+            }
+            None => {
+                let mut resource: Resource = HashMap::new();
+                resource.insert(atom.property.clone(), atom.value.clone());
+                store.insert(atom.subject.clone(), resource);
+            }
+        }
+    }
+    return Ok(());
 }
 
 /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
@@ -112,22 +132,17 @@ pub fn read_store_from_file<'a>(store: &'a mut Store, path: &'a PathBuf) -> &'a 
 }
 
 /// Serializes the current store and saves to path
-pub fn write_store_to_disk(store: &Store, path: &PathBuf) {
+pub fn write_store_to_disk(store: &Store, path: &PathBuf) -> BetterResult<()> {
     let mut file_string: String = String::new();
-    for (subject, resource) in store {
+    for (subject, _) in store {
         // TODO: use resource_to_ad3()
-        for (property, value) in resource {
-            // let ad3_atom = format!("[\"{}\",\"{}\",\"{}\"]\n", subject, property, value.replace("\"", "\\\""));
-            let mut ad3_atom =
-                serde_json::to_string(&vec![subject, property, value]).expect("Can't serialize");
-            ad3_atom.push_str("\n");
-            &file_string.push_str(&*ad3_atom);
-        }
-        // file_string.push(ch);
+        let resourcestring = serialize::resource_to_ad3(subject, store, None)?;
+        &file_string.push_str(&*resourcestring);
     }
     fs::create_dir_all(path.parent().expect("Could not find parent folder"))
         .expect("Unable to create dirs");
     fs::write(path, file_string).expect("Unable to write file");
+    return Ok(())
 }
 
 pub fn property_url_to_shortname(url: &String, store: &Store) -> Result<String> {
@@ -141,7 +156,8 @@ pub fn property_url_to_shortname(url: &String, store: &Store) -> Result<String> 
 }
 
 pub fn get_property(url: &String, store: &Store) -> Result<Property> {
-    let property_resource = store.get(url).ok_or("Property not found")?;
+    let property_resource = store.get(url)
+        .ok_or(&*format!("Property not found: {}", url))?;
     let property = Property {
         data_type: match_datatype(property_resource
             .get(urls::DATATYPE_PROP)
@@ -158,7 +174,7 @@ pub fn get_property(url: &String, store: &Store) -> Result<Property> {
         class_type: property_resource
             .get(urls::CLASSTYPE_PROP)
             .map(|s| s.clone()),
-        identifier: url.into(),
+        subject: url.into(),
     };
 
     return Ok(property);
@@ -352,7 +368,7 @@ pub fn match_datatype(string: &String) -> DataType {
         urls::DATE => DataType::Date,
         urls::TIMESTAMP => DataType::Timestamp,
         unsupported_datatype => {
-            return DataType::Unsupported(string.into())
+            return DataType::Unsupported(unsupported_datatype.into())
         }
     }
 }

@@ -165,7 +165,17 @@ fn get(context: &mut Context) {
                     }
                 }
                 store::PathReturn::Atom(atom) => {
-                    println!("{:?}", atom.native_value)
+                    match serialization {
+                        Some(serialize::SerialializationFormats::JSON) => {
+                            println!("{}", atom.value);
+                        }
+                        Some(serialize::SerialializationFormats::AD3) => {
+                            println!("{}", atom.value);
+                        }
+                        None => {
+                            println!("{:?}", &atom.native_value)
+                        }
+                    }
                 }
             }
         }
@@ -186,7 +196,6 @@ fn new(context: &mut Context) {
         .mapping
         .get(class_input)
         .expect(&*format!("Could not find class {} in mapping", class_input));
-    // let class_url = "https://example.com/Person";
     let model = get_model(class_url.into(), &mut context.store);
     println!("Enter a new {}: {}", model.shortname, model.description);
     prompt_instance(context, &model);
@@ -207,7 +216,7 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
         let mut input = prompt_field(&field, false, context);
         loop {
             if let Some(i) = input {
-                new_resource.insert(field.identifier.clone(), i.clone());
+                new_resource.insert(field.subject.clone(), i.clone());
                 break;
             } else {
                 println!("Required field, please enter a value.");
@@ -220,11 +229,11 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
         println!("{}: {}", field.shortname, field.description);
         let input = prompt_field(&field, true, context);
         if let Some(i) = input {
-            new_resource.insert(field.identifier.clone(), i.clone());
+            new_resource.insert(field.subject.clone(), i.clone());
         }
     }
 
-    let subject = format!("https://example.com/{}", uuid::Uuid::new_v4());
+    let subject = format!("_:{}", uuid::Uuid::new_v4());
     println!("{} created with URL: {}", &model.shortname, &subject);
 
     let map = prompt_bookmark(&mut context.mapping, &subject);

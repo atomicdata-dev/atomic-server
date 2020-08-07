@@ -1,5 +1,5 @@
 use serde_json::from_str;
-use crate::store::{self, Store};
+use crate::store::{self, Store, Atom};
 use crate::errors::BetterResult;
 
 pub fn deserialize_json_array(string: &String) -> BetterResult<Vec<String>> {

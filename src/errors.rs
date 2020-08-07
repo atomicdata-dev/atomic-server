@@ -52,3 +52,13 @@ impl std::convert::From<&str> for AppError {
         }
     }
 }
+
+impl std::convert::From<std::boxed::Box<dyn std::error::Error>> for AppError {
+    fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
+        AppError {
+          message: Some(error.to_string()),
+          cause: None,
+          error_type: AppErrorType::OtherError,
+        }
+    }
+}
