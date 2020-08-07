@@ -1,10 +1,10 @@
 use serde_json::from_str;
 use crate::store::{self, Store};
-use crate::errors::{BetterResult};
+use crate::errors::BetterResult;
 
-pub fn deserialize_json_array(string: &String) -> Vec<String> {
-    let vector: Vec<String> = from_str(string).unwrap();
-    return vector;
+pub fn deserialize_json_array(string: &String) -> BetterResult<Vec<String>> {
+    let vector: Vec<String> = from_str(string).expect(&*format!("Can't parse value {} as array", string));
+    return Ok(vector);
 }
 
 // Should list all the supported serialization formats

@@ -4,7 +4,7 @@
 
 use crate::errors::Result;
 use crate::mapping;
-use crate::urls;
+use crate::{serialize::deserialize_json_array, urls};
 use mapping::Mapping;
 use serde_json::from_str;
 use std::{collections::HashMap, fs, path::PathBuf};
@@ -20,6 +20,13 @@ pub struct Property {
     pub shortname: String,
     pub identifier: String,
     pub description: String,
+}
+
+pub struct Atom {
+    pub subject: String,
+    pub property: String,
+    pub value: String,
+    pub native_value: Option<Value>,
 }
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -120,57 +127,102 @@ pub fn get_property(url: &String, store: &Store) -> Result<Property> {
         identifier: url.into(),
     };
 
-    return Ok(property)
+    return Ok(property);
 }
 
-/// Accepts an Atomic Path string, returns the result value
+// A path can return one of many things
+pub enum PathReturn {
+    Subject(String),
+    Atom(Atom),
+}
+
+/// Accepts an Atomic Path string, returns the result value (resource or property value)
 /// https://docs.atomicdata.dev/core/paths.html
 /// Todo: return something more useful, give more context.
-pub fn get_path(atomic_path: &str, store: &Store, mapping: &Mapping) -> Result<String> {
+pub fn get_path(atomic_path: &str, store: &Store, mapping: &Mapping) -> Result<PathReturn> {
     // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
     let path_items: Vec<&str> = atomic_path.split(' ').collect();
     // For the first item, check the user mapping
-    let id_url = mapping::try_mapping_or_url(&String::from(path_items[0]), mapping)
+    let id_url: String = mapping::try_mapping_or_url(&String::from(path_items[0]), mapping)
         .ok_or(&*format!("No url found for {}", path_items[0]))?;
     if path_items.len() == 1 {
-        return Ok(id_url);
+        return Ok(PathReturn::Subject(id_url));
     }
-    // Set a parent, which starts as the root of the search
-    let mut parent = store.get(&id_url);
     // The URL of the next resource
-    let mut found_property_url = id_url;
+    let mut subject = id_url;
+    // Set the currently selectred resource parent, which starts as the root of the search
+    let mut resource: Option<&Resource> = store.get(&subject);
+    // During each of the iterations of the loop, the scope changes.
+    // Try using pathreturn...
+    let mut current: PathReturn = PathReturn::Subject(subject.clone());
     // Loops over every item in the list, traverses the graph
     // Skip the first one, for that is the subject (i.e. first parent) and not a property
     for item in path_items[1..].iter().cloned() {
+        // In every iteration, the subject, property_url and current should be set.
+        // Ignore double spaces
+        if item == "" {
+            continue;
+        }
+        // If the item is a number, assume its indexing some array
+        match item.parse::<u32>() {
+            Ok(i) => match current {
+                PathReturn::Atom(atom) => {
+                    let array_string = resource
+                        .ok_or("Resource not found")?
+                        .get(&atom.property)
+                        .ok_or("Property not found")?;
+                    let vector: Vec<String> =
+                        from_str(array_string).expect("Failed to parse array");
+                    if vector.len() <= i as usize {
+                        eprintln!(
+                            "Too high index ({}) for array with length {}",
+                            i,
+                            array_string.len()
+                        );
+                    }
+                    let url = &vector[i as usize];
+
+                    subject = url.clone();
+                    resource = store.get(url);
+                    current = PathReturn::Subject(url.clone());
+                    continue;
+                }
+                PathReturn::Subject(_) => return Err("You can't do an index on a resource, only on arrays.".into()),
+            },
+            Err(_) => {}
+        };
+        // Since the selector isn't an array index, we can assume it's a property URL
+        let property_url;
         // Get the shortname or use the URL
         if mapping::is_url(&String::from(item)) {
-            // found_value = current_resource.get(item).expect(&*format!("property '{}' not found", item)).clone();
-            found_property_url = item.into();
+            property_url = Some(String::from(item));
         } else {
             // Traverse relations, don't use mapping here, but do use classes
-            let property_url = property_shortname_to_url(
+            property_url = Some(property_shortname_to_url(
                 &String::from(item),
-                parent.ok_or("Relation not found")?,
+                resource.ok_or("Relation not found")?,
                 &store,
-            )?;
-            found_property_url = property_url;
+            )?);
         }
         // Set the parent for the next loop equal to the next node.
-        let value = parent.unwrap().get(&found_property_url).unwrap();
-        match store.get(value) {
-            Some(resource) => {
-                parent = Some(resource);
+        let value = Some(resource
+            .expect("Resource not found")
+            .get(&property_url.clone().unwrap())
+            .unwrap().clone());
+        current = PathReturn::Atom(
+            Atom {
+                subject: subject.clone(),
+                property: property_url.clone().unwrap(),
+                value: value.clone().unwrap(),
+                native_value: get_native_value(
+                    &value.clone().unwrap(),
+                    &property_url.clone().unwrap(),
+                    store
+                ).ok(),
             }
-            None => {
-                // If the value is something different than a resolvable URL, don't do anything
-            }
-        }
+        )
     }
-    let value = parent
-        .ok_or(format!("Resource not found: {:?}", &parent))?
-        .get(&found_property_url)
-        .ok_or(format!("Property not found: {:?}", &found_property_url))?;
-    return Ok(value.into());
+    return Ok(current);
 }
 
 pub fn property_shortname_to_url(
@@ -201,4 +253,51 @@ pub fn validate_store(store: &Store) -> Result<String> {
         println!("{:?}: {:?}", url, properties);
     }
     return Err("Whoops".into());
+}
+
+// All possible DataTypes
+#[derive(Debug)]
+pub enum Value {
+    String(String),
+    Slug(String),
+    AtomicUrl(String),
+    Integer(i32),
+    Date(String),
+    ResourceArray(Vec<String>),
+    UnkownValue(UnkownValue),
+}
+
+#[derive(Debug)]
+pub struct UnkownValue {
+    pub value: String,
+    // URL of the datatype
+    pub datatype: String,
+}
+
+pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
+pub const DATE_REGEX: &str = r"([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))";
+
+// Returns an enum of the native value
+pub fn get_native_value(value: &String, property_url: &String, store: &Store) -> Result<Value> {
+    let prop = get_property(property_url, store)?;
+    match prop.data_type.as_str() {
+        urls::INTEGER => {
+            let val: i32 = value.parse()?;
+            return Ok(Value::Integer(val));
+        }
+        urls::STRING => return Ok(Value::String(value.clone())),
+        urls::SLUG => return Ok(Value::Slug(value.clone())),
+        urls::ATOMIC_URL => return Ok(Value::AtomicUrl(value.clone())),
+        urls::RESOURCE_ARRAY => {
+            let vector: Vec<String> = deserialize_json_array(value).unwrap();
+            return Ok(Value::ResourceArray(vector))
+        },
+        urls::DATE => return Ok(Value::Date(value.clone())),
+        unsupported_datatype => {
+            return Ok(Value::UnkownValue(UnkownValue {
+                value: value.into(),
+                datatype: unsupported_datatype.into(),
+            }))
+        }
+    };
 }

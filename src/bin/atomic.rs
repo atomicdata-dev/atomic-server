@@ -147,23 +147,26 @@ fn get(context: &mut Context) {
     // Returns a URL or Value
     let result = store::get_path(path_string, &context.store, &context.mapping);
     match result {
-        Ok(url) => {
-            if mapping::is_url(&url) {
-                match serialization {
-                    Some(serialize::SerialializationFormats::JSON) => {
-                        let out = serialize::resource_to_json(&url, &context.store, 1).unwrap();
-                        println!("{}", out);
-                    }
-                    Some(serialize::SerialializationFormats::AD3) => {
-                        let out = serialize::resource_to_ad3(&url, &context.store, None).unwrap();
-                        println!("{}", out);
-                    }
-                    None => {
-                        pretty_print_resource(&url, &context.store);
+        Ok(res) => {
+            match res {
+                store::PathReturn::Subject(url) => {
+                    match serialization {
+                        Some(serialize::SerialializationFormats::JSON) => {
+                            let out = serialize::resource_to_json(&url, &context.store, 1).unwrap();
+                            println!("{}", out);
+                        }
+                        Some(serialize::SerialializationFormats::AD3) => {
+                            let out = serialize::resource_to_ad3(&url, &context.store, None).unwrap();
+                            println!("{}", out);
+                        }
+                        None => {
+                            pretty_print_resource(&url, &context.store);
+                        }
                     }
                 }
-            } else {
-                println!("{}", &url);
+                store::PathReturn::Atom(atom) => {
+                    println!("{:?}", atom.native_value.expect("No native value"))
+                }
             }
         }
         Err(e) => {
@@ -255,7 +258,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
         urls::SLUG => {
             let msg = format!("slug{}", msg_appendix);
             input = prompt_opt(&msg).unwrap();
-            let re = Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").unwrap();
+            let re = Regex::new(store::SLUG_REGEX).unwrap();
             match input {
                 Some(slug) => {
                     if re.is_match(&*slug) {
@@ -280,7 +283,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
         urls::DATE => {
             let msg = format!("date YY-MM-DDDD{}", msg_appendix);
             let date: Option<String> = prompt_opt(&msg).unwrap();
-            let re = Regex::new(r"([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))").unwrap();
+            let re = Regex::new(store::DATE_REGEX).unwrap();
             match date {
                 Some(date_val) => loop {
                     if re.is_match(&*date_val) {
@@ -400,7 +403,7 @@ fn get_model(subject: String, store: &Store) -> Model {
 
 // Asks for and saves the bookmark. Returns the shortname.
 fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<String> {
-    let re = Regex::new(r"^[a-z0-9]+(?:-[a-z0-9]+)*$").unwrap();
+    let re = Regex::new(store::SLUG_REGEX).unwrap();
     let mut shortname: Option<String> = prompt_opt(format!("Local Bookmark (optional)")).unwrap();
     loop {
         match shortname {
