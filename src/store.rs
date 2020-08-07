@@ -60,7 +60,7 @@ pub struct Atom {
     pub subject: String,
     pub property: String,
     pub value: String,
-    pub native_value: Option<Value>,
+    pub native_value: Value,
 }
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -252,7 +252,7 @@ pub fn get_path(atomic_path: &str, store: &Store, mapping: &Mapping) -> Result<P
                     &value.clone().unwrap(),
                     &property_url.clone().unwrap(),
                     store
-                ).ok(),
+                )?,
             }
         )
     }
