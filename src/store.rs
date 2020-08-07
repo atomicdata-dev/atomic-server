@@ -6,6 +6,7 @@ use crate::errors::Result;
 use crate::mapping;
 use crate::{serialize::deserialize_json_array, urls};
 use mapping::Mapping;
+use regex::Regex;
 use serde_json::from_str;
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -16,10 +17,43 @@ pub struct Property {
     // URL of the class
     pub class_type: Option<String>,
     // URL of the datatype
-    pub data_type: String,
+    pub data_type: DataType,
     pub shortname: String,
     pub identifier: String,
     pub description: String,
+}
+
+#[derive(Debug)]
+pub enum DataType {
+    AtomicUrl,
+    Date,
+    Integer,
+    MDString,
+    ResourceArray,
+    Slug,
+    String,
+    Timestamp,
+    Unsupported(String),
+}
+
+#[derive(Debug)]
+pub enum Value {
+    AtomicUrl(String),
+    Date(String),
+    Integer(i32),
+    MDString(String),
+    ResourceArray(Vec<String>),
+    Slug(String),
+    String(String),
+    Timestamp(i64),
+    UnkownValue(UnkownValue),
+}
+
+#[derive(Debug)]
+pub struct UnkownValue {
+    pub value: String,
+    // URL of the datatype
+    pub datatype: String,
 }
 
 pub struct Atom {
@@ -109,10 +143,10 @@ pub fn property_url_to_shortname(url: &String, store: &Store) -> Result<String> 
 pub fn get_property(url: &String, store: &Store) -> Result<Property> {
     let property_resource = store.get(url).ok_or("Property not found")?;
     let property = Property {
-        data_type: property_resource
+        data_type: match_datatype(property_resource
             .get(urls::DATATYPE_PROP)
             .ok_or(format!("Datatype not found for property {}", url))?
-            .into(),
+            .into()),
         shortname: property_resource
             .get(urls::SHORTNAME)
             .ok_or(format!("Shortname not found for property {}", url))?
@@ -255,49 +289,70 @@ pub fn validate_store(store: &Store) -> Result<String> {
     return Err("Whoops".into());
 }
 
-// All possible DataTypes
-#[derive(Debug)]
-pub enum Value {
-    String(String),
-    Slug(String),
-    AtomicUrl(String),
-    Integer(i32),
-    Date(String),
-    ResourceArray(Vec<String>),
-    UnkownValue(UnkownValue),
-}
-
-#[derive(Debug)]
-pub struct UnkownValue {
-    pub value: String,
-    // URL of the datatype
-    pub datatype: String,
-}
-
 pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
-pub const DATE_REGEX: &str = r"([12]\d{3}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01]))";
+pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
-// Returns an enum of the native value
+// Returns an enum of the native value.
+// Validates the contents.
 pub fn get_native_value(value: &String, property_url: &String, store: &Store) -> Result<Value> {
     let prop = get_property(property_url, store)?;
-    match prop.data_type.as_str() {
-        urls::INTEGER => {
+    match prop.data_type {
+        DataType::Integer => {
             let val: i32 = value.parse()?;
             return Ok(Value::Integer(val));
         }
-        urls::STRING => return Ok(Value::String(value.clone())),
-        urls::SLUG => return Ok(Value::Slug(value.clone())),
-        urls::ATOMIC_URL => return Ok(Value::AtomicUrl(value.clone())),
-        urls::RESOURCE_ARRAY => {
+        DataType::String => return Ok(Value::String(value.clone())),
+        DataType::MDString => return Ok(Value::MDString(value.clone())),
+        DataType::Slug => {
+            let re = Regex::new(SLUG_REGEX).unwrap();
+            if re.is_match(&*value) {
+                return Ok(Value::Slug(value.clone()));
+            }
+            return Err(format!("Not a valid slug: {}", value).into())
+        },
+        DataType::AtomicUrl => {
+            let re = Regex::new(DATE_REGEX).unwrap();
+            if re.is_match(&*value) {
+                return Ok(Value::Date(value.clone()));
+            }
+            return Err(format!("Not a valid Atomic URL: {}", value).into())
+        },
+        DataType::ResourceArray => {
             let vector: Vec<String> = deserialize_json_array(value).unwrap();
             return Ok(Value::ResourceArray(vector))
         },
-        urls::DATE => return Ok(Value::Date(value.clone())),
-        unsupported_datatype => {
+        DataType::Date => {
+            let re = Regex::new(DATE_REGEX).unwrap();
+            if re.is_match(&*value) {
+                return Ok(Value::Date(value.clone()));
+            }
+            return Err(format!("Not a valid date: {}", value).into())
+        },
+        DataType::Timestamp => {
+            let val: i64 = value.parse()?;
+            return Ok(Value::Timestamp(val));
+        },
+        DataType::Unsupported(unsup_url) => {
             return Ok(Value::UnkownValue(UnkownValue {
                 value: value.into(),
-                datatype: unsupported_datatype.into(),
+                datatype: unsup_url.into(),
             }))
         }
     };
+}
+
+pub fn match_datatype(string: &String) -> DataType {
+    match string.as_str() {
+        urls::INTEGER => DataType::Integer,
+        urls::STRING => DataType::String,
+        urls::MDSTRING => DataType::MDString,
+        urls::SLUG => DataType::Slug,
+        urls::ATOMIC_URL => DataType::AtomicUrl,
+        urls::RESOURCE_ARRAY => DataType::ResourceArray,
+        urls::DATE => DataType::Date,
+        urls::TIMESTAMP => DataType::Timestamp,
+        unsupported_datatype => {
+            return DataType::Unsupported(string.into())
+        }
+    }
 }

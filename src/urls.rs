@@ -16,10 +16,11 @@ pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
+pub const MDSTRING: &str = "https://atomicdata.dev/datatypes/timestamp";
 pub const SLUG: &str = "https://atomicdata.dev/datatypes/slug";
 pub const ATOMIC_URL: &str = "https://atomicdata.dev/datatypes/atomicURL";
 pub const INTEGER: &str = "https://atomicdata.dev/datatypes/integer";
 pub const RESOURCE_ARRAY: &str = "https://atomicdata.dev/datatypes/resourceArray";
 pub const BOOLEAN: &str = "https://atomicdata.dev/datatypes/boolean";
 pub const DATE: &str = "https://atomicdata.dev/datatypes/date";
-pub const DATETIME: &str = "https://atomicdata.dev/datatypes/dateTime";
+pub const TIMESTAMP: &str = "https://atomicdata.dev/datatypes/timestamp";

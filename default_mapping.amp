@@ -3,11 +3,12 @@ class=https://atomicdata.dev/classes/Class
 
 # Properties
 shortname=https://atomicdata.dev/properties/shortname
+description=https://atomicdata.dev/properties/description
 
 # Datatypes
 atomicurl=https://atomicdata.dev/datatypes/atomicURL
 date=https://atomicdata.dev/datatypes/date
-datetime=https://atomicdata.dev/datatypes/dateTime
+timestamp=https://atomicdata.dev/datatypes/timestamp
 integer=https://atomicdata.dev/datatypes/integer
 slug=https://atomicdata.dev/datatypes/slug
 string=https://atomicdata.dev/datatypes/string

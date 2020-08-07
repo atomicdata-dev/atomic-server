@@ -5,7 +5,7 @@ use promptly::prompt_opt;
 use regex::Regex;
 use serde_json::de::from_str;
 use std::{collections::HashMap, path::PathBuf};
-use atomic::store::{self, Store, Resource, Property};
+use atomic::store::{self, Store, Resource, Property, DataType};
 use atomic::urls;
 use atomic::mapping;
 use atomic::serialize;
@@ -165,7 +165,7 @@ fn get(context: &mut Context) {
                     }
                 }
                 store::PathReturn::Atom(atom) => {
-                    println!("{:?}", atom.native_value.expect("No native value"))
+                    println!("{:?}", atom.native_value)
                 }
             }
         }
@@ -248,14 +248,13 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
     } else {
         msg_appendix = " (required)";
     }
-    // let msg = format!("{}{}", &property.shortname, msg_appendix);
-    match property.data_type.as_str() {
-        urls::STRING => {
+    match &property.data_type {
+        DataType::String => {
             let msg = format!("string{}", msg_appendix);
             input = prompt_opt(&msg).unwrap();
             return input;
         }
-        urls::SLUG => {
+        DataType::Slug => {
             let msg = format!("slug{}", msg_appendix);
             input = prompt_opt(&msg).unwrap();
             let re = Regex::new(store::SLUG_REGEX).unwrap();
@@ -270,7 +269,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => (return None),
             }
         }
-        urls::INTEGER => {
+        DataType::Integer => {
             let msg = format!("integer{}", msg_appendix);
             let number: Option<u32> = prompt_opt(&msg).unwrap();
             match number {
@@ -280,7 +279,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => (return None),
             }
         }
-        urls::DATE => {
+        DataType::Date => {
             let msg = format!("date YY-MM-DDDD{}", msg_appendix);
             let date: Option<String> = prompt_opt(&msg).unwrap();
             let re = Regex::new(store::DATE_REGEX).unwrap();
@@ -294,7 +293,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => (return None),
             }
         }
-        urls::ATOMIC_URL => loop {
+        DataType::AtomicUrl => loop {
             let msg = format!("URL{}", msg_appendix);
             let url: Option<String> = prompt_opt(msg).unwrap();
             // If a classtype is present, the given URL must be an instance of that Class
@@ -318,7 +317,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => (),
             };
         },
-        urls::RESOURCE_ARRAY => loop {
+        DataType::ResourceArray => loop {
             let msg = format!(
                 "resource array - Add the URLs or Shortnames, separated by spacebars{}",
                 msg_appendix
@@ -354,7 +353,11 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => break,
             }
         },
-        _ => panic!("Unknown datatype: {}", property.data_type),
+        DataType::MDString => { todo!() }
+        DataType::Timestamp => { todo!() }
+        DataType::Unsupported(unsup) => {
+            panic!("Unsupported datatype: {:?}", unsup)
+        }
     };
     return input;
 }
