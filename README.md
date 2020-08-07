@@ -20,8 +20,8 @@ Currently only builds for debian / ubuntu.
 Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
 
 ```sh
-git clone git@github.com:joepio/atomic-cli.git
-cd atomic-cli
+git clone git@github.com:joepio/atomic.git
+cd atomic
 # Install atomic and atomic-server to path
 cargo install --path ./
 ```

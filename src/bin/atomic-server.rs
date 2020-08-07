@@ -117,7 +117,7 @@ pub async fn get_resource(
                 http::header::ContentType::html()
             );
             let mut tera_context = TeraCtx::new();
-            let resource = context.store.get(&subject).unwrap();
+            let resource = context.store.get(&subject).ok_or("Resource not found")?;
             let mut propvals: Vec<PropVal> = Vec::new();
 
             #[derive(Serialize)]
