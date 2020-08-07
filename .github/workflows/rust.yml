@@ -19,13 +19,13 @@ jobs:
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-    - uses: actions-rs/cargo@v1
-      with:
-        use-cross: true
-        command: build
-        args: --target x86_64-unknown-linux-gnu
-    # - name: Build
-    #   run: cargo build --verbose --bins --release
+    # - uses: actions-rs/cargo@v1
+    #   with:
+    #     use-cross: true
+    #     command: build
+    #     args: --target x86_64-unknown-linux-gnu
+    - name: Build
+      run: cargo build --verbose --bins --release
     - name: Run tests
       run: cargo test --verbose
     - name: Bump version and push tag/create release point
