@@ -3,6 +3,10 @@ name = "atomic"
 version = "0.1.0"
 authors = ["Joep Meindertsma <joep@argu.co>"]
 edition = "2018"
+license = "MIT"
+description = "Library for creating, storing, querying, validating and converting Atomic Data."
+readme = "README.md"
+repository = "https://github.com/joepio/atomic"
 
 [dependencies]
 regex = "1.3.9"

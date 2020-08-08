@@ -1,27 +1,6 @@
-[package]
-name = "atomic-all"
-description = "Create, share and standardize linked atomic data!"
-version = "0.4.2"
-authors = ["Joep Meindertsma <joep@ontola.io>"]
-edition = "2018"
-license = "MIT"
-repository = "https://github.com/joepio/atomic-cli"
-
 [workspace]
 members = [
     "server",
     "cli",
     "lib",
 ]
-
-[[bin]]
-name = "cli"
-path = "cli/src/main.rs"
-
-[[bin]]
-name = "server"
-path = "server/src/main.rs"
-
-[lib]
-name = "atomic"
-path = "lib/src/lib.rs"
