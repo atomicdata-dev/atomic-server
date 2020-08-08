@@ -3,7 +3,6 @@ use colored::*;
 use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
-use serde_json::de::from_str;
 use std::{collections::HashMap, path::PathBuf};
 use atomic::store::{self, Store, Resource, Property, DataType};
 use atomic::urls;
@@ -73,14 +72,14 @@ fn main() {
         .expect("Home dir could not be opened")
         .join(".config/atomic/");
     let user_mapping_path = config_folder.join("mapping.amp");
-    let default_mapping_path = PathBuf::from("./default_mapping.amp");
+    let default_mapping_path = PathBuf::from("../defaults/default_mapping.amp");
     let mut mapping_path = &default_mapping_path;
     if user_mapping_path.exists() {
         mapping_path = &user_mapping_path;
     }
     let mapping = mapping::read_mapping_from_file(&mapping_path);
 
-    let default_store_path = PathBuf::from("./default_store.ad3");
+    let default_store_path = PathBuf::from("../defaults/default_store.ad3");
     let user_store_path = config_folder.join("store.ad3");
     let mut store_path = &default_store_path;
 
@@ -355,7 +354,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                         }
                     }
                     if length == urls.len() {
-                        input = Some(serde_json::to_string(&urls).unwrap());
+                        input = Some(atomic::serialize::serialize_json_array(&urls).unwrap());
                         break;
                     }
                 }
@@ -395,7 +394,7 @@ fn get_model(subject: String, store: &Store) -> Model {
 
     fn get_properties(resource_array: String, store: &Store) -> Vec<Property> {
         let mut properties: Vec<Property> = vec![];
-        let string_vec: Vec<String> = from_str(&*resource_array).unwrap();
+        let string_vec: Vec<String> = atomic::serialize::deserialize_json_array(&resource_array.into()).unwrap();
         for prop_url in string_vec {
             properties.push(store::get_property(&prop_url, &store).unwrap());
         }

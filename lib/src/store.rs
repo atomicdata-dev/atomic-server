@@ -2,7 +2,7 @@
 // Currently, it writes everything as .ad3 (NDJSON arrays) to disk, but this should change later on.
 // Perhaps we'll use some database, or something very specific to rust: https://github.com/TheNeikos/rustbreak
 
-use crate::errors::{Result, BetterResult};
+use crate::errors::Result;
 use crate::mapping;
 use crate::{serialize, serialize::deserialize_json_array, urls};
 use mapping::Mapping;
@@ -90,49 +90,52 @@ pub fn add(atoms: Vec<&Atom>, store: &mut Store) -> Result<()> {
     return Ok(());
 }
 
+pub fn parse_ad3<'a, 'b>(store: &'a mut Store, string: &'b String) -> Result<&'a Store> {
+    for line in string.lines() {
+        match line.chars().next() {
+            // These are comments
+            Some('#') => {}
+            Some(' ') => {}
+            // That's an array, awesome
+            Some('[') => {
+                let string_vec: Vec<String> =
+                    from_str(line).expect(&*format!("Parsing error in {:?}", line));
+                if string_vec.len() != 3 {
+                    return Err(format!("Wrong length of array at line {:?}: wrong length of array, should be 3", line).into())
+                }
+                let subject = &string_vec[0];
+                let property = &string_vec[1];
+                let value = &string_vec[2];
+                match &mut store.get_mut(&*subject) {
+                    Some(existing) => {
+                        existing.insert(property.into(), value.into());
+                    }
+                    None => {
+                        let mut resource: Resource = HashMap::new();
+                        resource.insert(property.into(), value.into());
+                        store.insert(subject.into(), resource);
+                    }
+                }
+            }
+            Some(char) => return Err(format!("Parsing error at {:?}, cannot start with {}", line, char).into()),
+            None => {}
+        };
+    }
+    return Ok(store)
+}
+
 /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
-pub fn read_store_from_file<'a>(store: &'a mut Store, path: &'a PathBuf) -> &'a Store {
+pub fn read_store_from_file<'a>(store: &'a mut Store, path: &'a PathBuf) -> Result<&'a Store> {
     match std::fs::read_to_string(path) {
         Ok(contents) => {
-            for line in contents.lines() {
-                match line.chars().next() {
-                    // These are comments
-                    Some('#') => {}
-                    Some(' ') => {}
-                    // That's an array, awesome
-                    Some('[') => {
-                        let string_vec: Vec<String> =
-                            from_str(line).expect(&*format!("Parsing error in {:?}", path));
-                        if string_vec.len() != 3 {
-                            panic!(format!("Wrong length of array in {:?} at line {:?}: wrong length of array, should be 3", path, line))
-                        }
-                        let subject = &string_vec[0];
-                        let property = &string_vec[1];
-                        let value = &string_vec[2];
-                        match &mut store.get_mut(&*subject) {
-                            Some(existing) => {
-                                existing.insert(property.into(), value.into());
-                            }
-                            None => {
-                                let mut resource: Resource = HashMap::new();
-                                resource.insert(property.into(), value.into());
-                                store.insert(subject.into(), resource);
-                            }
-                        }
-                    }
-                    Some(_) => println!("Parsing error in {:?} at {:?}", path, line),
-                    None => {}
-                };
-            }
+            return parse_ad3(store, &contents.clone())
         }
-        Err(err) => panic!(format!("Parsing error... {}", err)),
+        Err(err) => Err(format!("Parsing error: {}", err).into()),
     }
-
-    return store;
 }
 
 /// Serializes the current store and saves to path
-pub fn write_store_to_disk(store: &Store, path: &PathBuf) -> BetterResult<()> {
+pub fn write_store_to_disk(store: &Store, path: &PathBuf) -> Result<()> {
     let mut file_string: String = String::new();
     for (subject, _) in store {
         // TODO: use resource_to_ad3()
