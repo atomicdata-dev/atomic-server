@@ -1,34 +1,38 @@
 # Atomic
 
-_Disclaimer: this project primarily serves as a project for me to learn Rust, and to check whether
-the [Atomic Data spec](https://docs.atomicdata.dev) I'm working on actually makes some sense._
-
-_Status: buggy, pre-alpha_
-
 Create, share, fetch and model linked [Atomic Data](https://docs.atomicdata.dev)!
-This project consists of a [CLI](#atomic-cli), a [server](#atomic-server) and a [library](#atomic-lib) for Rust.
+This repo consists of three components: A library, a server and a CLI.
 
-## Install
+## `atomic-server`
 
-### Using binaries
+The easiest way to share Atomic Data on the web.
 
-You can find the binaries on the [Releases page](https://github.com/joepio/atomic/releases/tag/v0.3.1).
-Currently only builds for debian / ubuntu.
+[Read more](server/README.md).
 
-### From source
+## `atomic` (CLI)
 
-Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
+A simple Command Line Interface tool to fetch, create and query Atomic Data.
 
-```sh
-git clone git@github.com:joepio/atomic.git
-cd atomic
-# Install atomic and atomic-server to path
-cargo install --path ./
-```
+[Read more](cli/README.md).
 
-## Development
+## `atomic-lib`
 
-```sh
-# You can pass arguments to binaries using cargo run like this
-$ cargo run --bin atomic -- get class
-```
+A Rust library to serialize, parse, store, convert, validate and store Atomic Data.
+
+[Read more](lib/README.md).
+
+## Motivation
+
+I've been working with Linked Data for a couple of years, and I believe it has some incredible merits.
+URLs are great identifiers, and using them for keys makes sense as well.
+However, using the RDF data model has some characteristics that make it difficult for many developers, and that limits adoption.
+That's why I've been working on a new way to think about linked data: Atomic Data.
+Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a strict subset), but introduces some new concepts that aim to make it easier to use for developers.
+The constantly evolving [Atomic Data Docs](docs.atomicdata.dev/) need
+
+This repository serves the following purposes:
+
+- Test some of the core ideas of Atomic Data (Atomic Schema, Paths, Serialization)
+- Learn me more about how Rust works (it's a cool language, and this is my first Rust project - keep that in mind while traversing the code!)
+- Serve the first Atomic Data (soon available on [atomicdata.dev](https://atomicdata.dev))
+- Provide developers with tools and inspiration to use Atomic Data in their own projects.

@@ -2,16 +2,6 @@
 
 A lightweight HTTP server that shares created Atomic data on the web.
 
-For setting up the server:
-
-```sh
-# Create a new .env using the template
-cp default.env .env
-# Run the server. It loads the .ad3 store that you point towards
-atomic-server
-# Visit http://localhost:8080/test
-```
-
 - [x] Respond to GET request for individual resources
 - [ ] Content-type negotiation
 - [x] URL extension recognition
@@ -23,3 +13,19 @@ atomic-server
 - [ ] HTTPS
 - [ ] Write / Mutations support
 - [ ] Collections / dynamic resources
+
+## Usage
+
+Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
+
+```sh
+git clone git@github.com:joepio/atomic.git
+cd atomic/server
+# Install atomic-server to path
+cargo install --path ./
+# Create a new .env using the template
+cp default.env .env
+# Run the server. It loads the .ad3 store that you point towards
+atomic-server
+# Visit http://localhost:8080/test
+```
