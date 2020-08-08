@@ -31,7 +31,7 @@ pub struct Context<'a> {
 
 fn main() {
     let matches = App::new("atomic")
-        .version("0.4.2")
+        .version("0.5.0")
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model linked atomic data!")
         .after_help("Visit https://github.com/joepio/atomic-cli for more info")
@@ -88,9 +88,9 @@ fn main() {
         store_path = &user_store_path;
     }
 
-    let mut store: Store = store::init();
+    let mut store: Store = Store::init();
     // The store contains the classes and properties
-    store = store::read_store_from_file(&mut store, &store_path).expect("Does it work").clone();
+    store.read_store_from_file(&store_path).expect("Does it work");
 
     let mut context = Context {
         mapping,
@@ -145,18 +145,18 @@ fn get(context: &mut Context) {
     };
 
     // Returns a URL or Value
-    let result = store::get_path(path_string, &context.store, &context.mapping);
+    let result = &context.store.get_path(path_string, &context.mapping);
     match result {
         Ok(res) => {
             match res {
                 store::PathReturn::Subject(url) => {
                     match serialization {
                         Some(serialize::SerialializationFormats::JSON) => {
-                            let out = serialize::resource_to_json(&url, &context.store, 1).unwrap();
+                            let out = &context.store.resource_to_json(&url, 1).unwrap();
                             println!("{}", out);
                         }
                         Some(serialize::SerialializationFormats::AD3) => {
-                            let out = serialize::resource_to_ad3(&url, &context.store, None).unwrap();
+                            let out = &context.store.resource_to_ad3(&url, None).unwrap();
                             println!("{}", out);
                         }
                         None => {
@@ -239,11 +239,11 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
-    context.store.insert(subject.clone(), new_resource.clone());
+    context.store.add_resource(subject.clone(), new_resource.clone());
     // Publish new resource to IPFS
     // TODO!
     // Save the store locally
-    store::write_store_to_disk(&context.store, &context.user_store_path);
+    context.store.write_store_to_disk(&context.user_store_path);
     mapping::write_mapping_to_disk(&context.mapping, &context.user_mapping_path);
     return (new_resource, subject, map);
 }
@@ -397,7 +397,7 @@ fn get_model(subject: String, store: &Store) -> Model {
         let mut properties: Vec<Property> = vec![];
         let string_vec: Vec<String> = atomic_lib::serialize::deserialize_json_array(&resource_array.into()).unwrap();
         for prop_url in string_vec {
-            properties.push(store::get_property(&prop_url, &store).unwrap());
+            properties.push(store.get_property(&prop_url).unwrap());
         }
         return properties;
     }
@@ -444,7 +444,7 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
 fn pretty_print_resource(url: &String, store: &Store) -> Result<()> {
     let mut output = String::new();
     for (prop_url, val) in store.get(url).ok_or(format!("Not found: {}", url))? {
-        let prop_shortname = store::property_url_to_shortname(prop_url, store).unwrap();
+        let prop_shortname = store.property_url_to_shortname(prop_url).unwrap();
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),

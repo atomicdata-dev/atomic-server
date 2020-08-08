@@ -1,10 +1,9 @@
 use serde::Serialize;
 use std::path::Path;
 use tera::{Context as TeraCtx};
-use atomic_lib::store::{self, Property};
-use atomic_lib::serialize;
+use atomic_lib::store::Property;
 use actix_web::{web, http, HttpRequest, HttpResponse};
-use crate::AppState;
+use crate::appstate::AppState;
 use crate::errors::BetterResult;
 use crate::log;
 use std::sync::Mutex;
@@ -44,7 +43,7 @@ pub async fn get_resource(
           builder.set(
               http::header::ContentType::json()
           );
-          let body = serialize::resource_to_json(&subject, &context.store, 1)?;
+          let body = context.store.resource_to_json(&subject, 1)?;
           Ok(builder.body(body))
       }
       ContentType::HTML => {
@@ -61,7 +60,7 @@ pub async fn get_resource(
               value: String,
           }
           for (property, value) in resource.iter() {
-              let fullprop =  store::get_property(property, &context.store)?;
+              let fullprop =  context.store.get_property(property)?;
               let propval = PropVal {
                   property: fullprop,
                   value: value.into(),
@@ -80,7 +79,7 @@ pub async fn get_resource(
           builder.set(
               http::header::ContentType::html()
           );
-          let body = serialize::resource_to_ad3(&subject, &context.store, Some(&context.domain))?;
+          let body = context.store.resource_to_ad3(&subject, Some(&context.domain))?;
           Ok(builder.body(body))
       }
   }

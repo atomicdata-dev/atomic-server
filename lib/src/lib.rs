@@ -1,3 +1,4 @@
+pub mod atom;
 pub mod mapping;
 pub mod serialize;
 pub mod store;
