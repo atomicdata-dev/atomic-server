@@ -19,7 +19,7 @@ struct Model {
     /// URL
     subject: String,
 }
-
+#[allow(dead_code)]
 pub struct Context<'a> {
     store: Store,
     mapping: mapping::Mapping,
@@ -239,11 +239,11 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
-    context.store.add_resource(subject.clone(), new_resource.clone());
+    context.store.add_resource(subject.clone(), new_resource.clone()).expect("Could not store resource");
     // Publish new resource to IPFS
     // TODO!
     // Save the store locally
-    context.store.write_store_to_disk(&context.user_store_path);
+    context.store.write_store_to_disk(&context.user_store_path).expect("Could not write to disk");
     mapping::write_mapping_to_disk(&context.mapping, &context.user_mapping_path);
     return (new_resource, subject, map);
 }
@@ -443,7 +443,8 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
 /// Prints a resource to the terminal with readble formatting and colors
 fn pretty_print_resource(url: &String, store: &Store) -> Result<()> {
     let mut output = String::new();
-    for (prop_url, val) in store.get(url).ok_or(format!("Not found: {}", url))? {
+    let resource = store.get(url).ok_or(format!("Not found: {}", url))?;
+    for (prop_url, val) in resource {
         let prop_shortname = store.property_url_to_shortname(prop_url).unwrap();
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",

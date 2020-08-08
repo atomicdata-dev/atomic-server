@@ -4,7 +4,7 @@
 
 use crate::errors::Result;
 use crate::mapping;
-use crate::{serialize, serialize::deserialize_json_array, urls, atom::Atom};
+use crate::{serialize::deserialize_json_array, urls, atom::Atom};
 use mapping::Mapping;
 use regex::Regex;
 use serde::Serialize;
@@ -48,18 +48,18 @@ pub enum Value {
     Slug(String),
     String(String),
     Timestamp(i64),
-    UnkownValue(UnkownValue),
+    Unsupported(UnsupportedValue),
 }
 
+/// When the Datatype of a Value is not handled by this library
 #[derive(Debug)]
-pub struct UnkownValue {
+pub struct UnsupportedValue {
     pub value: String,
-    // URL of the datatype
+    /// URL of the datatype
     pub datatype: String,
 }
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
-
 #[derive(Clone)]
 pub struct Store {
     hashmap: HashMap<String, Resource>,
@@ -90,13 +90,15 @@ impl Store {
         return Ok(());
     }
 
-    // Replaces existing resource with the contents
+    /// Replaces existing resource with the contents
     pub fn add_resource(&mut self, subject: String, resource: Resource) -> Result<()> {
         self.hashmap.insert(subject, resource)
             .ok_or("Could not add resource")?;
         return Ok(());
     }
 
+    /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
+    /// Allows comments and empty lines
     pub fn parse_ad3<'a, 'b>(&mut self, string: &'b String) -> Result<()> {
         for line in string.lines() {
             match line.chars().next() {
@@ -186,6 +188,7 @@ impl Store {
         return Ok(string);
     }
 
+    /// Fetches a property by URL, returns a Property instance
     pub fn get_property(&self, url: &String) -> Result<Property> {
         let property_resource = self
             .hashmap
@@ -228,7 +231,7 @@ impl Store {
 
     /// Accepts an Atomic Path string, returns the result value (resource or property value)
     /// https://docs.atomicdata.dev/core/paths.html
-    /// Todo: return something more useful, give more context.
+    //  Todo: return something more useful, give more context.
     pub fn get_path(&self, atomic_path: &str, mapping: &Mapping) -> Result<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
@@ -314,6 +317,8 @@ impl Store {
         return Ok(current);
     }
 
+    /// Finds the URL of a shortname used in the context of a specific Resource.
+    /// The Class, Properties and Shortnames of the Resource are used to find this URL
     pub fn property_shortname_to_url(
         &self,
         shortname: &String,
@@ -335,7 +340,7 @@ impl Store {
     }
 
     pub fn get(&self, resource_url: &String) -> Option<&Resource> {
-        return self.get(resource_url);
+        return self.hashmap.get(resource_url);
     }
 
     // Returns an enum of the native value.
@@ -379,7 +384,7 @@ impl Store {
                 return Ok(Value::Timestamp(val));
             }
             DataType::Unsupported(unsup_url) => {
-                return Ok(Value::UnkownValue(UnkownValue {
+                return Ok(Value::Unsupported(UnsupportedValue {
                     value: value.into(),
                     datatype: unsup_url.into(),
                 }))
@@ -412,6 +417,7 @@ impl Store {
         return Ok(string);
     }
 
+    #[allow(dead_code, unreachable_code)]
     pub fn validate_store(&self) -> Result<String> {
         todo!();
         for (url, properties) in self.hashmap.iter() {
