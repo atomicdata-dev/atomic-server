@@ -1,5 +1,7 @@
 # `atomic-server`
 
+_Status: pre-alpha_
+
 A lightweight HTTP server that shares created Atomic data on the web.
 
 - [x] Respond to GET request for individual resources

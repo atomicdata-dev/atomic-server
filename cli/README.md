@@ -1,5 +1,7 @@
 # `atomic` (CLI)
 
+_Status: pre-alpha_
+
 A command-line application to create, read and interact with Atomic Data.
 Should work with Atomic-Server (which is not yet the case).
 

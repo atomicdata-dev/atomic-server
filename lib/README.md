@@ -1,6 +1,6 @@
 # atomic-lib
 
-_Status: buggy, pre-alpha_
+_Status: pre-alpha_
 
 Rust library for using [Atomic Data](https://docs.atomicdata.dev).
 The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) applications both use this `atomic-lib` library.
