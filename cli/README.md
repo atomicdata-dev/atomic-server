@@ -3,7 +3,6 @@
 _Status: pre-alpha_
 
 A command-line application to create, read and interact with Atomic Data.
-Should work with Atomic-Server (which is not yet the case).
 
 ```
 atomic 0.1.3
@@ -29,6 +28,28 @@ SUBCOMMANDS:
 Visit https://github.com/joepio/atomic-cli for more info
 ```
 
+## Installation
+
+Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
+
+```sh
+git clone git@github.com:joepio/atomic.git
+cd atomic/cli
+# Install atomic to path
+cargo install --path ./
+```
+
+## Usage
+
+```sh
+# Learn how to use it
+atomic --help
+# Try some commands
+atomic get class
+atomic get "class description"
+atomic new class
+```
+
 ## Progress
 
 - [x] Stores & reads stuff from and to .ad3 user files on disk
@@ -37,10 +58,9 @@ Visit https://github.com/joepio/atomic-cli for more info
 - [x] A `get` command for finding resources and parts of data using Atomic Paths with...
   - [x] AD3 Serialization
   - [x] Basic JSON Serialization
-  - [ ] Actually good JSON Serialization
   - [ ] RDF (Turtle / N-Triples / RDF/XML) Serialization
-- [ ] Works with `atomic-server` (stores there, uses domain etc.)
 - [ ] Fetch data from the interwebs with `get` commands
+- [ ] Works with [`atomic-server`](../server) (fetches from there, stores there, uses domain etc.)
 - [ ] A `map` command for creating a bookmark and storing a copy
 - [ ] An `edit` command for manipulating existing resources
 
