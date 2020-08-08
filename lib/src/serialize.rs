@@ -1,10 +1,15 @@
-use serde_json::from_str;
-use crate::store::{self, Store, Atom};
-use crate::errors::BetterResult;
+use serde_json;
+use crate::store::{self, Store};
+use crate::errors::Result;
 
-pub fn deserialize_json_array(string: &String) -> BetterResult<Vec<String>> {
-    let vector: Vec<String> = from_str(string).expect(&*format!("Can't parse value {} as array", string));
+pub fn deserialize_json_array(string: &String) -> Result<Vec<String>> {
+    let vector: Vec<String> = serde_json::from_str(string).expect(&*format!("Can't parse value {} as array", string));
     return Ok(vector);
+}
+
+pub fn serialize_json_array(items: &Vec<String>) -> Result<String> {
+    let string = serde_json::to_string(items).expect("Can't serialize to string");
+    return Ok(string);
 }
 
 // Should list all the supported serialization formats
@@ -14,7 +19,7 @@ pub enum SerialializationFormats {
 }
 
 /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
-pub fn resource_to_json(resource_url: &String, store: &Store, depth: u32) -> BetterResult<String> {
+pub fn resource_to_json(resource_url: &String, store: &Store, _depth: u32) -> Result<String> {
     use serde_json::{Map, Value};
 
     let resource = store.get(resource_url).ok_or("Resource not found")?;
@@ -40,7 +45,7 @@ pub fn resource_to_json(resource_url: &String, store: &Store, depth: u32) -> Bet
     return Ok(string);
 }
 
-pub fn resource_to_ad3(subject: &String, store: &Store, domain: Option<&String>) -> BetterResult<String> {
+pub fn resource_to_ad3(subject: &String, store: &Store, domain: Option<&String>) -> Result<String> {
     let mut string = String::new();
     let resource = store.get(subject).ok_or("Resource not found")?;
     let mut mod_subject = subject.clone();
