@@ -9,7 +9,7 @@ pub struct Atom {
 }
 
 impl Atom {
-  fn new(subject: String, property: String, value: String, store: &Store) -> Self {
+  pub fn new(subject: String, property: String, value: String, store: &Store) -> Self {
     Atom {
       subject,
       property: property.clone(),
