@@ -4,8 +4,9 @@ use tera::{Context as TeraCtx};
 use atomic::store::{self, Property};
 use atomic::serialize;
 use actix_web::{web, http, HttpRequest, HttpResponse};
-use crate::Context;
+use crate::AppState;
 use crate::errors::BetterResult;
+use crate::log;
 use std::sync::Mutex;
 
 enum ContentType {
@@ -16,7 +17,7 @@ enum ContentType {
 
 pub async fn get_resource(
   _id: web::Path<String>,
-  data: web::Data<Mutex<Context>>,
+  data: web::Data<Mutex<AppState>>,
   req: HttpRequest,
 ) -> BetterResult<HttpResponse> {
   let path = Path::new(_id.as_str());
@@ -32,9 +33,8 @@ pub async fn get_resource(
       }
       None => ContentType::HTML,
   } ;
-  // Some logging, should be handled properly later.
-  println!("{:?}", id);
-  println!("method: {:?}", req.method());
+  log::info(&format!("{:?}", id));
+  log::info(&format!("method: {:?}", req.method()));
   let context = data.lock().unwrap();
   // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
   let subject = format!("_:{}", id);

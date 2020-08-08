@@ -10,10 +10,11 @@ use tera::Tera;
 
 mod handlers;
 mod errors;
+mod log;
 
 // Context for the server (not the request)
 #[derive(Clone)]
-pub struct Context {
+pub struct AppState {
     store: Store,
     // Where the app is hosted (defaults to http://localhost:8080/)
     domain: String,
@@ -21,7 +22,7 @@ pub struct Context {
 }
 
 // Creates the server context
-fn init() -> Context {
+fn init() -> AppState {
     dotenv().ok();
     let mut opt_path_store = None;
     let mut opt_domain = None;
@@ -49,7 +50,7 @@ fn init() -> Context {
         }
     };
 
-    return Context {
+    return AppState {
         store,
         domain,
         tera,
@@ -65,13 +66,15 @@ async fn main() -> io::Result<()> {
 
     println!("Starting server at: http://{}", endpoint);
     HttpServer::new(|| {
-        let context = init();
-        let data = web::Data::new(Mutex::new(context.clone()));
+        let appstate = init();
+        let data = web::Data::new(Mutex::new(appstate.clone()));
         App::new().app_data(data.clone())
+        .service(fs::Files::new("static", ".").show_files_listing())
         .service(
-            web::scope("/{path}").service(web::resource("").route(web::get().to(get_resource))),
+            web::scope("/{path}").service(
+                web::resource("").route(web::get().to(get_resource))
+            ),
         )
-        .service(fs::Files::new("src/static", ".").show_files_listing())
     })
     .bind(endpoint)?
     .run()
