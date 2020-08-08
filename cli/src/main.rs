@@ -5,6 +5,7 @@ use promptly::prompt_opt;
 use regex::Regex;
 use std::{collections::HashMap, path::PathBuf};
 use atomic::store::{self, Store, Resource, Property, DataType};
+use atomic::errors::Result;
 use atomic::urls;
 use atomic::mapping;
 use atomic::serialize;
@@ -89,7 +90,7 @@ fn main() {
 
     let mut store: Store = store::init();
     // The store contains the classes and properties
-    store = store::read_store_from_file(&mut store, &store_path).clone();
+    store = store::read_store_from_file(&mut store, &store_path).expect("Does it work").clone();
 
     let mut context = Context {
         mapping,
@@ -159,7 +160,7 @@ fn get(context: &mut Context) {
                             println!("{}", out);
                         }
                         None => {
-                            pretty_print_resource(&url, &context.store);
+                            pretty_print_resource(&url, &context.store).unwrap();
                         }
                     }
                 }
@@ -440,9 +441,9 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
 }
 
 /// Prints a resource to the terminal with readble formatting and colors
-fn pretty_print_resource(url: &String, store: &Store) {
+fn pretty_print_resource(url: &String, store: &Store) -> Result<()> {
     let mut output = String::new();
-    for (prop_url, val) in store.get(url).unwrap() {
+    for (prop_url, val) in store.get(url).ok_or(format!("Not found: {}", url))? {
         let prop_shortname = store::property_url_to_shortname(prop_url, store).unwrap();
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
@@ -451,5 +452,6 @@ fn pretty_print_resource(url: &String, store: &Store) {
         ));
     }
     output.push_str(&*format!("{0: <15}{1: <10} \n", "url".blue().bold(), url));
-    println!("{}", output)
+    println!("{}", output);
+    Ok(())
 }
