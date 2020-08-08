@@ -3,6 +3,9 @@
 _Status: pre-alpha_
 
 Rust library for using [Atomic Data](https://docs.atomicdata.dev).
+
+[Docs @ Crates.io](https://crates.io/crates/atomic_lib)
+
 The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) applications both use this `atomic-lib` library.
 
 - [x] In-memory store for getting / setting data
@@ -14,3 +17,14 @@ The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) 
 - [x] Convert to Rust native types
 - [x] Resolve / parse mappings (bookmarks)
 - [ ] Validate Atomic Graphs
+
+## Usage
+
+```sh
+# Add it to your project
+cargo add atomic_lib
+```
+
+```rs
+
+```

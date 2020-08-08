@@ -4,11 +4,11 @@ use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
 use std::{collections::HashMap, path::PathBuf};
-use atomic::store::{self, Store, Resource, Property, DataType};
-use atomic::errors::Result;
-use atomic::urls;
-use atomic::mapping;
-use atomic::serialize;
+use atomic_lib::store::{self, Store, Resource, Property, DataType};
+use atomic_lib::errors::Result;
+use atomic_lib::urls;
+use atomic_lib::mapping;
+use atomic_lib::serialize;
 use uuid;
 
 struct Model {
@@ -355,7 +355,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                         }
                     }
                     if length == urls.len() {
-                        input = Some(atomic::serialize::serialize_json_array(&urls).unwrap());
+                        input = Some(atomic_lib::serialize::serialize_json_array(&urls).unwrap());
                         break;
                     }
                 }
@@ -395,7 +395,7 @@ fn get_model(subject: String, store: &Store) -> Model {
 
     fn get_properties(resource_array: String, store: &Store) -> Vec<Property> {
         let mut properties: Vec<Property> = vec![];
-        let string_vec: Vec<String> = atomic::serialize::deserialize_json_array(&resource_array.into()).unwrap();
+        let string_vec: Vec<String> = atomic_lib::serialize::deserialize_json_array(&resource_array.into()).unwrap();
         for prop_url in string_vec {
             properties.push(store::get_property(&prop_url, &store).unwrap());
         }

@@ -1,8 +1,8 @@
 use serde::Serialize;
 use std::path::Path;
 use tera::{Context as TeraCtx};
-use atomic::store::{self, Property};
-use atomic::serialize;
+use atomic_lib::store::{self, Property};
+use atomic_lib::serialize;
 use actix_web::{web, http, HttpRequest, HttpResponse};
 use crate::AppState;
 use crate::errors::BetterResult;

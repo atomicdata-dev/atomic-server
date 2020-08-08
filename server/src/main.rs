@@ -1,7 +1,7 @@
 use actix_files as fs;
 use actix_web::{web, App, HttpServer};
-use atomic::store;
-use atomic::store::Store;
+use atomic_lib::store;
+use atomic_lib::store::Store;
 use crate::handlers::resource::get_resource;
 use dotenv::dotenv;
 use std::{io, path::PathBuf, sync::Mutex};
