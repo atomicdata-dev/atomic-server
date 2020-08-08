@@ -16,7 +16,7 @@ pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
-pub const MDSTRING: &str = "https://atomicdata.dev/datatypes/timestamp";
+pub const MDSTRING: &str = "https://atomicdata.dev/datatypes/MDString";
 pub const SLUG: &str = "https://atomicdata.dev/datatypes/slug";
 pub const ATOMIC_URL: &str = "https://atomicdata.dev/datatypes/atomicURL";
 pub const INTEGER: &str = "https://atomicdata.dev/datatypes/integer";
