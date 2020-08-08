@@ -17,9 +17,13 @@
 # Datatypes
 ["https://atomicdata.dev/datatypes/string","https://atomicdata.dev/properties/shortname","string"]
 ["https://atomicdata.dev/datatypes/string","https://atomicdata.dev/properties/description","A UTF-8 string. Allows newlines."]
+["https://atomicdata.dev/datatypes/integer","https://atomicdata.dev/properties/shortname","integer"]
+["https://atomicdata.dev/datatypes/integer","https://atomicdata.dev/properties/description","Signed Integer, max 64 bit.\nMax value: [`9223372036854775807`](https://en.wikipedia.org/wiki/9,223,372,036,854,775,807)\n\ne.g. `-420`\n"]
+["https://atomicdata.dev/datatypes/date","https://atomicdata.dev/properties/shortname","date"]
+["https://atomicdata.dev/datatypes/date","https://atomicdata.dev/properties/description","ISO date _without time_.\nYYYY-MM-DD.\n\ne.g. `1991-01-20`\n."]
 # Properties
 ["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
-["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/string"]
+["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/MDString"]
 ["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/shortname","description"]
 ["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/description","A textual description of the thing."]
 ["https://atomicdata.dev/properties/classtype","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
@@ -53,3 +57,4 @@
 # Some user data
 # The _:test is converted to the current domain (e.g. https://example.com/test)
 ["_:test","https://atomicdata.dev/properties/description","A demo resource"]
+["_:test","https://atomicdata.dev/properties/shortname","Test"]
