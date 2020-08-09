@@ -19,8 +19,9 @@
 //! assert!(my_value == "Test")
 //! ```
 
-pub mod atom;
+pub mod atoms;
 pub mod mapping;
+pub mod mutations;
 pub mod serialize;
 pub mod store;
 pub mod urls;

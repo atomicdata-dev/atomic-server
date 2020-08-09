@@ -51,10 +51,10 @@
 ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
 ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/resourceArray"]
 ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/classtype","https://atomicdata.dev/classes/Class"]
-["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/shortname","isA"]
+["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/shortname","isa"]
 ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/description","A list of Classes of which the thing is an instance of."]
 
 # Some user data
 # The _:test is converted to the current domain (e.g. https://example.com/test)
 ["_:test","https://atomicdata.dev/properties/description","A demo resource"]
-["_:test","https://atomicdata.dev/properties/shortname","Test"]
+["_:test","https://atomicdata.dev/properties/shortname","test"]

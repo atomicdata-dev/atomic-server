@@ -5,7 +5,8 @@
 
 use crate::errors::Result;
 use crate::mapping;
-use crate::{serialize::deserialize_json_array, urls, atom::Atom};
+use crate::mutations;
+use crate::{atoms::Atom, serialize::deserialize_json_array, urls};
 use mapping::Mapping;
 use regex::Regex;
 use serde::Serialize;
@@ -64,13 +65,18 @@ pub struct UnsupportedValue {
 #[derive(Clone)]
 pub struct Store {
     hashmap: HashMap<String, Resource>,
+    log: mutations::Log,
 }
 
 impl Store {
     /// Create an empty Store. This is where you start.
+    ///
+    /// # Example
+    /// let store = Store::init();
     pub fn init() -> Store {
         return Store {
             hashmap: HashMap::new(),
+            log: Vec::new(),
         };
     }
 
@@ -96,7 +102,8 @@ impl Store {
 
     /// Replaces existing resource with the contents
     pub fn add_resource(&mut self, subject: String, resource: Resource) -> Result<()> {
-        self.hashmap.insert(subject, resource)
+        self.hashmap
+            .insert(subject, resource)
             .ok_or("Could not add resource")?;
         return Ok(());
     }
@@ -148,7 +155,7 @@ impl Store {
             Ok(contents) => {
                 self.parse_ad3(&contents)?;
                 Ok(())
-            },
+            }
             Err(err) => Err(format!("Parsing error: {}", err).into()),
         }
     }
@@ -200,20 +207,26 @@ impl Store {
                         obj.insert("@id".into(), prop_url.as_str().into());
                         obj.insert("@type".into(), "@id".into());
                         obj.into()
-                    },
+                    }
                     DataType::Date => {
                         let mut obj = Map::new();
                         obj.insert("@id".into(), prop_url.as_str().into());
-                        obj.insert("@type".into(), "http://www.w3.org/2001/XMLSchema#date".into());
+                        obj.insert(
+                            "@type".into(),
+                            "http://www.w3.org/2001/XMLSchema#date".into(),
+                        );
                         obj.into()
-                    },
+                    }
                     DataType::Integer => {
                         let mut obj = Map::new();
                         obj.insert("@id".into(), prop_url.as_str().into());
                         // I'm not sure whether we should use XSD or Atomic Datatypes
-                        obj.insert("@type".into(), "http://www.w3.org/2001/XMLSchema#integer".into());
+                        obj.insert(
+                            "@type".into(),
+                            "http://www.w3.org/2001/XMLSchema#integer".into(),
+                        );
                         obj.into()
-                    },
+                    }
                     DataType::MDString => prop_url.as_str().into(),
                     DataType::ResourceArray => {
                         let mut obj = Map::new();
@@ -221,7 +234,7 @@ impl Store {
                         // Plain JSON-LD Arrays are not ordered. Here, they are converted into an RDF List.
                         obj.insert("@container".into(), "@list".into());
                         obj.into()
-                    },
+                    }
                     DataType::Slug => prop_url.as_str().into(),
                     DataType::String => prop_url.as_str().into(),
                     DataType::Timestamp => prop_url.as_str().into(),
@@ -235,10 +248,11 @@ impl Store {
                 Value::Date(val) => SerdeValue::String(val.into()),
                 Value::Integer(val) => SerdeValue::Number(val.into()),
                 Value::MDString(val) => SerdeValue::String(val.into()),
-                Value::ResourceArray(val) =>
-                    SerdeValue::Array(val.iter().map(
-                        |item| SerdeValue::String(item.clone())
-                    ).collect()),
+                Value::ResourceArray(val) => SerdeValue::Array(
+                    val.iter()
+                        .map(|item| SerdeValue::String(item.clone()))
+                        .collect(),
+                ),
                 Value::Slug(val) => SerdeValue::String(val.into()),
                 Value::String(val) => SerdeValue::String(val.into()),
                 Value::Timestamp(val) => SerdeValue::Number(val.into()),
@@ -380,11 +394,12 @@ impl Store {
                 subject: subject.clone(),
                 property: property_url.clone().unwrap(),
                 value: value.clone().unwrap(),
-                native_value: self
-                    .get_native_value(
-                        &value.clone().unwrap(),
-                        &self.get_property(&property_url.ok_or("No property url")?)?.data_type
-                    )?
+                native_value: self.get_native_value(
+                    &value.clone().unwrap(),
+                    &self
+                        .get_property(&property_url.ok_or("No property url")?)?
+                        .data_type,
+                )?,
             })
         }
         return Ok(current);
@@ -433,13 +448,7 @@ impl Store {
                 }
                 return Err(format!("Not a valid slug: {}", value).into());
             }
-            DataType::AtomicUrl => {
-                let re = Regex::new(DATE_REGEX).unwrap();
-                if re.is_match(&*value) {
-                    return Ok(Value::Date(value.clone()));
-                }
-                return Err(format!("Not a valid Atomic URL: {}", value).into());
-            }
+            DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
             DataType::ResourceArray => {
                 let vector: Vec<String> = deserialize_json_array(value).unwrap();
                 return Ok(Value::ResourceArray(vector));
@@ -464,11 +473,7 @@ impl Store {
         };
     }
 
-    pub fn resource_to_ad3(
-        &self,
-        subject: &String,
-        domain: Option<&String>,
-    ) -> Result<String> {
+    pub fn resource_to_ad3(&self, subject: &String, domain: Option<&String>) -> Result<String> {
         let mut string = String::new();
         let resource = self.get(subject).ok_or("Resource not found")?;
         let mut mod_subject = subject.clone();
@@ -489,16 +494,25 @@ impl Store {
         return Ok(string);
     }
 
+    /// Checks Atomic Data in the store for validity.
+    /// Returns an Error if it is not valid.
+    ///
+    /// Validates:
+    ///
+    /// - [X] If the Values can be parsed using their Datatype (e.g. if Integers are integers)
+    /// - [ ] If all required fields of the class are present
+    /// - [ ] If the URLs are publicly accessible and return the right type of data
     #[allow(dead_code, unreachable_code)]
-    pub fn validate_store(&self) -> Result<String> {
-        todo!();
-        for (url, properties) in self.hashmap.iter() {
-            // Are all property URLs accessible?
-            // Do the datatypes of the properties match the datatypes of the
-            // if they are instances of a class, do they have the required fields?
-            println!("{:?}: {:?}", url, properties);
+    pub fn validate_store(&self) -> Result<()> {
+        for (url, resource) in self.hashmap.iter() {
+            for (prop_url, value) in resource {
+                let property = self.get_property(prop_url)?;
+                self.get_native_value(value, &property.data_type)?;
+                println!("{:?}: {:?}", prop_url, value);
+            }
+            println!("{:?} Valid", url);
         }
-        return Err("Whoops".into());
+        return Ok(())
     }
 }
 
@@ -522,5 +536,51 @@ pub fn match_datatype(string: &String) -> DataType {
         urls::DATE => DataType::Date,
         urls::TIMESTAMP => DataType::Timestamp,
         unsupported_datatype => return DataType::Unsupported(unsupported_datatype.into()),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn init_store() -> Store {
+        let string =
+            String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
+        let mut store = Store::init();
+        store.read_store_from_file(&PathBuf::from("../defaults/default_store.ad3")).unwrap();
+        // Run parse...
+        store.parse_ad3(&string).unwrap();
+        return store;
+    }
+
+    #[test]
+    fn get() {
+        let store = init_store();
+        // Get our resource...
+        let my_resource = store.get(&"_:test".into()).unwrap();
+        // Get our value by filtering on our property...
+        let my_value = my_resource
+            .get("https://atomicdata.dev/properties/shortname")
+            .unwrap();
+        println!("My value: {}", my_value);
+        assert!(my_value == "hi");
+    }
+
+    #[test]
+    fn validate() {
+        let store = init_store();
+        store.validate_store().unwrap();
+        assert!(true)
+    }
+
+    #[test]
+    #[should_panic]
+    fn validate_invalid() {
+        let mut store = init_store();
+        let invalid_ad3 =
+            String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
+        store.parse_ad3(&invalid_ad3).unwrap();
+        store.validate_store().unwrap();
+        assert!(true)
     }
 }

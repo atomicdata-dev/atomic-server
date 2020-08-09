@@ -1,13 +1,18 @@
-// Mapping - This is for managing and using local shortnames / bookmarks that map to URLs.
+//! # Mappings
+//! Because writing full URLs is error prone and time consuming, we map URLs to shortnames.
+//! These are often user-specific.
+//! This section provides tools to store, share and resolve these Mappings.
 
+use crate::errors::Result;
 use std::{collections::HashMap, fs, path::PathBuf};
 
 /// Maps shortanmes to URLs
 pub type Mapping = HashMap<String, String>;
 
+/// Checks if the input string is a Mapping or a valid URL.
+/// If it is neither, a None is returned.
 pub fn try_mapping_or_url(mapping_or_url: &String, mapping: &Mapping) -> Option<String> {
-    let maybe = mapping.get(mapping_or_url);
-    match maybe {
+    match mapping.get(mapping_or_url) {
         Some(hit) => return Some(hit.clone()),
         None => {
             // Currently only accept HTTP(S) protocol
@@ -19,31 +24,31 @@ pub fn try_mapping_or_url(mapping_or_url: &String, mapping: &Mapping) -> Option<
     }
 }
 
-pub fn read_mapping_from_file(path: &PathBuf) -> Mapping {
+/// Reads an .amp (atomic mapping) file.
+/// This is a simple .ini-like text file that maps shortnames to URLs.
+/// The left-hand should contain the shortname, the right-hand the URL.
+/// Ignores # comments and empty lines
+pub fn read_mapping_from_file(path: &PathBuf) -> Result<Mapping> {
     let mut mapping: Mapping = HashMap::new();
-    match std::fs::read_to_string(path) {
-        Ok(contents) => {
-            for line in contents.lines() {
-                match line.chars().next() {
-                    Some('#') => {}
-                    Some(' ') => {}
-                    Some(_) => {
-                        let split: Vec<&str> = line.split("=").collect();
-                        if split.len() == 2 {
-                            &mapping.insert(String::from(split[0]), String::from(split[1]));
-                        } else {
-                            println!("Error reading line {:?} in {:?}", line, path);
-                        };
-                    }
-                    None => {}
+    for line in std::fs::read_to_string(path)?.lines() {
+        match line.chars().next() {
+            Some('#') => {}
+            Some(' ') => {}
+            Some(_) => {
+                let split: Vec<&str> = line.split("=").collect();
+                if split.len() == 2 {
+                    &mapping.insert(String::from(split[0]), String::from(split[1]));
+                } else {
+                    return Err(format!("Error reading line {:?} in {:?}", line, path).into());
                 };
             }
-        }
-        Err(_) => panic!("Error reading mapping file {:?}", path),
+            None => {}
+        };
     }
-    return mapping;
+    return Ok(mapping);
 }
 
+/// Serializes the mapping and stores it to the path
 pub fn write_mapping_to_disk(mapping: &Mapping, path: &PathBuf) {
     let mut file_string: String = String::new();
     for (key, url) in mapping {

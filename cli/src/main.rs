@@ -78,7 +78,7 @@ fn main() {
     if user_mapping_path.exists() {
         mapping_path = &user_mapping_path;
     }
-    let mapping = mapping::read_mapping_from_file(&mapping_path);
+    let mapping = mapping::read_mapping_from_file(&mapping_path).unwrap();
 
     let default_store_path = PathBuf::from("../defaults/default_store.ad3");
     let user_store_path = config_folder.join("store.ad3");
