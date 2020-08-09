@@ -1,5 +1,6 @@
 # Classes
 class=https://atomicdata.dev/classes/Class
+property=https://atomicdata.dev/classes/Property
 
 # Properties
 shortname=https://atomicdata.dev/properties/shortname

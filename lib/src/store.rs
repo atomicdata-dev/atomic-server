@@ -6,6 +6,7 @@
 use crate::errors::Result;
 use crate::mapping;
 use crate::mutations;
+use crate::serialize;
 use crate::{atoms::Atom, serialize::deserialize_json_array, urls};
 use mapping::Mapping;
 use regex::Regex;
@@ -13,10 +14,20 @@ use serde::Serialize;
 use serde_json::from_str;
 use std::{collections::HashMap, fs, path::PathBuf};
 
+#[derive(Debug)]
+pub struct Class {
+    pub requires: Vec<Property>,
+    pub recommends: Vec<Property>,
+    pub shortname: String,
+    pub description: String,
+    /// URL
+    pub subject: String,
+}
+
 /// The first string represents the URL of the Property, the second one its Value.
 pub type Resource = HashMap<String, String>;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Property {
     // URL of the class
     pub class_type: Option<String>,
@@ -301,7 +312,75 @@ impl Store {
         return Ok(property);
     }
 
-    ///
+    /// Finds all classes (isA) for any subject.
+    /// Returns an empty vector if there are none.
+    pub fn get_classes_for_subject(&self, subject: &String) -> Result<Vec<Class>> {
+        let classes_array_opt = self
+            .get(subject)
+            .ok_or(format!("Subject not found: {}", subject))?
+            .get(urls::IS_A);
+        let classes_array = match classes_array_opt {
+            Some(vec) => vec,
+            None => {
+                return Ok(Vec::new())
+            }
+        };
+            // .ok_or(format!("IsA property not present in {}", subject))?;
+        let native = self.get_native_value(classes_array, &DataType::ResourceArray)?;
+        let vector = match native {
+            Value::ResourceArray(vec) => vec,
+            _ => return Err("Should be an array".into()),
+        };
+        let mut classes: Vec<Class> = Vec::new();
+        for class in vector {
+            classes.push(self.get_class(&class))
+        }
+        return Ok(classes);
+    }
+
+    /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
+    pub fn get_class(&self, subject: &String) -> Class {
+        // The string representation of the Class
+        let class_strings = self.get(&subject).expect("Class not found");
+        let shortname = class_strings
+            .get(urls::SHORTNAME)
+            .expect("Class has no shortname");
+        let description = class_strings
+            .get(urls::DESCRIPTION)
+            .expect("Class has no description");
+        let requires_string = class_strings.get(urls::REQUIRES);
+        let recommends_string = class_strings.get(urls::RECOMMENDS);
+
+        let mut requires: Vec<Property> = Vec::new();
+        let mut recommends: Vec<Property> = Vec::new();
+        if requires_string.is_some() {
+            requires = get_properties(requires_string.unwrap().into(), &self);
+        }
+        if recommends_string.is_some() {
+            recommends = get_properties(recommends_string.unwrap().into(), &self);
+        }
+
+        fn get_properties(resource_array: String, store: &Store) -> Vec<Property> {
+            let mut properties: Vec<Property> = vec![];
+            let string_vec: Vec<String> =
+                serialize::deserialize_json_array(&resource_array.into()).unwrap();
+            for prop_url in string_vec {
+                properties.push(store.get_property(&prop_url).unwrap());
+            }
+            return properties;
+        }
+
+        let class = Class {
+            requires,
+            recommends,
+            shortname: shortname.into(),
+            subject: subject.into(),
+            description: description.into(),
+        };
+
+        return class;
+    }
+
     pub fn property_url_to_shortname(&self, url: &String) -> Result<String> {
         let property_resource = self
             .hashmap
@@ -500,19 +579,42 @@ impl Store {
     /// Validates:
     ///
     /// - [X] If the Values can be parsed using their Datatype (e.g. if Integers are integers)
-    /// - [ ] If all required fields of the class are present
+    /// - [X] If all required fields of the class are present
     /// - [ ] If the URLs are publicly accessible and return the right type of data
+    /// - [ ] Returns a report with multiple options
     #[allow(dead_code, unreachable_code)]
     pub fn validate_store(&self) -> Result<()> {
-        for (url, resource) in self.hashmap.iter() {
+        for (subject, resource) in self.hashmap.iter() {
+            println!("Subject: {:?}", subject);
+            println!("Resource: {:?}", resource);
+
+            let mut found_props: Vec<String> = Vec::new();
+
             for (prop_url, value) in resource {
                 let property = self.get_property(prop_url)?;
                 self.get_native_value(value, &property.data_type)?;
-                println!("{:?}: {:?}", prop_url, value);
+                found_props.push(prop_url.clone());
+                // println!("{:?}: {:?}", prop_url, value);
             }
-            println!("{:?} Valid", url);
+            let classes = self.get_classes_for_subject(subject)?;
+            for class in classes {
+                println!("Class: {:?}", class.shortname);
+                println!("Found: {:?}", found_props);
+                for required_prop in class.requires {
+                    println!("Required: {:?}", required_prop.shortname);
+                    if !found_props.contains(&required_prop.subject) {
+                        return Err(format!(
+                            "Missing requried property {} in {} because of class {}",
+                            &required_prop.shortname,
+                            subject,
+                            class.subject,
+                        ).into())
+                    }
+                }
+            }
+            println!("{:?} Valid", subject);
         }
-        return Ok(())
+        return Ok(());
     }
 }
 
@@ -547,7 +649,9 @@ mod test {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let mut store = Store::init();
-        store.read_store_from_file(&PathBuf::from("../defaults/default_store.ad3")).unwrap();
+        store
+            .read_store_from_file(&PathBuf::from("../defaults/default_store.ad3"))
+            .unwrap();
         // Run parse...
         store.parse_ad3(&string).unwrap();
         return store;
@@ -570,7 +674,6 @@ mod test {
     fn validate() {
         let store = init_store();
         store.validate_store().unwrap();
-        assert!(true)
     }
 
     #[test]
@@ -578,9 +681,9 @@ mod test {
     fn validate_invalid() {
         let mut store = init_store();
         let invalid_ad3 =
+            // should be array, is string
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
         store.parse_ad3(&invalid_ad3).unwrap();
         store.validate_store().unwrap();
-        assert!(true)
     }
 }

@@ -4,21 +4,13 @@ use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
 use std::{collections::HashMap, path::PathBuf};
-use atomic_lib::store::{self, Store, Resource, Property, DataType};
+use atomic_lib::store::{self, Store, Resource, Property, DataType, Class};
 use atomic_lib::errors::Result;
 use atomic_lib::urls;
 use atomic_lib::mapping;
 use atomic_lib::serialize;
 use uuid;
 
-struct Model {
-    requires: Vec<Property>,
-    recommends: Vec<Property>,
-    shortname: String,
-    description: String,
-    /// URL
-    subject: String,
-}
 #[allow(dead_code)]
 pub struct Context<'a> {
     store: Store,
@@ -196,22 +188,22 @@ fn new(context: &mut Context) {
         .mapping
         .get(class_input)
         .expect(&*format!("Could not find class {} in mapping", class_input));
-    let model = get_model(class_url.into(), &mut context.store);
+    let model = context.store.get_class(class_url.into());
     println!("Enter a new {}: {}", model.shortname, model.description);
     prompt_instance(context, &model);
 }
 
 /// Lets the user enter an instance of an Atomic Class through multiple prompts
 /// Returns the Resource, its URL and its Bookmark
-fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, Option<String>) {
+fn prompt_instance(context: &mut Context, class: &Class) -> (Resource, String, Option<String>) {
     let mut new_resource: Resource = HashMap::new();
 
     new_resource.insert(
         "https://atomicdata.dev/properties/isA".into(),
-        String::from(&model.subject),
+        String::from(&class.subject),
     );
 
-    for field in &model.requires {
+    for field in &class.requires {
         println!("{}: {}", field.shortname, field.description);
         let mut input = prompt_field(&field, false, context);
         loop {
@@ -225,7 +217,7 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
         }
     }
 
-    for field in &model.recommends {
+    for field in &class.recommends {
         println!("{}: {}", field.shortname, field.description);
         let input = prompt_field(&field, true, context);
         if let Some(i) = input {
@@ -234,7 +226,7 @@ fn prompt_instance(context: &mut Context, model: &Model) -> (Resource, String, O
     }
 
     let subject = format!("_:{}", uuid::Uuid::new_v4());
-    println!("{} created with URL: {}", &model.shortname, &subject);
+    println!("{} created with URL: {}", &class.shortname, &subject);
 
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
@@ -308,7 +300,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             // If a classtype is present, the given URL must be an instance of that Class
             let classtype = &property.class_type;
             if classtype.is_some() {
-                let class = get_model(String::from(classtype.as_ref().unwrap()), &context.store);
+                let class = context.store.get_class(&String::from(classtype.as_ref().unwrap()));
                 println!("Enter the URL or shortname of a {}", class.description)
             }
             match url {
@@ -347,7 +339,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                                 // TODO: This currently creates Property instances, but this should depend on the class!
                                 let (_resource, url, _shortname) = prompt_instance(
                                     context,
-                                    &get_model(urls::PROPERTY.into(), &context.store),
+                                    &context.store.get_class(&urls::PROPERTY.into()),
                                 );
                                 urls.push(url);
                                 continue;
@@ -369,48 +361,6 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
         }
     };
     return input;
-}
-
-/// Retrieves a model from the store by subject URL and converts it into a model useful for forms
-fn get_model(subject: String, store: &Store) -> Model {
-    // The string representation of the model
-    let model_strings = store.get(&subject).expect("Model not found");
-    let shortname = model_strings
-        .get(urls::SHORTNAME)
-        .expect("Model has no shortname");
-    let description = model_strings
-        .get(urls::DESCRIPTION)
-        .expect("Model has no description");
-    let requires_string = model_strings.get(urls::REQUIRES);
-    let recommends_string = model_strings.get(urls::RECOMMENDS);
-
-    let mut requires: Vec<Property> = Vec::new();
-    let mut recommends: Vec<Property> = Vec::new();
-    if requires_string.is_some() {
-        requires = get_properties(requires_string.unwrap().into(), &store);
-    }
-    if recommends_string.is_some() {
-        recommends = get_properties(recommends_string.unwrap().into(), &store);
-    }
-
-    fn get_properties(resource_array: String, store: &Store) -> Vec<Property> {
-        let mut properties: Vec<Property> = vec![];
-        let string_vec: Vec<String> = atomic_lib::serialize::deserialize_json_array(&resource_array.into()).unwrap();
-        for prop_url in string_vec {
-            properties.push(store.get_property(&prop_url).unwrap());
-        }
-        return properties;
-    }
-
-    let model = Model {
-        requires,
-        recommends,
-        shortname: shortname.into(),
-        subject,
-        description: description.into(),
-    };
-
-    return model;
 }
 
 // Asks for and saves the bookmark. Returns the shortname.
