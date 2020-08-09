@@ -14,7 +14,7 @@ impl Atom {
       subject,
       property: property.clone(),
       value: value.clone(),
-      native_value: store.get_native_value(&value, &property).unwrap(),
+      native_value: store.get_native_value(&value, &store.get_property(&property).unwrap().data_type).unwrap(),
     }
   }
 }

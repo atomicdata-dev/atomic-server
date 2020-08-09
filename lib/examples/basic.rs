@@ -4,7 +4,7 @@ fn main() {
   // Let's parse this AD3 string
   let string = String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"Test\"]");
   // Start with initializing our store
-  let mut store = atomic_lib::store::Store::init();
+  let mut store = atomic_lib::Store::init();
   // Run parse...
   store.parse_ad3(&string).unwrap();
   // Get our resource...

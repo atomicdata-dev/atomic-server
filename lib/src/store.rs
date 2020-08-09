@@ -1,6 +1,7 @@
-// Store - this is an in-memory store of Atomic data.
-// Currently, it writes everything as .ad3 (NDJSON arrays) to disk, but this should change later on.
-// Perhaps we'll use some database, or something very specific to rust: https://github.com/TheNeikos/rustbreak
+//! Store - this is an in-memory store of Atomic data.
+//! This provides many methods for finding, changing, serializing and parsing Atomic Data.
+//! Currently, it can only persist its data as .ad3 (Atomic Data Triples) to disk.
+//! A more robust persistent storage option will be used later, such as: https://github.com/TheNeikos/rustbreak
 
 use crate::errors::Result;
 use crate::mapping;
@@ -66,13 +67,16 @@ pub struct Store {
 }
 
 impl Store {
+    /// Create an empty Store. This is where you start.
     pub fn init() -> Store {
         return Store {
             hashmap: HashMap::new(),
         };
     }
 
-    pub fn add_atom(&mut self, atoms: Vec<&Atom>) -> Result<()> {
+    /// Add individual Atoms to the store.
+    /// Will replace existing Atoms that share Subject / Property combination.
+    pub fn add_atoms(&mut self, atoms: Vec<&Atom>) -> Result<()> {
         for atom in atoms {
             match self.hashmap.get_mut(&atom.subject) {
                 Some(resource) => {
@@ -98,7 +102,7 @@ impl Store {
     }
 
     /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
-    /// Allows comments and empty lines
+    /// Allows comments and empty lines.
     pub fn parse_ad3<'a, 'b>(&mut self, string: &'b String) -> Result<()> {
         for line in string.lines() {
             match line.chars().next() {
@@ -115,6 +119,7 @@ impl Store {
                     let subject = &string_vec[0];
                     let property = &string_vec[1];
                     let value = &string_vec[2];
+                    // TODO: Should use store.add_atoms
                     match &mut self.hashmap.get_mut(&*subject) {
                         Some(existing) => {
                             existing.insert(property.into(), value.into());
@@ -161,28 +166,92 @@ impl Store {
         return Ok(());
     }
 
+    /// Serializes a single Resource to a JSON object.
+    /// It uses the Shortnames of properties for Keys.
     /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
+    // Very naive implementation, should actually turn:
+    // [ ] ResourceArrays into arrrays
+    // [ ] URLS into @id things
+    // [ ] Numbers into native numbers
+    // [ ] Resoures into objects, if the nesting depth allows it
     pub fn resource_to_json(&self, resource_url: &String, _depth: u32) -> Result<String> {
-        use serde_json::{Map, Value};
+        use serde_json::{Map, Value as SerdeValue};
+
+        let json_ld: bool = true;
 
         let resource = self.get(resource_url).ok_or("Resource not found")?;
 
         // Initiate JSON object
-        let mut map = Map::new();
+        let mut root = Map::new();
+
+        // For JSON-LD serialization
+        let mut context = Map::new();
 
         // For every atom, find the key, datatype and add it to the @context
         for (prop_url, value) in resource.iter() {
-            // Add it to the JSON object
-            // Very naive implementation, should actually turn:
-            // [ ] ResourceArrays into arrrays
-            // [ ] URLS into @id things
-            // [ ] Numbers into native numbers
-            // [ ] Resoures into objects, if the nesting depth allows it
-            let property = self.get_property(prop_url).unwrap();
-            map.insert(property.shortname, Value::String(value.into()));
+            // We need the Property for shortname and Datatype
+            let property = self.get_property(prop_url)?;
+            if json_ld {
+                // In JSON-LD, the value of a Context Item can be a string or an object.
+                // This object can contain information about the translation or datatype of the value
+                let ctx_value: SerdeValue = match property.data_type {
+                    DataType::AtomicUrl => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        obj.insert("@type".into(), "@id".into());
+                        obj.into()
+                    },
+                    DataType::Date => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        obj.insert("@type".into(), "http://www.w3.org/2001/XMLSchema#date".into());
+                        obj.into()
+                    },
+                    DataType::Integer => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        // I'm not sure whether we should use XSD or Atomic Datatypes
+                        obj.insert("@type".into(), "http://www.w3.org/2001/XMLSchema#integer".into());
+                        obj.into()
+                    },
+                    DataType::MDString => prop_url.as_str().into(),
+                    DataType::ResourceArray => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        // Plain JSON-LD Arrays are not ordered. Here, they are converted into an RDF List.
+                        obj.insert("@container".into(), "@list".into());
+                        obj.into()
+                    },
+                    DataType::Slug => prop_url.as_str().into(),
+                    DataType::String => prop_url.as_str().into(),
+                    DataType::Timestamp => prop_url.as_str().into(),
+                    DataType::Unsupported(_) => prop_url.as_str().into(),
+                };
+                context.insert(property.shortname.as_str().into(), ctx_value);
+            }
+            let native_value = self.get_native_value(value, &property.data_type);
+            let jsonval = match native_value? {
+                Value::AtomicUrl(val) => SerdeValue::String(val.into()),
+                Value::Date(val) => SerdeValue::String(val.into()),
+                Value::Integer(val) => SerdeValue::Number(val.into()),
+                Value::MDString(val) => SerdeValue::String(val.into()),
+                Value::ResourceArray(val) =>
+                    SerdeValue::Array(val.iter().map(
+                        |item| SerdeValue::String(item.clone())
+                    ).collect()),
+                Value::Slug(val) => SerdeValue::String(val.into()),
+                Value::String(val) => SerdeValue::String(val.into()),
+                Value::Timestamp(val) => SerdeValue::Number(val.into()),
+                Value::Unsupported(val) => SerdeValue::String(val.value.into()),
+            };
+            root.insert(property.shortname, jsonval);
         }
 
-        let obj = Value::Object(map);
+        if json_ld {
+            root.insert("@context".into(), context.into());
+            root.insert("@id".into(), resource_url.as_str().into());
+        }
+        let obj = SerdeValue::Object(root);
         let string = serde_json::to_string_pretty(&obj).unwrap();
 
         return Ok(string);
@@ -218,6 +287,7 @@ impl Store {
         return Ok(property);
     }
 
+    ///
     pub fn property_url_to_shortname(&self, url: &String) -> Result<String> {
         let property_resource = self
             .hashmap
@@ -311,7 +381,10 @@ impl Store {
                 property: property_url.clone().unwrap(),
                 value: value.clone().unwrap(),
                 native_value: self
-                    .get_native_value(&value.clone().unwrap(), &property_url.clone().unwrap())?,
+                    .get_native_value(
+                        &value.clone().unwrap(),
+                        &self.get_property(&property_url.ok_or("No property url")?)?.data_type
+                    )?
             })
         }
         return Ok(current);
@@ -345,9 +418,8 @@ impl Store {
 
     // Returns an enum of the native value.
     // Validates the contents.
-    pub fn get_native_value(&self, value: &String, property_url: &String) -> Result<Value> {
-        let prop = self.get_property(property_url)?;
-        match prop.data_type {
+    pub fn get_native_value(&self, value: &String, datatype: &DataType) -> Result<Value> {
+        match datatype {
             DataType::Integer => {
                 let val: i32 = value.parse()?;
                 return Ok(Value::Integer(val));
