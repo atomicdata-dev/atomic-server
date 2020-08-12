@@ -361,7 +361,6 @@ dependencies = [
  "dirs",
  "promptly",
  "regex",
- "uuid",
 ]
 
 [[package]]
@@ -384,7 +383,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "regex",
  "serde",

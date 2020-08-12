@@ -114,8 +114,7 @@ impl Store {
     /// Replaces existing resource with the contents
     pub fn add_resource(&mut self, subject: String, resource: Resource) -> Result<()> {
         self.hashmap
-            .insert(subject, resource)
-            .ok_or("Could not add resource")?;
+            .insert(subject, resource);
         return Ok(());
     }
 
@@ -399,7 +398,7 @@ impl Store {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         // For the first item, check the user mapping
-        let id_url: String = mapping::try_mapping_or_url(&String::from(path_items[0]), mapping)
+        let id_url: String = mapping.try_mapping_or_url(&String::from(path_items[0]))
             .ok_or(&*format!("No url found for {}", path_items[0]))?;
         if path_items.len() == 1 {
             return Ok(PathReturn::Subject(id_url));
@@ -508,6 +507,11 @@ impl Store {
 
     pub fn get(&self, resource_url: &String) -> Option<&Resource> {
         return self.hashmap.get(resource_url);
+    }
+
+    /// Gets a resource where with Values instead of strings
+    pub fn get_native(&self) {
+
     }
 
     // Returns an enum of the native value.

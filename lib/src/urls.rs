@@ -1,3 +1,5 @@
+//! Contains some of the most important Atomic Data URLs.
+
 // Classes
 pub const CLASS: &str = "https://atomicdata.dev/classes/Class";
 pub const PROPERTY: &str = "https://atomicdata.dev/classes/Property";

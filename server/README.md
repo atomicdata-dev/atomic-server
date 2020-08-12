@@ -16,7 +16,7 @@ A lightweight HTTP server that shares created Atomic data on the web.
 - [ ] Write / Mutations support
 - [ ] Collections / dynamic resources
 
-## Usage
+## Install from source
 
 Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
 

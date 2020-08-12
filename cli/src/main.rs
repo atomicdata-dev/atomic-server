@@ -7,14 +7,14 @@ use std::{collections::HashMap, path::PathBuf};
 use atomic_lib::store::{self, Store, Resource, Property, DataType, Class};
 use atomic_lib::errors::Result;
 use atomic_lib::urls;
-use atomic_lib::mapping;
+use atomic_lib::mapping::{self, Mapping};
 use atomic_lib::serialize;
-use uuid;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[allow(dead_code)]
 pub struct Context<'a> {
     store: Store,
-    mapping: mapping::Mapping,
+    mapping: Mapping,
     matches: ArgMatches<'a>,
     config_folder: PathBuf,
     user_store_path: PathBuf,
@@ -23,16 +23,18 @@ pub struct Context<'a> {
 
 fn main() {
     let matches = App::new("atomic")
-        .version("0.5.0")
+        .version("0.7.1")
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model linked atomic data!")
         .after_help("Visit https://github.com/joepio/atomic-cli for more info")
         .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
-            SubCommand::with_name("new").about("Create a Resource").arg(
+            SubCommand::with_name("new").about("Create a Resource")
+            .arg(
                 Arg::with_name("class")
-                    .help("The URL or shortname of the Class that should be created"),
-            ),
+                    .help("The URL or shortname of the Class that should be created")
+                    .required(true),
+            )
         )
         .subcommand(
             SubCommand::with_name("get")
@@ -70,7 +72,8 @@ fn main() {
     if user_mapping_path.exists() {
         mapping_path = &user_mapping_path;
     }
-    let mapping = mapping::read_mapping_from_file(&mapping_path).unwrap();
+    let mut mapping: Mapping = Mapping::init();
+    mapping.read_mapping_from_file(&mapping_path).unwrap();
 
     let default_store_path = PathBuf::from("../defaults/default_store.ad3");
     let user_store_path = config_folder.join("store.ad3");
@@ -110,7 +113,7 @@ fn main() {
 
 fn list(context: &mut Context) {
     let mut string = String::new();
-    for (shortname, url) in context.mapping.iter() {
+    for (shortname, url) in context.mapping.clone().into_iter() {
         string.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             shortname.blue().bold(),
@@ -181,21 +184,24 @@ fn new(context: &mut Context) {
     let class_input = context
         .matches
         .subcommand_matches("new")
-        .expect("Add a class")
+        .unwrap()
         .value_of("class")
         .expect("Add a class value");
-    let class_url = context
-        .mapping
-        .get(class_input)
-        .expect(&*format!("Could not find class {} in mapping", class_input));
-    let model = context.store.get_class(class_url.into());
+
+    let class_url = context.mapping.try_mapping_or_url(&class_input.into()).unwrap();
+    let model = context.store.get_class(&class_url);
     println!("Enter a new {}: {}", model.shortname, model.description);
-    prompt_instance(context, &model);
+    prompt_instance(context, &model, None);
 }
 
 /// Lets the user enter an instance of an Atomic Class through multiple prompts
-/// Returns the Resource, its URL and its Bookmark
-fn prompt_instance(context: &mut Context, class: &Class) -> (Resource, String, Option<String>) {
+/// Adds the instance to the store, and writes to disk.
+/// Returns the Resource, its URL and its Bookmark.
+fn prompt_instance(
+    context: &mut Context,
+    class: &Class,
+    preffered_shortname: Option<String>
+) -> (Resource, String, Option<String>) {
     let mut new_resource: Resource = HashMap::new();
 
     new_resource.insert(
@@ -204,7 +210,14 @@ fn prompt_instance(context: &mut Context, class: &Class) -> (Resource, String, O
     );
 
     for field in &class.requires {
-        println!("{}: {}", field.shortname, field.description);
+        if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
+            new_resource.insert(field.subject.clone(), preffered_shortname.clone().unwrap());
+            println!("Shortname set to {}", preffered_shortname.clone().unwrap());
+            continue
+        }
+        println!("{}: {}", field.shortname.bold().blue(), field.description);
+        // In multiple Properties, the shortname field is required.
+        // A preferred shortname can be passed into this function
         let mut input = prompt_field(&field, false, context);
         loop {
             if let Some(i) = input {
@@ -225,18 +238,32 @@ fn prompt_instance(context: &mut Context, class: &Class) -> (Resource, String, O
         }
     }
 
-    let subject = format!("_:{}", uuid::Uuid::new_v4());
+    // The Path is the thing at the end of the URL, from the domain
+    // Here I just print out some (kind of) random numbers.
+    // I think URL generation could be better, though. Perhaps use a
+    let path = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .subsec_nanos();
+
+    let mut subject = format!("_:{}", path);
+    if preffered_shortname.is_some() {
+        subject = format!("_:{}-{}", path, preffered_shortname.unwrap());
+    }
     println!("{} created with URL: {}", &class.shortname, &subject);
 
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
-    context.store.add_resource(subject.clone(), new_resource.clone()).expect("Could not store resource");
+    context.store.add_resource(
+        subject.clone(),
+        new_resource.clone()
+    ).unwrap();
     // Publish new resource to IPFS
     // TODO!
     // Save the store locally
     context.store.write_store_to_disk(&context.user_store_path).expect("Could not write to disk");
-    mapping::write_mapping_to_disk(&context.mapping, &context.user_mapping_path);
+    context.mapping.write_mapping_to_disk(&context.user_mapping_path);
     return (new_resource, subject, map);
 }
 
@@ -250,7 +277,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
         msg_appendix = " (required)";
     }
     match &property.data_type {
-        DataType::String => {
+        DataType::String | DataType::MDString => {
             let msg = format!("string{}", msg_appendix);
             input = prompt_opt(&msg).unwrap();
             return input;
@@ -306,7 +333,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             match url {
                 Some(u) => {
                     // TODO: Check if string or if map
-                    input = mapping::try_mapping_or_url(&u, &context.mapping);
+                    input = context.mapping.try_mapping_or_url(&u);
                     match input {
                         Some(url) => return Some(url),
                         None => {
@@ -330,7 +357,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                     let mut urls: Vec<String> = Vec::new();
                     let length = string_items.clone().count();
                     for item in string_items.into_iter() {
-                        match mapping::try_mapping_or_url(&item.into(), &context.mapping) {
+                        match context.mapping.try_mapping_or_url(&item.into()) {
                             Some(url) => {
                                 urls.push(url);
                             }
@@ -340,6 +367,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                                 let (_resource, url, _shortname) = prompt_instance(
                                     context,
                                     &context.store.get_class(&urls::PROPERTY.into()),
+                                    Some(item.into())
                                 );
                                 urls.push(url);
                                 continue;
@@ -354,7 +382,6 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => break,
             }
         },
-        DataType::MDString => { todo!() }
         DataType::Timestamp => { todo!() }
         DataType::Unsupported(unsup) => {
             panic!("Unsupported datatype: {:?}", unsup)
@@ -368,17 +395,17 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
     let re = Regex::new(store::SLUG_REGEX).unwrap();
     let mut shortname: Option<String> = prompt_opt(format!("Local Bookmark (optional)")).unwrap();
     loop {
-        match shortname {
+        match shortname.as_ref() {
             Some(sn) => {
-                if mapping.contains_key(&*sn) {
+                if mapping.contains_key(sn) {
                     let msg = format!(
                         "You're already using that shortname for {:?}, try something else",
-                        mapping.get(&*sn).unwrap()
+                        mapping.get(sn).unwrap()
                     );
                     shortname = prompt_opt(msg).unwrap();
-                } else if re.is_match(&*sn) {
-                    &mut mapping.insert(String::from(&sn), String::from(subject));
-                    return Some(String::from(&sn));
+                } else if re.is_match(&sn.as_str()) {
+                    &mut mapping.insert(String::from(sn), String::from(subject));
+                    return Some(String::from(sn));
                 } else {
                     shortname =
                         prompt_opt("Not a valid bookmark, only use letters, numbers, and '-'")
