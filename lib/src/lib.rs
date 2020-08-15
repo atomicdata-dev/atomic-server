@@ -28,3 +28,4 @@ pub mod store;
 pub mod urls;
 
 pub use store::Store;
+pub use atoms::Atom;

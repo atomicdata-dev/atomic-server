@@ -113,8 +113,7 @@ impl Store {
 
     /// Replaces existing resource with the contents
     pub fn add_resource(&mut self, subject: String, resource: Resource) -> Result<()> {
-        self.hashmap
-            .insert(subject, resource);
+        self.hashmap.insert(subject, resource);
         return Ok(());
     }
 
@@ -320,11 +319,9 @@ impl Store {
             .get(urls::IS_A);
         let classes_array = match classes_array_opt {
             Some(vec) => vec,
-            None => {
-                return Ok(Vec::new())
-            }
+            None => return Ok(Vec::new()),
         };
-            // .ok_or(format!("IsA property not present in {}", subject))?;
+        // .ok_or(format!("IsA property not present in {}", subject))?;
         let native = self.get_native_value(classes_array, &DataType::ResourceArray)?;
         let vector = match native {
             Value::ResourceArray(vec) => vec,
@@ -398,7 +395,8 @@ impl Store {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         // For the first item, check the user mapping
-        let id_url: String = mapping.try_mapping_or_url(&String::from(path_items[0]))
+        let id_url: String = mapping
+            .try_mapping_or_url(&String::from(path_items[0]))
             .ok_or(&*format!("No url found for {}", path_items[0]))?;
         if path_items.len() == 1 {
             return Ok(PathReturn::Subject(id_url));
@@ -510,9 +508,7 @@ impl Store {
     }
 
     /// Gets a resource where with Values instead of strings
-    pub fn get_native(&self) {
-
-    }
+    pub fn get_native(&self) {}
 
     // Returns an enum of the native value.
     // Validates the contents.
@@ -533,7 +529,7 @@ impl Store {
             }
             DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
             DataType::ResourceArray => {
-                let vector: Vec<String> = deserialize_json_array(value).unwrap();
+                let vector = deserialize_json_array(value)?;
                 return Ok(Value::ResourceArray(vector));
             }
             DataType::Date => {
@@ -609,16 +605,83 @@ impl Store {
                     if !found_props.contains(&required_prop.subject) {
                         return Err(format!(
                             "Missing requried property {} in {} because of class {}",
-                            &required_prop.shortname,
-                            subject,
-                            class.subject,
-                        ).into())
+                            &required_prop.shortname, subject, class.subject,
+                        )
+                        .into());
                     }
                 }
             }
             println!("{:?} Valid", subject);
         }
         return Ok(());
+    }
+
+    /// Triple Pattern Fragments interface.
+    /// Use this for most queries, e.g. finding all items with some property / value combination.
+    /// Returns an empty array if nothing is found.
+    ///
+    /// # Example
+    ///
+    /// For example, if I want to view all resources with the class "Person", I'd do:
+    ///
+    /// ```
+    /// tpf(None, Some("https://atomicdata.dev/isA"), Some("https://example.com/Person"))
+    /// ```
+    pub fn tpf(
+        &self,
+        q_subject: Option<String>,
+        q_property: Option<String>,
+        q_value: Option<String>,
+    ) -> Vec<Atom> {
+        let mut vec: Vec<Atom> = Vec::new();
+
+        let hassub = q_subject.is_some();
+        let hasprop = q_property.is_some();
+        let hasval = q_value.is_some();
+
+        // Simply return all the atoms
+        if !hassub && !hasprop && !hasval {
+            for (sub, resource) in self.hashmap.iter() {
+                for (property, value) in resource {
+                    vec.push(Atom::new(sub.into(), property.into(), value.into(), &self))
+                }
+            }
+            return vec;
+        }
+
+        let mut find_in_resource = |subj: &String, resource: &Resource| {
+            for (prop, val) in resource.iter() {
+                if hasprop && q_property.as_ref().unwrap() == prop {
+                        if hasval {
+                        if val == q_value.as_ref().unwrap() {
+                            vec.push(Atom::new(subj.into(), prop.into(), val.into(), &self))
+                        }
+                    } else {
+                        vec.push(Atom::new(subj.into(), prop.into(), val.into(), &self))
+                    }
+                } else if hasval && q_value.as_ref().unwrap() == val {
+                    vec.push(Atom::new(subj.into(), prop.into(), val.into(), &self))
+                }
+            }
+        };
+
+        match q_subject {
+            Some(sub) => match self.get(&sub) {
+                Some(resource) => {
+                    find_in_resource(&sub, resource);
+                    return vec;
+                }
+                None => {
+                    return vec;
+                }
+            },
+            None => {
+                for (subj, properties) in self.hashmap.iter() {
+                    find_in_resource(subj, properties);
+                }
+                return vec;
+            }
+        }
     }
 }
 

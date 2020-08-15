@@ -1,15 +1,16 @@
-use clap::{App, AppSettings,Arg, ArgMatches, SubCommand};
+use atomic_lib::errors::Result;
+use atomic_lib::mapping::{self, Mapping};
+use atomic_lib::serialize;
+use atomic_lib::store::{self, Class, DataType, Property, Resource, Store};
+use atomic_lib::urls;
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use colored::*;
 use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
-use std::{collections::HashMap, path::PathBuf};
-use atomic_lib::store::{self, Store, Resource, Property, DataType, Class};
-use atomic_lib::errors::Result;
-use atomic_lib::urls;
-use atomic_lib::mapping::{self, Mapping};
-use atomic_lib::serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::{collections::HashMap, path::PathBuf};
+use serialize::serialize_atoms_to_ad3;
 
 #[allow(dead_code)]
 pub struct Context<'a> {
@@ -49,7 +50,7 @@ fn main() {
                     .help("\
                     The subject URL, shortname or path to be fetched. \
                     Use quotes for paths. \
-                    You can use Bookmarks instead of a full subjet URL. \
+                    You can use Bookmarks instead of a full subject URL. \
                     ",
                     )
                     .required(true)
@@ -58,6 +59,27 @@ fn main() {
                     .long("as")
                     .help("Serialization option (pretty=default, json, ad3)")
                     .takes_value(true)
+                )
+        )
+        .subcommand(
+            SubCommand::with_name("tpf")
+                    .about("Finds Atoms using Triple Pattern Fragments",
+                    )
+                    .after_help("\
+                    Filter the store by <subject> <property> and <value>. \
+                    Use a dot to indicate that you don't need to filter. \
+                    ")
+                .arg(Arg::with_name("subject")
+                    .help("The subject URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
+                    .required(true)
+                )
+                .arg(Arg::with_name("property")
+                    .help("The property URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
+                    .required(true)
+                )
+                .arg(Arg::with_name("value")
+                    .help("The value URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
+                    .required(true)
                 )
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
@@ -85,7 +107,9 @@ fn main() {
 
     let mut store: Store = Store::init();
     // The store contains the classes and properties
-    store.read_store_from_file(&store_path).expect("Does it work");
+    store
+        .read_store_from_file(&store_path)
+        .expect("Does it work");
 
     let mut context = Context {
         mapping,
@@ -106,6 +130,9 @@ fn main() {
         Some("get") => {
             get(&mut context);
         }
+        Some("tpf") => {
+            tpf(&mut context);
+        }
         Some(cmd) => println!("{} is not a valid command. Run atomic --help", cmd),
         None => println!("Run atomic --help for available commands"),
     }
@@ -124,56 +151,47 @@ fn list(context: &mut Context) {
 }
 
 fn get(context: &mut Context) {
-    let subcommand_matches = context
-        .matches
-        .subcommand_matches("get")
-        .unwrap();
-    let path_string = subcommand_matches.value_of("path")
+    let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
+    let path_string = subcommand_matches
+        .value_of("path")
         .expect("Add a URL, shortname or path");
-    let serialization: Option<serialize::SerialializationFormats> = match subcommand_matches.value_of("as") {
-        Some("json") => Some(serialize::SerialializationFormats::JSON),
-        Some("ad3") => Some(serialize::SerialializationFormats::AD3),
-        Some(format) => {
-            panic!("As {} not supported. Try 'json' or 'ad3'.", format);
-        }
-        None => None
-    };
+    let serialization: Option<serialize::SerialializationFormats> =
+        match subcommand_matches.value_of("as") {
+            Some("json") => Some(serialize::SerialializationFormats::JSON),
+            Some("ad3") => Some(serialize::SerialializationFormats::AD3),
+            Some(format) => {
+                panic!("As {} not supported. Try 'json' or 'ad3'.", format);
+            }
+            None => None,
+        };
 
     // Returns a URL or Value
     let result = &context.store.get_path(path_string, &context.mapping);
     match result {
-        Ok(res) => {
-            match res {
-                store::PathReturn::Subject(url) => {
-                    match serialization {
-                        Some(serialize::SerialializationFormats::JSON) => {
-                            let out = &context.store.resource_to_json(&url, 1).unwrap();
-                            println!("{}", out);
-                        }
-                        Some(serialize::SerialializationFormats::AD3) => {
-                            let out = &context.store.resource_to_ad3(&url, None).unwrap();
-                            println!("{}", out);
-                        }
-                        None => {
-                            pretty_print_resource(&url, &context.store).unwrap();
-                        }
-                    }
+        Ok(res) => match res {
+            store::PathReturn::Subject(url) => match serialization {
+                Some(serialize::SerialializationFormats::JSON) => {
+                    let out = &context.store.resource_to_json(&url, 1).unwrap();
+                    println!("{}", out);
                 }
-                store::PathReturn::Atom(atom) => {
-                    match serialization {
-                        Some(serialize::SerialializationFormats::JSON) => {
-                            println!("{}", atom.value);
-                        }
-                        Some(serialize::SerialializationFormats::AD3) => {
-                            println!("{}", atom.value);
-                        }
-                        None => {
-                            println!("{:?}", &atom.native_value)
-                        }
-                    }
+                Some(serialize::SerialializationFormats::AD3) => {
+                    let out = &context.store.resource_to_ad3(&url, None).unwrap();
+                    println!("{}", out);
                 }
-            }
-        }
+                None => {
+                    pretty_print_resource(&url, &context.store).unwrap();
+                }
+            },
+            store::PathReturn::Atom(atom) => match serialization {
+                Some(serialize::SerialializationFormats::JSON) => {
+                    println!("{}", atom.value);
+                }
+                Some(serialize::SerialializationFormats::AD3) => {
+                    println!("{}", atom.value);
+                }
+                None => println!("{:?}", &atom.native_value),
+            },
+        },
         Err(e) => {
             eprintln!("{}", e);
         }
@@ -188,7 +206,10 @@ fn new(context: &mut Context) {
         .value_of("class")
         .expect("Add a class value");
 
-    let class_url = context.mapping.try_mapping_or_url(&class_input.into()).unwrap();
+    let class_url = context
+        .mapping
+        .try_mapping_or_url(&class_input.into())
+        .unwrap();
     let model = context.store.get_class(&class_url);
     println!("Enter a new {}: {}", model.shortname, model.description);
     prompt_instance(context, &model, None);
@@ -200,7 +221,7 @@ fn new(context: &mut Context) {
 fn prompt_instance(
     context: &mut Context,
     class: &Class,
-    preffered_shortname: Option<String>
+    preffered_shortname: Option<String>,
 ) -> (Resource, String, Option<String>) {
     let mut new_resource: Resource = HashMap::new();
 
@@ -213,7 +234,7 @@ fn prompt_instance(
         if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
             new_resource.insert(field.subject.clone(), preffered_shortname.clone().unwrap());
             println!("Shortname set to {}", preffered_shortname.clone().unwrap());
-            continue
+            continue;
         }
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         // In multiple Properties, the shortname field is required.
@@ -255,15 +276,20 @@ fn prompt_instance(
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
-    context.store.add_resource(
-        subject.clone(),
-        new_resource.clone()
-    ).unwrap();
+    context
+        .store
+        .add_resource(subject.clone(), new_resource.clone())
+        .unwrap();
     // Publish new resource to IPFS
     // TODO!
     // Save the store locally
-    context.store.write_store_to_disk(&context.user_store_path).expect("Could not write to disk");
-    context.mapping.write_mapping_to_disk(&context.user_mapping_path);
+    context
+        .store
+        .write_store_to_disk(&context.user_store_path)
+        .expect("Could not write to disk");
+    context
+        .mapping
+        .write_mapping_to_disk(&context.user_mapping_path);
     return (new_resource, subject, map);
 }
 
@@ -327,7 +353,9 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             // If a classtype is present, the given URL must be an instance of that Class
             let classtype = &property.class_type;
             if classtype.is_some() {
-                let class = context.store.get_class(&String::from(classtype.as_ref().unwrap()));
+                let class = context
+                    .store
+                    .get_class(&String::from(classtype.as_ref().unwrap()));
                 println!("Enter the URL or shortname of a {}", class.description)
             }
             match url {
@@ -367,7 +395,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                                 let (_resource, url, _shortname) = prompt_instance(
                                     context,
                                     &context.store.get_class(&urls::PROPERTY.into()),
-                                    Some(item.into())
+                                    Some(item.into()),
                                 );
                                 urls.push(url);
                                 continue;
@@ -382,10 +410,8 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 None => break,
             }
         },
-        DataType::Timestamp => { todo!() }
-        DataType::Unsupported(unsup) => {
-            panic!("Unsupported datatype: {:?}", unsup)
-        }
+        DataType::Timestamp => todo!(),
+        DataType::Unsupported(unsup) => panic!("Unsupported datatype: {:?}", unsup),
     };
     return input;
 }
@@ -432,4 +458,22 @@ fn pretty_print_resource(url: &String, store: &Store) -> Result<()> {
     output.push_str(&*format!("{0: <15}{1: <10} \n", "url".blue().bold(), url));
     println!("{}", output);
     Ok(())
+}
+
+fn tpf(context: &mut Context) {
+    let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
+    let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
+    let property = tpf_value(subcommand_matches.value_of("property").unwrap());
+    let value = tpf_value(subcommand_matches.value_of("value").unwrap());
+    let found_atoms = context.store.tpf(subject, property, value);
+    let serialized = serialize_atoms_to_ad3(found_atoms);
+    println!("{}", serialized.unwrap())
+}
+
+fn tpf_value(string: &str) -> Option<String> {
+    if string == "." {
+        return None
+    } else {
+        return Some(string.into())
+    }
 }
