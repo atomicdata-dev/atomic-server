@@ -1,5 +1,7 @@
 use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
 use serde::Serialize;
+use log;
+use std::error::Error;
 
 // More strict error type, supports HTTP responses
 pub type BetterResult<T> = std::result::Result<T, AppError>;
@@ -22,6 +24,8 @@ pub struct AppErrorResponse {
     pub error: String,
 }
 
+impl Error for AppError {}
+
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self.error_type {
@@ -31,6 +35,7 @@ impl ResponseError for AppError {
     }
     fn error_response(&self) -> HttpResponse {
         let body = format!("Error: {:?}. {:?}", self.message, self.cause);
+        log::info!("Error reponse: {}", body);
         HttpResponse::build(self.status_code()).body(body)
     }
 }

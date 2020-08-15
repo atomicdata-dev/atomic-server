@@ -8,15 +8,18 @@ A lightweight HTTP server that shares created Atomic data on the web.
 - [ ] Content-type negotiation
 - [x] URL extension recognition
 - [x] HTML serialization
+- [ ] CSS / design
 - [x] JSON serialization
 - [x] AD3 serialization
+- [x] Basic error handling
 - [ ] TPF endpoint
-- [ ] Homepage
+- [x] Homepage
+- [x] Static asset support for .css / .ico / etc.
 - [ ] HTTPS
 - [ ] Write / Mutations support
 - [ ] Collections / dynamic resources
 
-## Install from source
+## Install
 
 Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
 
@@ -31,3 +34,5 @@ cp default.env .env
 atomic-server
 # Visit http://localhost:8080/test
 ```
+
+You can also install with `cargo install atomic-server`, but you currently need the `.env` from this repo.

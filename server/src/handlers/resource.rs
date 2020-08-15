@@ -2,10 +2,10 @@ use serde::Serialize;
 use std::path::Path;
 use tera::{Context as TeraCtx};
 use atomic_lib::store::Property;
-use actix_web::{web, http, HttpRequest, HttpResponse};
+use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
 use crate::errors::BetterResult;
-use crate::log;
+use log;
 use std::sync::Mutex;
 
 enum ContentType {
@@ -17,7 +17,6 @@ enum ContentType {
 pub async fn get_resource(
   _id: web::Path<String>,
   data: web::Data<Mutex<AppState>>,
-  req: HttpRequest,
 ) -> BetterResult<HttpResponse> {
   let path = Path::new(_id.as_str());
   let id = path.file_stem().unwrap().to_str().unwrap();
@@ -32,8 +31,8 @@ pub async fn get_resource(
       }
       None => ContentType::HTML,
   } ;
-  log::info(&format!("{:?}", id));
-  log::info(&format!("method: {:?}", req.method()));
+
+  log::info!("id: {:?}", id);
   let context = data.lock().unwrap();
   // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
   let subject = format!("_:{}", id);
@@ -65,7 +64,6 @@ pub async fn get_resource(
                   property: fullprop,
                   value: value.into(),
               };
-              println!("{:?}", propval.property.shortname);
               propvals.push(propval);
           }
           tera_context.insert("resource", &propvals);

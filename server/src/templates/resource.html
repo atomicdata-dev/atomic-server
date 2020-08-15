@@ -1,9 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Resource{% endblock title %}
+{% block content %}
 <ul>
   {% for item in resource -%}
-  <li><a href="{{ item.property.subject }}">{{ item.property.shortname }}</a> {{ item.value }}</li>
+  <li>
+    <a href="{{ item.property.subject }}" title="{{ item.property.description }}">
+      {{ item.property.shortname }}</a>
+    {{ item.value }}</li>
   {%- endfor %}
 </ul>
 
 <em>You can add .json or .ad3 to this URL to fetch JSON and Atomic Data representations.</em>
-<em>This is an early pre-alpha of the <a href="https://github.com/joepio/atomic">Atomic library for Rust</a>.</em>
-<em>Check out the <a href="docs.atomicdata.dev/">Atomic Data docs</a>.</em>
+{% endblock content %}
