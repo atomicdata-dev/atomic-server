@@ -20,11 +20,11 @@
 //! ```
 
 pub mod atoms;
+pub mod errors;
 pub mod mapping;
 pub mod mutations;
 pub mod serialize;
 pub mod store;
 pub mod urls;
-pub mod errors;
 
 pub use store::Store;

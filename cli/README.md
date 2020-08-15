@@ -32,6 +32,14 @@ Visit https://github.com/joepio/atomic-cli for more info
 
 Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
 
+Install using crates.io:
+
+```sh
+cargo install atomic-cli
+```
+
+Or build from this repo:
+
 ```sh
 git clone git@github.com:joepio/atomic.git
 cd atomic/cli
