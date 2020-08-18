@@ -4,20 +4,23 @@ _Status: pre-alpha_
 
 A lightweight HTTP server that shares created Atomic data on the web.
 
+## Progress
+
 - [x] Respond to GET request for individual resources
-- [ ] Content-type negotiation
 - [x] URL extension recognition
 - [x] HTML serialization
-- [ ] CSS / design
 - [x] JSON serialization
 - [x] AD3 serialization
 - [x] Basic error handling
-- [ ] TPF endpoint
+- [x] TPF endpoint
 - [x] Homepage
 - [x] Static asset support for .css / .ico / etc.
-- [ ] HTTPS
-- [ ] Write / Mutations support
+- [ ] CSS / design
+- [ ] Content-type negotiation
 - [ ] Collections / dynamic resources
+- [ ] HTTPS
+- [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support
+- [ ] Auth support (WebID-OICD possibly?)
 
 ## Install
 

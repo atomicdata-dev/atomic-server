@@ -1,6 +1,7 @@
 use crate::store::{Store, Value};
+use serde::Serialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Atom {
     pub subject: String,
     pub property: String,

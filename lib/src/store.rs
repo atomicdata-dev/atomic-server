@@ -51,7 +51,7 @@ pub enum DataType {
     Unsupported(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub enum Value {
     AtomicUrl(String),
     Date(String),
@@ -65,7 +65,7 @@ pub enum Value {
 }
 
 /// When the Datatype of a Value is not handled by this library
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct UnsupportedValue {
     pub value: String,
     /// URL of the datatype
@@ -649,6 +649,7 @@ impl Store {
             return vec;
         }
 
+        // Find atoms matching the TPF query in a single resource
         let mut find_in_resource = |subj: &String, resource: &Resource| {
             for (prop, val) in resource.iter() {
                 if hasprop && q_property.as_ref().unwrap() == prop {
@@ -668,6 +669,7 @@ impl Store {
         match q_subject {
             Some(sub) => match self.get(&sub) {
                 Some(resource) => {
+                    println!("Ja! {:?}", resource);
                     find_in_resource(&sub, resource);
                     return vec;
                 }

@@ -4,15 +4,9 @@ use tera::{Context as TeraCtx};
 use atomic_lib::store::Property;
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
-use crate::errors::BetterResult;
+use crate::{content_types::ContentType, errors::BetterResult};
 use log;
 use std::sync::Mutex;
-
-enum ContentType {
-  JSON,
-  HTML,
-  AD3,
-}
 
 pub async fn get_resource(
   _id: web::Path<String>,
@@ -77,7 +71,7 @@ pub async fn get_resource(
           builder.set(
               http::header::ContentType::html()
           );
-          let body = context.store.resource_to_ad3(&subject, Some(&context.domain))?;
+          let body = context.store.resource_to_ad3(&subject, Some(&context.config.domain))?;
           Ok(builder.body(body))
       }
   }

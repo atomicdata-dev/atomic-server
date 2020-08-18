@@ -3,12 +3,25 @@
 
 <head>
     {% block head %}
-    <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="/static/styles.css" />
     <title>{% block title %}{% endblock title %} - My Webpage</title>
     {% endblock head %}
 </head>
 
 <body>
+    <div id="nav">
+        <ul>
+            <li>
+                <a href="/">Home</a>
+            </li>
+            <li>
+                <a href="https://docs.atomicdata.dev">Docs</a>
+            </li>
+            <li>
+                <a href="/tpf">TPF</a>
+            </li>
+        </ul>
+    </div>
     <div id="content">{% block content %}{% endblock content %}</div>
     <div id="footer">
         {% block footer %}

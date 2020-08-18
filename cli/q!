@@ -1,0 +1,41 @@
+##
+# Host Database
+#
+# localhost is used to configure the loopback interface
+# when the system is booting.  Do not change this entry.
+##
+127.0.0.1	localhost
+255.255.255.255	broadcasthost
+::1             localhost
+# Added by Docker Desktop
+# To allow the same kube context to work on the host and the container:
+127.0.0.1 kubernetes.docker.internal
+# End of section
+127.0.0.1 argu.localdev
+127.0.0.1 app.argu.localdev
+127.0.0.1 dexes.localdev
+127.0.0.1 app.argu.localdev
+::1 argu.localdev
+::1 dexes.localdev
+::1 joep.dexes.localdev
+::1 testman.dexes.localdev
+::1 hopsie.dexes.localdev
+::1 test.dexes.localdev
+::1 app.argu.localdev
+127.0.0.1 argu.localtest
+127.0.0.1 app.argu.localtest
+::1 argu.localtest
+::1 app.argu.localtest
+127.0.0.1 postgres
+127.0.0.1 redis
+127.0.0.1 rabbitmq
+127.0.0.1 token.svc.cluster.local
+127.0.0.1 deku.svc.cluster.local
+127.0.0.1 email.svc.cluster.local
+127.0.0.1 argu.svc.cluster.local
+127.0.0.1 elastic
+127.0.0.1 mailcatcher
+127.0.0.1 mockserver
+127.0.0.1 atomicdata.dev
+127.0.0.1 figmadaemon.com
+127.0.0.1 dextransfer.localdev
