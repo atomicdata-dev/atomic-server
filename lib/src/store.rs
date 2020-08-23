@@ -648,8 +648,8 @@ impl Store {
         q_subject: Option<String>,
         q_property: Option<String>,
         q_value: Option<String>,
-    ) -> Vec<RichAtom> {
-        let mut vec: Vec<RichAtom> = Vec::new();
+    ) -> Vec<Atom> {
+        let mut vec: Vec<Atom> = Vec::new();
 
         let hassub = q_subject.is_some();
         let hasprop = q_property.is_some();
@@ -659,7 +659,7 @@ impl Store {
         if !hassub && !hasprop && !hasval {
             for (sub, resource) in self.hashmap.iter() {
                 for (property, value) in resource {
-                    vec.push(RichAtom::new(sub.into(), property.into(), value.into(), &self))
+                    vec.push(Atom::new(sub.into(), property.into(), value.into()))
                 }
             }
             return vec;
@@ -671,13 +671,13 @@ impl Store {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                         if hasval {
                         if val == q_value.as_ref().unwrap() {
-                            vec.push(RichAtom::new(subj.into(), prop.into(), val.into(), &self))
+                            vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                         }
                     } else {
-                        vec.push(RichAtom::new(subj.into(), prop.into(), val.into(), &self))
+                        vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                     }
                 } else if hasval && q_value.as_ref().unwrap() == val {
-                    vec.push(RichAtom::new(subj.into(), prop.into(), val.into(), &self))
+                    vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                 }
             }
         };

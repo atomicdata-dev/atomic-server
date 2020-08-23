@@ -3,7 +3,7 @@ use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.
 /// It's RichAtom sibling provides some extra methods.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Atom {
     pub subject: String,
     pub property: String,
@@ -22,7 +22,7 @@ impl Atom {
 
 /// A more heavyweight atom that is validated,
 /// converted to a native value and has various property details.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct RichAtom {
     pub subject: String,
     pub property: Property,
@@ -45,6 +45,14 @@ impl RichAtom {
   }
 }
 
+pub fn plain_to_rich(plainatom: Atom, store: &Store) -> RichAtom {
+  RichAtom::new(
+    plainatom.subject,
+    plainatom.property,
+    plainatom.value,
+    store,
+  )
+}
 
 pub fn rich_to_plain(richatom: &RichAtom) -> Atom {
   return Atom {

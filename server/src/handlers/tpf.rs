@@ -3,7 +3,7 @@ use tera::{Context as TeraCtx};
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
 use crate::render_atom::RenderAtom;
-use atomic_lib::atoms::rich_to_plain;
+use atomic_lib::atoms::plain_to_rich;
 use crate::{content_types::ContentType, errors::BetterResult};
 use log;
 use std::sync::Mutex;
@@ -38,7 +38,7 @@ pub async fn tpf(
       ContentType::HTML => {
           let renderedatoms: Vec<RenderAtom> = atoms.iter()
             .map(
-              |atom| RenderAtom::from_rich_atom(atom)).collect();
+              |atom| RenderAtom::from_rich_atom(&plain_to_rich(atom.clone(), &context.store))).collect();
           builder.set(
               http::header::ContentType::html()
           );
@@ -58,8 +58,8 @@ pub async fn tpf(
           builder.set(
               http::header::ContentType::html()
           );
-          let plainatoms = atoms.iter().map(|atom| rich_to_plain(atom)).collect();
-          let ad3_string = atomic_lib::serialize::serialize_atoms_to_ad3(plainatoms)?;
+          // let plainatoms = atoms.iter().map(|atom| rich_to_plain(atom)).collect();
+          let ad3_string = atomic_lib::serialize::serialize_atoms_to_ad3(atoms)?;
           Ok(builder.body(ad3_string))
       }
   }
