@@ -7,7 +7,7 @@ use crate::errors::Result;
 use crate::mapping;
 use crate::mutations;
 use crate::serialize;
-use crate::{atoms::Atom, serialize::deserialize_json_array, urls};
+use crate::{atoms::{RichAtom, Atom}, serialize::deserialize_json_array, urls};
 use mapping::Mapping;
 use regex::Regex;
 use serde::Serialize;
@@ -27,7 +27,7 @@ pub struct Class {
 /// The first string represents the URL of the Property, the second one its Value.
 pub type Resource = HashMap<String, String>;
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Property {
     // URL of the class
     pub class_type: Option<String>,
@@ -38,7 +38,7 @@ pub struct Property {
     pub description: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum DataType {
     AtomicUrl,
     Date,
@@ -51,7 +51,7 @@ pub enum DataType {
     Unsupported(String),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub enum Value {
     AtomicUrl(String),
     Date(String),
@@ -65,7 +65,7 @@ pub enum Value {
 }
 
 /// When the Datatype of a Value is not handled by this library
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct UnsupportedValue {
     pub value: String,
     /// URL of the datatype
@@ -431,7 +431,7 @@ impl Store {
                     PathReturn::Atom(atom) => {
                         let array_string = resource
                             .ok_or("Resource not found")?
-                            .get(&atom.property)
+                            .get(&atom.property.subject)
                             .ok_or("Property not found")?;
                         let vector: Vec<String> =
                             from_str(array_string).expect("Failed to parse array");
@@ -475,17 +475,12 @@ impl Store {
                     .unwrap()
                     .clone(),
             );
-            current = PathReturn::Atom(Atom {
-                subject: subject.clone(),
-                property: property_url.clone().unwrap(),
-                value: value.clone().unwrap(),
-                native_value: self.get_native_value(
-                    &value.clone().unwrap(),
-                    &self
-                        .get_property(&property_url.ok_or("No property url")?)?
-                        .data_type,
-                )?,
-            })
+            current = PathReturn::Atom(RichAtom::new(
+                subject.clone(),
+                property_url.clone().unwrap(),
+                value.clone().unwrap(),
+                &self,
+            ))
         }
         return Ok(current);
     }
@@ -653,8 +648,8 @@ impl Store {
         q_subject: Option<String>,
         q_property: Option<String>,
         q_value: Option<String>,
-    ) -> Vec<Atom> {
-        let mut vec: Vec<Atom> = Vec::new();
+    ) -> Vec<RichAtom> {
+        let mut vec: Vec<RichAtom> = Vec::new();
 
         let hassub = q_subject.is_some();
         let hasprop = q_property.is_some();
@@ -664,7 +659,7 @@ impl Store {
         if !hassub && !hasprop && !hasval {
             for (sub, resource) in self.hashmap.iter() {
                 for (property, value) in resource {
-                    vec.push(Atom::new(sub.into(), property.into(), value.into(), &self))
+                    vec.push(RichAtom::new(sub.into(), property.into(), value.into(), &self))
                 }
             }
             return vec;
@@ -676,13 +671,13 @@ impl Store {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                         if hasval {
                         if val == q_value.as_ref().unwrap() {
-                            vec.push(Atom::new(subj.into(), prop.into(), val.into(), &self))
+                            vec.push(RichAtom::new(subj.into(), prop.into(), val.into(), &self))
                         }
                     } else {
-                        vec.push(Atom::new(subj.into(), prop.into(), val.into(), &self))
+                        vec.push(RichAtom::new(subj.into(), prop.into(), val.into(), &self))
                     }
                 } else if hasval && q_value.as_ref().unwrap() == val {
-                    vec.push(Atom::new(subj.into(), prop.into(), val.into(), &self))
+                    vec.push(RichAtom::new(subj.into(), prop.into(), val.into(), &self))
                 }
             }
         };
@@ -716,7 +711,7 @@ impl Store {
 // A path can return one of many things
 pub enum PathReturn {
     Subject(String),
-    Atom(Atom),
+    Atom(RichAtom),
 }
 
 pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
