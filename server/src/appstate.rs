@@ -13,7 +13,14 @@ pub struct AppState {
 // Creates the server context
 pub fn init(config: Config) -> AppState {
     let mut store = Store::init();
-    store.read_store_from_file(&config.store_path).expect("Cannot read store");
+
+    if config.store_path.exists() {
+        store.read_store_from_file(&config.store_path).expect("Cannot read store");
+    } else {
+        println!("No store found, initializing in {:?}", &config.store_path);
+        store.load_default();
+        store.write_store_to_disk(&config.store_path).expect("Could not create store");
+    }
 
     let tera = match Tera::new("src/templates/*.html") {
         Ok(t) => t,

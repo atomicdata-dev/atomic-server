@@ -17,7 +17,7 @@ pub struct Config {
 /// Creates the server config, reads .env values and sets defaults
 pub fn init() -> Config {
     dotenv().ok();
-    let mut store_path = PathBuf::from("../defaults/default_store.ad3");
+    let mut store_path = PathBuf::from("~/.atomic/default_store.ad3");
     let mut domain = String::from("http://localhost:8080/");
     let mut port = 8080;
     let mut ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));

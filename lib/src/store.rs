@@ -186,14 +186,18 @@ impl Store {
     /// It uses the Shortnames of properties for Keys.
     /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
     // Very naive implementation, should actually turn:
-    // [ ] ResourceArrays into arrrays
-    // [ ] URLS into @id things
+    // [x] ResourceArrays into arrrays
+    // [x] URLS into @id things
     // [ ] Numbers into native numbers
     // [ ] Resoures into objects, if the nesting depth allows it
-    pub fn resource_to_json(&self, resource_url: &String, _depth: u32) -> Result<String> {
+    pub fn resource_to_json(
+        &self,
+        resource_url: &String,
+        _depth: u32
+    ) -> Result<String> {
         use serde_json::{Map, Value as SerdeValue};
 
-        let json_ld: bool = true;
+        let json_ld: bool = false;
 
         let resource = self.get(resource_url).ok_or("Resource not found")?;
 
@@ -251,8 +255,13 @@ impl Store {
                 };
                 context.insert(property.shortname.as_str().into(), ctx_value);
             }
-            let native_value = self.get_native_value(value, &property.data_type);
-            let jsonval = match native_value? {
+            let native_value = self.get_native_value(value, &property.data_type)
+                .expect(&*format!(
+                    "Could not convert value {:?} with property type {:?} into native value",
+                    value,
+                    &property.data_type)
+                );
+            let jsonval = match native_value {
                 Value::AtomicUrl(val) => SerdeValue::String(val.into()),
                 Value::Date(val) => SerdeValue::String(val.into()),
                 Value::Integer(val) => SerdeValue::Number(val.into()),
@@ -275,7 +284,7 @@ impl Store {
             root.insert("@id".into(), resource_url.as_str().into());
         }
         let obj = SerdeValue::Object(root);
-        let string = serde_json::to_string_pretty(&obj).unwrap();
+        let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
 
         return Ok(string);
     }
@@ -529,7 +538,12 @@ impl Store {
             }
             DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
             DataType::ResourceArray => {
-                let vector = deserialize_json_array(value)?;
+                let vector = match deserialize_json_array(value) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(format!("Not a valid ResourceArray: {} - {}", value, e).into())
+                    }
+                };
                 return Ok(Value::ResourceArray(vector));
             }
             DataType::Date => {
@@ -622,10 +636,17 @@ impl Store {
     ///
     /// # Example
     ///
-    /// For example, if I want to view all resources with the class "Person", I'd do:
+    /// For example, if I want to view all Resources that are instances of the class "Property", I'd do:
     ///
     /// ```
-    /// tpf(None, Some("https://atomicdata.dev/isA"), Some("https://example.com/Person"))
+    /// let mut store = atomic_lib::Store::init();
+    /// store.load_default();
+    /// let atoms = store.tpf(
+    ///     None,
+    ///     Some(String::from("https://atomicdata.dev/properties/isA")),
+    ///     Some(String::from("[\"https://atomicdata.dev/classes/Class\"]"))
+    /// );
+    /// assert!(atoms.len() == 3)
     /// ```
     pub fn tpf(
         &self,
@@ -669,7 +690,6 @@ impl Store {
         match q_subject {
             Some(sub) => match self.get(&sub) {
                 Some(resource) => {
-                    println!("Ja! {:?}", resource);
                     find_in_resource(&sub, resource);
                     return vec;
                 }
@@ -684,6 +704,12 @@ impl Store {
                 return vec;
             }
         }
+    }
+
+    /// Loads the default Atomic Store, containing the Properties, Datatypes and Clasess for Atomic Schema.
+    pub fn load_default(&mut self) {
+        let ad3 = include_str!("../../defaults/default_store.ad3");
+        self.parse_ad3(&String::from(ad3)).unwrap();
     }
 }
 
@@ -718,9 +744,7 @@ mod test {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let mut store = Store::init();
-        store
-            .read_store_from_file(&PathBuf::from("../defaults/default_store.ad3"))
-            .unwrap();
+        store.load_default();
         // Run parse...
         store.parse_ad3(&string).unwrap();
         return store;
@@ -754,5 +778,14 @@ mod test {
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
         store.parse_ad3(&invalid_ad3).unwrap();
         store.validate_store().unwrap();
+    }
+
+    #[test]
+    fn serialize() {
+        let store = init_store();
+        store.resource_to_json(
+            &String::from(urls::CLASS),
+            1
+        ).unwrap();
     }
 }

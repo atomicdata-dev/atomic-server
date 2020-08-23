@@ -101,11 +101,15 @@ fn main() {
     let user_store_path = config_folder.join("store.ad3");
     let mut store_path = &default_store_path;
 
+    let mut store: Store = Store::init();
     if user_store_path.exists() {
         store_path = &user_store_path;
+    } else {
+        println!("No store found, initializing in {:?}", &user_store_path);
+        store.load_default();
+        store.write_store_to_disk(&user_store_path).expect("Could not create store");
     }
 
-    let mut store: Store = Store::init();
     // The store contains the classes and properties
     store
         .read_store_from_file(&store_path)
@@ -226,7 +230,7 @@ fn prompt_instance(
     let mut new_resource: Resource = HashMap::new();
 
     new_resource.insert(
-        "https://atomicdata.dev/properties/isA".into(),
+        "[\"https://atomicdata.dev/properties/isA\"]".into(),
         String::from(&class.subject),
     );
 
