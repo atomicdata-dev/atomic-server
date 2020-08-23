@@ -4,7 +4,7 @@ use tera::{Context as TeraCtx};
 use atomic_lib::store::Property;
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
-use crate::{content_types::ContentType, errors::BetterResult};
+use crate::{content_types::ContentType, errors::BetterResult, render_atom::value_to_html};
 use log;
 use std::sync::Mutex;
 
@@ -54,9 +54,10 @@ pub async fn get_resource(
           }
           for (property, value) in resource.iter() {
               let fullprop =  context.store.get_property(property)?;
+              let val =  context.store.get_native_value(value, &fullprop.data_type)?;
               let propval = PropVal {
                   property: fullprop,
-                  value: value.into(),
+                  value: value_to_html(val),
               };
               propvals.push(propval);
           }

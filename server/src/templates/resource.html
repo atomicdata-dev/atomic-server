@@ -4,7 +4,7 @@
 <ul>
   {% for item in resource -%}
   <li>
-    <a href="{{ item.property.subject }}" title="{{ item.property.description }}">
+    <a href="/get?path={{ item.property.subject }}" title="{{ item.property.description }}">
       {{ item.property.shortname }}</a>
     {{ item.value }}</li>
   {%- endfor %}

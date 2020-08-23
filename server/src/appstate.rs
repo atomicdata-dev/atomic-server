@@ -1,4 +1,5 @@
 use atomic_lib::store::Store;
+use atomic_lib::mapping::Mapping;
 use tera::Tera;
 use crate::config::Config;
 
@@ -7,12 +8,14 @@ use crate::config::Config;
 pub struct AppState {
     pub store: Store,
     pub tera: Tera,
+    pub mapping: Mapping,
     pub config: Config,
 }
 
 // Creates the server context
 pub fn init(config: Config) -> AppState {
     let mut store = Store::init();
+    let mapping = Mapping::init();
 
     if config.store_path.exists() {
         store.read_store_from_file(&config.store_path).expect("Cannot read store");
@@ -33,6 +36,7 @@ pub fn init(config: Config) -> AppState {
     return AppState {
         store,
         config,
+        mapping,
         tera,
     };
 }

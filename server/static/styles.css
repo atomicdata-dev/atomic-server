@@ -16,3 +16,16 @@ body {
 #nav li {
   display: inline;
 }
+
+.propertyLabel {
+  font-size: .7rem;
+  font-weight: bold;
+}
+
+.tpfForm input {
+  width: 100%;
+}
+
+.tpfForm input[type=submit] {
+  display: none;
+}

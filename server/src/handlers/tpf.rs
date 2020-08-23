@@ -2,6 +2,8 @@ use serde::{Deserialize};
 use tera::{Context as TeraCtx};
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
+use crate::render_atom::RenderAtom;
+use atomic_lib::atoms::rich_to_plain;
 use crate::{content_types::ContentType, errors::BetterResult};
 use log;
 use std::sync::Mutex;
@@ -12,7 +14,6 @@ pub struct TPFQuery {
    property: Option<String>,
    value: Option<String>,
 }
-
 
 pub async fn tpf(
   data: web::Data<Mutex<AppState>>,
@@ -35,11 +36,15 @@ pub async fn tpf(
           Ok(builder.body(""))
       }
       ContentType::HTML => {
+          let renderedatoms: Vec<RenderAtom> = atoms.iter()
+            .map(
+              |atom| RenderAtom::from_rich_atom(atom)).collect();
           builder.set(
               http::header::ContentType::html()
           );
           let mut tera_context = TeraCtx::new();
-          tera_context.insert("atoms", &atoms);
+          // Use the value_to_html helper here
+          tera_context.insert("atoms", &renderedatoms);
           tera_context.insert("subject", &subject);
           tera_context.insert("property", &property);
           tera_context.insert("value", &value);
@@ -53,7 +58,8 @@ pub async fn tpf(
           builder.set(
               http::header::ContentType::html()
           );
-          let ad3_string = atomic_lib::serialize::serialize_atoms_to_ad3(atoms)?;
+          let plainatoms = atoms.iter().map(|atom| rich_to_plain(atom)).collect();
+          let ad3_string = atomic_lib::serialize::serialize_atoms_to_ad3(plainatoms)?;
           Ok(builder.body(ad3_string))
       }
   }
