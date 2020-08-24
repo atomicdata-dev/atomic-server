@@ -703,7 +703,7 @@ impl Store {
 
     /// Loads the default Atomic Store, containing the Properties, Datatypes and Clasess for Atomic Schema.
     pub fn load_default(&mut self) {
-        let ad3 = include_str!("../../defaults/default_store.ad3");
+        let ad3 = include_str!("./../defaults/default_store.ad3");
         self.parse_ad3(&String::from(ad3)).unwrap();
     }
 }
