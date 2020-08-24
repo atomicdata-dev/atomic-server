@@ -5,27 +5,23 @@ _Status: pre-alpha_
 A command-line application to create, read and interact with Atomic Data.
 
 ```
-atomic 0.1.3
+atomic 0.9.0
 Joep Meindertsma <joep@ontola.io>
 Create, share, fetch and model linked atomic data!
 
 USAGE:
-    atomic [SUBCOMMAND]
+    atomic-cli [SUBCOMMAND]
 
 FLAGS:
     -h, --help       Prints help information
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    get     Traverses a Path and prints the resulting Resource or Value. Examples:
-            atomic get "class description"
-            atomic get "https://example.com"
-            Visit https://docs.atomicdata.dev/core/paths.html for more info about paths.
+    get     Traverses a Path and prints the resulting Resource or Value.
     help    Prints this message or the help of the given subcommand(s)
     list    List all bookmarks
     new     Create a Resource
-
-Visit https://github.com/joepio/atomic-cli for more info
+    tpf     Finds Atoms using Triple Pattern Fragments
 ```
 
 ## Installation

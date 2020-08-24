@@ -1,7 +1,7 @@
 [package]
 name = "atomic-server"
 description = "Create, share and standardize linked atomic data!"
-version = "0.8.1"
+version = "0.9.0"
 authors = ["Joep Meindertsma <joep@ontola.io>"]
 edition = "2018"
 license = "MIT"
@@ -21,7 +21,7 @@ actix-web = { version = "2.0.0", features=["rustls"] }
 actix-rt = "1.1.1"
 tera = "1.4.0"
 actix-files = "0.2.2"
-atomic_lib = { version = "0.8.1", path = "../lib" }
+atomic_lib = { version = "0.9.0", path = "../lib" }
 env_logger = "0.7.1"
 log = "0.4.11"
 comrak = "0.8.2"
