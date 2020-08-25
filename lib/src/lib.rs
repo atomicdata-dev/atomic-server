@@ -23,9 +23,15 @@ pub mod atoms;
 pub mod errors;
 pub mod mapping;
 pub mod mutations;
+pub mod resources;
 pub mod serialize;
 pub mod store;
+pub mod store_native;
 pub mod urls;
+pub mod values;
 
 pub use store::Store;
 pub use atoms::Atom;
+pub use atoms::RichAtom;
+pub use values::Value;
+pub use resources::Resource;

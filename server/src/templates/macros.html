@@ -1,0 +1,19 @@
+{% macro input(label, type="text") %}
+    <label>
+        {{ label }}
+        <input type="{{type}}" />
+    </label>
+{% endmacro input %}
+
+<!-- Requires a Resource -->
+{% macro propvals(vector) %}
+{% for propval in vector -%}
+<p>
+  <b class="propertyLabel">
+    <a href="/get?path={{ propval.property.subject }}">{{ propval.property.shortname }}</a>
+  </b>
+  <br/>
+  {{ propval.value | safe }}
+</p>
+{%- endfor %}
+{% endmacro propvals %}

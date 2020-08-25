@@ -1,9 +1,8 @@
 use crate::appstate::AppState;
-use crate::{content_types::ContentType, errors::BetterResult};
+use crate::{content_types::ContentType, errors::BetterResult, render::propvals::{PropVal, from_hashmap_resource}};
 use actix_web::{http, web, HttpResponse};
-use atomic_lib::store::Property;
 use log;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
 
@@ -35,34 +34,19 @@ pub async fn path(
             match path_result {
                 atomic_lib::store::PathReturn::Subject(subject) => {
                     let resource = context.store.get(&subject).ok_or("Resource not found")?;
-                    for (property, value) in resource.iter() {
-                        let fullprop = context.store.get_property(property)?;
-                        let native_value = context.store.get_native_value(value, &fullprop.data_type)?;
-                        let propval = PropVal {
-                            property: fullprop,
-                            value: crate::render_atom::value_to_html(native_value),
-                        };
-                        propvals.push(propval);
-                    }
+                    propvals = from_hashmap_resource(resource, &context.store)?;
                 }
                 atomic_lib::store::PathReturn::Atom(atom) => {
                     propvals.push(
                         PropVal {
                             property: context.store.get_property(&atom.property.subject)?,
-                            value: crate::render_atom::value_to_html(atom.native_value),
+                            value: crate::render::atom::value_to_html(atom.native_value),
                         }
                     );
                 }
             }
             builder.set(http::header::ContentType::html());
             let mut tera_context = TeraCtx::new();
-
-            #[derive(Serialize)]
-            struct PropVal {
-                property: Property,
-                value: String,
-            }
-
             tera_context.insert("propvals", &propvals);
             tera_context.insert("path", &path);
             let body = context.tera.render("path.html", &tera_context).unwrap();

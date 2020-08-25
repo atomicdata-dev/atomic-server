@@ -8,7 +8,7 @@ pub type BetterResult<T> = std::result::Result<T, AppError>;
 
 #[derive(Debug)]
 pub enum AppErrorType {
-    NotFoundError,
+    // NotFoundError,
     OtherError,
 }
 
@@ -29,7 +29,7 @@ impl Error for AppError {}
 impl ResponseError for AppError {
     fn status_code(&self) -> StatusCode {
         match self.error_type {
-            AppErrorType::NotFoundError => StatusCode::NOT_FOUND,
+            // AppErrorType::NotFoundError => StatusCode::NOT_FOUND,
             AppErrorType::OtherError => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }

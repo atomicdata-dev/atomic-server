@@ -1,16 +1,18 @@
 use atomic_lib::errors::Result;
 use atomic_lib::mapping::{self, Mapping};
 use atomic_lib::serialize;
-use atomic_lib::store::{self, Class, DataType, Property, Resource, Store};
+use atomic_lib::store::{self, Class, Property};
 use atomic_lib::urls;
+use atomic_lib::values::DataType;
+use atomic_lib::{Resource, Store, Value};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use colored::*;
 use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
-use std::time::{SystemTime, UNIX_EPOCH};
-use std::{collections::HashMap, path::PathBuf};
 use serialize::serialize_atoms_to_ad3;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::{path::PathBuf};
 
 #[allow(dead_code)]
 pub struct Context<'a> {
@@ -107,7 +109,9 @@ fn main() {
     } else {
         println!("No store found, initializing in {:?}", &user_store_path);
         store.load_default();
-        store.write_store_to_disk(&user_store_path).expect("Could not create store");
+        store
+            .write_store_to_disk(&user_store_path)
+            .expect("Could not create store");
     }
 
     // The store contains the classes and properties
@@ -216,7 +220,7 @@ fn new(context: &mut Context) {
         .unwrap();
     let model = context.store.get_class(&class_url);
     println!("Enter a new {}: {}", model.shortname, model.description);
-    prompt_instance(context, &model, None);
+    prompt_instance(context, &model, None).unwrap();
 }
 
 /// Lets the user enter an instance of an Atomic Class through multiple prompts
@@ -226,45 +230,10 @@ fn prompt_instance(
     context: &mut Context,
     class: &Class,
     preffered_shortname: Option<String>,
-) -> (Resource, String, Option<String>) {
-    let mut new_resource: Resource = HashMap::new();
-
-    new_resource.insert(
-        "[\"https://atomicdata.dev/properties/isA\"]".into(),
-        String::from(&class.subject),
-    );
-
-    for field in &class.requires {
-        if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
-            new_resource.insert(field.subject.clone(), preffered_shortname.clone().unwrap());
-            println!("Shortname set to {}", preffered_shortname.clone().unwrap());
-            continue;
-        }
-        println!("{}: {}", field.shortname.bold().blue(), field.description);
-        // In multiple Properties, the shortname field is required.
-        // A preferred shortname can be passed into this function
-        let mut input = prompt_field(&field, false, context);
-        loop {
-            if let Some(i) = input {
-                new_resource.insert(field.subject.clone(), i.clone());
-                break;
-            } else {
-                println!("Required field, please enter a value.");
-                input = prompt_field(&field, false, context);
-            }
-        }
-    }
-
-    for field in &class.recommends {
-        println!("{}: {}", field.shortname, field.description);
-        let input = prompt_field(&field, true, context);
-        if let Some(i) = input {
-            new_resource.insert(field.subject.clone(), i.clone());
-        }
-    }
-
+) -> Result<(Resource, String, Option<String>)> {
+    // Not sure about the best way t
     // The Path is the thing at the end of the URL, from the domain
-    // Here I just print out some (kind of) random numbers.
+    // Here I set some (kind of) random numbers.
     // I think URL generation could be better, though. Perhaps use a
     let path = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -273,16 +242,57 @@ fn prompt_instance(
 
     let mut subject = format!("_:{}", path);
     if preffered_shortname.is_some() {
-        subject = format!("_:{}-{}", path, preffered_shortname.unwrap());
+        subject = format!("_:{}-{}", path, preffered_shortname.clone().unwrap());
     }
-    println!("{} created with URL: {}", &class.shortname, &subject);
+
+    let mut new_resource: Resource = Resource::new(subject.clone());
+
+    new_resource.insert(
+        "https://atomicdata.dev/properties/isA".into(),
+        Value::ResourceArray(Vec::from([class.subject.clone().into()])),
+    )?;
+
+    for field in &class.requires {
+        if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
+            new_resource.insert_string(
+                field.subject.clone(),
+                &preffered_shortname.clone().unwrap(),
+                &mut context.store,
+            )?;
+            println!("Shortname set to {}", preffered_shortname.clone().unwrap().bold().green());
+            continue;
+        }
+        println!("{}: {}", field.shortname.bold().blue(), field.description);
+        // In multiple Properties, the shortname field is required.
+        // A preferred shortname can be passed into this function
+        let mut input = prompt_field(&field, false, context)?;
+        loop {
+            if let Some(i) = input {
+                new_resource.insert_string(field.subject.clone(), &i, &mut context.store)?;
+                break;
+            } else {
+                println!("Required field, please enter a value.");
+                input = prompt_field(&field, false, context)?;
+            }
+        }
+    }
+
+    for field in &class.recommends {
+        println!("{}: {}", field.shortname, field.description);
+        let input = prompt_field(&field, true, context)?;
+        if let Some(i) = input {
+            new_resource.insert_string(field.subject.clone(), &i, &mut context.store)?;
+        }
+    }
+
+    println!("{} created with URL: {}", &class.shortname, &subject.clone());
 
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
     context
         .store
-        .add_resource(subject.clone(), new_resource.clone())
+        .add_resource(new_resource.subject().clone(), new_resource.to_plain())
         .unwrap();
     // Publish new resource to IPFS
     // TODO!
@@ -294,11 +304,11 @@ fn prompt_instance(
     context
         .mapping
         .write_mapping_to_disk(&context.user_mapping_path);
-    return (new_resource, subject, map);
+    return Ok((new_resource, subject, map));
 }
 
 // Checks the property and its datatype, and issues a prompt that performs validation.
-fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> Option<String> {
+fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> Result<Option<String>> {
     let mut input: Option<String> = None;
     let msg_appendix;
     if optional {
@@ -307,10 +317,10 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
         msg_appendix = " (required)";
     }
     match &property.data_type {
-        DataType::String | DataType::MDString => {
+        DataType::String | DataType::Markdown => {
             let msg = format!("string{}", msg_appendix);
             input = prompt_opt(&msg).unwrap();
-            return input;
+            return Ok(input);
         }
         DataType::Slug => {
             let msg = format!("slug{}", msg_appendix);
@@ -319,12 +329,12 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             match input {
                 Some(slug) => {
                     if re.is_match(&*slug) {
-                        return Some(slug);
+                        return Ok(Some(slug));
                     }
                     println!("Only letters, numbers and dashes - no spaces or special characters.");
-                    return None;
+                    return Ok(None);
                 }
-                None => (return None),
+                None => (return Ok(None)),
             }
         }
         DataType::Integer => {
@@ -334,7 +344,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                 Some(nr) => {
                     input = Some(nr.to_string());
                 }
-                None => (return None),
+                None => (return Ok(None)),
             }
         }
         DataType::Date => {
@@ -344,11 +354,11 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
             match date {
                 Some(date_val) => loop {
                     if re.is_match(&*date_val) {
-                        return Some(date_val);
+                        return Ok(Some(date_val));
                     }
                     println!("Not a valid date.");
                 },
-                None => (return None),
+                None => (return Ok(None)),
             }
         }
         DataType::AtomicUrl => loop {
@@ -367,10 +377,10 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                     // TODO: Check if string or if map
                     input = context.mapping.try_mapping_or_url(&u);
                     match input {
-                        Some(url) => return Some(url),
+                        Some(url) => return Ok(Some(url)),
                         None => {
                             println!("Shortname not found, try again.");
-                            return None;
+                            return Ok(None);
                         }
                     }
                 }
@@ -394,13 +404,13 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
                                 urls.push(url);
                             }
                             None => {
-                                println!("{} is not a valid URL or known Shortname, so let's create a new Resource:", item, );
+                                println!("Define the Property named {}", item.bold().green(), );
                                 // TODO: This currently creates Property instances, but this should depend on the class!
                                 let (_resource, url, _shortname) = prompt_instance(
                                     context,
                                     &context.store.get_class(&urls::PROPERTY.into()),
                                     Some(item.into()),
-                                );
+                                )?;
                                 urls.push(url);
                                 continue;
                             }
@@ -417,7 +427,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> O
         DataType::Timestamp => todo!(),
         DataType::Unsupported(unsup) => panic!("Unsupported datatype: {:?}", unsup),
     };
-    return input;
+    return Ok(input);
 }
 
 // Asks for and saves the bookmark. Returns the shortname.
@@ -476,8 +486,8 @@ fn tpf(context: &mut Context) {
 
 fn tpf_value(string: &str) -> Option<String> {
     if string == "." {
-        return None
+        return None;
     } else {
-        return Some(string.into())
+        return Some(string.into());
     }
 }

@@ -1,3 +1,4 @@
+{% import "macros.html" as macros %}
 {% extends "base.html" %}
 {% block title %}Path{% endblock title %}
 {% block content %}
@@ -5,13 +6,5 @@
   <input name="path" value="{{ path }}" />
   <input type="submit" value="get"/>
 </form>
-{% for propval in propvals -%}
-<p>
-  <b class="propertyLabel">
-    <a href="/get?path={{ propval.property.subject }}">{{ propval.property.shortname }}</a>
-  </b>
-  <br/>
-  {{ propval.value | safe }}
-</p>
-{%- endfor %}
+{{ macros::propvals(vector=propvals) }}
 {% endblock content %}

@@ -2,7 +2,7 @@ use serde::{Deserialize};
 use tera::{Context as TeraCtx};
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
-use crate::render_atom::RenderAtom;
+use crate::render::atom::RenderAtom;
 use atomic_lib::atoms::plain_to_rich;
 use crate::{content_types::ContentType, errors::BetterResult};
 use log;

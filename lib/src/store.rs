@@ -7,9 +7,9 @@ use crate::errors::Result;
 use crate::mapping;
 use crate::mutations;
 use crate::serialize;
-use crate::{atoms::{RichAtom, Atom}, serialize::deserialize_json_array, urls};
+use crate::values::{DataType, Value, match_datatype};
+use crate::{atoms::{RichAtom, Atom}, urls};
 use mapping::Mapping;
-use regex::Regex;
 use serde::Serialize;
 use serde_json::from_str;
 use std::{collections::HashMap, fs, path::PathBuf};
@@ -38,43 +38,10 @@ pub struct Property {
     pub description: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
-pub enum DataType {
-    AtomicUrl,
-    Date,
-    Integer,
-    MDString,
-    ResourceArray,
-    Slug,
-    String,
-    Timestamp,
-    Unsupported(String),
-}
-
-#[derive(Clone, Debug, Serialize)]
-pub enum Value {
-    AtomicUrl(String),
-    Date(String),
-    Integer(i32),
-    MDString(String),
-    ResourceArray(Vec<String>),
-    Slug(String),
-    String(String),
-    Timestamp(i64),
-    Unsupported(UnsupportedValue),
-}
-
-/// When the Datatype of a Value is not handled by this library
-#[derive(Clone, Debug, Serialize)]
-pub struct UnsupportedValue {
-    pub value: String,
-    /// URL of the datatype
-    pub datatype: String,
-}
-
 /// The in-memory store of data, containing the Resources, Properties and Classes
 #[derive(Clone)]
 pub struct Store {
+    // The store currently holds two stores - that is not ideal
     hashmap: HashMap<String, Resource>,
     log: mutations::Log,
 }
@@ -112,8 +79,10 @@ impl Store {
     }
 
     /// Replaces existing resource with the contents
+    /// Accepts a simple nested string only hashmap
+    /// Adds to hashmap and to the resource store
     pub fn add_resource(&mut self, subject: String, resource: Resource) -> Result<()> {
-        self.hashmap.insert(subject, resource);
+        self.hashmap.insert(subject.clone(), resource.clone());
         return Ok(());
     }
 
@@ -240,7 +209,7 @@ impl Store {
                         );
                         obj.into()
                     }
-                    DataType::MDString => prop_url.as_str().into(),
+                    DataType::Markdown => prop_url.as_str().into(),
                     DataType::ResourceArray => {
                         let mut obj = Map::new();
                         obj.insert("@id".into(), prop_url.as_str().into());
@@ -255,7 +224,7 @@ impl Store {
                 };
                 context.insert(property.shortname.as_str().into(), ctx_value);
             }
-            let native_value = self.get_native_value(value, &property.data_type)
+            let native_value = Value::new(value, &property.data_type)
                 .expect(&*format!(
                     "Could not convert value {:?} with property type {:?} into native value",
                     value,
@@ -265,7 +234,7 @@ impl Store {
                 Value::AtomicUrl(val) => SerdeValue::String(val.into()),
                 Value::Date(val) => SerdeValue::String(val.into()),
                 Value::Integer(val) => SerdeValue::Number(val.into()),
-                Value::MDString(val) => SerdeValue::String(val.into()),
+                Value::Markdown(val) => SerdeValue::String(val.into()),
                 Value::ResourceArray(val) => SerdeValue::Array(
                     val.iter()
                         .map(|item| SerdeValue::String(item.clone()))
@@ -331,7 +300,7 @@ impl Store {
             None => return Ok(Vec::new()),
         };
         // .ok_or(format!("IsA property not present in {}", subject))?;
-        let native = self.get_native_value(classes_array, &DataType::ResourceArray)?;
+        let native = Value::new(classes_array, &DataType::ResourceArray)?;
         let vector = match native {
             Value::ResourceArray(vec) => vec,
             _ => return Err("Should be an array".into()),
@@ -516,49 +485,8 @@ impl Store {
 
     // Returns an enum of the native value.
     // Validates the contents.
-    pub fn get_native_value(&self, value: &String, datatype: &DataType) -> Result<Value> {
-        match datatype {
-            DataType::Integer => {
-                let val: i32 = value.parse()?;
-                return Ok(Value::Integer(val));
-            }
-            DataType::String => return Ok(Value::String(value.clone())),
-            DataType::MDString => return Ok(Value::MDString(value.clone())),
-            DataType::Slug => {
-                let re = Regex::new(SLUG_REGEX).unwrap();
-                if re.is_match(&*value) {
-                    return Ok(Value::Slug(value.clone()));
-                }
-                return Err(format!("Not a valid slug: {}", value).into());
-            }
-            DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
-            DataType::ResourceArray => {
-                let vector = match deserialize_json_array(value) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(format!("Not a valid ResourceArray: {} - {}", value, e).into())
-                    }
-                };
-                return Ok(Value::ResourceArray(vector));
-            }
-            DataType::Date => {
-                let re = Regex::new(DATE_REGEX).unwrap();
-                if re.is_match(&*value) {
-                    return Ok(Value::Date(value.clone()));
-                }
-                return Err(format!("Not a valid date: {}", value).into());
-            }
-            DataType::Timestamp => {
-                let val: i64 = value.parse()?;
-                return Ok(Value::Timestamp(val));
-            }
-            DataType::Unsupported(unsup_url) => {
-                return Ok(Value::Unsupported(UnsupportedValue {
-                    value: value.into(),
-                    datatype: unsup_url.into(),
-                }))
-            }
-        };
+    pub fn get_native_value(value: &String, datatype: &DataType) -> Result<Value> {
+        Value::new(value, datatype)
     }
 
     pub fn resource_to_ad3(&self, subject: &String, domain: Option<&String>) -> Result<String> {
@@ -601,7 +529,8 @@ impl Store {
 
             for (prop_url, value) in resource {
                 let property = self.get_property(prop_url)?;
-                self.get_native_value(value, &property.data_type)?;
+
+                Value::new(value, &property.data_type)?;
                 found_props.push(prop_url.clone());
                 // println!("{:?}: {:?}", prop_url, value);
             }
@@ -703,7 +632,7 @@ impl Store {
 
     /// Loads the default Atomic Store, containing the Properties, Datatypes and Clasess for Atomic Schema.
     pub fn load_default(&mut self) {
-        let ad3 = include_str!("./../defaults/default_store.ad3");
+        let ad3 = include_str!("../../defaults/default_store.ad3");
         self.parse_ad3(&String::from(ad3)).unwrap();
     }
 }
@@ -716,20 +645,6 @@ pub enum PathReturn {
 
 pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
-
-pub fn match_datatype(string: &String) -> DataType {
-    match string.as_str() {
-        urls::INTEGER => DataType::Integer,
-        urls::STRING => DataType::String,
-        urls::MDSTRING => DataType::MDString,
-        urls::SLUG => DataType::Slug,
-        urls::ATOMIC_URL => DataType::AtomicUrl,
-        urls::RESOURCE_ARRAY => DataType::ResourceArray,
-        urls::DATE => DataType::Date,
-        urls::TIMESTAMP => DataType::Timestamp,
-        unsupported_datatype => return DataType::Unsupported(unsupported_datatype.into()),
-    }
-}
 
 #[cfg(test)]
 mod test {

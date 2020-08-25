@@ -1,9 +1,11 @@
-use atomic_lib::store::Value;
+use atomic_lib::values::Value;
 use atomic_lib::atoms::RichAtom;
 use atomic_lib::store::Property;
 use serde::Serialize;
 use tera::escape_html;
 use comrak::{markdown_to_html, ComrakOptions};
+
+/// Atom with all the props that make it suitable for rendering.
 #[derive(Serialize)]
 pub struct RenderAtom {
     subject: String,
@@ -15,11 +17,11 @@ pub struct RenderAtom {
 
 /// Converts an Atomic Value to an HTML string suitable for display
 /// Escapes HTML contents for safe value rendering
-pub fn value_to_html(value: atomic_lib::store::Value) -> String {
+pub fn value_to_html(value: Value) -> String {
     match value {
         Value::Integer(i) => return format!("{}", i),
         Value::String(s) => return format!("{}", escape_html(&*s)),
-        Value::MDString(s) => return format!("{}", markdown_to_html(&*s, &ComrakOptions::default())),
+        Value::Markdown(s) => return format!("{}", markdown_to_html(&*s, &ComrakOptions::default())),
         Value::Slug(s) => return format!("{}", escape_html(&*s)).into(),
         Value::AtomicUrl(s) => return format!("<a href=\"/get?path={}\">{}</a>", escape_html(&*s), escape_html(&*s)).into(),
         Value::ResourceArray(v) => {

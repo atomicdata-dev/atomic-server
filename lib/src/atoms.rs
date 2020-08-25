@@ -1,4 +1,5 @@
-use crate::store::{Store, Value, Property};
+use crate::store::{Store, Property};
+use crate::values::Value;
 use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.
@@ -37,7 +38,7 @@ impl RichAtom {
       subject: subject.clone(),
       property: rich_prop.clone(),
       value: value.clone(),
-      native_value: store.get_native_value(
+      native_value: Value::new(
         &value,
         &rich_prop.data_type)
         .expect(&*format!("Could not convert to native value {} {} {}", subject, property, value)),

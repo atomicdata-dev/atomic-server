@@ -7,7 +7,7 @@ mod config;
 mod errors;
 mod handlers;
 mod content_types;
-mod render_atom;
+mod render;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {
