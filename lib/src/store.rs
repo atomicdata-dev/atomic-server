@@ -168,7 +168,7 @@ impl Store {
 
         let json_ld: bool = false;
 
-        let resource = self.get(resource_url).ok_or("Resource not found")?;
+        let resource = self.get_string_resource(resource_url).ok_or("Resource not found")?;
 
         // Initiate JSON object
         let mut root = Map::new();
@@ -292,7 +292,7 @@ impl Store {
     /// Returns an empty vector if there are none.
     pub fn get_classes_for_subject(&self, subject: &String) -> Result<Vec<Class>> {
         let classes_array_opt = self
-            .get(subject)
+            .get_string_resource(subject)
             .ok_or(format!("Subject not found: {}", subject))?
             .get(urls::IS_A);
         let classes_array = match classes_array_opt {
@@ -315,7 +315,7 @@ impl Store {
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     pub fn get_class(&self, subject: &String) -> Class {
         // The string representation of the Class
-        let class_strings = self.get(&subject).expect("Class not found");
+        let class_strings = self.get_string_resource(&subject).expect("Class not found");
         let shortname = class_strings
             .get(urls::SHORTNAME)
             .expect("Class has no shortname");
@@ -476,7 +476,7 @@ impl Store {
         return Err(format!("Could not find shortname {}", shortname).into());
     }
 
-    pub fn get(&self, resource_url: &String) -> Option<&Resource> {
+    pub fn get_string_resource(&self, resource_url: &String) -> Option<&Resource> {
         return self.hashmap.get(resource_url);
     }
 
@@ -491,7 +491,7 @@ impl Store {
 
     pub fn resource_to_ad3(&self, subject: &String, domain: Option<&String>) -> Result<String> {
         let mut string = String::new();
-        let resource = self.get(subject).ok_or("Resource not found")?;
+        let resource = self.get_string_resource(subject).ok_or("Resource not found")?;
         let mut mod_subject = subject.clone();
         // Replace local schema with actual local domain
         if subject.starts_with("_:") && domain.is_some() {
@@ -612,7 +612,7 @@ impl Store {
         };
 
         match q_subject {
-            Some(sub) => match self.get(&sub) {
+            Some(sub) => match self.get_string_resource(&sub) {
                 Some(resource) => {
                     find_in_resource(&sub, resource);
                     return vec;
@@ -664,7 +664,7 @@ mod test {
     fn get() {
         let store = init_store();
         // Get our resource...
-        let my_resource = store.get(&"_:test".into()).unwrap();
+        let my_resource = store.get_string_resource(&"_:test".into()).unwrap();
         // Get our value by filtering on our property...
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")

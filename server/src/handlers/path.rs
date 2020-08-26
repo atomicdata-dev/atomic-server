@@ -33,7 +33,7 @@ pub async fn path(
             let mut propvals: Vec<PropVal> = Vec::new();
             match path_result {
                 atomic_lib::store::PathReturn::Subject(subject) => {
-                    let resource = context.store.get(&subject).ok_or("Resource not found")?;
+                    let resource = context.store.get_string_resource(&subject).ok_or("Resource not found")?;
                     propvals = from_hashmap_resource(resource, &context.store)?;
                 }
                 atomic_lib::store::PathReturn::Atom(atom) => {
