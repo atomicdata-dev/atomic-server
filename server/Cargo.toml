@@ -25,3 +25,7 @@ atomic_lib = { version = "0.9.0", path = "../lib" }
 env_logger = "0.7.1"
 log = "0.4.11"
 comrak = "0.8.2"
+rustls = "0.16.0"
+acme-lib = "0.8.1"
+use = "0.0.0"
+actix-web-middleware-redirect-https = "1.0.0"

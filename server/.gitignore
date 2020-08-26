@@ -1,2 +1,4 @@
 /target
 .env
+.ssl/*
+/static/well-known/acme-challenge/*

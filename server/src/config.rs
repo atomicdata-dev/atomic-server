@@ -3,24 +3,46 @@ use std::env;
 use std::{path::PathBuf};
 use std::net::{IpAddr, Ipv4Addr};
 
-/// Config for the server.
-/// These values should be set when the server initializes, and do not change while running.
+/// Configuration for the server.
+/// These values are set when the server initializes, and do not change while running.
 #[derive(Clone)]
 pub struct Config {
-    // Where the app is hosted (defaults to http://localhost:8080/)
+    pub development: bool,
+    /// Where the app is hosted (defaults to localhost).
+    /// Without the port and schema values.
     pub domain: String,
+    /// E.g. https://example.com
+    pub root_url: String,
+    /// The contact mail address for Let's Encrypt HTTPS setup
+    pub email: Option<String>,
+    /// The port where the app is available (defaults to 80)
     pub port: u32,
+    /// Where the .ad3 store is located
     pub store_path: PathBuf,
+    /// The IP address of the serer. (defaults to 127.0.0.1)
     pub ip: IpAddr,
+    /// If we're using SSL or plaintext HTTP.
+    /// Is disabled when using cert_init
+    pub https: bool,
+    pub key_path: Option<String>,
+    pub cert_path: Option<String>,
+    /// This is only true when the Let's Encrypt initialization is running
+    pub cert_init: bool,
 }
 
 /// Creates the server config, reads .env values and sets defaults
 pub fn init() -> Config {
     dotenv().ok();
-    let mut store_path = PathBuf::from("~/.atomic/default_store.ad3");
-    let mut domain = String::from("http://localhost:8080/");
-    let mut port = 8080;
+    let development = true;
+    let mut domain = String::from("localhost");
+    let cert_path = None;
+    let key_path = None;
+    let mut cert_init = false;
+    let mut https = false;
     let mut ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    let mut port = if https { 443 } else { 80 };
+    let mut store_path = PathBuf::from("~/.atomic/default_store.ad3");
+    let mut email = None;
     for (key, value) in env::vars() {
         match &*key {
             "ATOMIC_STORE_PATH" => {
@@ -35,14 +57,38 @@ pub fn init() -> Config {
             "ATOMIC_IP" => {
                 ip = value.parse().expect("Could not parse ATOMIC_IP. Is it a valid IP address?");
             }
+            "ATOMIC_EMAIL" => {
+                email = Some(String::from(value));
+            }
+            "ATOMIC_HTTPS" => {
+                https = value.parse().expect("ATOMIC_HTTPS is not a boolean");
+            }
+            "ATOMIC_CERT_INIT" => {
+                cert_init = value.parse().expect("ATOMIC_CERT_INIT is not a boolean");
+            }
             _ => {}
         }
     }
 
+    // Always disable HTTPS when initializing certificates
+    if cert_init {
+        https = false;
+    }
+
+    let schema = if https {"https"} else {"http"};
+    let root_url = format!("{}:{}", schema, domain);
+
     return Config {
-        store_path,
+        cert_init,
+        cert_path,
+        email,
+        development,
         domain,
-        port,
+        https,
         ip,
+        key_path,
+        port,
+        root_url,
+        store_path,
     };
 }
