@@ -20,6 +20,7 @@
 //! ```
 
 pub mod atoms;
+pub mod db;
 pub mod errors;
 pub mod mapping;
 pub mod mutations;
@@ -27,6 +28,7 @@ pub mod resources;
 pub mod serialize;
 pub mod store;
 pub mod store_native;
+pub mod storelike;
 pub mod urls;
 pub mod values;
 

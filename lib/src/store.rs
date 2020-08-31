@@ -6,43 +6,17 @@
 use crate::errors::Result;
 use crate::mapping;
 use crate::mutations;
-use crate::serialize;
 use crate::values::{DataType, Value, match_datatype};
-use crate::{atoms::{RichAtom, Atom}, urls};
+use crate::{atoms::{RichAtom, Atom}, urls, storelike::{Property, Storelike, Class, ResourceString}};
 use mapping::Mapping;
-use serde::Serialize;
 use serde_json::from_str;
 use std::{collections::HashMap, fs, path::PathBuf};
-
-#[derive(Debug)]
-pub struct Class {
-    pub requires: Vec<Property>,
-    pub recommends: Vec<Property>,
-    pub shortname: String,
-    pub description: String,
-    /// URL
-    pub subject: String,
-}
-
-/// The first string represents the URL of the Property, the second one its Value.
-pub type Resource = HashMap<String, String>;
-
-#[derive(Clone, Debug, Serialize)]
-pub struct Property {
-    // URL of the class
-    pub class_type: Option<String>,
-    // URL of the datatype
-    pub data_type: DataType,
-    pub shortname: String,
-    pub subject: String,
-    pub description: String,
-}
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
 #[derive(Clone)]
 pub struct Store {
     // The store currently holds two stores - that is not ideal
-    hashmap: HashMap<String, Resource>,
+    hashmap: HashMap<String, ResourceString>,
     log: mutations::Log,
 }
 
@@ -60,18 +34,18 @@ impl Store {
 
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
-    pub fn add_atoms(&mut self, atoms: Vec<&Atom>) -> Result<()> {
+    pub fn add_atoms(&mut self, atoms: Vec<Atom>) -> Result<()> {
         for atom in atoms {
             match self.hashmap.get_mut(&atom.subject) {
                 Some(resource) => {
                     resource
-                        .insert(atom.property.clone(), atom.value.clone())
+                        .insert(atom.property, atom.value)
                         .ok_or(&*format!("Failed to add atom"))?;
                 }
                 None => {
-                    let mut resource: Resource = HashMap::new();
-                    resource.insert(atom.property.clone(), atom.value.clone());
-                    self.hashmap.insert(atom.subject.clone(), resource);
+                    let mut resource: ResourceString = HashMap::new();
+                    resource.insert(atom.property, atom.value);
+                    self.hashmap.insert(atom.subject, resource);
                 }
             }
         }
@@ -81,7 +55,7 @@ impl Store {
     /// Replaces existing resource with the contents
     /// Accepts a simple nested string only hashmap
     /// Adds to hashmap and to the resource store
-    pub fn add_resource(&mut self, subject: String, resource: Resource) -> Result<()> {
+    pub fn add_resource(&mut self, subject: String, resource: ResourceString) -> Result<()> {
         self.hashmap.insert(subject.clone(), resource.clone());
         return Ok(());
     }
@@ -89,6 +63,7 @@ impl Store {
     /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
     /// Allows comments and empty lines.
     pub fn parse_ad3<'a, 'b>(&mut self, string: &'b String) -> Result<()> {
+        let mut atoms: Vec<Atom> = Vec::new();
         for line in string.lines() {
             match line.chars().next() {
                 // These are comments
@@ -104,17 +79,7 @@ impl Store {
                     let subject = &string_vec[0];
                     let property = &string_vec[1];
                     let value = &string_vec[2];
-                    // TODO: Should use store.add_atoms
-                    match &mut self.hashmap.get_mut(&*subject) {
-                        Some(existing) => {
-                            existing.insert(property.into(), value.into());
-                        }
-                        None => {
-                            let mut resource: Resource = HashMap::new();
-                            resource.insert(property.into(), value.into());
-                            self.hashmap.insert(subject.into(), resource);
-                        }
-                    }
+                    atoms.push(Atom::new(subject.clone(), property.clone(), value.clone()));
                 }
                 Some(char) => {
                     return Err(
@@ -124,6 +89,7 @@ impl Store {
                 None => {}
             };
         }
+        self.add_atoms(atoms)?;
         return Ok(());
     }
 
@@ -291,9 +257,10 @@ impl Store {
     /// Finds all classes (isA) for any subject.
     /// Returns an empty vector if there are none.
     pub fn get_classes_for_subject(&self, subject: &String) -> Result<Vec<Class>> {
-        let classes_array_opt = self
+        let resource = self
             .get_string_resource(subject)
-            .ok_or(format!("Subject not found: {}", subject))?
+            .ok_or(format!("Subject not found: {}", subject))?;
+        let classes_array_opt = resource
             .get(urls::IS_A);
         let classes_array = match classes_array_opt {
             Some(vec) => vec,
@@ -310,49 +277,6 @@ impl Store {
             classes.push(self.get_class(&class))
         }
         return Ok(classes);
-    }
-
-    /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
-    pub fn get_class(&self, subject: &String) -> Class {
-        // The string representation of the Class
-        let class_strings = self.get_string_resource(&subject).expect("Class not found");
-        let shortname = class_strings
-            .get(urls::SHORTNAME)
-            .expect("Class has no shortname");
-        let description = class_strings
-            .get(urls::DESCRIPTION)
-            .expect("Class has no description");
-        let requires_string = class_strings.get(urls::REQUIRES);
-        let recommends_string = class_strings.get(urls::RECOMMENDS);
-
-        let mut requires: Vec<Property> = Vec::new();
-        let mut recommends: Vec<Property> = Vec::new();
-        if requires_string.is_some() {
-            requires = get_properties(requires_string.unwrap().into(), &self);
-        }
-        if recommends_string.is_some() {
-            recommends = get_properties(recommends_string.unwrap().into(), &self);
-        }
-
-        fn get_properties(resource_array: String, store: &Store) -> Vec<Property> {
-            let mut properties: Vec<Property> = vec![];
-            let string_vec: Vec<String> =
-                serialize::deserialize_json_array(&resource_array.into()).unwrap();
-            for prop_url in string_vec {
-                properties.push(store.get_property(&prop_url).unwrap());
-            }
-            return properties;
-        }
-
-        let class = Class {
-            requires,
-            recommends,
-            shortname: shortname.into(),
-            subject: subject.into(),
-            description: description.into(),
-        };
-
-        return class;
     }
 
     pub fn property_url_to_shortname(&self, url: &String) -> Result<String> {
@@ -382,7 +306,7 @@ impl Store {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource: Option<&Resource> = self.hashmap.get(&subject);
+        let mut resource: Option<&ResourceString> = self.hashmap.get(&subject);
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -459,7 +383,7 @@ impl Store {
     pub fn property_shortname_to_url(
         &self,
         shortname: &String,
-        resource: &Resource,
+        resource: &ResourceString,
     ) -> Result<String> {
         for (prop_url, _value) in resource.iter() {
             let prop_resource = self
@@ -474,10 +398,6 @@ impl Store {
             }
         }
         return Err(format!("Could not find shortname {}", shortname).into());
-    }
-
-    pub fn get_string_resource(&self, resource_url: &String) -> Option<&Resource> {
-        return self.hashmap.get(resource_url);
     }
 
     /// Gets a resource where with Values instead of strings
@@ -502,7 +422,7 @@ impl Store {
             mod_subject = format!("{}{}", &domain.unwrap(), &chars.as_str());
         }
         for (property, value) in resource {
-            let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, property, value])
+            let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])
                 .expect("Can't serialize");
             ad3_atom.push_str("\n");
             &string.push_str(&*ad3_atom);
@@ -595,7 +515,7 @@ impl Store {
         }
 
         // Find atoms matching the TPF query in a single resource
-        let mut find_in_resource = |subj: &String, resource: &Resource| {
+        let mut find_in_resource = |subj: &String, resource: &ResourceString| {
             for (prop, val) in resource.iter() {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                         if hasval {
@@ -614,7 +534,7 @@ impl Store {
         match q_subject {
             Some(sub) => match self.get_string_resource(&sub) {
                 Some(resource) => {
-                    find_in_resource(&sub, resource);
+                    find_in_resource(&sub, &resource);
                     return vec;
                 }
                 None => {
@@ -637,14 +557,20 @@ impl Store {
     }
 }
 
+impl Storelike for Store {
+    fn get_string_resource(&self, resource_url: &String) -> Option<ResourceString> {
+        match self.hashmap.get(resource_url) {
+            Some(result) => Some(result.clone()),
+            None => None
+        }
+    }
+}
+
 // A path can return one of many things
 pub enum PathReturn {
     Subject(String),
     Atom(RichAtom),
 }
-
-pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
-pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 #[cfg(test)]
 mod test {

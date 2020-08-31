@@ -1,4 +1,5 @@
-use crate::store::{Store, Property};
+use crate::store::Store;
+use crate::storelike::Property;
 use crate::values::Value;
 use serde::Serialize;
 
