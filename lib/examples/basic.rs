@@ -1,4 +1,5 @@
 extern crate atomic_lib;
+use crate::storelike::Storelike;
 
 fn main() {
   // Let's parse this AD3 string
