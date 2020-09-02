@@ -10,7 +10,6 @@ use crate::{
     atoms::Atom,
     storelike::{ResourceString, Storelike},
 };
-use serde_json::from_str;
 use std::{collections::HashMap, fs, path::PathBuf};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -31,47 +30,6 @@ impl Store {
             hashmap: HashMap::new(),
             log: Vec::new(),
         };
-    }
-
-    /// Replaces existing resource with the contents
-    /// Accepts a simple nested string only hashmap
-    /// Adds to hashmap and to the resource store
-    pub fn add_resource(&mut self, subject: String, resource: ResourceString) -> AtomicResult<()> {
-        self.hashmap.insert(subject.clone(), resource.clone());
-        return Ok(());
-    }
-
-    /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
-    /// Allows comments and empty lines.
-    pub fn parse_ad3<'a, 'b>(&mut self, string: &'b String) -> AtomicResult<()> {
-        let mut atoms: Vec<Atom> = Vec::new();
-        for line in string.lines() {
-            match line.chars().next() {
-                // These are comments
-                Some('#') => {}
-                Some(' ') => {}
-                // That's an array, awesome
-                Some('[') => {
-                    let string_vec: Vec<String> =
-                        from_str(line).expect(&*format!("Parsing error in {:?}", line));
-                    if string_vec.len() != 3 {
-                        return Err(format!("Wrong length of array at line {:?}: wrong length of array, should be 3", line).into());
-                    }
-                    let subject = &string_vec[0];
-                    let property = &string_vec[1];
-                    let value = &string_vec[2];
-                    atoms.push(Atom::new(subject.clone(), property.clone(), value.clone()));
-                }
-                Some(char) => {
-                    return Err(
-                        format!("Parsing error at {:?}, cannot start with {}", line, char).into(),
-                    )
-                }
-                None => {}
-            };
-        }
-        self.add_atoms(atoms)?;
-        return Ok(());
     }
 
     /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
@@ -176,13 +134,17 @@ impl Storelike for Store {
         return Ok(());
     }
 
+    fn add_resource_string(&mut self, subject: String, resource: ResourceString) -> AtomicResult<()> {
+        self.hashmap.insert(subject.clone(), resource.clone());
+        return Ok(());
+    }
+
     fn get_string_resource(&self, resource_url: &String) -> Option<ResourceString> {
         match self.hashmap.get(resource_url) {
             Some(result) => Some(result.clone()),
             None => None,
         }
     }
-
 
     fn tpf(
         &self,

@@ -6,6 +6,7 @@ use crate::{
 };
 use serde::Serialize;
 use std::collections::HashMap;
+use serde_json::from_str;
 
 /// The first string represents the URL of the Property, the second one its Value.
 pub type ResourceString = HashMap<String, String>;
@@ -45,6 +46,11 @@ pub trait Storelike {
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
     fn add_atoms(&mut self, atoms: Vec<Atom>) -> AtomicResult<()>;
+
+    /// Replaces existing resource with the contents
+    /// Accepts a simple nested string only hashmap
+    /// Adds to hashmap and to the resource store
+    fn add_resource_string(&mut self, subject: String, resource: ResourceString) -> AtomicResult<()>;
 
     fn get_string_resource(&self, resource_url: &String) -> Option<ResourceString>;
 
@@ -140,6 +146,39 @@ pub trait Storelike {
         };
 
         return Ok(property);
+    }
+
+    /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
+    /// Allows comments and empty lines.
+    fn parse_ad3<'a, 'b>(&mut self, string: &'b String) -> AtomicResult<()> {
+        let mut atoms: Vec<Atom> = Vec::new();
+        for line in string.lines() {
+            match line.chars().next() {
+                // These are comments
+                Some('#') => {}
+                Some(' ') => {}
+                // That's an array, awesome
+                Some('[') => {
+                    let string_vec: Vec<String> =
+                        from_str(line).expect(&*format!("Parsing error in {:?}", line));
+                    if string_vec.len() != 3 {
+                        return Err(format!("Wrong length of array at line {:?}: wrong length of array, should be 3", line).into());
+                    }
+                    let subject = &string_vec[0];
+                    let property = &string_vec[1];
+                    let value = &string_vec[2];
+                    atoms.push(Atom::new(subject.clone(), property.clone(), value.clone()));
+                }
+                Some(char) => {
+                    return Err(
+                        format!("Parsing error at {:?}, cannot start with {}", line, char).into(),
+                    )
+                }
+                None => {}
+            };
+        }
+        self.add_atoms(atoms)?;
+        return Ok(());
     }
 
     /// Finds the URL of a shortname used in the context of a specific Resource.
