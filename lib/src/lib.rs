@@ -5,6 +5,8 @@
 //! # Getting started
 //!
 //! ```
+//! // Import the `Storelike` trait for access to most functions
+//! use atomic_lib::Storelike;
 //! // Let's parse this AD3 string
 //! let string = String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"Test\"]");
 //! // Start with initializing our store
