@@ -2,6 +2,7 @@ use crate::appstate::AppState;
 use crate::{
     content_types::ContentType, errors::BetterResult, render::propvals::from_hashmap_resource,
 };
+use atomic_lib::Storelike;
 use actix_web::{http, web, HttpResponse};
 use log;
 use std::path::Path;
@@ -40,7 +41,7 @@ pub async fn get_resource(
             let mut tera_context = TeraCtx::new();
             let resource = context.store.get_string_resource(&subject).ok_or("Resource not found")?;
 
-            let propvals = from_hashmap_resource(resource, &context.store)?;
+            let propvals = from_hashmap_resource(&resource, &context.store)?;
 
             tera_context.insert("resource", &propvals);
             let body = context.tera.render("resource.html", &tera_context).unwrap();

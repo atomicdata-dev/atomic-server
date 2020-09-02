@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use crate::values::Value;
 use crate::Store;
+use crate::Storelike;
 use std::collections::HashMap;
 
 /// A resource is a set of Atoms that shares a single Subject

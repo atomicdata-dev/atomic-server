@@ -20,6 +20,7 @@
 //! ```
 
 pub mod atoms;
+#[cfg(feature="db")]
 pub mod db;
 pub mod errors;
 pub mod mapping;
@@ -33,6 +34,7 @@ pub mod urls;
 pub mod values;
 
 pub use store::Store;
+pub use storelike::Storelike;
 pub use atoms::Atom;
 pub use atoms::RichAtom;
 pub use values::Value;

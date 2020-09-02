@@ -4,6 +4,8 @@ use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
 use crate::render::atom::RenderAtom;
 use atomic_lib::atoms::plain_to_rich;
+use atomic_lib::atoms::RichAtom;
+use atomic_lib::{Atom, Storelike};
 use crate::{content_types::ContentType, errors::BetterResult};
 use log;
 use std::sync::Mutex;
@@ -36,9 +38,23 @@ pub async fn tpf(
           Ok(builder.body(""))
       }
       ContentType::HTML => {
-          let renderedatoms: Vec<RenderAtom> = atoms.iter()
-            .map(
-              |atom| RenderAtom::from_rich_atom(&plain_to_rich(atom.clone(), &context.store))).collect();
+          let mut renderedatoms: Vec<RenderAtom> = Vec::new();
+
+          for atom in atoms {
+            renderedatoms.push(RenderAtom::from_atom(&atom, &context.store)?);
+          }
+
+
+          // let atom_to_render_atom = |atom: Atom| Ok(RenderAtom::from_rich_atom(&plain_to_rich(
+          //     atom.clone(),
+          //     context.store.get_property(&atom.property)?
+          //   )?));
+          // let renderedatoms_in: Vec<RenderAtom> = Ok(atoms.iter()
+          //   .map(|atom| atom_to_render_atom(atom.clone()).expect("joe")?));
+          // let  renderedatoms = renderedatoms_in?.collect();
+
+
+
           builder.set(
               http::header::ContentType::html()
           );

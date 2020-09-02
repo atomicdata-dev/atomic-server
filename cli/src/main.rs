@@ -1,7 +1,8 @@
 use atomic_lib::errors::Result;
 use atomic_lib::mapping::{self, Mapping};
 use atomic_lib::serialize;
-use atomic_lib::store::{self, Class, Property};
+use atomic_lib::store;
+use atomic_lib::storelike::{Class, Property, Storelike};
 use atomic_lib::urls;
 use atomic_lib::values::DataType;
 use atomic_lib::{Resource, Store, Value};
@@ -325,7 +326,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> R
         DataType::Slug => {
             let msg = format!("slug{}", msg_appendix);
             input = prompt_opt(&msg).unwrap();
-            let re = Regex::new(store::SLUG_REGEX).unwrap();
+            let re = Regex::new(atomic_lib::values::SLUG_REGEX).unwrap();
             match input {
                 Some(slug) => {
                     if re.is_match(&*slug) {
@@ -350,7 +351,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> R
         DataType::Date => {
             let msg = format!("date YY-MM-DDDD{}", msg_appendix);
             let date: Option<String> = prompt_opt(&msg).unwrap();
-            let re = Regex::new(store::DATE_REGEX).unwrap();
+            let re = Regex::new(atomic_lib::values::DATE_REGEX).unwrap();
             match date {
                 Some(date_val) => loop {
                     if re.is_match(&*date_val) {
@@ -432,7 +433,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> R
 
 // Asks for and saves the bookmark. Returns the shortname.
 fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<String> {
-    let re = Regex::new(store::SLUG_REGEX).unwrap();
+    let re = Regex::new(atomic_lib::values::SLUG_REGEX).unwrap();
     let mut shortname: Option<String> = prompt_opt(format!("Local Bookmark (optional)")).unwrap();
     loop {
         match shortname.as_ref() {
@@ -462,7 +463,7 @@ fn pretty_print_resource(url: &String, store: &Store) -> Result<()> {
     let mut output = String::new();
     let resource = store.get_string_resource(url).ok_or(format!("Not found: {}", url))?;
     for (prop_url, val) in resource {
-        let prop_shortname = store.property_url_to_shortname(prop_url).unwrap();
+        let prop_shortname = store.property_url_to_shortname(&prop_url).unwrap();
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),

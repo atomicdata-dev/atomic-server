@@ -1,7 +1,7 @@
 use actix_web::{middleware, web, App, HttpServer};
 use std::{io, sync::Mutex};
 use env_logger;
-use actix_web_middleware_redirect_https::RedirectHTTPS;
+// use actix_web_middleware_redirect_https::RedirectHTTPS;
 
 mod appstate;
 mod config;
