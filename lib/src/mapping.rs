@@ -3,7 +3,7 @@
 //! These are often user-specific.
 //! This section provides tools to store, share and resolve these Mappings.
 
-use crate::errors::Result;
+use crate::errors::AtomicResult;
 use std::{collections::HashMap, fs, path::PathBuf};
 use std::collections::hash_map::IntoIter;
 /// Maps shortanmes (bookmarks) to URLs
@@ -50,7 +50,7 @@ impl Mapping {
     /// This is a simple .ini-like text file that maps shortnames to URLs.
     /// The left-hand should contain the shortname, the right-hand the URL.
     /// Ignores # comments and empty lines
-    pub fn read_mapping_from_file(&mut self, path: &PathBuf) -> Result<()> {
+    pub fn read_mapping_from_file(&mut self, path: &PathBuf) -> AtomicResult<()> {
         for line in std::fs::read_to_string(path)?.lines() {
             match line.chars().next() {
                 Some('#') => {}

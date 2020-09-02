@@ -1,11 +1,12 @@
-use crate::errors::Result;
+use crate::errors::AtomicResult;
 use crate::values::Value;
 use crate::Store;
 use crate::Storelike;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 /// A resource is a set of Atoms that shares a single Subject
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Resource {
     propvals: PropVals,
     subject: String,
@@ -25,7 +26,7 @@ impl Resource {
     }
 
     /// Get a value by property URL
-    pub fn get(&self, property_url: &String) -> Result<&Value> {
+    pub fn get(&self, property_url: &String) -> AtomicResult<&Value> {
         return Ok(self.propvals.get(property_url).ok_or(format!(
             "Property {} for resource {} not found",
             property_url, self.subject
@@ -33,7 +34,7 @@ impl Resource {
     }
 
     /// Gets a value by its shortname
-    pub fn get_shortname(&self, shortname: &String, store: &Store) -> Result<&Value> {
+    pub fn get_shortname(&self, shortname: &String, store: &Store) -> AtomicResult<&Value> {
         for (url, _val) in self.propvals.iter() {
             match store.get_property(url) {
                 Ok(prop) => {
@@ -56,7 +57,7 @@ impl Resource {
         property_url: String,
         value: &String,
         store: &Store,
-    ) -> Result<()> {
+    ) -> AtomicResult<()> {
         let fullprop = &store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.propvals.insert(property_url, val);
@@ -65,7 +66,7 @@ impl Resource {
 
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
-    pub fn insert(&mut self, property: String, value: Value) -> Result<()> {
+    pub fn insert(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property, value);
         Ok(())
     }

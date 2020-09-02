@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt;
 
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub type AtomicResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[derive(Debug)]
 struct AtomicError(String);

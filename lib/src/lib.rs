@@ -35,6 +35,7 @@ pub mod storelike;
 pub mod urls;
 pub mod values;
 
+pub use db::Db;
 pub use store::Store;
 pub use storelike::Storelike;
 pub use atoms::Atom;

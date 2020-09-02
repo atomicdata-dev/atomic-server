@@ -3,10 +3,8 @@ use tera::{Context as TeraCtx};
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
 use crate::render::atom::RenderAtom;
-use atomic_lib::atoms::plain_to_rich;
-use atomic_lib::atoms::RichAtom;
-use atomic_lib::{Atom, Storelike};
 use crate::{content_types::ContentType, errors::BetterResult};
+use atomic_lib::Storelike;
 use log;
 use std::sync::Mutex;
 

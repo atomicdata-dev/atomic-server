@@ -1,7 +1,6 @@
-use atomic_lib::errors::Result;
+use atomic_lib::errors::AtomicResult;
 use atomic_lib::mapping::{self, Mapping};
 use atomic_lib::serialize;
-use atomic_lib::store;
 use atomic_lib::storelike::{self, Class, Property, Storelike};
 use atomic_lib::urls;
 use atomic_lib::values::DataType;
@@ -231,7 +230,7 @@ fn prompt_instance(
     context: &mut Context,
     class: &Class,
     preffered_shortname: Option<String>,
-) -> Result<(Resource, String, Option<String>)> {
+) -> AtomicResult<(Resource, String, Option<String>)> {
     // Not sure about the best way t
     // The Path is the thing at the end of the URL, from the domain
     // Here I set some (kind of) random numbers.
@@ -309,7 +308,7 @@ fn prompt_instance(
 }
 
 // Checks the property and its datatype, and issues a prompt that performs validation.
-fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> Result<Option<String>> {
+fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> AtomicResult<Option<String>> {
     let mut input: Option<String> = None;
     let msg_appendix;
     if optional {
@@ -459,7 +458,7 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
 }
 
 /// Prints a resource to the terminal with readble formatting and colors
-fn pretty_print_resource(url: &String, store: &Store) -> Result<()> {
+fn pretty_print_resource(url: &String, store: &Store) -> AtomicResult<()> {
     let mut output = String::new();
     let resource = store.get_string_resource(url).ok_or(format!("Not found: {}", url))?;
     for (prop_url, val) in resource {

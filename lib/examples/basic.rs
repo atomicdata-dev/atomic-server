@@ -1,5 +1,6 @@
 extern crate atomic_lib;
-use atomic_lib::storelike::Storelike;
+// We need to bring the Storelike trait into scope
+use atomic_lib::Storelike;
 
 fn main() {
   // Let's parse this AD3 string

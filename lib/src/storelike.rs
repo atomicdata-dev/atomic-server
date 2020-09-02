@@ -1,4 +1,4 @@
-use crate::errors::Result;
+use crate::errors::AtomicResult;
 use crate::urls;
 use crate::{
     values::{match_datatype, DataType, Value},
@@ -44,7 +44,7 @@ pub enum PathReturn {
 pub trait Storelike {
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
-    fn add_atoms(&mut self, atoms: Vec<Atom>) -> Result<()>;
+    fn add_atoms(&mut self, atoms: Vec<Atom>) -> AtomicResult<()>;
 
     fn get_string_resource(&self, resource_url: &String) -> Option<ResourceString>;
 
@@ -91,7 +91,7 @@ pub trait Storelike {
 
     /// Finds all classes (isA) for any subject.
     /// Returns an empty vector if there are none.
-    fn get_classes_for_subject(&self, subject: &String) -> Result<Vec<Class>> {
+    fn get_classes_for_subject(&self, subject: &String) -> AtomicResult<Vec<Class>> {
         let resource = self
             .get_string_resource(subject)
             .ok_or(format!("Subject not found: {}", subject))?;
@@ -114,7 +114,7 @@ pub trait Storelike {
     }
 
     /// Fetches a property by URL, returns a Property instance
-    fn get_property(&self, url: &String) -> Result<Property> {
+    fn get_property(&self, url: &String) -> AtomicResult<Property> {
         let property_resource = self
             .get_string_resource(url)
             .ok_or(&*format!("Property not found: {}", url))?;
@@ -148,7 +148,7 @@ pub trait Storelike {
         &self,
         shortname: &String,
         resource: &ResourceString,
-    ) -> Result<String> {
+    ) -> AtomicResult<String> {
         for (prop_url, _value) in resource.iter() {
             let prop_resource = self
                 .get_string_resource(&*prop_url)
@@ -164,7 +164,7 @@ pub trait Storelike {
     }
 
     /// Finds
-    fn property_url_to_shortname(&self, url: &String) -> Result<String> {
+    fn property_url_to_shortname(&self, url: &String) -> AtomicResult<String> {
         let resource = self
             .get_string_resource(url)
             .ok_or(format!("Could not find property for {}", url))?;
@@ -175,6 +175,29 @@ pub trait Storelike {
         return Ok(property_resource.into());
     }
 
+    fn resource_to_ad3(&self, subject: &String, domain: Option<&String>) -> AtomicResult<String> {
+        let mut string = String::new();
+        let resource = self
+            .get_string_resource(subject)
+            .ok_or("Resource not found")?;
+        let mut mod_subject = subject.clone();
+        // Replace local schema with actual local domain
+        if subject.starts_with("_:") && domain.is_some() {
+            // Remove first two characters
+            let mut chars = subject.chars();
+            chars.next();
+            chars.next();
+            mod_subject = format!("{}{}", &domain.unwrap(), &chars.as_str());
+        }
+        for (property, value) in resource {
+            let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])
+                .expect("Can't serialize");
+            ad3_atom.push_str("\n");
+            &string.push_str(&*ad3_atom);
+        }
+        return Ok(string);
+    }
+
     /// Serializes a single Resource to a JSON object.
     /// It uses the Shortnames of properties for Keys.
     /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
@@ -183,7 +206,7 @@ pub trait Storelike {
     // [x] URLS into @id things
     // [ ] Numbers into native numbers
     // [ ] Resoures into objects, if the nesting depth allows it
-    fn resource_to_json(&self, resource_url: &String, _depth: u32) -> Result<String> {
+    fn resource_to_json(&self, resource_url: &String, _depth: u32) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};
 
         let json_ld: bool = false;
@@ -278,10 +301,35 @@ pub trait Storelike {
         return Ok(string);
     }
 
+    /// Triple Pattern Fragments interface.
+    /// Use this for most queries, e.g. finding all items with some property / value combination.
+    /// Returns an empty array if nothing is found.
+    ///
+    /// # Example
+    ///
+    /// For example, if I want to view all Resources that are instances of the class "Property", I'd do:
+    ///
+    /// ```
+    /// let mut store = atomic_lib::Store::init();
+    /// store.load_default();
+    /// let atoms = store.tpf(
+    ///     None,
+    ///     Some(String::from("https://atomicdata.dev/properties/isA")),
+    ///     Some(String::from("[\"https://atomicdata.dev/classes/Class\"]"))
+    /// );
+    /// assert!(atoms.len() == 3)
+    /// ```
+    fn tpf(
+        &self,
+        q_subject: Option<String>,
+        q_property: Option<String>,
+        q_value: Option<String>,
+    ) -> Vec<Atom>;
+
     /// Accepts an Atomic Path string, returns the result value (resource or property value)
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(&self, atomic_path: &str, mapping: &Mapping) -> Result<PathReturn> {
+    fn get_path(&self, atomic_path: &str, mapping: &Mapping) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         // For the first item, check the user mapping
