@@ -2,7 +2,7 @@ use atomic_lib::errors::Result;
 use atomic_lib::mapping::{self, Mapping};
 use atomic_lib::serialize;
 use atomic_lib::store;
-use atomic_lib::storelike::{Class, Property, Storelike};
+use atomic_lib::storelike::{self, Class, Property, Storelike};
 use atomic_lib::urls;
 use atomic_lib::values::DataType;
 use atomic_lib::{Resource, Store, Value};
@@ -178,7 +178,7 @@ fn get(context: &mut Context) {
     let result = &context.store.get_path(path_string, &context.mapping);
     match result {
         Ok(res) => match res {
-            store::PathReturn::Subject(url) => match serialization {
+            storelike::PathReturn::Subject(url) => match serialization {
                 Some(serialize::SerialializationFormats::JSON) => {
                     let out = &context.store.resource_to_json(&url, 1).unwrap();
                     println!("{}", out);
@@ -191,7 +191,7 @@ fn get(context: &mut Context) {
                     pretty_print_resource(&url, &context.store).unwrap();
                 }
             },
-            store::PathReturn::Atom(atom) => match serialization {
+            storelike::PathReturn::Atom(atom) => match serialization {
                 Some(serialize::SerialializationFormats::JSON) => {
                     println!("{}", atom.value);
                 }
