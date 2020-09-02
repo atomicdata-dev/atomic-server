@@ -1,10 +1,15 @@
 use crate::appstate::AppState;
-use crate::{content_types::ContentType, errors::BetterResult, render::propvals::{PropVal, from_hashmap_resource}};
+use crate::{
+    content_types::ContentType,
+    errors::BetterResult,
+    render::propvals::{from_hashmap_resource, PropVal},
+};
 use actix_web::{http, web, HttpResponse};
 use log;
 use serde::Deserialize;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
+use atomic_lib::Storelike;
 
 #[derive(Deserialize, Debug)]
 pub struct GetQuery {
@@ -32,17 +37,18 @@ pub async fn path(
         ContentType::HTML => {
             let mut propvals: Vec<PropVal> = Vec::new();
             match path_result {
-                atomic_lib::store::PathReturn::Subject(subject) => {
-                    let resource = context.store.get_string_resource(&subject).ok_or("Resource not found")?;
-                    propvals = from_hashmap_resource(resource, &context.store)?;
+                atomic_lib::storelike::PathReturn::Subject(subject) => {
+                    let resource = context
+                        .store
+                        .get_string_resource(&subject)
+                        .ok_or("Resource not found")?;
+                    propvals = from_hashmap_resource(&resource, &context.store)?;
                 }
-                atomic_lib::store::PathReturn::Atom(atom) => {
-                    propvals.push(
-                        PropVal {
-                            property: context.store.get_property(&atom.property.subject)?,
-                            value: crate::render::atom::value_to_html(atom.native_value),
-                        }
-                    );
+                atomic_lib::storelike::PathReturn::Atom(atom) => {
+                    propvals.push(PropVal {
+                        property: context.store.get_property(&atom.property.subject)?,
+                        value: crate::render::atom::value_to_html(atom.native_value),
+                    });
                 }
             }
             builder.set(http::header::ContentType::html());

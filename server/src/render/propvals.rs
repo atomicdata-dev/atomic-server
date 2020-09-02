@@ -1,4 +1,4 @@
-use atomic_lib::{Store, store::Property, Value};
+use atomic_lib::{Store, Storelike, storelike::Property, Value};
 use serde::Serialize;
 use std::collections::HashMap;
 use crate::errors::BetterResult;

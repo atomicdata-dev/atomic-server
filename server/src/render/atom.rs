@@ -1,9 +1,10 @@
 use atomic_lib::values::Value;
 use atomic_lib::atoms::RichAtom;
-use atomic_lib::store::Property;
+use atomic_lib::{Storelike, storelike::Property, Atom};
 use serde::Serialize;
 use tera::escape_html;
 use comrak::{markdown_to_html, ComrakOptions};
+use crate::errors::BetterResult;
 
 /// Atom with all the props that make it suitable for rendering.
 #[derive(Serialize)]
@@ -44,5 +45,18 @@ impl RenderAtom {
             native_value: atom.native_value.clone(),
             html: value_to_html(atom.native_value.clone()),
         }
+    }
+
+    pub fn from_atom(atom: &Atom, store: &dyn Storelike) -> BetterResult<RenderAtom> {
+        let property = store.get_property(&atom.property)?;
+        let native = Value::new(&atom.value, &property.data_type)?;
+
+        return Ok(RenderAtom {
+            subject: atom.subject.clone(),
+            property,
+            value: atom.value.clone(),
+            native_value: native.clone(),
+            html: value_to_html(native),
+        })
     }
 }
