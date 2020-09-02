@@ -1,6 +1,6 @@
 use crate::storelike::Property;
 use crate::values::Value;
-use crate::errors::Result;
+use crate::errors::AtomicResult;
 use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.
@@ -33,7 +33,7 @@ pub struct RichAtom {
 }
 
 impl RichAtom {
-  pub fn new(subject: String, property: Property, value: String) -> Result<Self> {
+  pub fn new(subject: String, property: Property, value: String) -> AtomicResult<Self> {
     Ok(RichAtom {
       subject: subject.clone(),
       property: property.clone(),
@@ -46,7 +46,7 @@ impl RichAtom {
   }
 }
 
-pub fn plain_to_rich(plainatom: Atom, property: Property) -> Result<RichAtom> {
+pub fn plain_to_rich(plainatom: Atom, property: Property) -> AtomicResult<RichAtom> {
   RichAtom::new(
     plainatom.subject,
     property,

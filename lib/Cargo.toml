@@ -13,6 +13,7 @@ regex = "1.3.9"
 serde_json = "1.0.57"
 serde = { version = "1.0.114", features = ["derive"] }
 sled = {version = "0.34.3", optional = true}
+bincode = {version = "1.3.1", optional = true}
 
 [features]
-db = ["sled"]
+db = ["sled", "bincode"]

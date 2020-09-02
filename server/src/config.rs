@@ -41,7 +41,7 @@ pub fn init() -> Config {
     let mut https = false;
     let mut ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
     let mut port = if https { 443 } else { 80 };
-    let mut store_path = PathBuf::from("~/.atomic/default_store.ad3");
+    let mut store_path = PathBuf::from("~/.atomic/default_store.db");
     let mut email = None;
     for (key, value) in env::vars() {
         match &*key {

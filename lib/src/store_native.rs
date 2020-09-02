@@ -3,7 +3,7 @@
 //! Currently, it can only persist its data as .ad3 (Atomic Data Triples) to disk.
 //! A more robust persistent storage option will be used later, such as: https://github.com/TheNeikos/rustbreak
 
-use crate::errors::Result;
+use crate::errors::AtomicResult;
 use crate::Resource;
 use std::collections::HashMap;
 
@@ -25,7 +25,7 @@ impl StoreNative {
         };
     }
 
-    pub fn add_resource(&mut self, resource: Resource) -> Result<()> {
+    pub fn add_resource(&mut self, resource: Resource) -> AtomicResult<()> {
         self.resources.insert(resource.subject().clone(), resource);
         Ok(())
     }

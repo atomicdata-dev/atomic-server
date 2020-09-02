@@ -13,7 +13,7 @@ pub struct PropVal {
 
 pub type PropVals = Vec<PropVal>;
 
-pub fn from_hashmap_resource(resource: &HashMap<String, String>, store: &Store) -> BetterResult<PropVals> {
+pub fn from_hashmap_resource(resource: &HashMap<String, String>, store: &dyn Storelike) -> BetterResult<PropVals> {
     let mut hashmap: PropVals = Vec::new();
 
     for (property, value) in resource.iter() {

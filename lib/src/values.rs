@@ -1,11 +1,11 @@
-use crate::errors::Result;
+use crate::errors::AtomicResult;
 use crate::serialize;
 use crate::urls;
 use regex::Regex;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 
 /// An individual Value in an Atom, represented as a native Rust enum.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
     AtomicUrl(String),
     Date(String),
@@ -32,7 +32,7 @@ pub enum DataType {
 }
 
 /// When the Datatype of a Value is not handled by this library
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UnsupportedValue {
     pub value: String,
     /// URL of the datatype
@@ -43,7 +43,7 @@ pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
-    pub fn new(value: &String, datatype: &DataType) -> Result<Value> {
+    pub fn new(value: &String, datatype: &DataType) -> AtomicResult<Value> {
         match datatype {
             DataType::Integer => {
                 let val: i32 = value.parse()?;
@@ -99,7 +99,7 @@ impl Value {
     }
 
     /// Returns a new Value, accepts a datatype string
-    pub fn new_from_string(value: &String, datatype: &String) -> Result<Value> {
+    pub fn new_from_string(value: &String, datatype: &String) -> AtomicResult<Value> {
       Value::new(value, &match_datatype(datatype))
     }
 }
@@ -116,4 +116,9 @@ pub fn match_datatype(string: &String) -> DataType {
       urls::TIMESTAMP => DataType::Timestamp,
       unsupported_datatype => return DataType::Unsupported(unsupported_datatype.into()),
   }
+}
+impl From<String> for Value {
+    fn from(string: String) -> Self {
+        Value::new(&string, &DataType::String).unwrap()
+    }
 }
