@@ -1,5 +1,6 @@
 use atomic_lib::Db;
 use atomic_lib::mapping::Mapping;
+use atomic_lib::Storelike;
 use tera::Tera;
 use crate::config::Config;
 
@@ -15,7 +16,10 @@ pub struct AppState {
 // Creates the server context
 pub fn init(config: Config) -> AppState {
     // let mut store = Store::init();
-    let store = atomic_lib::Db::init(config.store_path.clone());
+    let mut store = atomic_lib::Db::init(config.store_path.clone());
+
+    let ad3 = include_str!("../../defaults/default_store.ad3");
+    store.parse_ad3(&String::from(ad3)).expect("Error when parsing store");
 
     let mapping = Mapping::init();
 

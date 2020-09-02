@@ -292,7 +292,7 @@ fn prompt_instance(
     // Add created_instance to store
     context
         .store
-        .add_resource(new_resource.subject().clone(), new_resource.to_plain())
+        .add_resource_string(new_resource.subject().clone(), new_resource.to_plain())
         .unwrap();
     // Publish new resource to IPFS
     // TODO!
