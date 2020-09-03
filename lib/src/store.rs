@@ -5,7 +5,7 @@
 
 use crate::errors::AtomicResult;
 use crate::mutations;
-use crate::values::{DataType, Value};
+use crate::values::Value;
 use crate::{
     atoms::Atom,
     storelike::{ResourceString, Storelike},
@@ -55,16 +55,6 @@ impl Store {
         fs::write(path, file_string).expect("Unable to write file");
         return Ok(());
     }
-
-    /// Gets a resource where with Values instead of strings
-    pub fn get_native(&self) {}
-
-    // Returns an enum of the native value.
-    // Validates the contents.
-    pub fn get_native_value(value: &String, datatype: &DataType) -> AtomicResult<Value> {
-        Value::new(value, datatype)
-    }
-
 
     /// Checks Atomic Data in the store for validity.
     /// Returns an Error if it is not valid.
@@ -134,18 +124,20 @@ impl Storelike for Store {
         return Ok(());
     }
 
-    fn add_resource_string(&mut self, subject: String, resource: ResourceString) -> AtomicResult<()> {
-        self.hashmap.insert(subject.clone(), resource.clone());
+    fn add_resource_string(&mut self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
+        self.hashmap.insert(subject, resource.clone());
         return Ok(());
     }
 
-    fn get_string_resource(&self, resource_url: &String) -> Option<ResourceString> {
+    fn get_resource_string(&self, resource_url: &String) -> Option<ResourceString> {
         match self.hashmap.get(resource_url) {
             Some(result) => Some(result.clone()),
             None => None,
         }
     }
 
+    // Very costly, slow implementation.
+    // Does not assume any indexing.
     fn tpf(
         &self,
         q_subject: Option<String>,
@@ -186,7 +178,7 @@ impl Storelike for Store {
         };
 
         match q_subject {
-            Some(sub) => match self.get_string_resource(&sub) {
+            Some(sub) => match self.get_resource_string(&sub) {
                 Some(resource) => {
                     find_in_resource(&sub, &resource);
                     return vec;
@@ -225,7 +217,7 @@ mod test {
     fn get() {
         let store = init_store();
         // Get our resource...
-        let my_resource = store.get_string_resource(&"_:test".into()).unwrap();
+        let my_resource = store.get_resource_string(&"_:test".into()).unwrap();
         // Get our value by filtering on our property...
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")

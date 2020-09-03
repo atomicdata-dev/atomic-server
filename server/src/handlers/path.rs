@@ -40,7 +40,7 @@ pub async fn path(
                 atomic_lib::storelike::PathReturn::Subject(subject) => {
                     let resource = context
                         .store
-                        .get_string_resource(&subject)
+                        .get_resource_string(&subject)
                         .ok_or("Resource not found")?;
                     propvals = from_hashmap_resource(&resource, &context.store)?;
                 }

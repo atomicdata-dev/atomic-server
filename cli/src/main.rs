@@ -460,7 +460,7 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
 /// Prints a resource to the terminal with readble formatting and colors
 fn pretty_print_resource(url: &String, store: &Store) -> AtomicResult<()> {
     let mut output = String::new();
-    let resource = store.get_string_resource(url).ok_or(format!("Not found: {}", url))?;
+    let resource = store.get_resource_string(url).ok_or(format!("Not found: {}", url))?;
     for (prop_url, val) in resource {
         let prop_shortname = store.property_url_to_shortname(&prop_url).unwrap();
         output.push_str(&*format!(
