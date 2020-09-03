@@ -39,6 +39,8 @@ pub enum PathReturn {
     Atom(RichAtom),
 }
 
+pub type ResourceCollection = Vec<(String, ResourceString)>;
+
 /// Storelike provides many useful methods for interacting with an Atomic Store.
 /// It serves as a basic store Trait, agnostic of how it functions under the hood.
 /// This is useful, because we can create methods for Storelike that will work with either in-memory
@@ -70,11 +72,11 @@ pub trait Storelike {
     fn get_resource(&self, subject: &String) -> Option<Resource> {
         match self.get_resource_string(subject) {
             Some(resource_string) => {
-
                 let mut res = Resource::new(subject.clone());
                 for (prop_string, val_string) in resource_string {
                     let propertyfull = self.get_property(&prop_string).expect("Prop not found");
-                    let fullvalue = Value::new(&val_string, &propertyfull.data_type).expect("Could not convert value");
+                    let fullvalue = Value::new(&val_string, &propertyfull.data_type)
+                        .expect("Could not convert value");
                     res.insert(prop_string.clone(), fullvalue).unwrap();
                 }
                 // Above code is a copy from:
@@ -82,7 +84,7 @@ pub trait Storelike {
                 // But has some Size issues
                 Some(res)
             }
-            None => None
+            None => None,
         }
     }
 
@@ -179,6 +181,9 @@ pub trait Storelike {
 
         return Ok(property);
     }
+
+    /// Returns a collection with all resources in the store
+    fn all_resources(&self) -> AtomicResult<ResourceCollection>;
 
     /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
     /// Allows comments and empty lines.
@@ -381,6 +386,7 @@ pub trait Storelike {
     /// For example, if I want to view all Resources that are instances of the class "Property", I'd do:
     ///
     /// ```
+    /// use atomic_lib::Storelike;
     /// let mut store = atomic_lib::Store::init();
     /// store.load_default();
     /// let atoms = store.tpf(
@@ -390,12 +396,67 @@ pub trait Storelike {
     /// );
     /// assert!(atoms.len() == 3)
     /// ```
+    // Very costly, slow implementation.
+    // Does not assume any indexing.
     fn tpf(
         &self,
         q_subject: Option<String>,
         q_property: Option<String>,
         q_value: Option<String>,
-    ) -> Vec<Atom>;
+    ) -> AtomicResult<Vec<Atom>> {
+        let mut vec: Vec<Atom> = Vec::new();
+
+        let hassub = q_subject.is_some();
+        let hasprop = q_property.is_some();
+        let hasval = q_value.is_some();
+
+        // Simply return all the atoms
+        if !hassub && !hasprop && !hasval {
+
+            for (sub, resource) in self.all_resources()? {
+                for (property, value) in resource {
+                    println!("{} {} {}", sub, property, value);
+                    vec.push(Atom::new(sub.clone().into(), property.into(), value.into()))
+                }
+            }
+            return Ok(vec);
+        }
+
+        // Find atoms matching the TPF query in a single resource
+        let mut find_in_resource = |subj: &String, resource: &ResourceString| {
+            for (prop, val) in resource.iter() {
+                if hasprop && q_property.as_ref().unwrap() == prop {
+                    if hasval {
+                        if val == q_value.as_ref().unwrap() {
+                            vec.push(Atom::new(subj.into(), prop.into(), val.into()))
+                        }
+                    } else {
+                        vec.push(Atom::new(subj.into(), prop.into(), val.into()))
+                    }
+                } else if hasval && q_value.as_ref().unwrap() == val {
+                    vec.push(Atom::new(subj.into(), prop.into(), val.into()))
+                }
+            }
+        };
+
+        match q_subject {
+            Some(sub) => match self.get_resource_string(&sub) {
+                Some(resource) => {
+                    find_in_resource(&sub, &resource);
+                    return Ok(vec);
+                }
+                None => {
+                    return Ok(vec);
+                }
+            },
+            None => {
+                for (subj, properties) in self.all_resources()? {
+                    find_in_resource(&subj, &properties);
+                }
+                return Ok(vec);
+            }
+        }
+    }
 
     /// Accepts an Atomic Path string, returns the result value (resource or property value)
     /// https://docs.atomicdata.dev/core/paths.html

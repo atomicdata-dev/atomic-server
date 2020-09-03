@@ -26,7 +26,7 @@ pub async fn tpf(
   let subject = empty_to_nothing(query.subject.clone());
   let property = empty_to_nothing(query.property.clone());
   let value = empty_to_nothing(query.value.clone());
-  let atoms = context.store.tpf(subject.clone(), property.clone(), value.clone());
+  let atoms = context.store.tpf(subject.clone(), property.clone(), value.clone())?;
   log::info!("{:?}", query);
   match content_type {
       ContentType::JSON => {
@@ -41,17 +41,6 @@ pub async fn tpf(
           for atom in atoms {
             renderedatoms.push(RenderAtom::from_atom(&atom, &context.store)?);
           }
-
-
-          // let atom_to_render_atom = |atom: Atom| Ok(RenderAtom::from_rich_atom(&plain_to_rich(
-          //     atom.clone(),
-          //     context.store.get_property(&atom.property)?
-          //   )?));
-          // let renderedatoms_in: Vec<RenderAtom> = Ok(atoms.iter()
-          //   .map(|atom| atom_to_render_atom(atom.clone()).expect("joe")?));
-          // let  renderedatoms = renderedatoms_in?.collect();
-
-
 
           builder.set(
               http::header::ContentType::html()
