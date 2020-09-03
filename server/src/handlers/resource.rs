@@ -39,7 +39,7 @@ pub async fn get_resource(
         ContentType::HTML => {
             builder.set(http::header::ContentType::html());
             let mut tera_context = TeraCtx::new();
-            let resource = context.store.get_string_resource(&subject).ok_or("Resource not found")?;
+            let resource = context.store.get_resource_string(&subject).ok_or("Resource not found")?;
 
             let propvals = from_hashmap_resource(&resource, &context.store)?;
 

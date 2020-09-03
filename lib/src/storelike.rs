@@ -1,12 +1,13 @@
 use crate::errors::AtomicResult;
 use crate::urls;
 use crate::{
+    mapping::Mapping,
     values::{match_datatype, DataType, Value},
-    Atom, mapping::Mapping, RichAtom,
+    Atom, Resource, RichAtom,
 };
 use serde::Serialize;
-use std::collections::HashMap;
 use serde_json::from_str;
+use std::collections::HashMap;
 
 /// The first string represents the URL of the Property, the second one its Value.
 pub type ResourceString = HashMap<String, String>;
@@ -50,14 +51,45 @@ pub trait Storelike {
     /// Replaces existing resource with the contents
     /// Accepts a simple nested string only hashmap
     /// Adds to hashmap and to the resource store
-    fn add_resource_string(&mut self, subject: String, resource: ResourceString) -> AtomicResult<()>;
+    fn add_resource_string(
+        &mut self,
+        subject: String,
+        resource: &ResourceString,
+    ) -> AtomicResult<()>;
 
-    fn get_string_resource(&self, resource_url: &String) -> Option<ResourceString>;
+    /// Returns a hashmap ResourceString with string Values
+    fn get_resource_string(&self, resource_url: &String) -> Option<ResourceString>;
+
+    /// Adds a Resource to the store
+    fn add_resource(&mut self, resource: &Resource) -> AtomicResult<()> {
+        self.add_resource_string(resource.subject().clone(), &resource.to_plain())?;
+        return Ok(());
+    }
+
+    /// Returns a full Resource with native Values
+    fn get_resource(&self, subject: &String) -> Option<Resource> {
+        match self.get_resource_string(subject) {
+            Some(resource_string) => {
+
+                let mut res = Resource::new(subject.clone());
+                for (prop_string, val_string) in resource_string {
+                    let propertyfull = self.get_property(&prop_string).expect("Prop not found");
+                    let fullvalue = Value::new(&val_string, &propertyfull.data_type).expect("Could not convert value");
+                    res.insert(prop_string.clone(), fullvalue).unwrap();
+                }
+                // Above code is a copy from:
+                // let res = Resource::new_from_resource_string(subject.clone(), &resource, self)?;
+                // But has some Size issues
+                Some(res)
+            }
+            None => None
+        }
+    }
 
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &String) -> Class {
         // The string representation of the Class
-        let class_strings = self.get_string_resource(&subject).expect("Class not found");
+        let class_strings = self.get_resource_string(&subject).expect("Class not found");
         let shortname = class_strings
             .get(urls::SHORTNAME)
             .expect("Class has no shortname");
@@ -99,7 +131,7 @@ pub trait Storelike {
     /// Returns an empty vector if there are none.
     fn get_classes_for_subject(&self, subject: &String) -> AtomicResult<Vec<Class>> {
         let resource = self
-            .get_string_resource(subject)
+            .get_resource_string(subject)
             .ok_or(format!("Subject not found: {}", subject))?;
         let classes_array_opt = resource.get(urls::IS_A);
         let classes_array = match classes_array_opt {
@@ -122,7 +154,7 @@ pub trait Storelike {
     /// Fetches a property by URL, returns a Property instance
     fn get_property(&self, url: &String) -> AtomicResult<Property> {
         let property_resource = self
-            .get_string_resource(url)
+            .get_resource_string(url)
             .ok_or(&*format!("Property not found: {}", url))?;
         let property = Property {
             data_type: match_datatype(
@@ -190,7 +222,7 @@ pub trait Storelike {
     ) -> AtomicResult<String> {
         for (prop_url, _value) in resource.iter() {
             let prop_resource = self
-                .get_string_resource(&*prop_url)
+                .get_resource_string(&*prop_url)
                 .ok_or(format!("Property '{}' not found", prop_url))?;
             let prop_shortname = prop_resource
                 .get(urls::SHORTNAME)
@@ -205,7 +237,7 @@ pub trait Storelike {
     /// Finds
     fn property_url_to_shortname(&self, url: &String) -> AtomicResult<String> {
         let resource = self
-            .get_string_resource(url)
+            .get_resource_string(url)
             .ok_or(format!("Could not find property for {}", url))?;
         let property_resource = resource
             .get(urls::SHORTNAME)
@@ -217,7 +249,7 @@ pub trait Storelike {
     fn resource_to_ad3(&self, subject: &String, domain: Option<&String>) -> AtomicResult<String> {
         let mut string = String::new();
         let resource = self
-            .get_string_resource(subject)
+            .get_resource_string(subject)
             .ok_or("Resource not found")?;
         let mut mod_subject = subject.clone();
         // Replace local schema with actual local domain
@@ -251,7 +283,7 @@ pub trait Storelike {
         let json_ld: bool = false;
 
         let resource = self
-            .get_string_resource(resource_url)
+            .get_resource_string(resource_url)
             .ok_or("Resource not found")?;
 
         // Initiate JSON object
@@ -381,7 +413,7 @@ pub trait Storelike {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource: Option<ResourceString> = self.get_string_resource(&subject);
+        let mut resource: Option<ResourceString> = self.get_resource_string(&subject);
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -402,7 +434,8 @@ pub trait Storelike {
                             .get(&atom.property.subject)
                             .ok_or("Property not found")?;
                         let vector: Vec<String> =
-                            crate::serialize::deserialize_json_array(array_string).expect("Failed to parse array");
+                            crate::serialize::deserialize_json_array(array_string)
+                                .expect("Failed to parse array");
                         if vector.len() <= i as usize {
                             eprintln!(
                                 "Too high index ({}) for array with length {}",
@@ -413,7 +446,7 @@ pub trait Storelike {
                         let url = &vector[i as usize];
 
                         subject = url.clone();
-                        resource = self.get_string_resource(url);
+                        resource = self.get_resource_string(url);
                         current = PathReturn::Subject(url.clone());
                         continue;
                     }

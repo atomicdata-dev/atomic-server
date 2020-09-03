@@ -1,8 +1,8 @@
 use crate::errors::AtomicResult;
 use crate::values::Value;
 use crate::Store;
-use crate::Storelike;
-use serde::{Serialize, Deserialize};
+use crate::{storelike::ResourceString, Storelike};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A resource is a set of Atoms that shares a single Subject
@@ -25,6 +25,20 @@ impl Resource {
         };
     }
 
+    pub fn new_from_resource_string(
+        subject: String,
+        resource_string: &ResourceString,
+        store: &dyn Storelike,
+    ) -> AtomicResult<Resource> {
+        let mut res = Resource::new(subject);
+        for (prop_string, val_string) in resource_string {
+            let propertyfull = store.get_property(prop_string).expect("Prop not found");
+            let fullvalue = Value::new(val_string, &propertyfull.data_type)?;
+            res.insert(prop_string.clone(), fullvalue)?;
+        }
+        Ok(res)
+    }
+
     /// Get a value by property URL
     pub fn get(&self, property_url: &String) -> AtomicResult<&Value> {
         return Ok(self.propvals.get(property_url).ok_or(format!(
@@ -39,14 +53,13 @@ impl Resource {
             match store.get_property(url) {
                 Ok(prop) => {
                     if &prop.shortname == shortname {
-                        return Ok(self.get(url)?)
+                        return Ok(self.get(url)?);
                     }
                 }
                 Err(_) => {}
             }
-
         }
-        return Err("No match".into())
+        return Err("No match".into());
     }
 
     /// Insert a Property/Value combination.
