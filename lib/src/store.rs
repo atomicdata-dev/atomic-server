@@ -8,7 +8,7 @@ use crate::mutations;
 use crate::values::Value;
 use crate::{
     atoms::Atom,
-    storelike::{ResourceString, Storelike},
+    storelike::{ResourceString, Storelike, ResourceCollection},
 };
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -46,7 +46,7 @@ impl Store {
     /// Serializes the current store and saves to path
     pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
-        for (subject, _) in self.hashmap.iter() {
+        for (subject, _) in self.all_resources()? {
             let resourcestring = self.resource_to_ad3(&subject, None)?;
             &file_string.push_str(&*resourcestring);
         }
@@ -67,20 +67,20 @@ impl Store {
     /// - [ ] Returns a report with multiple options
     #[allow(dead_code, unreachable_code)]
     pub fn validate_store(&self) -> AtomicResult<()> {
-        for (subject, resource) in self.hashmap.iter() {
+        for (subject, resource) in self.all_resources()? {
             println!("Subject: {:?}", subject);
             println!("Resource: {:?}", resource);
 
             let mut found_props: Vec<String> = Vec::new();
 
             for (prop_url, value) in resource {
-                let property = self.get_property(prop_url)?;
+                let property = self.get_property(&prop_url)?;
 
-                Value::new(value, &property.data_type)?;
+                Value::new(&value, &property.data_type)?;
                 found_props.push(prop_url.clone());
                 // println!("{:?}: {:?}", prop_url, value);
             }
-            let classes = self.get_classes_for_subject(subject)?;
+            let classes = self.get_classes_for_subject(&subject)?;
             for class in classes {
                 println!("Class: {:?}", class.shortname);
                 println!("Found: {:?}", found_props);
@@ -129,70 +129,15 @@ impl Storelike for Store {
         return Ok(());
     }
 
+    fn all_resources(&self) -> AtomicResult<ResourceCollection> {
+        let res = self.hashmap.clone().into_iter().collect();
+        Ok(res)
+    }
+
     fn get_resource_string(&self, resource_url: &String) -> Option<ResourceString> {
         match self.hashmap.get(resource_url) {
             Some(result) => Some(result.clone()),
             None => None,
-        }
-    }
-
-    // Very costly, slow implementation.
-    // Does not assume any indexing.
-    fn tpf(
-        &self,
-        q_subject: Option<String>,
-        q_property: Option<String>,
-        q_value: Option<String>,
-    ) -> Vec<Atom> {
-        let mut vec: Vec<Atom> = Vec::new();
-
-        let hassub = q_subject.is_some();
-        let hasprop = q_property.is_some();
-        let hasval = q_value.is_some();
-
-        // Simply return all the atoms
-        if !hassub && !hasprop && !hasval {
-            for (sub, resource) in self.hashmap.iter() {
-                for (property, value) in resource {
-                    vec.push(Atom::new(sub.into(), property.into(), value.into()))
-                }
-            }
-            return vec;
-        }
-
-        // Find atoms matching the TPF query in a single resource
-        let mut find_in_resource = |subj: &String, resource: &ResourceString| {
-            for (prop, val) in resource.iter() {
-                if hasprop && q_property.as_ref().unwrap() == prop {
-                    if hasval {
-                        if val == q_value.as_ref().unwrap() {
-                            vec.push(Atom::new(subj.into(), prop.into(), val.into()))
-                        }
-                    } else {
-                        vec.push(Atom::new(subj.into(), prop.into(), val.into()))
-                    }
-                } else if hasval && q_value.as_ref().unwrap() == val {
-                    vec.push(Atom::new(subj.into(), prop.into(), val.into()))
-                }
-            }
-        };
-
-        match q_subject {
-            Some(sub) => match self.get_resource_string(&sub) {
-                Some(resource) => {
-                    find_in_resource(&sub, &resource);
-                    return vec;
-                }
-                None => {
-                    return vec;
-                }
-            },
-            None => {
-                for (subj, properties) in self.hashmap.iter() {
-                    find_in_resource(subj, properties);
-                }
-                return vec;
-            }
         }
     }
 }
