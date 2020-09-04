@@ -3,18 +3,20 @@ use tera::{Context as TeraCtx};
 use actix_web::{web, http, HttpResponse};
 use crate::appstate::AppState;
 use crate::render::atom::RenderAtom;
-use crate::{content_types::ContentType, errors::BetterResult};
+use crate::{content_types::ContentType, errors::BetterResult, helpers::empty_to_nothing};
 use atomic_lib::Storelike;
 use log;
 use std::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
 pub struct TPFQuery {
-   subject: Option<String>,
-   property: Option<String>,
-   value: Option<String>,
+   pub subject: Option<String>,
+   pub property: Option<String>,
+   pub value: Option<String>,
 }
 
+/// Triple Pattern Fragment handler.
+/// Reads optional 'subject' 'property' 'value' from query params, searches the store, return triples.
 pub async fn tpf(
   data: web::Data<Mutex<AppState>>,
   query: web::Query<TPFQuery>,
@@ -46,7 +48,6 @@ pub async fn tpf(
               http::header::ContentType::html()
           );
           let mut tera_context = TeraCtx::new();
-          // Use the value_to_html helper here
           tera_context.insert("atoms", &renderedatoms);
           tera_context.insert("subject", &subject);
           tera_context.insert("property", &property);
@@ -61,22 +62,8 @@ pub async fn tpf(
           builder.set(
               http::header::ContentType::html()
           );
-          // let plainatoms = atoms.iter().map(|atom| rich_to_plain(atom)).collect();
           let ad3_string = atomic_lib::serialize::serialize_atoms_to_ad3(atoms)?;
           Ok(builder.body(ad3_string))
       }
-  }
-}
-
-fn empty_to_nothing(string: Option<String>) -> Option<String> {
-  match string.as_ref() {
-      Some(st) => {
-        if st.len() == 0 {
-          return None
-        } else {
-          return string
-        }
-      }
-      None => return None
   }
 }

@@ -11,9 +11,11 @@
 <p>
   <b class="propertyLabel">
     <a href="/get?path={{ propval.property.subject }}">{{ propval.property.shortname }}</a>
+    <!-- <span> </span> -->
+    <!-- <a href="/delta?subject={{ propval.subject }}&property={{ propval.property.subject }}&value={{ propval.value }}">edit</a> -->
   </b>
   <br/>
-  {{ propval.value | safe }}
+  {{ propval.value_html | safe }}
 </p>
 {%- endfor %}
 {% endmacro propvals %}

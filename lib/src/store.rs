@@ -192,7 +192,7 @@ mod test {
     fn serialize() {
         let store = init_store();
         store
-            .resource_to_json(&String::from(urls::CLASS), 1)
+            .resource_to_json(&String::from(urls::CLASS), 1, true)
             .unwrap();
     }
 }

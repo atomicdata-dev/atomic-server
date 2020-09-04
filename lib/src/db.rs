@@ -4,7 +4,7 @@
 use crate::{
     errors::AtomicResult,
     storelike::{ResourceString, Storelike, ResourceCollection},
-    Atom, Resource,
+    Atom, Resource, urls, Delta,
 };
 use sled;
 use std::collections::HashMap;
@@ -39,36 +39,51 @@ impl Db {
         })
     }
 
-    fn index_value_add(&mut self, atom: Atom) -> AtomicResult<()> {
-        todo!();
+    pub fn add_atom(&mut self, atom: Atom) -> AtomicResult<()>{
+        match self.get_resource_string(&atom.subject).as_mut() {
+            Some(resource) => {
+                // Overwrites existing properties
+                match resource.insert(atom.property, atom.value) {
+                    Some(_oldval) => {
+                        // Remove the value from the Subject index
+                        // self.index_value_remove(atom);
+                    }
+                    None => {}
+                };
+                self.add_resource_string(atom.subject, &resource)?;
+            }
+            None => {
+                let mut resource: ResourceString = HashMap::new();
+                resource.insert(atom.property.clone(), atom.value);
+                self.add_resource_string(atom.subject, &resource)?;
+            }
+        };
+        Ok(())
     }
 
-    fn index_value_remove(&mut self, atom: Atom) -> AtomicResult<()> {
-        todo!();
+    pub fn process_deltas(&mut self, deltas: Vec<Delta>) -> AtomicResult<()> {
+        deltas.iter().for_each(|delta| { match delta.method.as_str() {
+            urls::INSERT => {
+                self.add_atom(Atom::from(delta)).unwrap()
+            },
+            unknown => {println!("Ignoring unknown method: {}", unknown )},
+        }});
+        Ok(())
     }
+
+    // fn index_value_add(&mut self, atom: Atom) -> AtomicResult<()> {
+    //     todo!();
+    // }
+
+    // fn index_value_remove(&mut self, atom: Atom) -> AtomicResult<()> {
+    //     todo!();
+    // }
 }
 
 impl Storelike for Db {
     fn add_atoms(&mut self, atoms: Vec<Atom>) -> AtomicResult<()> {
         for atom in atoms {
-            match self.get_resource_string(&atom.subject).as_mut() {
-                Some(resource) => {
-                    // Overwrites existing properties
-                    match resource.insert(atom.property, atom.value) {
-                        Some(_oldval) => {
-                            // Remove the value from the Subject index
-                            // self.index_value_remove(atom);
-                        }
-                        None => {}
-                    };
-                    self.add_resource_string(atom.subject, &resource)?;
-                }
-                None => {
-                    let mut resource: ResourceString = HashMap::new();
-                    resource.insert(atom.property.clone(), atom.value);
-                    self.add_resource_string(atom.subject, &resource)?;
-                }
-            }
+            self.add_atom(atom)?;
         }
         self.db.flush()?;
         Ok(())

@@ -41,5 +41,6 @@ pub use store::Store;
 pub use storelike::Storelike;
 pub use atoms::Atom;
 pub use atoms::RichAtom;
+pub use atoms::Delta;
 pub use values::Value;
 pub use resources::Resource;

@@ -26,5 +26,6 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
 // Should list all the supported serialization formats
 pub enum SerialializationFormats {
     JSON,
+    JSONLD,
     AD3,
 }

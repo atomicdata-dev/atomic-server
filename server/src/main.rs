@@ -7,6 +7,7 @@ mod appstate;
 mod config;
 mod errors;
 mod handlers;
+mod helpers;
 mod https;
 mod content_types;
 mod render;

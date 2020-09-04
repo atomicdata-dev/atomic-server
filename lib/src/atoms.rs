@@ -1,6 +1,6 @@
+use crate::errors::AtomicResult;
 use crate::storelike::Property;
 use crate::values::Value;
-use crate::errors::AtomicResult;
 use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.
@@ -13,13 +13,13 @@ pub struct Atom {
 }
 
 impl Atom {
-  pub fn new(subject: String, property: String, value: String) -> Self {
-    Atom {
-      subject: subject.clone(),
-      property: property.clone(),
-      value: value.clone(),
+    pub fn new(subject: String, property: String, value: String) -> Self {
+        Atom {
+            subject: subject.clone(),
+            property: property.clone(),
+            value: value.clone(),
+        }
     }
-  }
 }
 
 /// A more heavyweight atom that is validated,
@@ -33,31 +33,40 @@ pub struct RichAtom {
 }
 
 impl RichAtom {
-  pub fn new(subject: String, property: Property, value: String) -> AtomicResult<Self> {
-    Ok(RichAtom {
-      subject: subject.clone(),
-      property: property.clone(),
-      value: value.clone(),
-      native_value: Value::new(
-        &value,
-        &property.data_type
-      )?
-    })
-  }
+    pub fn new(subject: String, property: Property, value: String) -> AtomicResult<Self> {
+        Ok(RichAtom {
+            subject: subject.clone(),
+            property: property.clone(),
+            value: value.clone(),
+            native_value: Value::new(&value, &property.data_type)?,
+        })
+    }
 }
 
-pub fn plain_to_rich(plainatom: Atom, property: Property) -> AtomicResult<RichAtom> {
-  RichAtom::new(
-    plainatom.subject,
-    property,
-    plainatom.value,
-  )
+/// Individual change to a resource
+pub struct Delta {
+    pub subject: String,
+    pub property: String,
+    pub value: String,
+    pub method: String,
 }
 
-pub fn rich_to_plain(richatom: &RichAtom) -> Atom {
-  return Atom {
-    subject: richatom.subject.clone(),
-    property: richatom.property.subject.clone(),
-    value: richatom.value.clone(),
-  }
+impl From<&Delta> for Atom {
+    fn from(delta: &Delta) -> Self {
+        Atom::new(
+            delta.subject.clone(),
+            delta.property.clone(),
+            delta.value.clone(),
+        )
+    }
+}
+
+impl From<&RichAtom> for Atom {
+    fn from(richatom: &RichAtom) -> Self {
+        Atom::new(
+            richatom.subject.clone(),
+            richatom.property.subject.clone(),
+            richatom.value.clone(),
+        )
+    }
 }

@@ -1,27 +1,35 @@
-use atomic_lib::{Storelike, storelike::Property, Value};
+use super::atom::value_to_html;
+use crate::errors::BetterResult;
+use atomic_lib::{storelike::Property, Storelike, Value};
 use serde::Serialize;
 use std::collections::HashMap;
-use crate::errors::BetterResult;
-use super::atom::value_to_html;
 
 /// Useful for rendering Atomic Data
 #[derive(Serialize)]
 pub struct PropVal {
     pub property: Property,
     pub value: String,
+    pub value_html: String,
+    pub subject: String,
 }
 
 pub type PropVals = Vec<PropVal>;
 
-pub fn from_hashmap_resource(resource: &HashMap<String, String>, store: &dyn Storelike) -> BetterResult<PropVals> {
+pub fn from_hashmap_resource(
+    resource: &HashMap<String, String>,
+    store: &dyn Storelike,
+    subject: String,
+) -> BetterResult<PropVals> {
     let mut hashmap: PropVals = Vec::new();
 
     for (property, value) in resource.iter() {
-        let fullprop =  store.get_property(property)?;
-        let val =  Value::new(value, &fullprop.data_type)?;
+        let fullprop = store.get_property(property)?;
+        let val = Value::new(value, &fullprop.data_type)?;
         hashmap.push(PropVal {
             property: fullprop,
-            value: value_to_html(val)
+            value: value.into(),
+            value_html: value_to_html(val),
+            subject: subject.clone(),
         });
     }
     Ok(hashmap)

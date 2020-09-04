@@ -11,8 +11,8 @@ use dirs::home_dir;
 use promptly::prompt_opt;
 use regex::Regex;
 use serialize::serialize_atoms_to_ad3;
+use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::{path::PathBuf};
 
 #[allow(dead_code)]
 pub struct Context<'a> {
@@ -26,10 +26,10 @@ pub struct Context<'a> {
 
 fn main() {
     let matches = App::new("atomic")
-        .version("0.9.0")
+        .version("0.10.0")
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model linked atomic data!")
-        .after_help("Visit https://github.com/joepio/atomic-cli for more info")
+        .after_help("Visit https://github.com/joepio/atomic for more info")
         .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("new").about("Create a Resource")
@@ -88,7 +88,7 @@ fn main() {
         .get_matches();
 
     let config_folder = home_dir()
-        .expect("Home dir could not be opened")
+        .expect("Home dir could not be opened. We need this to store data.")
         .join(".config/atomic/");
     let user_mapping_path = config_folder.join("mapping.amp");
     let default_mapping_path = PathBuf::from("../defaults/default_mapping.amp");
@@ -166,6 +166,7 @@ fn get(context: &mut Context) {
     let serialization: Option<serialize::SerialializationFormats> =
         match subcommand_matches.value_of("as") {
             Some("json") => Some(serialize::SerialializationFormats::JSON),
+            Some("jsonld") => Some(serialize::SerialializationFormats::JSONLD),
             Some("ad3") => Some(serialize::SerialializationFormats::AD3),
             Some(format) => {
                 panic!("As {} not supported. Try 'json' or 'ad3'.", format);
@@ -179,7 +180,11 @@ fn get(context: &mut Context) {
         Ok(res) => match res {
             storelike::PathReturn::Subject(url) => match serialization {
                 Some(serialize::SerialializationFormats::JSON) => {
-                    let out = &context.store.resource_to_json(&url, 1).unwrap();
+                    let out = &context.store.resource_to_json(&url, 1, false).unwrap();
+                    println!("{}", out);
+                }
+                Some(serialize::SerialializationFormats::JSONLD) => {
+                    let out = &context.store.resource_to_json(&url, 1, true).unwrap();
                     println!("{}", out);
                 }
                 Some(serialize::SerialializationFormats::AD3) => {
@@ -191,6 +196,7 @@ fn get(context: &mut Context) {
                 }
             },
             storelike::PathReturn::Atom(atom) => match serialization {
+                Some(serialize::SerialializationFormats::JSONLD) |
                 Some(serialize::SerialializationFormats::JSON) => {
                     println!("{}", atom.value);
                 }
@@ -259,7 +265,10 @@ fn prompt_instance(
                 &preffered_shortname.clone().unwrap(),
                 &mut context.store,
             )?;
-            println!("Shortname set to {}", preffered_shortname.clone().unwrap().bold().green());
+            println!(
+                "Shortname set to {}",
+                preffered_shortname.clone().unwrap().bold().green()
+            );
             continue;
         }
         println!("{}: {}", field.shortname.bold().blue(), field.description);
@@ -285,14 +294,18 @@ fn prompt_instance(
         }
     }
 
-    println!("{} created with URL: {}", &class.shortname, &subject.clone());
+    println!(
+        "{} created with URL: {}",
+        &class.shortname,
+        &subject.clone()
+    );
 
     let map = prompt_bookmark(&mut context.mapping, &subject);
 
     // Add created_instance to store
     context
         .store
-        .add_resource_string(new_resource.subject().clone(), new_resource.to_plain())
+        .add_resource_string(new_resource.subject().clone(), &new_resource.to_plain())
         .unwrap();
     // Publish new resource to IPFS
     // TODO!
@@ -308,7 +321,11 @@ fn prompt_instance(
 }
 
 // Checks the property and its datatype, and issues a prompt that performs validation.
-fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> AtomicResult<Option<String>> {
+fn prompt_field(
+    property: &Property,
+    optional: bool,
+    context: &mut Context,
+) -> AtomicResult<Option<String>> {
     let mut input: Option<String> = None;
     let msg_appendix;
     if optional {
@@ -404,7 +421,7 @@ fn prompt_field(property: &Property, optional: bool, context: &mut Context) -> A
                                 urls.push(url);
                             }
                             None => {
-                                println!("Define the Property named {}", item.bold().green(), );
+                                println!("Define the Property named {}", item.bold().green(),);
                                 // TODO: This currently creates Property instances, but this should depend on the class!
                                 let (_resource, url, _shortname) = prompt_instance(
                                     context,
@@ -460,7 +477,9 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<S
 /// Prints a resource to the terminal with readble formatting and colors
 fn pretty_print_resource(url: &String, store: &Store) -> AtomicResult<()> {
     let mut output = String::new();
-    let resource = store.get_resource_string(url).ok_or(format!("Not found: {}", url))?;
+    let resource = store
+        .get_resource_string(url)
+        .ok_or(format!("Not found: {}", url))?;
     for (prop_url, val) in resource {
         let prop_shortname = store.property_url_to_shortname(&prop_url).unwrap();
         output.push_str(&*format!(
@@ -479,7 +498,10 @@ fn tpf(context: &mut Context) {
     let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());
     let value = tpf_value(subcommand_matches.value_of("value").unwrap());
-    let found_atoms = context.store.tpf(subject, property, value);
+    let found_atoms = context
+        .store
+        .tpf(subject, property, value)
+        .expect("TPF failed");
     let serialized = serialize_atoms_to_ad3(found_atoms);
     println!("{}", serialized.unwrap())
 }
