@@ -19,6 +19,7 @@ pub async fn get_resource(
         Some(extension) => match extension.to_str().unwrap() {
             "ad3" => ContentType::AD3,
             "json" => ContentType::JSON,
+            "jsonld" => ContentType::JSONLD,
             "html" => ContentType::HTML,
             _ => ContentType::HTML,
         },
@@ -33,7 +34,12 @@ pub async fn get_resource(
     match content_type {
         ContentType::JSON => {
             builder.set(http::header::ContentType::json());
-            let body = context.store.resource_to_json(&subject, 1)?;
+            let body = context.store.resource_to_json(&subject, 1, false)?;
+            Ok(builder.body(body))
+        }
+        ContentType::JSONLD => {
+            builder.set(http::header::ContentType::json());
+            let body = context.store.resource_to_json(&subject, 1, true)?;
             Ok(builder.body(body))
         }
         ContentType::HTML => {
@@ -41,7 +47,7 @@ pub async fn get_resource(
             let mut tera_context = TeraCtx::new();
             let resource = context.store.get_resource_string(&subject).ok_or("Resource not found")?;
 
-            let propvals = from_hashmap_resource(&resource, &context.store)?;
+            let propvals = from_hashmap_resource(&resource, &context.store, subject)?;
 
             tera_context.insert("resource", &propvals);
             let body = context.tera.render("resource.html", &tera_context).unwrap();

@@ -280,12 +280,10 @@ pub trait Storelike {
     // Very naive implementation, should actually turn:
     // [x] ResourceArrays into arrrays
     // [x] URLS into @id things
-    // [ ] Numbers into native numbers
+    // [x] Numbers into native numbers
     // [ ] Resoures into objects, if the nesting depth allows it
-    fn resource_to_json(&self, resource_url: &String, _depth: u32) -> AtomicResult<String> {
+    fn resource_to_json(&self, resource_url: &String, _depth: u32, json_ld: bool) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};
-
-        let json_ld: bool = false;
 
         let resource = self
             .get_resource_string(resource_url)
@@ -393,7 +391,7 @@ pub trait Storelike {
     ///     None,
     ///     Some(String::from("https://atomicdata.dev/properties/isA")),
     ///     Some(String::from("[\"https://atomicdata.dev/classes/Class\"]"))
-    /// );
+    /// ).unwrap();
     /// assert!(atoms.len() == 3)
     /// ```
     // Very costly, slow implementation.
@@ -415,7 +413,6 @@ pub trait Storelike {
 
             for (sub, resource) in self.all_resources()? {
                 for (property, value) in resource {
-                    println!("{} {} {}", sub, property, value);
                     vec.push(Atom::new(sub.clone().into(), property.into(), value.into()))
                 }
             }

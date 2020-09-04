@@ -10,15 +10,16 @@ A lightweight HTTP server that shares created Atomic data on the web.
 - [x] URL extension recognition
 - [x] HTML serialization
 - [x] JSON serialization
+- [x] JSON-LD serialization
 - [x] AD3 serialization
 - [x] Basic error handling
 - [x] TPF endpoint
 - [x] Homepage
 - [x] Static asset support for .css / .ico / etc.
+- [x] HTTPS (WIP, kind of working)
 - [ ] CSS / design
 - [ ] Content-type negotiation
 - [ ] Collections / dynamic resources
-- [ ] HTTPS
 - [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support
 - [ ] Auth support (WebID-OICD possibly?)
 
@@ -31,7 +32,7 @@ git clone git@github.com:joepio/atomic.git
 cd atomic/server
 # Create a new .env using the template
 cp default.env .env
-# Run the server. It loads the .ad3 store that you point towards
+# Run the server. It creates a store in ~/.config/atomic/db by default
 cargo run
 # Visit http://localhost:8080/test
 ```

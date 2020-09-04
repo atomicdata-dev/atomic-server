@@ -34,6 +34,11 @@ pub async fn path(
             //   let body = context.store.resource_to_json(&subject, 1)?;
             Ok(builder.body("Not implemented"))
         }
+        ContentType::JSONLD => {
+            builder.set(http::header::ContentType::json());
+            //   let body = context.store.resource_to_json(&subject, 1)?;
+            Ok(builder.body("Not implemented"))
+        }
         ContentType::HTML => {
             let mut propvals: Vec<PropVal> = Vec::new();
             match path_result {
@@ -42,12 +47,15 @@ pub async fn path(
                         .store
                         .get_resource_string(&subject)
                         .ok_or("Resource not found")?;
-                    propvals = from_hashmap_resource(&resource, &context.store)?;
+                    propvals = from_hashmap_resource(&resource, &context.store, subject)?;
                 }
                 atomic_lib::storelike::PathReturn::Atom(atom) => {
                     propvals.push(PropVal {
+
                         property: context.store.get_property(&atom.property.subject)?,
-                        value: crate::render::atom::value_to_html(atom.native_value),
+                        value_html: crate::render::atom::value_to_html(atom.native_value),
+                        value: atom.value,
+                        subject: atom.subject,
                     });
                 }
             }
