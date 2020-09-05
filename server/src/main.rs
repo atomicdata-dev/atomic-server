@@ -20,7 +20,7 @@ async fn main() -> io::Result<()> {
 
     let config = config::init();
     let endpoint = format!("{}:{}", config.ip, config.port);
-    let appstate = appstate::init(config.clone());
+    let appstate = appstate::init(config.clone()).expect("Failed to build appstate.");
 
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));

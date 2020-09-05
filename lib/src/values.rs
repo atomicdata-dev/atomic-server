@@ -60,7 +60,7 @@ impl Value {
             }
             DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
             DataType::ResourceArray => {
-                let vector: Vec<String> = serialize::deserialize_json_array(&value)
+                let vector: Vec<String> = crate::parse::parse_json_array(&value)
                     .map_err(|e| return format!("Could not deserialize ResourceArray: {}. {}", &value, e))?;
                 return Ok(Value::ResourceArray(vector));
             }
@@ -90,7 +90,7 @@ impl Value {
           Value::Date(s) => s.clone(),
           Value::Integer(i) => i.to_string(),
           Value::Markdown(i) => i.clone(),
-          Value::ResourceArray(v) => serialize::serialize_json_array(v).expect("Could not serialize resource array"),
+          Value::ResourceArray(v) => serialize::serialize_json_array(v).unwrap_or(format!("[Could not serialize resource array: {:?}]", v).into()),
           Value::Slug(s) => s.clone(),
           Value::String(s) => s.clone(),
           Value::Timestamp(i) => i.to_string(),

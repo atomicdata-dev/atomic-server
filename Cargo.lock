@@ -424,6 +424,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sled",
+ "ureq",
 ]
 
 [[package]]

@@ -6,8 +6,9 @@
 use crate::errors::AtomicResult;
 use crate::mutations;
 use crate::{
+    ResourceString,
     atoms::Atom,
-    storelike::{ResourceString, Storelike, ResourceCollection},
+    storelike::{Storelike, ResourceCollection},
 };
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -35,7 +36,8 @@ impl Store {
     pub fn read_store_from_file<'a>(&mut self, path: &'a PathBuf) -> AtomicResult<()> {
         match std::fs::read_to_string(path) {
             Ok(contents) => {
-                self.parse_ad3(&contents)?;
+                let atoms = crate::parse::parse_ad3(&contents)?;
+                self.add_atoms(atoms)?;
                 Ok(())
             }
             Err(err) => Err(format!("Parsing error: {}", err).into()),
@@ -58,7 +60,8 @@ impl Store {
     /// Loads the default Atomic Store, containing the Properties, Datatypes and Clasess for Atomic Schema.
     pub fn load_default(&mut self) {
         let ad3 = include_str!("../../defaults/default_store.ad3");
-        self.parse_ad3(&String::from(ad3)).unwrap();
+        let atoms = crate::parse::parse_ad3(&String::from(ad3)).unwrap();
+        self.add_atoms(atoms).expect("Failed to add default Atoms to store");
     }
 }
 
@@ -89,10 +92,10 @@ impl Storelike for Store {
         Ok(res)
     }
 
-    fn get_resource_string(&self, resource_url: &String) -> Option<ResourceString> {
+    fn get_resource_string(&self, resource_url: &String) -> AtomicResult<ResourceString> {
         match self.hashmap.get(resource_url) {
-            Some(result) => Some(result.clone()),
-            None => None,
+            Some(result) => Ok(result.clone()),
+            None => Err(format!("Could not find resource {}", resource_url).into()),
         }
     }
 }
@@ -101,15 +104,15 @@ impl Storelike for Store {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::urls;
+    use crate::{parse::parse_ad3, urls};
 
     fn init_store() -> Store {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let mut store = Store::init();
         store.load_default();
-        // Run parse...
-        store.parse_ad3(&string).unwrap();
+        let atoms = parse_ad3(&string).unwrap();
+        store.add_atoms(atoms).unwrap();
         return store;
     }
 
@@ -139,7 +142,8 @@ mod test {
         let invalid_ad3 =
             // should be array, is string
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
-        store.parse_ad3(&invalid_ad3).unwrap();
+        let atoms = parse_ad3(&invalid_ad3).unwrap();
+        store.add_atoms(atoms).unwrap();
         store.validate_store().unwrap();
     }
 

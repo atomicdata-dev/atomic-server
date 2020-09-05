@@ -4,14 +4,10 @@ use crate::{
     delta::Delta,
     mapping::Mapping,
     values::{match_datatype, DataType, Value},
-    Atom, Resource, RichAtom,
+    Atom, Resource, RichAtom, resources::ResourceString, parse::parse_ad3,
 };
 use serde::Serialize;
-use serde_json::from_str;
 use std::collections::HashMap;
-
-/// The first string represents the URL of the Property, the second one its Value.
-pub type ResourceString = HashMap<String, String>;
 
 #[derive(Clone, Debug, Serialize)]
 pub struct Property {
@@ -61,7 +57,7 @@ pub trait Storelike {
     ) -> AtomicResult<()>;
 
     /// Returns a hashmap ResourceString with string Values
-    fn get_resource_string(&self, resource_url: &String) -> Option<ResourceString>;
+    fn get_resource_string(&self, resource_url: &String) -> AtomicResult<ResourceString>;
 
     /// Adds a Resource to the store
     fn add_resource(&mut self, resource: &Resource) -> AtomicResult<()> {
@@ -69,24 +65,41 @@ pub trait Storelike {
         return Ok(());
     }
 
-    /// Returns a full Resource with native Values
-    fn get_resource(&self, subject: &String) -> Option<Resource> {
-        match self.get_resource_string(subject) {
-            Some(resource_string) => {
-                let mut res = Resource::new(subject.clone());
-                for (prop_string, val_string) in resource_string {
-                    let propertyfull = self.get_property(&prop_string).expect("Prop not found");
-                    let fullvalue = Value::new(&val_string, &propertyfull.data_type)
-                        .expect("Could not convert value");
-                    res.insert(prop_string.clone(), fullvalue).unwrap();
-                }
-                // Above code is a copy from:
-                // let res = Resource::new_from_resource_string(subject.clone(), &resource, self)?;
-                // But has some Size issues
-                Some(res)
+    /// Fetches a resource, makes sure its subject matches.
+    /// Does not save to the store.
+    /// Only adds atoms with matching subjects match.
+    fn fetch_resource(&self, subject: &String) -> AtomicResult<ResourceString> {
+        let resp = ureq::get(&subject)
+            .set("Accept", crate::parse::AD3_MIME)
+            .call();
+        let body = &resp.into_string()?;
+        let atoms = parse_ad3(body)?;
+        let mut resource = ResourceString::new();
+        for atom in atoms {
+            if &atom.subject == subject {
+                resource.insert(atom.property, atom.value);
             }
-            None => None,
         }
+        if resource.len() == 0 {
+            return Err("No valid atoms in resource".into())
+        }
+        Ok(resource)
+    }
+
+    /// Returns a full Resource with native Values
+    fn get_resource(&self, subject: &String) -> AtomicResult<Resource> {
+        let resource_string = self.get_resource_string(subject)?;
+        let mut res = Resource::new(subject.clone());
+        for (prop_string, val_string) in resource_string {
+            let propertyfull = self.get_property(&prop_string)?;
+            let fullvalue = Value::new(&val_string, &propertyfull.data_type)
+                .expect("Could not convert value");
+            res.insert(prop_string.clone(), fullvalue)?;
+        }
+        Ok(res)
+        // Above code is a copy from:
+        // let res = Resource::new_from_resource_string(subject.clone(), &resource, self)?;
+        // But has some Size issues
     }
 
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
@@ -107,7 +120,7 @@ pub trait Storelike {
         let get_properties = |resource_array: String| -> Vec<Property> {
             let mut properties: Vec<Property> = vec![];
             let string_vec: Vec<String> =
-                crate::serialize::deserialize_json_array(&resource_array.into()).unwrap();
+                crate::parse::parse_json_array(&*resource_array).unwrap();
             for prop_url in string_vec {
                 properties.push(self.get_property(&prop_url).unwrap());
             }
@@ -134,8 +147,7 @@ pub trait Storelike {
     /// Returns an empty vector if there are none.
     fn get_classes_for_subject(&self, subject: &String) -> AtomicResult<Vec<Class>> {
         let resource = self
-            .get_resource_string(subject)
-            .ok_or(format!("Subject not found: {}", subject))?;
+            .get_resource_string(subject)?;
         let classes_array_opt = resource.get(urls::IS_A);
         let classes_array = match classes_array_opt {
             Some(vec) => vec,
@@ -157,8 +169,7 @@ pub trait Storelike {
     /// Fetches a property by URL, returns a Property instance
     fn get_property(&self, url: &String) -> AtomicResult<Property> {
         let property_resource = self
-            .get_resource_string(url)
-            .ok_or(&*format!("Property not found: {}", url))?;
+            .get_resource_string(url)?;
         let property = Property {
             data_type: match_datatype(
                 property_resource
@@ -183,46 +194,14 @@ pub trait Storelike {
         return Ok(property);
     }
 
-    /// Returns a collection with all resources in the store
+    /// Returns a collection with all resources in the store.
+    /// WARNING: This could be very expensive!
     fn all_resources(&self) -> AtomicResult<ResourceCollection>;
-
-    /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
-    /// Allows comments and empty lines.
-    fn parse_ad3<'a, 'b>(&mut self, string: &'b String) -> AtomicResult<()> {
-        let mut atoms: Vec<Atom> = Vec::new();
-        for line in string.lines() {
-            match line.chars().next() {
-                // These are comments
-                Some('#') => {}
-                Some(' ') => {}
-                // That's an array, awesome
-                Some('[') => {
-                    let string_vec: Vec<String> =
-                        from_str(line).expect(&*format!("Parsing error in {:?}", line));
-                    if string_vec.len() != 3 {
-                        return Err(format!("Wrong length of array at line {:?}: wrong length of array, should be 3", line).into());
-                    }
-                    let subject = &string_vec[0];
-                    let property = &string_vec[1];
-                    let value = &string_vec[2];
-                    atoms.push(Atom::new(subject.clone(), property.clone(), value.clone()));
-                }
-                Some(char) => {
-                    return Err(
-                        format!("Parsing error at {:?}, cannot start with {}", line, char).into(),
-                    )
-                }
-                None => {}
-            };
-        }
-        self.add_atoms(atoms)?;
-        return Ok(());
-    }
 
     /// Adds an atom to the store. Does not do any validations
     fn add_atom(&mut self, atom: Atom) -> AtomicResult<()> {
         match self.get_resource_string(&atom.subject).as_mut() {
-            Some(resource) => {
+            Ok(resource) => {
                 // Overwrites existing properties
                 match resource.insert(atom.property, atom.value) {
                     Some(_oldval) => {
@@ -233,7 +212,7 @@ pub trait Storelike {
                 };
                 self.add_resource_string(atom.subject, &resource)?;
             }
-            None => {
+            Err(_) => {
                 let mut resource: ResourceString = HashMap::new();
                 resource.insert(atom.property.clone(), atom.value);
                 self.add_resource_string(atom.subject, &resource)?;
@@ -248,23 +227,23 @@ pub trait Storelike {
     fn process_delta(&mut self, delta: Delta) -> AtomicResult<()> {
         let mut updated_resources = Vec::new();
 
-        delta.lines.iter().for_each(|delta| {
+        for delta in delta.lines.iter() {
             match delta.method.as_str() {
                 urls::INSERT | "insert" => {
                     let datatype = self
                         .get_property(&delta.property)
                         .expect("Can't get property")
                         .data_type;
-                    Value::new(&delta.value, &datatype).unwrap();
+                    Value::new(&delta.value, &datatype)?;
                     updated_resources.push(&delta.subject);
-                    self.add_atom(Atom::from(delta)).unwrap();
+                    self.add_atom(Atom::from(delta))?;
                 }
                 urls::DELETE | "delete" => {
-                    self.add_atom(Atom::from(delta)).unwrap();
+                    self.add_atom(Atom::from(delta))?;
                 }
                 unknown => println!("Ignoring unknown method: {}", unknown),
             };
-        });
+        }
         Ok(())
     }
 
@@ -277,8 +256,7 @@ pub trait Storelike {
     ) -> AtomicResult<String> {
         for (prop_url, _value) in resource.iter() {
             let prop_resource = self
-                .get_resource_string(&*prop_url)
-                .ok_or(format!("Property '{}' not found", prop_url))?;
+                .get_resource_string(&*prop_url)?;
             let prop_shortname = prop_resource
                 .get(urls::SHORTNAME)
                 .ok_or(format!("Property shortname for '{}' not found", prop_url))?;
@@ -292,8 +270,7 @@ pub trait Storelike {
     /// Finds
     fn property_url_to_shortname(&self, url: &String) -> AtomicResult<String> {
         let resource = self
-            .get_resource_string(url)
-            .ok_or(format!("Could not find property for {}", url))?;
+            .get_resource_string(url)?;
         let property_resource = resource
             .get(urls::SHORTNAME)
             .ok_or(format!("Could not get shortname prop for {}", url))?;
@@ -301,19 +278,21 @@ pub trait Storelike {
         return Ok(property_resource.into());
     }
 
-    fn resource_to_ad3(&self, subject: &String, domain: Option<&String>) -> AtomicResult<String> {
+    /// fetches a resource, serializes it to .ad3
+    /// The local_base_url is needed to convert the local identifier to the domain
+    /// It should be something like `https://example.com/`
+    fn resource_to_ad3(&self, subject: &String, local_base_url: Option<&String>) -> AtomicResult<String> {
         let mut string = String::new();
         let resource = self
-            .get_resource_string(subject)
-            .ok_or("Resource not found")?;
+            .get_resource_string(subject)?;
         let mut mod_subject = subject.clone();
         // Replace local schema with actual local domain
-        if subject.starts_with("_:") && domain.is_some() {
+        if subject.starts_with("_:") && local_base_url.is_some() {
             // Remove first two characters
             let mut chars = subject.chars();
             chars.next();
             chars.next();
-            mod_subject = format!("{}{}", &domain.unwrap(), &chars.as_str());
+            mod_subject = format!("{}{}", &local_base_url.unwrap(), &chars.as_str());
         }
         for (property, value) in resource {
             let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])
@@ -341,8 +320,7 @@ pub trait Storelike {
         use serde_json::{Map, Value as SerdeValue};
 
         let resource = self
-            .get_resource_string(resource_url)
-            .ok_or("Resource not found")?;
+            .get_resource_string(resource_url)?;
 
         // Initiate JSON object
         let mut root = Map::new();
@@ -492,11 +470,11 @@ pub trait Storelike {
 
         match q_subject {
             Some(sub) => match self.get_resource_string(&sub) {
-                Some(resource) => {
+                Ok(resource) => {
                     find_in_resource(&sub, &resource);
                     return Ok(vec);
                 }
-                None => {
+                Err(_) => {
                     return Ok(vec);
                 }
             },
@@ -526,7 +504,7 @@ pub trait Storelike {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource: Option<ResourceString> = self.get_resource_string(&subject);
+        let mut resource = self.get_resource_string(&subject)?;
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -542,12 +520,12 @@ pub trait Storelike {
             match item.parse::<u32>() {
                 Ok(i) => match current {
                     PathReturn::Atom(atom) => {
-                        let resource_check = resource.ok_or("Resource not found")?;
-                        let array_string = resource_check
+                        // let resource_check = resource.ok_or("Resource not found")?;
+                        let array_string = resource
                             .get(&atom.property.subject)
                             .ok_or(format!("Property {} not found", &atom.property.subject))?;
                         let vector: Vec<String> =
-                            crate::serialize::deserialize_json_array(array_string)
+                            crate::parse::parse_json_array(array_string)
                                 .expect(&*format!("Failed to parse array: {}", array_string));
                         if vector.len() <= i as usize {
                             eprintln!(
@@ -559,7 +537,7 @@ pub trait Storelike {
                         let url = &vector[i as usize];
 
                         subject = url.clone();
-                        resource = self.get_resource_string(url);
+                        resource = self.get_resource_string(url)?;
                         current = PathReturn::Subject(url.clone());
                         continue;
                     }
@@ -578,14 +556,13 @@ pub trait Storelike {
                 // Traverse relations, don't use mapping here, but do use classes
                 property_url = Some(self.property_shortname_to_url(
                     &String::from(item),
-                    &resource.clone().ok_or("Relation not found")?,
+                    &resource.clone(),
                 )?);
             }
             // Set the parent for the next loop equal to the next node.
             let value = Some(
                 resource
                     .clone()
-                    .expect("Resource not found")
                     .get(&property_url.clone().unwrap())
                     .unwrap()
                     .clone(),

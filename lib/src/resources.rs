@@ -1,7 +1,7 @@
 use crate::errors::AtomicResult;
 use crate::values::Value;
 use crate::Store;
-use crate::{storelike::ResourceString, Storelike};
+use crate::Storelike;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -101,3 +101,7 @@ impl Resource {
         hashmap
     }
 }
+
+/// A plainstring hashmap, which represents an (unvalidated?) Atomic Resource.
+/// The key string represents the URL of the Property, the value one its Values.
+pub type ResourceString = HashMap<String, String>;

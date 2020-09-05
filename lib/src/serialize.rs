@@ -2,11 +2,6 @@ use serde_json;
 use crate::errors::AtomicResult;
 use crate::Atom;
 
-pub fn deserialize_json_array(string: &String) -> AtomicResult<Vec<String>> {
-    let vector: Vec<String> = serde_json::from_str(string)?;
-    return Ok(vector)
-}
-
 pub fn serialize_json_array(items: &Vec<String>) -> AtomicResult<String> {
     let string = serde_json::to_string(items).expect("Can't serialize to string");
     return Ok(string);

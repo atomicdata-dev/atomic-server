@@ -14,7 +14,7 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
             let user_arg = subcommand_matches.value_of("property").unwrap();
             context.store.property_shortname_to_url(
                 &user_arg.into(),
-                &context.store.get_resource_string(&subject).ok_or("Subject not found")?,
+                &context.store.get_resource_string(&subject)?,
             )
         }
     };

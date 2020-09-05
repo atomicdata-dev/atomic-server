@@ -3,7 +3,8 @@
 
 use crate::{
     errors::AtomicResult,
-    storelike::{ResourceString, Storelike, ResourceCollection},
+    storelike::{Storelike, ResourceCollection},
+    resources::ResourceString,
     Atom, Resource,
 };
 use sled;
@@ -73,7 +74,7 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_resource_string(&self, resource_url: &String) -> Option<ResourceString> {
+    fn get_resource_string(&self, resource_url: &String) -> AtomicResult<ResourceString> {
         match self
             .resources
             .get(bincode::serialize(resource_url).expect("Can't deserialize subject"))
@@ -82,9 +83,16 @@ impl Storelike for Db {
             Some(res_bin) => {
                 let resource: ResourceString = bincode::deserialize(&res_bin)
                     .expect("Can't deserialize resource. Your database may be corrupt!");
-                Some(resource)
+                Ok(resource)
             }
-            None => None,
+            None => {
+                match self.fetch_resource(resource_url) {
+                    Ok(got) => Ok(got),
+                    Err(e) => {
+                        return Err(format!("Failed to retrieve {} from the web: {}", resource_url, e).into())
+                    },
+                }
+            },
         }
     }
 

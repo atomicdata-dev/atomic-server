@@ -3,7 +3,7 @@ use atomic_lib::mapping::Mapping;
 use atomic_lib::serialize;
 use atomic_lib::Storelike;
 
-use atomic_lib::Db;
+use atomic_lib::{parse, Db};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
 use colored::*;
 use dirs::home_dir;
@@ -126,7 +126,7 @@ fn main() {
     mapping.read_mapping_from_file(&mapping_path).unwrap();
     let user_store_path = config_folder.join("db");
     let store_path = &user_store_path;
-    let store: Db = Db::init(store_path).expect("Failed opening store");
+    let store: Db = Db::init(store_path).expect("Failed opening store. Is another program using it?");
 
     let mut context = Context {
         mapping,
@@ -181,8 +181,7 @@ fn list(context: &mut Context) {
 fn pretty_print_resource(url: &String, store: &dyn Storelike) -> AtomicResult<()> {
     let mut output = String::new();
     let resource = store
-        .get_resource_string(url)
-        .ok_or(format!("Not found: {}", url))?;
+        .get_resource_string(url)?;
     for (prop_url, val) in resource {
         let prop_shortname = store.property_url_to_shortname(&prop_url).unwrap();
         output.push_str(&*format!(
@@ -221,10 +220,11 @@ fn tpf_value(string: &str) -> Option<String> {
 /// Adds the default store to the store
 fn populate(context: &mut Context) {
     let ad3 = include_str!("../../defaults/default_store.ad3");
+    let atoms = parse::parse_ad3(&String::from(ad3)).expect("Could not parse default store atoms");
     context
         .store
-        .parse_ad3(&String::from(ad3))
-        .expect("Error when parsing store");
+        .add_atoms(atoms)
+        .expect("Error when loading default atoms");
     println!("Succesfully added default Atoms to the store. Run `atomic-cli tpf . . .` to list them all!");
 }
 

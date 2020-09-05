@@ -25,6 +25,7 @@ pub async fn get_resource(
         },
         None => ContentType::HTML,
     };
+    let content_type = ContentType::AD3;
 
     log::info!("id: {:?}", id);
     let context = data.lock().unwrap();
@@ -45,7 +46,7 @@ pub async fn get_resource(
         ContentType::HTML => {
             builder.set(http::header::ContentType::html());
             let mut tera_context = TeraCtx::new();
-            let resource = context.store.get_resource_string(&subject).ok_or("Resource not found")?;
+            let resource = context.store.get_resource_string(&subject)?;
 
             let propvals = from_hashmap_resource(&resource, &context.store, subject)?;
 
@@ -57,7 +58,7 @@ pub async fn get_resource(
             builder.set(http::header::ContentType::html());
             let body = context
                 .store
-                .resource_to_ad3(&subject, Some(&context.config.root_url))?;
+                .resource_to_ad3(&subject, Some(&context.config.local_base_url))?;
             Ok(builder.body(body))
         }
     }

@@ -3,7 +3,7 @@ use serde::Serialize;
 use log;
 use std::error::Error;
 
-// More strict error type, supports HTTP responses
+// More strict Result type
 pub type BetterResult<T> = std::result::Result<T, AppError>;
 
 #[derive(Debug)]
@@ -12,6 +12,8 @@ pub enum AppErrorType {
     OtherError,
 }
 
+// More strict error type, supports HTTP responses
+// Needs a lot of work, though
 #[derive(Debug)]
 pub struct AppError {
     pub message: Option<String>,
@@ -46,7 +48,8 @@ impl std::fmt::Display for AppError {
     }
 }
 
-impl std::convert::From<&str> for AppError {
+// Error conversions
+impl From<&str> for AppError {
     fn from(message: &str) -> Self {
         AppError {
           message: Some(message.into()),
@@ -56,8 +59,19 @@ impl std::convert::From<&str> for AppError {
     }
 }
 
-impl std::convert::From<std::boxed::Box<dyn std::error::Error>> for AppError {
+impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
+        AppError {
+          message: Some(error.to_string()),
+          cause: None,
+          error_type: AppErrorType::OtherError,
+        }
+    }
+}
+
+
+impl From<tera::Error> for AppError {
+    fn from(error: tera::Error) -> Self {
         AppError {
           message: Some(error.to_string()),
           cause: None,

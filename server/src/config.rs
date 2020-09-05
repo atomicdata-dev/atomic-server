@@ -13,7 +13,7 @@ pub struct Config {
     /// Without the port and schema values.
     pub domain: String,
     /// E.g. https://example.com
-    pub root_url: String,
+    pub local_base_url: String,
     /// The contact mail address for Let's Encrypt HTTPS setup
     pub email: Option<String>,
     /// The port where the app is available (defaults to 80)
@@ -79,7 +79,7 @@ pub fn init() -> Config {
     }
 
     let schema = if https {"https"} else {"http"};
-    let root_url = format!("{}:{}", schema, domain);
+    let local_base_url = format!("{}://{}/", schema, domain);
 
     return Config {
         cert_init,
@@ -91,7 +91,7 @@ pub fn init() -> Config {
         ip,
         key_path,
         port,
-        root_url,
+        local_base_url,
         store_path,
     };
 }
