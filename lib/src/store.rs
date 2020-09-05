@@ -5,7 +5,6 @@
 
 use crate::errors::AtomicResult;
 use crate::mutations;
-use crate::values::Value;
 use crate::{
     atoms::Atom,
     storelike::{ResourceString, Storelike, ResourceCollection},
@@ -53,50 +52,6 @@ impl Store {
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
             .expect("Unable to create dirs");
         fs::write(path, file_string).expect("Unable to write file");
-        return Ok(());
-    }
-
-    /// Checks Atomic Data in the store for validity.
-    /// Returns an Error if it is not valid.
-    ///
-    /// Validates:
-    ///
-    /// - [X] If the Values can be parsed using their Datatype (e.g. if Integers are integers)
-    /// - [X] If all required fields of the class are present
-    /// - [ ] If the URLs are publicly accessible and return the right type of data
-    /// - [ ] Returns a report with multiple options
-    #[allow(dead_code, unreachable_code)]
-    pub fn validate_store(&self) -> AtomicResult<()> {
-        for (subject, resource) in self.all_resources()? {
-            println!("Subject: {:?}", subject);
-            println!("Resource: {:?}", resource);
-
-            let mut found_props: Vec<String> = Vec::new();
-
-            for (prop_url, value) in resource {
-                let property = self.get_property(&prop_url)?;
-
-                Value::new(&value, &property.data_type)?;
-                found_props.push(prop_url.clone());
-                // println!("{:?}: {:?}", prop_url, value);
-            }
-            let classes = self.get_classes_for_subject(&subject)?;
-            for class in classes {
-                println!("Class: {:?}", class.shortname);
-                println!("Found: {:?}", found_props);
-                for required_prop in class.requires {
-                    println!("Required: {:?}", required_prop.shortname);
-                    if !found_props.contains(&required_prop.subject) {
-                        return Err(format!(
-                            "Missing requried property {} in {} because of class {}",
-                            &required_prop.shortname, subject, class.subject,
-                        )
-                        .into());
-                    }
-                }
-            }
-            println!("{:?} Valid", subject);
-        }
         return Ok(());
     }
 

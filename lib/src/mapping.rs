@@ -22,6 +22,7 @@ impl Mapping {
     }
 
     /// Checks if the input string is a Mapping or a valid URL.
+    /// Returns Some if it is valid.
     /// If it is neither, a None is returned.
     pub fn try_mapping_or_url(&self, mapping_or_url: &String) -> Option<String> {
         match self.get(mapping_or_url) {

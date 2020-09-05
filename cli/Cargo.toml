@@ -1,6 +1,6 @@
 [package]
 name = "atomic-cli"
-version = "0.10.0"
+version = "0.11.0"
 authors = ["Joep Meindertsma <joep@argu.co>"]
 edition = "2018"
 license = "MIT"
@@ -14,6 +14,6 @@ repository = "https://github.com/joepio/atomic"
 promptly = "0.3.0"
 clap = "2.33.1"
 colored = "1.9.3"
-atomic_lib = { version = "0.10.0", path = "../lib" }
+atomic_lib = { version = "0.10.0", path = "../lib", features = ["db"] }
 dirs = "3.0.1"
 regex = "1.3.9"

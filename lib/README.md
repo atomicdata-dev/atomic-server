@@ -16,8 +16,9 @@ The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) 
 - [x] Convert to Rust native types
 - [x] Resolve / parse mappings (bookmarks)
 - [x] Validate Atomic Graphs
+- [x] Mutations (linked-delta's)
 - [ ] RDF (turtle / N-Triples) Serialization
-- [ ] Mutations (linked-delta's)
+- [ ] Strategy for extending datatypes (Currently uses an `enum`)
 
 ## Usage
 

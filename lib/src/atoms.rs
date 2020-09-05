@@ -1,6 +1,7 @@
 use crate::errors::AtomicResult;
 use crate::storelike::Property;
 use crate::values::Value;
+use crate::DeltaLine;
 use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.
@@ -43,16 +44,8 @@ impl RichAtom {
     }
 }
 
-/// Individual change to a resource
-pub struct Delta {
-    pub subject: String,
-    pub property: String,
-    pub value: String,
-    pub method: String,
-}
-
-impl From<&Delta> for Atom {
-    fn from(delta: &Delta) -> Self {
+impl From<&DeltaLine> for Atom {
+    fn from(delta: &DeltaLine) -> Self {
         Atom::new(
             delta.subject.clone(),
             delta.property.clone(),
