@@ -4,13 +4,12 @@
 use crate::{
     errors::AtomicResult,
     storelike::{ResourceString, Storelike, ResourceCollection},
-    Atom, Resource, urls, Delta,
+    Atom, Resource,
 };
 use sled;
-use std::collections::HashMap;
 
-/// The Db is a scalable Atomic Data store.
-/// I'ts an implementation of Storelike
+/// The Db is a persistent on-disk Atomic Data store.
+/// It's an implementation of Storelike.
 #[derive(Clone)]
 pub struct Db {
     // The Key-Value store that contains all data.
@@ -26,7 +25,7 @@ pub struct Db {
 
 impl Db {
     // Creates a new store at the specified path
-    pub fn init(path: std::path::PathBuf) -> AtomicResult<Db> {
+    pub fn init(path: &std::path::PathBuf) -> AtomicResult<Db> {
         let db = sled::open(path)?;
         let resources = db.open_tree("resources")?;
         let index_props = db.open_tree("index_props")?;
@@ -37,38 +36,6 @@ impl Db {
             index_vals,
             index_props,
         })
-    }
-
-    pub fn add_atom(&mut self, atom: Atom) -> AtomicResult<()>{
-        match self.get_resource_string(&atom.subject).as_mut() {
-            Some(resource) => {
-                // Overwrites existing properties
-                match resource.insert(atom.property, atom.value) {
-                    Some(_oldval) => {
-                        // Remove the value from the Subject index
-                        // self.index_value_remove(atom);
-                    }
-                    None => {}
-                };
-                self.add_resource_string(atom.subject, &resource)?;
-            }
-            None => {
-                let mut resource: ResourceString = HashMap::new();
-                resource.insert(atom.property.clone(), atom.value);
-                self.add_resource_string(atom.subject, &resource)?;
-            }
-        };
-        Ok(())
-    }
-
-    pub fn process_deltas(&mut self, deltas: Vec<Delta>) -> AtomicResult<()> {
-        deltas.iter().for_each(|delta| { match delta.method.as_str() {
-            urls::INSERT => {
-                self.add_atom(Atom::from(delta)).unwrap()
-            },
-            unknown => {println!("Ignoring unknown method: {}", unknown )},
-        }});
-        Ok(())
     }
 
     // fn index_value_add(&mut self, atom: Atom) -> AtomicResult<()> {

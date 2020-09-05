@@ -1,6 +1,7 @@
 use crate::errors::AtomicResult;
 use crate::urls;
 use crate::{
+    delta::Delta,
     mapping::Mapping,
     values::{match_datatype, DataType, Value},
     Atom, Resource, RichAtom,
@@ -218,6 +219,55 @@ pub trait Storelike {
         return Ok(());
     }
 
+    /// Adds an atom to the store. Does not do any validations
+    fn add_atom(&mut self, atom: Atom) -> AtomicResult<()> {
+        match self.get_resource_string(&atom.subject).as_mut() {
+            Some(resource) => {
+                // Overwrites existing properties
+                match resource.insert(atom.property, atom.value) {
+                    Some(_oldval) => {
+                        // Remove the value from the Subject index
+                        // self.index_value_remove(atom);
+                    }
+                    None => {}
+                };
+                self.add_resource_string(atom.subject, &resource)?;
+            }
+            None => {
+                let mut resource: ResourceString = HashMap::new();
+                resource.insert(atom.property.clone(), atom.value);
+                self.add_resource_string(atom.subject, &resource)?;
+            }
+        };
+        Ok(())
+    }
+
+    /// Processes a vector of deltas and updates the store.
+    /// Panics if the
+    /// Use this for ALL updates to the store!
+    fn process_delta(&mut self, delta: Delta) -> AtomicResult<()> {
+        let mut updated_resources = Vec::new();
+
+        delta.lines.iter().for_each(|delta| {
+            match delta.method.as_str() {
+                urls::INSERT | "insert" => {
+                    let datatype = self
+                        .get_property(&delta.property)
+                        .expect("Can't get property")
+                        .data_type;
+                    Value::new(&delta.value, &datatype).unwrap();
+                    updated_resources.push(&delta.subject);
+                    self.add_atom(Atom::from(delta)).unwrap();
+                }
+                urls::DELETE | "delete" => {
+                    self.add_atom(Atom::from(delta)).unwrap();
+                }
+                unknown => println!("Ignoring unknown method: {}", unknown),
+            };
+        });
+        Ok(())
+    }
+
     /// Finds the URL of a shortname used in the context of a specific Resource.
     /// The Class, Properties and Shortnames of the Resource are used to find this URL
     fn property_shortname_to_url(
@@ -282,7 +332,12 @@ pub trait Storelike {
     // [x] URLS into @id things
     // [x] Numbers into native numbers
     // [ ] Resoures into objects, if the nesting depth allows it
-    fn resource_to_json(&self, resource_url: &String, _depth: u32, json_ld: bool) -> AtomicResult<String> {
+    fn resource_to_json(
+        &self,
+        resource_url: &String,
+        _depth: u32,
+        json_ld: bool,
+    ) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};
 
         let resource = self
@@ -410,7 +465,6 @@ pub trait Storelike {
 
         // Simply return all the atoms
         if !hassub && !hasprop && !hasval {
-
             for (sub, resource) in self.all_resources()? {
                 for (property, value) in resource {
                     vec.push(Atom::new(sub.clone().into(), property.into(), value.into()))
@@ -456,6 +510,7 @@ pub trait Storelike {
     }
 
     /// Accepts an Atomic Path string, returns the result value (resource or property value)
+    /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
     fn get_path(&self, atomic_path: &str, mapping: &Mapping) -> AtomicResult<PathReturn> {
@@ -490,10 +545,10 @@ pub trait Storelike {
                         let resource_check = resource.ok_or("Resource not found")?;
                         let array_string = resource_check
                             .get(&atom.property.subject)
-                            .ok_or("Property not found")?;
+                            .ok_or(format!("Property {} not found", &atom.property.subject))?;
                         let vector: Vec<String> =
                             crate::serialize::deserialize_json_array(array_string)
-                                .expect("Failed to parse array");
+                                .expect(&*format!("Failed to parse array: {}", array_string));
                         if vector.len() <= i as usize {
                             eprintln!(
                                 "Too high index ({}) for array with length {}",
@@ -542,5 +597,49 @@ pub trait Storelike {
             )?)
         }
         return Ok(current);
+    }
+
+    /// Checks Atomic Data in the store for validity.
+    /// Returns an Error if it is not valid.
+    ///
+    /// Validates:
+    ///
+    /// - [X] If the Values can be parsed using their Datatype (e.g. if Integers are integers)
+    /// - [X] If all required fields of the class are present
+    /// - [ ] If the URLs are publicly accessible and return the right type of data
+    /// - [ ] Returns a report, instead of throws an error
+    #[allow(dead_code, unreachable_code)]
+    fn validate_store(&self) -> AtomicResult<()> {
+        for (subject, resource) in self.all_resources()? {
+            println!("Subject: {:?}", subject);
+            println!("Resource: {:?}", resource);
+
+            let mut found_props: Vec<String> = Vec::new();
+
+            for (prop_url, value) in resource {
+                let property = self.get_property(&prop_url)?;
+
+                Value::new(&value, &property.data_type)?;
+                found_props.push(prop_url.clone());
+                // println!("{:?}: {:?}", prop_url, value);
+            }
+            let classes = self.get_classes_for_subject(&subject)?;
+            for class in classes {
+                println!("Class: {:?}", class.shortname);
+                println!("Found: {:?}", found_props);
+                for required_prop in class.requires {
+                    println!("Required: {:?}", required_prop.shortname);
+                    if !found_props.contains(&required_prop.subject) {
+                        return Err(format!(
+                            "Missing requried property {} in {} because of class {}",
+                            &required_prop.shortname, subject, class.subject,
+                        )
+                        .into());
+                    }
+                }
+            }
+            println!("{:?} Valid", subject);
+        }
+        return Ok(());
     }
 }

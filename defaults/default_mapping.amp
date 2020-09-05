@@ -13,3 +13,6 @@ timestamp=https://atomicdata.dev/datatypes/timestamp
 integer=https://atomicdata.dev/datatypes/integer
 slug=https://atomicdata.dev/datatypes/slug
 string=https://atomicdata.dev/datatypes/string
+
+# Methods
+insert=https://atomicdata.dev/methods/insert

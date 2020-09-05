@@ -29,3 +29,4 @@ pub const TIMESTAMP: &str = "https://atomicdata.dev/datatypes/timestamp";
 
 // Methods
 pub const INSERT: &str = "https://atomicdata.dev/methods/insert";
+pub const DELETE: &str = "https://atomicdata.dev/methods/delete";

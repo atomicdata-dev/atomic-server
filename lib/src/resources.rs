@@ -69,7 +69,7 @@ impl Resource {
         &mut self,
         property_url: String,
         value: &String,
-        store: &Store,
+        store: &dyn Storelike,
     ) -> AtomicResult<()> {
         let fullprop = &store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;

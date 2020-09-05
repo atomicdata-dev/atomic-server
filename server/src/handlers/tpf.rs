@@ -31,7 +31,7 @@ pub async fn tpf(
   let atoms = context.store.tpf(subject.clone(), property.clone(), value.clone())?;
   log::info!("{:?}", query);
   match content_type {
-      ContentType::JSON => {
+      ContentType::JSON | ContentType::JSONLD => {
           builder.set(
               http::header::ContentType::json()
           );

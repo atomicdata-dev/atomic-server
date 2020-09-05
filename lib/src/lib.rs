@@ -24,6 +24,7 @@
 pub mod atoms;
 #[cfg(feature="db")]
 pub mod db;
+pub mod delta;
 pub mod errors;
 pub mod mapping;
 pub mod mutations;
@@ -37,10 +38,10 @@ pub mod values;
 
 #[cfg(feature="db")]
 pub use db::Db;
+pub use delta::DeltaLine;
 pub use store::Store;
 pub use storelike::Storelike;
 pub use atoms::Atom;
 pub use atoms::RichAtom;
-pub use atoms::Delta;
 pub use values::Value;
 pub use resources::Resource;
