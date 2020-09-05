@@ -85,7 +85,7 @@ impl Storelike for Store {
         Ok(res)
     }
 
-    fn get_resource_string(&self, resource_url: &String) -> AtomicResult<ResourceString> {
+    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         match self.hashmap.get(resource_url) {
             Some(result) => Ok(result.clone()),
             None => Err(format!("Could not find resource {}", resource_url).into()),
@@ -112,7 +112,7 @@ mod test {
     #[test]
     fn get() {
         let store = init_store();
-        let my_resource = store.get_resource_string(&"_:test".into()).unwrap();
+        let my_resource = store.get_resource_string("_:test").unwrap();
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")
             .unwrap();
@@ -136,6 +136,14 @@ mod test {
         let atoms = parse_ad3(&invalid_ad3).unwrap();
         store.add_atoms(atoms).unwrap();
         store.validate_store().unwrap();
+    }
+
+    #[test]
+    fn get_full_resource_and_shortname() {
+        let store = init_store();
+        let resource = store.get_resource(urls::CLASS).unwrap();
+        let shortname = resource.get_shortname("shortname", &store).unwrap().to_string();
+        assert!(shortname == "class");
     }
 
     #[test]

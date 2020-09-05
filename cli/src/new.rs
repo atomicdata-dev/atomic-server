@@ -8,22 +8,23 @@ use colored::Colorize;
 use promptly::prompt_opt;
 use regex::Regex;
 
-/// Create a new instance of some class through a series of prompts
-pub fn new(context: &mut Context) {
+/// Create a new instance of some class through a series of prompts, adds it to the store
+pub fn new(context: &mut Context) -> AtomicResult<()>{
   let class_input = context
       .matches
       .subcommand_matches("new")
       .unwrap()
       .value_of("class")
       .expect("Add a class value");
-
   let class_url = context
       .mapping
-      .try_mapping_or_url(&class_input.into())
+      .try_mapping_or_url(class_input)
       .unwrap();
-  let model = context.store.get_class(&class_url);
-  println!("Enter a new {}: {}", model.shortname, model.description);
-  prompt_instance(context, &model, None).unwrap();
+  let class = context.store.get_class(&class_url)?;
+  println!("Enter a new {}: {}", class.shortname, class.description);
+  let (resource, _bookmark) = prompt_instance(context, &class, None)?;
+  println!("Succesfully created a new {}: subject: {}", class.shortname, resource.subject());
+  Ok(())
 }
 
 /// Lets the user enter an instance of an Atomic Class through multiple prompts
@@ -33,14 +34,13 @@ fn prompt_instance(
   context: &mut Context,
   class: &Class,
   preffered_shortname: Option<String>,
-) -> AtomicResult<(Resource, String, Option<String>)> {
+) -> AtomicResult<(Resource, Option<String>)> {
   // Not sure about the best way t
   // The Path is the thing at the end of the URL, from the domain
   // Here I set some (kind of) random numbers.
   // I think URL generation could be better, though. Perhaps use a
   let path = SystemTime::now()
-      .duration_since(UNIX_EPOCH)
-      .unwrap()
+      .duration_since(UNIX_EPOCH)?
       .subsec_nanos();
 
   let mut subject = format!("_:{}", path);
@@ -103,11 +103,11 @@ fn prompt_instance(
   context
       .store
       .add_resource_string(new_resource.subject().clone(), &new_resource.to_plain())
-      .unwrap();
+      ?;
   context
       .mapping
       .write_mapping_to_disk(&context.user_mapping_path);
-  return Ok((new_resource, subject, map));
+  return Ok((new_resource, map));
 }
 
 // Checks the property and its datatype, and issues a prompt that performs validation.
@@ -126,13 +126,13 @@ fn prompt_field(
   match &property.data_type {
       DataType::String | DataType::Markdown => {
           let msg = format!("string{}", msg_appendix);
-          input = prompt_opt(&msg).unwrap();
+          input = prompt_opt(&msg)?;
           return Ok(input);
       }
       DataType::Slug => {
           let msg = format!("slug{}", msg_appendix);
-          input = prompt_opt(&msg).unwrap();
-          let re = Regex::new(atomic_lib::values::SLUG_REGEX).unwrap();
+          input = prompt_opt(&msg)?;
+          let re = Regex::new(atomic_lib::values::SLUG_REGEX)?;
           match input {
               Some(slug) => {
                   if re.is_match(&*slug) {
@@ -146,7 +146,7 @@ fn prompt_field(
       }
       DataType::Integer => {
           let msg = format!("integer{}", msg_appendix);
-          let number: Option<u32> = prompt_opt(&msg).unwrap();
+          let number: Option<u32> = prompt_opt(&msg)?;
           match number {
               Some(nr) => {
                   input = Some(nr.to_string());
@@ -177,7 +177,7 @@ fn prompt_field(
           if classtype.is_some() {
               let class = context
                   .store
-                  .get_class(&String::from(classtype.as_ref().unwrap()));
+                  .get_class(&String::from(classtype.as_ref().unwrap()))?;
               println!("Enter the URL or shortname of a {}", class.description)
           }
           match url {
@@ -207,25 +207,25 @@ fn prompt_field(
                   let mut urls: Vec<String> = Vec::new();
                   let length = string_items.clone().count();
                   for item in string_items.into_iter() {
-                      match context.mapping.try_mapping_or_url(&item.into()) {
+                      match context.mapping.try_mapping_or_url(item) {
                           Some(url) => {
                               urls.push(url);
                           }
                           None => {
                               println!("Define the Property named {}", item.bold().green(),);
                               // TODO: This currently creates Property instances, but this should depend on the class!
-                              let (_resource, url, _shortname) = prompt_instance(
+                              let (resource, _shortname) = prompt_instance(
                                   context,
-                                  &context.store.get_class(&urls::PROPERTY.into()),
+                                  &context.store.get_class(urls::PROPERTY)?,
                                   Some(item.into()),
                               )?;
-                              urls.push(url);
+                              urls.push(resource.subject().clone());
                               continue;
                           }
                       }
                   }
                   if length == urls.len() {
-                      input = Some(atomic_lib::serialize::serialize_json_array(&urls).unwrap());
+                      input = Some(atomic_lib::serialize::serialize_json_array_owned(&urls).unwrap());
                       break;
                   }
               }
@@ -239,7 +239,7 @@ fn prompt_field(
 }
 
 // Asks for and saves the bookmark. Returns the shortname.
-fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &String) -> Option<String> {
+fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &str) -> Option<String> {
   let re = Regex::new(atomic_lib::values::SLUG_REGEX).unwrap();
   let mut shortname: Option<String> = prompt_opt(format!("Local Bookmark (optional)")).unwrap();
   loop {

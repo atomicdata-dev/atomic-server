@@ -11,9 +11,9 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
         Ok(prop) => Ok(prop),
         // If it's a shortname available from the Class of the resource, use that;
         Err(_) => {
-            let user_arg = subcommand_matches.value_of("property").unwrap();
+            let shortname = subcommand_matches.value_of("property").unwrap();
             context.store.property_shortname_to_url(
-                &user_arg.into(),
+                shortname,
                 &context.store.get_resource_string(&subject)?,
             )
         }
@@ -28,8 +28,7 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
     deltas.push(delta);
     context
         .store
-        .process_delta(Delta::new_from_lines(deltas))
-        .expect("Failed to apply delta");
+        .process_delta(Delta::new_from_lines(deltas))?;
     Ok(())
 }
 

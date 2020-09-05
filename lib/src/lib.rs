@@ -17,7 +17,7 @@ let atoms = atomic_lib::parse::parse_ad3(&string).unwrap();
 // Add the atoms to the store
 store.add_atoms(atoms).unwrap();
 // Get our resource...
-let my_resource = store.get_resource_string(&"_:test".into()).unwrap();
+let my_resource = store.get_resource_string("_:test").unwrap();
 // Get our value by filtering on our property...
 let my_value = my_resource.get("https://atomicdata.dev/properties/shortname").unwrap();
 println!("My value: {}", my_value);

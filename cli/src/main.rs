@@ -58,7 +58,7 @@ fn main() {
                 )
                 .arg(Arg::with_name("as")
                     .long("as")
-                    .help("Serialization option (pretty=default, json, ad3)")
+                    .help("Serialization option (pretty=default, json, ad3, nt)")
                     .takes_value(true)
                 )
         )
@@ -140,31 +140,42 @@ fn main() {
         user_mapping_path: user_mapping_path.clone(),
     };
 
+    match exec_command(&mut context) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::exit(1);
+        }
+    }
+}
+
+fn exec_command(context: &mut Context) -> AtomicResult<()>{
     match context.matches.subcommand_name() {
         Some("new") => {
-            new::new(&mut context);
+            new::new(context)?;
         }
         Some("list") => {
-            list(&mut context);
+            list(context);
         }
         Some("get") => {
-            path::get(&mut context);
+            path::get(context)?;
         }
         Some("tpf") => {
-            tpf(&mut context);
+            tpf(context);
         }
         Some("delta") => {
-            delta::delta(&mut context).unwrap();
+            delta::delta(context)?;
         }
         Some("populate") => {
-            populate(&mut context).unwrap();
+            populate(context)?;
         }
         Some("validate") => {
-            validate(&mut context);
+            validate(context);
         }
         Some(cmd) => println!("{} is not a valid command. Run atomic --help", cmd),
         None => println!("Run atomic --help for available commands"),
-    }
+    };
+    Ok(())
 }
 
 /// List all bookmarks
@@ -212,7 +223,7 @@ fn tpf(context: &mut Context) {
     println!("{}", serialized.unwrap())
 }
 
-fn tpf_value(string: &str) -> Option<String> {
+fn tpf_value(string: &str) -> Option<&str> {
     if string == "." {
         return None;
     } else {

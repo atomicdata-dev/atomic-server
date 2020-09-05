@@ -74,9 +74,10 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_resource_string(&self, resource_url: &String) -> AtomicResult<ResourceString> {
+    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         match self
             .resources
+            // Todo: return some custom error types here
             .get(bincode::serialize(resource_url).expect("Can't deserialize subject"))
             .expect("cant even access store")
         {

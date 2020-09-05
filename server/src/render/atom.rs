@@ -37,6 +37,7 @@ pub fn value_to_html(value: Value) -> String {
 }
 
 impl RenderAtom {
+    #[allow(dead_code)]
     pub fn from_rich_atom(atom: &RichAtom) -> RenderAtom {
         return RenderAtom {
             subject: atom.subject.clone(),

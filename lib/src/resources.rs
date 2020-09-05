@@ -1,7 +1,7 @@
 use crate::errors::AtomicResult;
 use crate::values::Value;
 use crate::Store;
-use crate::Storelike;
+use crate::{Atom, Storelike};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -40,7 +40,7 @@ impl Resource {
     }
 
     /// Get a value by property URL
-    pub fn get(&self, property_url: &String) -> AtomicResult<&Value> {
+    pub fn get(&self, property_url: &str) -> AtomicResult<&Value> {
         return Ok(self.propvals.get(property_url).ok_or(format!(
             "Property {} for resource {} not found",
             property_url, self.subject
@@ -48,7 +48,7 @@ impl Resource {
     }
 
     /// Gets a value by its shortname
-    pub fn get_shortname(&self, shortname: &String, store: &Store) -> AtomicResult<&Value> {
+    pub fn get_shortname(&self, shortname: &str, store: &Store) -> AtomicResult<&Value> {
         for (url, _val) in self.propvals.iter() {
             match store.get_property(url) {
                 Ok(prop) => {
@@ -105,3 +105,11 @@ impl Resource {
 /// A plainstring hashmap, which represents an (unvalidated?) Atomic Resource.
 /// The key string represents the URL of the Property, the value one its Values.
 pub type ResourceString = HashMap<String, String>;
+
+pub fn resourcestring_to_atoms(subject: &str, resource: ResourceString) -> Vec<Atom> {
+    let mut vec = Vec::new();
+    for (prop, val) in resource.iter() {
+        vec.push(Atom::new(subject, prop, val));
+    };
+    vec
+}

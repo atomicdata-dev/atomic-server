@@ -25,7 +25,7 @@ pub fn parse_ad3<'a, 'b>(string: &'b String) -> AtomicResult<Vec<Atom>> {
                 let subject = &string_vec[0];
                 let property = &string_vec[1];
                 let value = &string_vec[2];
-                atoms.push(Atom::new(subject.clone(), property.clone(), value.clone()));
+                atoms.push(Atom::new(subject, property, value));
             }
             Some(char) => {
                 return Err(format!(

@@ -15,7 +15,7 @@ pub async fn get_resource(
 ) -> BetterResult<HttpResponse> {
     let path = Path::new(_id.as_str());
     let id = path.file_stem().unwrap().to_str().unwrap();
-    let content_type: ContentType = match path.extension() {
+    let _content_type: ContentType = match path.extension() {
         Some(extension) => match extension.to_str().unwrap() {
             "ad3" => ContentType::AD3,
             "json" => ContentType::JSON,

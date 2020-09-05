@@ -24,13 +24,13 @@ impl Mapping {
     /// Checks if the input string is a Mapping or a valid URL.
     /// Returns Some if it is valid.
     /// If it is neither, a None is returned.
-    pub fn try_mapping_or_url(&self, mapping_or_url: &String) -> Option<String> {
+    pub fn try_mapping_or_url(&self, mapping_or_url: &str) -> Option<String> {
         match self.get(mapping_or_url) {
-            Some(hit) => return Some(hit.clone()),
+            Some(hit) => return Some(hit.into()),
             None => {
                 // Currently only accept HTTP(S) protocol
                 if is_url(mapping_or_url) {
-                    return Some(mapping_or_url.clone());
+                    return Some(mapping_or_url.into());
                 }
                 return None;
             }
@@ -43,7 +43,7 @@ impl Mapping {
     }
 
     /// Checks if the bookmark exists, returns it
-    pub fn get(&self, bookmark: &String) -> Option<&String> {
+    pub fn get(&self, bookmark: &str) -> Option<&String> {
         self.hashmap.get(bookmark)
     }
 
@@ -90,7 +90,7 @@ impl Mapping {
             let map = format!("{}={}\n", key, url);
             &file_string.push_str(&*map);
         }
-        fs::create_dir_all(path.parent().expect("Could not find parent folder"))
+        fs::create_dir_all(path.parent().expect("Cannot create above root"))
             .expect("Unable to create dirs");
         fs::write(path, file_string).expect("Unable to write file");
     }
@@ -103,7 +103,7 @@ impl Mapping {
 }
 
 /// Check if something is a URL
-pub fn is_url(string: &String) -> bool {
+pub fn is_url(string: &str) -> bool {
     string.starts_with("http") || string.starts_with("_:")
 }
 

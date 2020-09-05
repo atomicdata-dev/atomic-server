@@ -1,8 +1,7 @@
 use crate::errors::AtomicResult;
-use crate::serialize;
 use crate::urls;
 use regex::Regex;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// An individual Value in an Atom, represented as a native Rust enum.
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -60,8 +59,9 @@ impl Value {
             }
             DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
             DataType::ResourceArray => {
-                let vector: Vec<String> = crate::parse::parse_json_array(&value)
-                    .map_err(|e| return format!("Could not deserialize ResourceArray: {}. {}", &value, e))?;
+                let vector: Vec<String> = crate::parse::parse_json_array(&value).map_err(|e| {
+                    return format!("Could not deserialize ResourceArray: {}. {}", &value, e);
+                })?;
                 return Ok(Value::ResourceArray(vector));
             }
             DataType::Date => {
@@ -72,7 +72,9 @@ impl Value {
                 return Err(format!("Not a valid date: {}", value).into());
             }
             DataType::Timestamp => {
-                let val: i64 = value.parse().map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e ))?;
+                let val: i64 = value
+                    .parse()
+                    .map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e))?;
                 return Ok(Value::Timestamp(val));
             }
             DataType::Unsupported(unsup_url) => {
@@ -85,37 +87,41 @@ impl Value {
     }
 
     pub fn to_string(&self) -> String {
-      match self {
-          Value::AtomicUrl(s) => s.clone(),
-          Value::Date(s) => s.clone(),
-          Value::Integer(i) => i.to_string(),
-          Value::Markdown(i) => i.clone(),
-          Value::ResourceArray(v) => serialize::serialize_json_array(v).unwrap_or(format!("[Could not serialize resource array: {:?}]", v).into()),
-          Value::Slug(s) => s.clone(),
-          Value::String(s) => s.clone(),
-          Value::Timestamp(i) => i.to_string(),
-          Value::Unsupported(u) => u.value.clone(),
-      }
+        match self {
+            Value::AtomicUrl(s) => s.clone(),
+            Value::Date(s) => s.clone(),
+            Value::Integer(i) => i.to_string(),
+            Value::Markdown(i) => i.clone(),
+            Value::ResourceArray(v) => {
+                return crate::serialize::serialize_json_array_owned(v).unwrap_or_else(|_e| {
+                    format!("[Could not serialize resource array: {:?}", v).into()
+                })
+            }
+            Value::Slug(s) => s.clone(),
+            Value::String(s) => s.clone(),
+            Value::Timestamp(i) => i.to_string(),
+            Value::Unsupported(u) => u.value.clone(),
+        }
     }
 
     /// Returns a new Value, accepts a datatype string
     pub fn new_from_string(value: &String, datatype: &String) -> AtomicResult<Value> {
-      Value::new(value, &match_datatype(datatype))
+        Value::new(value, &match_datatype(datatype))
     }
 }
 
-pub fn match_datatype(string: &String) -> DataType {
-  match string.as_str() {
-      urls::INTEGER => DataType::Integer,
-      urls::STRING => DataType::String,
-      urls::MARKDOWN => DataType::Markdown,
-      urls::SLUG => DataType::Slug,
-      urls::ATOMIC_URL => DataType::AtomicUrl,
-      urls::RESOURCE_ARRAY => DataType::ResourceArray,
-      urls::DATE => DataType::Date,
-      urls::TIMESTAMP => DataType::Timestamp,
-      unsupported_datatype => return DataType::Unsupported(unsupported_datatype.into()),
-  }
+pub fn match_datatype(string: &str) -> DataType {
+    match string {
+        urls::INTEGER => DataType::Integer,
+        urls::STRING => DataType::String,
+        urls::MARKDOWN => DataType::Markdown,
+        urls::SLUG => DataType::Slug,
+        urls::ATOMIC_URL => DataType::AtomicUrl,
+        urls::RESOURCE_ARRAY => DataType::ResourceArray,
+        urls::DATE => DataType::Date,
+        urls::TIMESTAMP => DataType::Timestamp,
+        unsupported_datatype => return DataType::Unsupported(unsupported_datatype.into()),
+    }
 }
 impl From<String> for Value {
     fn from(string: String) -> Self {
