@@ -56,13 +56,6 @@ impl Store {
         fs::write(path, file_string).expect("Unable to write file");
         return Ok(());
     }
-
-    /// Loads the default Atomic Store, containing the Properties, Datatypes and Clasess for Atomic Schema.
-    pub fn load_default(&mut self) {
-        let ad3 = include_str!("../../defaults/default_store.ad3");
-        let atoms = crate::parse::parse_ad3(&String::from(ad3)).unwrap();
-        self.add_atoms(atoms).expect("Failed to add default Atoms to store");
-    }
 }
 
 impl Storelike for Store {
