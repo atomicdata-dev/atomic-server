@@ -25,6 +25,7 @@ pub async fn get_resource(
         },
         None => ContentType::HTML,
     };
+    // TODO: Make this listen to Accept headers
     let content_type = ContentType::AD3;
 
     log::info!("id: {:?}", id);

@@ -47,12 +47,20 @@ impl Mapping {
         self.hashmap.get(bookmark)
     }
 
+    /// Reads an .amp (atomic mapping) file from your disk.
+    pub fn read_mapping_from_file(&mut self, path: &PathBuf) -> AtomicResult<()> {
+        let mapping_string  =std::fs::read_to_string(path)?;
+        self.parse_mapping(&mapping_string)?;
+        Ok(())
+    }
+
     /// Reads an .amp (atomic mapping) file.
     /// This is a simple .ini-like text file that maps shortnames to URLs.
     /// The left-hand should contain the shortname, the right-hand the URL.
-    /// Ignores # comments and empty lines
-    pub fn read_mapping_from_file(&mut self, path: &PathBuf) -> AtomicResult<()> {
-        for line in std::fs::read_to_string(path)?.lines() {
+    /// Ignores # comments and empty lines.
+    /// Stores after parsing to the Mapping struct.
+    pub fn parse_mapping(&mut self, mapping_string: &str) -> AtomicResult<()> {
+        for line in mapping_string.lines() {
             match line.chars().next() {
                 Some('#') => {}
                 Some(' ') => {}
@@ -61,7 +69,7 @@ impl Mapping {
                     if split.len() == 2 {
                         &self.hashmap.insert(String::from(split[0]), String::from(split[1]));
                     } else {
-                        return Err(format!("Error reading line {:?} in {:?}", line, path).into());
+                        return Err(format!("Error reading line {:?}", line).into());
                     };
                 }
                 None => {}
@@ -85,6 +93,12 @@ impl Mapping {
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
             .expect("Unable to create dirs");
         fs::write(path, file_string).expect("Unable to write file");
+    }
+
+    pub fn populate(&mut self) -> AtomicResult<()> {
+        let mapping = include_str!("../defaults/default_mapping.amp");
+        self.parse_mapping(mapping)?;
+        Ok(())
     }
 }
 

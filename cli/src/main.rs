@@ -2,8 +2,7 @@ use atomic_lib::errors::AtomicResult;
 use atomic_lib::mapping::Mapping;
 use atomic_lib::serialize;
 use atomic_lib::Storelike;
-
-use atomic_lib::{parse, Db};
+use atomic_lib::Db;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
 use colored::*;
 use dirs::home_dir;
@@ -116,14 +115,18 @@ fn main() {
     let config_folder = home_dir()
         .expect("Home dir could not be opened. We need this to store data.")
         .join(".config/atomic/");
-    let user_mapping_path = config_folder.join("mapping.amp");
-    let default_mapping_path = PathBuf::from("../defaults/default_mapping.amp");
-    let mut mapping_path = &default_mapping_path;
-    if user_mapping_path.exists() {
-        mapping_path = &user_mapping_path;
-    }
+
+    // The mapping holds shortnames and URLs for quick CLI usage
     let mut mapping: Mapping = Mapping::init();
-    mapping.read_mapping_from_file(&mapping_path).unwrap();
+    let user_mapping_path = config_folder.join("mapping.amp");
+    if !user_mapping_path.exists() {
+        mapping.populate().unwrap();
+    } else {
+        mapping.read_mapping_from_file(&user_mapping_path).unwrap();
+    }
+
+    // Currenlty uses the Sled store, just like the server.
+    // Unfortunately, these can't be used at the same time!
     let user_store_path = config_folder.join("db");
     let store_path = &user_store_path;
     let store: Db = Db::init(store_path).expect("Failed opening store. Is another program using it?");
@@ -154,7 +157,7 @@ fn main() {
             delta::delta(&mut context).unwrap();
         }
         Some("populate") => {
-            populate(&mut context);
+            populate(&mut context).unwrap();
         }
         Some("validate") => {
             validate(&mut context);
@@ -218,14 +221,10 @@ fn tpf_value(string: &str) -> Option<String> {
 }
 
 /// Adds the default store to the store
-fn populate(context: &mut Context) {
-    let ad3 = include_str!("../../defaults/default_store.ad3");
-    let atoms = parse::parse_ad3(&String::from(ad3)).expect("Could not parse default store atoms");
-    context
-        .store
-        .add_atoms(atoms)
-        .expect("Error when loading default atoms");
+fn populate(context: &mut Context) -> AtomicResult<()> {
+    context.store.populate()?;
     println!("Succesfully added default Atoms to the store. Run `atomic-cli tpf . . .` to list them all!");
+    Ok(())
 }
 
 /// Validates the store

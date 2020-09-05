@@ -19,9 +19,7 @@ pub struct AppState {
 /// Initializes a store.
 pub fn init(config: Config) -> BetterResult<AppState> {
     let mut store = atomic_lib::Db::init(&config.store_path)?;
-    let ad3 = include_str!("../../defaults/default_store.ad3");
-    let atoms = atomic_lib::parse::parse_ad3(&String::from(ad3))?;
-    store.add_atoms(atoms)?;
+    store.populate()?;
 
     let mapping = Mapping::init();
 

@@ -35,3 +35,8 @@ This repository serves the following purposes:
 - Learn me more about how Rust works (it's a cool language, and this is my first Rust project - keep that in mind while traversing the code!)
 - Serve the first Atomic Data (soon available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the The constantly evolving [Atomic Data Docs](https://docs.atomicdata.dev/)
 - Provide developers with tools and inspiration to use Atomic Data in their own projects.
+
+## Contribute
+
+Issues and PR's are welcome!
+[Read more.](CONTRIBUTE.md)

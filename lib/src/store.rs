@@ -103,7 +103,7 @@ mod test {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let mut store = Store::init();
-        store.load_default();
+        store.populate().unwrap();
         let atoms = parse_ad3(&string).unwrap();
         store.add_atoms(atoms).unwrap();
         return store;
@@ -112,9 +112,7 @@ mod test {
     #[test]
     fn get() {
         let store = init_store();
-        // Get our resource...
         let my_resource = store.get_resource_string(&"_:test".into()).unwrap();
-        // Get our value by filtering on our property...
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")
             .unwrap();
@@ -133,7 +131,7 @@ mod test {
     fn validate_invalid() {
         let mut store = init_store();
         let invalid_ad3 =
-            // should be array, is string
+            // 'requires' should be an array, but is a string
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
         let atoms = parse_ad3(&invalid_ad3).unwrap();
         store.add_atoms(atoms).unwrap();

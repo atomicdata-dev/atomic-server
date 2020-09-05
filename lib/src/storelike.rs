@@ -419,7 +419,7 @@ pub trait Storelike {
     /// ```
     /// use atomic_lib::Storelike;
     /// let mut store = atomic_lib::Store::init();
-    /// store.load_default();
+    /// store.populate();
     /// let atoms = store.tpf(
     ///     None,
     ///     Some(String::from("https://atomicdata.dev/properties/isA")),
@@ -618,5 +618,13 @@ pub trait Storelike {
             println!("{:?} Valid", subject);
         }
         return Ok(());
+    }
+
+    /// Loads the default store
+    fn populate(&mut self) -> AtomicResult<()>{
+        let ad3 = include_str!("../defaults/default_store.ad3");
+        let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
+        self.add_atoms(atoms)?;
+        Ok(())
     }
 }
