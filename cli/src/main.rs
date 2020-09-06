@@ -131,7 +131,7 @@ fn main() -> AtomicResult<()> {
     // Unfortunately, these can't be used at the same time!
     let user_store_path = config_folder.join("db");
     let store_path = &user_store_path;
-    let store: Db = Db::init(store_path).map_err(Err("Failed opening store. Is another program using it?"))?;
+    let store: Db = Db::init(store_path).expect("Failed opening store. Is another program using it?");
 
     let mut context = Context {
         mapping,

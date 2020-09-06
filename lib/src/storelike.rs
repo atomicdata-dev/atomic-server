@@ -11,7 +11,7 @@ use crate::{
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Property {
     // URL of the class
     pub class_type: Option<String>,

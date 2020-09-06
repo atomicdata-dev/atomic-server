@@ -17,7 +17,7 @@ pub enum Value {
     Unsupported(UnsupportedValue),
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum DataType {
     AtomicUrl,
     Date,
@@ -42,22 +42,22 @@ pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
-    pub fn new(value: &String, datatype: &DataType) -> AtomicResult<Value> {
+    pub fn new(value: &str, datatype: &DataType) -> AtomicResult<Value> {
         match datatype {
             DataType::Integer => {
                 let val: i32 = value.parse()?;
                 return Ok(Value::Integer(val));
             }
-            DataType::String => return Ok(Value::String(value.clone())),
-            DataType::Markdown => return Ok(Value::Markdown(value.clone())),
+            DataType::String => return Ok(Value::String(value.into())),
+            DataType::Markdown => return Ok(Value::Markdown(value.into())),
             DataType::Slug => {
                 let re = Regex::new(SLUG_REGEX).unwrap();
                 if re.is_match(&*value) {
-                    return Ok(Value::Slug(value.clone()));
+                    return Ok(Value::Slug(value.into()));
                 }
                 return Err(format!("Not a valid slug: {}", value).into());
             }
-            DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.clone())),
+            DataType::AtomicUrl => return Ok(Value::AtomicUrl(value.into())),
             DataType::ResourceArray => {
                 let vector: Vec<String> = crate::parse::parse_json_array(&value).map_err(|e| {
                     return format!("Could not deserialize ResourceArray: {}. {}", &value, e);
@@ -67,7 +67,7 @@ impl Value {
             DataType::Date => {
                 let re = Regex::new(DATE_REGEX).unwrap();
                 if re.is_match(&*value) {
-                    return Ok(Value::Date(value.clone()));
+                    return Ok(Value::Date(value.into()));
                 }
                 return Err(format!("Not a valid date: {}", value).into());
             }
