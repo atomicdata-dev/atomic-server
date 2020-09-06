@@ -28,6 +28,7 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
 /// Note that N-Triples is also valid Turtle, N3 and Notation3.
 /// This is an expensive function, as every atom's datatype has to be fetched.
 pub fn serialize_atoms_to_n_triples(atoms: Vec<Atom>, store: &dyn Storelike) -> AtomicResult<String> {
+    eprintln!("CAUTION: N-Triples serialization is not implemented correctly, values are not escaped correctly.");
     if atoms.len() == 0 {
         return Err("No atoms to serialize".into())
     }
@@ -61,15 +62,20 @@ pub fn serialize_atoms_to_n_triples(atoms: Vec<Atom>, store: &dyn Storelike) -> 
 }
 
 /// SHOULD escape turtle value strings
-/// Probably should use an external library
+/// Probably will need to use an external library...
+// US-ASCII
+// https://www.w3.org/TR/rdf-testcases/#ntriples
 fn escape_turtle_value (string: &str) -> &str {
     string
 }
 
-// Should list all the supported serialization formats
-pub enum SerialializationFormats {
+pub const SERIALIZE_OPTIONS: [&'static str; 5] = ["pretty", "json", "jsonld", "ad3", "nt"];
+
+/// Should list all the supported serialization formats
+pub enum Format {
     JSON,
     JSONLD,
     AD3,
     NT,
+    PRETTY,
 }

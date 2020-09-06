@@ -6,7 +6,7 @@ use atomic_lib::Db;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
 use colored::*;
 use dirs::home_dir;
-use serialize::serialize_atoms_to_ad3;
+use serialize::{SERIALIZE_OPTIONS, serialize_atoms_to_ad3};
 use std::path::PathBuf;
 
 mod delta;
@@ -23,7 +23,7 @@ pub struct Context<'a> {
     user_mapping_path: PathBuf,
 }
 
-fn main() {
+fn main() -> AtomicResult<()> {
     let matches = App::new("atomic")
         .version(crate_version!())
         .author("Joep Meindertsma <joep@ontola.io>")
@@ -58,7 +58,9 @@ fn main() {
                 )
                 .arg(Arg::with_name("as")
                     .long("as")
-                    .help("Serialization option (pretty=default, json, ad3, nt)")
+                    .possible_values(&SERIALIZE_OPTIONS)
+                    .default_value("pretty")
+                    .help(&*format!("Serialization option ({:#?})", SERIALIZE_OPTIONS))
                     .takes_value(true)
                 )
         )
@@ -120,16 +122,16 @@ fn main() {
     let mut mapping: Mapping = Mapping::init();
     let user_mapping_path = config_folder.join("mapping.amp");
     if !user_mapping_path.exists() {
-        mapping.populate().unwrap();
+        mapping.populate()?;
     } else {
-        mapping.read_mapping_from_file(&user_mapping_path).unwrap();
+        mapping.read_mapping_from_file(&user_mapping_path)?;
     }
 
     // Currenlty uses the Sled store, just like the server.
     // Unfortunately, these can't be used at the same time!
     let user_store_path = config_folder.join("db");
     let store_path = &user_store_path;
-    let store: Db = Db::init(store_path).expect("Failed opening store. Is another program using it?");
+    let store: Db = Db::init(store_path).map_err(Err("Failed opening store. Is another program using it?"))?;
 
     let mut context = Context {
         mapping,
@@ -140,13 +142,8 @@ fn main() {
         user_mapping_path: user_mapping_path.clone(),
     };
 
-    match exec_command(&mut context) {
-        Ok(_) => {}
-        Err(e) => {
-            eprintln!("Error: {}", e);
-            std::process::exit(1);
-        }
-    }
+    exec_command(&mut context)?;
+    Ok(())
 }
 
 fn exec_command(context: &mut Context) -> AtomicResult<()>{
@@ -161,7 +158,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()>{
             path::get(context)?;
         }
         Some("tpf") => {
-            tpf(context);
+            tpf(context)?;
         }
         Some("delta") => {
             delta::delta(context)?;
@@ -170,7 +167,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()>{
             populate(context)?;
         }
         Some("validate") => {
-            validate(context);
+            validate(context)?;
         }
         Some(cmd) => println!("{} is not a valid command. Run atomic --help", cmd),
         None => println!("Run atomic --help for available commands"),
@@ -197,7 +194,7 @@ fn pretty_print_resource(url: &String, store: &dyn Storelike) -> AtomicResult<()
     let resource = store
         .get_resource_string(url)?;
     for (prop_url, val) in resource {
-        let prop_shortname = store.property_url_to_shortname(&prop_url).unwrap();
+        let prop_shortname = store.property_url_to_shortname(&prop_url)?;
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),
@@ -210,7 +207,7 @@ fn pretty_print_resource(url: &String, store: &dyn Storelike) -> AtomicResult<()
 }
 
 /// Triple Pattern Fragment Query
-fn tpf(context: &mut Context) {
+fn tpf(context: &mut Context) -> AtomicResult<()>{
     let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
     let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());
@@ -219,8 +216,9 @@ fn tpf(context: &mut Context) {
         .store
         .tpf(subject, property, value)
         .expect("TPF failed");
-    let serialized = serialize_atoms_to_ad3(found_atoms);
-    println!("{}", serialized.unwrap())
+    let serialized = serialize_atoms_to_ad3(found_atoms)?;
+    println!("{}", serialized);
+    Ok(())
 }
 
 fn tpf_value(string: &str) -> Option<&str> {
@@ -239,7 +237,8 @@ fn populate(context: &mut Context) -> AtomicResult<()> {
 }
 
 /// Validates the store
-fn validate(context: &mut Context) {
-    context.store.validate_store().expect("Invalid store");
+fn validate(context: &mut Context) -> AtomicResult<()> {
+    context.store.validate_store()?;
     println!("Store is valid!");
+    Ok(())
 }

@@ -8,7 +8,7 @@ use crate::{
     values::{match_datatype, DataType, Value},
     Atom, Resource, RichAtom,
 };
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize)]
@@ -22,7 +22,7 @@ pub struct Property {
     pub description: String,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Class {
     pub requires: Vec<Property>,
     pub recommends: Vec<Property>,

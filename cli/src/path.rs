@@ -1,5 +1,6 @@
 use crate::{pretty_print_resource, Context};
 use atomic_lib::{storelike, serialize, Storelike, errors::AtomicResult, Atom};
+use serialize::Format;
 
 /// Resolves an Atomic Path query
 pub fn get(context: &mut Context) -> AtomicResult<()> {
@@ -7,62 +8,62 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
   let path_string = subcommand_matches
       .value_of("path")
       .expect("Add a URL, shortname or path");
-  let serialization: Option<serialize::SerialializationFormats> =
-      match subcommand_matches.value_of("as") {
-          Some("json") => Some(serialize::SerialializationFormats::JSON),
-          Some("jsonld") => Some(serialize::SerialializationFormats::JSONLD),
-          Some("ad3") => Some(serialize::SerialializationFormats::AD3),
-          Some("nt") => Some(serialize::SerialializationFormats::NT),
-          Some("turtle") => Some(serialize::SerialializationFormats::NT),
-          Some("n3") => Some(serialize::SerialializationFormats::NT),
-          Some(format) => {
-              panic!("As {} not supported. Try 'json' or 'ad3'.", format);
+  let serialization: Format =
+      match subcommand_matches.value_of("as").unwrap() {
+          "pretty" => (Format::PRETTY),
+          "json" => (Format::JSON),
+          "jsonld" => (Format::JSONLD),
+          "ad3" => (Format::AD3),
+          "nt" => (Format::NT),
+          "turtle" => (Format::NT),
+          "n3" => (Format::NT),
+          format => {
+              return Err(format!("As {} not supported. Try 'json' or 'ad3'.", format).into());
           }
-          None => None,
       };
 
   // Returns a URL or Value
   let result = &context.store.get_path(path_string, &context.mapping);
+  let store = &context.store;
   match result {
       Ok(res) => match res {
           storelike::PathReturn::Subject(subject) => match serialization {
-              Some(serialize::SerialializationFormats::JSON) => {
-                  let out = &context.store.resource_to_json(&subject, 1, false)?;
+              Format::JSON => {
+                  let out = store.resource_to_json(&subject, 1, false)?;
                   println!("{}", out);
               }
-              Some(serialize::SerialializationFormats::JSONLD) => {
-                  let out = &context.store.resource_to_json(&subject, 1, true)?;
+              Format::JSONLD => {
+                  let out = store.resource_to_json(&subject, 1, true)?;
                   println!("{}", out);
               }
-              Some(serialize::SerialializationFormats::AD3) => {
-                  let out = &context.store.resource_to_ad3(&subject, None)?;
+              Format::AD3 => {
+                  let out = store.resource_to_ad3(&subject, None)?;
                   println!("{}", out);
               }
-              Some(serialize::SerialializationFormats::NT) => {
-                  println!("subject: {}", &subject);
+              Format::NT => {
                   let atoms = context.store.tpf(Some(&subject), None, None)?;
-                  let out = serialize::serialize_atoms_to_n_triples(atoms, &context.store)?;
+                  let out = serialize::serialize_atoms_to_n_triples(atoms, store)?;
                   println!("{}", out);
               }
-              None => {
-                  pretty_print_resource(&subject, &context.store).unwrap();
+              Format::PRETTY => {
+                  pretty_print_resource(&subject, store).unwrap();
               }
           },
           storelike::PathReturn::Atom(atom) => match serialization {
-              Some(serialize::SerialializationFormats::JSONLD)
-              | Some(serialize::SerialializationFormats::JSON) => {
+              Format::JSONLD
+              | Format::JSON => {
                   println!("{}", atom.value);
               }
-              Some(serialize::SerialializationFormats::AD3) => {
+              Format::AD3 => {
                   println!("{}", atom.value);
               }
-              Some(serialize::SerialializationFormats::NT) => {
+              Format::NT => {
                   let mut atoms: Vec<Atom> = Vec::new();
                   atoms.push(atom.into());
-                  let out = serialize::serialize_atoms_to_n_triples(atoms.into(), &context.store)?;
+                  let out = serialize::serialize_atoms_to_n_triples(atoms.into(), store)?;
                   println!("{}", out);
               }
-              None => println!("{:?}", &atom.native_value),
+              Format::PRETTY => println!("{:?}", &atom.native_value),
           },
       },
       Err(e) => {
