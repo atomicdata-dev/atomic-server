@@ -28,7 +28,7 @@ pub async fn tpf(
   let subject = empty_to_nothing(query.subject.clone());
   let property = empty_to_nothing(query.property.clone());
   let value = empty_to_nothing(query.value.clone());
-  let atoms = context.store.tpf(subject.clone(), property.clone(), value.clone())?;
+  let atoms = context.store.tpf(subject.as_deref(), property.as_deref(), value.as_deref())?;
   log::info!("{:?}", query);
   match content_type {
       ContentType::JSON | ContentType::JSONLD => {

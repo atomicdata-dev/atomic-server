@@ -1,6 +1,5 @@
 use crate::errors::AtomicResult;
 use crate::values::Value;
-use crate::Store;
 use crate::{mapping::is_url, storelike::{Property, Class}, Atom, Storelike};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
