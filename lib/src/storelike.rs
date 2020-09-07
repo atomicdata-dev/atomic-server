@@ -8,7 +8,7 @@ use crate::{
     values::{match_datatype, DataType, Value},
     Atom, Resource, RichAtom,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -64,7 +64,7 @@ pub trait Storelike {
     /// Adds a Resource to the store
     fn add_resource(&mut self, resource: &Resource) -> AtomicResult<()> {
         self.add_resource_string(resource.subject().clone(), &resource.to_plain())?;
-        return Ok(());
+        Ok(())
     }
 
     /// Fetches a resource, makes sure its subject matches.
@@ -78,11 +78,11 @@ pub trait Storelike {
         let atoms = parse_ad3(body)?;
         let mut resource = ResourceString::new();
         for atom in atoms {
-            if &atom.subject == subject {
+            if atom.subject == subject {
                 resource.insert(atom.property, atom.value);
             }
         }
-        if resource.len() == 0 {
+        if resource.is_empty() {
             return Err("No valid atoms in resource".into());
         }
         Ok(resource)
@@ -125,7 +125,7 @@ pub trait Storelike {
             for prop_url in string_vec {
                 properties.push(self.get_property(&prop_url).unwrap());
             }
-            return properties;
+            properties
         };
         if requires_string.is_some() {
             requires = get_properties(requires_string.unwrap().into());
@@ -141,12 +141,12 @@ pub trait Storelike {
             description: description.into(),
         };
 
-        return Ok(class);
+        Ok(class)
     }
 
     /// Finds all classes (isA) for any subject.
     /// Returns an empty vector if there are none.
-    fn get_classes_for_subject(&self, subject: &String) -> AtomicResult<Vec<Class>> {
+    fn get_classes_for_subject(&self, subject: &str) -> AtomicResult<Vec<Class>> {
         let resource = self.get_resource_string(subject)?;
         let classes_array_opt = resource.get(urls::IS_A);
         let classes_array = match classes_array_opt {
@@ -163,7 +163,7 @@ pub trait Storelike {
         for class in vector {
             classes.push(self.get_class(&class)?)
         }
-        return Ok(classes);
+        Ok(classes)
     }
 
     /// Fetches a property by URL, returns a Property instance
@@ -189,7 +189,7 @@ pub trait Storelike {
             subject: url.into(),
         };
 
-        return Ok(property);
+        Ok(property)
     }
 
     /// Returns a collection with all resources in the store.
@@ -201,12 +201,9 @@ pub trait Storelike {
         match self.get_resource_string(&atom.subject).as_mut() {
             Ok(resource) => {
                 // Overwrites existing properties
-                match resource.insert(atom.property, atom.value) {
-                    Some(_oldval) => {
-                        // Remove the value from the Subject index
-                        // self.index_value_remove(atom);
-                    }
-                    None => {}
+                if let Some(_oldval) = resource.insert(atom.property, atom.value) {
+                    // Remove the value from the Subject index
+                    // self.index_value_remove(atom);
                 };
                 self.add_resource_string(atom.subject, &resource)?;
             }
@@ -261,7 +258,7 @@ pub trait Storelike {
                 return Ok(prop_url.clone());
             }
         }
-        return Err(format!("Could not find shortname {}", shortname).into());
+        Err(format!("Could not find shortname {}", shortname).into())
     }
 
     /// Finds
@@ -271,7 +268,7 @@ pub trait Storelike {
             .get(urls::SHORTNAME)
             .ok_or(format!("Could not get shortname prop for {}", url))?;
 
-        return Ok(property_resource.into());
+        Ok(property_resource.into())
     }
 
     /// fetches a resource, serializes it to .ad3
@@ -294,12 +291,11 @@ pub trait Storelike {
             mod_subject = format!("{}{}", &local_base_url.unwrap(), &chars.as_str());
         }
         for (property, value) in resource {
-            let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])
-                .expect("Can't serialize");
+            let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])?;
             ad3_atom.push_str("\n");
             &string.push_str(&*ad3_atom);
         }
-        return Ok(string);
+        Ok(string)
     }
 
     /// Serializes a single Resource to a JSON object.
@@ -312,7 +308,7 @@ pub trait Storelike {
     // [ ] Resoures into objects, if the nesting depth allows it
     fn resource_to_json(
         &self,
-        resource_url: &String,
+        resource_url: &str,
         _depth: u32,
         json_ld: bool,
     ) -> AtomicResult<String> {
@@ -379,31 +375,31 @@ pub trait Storelike {
                 value, &property.data_type
             ));
             let jsonval = match native_value {
-                Value::AtomicUrl(val) => SerdeValue::String(val.into()),
-                Value::Date(val) => SerdeValue::String(val.into()),
+                Value::AtomicUrl(val) => SerdeValue::String(val),
+                Value::Date(val) => SerdeValue::String(val),
                 Value::Integer(val) => SerdeValue::Number(val.into()),
-                Value::Markdown(val) => SerdeValue::String(val.into()),
+                Value::Markdown(val) => SerdeValue::String(val),
                 Value::ResourceArray(val) => SerdeValue::Array(
                     val.iter()
                         .map(|item| SerdeValue::String(item.clone()))
                         .collect(),
                 ),
-                Value::Slug(val) => SerdeValue::String(val.into()),
-                Value::String(val) => SerdeValue::String(val.into()),
+                Value::Slug(val) => SerdeValue::String(val),
+                Value::String(val) => SerdeValue::String(val),
                 Value::Timestamp(val) => SerdeValue::Number(val.into()),
-                Value::Unsupported(val) => SerdeValue::String(val.value.into()),
+                Value::Unsupported(val) => SerdeValue::String(val.value),
             };
             root.insert(property.shortname, jsonval);
         }
 
         if json_ld {
             root.insert("@context".into(), context.into());
-            root.insert("@id".into(), resource_url.as_str().into());
+            root.insert("@id".into(), resource_url.into());
         }
         let obj = SerdeValue::Object(root);
         let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
 
-        return Ok(string);
+        Ok(string)
     }
 
     /// Triple Pattern Fragments interface.
@@ -471,20 +467,20 @@ pub trait Storelike {
                 Ok(resource) => {
                     if q_property.is_some() | q_value.is_some() {
                         find_in_resource(&sub, &resource);
-                        return Ok(vec);
+                        Ok(vec)
                     } else {
-                        return Ok(resources::resourcestring_to_atoms(sub, resource));
+                        Ok(resources::resourcestring_to_atoms(sub, resource))
                     }
                 }
                 Err(_) => {
-                    return Ok(vec);
+                    Ok(vec)
                 }
             },
             None => {
                 for (subj, properties) in self.all_resources()? {
                     find_in_resource(&subj, &properties);
                 }
-                return Ok(vec);
+                Ok(vec)
             }
         }
     }

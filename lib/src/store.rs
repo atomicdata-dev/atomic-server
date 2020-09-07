@@ -26,10 +26,10 @@ impl Store {
     /// # Example
     /// let store = Store::init();
     pub fn init() -> Store {
-        return Store {
+        Store {
             hashmap: HashMap::new(),
             log: Vec::new(),
-        };
+        }
     }
 
     /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
@@ -54,7 +54,7 @@ impl Store {
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
             .expect("Unable to create dirs");
         fs::write(path, file_string).expect("Unable to write file");
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -72,12 +72,12 @@ impl Storelike for Store {
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 
     fn add_resource_string(&mut self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
         self.hashmap.insert(subject, resource.clone());
-        return Ok(());
+        Ok(())
     }
 
     fn all_resources(&self) -> AtomicResult<ResourceCollection> {
@@ -106,7 +106,7 @@ mod test {
         store.populate().unwrap();
         let atoms = parse_ad3(&string).unwrap();
         store.add_atoms(atoms).unwrap();
-        return store;
+        store
 }
 
     #[test]

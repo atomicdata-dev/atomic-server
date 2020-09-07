@@ -7,7 +7,6 @@ use crate::{
     storelike::{ResourceCollection, Storelike},
     Atom, Resource,
 };
-use sled;
 
 /// The Db is a persistent on-disk Atomic Data store.
 /// It's an implementation of Storelike.
@@ -89,9 +88,7 @@ impl Storelike for Db {
             None => match self.fetch_resource(resource_url) {
                 Ok(got) => Ok(got),
                 Err(e) => {
-                    return Err(
-                        format!("Failed to retrieve {} from the web: {}", resource_url, e).into(),
-                    )
+                    Err(format!("Failed to retrieve {} from the web: {}", resource_url, e).into())
                 }
             },
         }
@@ -112,7 +109,7 @@ impl Storelike for Db {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{Storelike, parse::parse_ad3};
+    use crate::{parse::parse_ad3, Storelike};
 
     // Same as examples/basic.rs
     #[test]
