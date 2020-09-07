@@ -107,7 +107,7 @@ mod test {
         let atoms = parse_ad3(&string).unwrap();
         store.add_atoms(atoms).unwrap();
         return store;
-    }
+}
 
     #[test]
     fn get() {

@@ -4,7 +4,7 @@ pub const AD3_MIME: &str = "application/ad3-ndjson";
 
 /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
 /// Allows comments and empty lines.
-pub fn parse_ad3<'a, 'b>(string: &'b String) -> AtomicResult<Vec<Atom>> {
+pub fn parse_ad3<'a, 'b>(string: &'b str) -> AtomicResult<Vec<Atom>> {
     let mut atoms: Vec<Atom> = Vec::new();
     for line in string.lines() {
         match line.chars().next() {

@@ -1,0 +1,10 @@
+---
+  base: 'http://surfy.ddns.net'
+  iterations: 5000
+  concurrency: 50
+  rampup: 2
+
+  plan:
+    - name: Test resource
+      request:
+        url: /tpf

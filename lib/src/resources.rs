@@ -166,7 +166,7 @@ pub fn resourcestring_to_atoms(subject: &str, resource: ResourceString) -> Vec<A
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{urls, parse::parse_ad3};
+    use crate::{urls, parse::parse_ad3, Store};
 
     fn init_store() -> Store {
         let string =

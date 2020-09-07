@@ -48,3 +48,18 @@ You can also install with `cargo install atomic-server`, but this binary will al
 - the `.env` from this repo, although the defaults should work just fine.
 - the `/templates` directory
 - the `/static` directory
+
+## Testing
+
+```sh
+# This also makes sure that cli and server work, plus it test the db feature
+cargo test --all
+```
+
+## Performance benchmarking
+
+```sh
+# Install drill
+cargo install drill
+drill -b benchmark.yml --stats
+```

@@ -3,8 +3,8 @@
 
 use crate::{
     errors::AtomicResult,
-    storelike::{Storelike, ResourceCollection},
     resources::ResourceString,
+    storelike::{ResourceCollection, Storelike},
     Atom, Resource,
 };
 use sled;
@@ -26,7 +26,7 @@ pub struct Db {
 
 impl Db {
     // Creates a new store at the specified path
-    pub fn init(path: &std::path::PathBuf) -> AtomicResult<Db> {
+    pub fn init<P: AsRef<std::path::Path>>(path: P) -> AtomicResult<Db> {
         let db = sled::open(path)?;
         let resources = db.open_tree("resources")?;
         let index_props = db.open_tree("index_props")?;
@@ -86,12 +86,12 @@ impl Storelike for Db {
                     .expect("Can't deserialize resource. Your database may be corrupt!");
                 Ok(resource)
             }
-            None => {
-                match self.fetch_resource(resource_url) {
-                    Ok(got) => Ok(got),
-                    Err(e) => {
-                        return Err(format!("Failed to retrieve {} from the web: {}", resource_url, e).into())
-                    },
+            None => match self.fetch_resource(resource_url) {
+                Ok(got) => Ok(got),
+                Err(e) => {
+                    return Err(
+                        format!("Failed to retrieve {} from the web: {}", resource_url, e).into(),
+                    )
                 }
             },
         }
@@ -106,5 +106,38 @@ impl Storelike for Db {
             resources.push((subby, resource));
         }
         Ok(resources)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{Storelike, parse::parse_ad3};
+
+    // Same as examples/basic.rs
+    #[test]
+    fn basic() {
+        let string =
+            String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
+        let mut store = Db::init("tmp/db").unwrap();
+        store.populate().unwrap();
+        let atoms = parse_ad3(&string).unwrap();
+        store.add_atoms(atoms).unwrap();
+        // Let's parse this AD3 string. It looks awkward because of the escaped quotes.
+        let string = "[\"_:test\",\"https://atomicdata.dev/properties/description\",\"Test\"]";
+        // The parser returns a Vector of Atoms
+        let atoms = crate::parse::parse_ad3(&string).unwrap();
+        // Add the Atoms to the Store
+        store.add_atoms(atoms).unwrap();
+        // Get our resource...
+        let my_resource = store.get_resource("_:test").unwrap();
+        // Get our value by filtering on our property...
+        let my_value = my_resource
+            .get("https://atomicdata.dev/properties/description")
+            .unwrap();
+        assert!(my_value.to_string() == "Test");
+        // We can also use the shortname of description
+        let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
+        assert!(my_value_from_shortname.to_string() == "Test")
     }
 }
