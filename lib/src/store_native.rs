@@ -20,9 +20,9 @@ impl StoreNative {
     /// # Example
     /// let store = Store::init();
     pub fn init() -> StoreNative {
-        return StoreNative {
+        StoreNative {
             resources: HashMap::new(),
-        };
+        }
     }
 
     pub fn add_resource(&mut self, resource: Resource) -> AtomicResult<()> {
@@ -30,7 +30,7 @@ impl StoreNative {
         Ok(())
     }
 
-    pub fn get(&self, resource_url: &String) -> Option<&Resource> {
-        return self.resources.get(resource_url);
+    pub fn get(&self, resource_url: &str) -> Option<&Resource> {
+        self.resources.get(resource_url)
     }
 }

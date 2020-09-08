@@ -139,7 +139,7 @@ fn main() -> AtomicResult<()> {
         matches,
         config_folder,
         user_store_path: user_store_path.clone(),
-        user_mapping_path: user_mapping_path.clone(),
+        user_mapping_path,
     };
 
     exec_command(&mut context)?;
@@ -189,7 +189,7 @@ fn list(context: &mut Context) {
 }
 
 /// Prints a resource to the terminal with readble formatting and colors
-fn pretty_print_resource(url: &String, store: &dyn Storelike) -> AtomicResult<()> {
+fn pretty_print_resource(url: &str, store: &dyn Storelike) -> AtomicResult<()> {
     let mut output = String::new();
     let resource = store
         .get_resource_string(url)?;
@@ -223,9 +223,9 @@ fn tpf(context: &mut Context) -> AtomicResult<()>{
 
 fn tpf_value(string: &str) -> Option<&str> {
     if string == "." {
-        return None;
+        None
     } else {
-        return Some(string.into());
+        Some(string)
     }
 }
 

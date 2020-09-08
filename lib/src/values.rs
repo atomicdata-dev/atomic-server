@@ -103,9 +103,16 @@ pub fn match_datatype(string: &str) -> DataType {
         unsupported_datatype => DataType::Unsupported(unsupported_datatype.into()),
     }
 }
+
 impl From<String> for Value {
-    fn from(string: String) -> Self {
-        Value::new(&string, &DataType::String).unwrap()
+    fn from(val: String) -> Self {
+        Value::String(val)
+    }
+}
+
+impl From<i32> for Value {
+    fn from(val: i32) -> Self {
+        Value::Integer(val)
     }
 }
 
@@ -141,10 +148,11 @@ mod test {
         assert!(int.to_string() == "8");
         let string = Value::new("string", &DataType::String).unwrap();
         assert!(string.to_string() == "string");
-        let string = Value::new("string", &DataType::String).unwrap();
-        assert!(string.to_string() == "string");
         let date = Value::new("1200-02-02", &DataType::Date).unwrap();
         assert!(date.to_string() == "1200-02-02");
+
+        let converted  = Value::from(8);
+        assert!(converted.to_string() == "8");
     }
 
     #[test]

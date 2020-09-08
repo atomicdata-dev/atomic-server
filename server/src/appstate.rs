@@ -25,10 +25,10 @@ pub fn init(config: Config) -> BetterResult<AppState> {
 
     let tera = Tera::new("templates/*.html")?;
 
-    return Ok(AppState {
+    Ok(AppState {
         store,
         config,
         mapping,
         tera,
-    });
+    })
 }

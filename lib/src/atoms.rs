@@ -14,11 +14,11 @@ pub struct Atom {
 }
 
 impl Atom {
-    pub fn new(subject: &str, property: &str, value: &str) -> Self {
+    pub fn new(subject: String, property: String, value: String) -> Self {
         Atom {
-            subject: subject.into(),
-            property: property.into(),
-            value: value.into(),
+            subject,
+            property,
+            value,
         }
     }
 }
@@ -36,7 +36,7 @@ pub struct RichAtom {
 impl RichAtom {
     pub fn new(subject: String, property: Property, value: String) -> AtomicResult<Self> {
         Ok(RichAtom {
-            subject: subject.clone(),
+            subject,
             property: property.clone(),
             value: value.clone(),
             native_value: Value::new(&value, &property.data_type)?,
@@ -44,22 +44,22 @@ impl RichAtom {
     }
 }
 
-impl From<&DeltaLine> for Atom {
-    fn from(delta: &DeltaLine) -> Self {
+impl From<DeltaLine> for Atom {
+    fn from(delta: DeltaLine) -> Self {
         Atom::new(
-            &delta.subject,
-            &delta.property,
-            &delta.value,
+            delta.subject,
+            delta.property,
+            delta.value,
         )
     }
 }
 
-impl From<&RichAtom> for Atom {
-    fn from(richatom: &RichAtom) -> Self {
+impl From<RichAtom> for Atom {
+    fn from(richatom: RichAtom) -> Self {
         Atom::new(
-            &richatom.subject,
-            &richatom.property.subject,
-            &richatom.value,
+            richatom.subject,
+            richatom.property.subject,
+            richatom.value,
         )
     }
 }

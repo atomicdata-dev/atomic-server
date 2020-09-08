@@ -1,6 +1,5 @@
 use actix_web::{middleware, web, App, HttpServer};
 use std::{io, sync::Mutex};
-use env_logger;
 // use actix_web_middleware_redirect_https::RedirectHTTPS;
 
 mod appstate;
@@ -25,7 +24,7 @@ async fn main() -> io::Result<()> {
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
         App::new()
-            .app_data(data.clone())
+            .app_data(data)
             .wrap(middleware::Logger::default())
             // .wrap(actix_web_middleware_redirect_https::RedirectHTTPS::default())
             .service(actix_files::Files::new("/static", "static/").show_files_listing())

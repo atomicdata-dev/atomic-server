@@ -1,7 +1,7 @@
 # Contribute
 
 I'm glad you're reading this!
-If you encounter issues, add them to the github issue tracker.
+If you encounter issues, add them to the Github issue tracker.
 Same goes for feature requests.
 PR's are welcome, too!
 

@@ -26,13 +26,13 @@ impl Mapping {
     /// If it is neither, a None is returned.
     pub fn try_mapping_or_url(&self, mapping_or_url: &str) -> Option<String> {
         match self.get(mapping_or_url) {
-            Some(hit) => return Some(hit.into()),
+            Some(hit) => Some(hit.into()),
             None => {
                 // Currently only accept HTTP(S) protocol
                 if is_url(mapping_or_url) {
                     return Some(mapping_or_url.into());
                 }
-                return None;
+                None
             }
         }
     }
@@ -65,9 +65,9 @@ impl Mapping {
                 Some('#') => {}
                 Some(' ') => {}
                 Some(_) => {
-                    let split: Vec<&str> = line.split("=").collect();
+                    let split: Vec<&str> = line.split('=').collect();
                     if split.len() == 2 {
-                        &self.hashmap.insert(String::from(split[0]), String::from(split[1]));
+                        self.hashmap.insert(String::from(split[0]), String::from(split[1]));
                     } else {
                         return Err(format!("Error reading line {:?}", line).into());
                     };
@@ -75,12 +75,12 @@ impl Mapping {
                 None => {}
             };
         }
-        return Ok(());
+        Ok(())
     }
 
     /// Check if the bookmark shortname is present
-    pub fn contains_key(&self, key: &String) -> bool {
-        return self.hashmap.contains_key(key)
+    pub fn contains_key(&self, key: &str) -> bool {
+        self.hashmap.contains_key(key)
     }
 
     /// Serializes the mapping and stores it to the path
@@ -88,7 +88,7 @@ impl Mapping {
         let mut file_string: String = String::new();
         for (key, url) in self.hashmap.clone().iter() {
             let map = format!("{}={}\n", key, url);
-            &file_string.push_str(&*map);
+            file_string.push_str(&*map);
         }
         fs::create_dir_all(path.parent().expect("Cannot create above root"))
             .expect("Unable to create dirs");

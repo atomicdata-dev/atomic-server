@@ -52,7 +52,7 @@ pub fn init() -> Config {
                 store_path = value.parse().expect("Could not parse ATOMIC_STORE_PATH. Is it a valid path?");
             }
             "ATOMIC_DOMAIN" => {
-                domain = String::from(value);
+                domain = value;
             }
             "ATOMIC_PORT" => {
                 port = value.parse().expect("ATOMIC_PORT is not a number");
@@ -61,7 +61,7 @@ pub fn init() -> Config {
                 ip = value.parse().expect("Could not parse ATOMIC_IP. Is it a valid IP address?");
             }
             "ATOMIC_EMAIL" => {
-                email = Some(String::from(value));
+                email = Some(value);
             }
             "ATOMIC_HTTPS" => {
                 https = value.parse().expect("ATOMIC_HTTPS is not a boolean");
@@ -81,7 +81,7 @@ pub fn init() -> Config {
     let schema = if https {"https"} else {"http"};
     let local_base_url = format!("{}://{}/", schema, domain);
 
-    return Config {
+    Config {
         cert_init,
         cert_path,
         email,
@@ -93,5 +93,5 @@ pub fn init() -> Config {
         port,
         local_base_url,
         store_path,
-    };
+    }
 }

@@ -1,15 +1,15 @@
-use serde_json;
+
 use crate::errors::AtomicResult;
 use crate::{Storelike, Atom, urls};
 
-pub fn serialize_json_array(items: &Vec<&str>) -> AtomicResult<String> {
+pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
     let string = serde_json::to_string(items)?;
-    return Ok(string);
+    Ok(string)
 }
 
-pub fn serialize_json_array_owned(items: &Vec<String>) -> AtomicResult<String> {
+pub fn serialize_json_array_owned(items: &[String]) -> AtomicResult<String> {
     let string = serde_json::to_string(items)?;
-    return Ok(string);
+    Ok(string)
 }
 
 /// Serializes Atoms to .ad3.
@@ -19,9 +19,9 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
     for atom in atoms {
         let mut ad3_atom = serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value])?;
         ad3_atom.push_str("\n");
-        &string.push_str(&*ad3_atom);
+        string.push_str(&*ad3_atom);
     }
-    return Ok(string);
+    Ok(string)
 }
 
 /// N-Triples serialization.
@@ -29,7 +29,7 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
 /// This is an expensive function, as every atom's datatype has to be fetched.
 pub fn serialize_atoms_to_n_triples(atoms: Vec<Atom>, store: &dyn Storelike) -> AtomicResult<String> {
     eprintln!("CAUTION: N-Triples serialization is not implemented correctly, values are not escaped correctly.");
-    if atoms.len() == 0 {
+    if atoms.is_empty() {
         return Err("No atoms to serialize".into())
     }
     let mut string = String::new();
@@ -56,9 +56,9 @@ pub fn serialize_atoms_to_n_triples(atoms: Vec<Atom>, store: &dyn Storelike) -> 
             crate::values::DataType::Unsupported(uns) => dtstring(&uns),
         };
         let ad3_atom = format!("<{}> <{}> {} . \n", atom.subject, atom.property, value);
-        &string.push_str(&*ad3_atom);
+        string.push_str(&*ad3_atom);
     }
-    return Ok(string);
+    Ok(string)
 }
 
 /// SHOULD escape turtle value strings
@@ -69,7 +69,7 @@ fn escape_turtle_value (string: &str) -> &str {
     string
 }
 
-pub const SERIALIZE_OPTIONS: [&'static str; 5] = ["pretty", "json", "jsonld", "ad3", "nt"];
+pub const SERIALIZE_OPTIONS: [&str; 5] = ["pretty", "json", "jsonld", "ad3", "nt"];
 
 /// Should list all the supported serialization formats
 pub enum Format {

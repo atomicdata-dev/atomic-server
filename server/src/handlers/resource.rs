@@ -4,7 +4,6 @@ use crate::{
 };
 use atomic_lib::Storelike;
 use actix_web::{http, web, HttpResponse};
-use log;
 use std::path::Path;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
@@ -59,7 +58,7 @@ pub async fn get_resource(
             builder.set(http::header::ContentType::html());
             let body = context
                 .store
-                .resource_to_ad3(&subject, Some(&context.config.local_base_url))?;
+                .resource_to_ad3(subject, Some(&context.config.local_base_url))?;
             Ok(builder.body(body))
         }
     }

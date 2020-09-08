@@ -5,7 +5,6 @@ use crate::appstate::AppState;
 use crate::render::atom::RenderAtom;
 use crate::{content_types::ContentType, errors::BetterResult, helpers::empty_to_nothing};
 use atomic_lib::Storelike;
-use log;
 use std::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
@@ -41,7 +40,7 @@ pub async fn tpf(
           let mut renderedatoms: Vec<RenderAtom> = Vec::new();
 
           for atom in atoms {
-            renderedatoms.push(RenderAtom::from_atom(&atom, &context.store)?);
+            renderedatoms.push(RenderAtom::from_atom(atom, &context.store)?);
           }
 
           builder.set(

@@ -5,7 +5,6 @@ use crate::{
     render::propvals::{from_hashmap_resource, PropVal},
 };
 use actix_web::{http, web, HttpResponse};
-use log;
 use serde::Deserialize;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
@@ -20,7 +19,7 @@ pub async fn path(
     data: web::Data<Mutex<AppState>>,
     query: web::Query<GetQuery>,
 ) -> BetterResult<HttpResponse> {
-    let path = &query.path.clone().unwrap_or("".into());
+    let path = &query.path.clone().unwrap_or_default();
     let context = data.lock().unwrap();
     let content_type: ContentType = ContentType::HTML;
 
@@ -52,7 +51,7 @@ pub async fn path(
                     propvals.push(PropVal {
 
                         property: context.store.get_property(&atom.property.subject)?,
-                        value_html: crate::render::atom::value_to_html(atom.native_value),
+                        value_html: crate::render::atom::value_to_html(&atom.native_value),
                         value: atom.value,
                         subject: atom.subject,
                     });

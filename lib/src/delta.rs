@@ -29,16 +29,26 @@ pub struct Delta {
 // That would make things easier regarding hashes.
 impl Delta {
     /// Creates a single, unvalidated Delta
-    pub fn new() -> Delta {
-        Delta {
-            lines: Vec::new(),
-            actor: String::from("_:localActor"),
-        }
-    }
+    // pub fn new() -> Delta {
+    //     Delta {
+    //         lines: Vec::new(),
+    //         actor: String::from("_:localActor"),
+    //     }
+    // }
 
     pub fn new_from_lines(lines: Vec<DeltaLine>) -> Delta {
         Delta {
             lines,
+            actor: String::from("_:localActor"),
+        }
+    }
+}
+
+impl Default for Delta {
+    /// Creates a single, unvalidated Delta
+    fn default() -> Self {
+        Delta {
+            lines: Vec::new(),
             actor: String::from("_:localActor"),
         }
     }

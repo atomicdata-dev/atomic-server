@@ -28,7 +28,7 @@ pub fn from_hashmap_resource(
         hashmap.push(PropVal {
             property: fullprop,
             value: value.into(),
-            value_html: value_to_html(val),
+            value_html: value_to_html(&val),
             subject: subject.clone(),
         });
     }

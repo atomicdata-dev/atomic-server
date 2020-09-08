@@ -23,7 +23,7 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
       };
 
   // Returns a URL or Value
-  let result = &context.store.get_path(path_string, &context.mapping);
+  let result = context.store.get_path(path_string, &context.mapping);
   let store = &context.store;
   match result {
       Ok(res) => match res {
@@ -37,7 +37,7 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
                   println!("{}", out);
               }
               Format::AD3 => {
-                  let out = store.resource_to_ad3(&subject, None)?;
+                  let out = store.resource_to_ad3(subject, None)?;
                   println!("{}", out);
               }
               Format::NT => {
@@ -59,8 +59,8 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
               }
               Format::NT => {
                   let mut atoms: Vec<Atom> = Vec::new();
-                  atoms.push(atom.into());
-                  let out = serialize::serialize_atoms_to_n_triples(atoms.into(), store)?;
+                  atoms.push(Atom::from(*atom));
+                  let out = serialize::serialize_atoms_to_n_triples(atoms, store)?;
                   println!("{}", out);
               }
               Format::PRETTY => println!("{:?}", &atom.native_value),

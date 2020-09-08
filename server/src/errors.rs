@@ -1,6 +1,5 @@
 use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
 use serde::Serialize;
-use log;
 use std::error::Error;
 
 // More strict Result type

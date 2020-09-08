@@ -48,8 +48,8 @@ impl Store {
     pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
         for (subject, _) in self.all_resources()? {
-            let resourcestring = self.resource_to_ad3(&subject, None)?;
-            &file_string.push_str(&*resourcestring);
+            let resourcestring = self.resource_to_ad3(subject, None)?;
+            file_string.push_str(&*resourcestring);
         }
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
             .expect("Unable to create dirs");

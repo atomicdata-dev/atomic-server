@@ -18,46 +18,46 @@ pub struct RenderAtom {
 
 /// Converts an Atomic Value to an HTML string suitable for display
 /// Escapes HTML contents for safe value rendering
-pub fn value_to_html(value: Value) -> String {
+pub fn value_to_html(value: &Value) -> String {
     match value {
-        Value::Integer(i) => return format!("{}", i),
-        Value::String(s) => return format!("{}", escape_html(&*s)),
-        Value::Markdown(s) => return format!("{}", markdown_to_html(&*s, &ComrakOptions::default())),
-        Value::Slug(s) => return format!("{}", escape_html(&*s)).into(),
-        Value::AtomicUrl(s) => return format!("<a href=\"/get?path={}\">{}</a>", escape_html(&*s), escape_html(&*s)).into(),
+        Value::Integer(i) => format!("{}", i),
+        Value::String(s) => escape_html(&*s),
+        Value::Markdown(s) => markdown_to_html(&*s, &ComrakOptions::default()),
+        Value::Slug(s) => escape_html(&*s),
+        Value::AtomicUrl(s) => format!("<a href=\"/get?path={}\">{}</a>", escape_html(&*s), escape_html(&*s)),
         Value::ResourceArray(v) => {
             let mut string = String::from("");
             v.iter().for_each(|item| string.push_str(&*format!("<a href=\"/get?path={}\">{}</a>, ", escape_html(item), escape_html(item))));
-            return string
+            string
         },
-        Value::Date(s) => return format!("{:?}", s).into(),
-        Value::Timestamp(i) => return format!("{}", i).into(),
-        Value::Unsupported(unsup_url) => return format!("{:?}", unsup_url).into(),
-    };
+        Value::Date(s) => format!("{:?}", s),
+        Value::Timestamp(i) => format!("{}", i),
+        Value::Unsupported(unsup_url) => format!("{:?}", unsup_url),
+    }
 }
 
 impl RenderAtom {
     #[allow(dead_code)]
     pub fn from_rich_atom(atom: &RichAtom) -> RenderAtom {
-        return RenderAtom {
+        RenderAtom {
             subject: atom.subject.clone(),
             property: atom.property.clone(),
             value: atom.value.clone(),
             native_value: atom.native_value.clone(),
-            html: value_to_html(atom.native_value.clone()),
+            html: value_to_html(&atom.native_value),
         }
     }
 
-    pub fn from_atom(atom: &Atom, store: &dyn Storelike) -> BetterResult<RenderAtom> {
+    pub fn from_atom(atom: Atom, store: &dyn Storelike) -> BetterResult<RenderAtom> {
         let property = store.get_property(&atom.property)?;
         let native = Value::new(&atom.value, &property.data_type)?;
 
-        return Ok(RenderAtom {
-            subject: atom.subject.clone(),
+        Ok(RenderAtom {
+            subject: atom.subject,
             property,
-            value: atom.value.clone(),
-            native_value: native.clone(),
-            html: value_to_html(native),
+            value: atom.value,
+            html: value_to_html(&native),
+            native_value: native,
         })
     }
 }

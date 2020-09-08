@@ -4,7 +4,7 @@ pub const AD3_MIME: &str = "application/ad3-ndjson";
 
 /// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
 /// Allows comments and empty lines.
-pub fn parse_ad3<'a, 'b>(string: &'b str) -> AtomicResult<Vec<Atom>> {
+pub fn parse_ad3(string: &str) -> AtomicResult<Vec<Atom>> {
     let mut atoms: Vec<Atom> = Vec::new();
     for line in string.lines() {
         match line.chars().next() {
@@ -22,9 +22,9 @@ pub fn parse_ad3<'a, 'b>(string: &'b str) -> AtomicResult<Vec<Atom>> {
                     )
                     .into());
                 }
-                let subject = &string_vec[0];
-                let property = &string_vec[1];
-                let value = &string_vec[2];
+                let subject = string_vec[0].clone();
+                let property = string_vec[1].clone();
+                let value = string_vec[2].clone();
                 atoms.push(Atom::new(subject, property, value));
             }
             Some(char) => {
@@ -37,10 +37,10 @@ pub fn parse_ad3<'a, 'b>(string: &'b str) -> AtomicResult<Vec<Atom>> {
             None => {}
         };
     }
-    return Ok(atoms);
+    Ok(atoms)
 }
 
 pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
     let vector: Vec<String> = serde_json::from_str(string)?;
-    return Ok(vector);
+    Ok(vector)
 }
