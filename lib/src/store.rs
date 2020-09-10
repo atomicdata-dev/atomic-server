@@ -92,7 +92,9 @@ impl Storelike for Store {
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         match self.hashmap.get(resource_url) {
             Some(result) => Ok(result.clone()),
-            None => Err(format!("Could not find resource {}", resource_url).into()),
+            None => {
+                Ok(self.fetch_resource(resource_url)?)
+            },
         }
     }
 }
@@ -158,5 +160,28 @@ mod test {
         store
             .resource_to_json(&String::from(urls::CLASS), 1, true)
             .unwrap();
+    }
+
+    #[test]
+    fn path() {
+        let store = init_store();
+        let res = store.get_path("https://atomicdata.dev/classes/Class shortname", None).unwrap();
+        match res {
+            crate::storelike::PathReturn::Subject(_) => {
+                panic!("Should be an Atom")
+            }
+            crate::storelike::PathReturn::Atom(atom) => {
+                assert!(atom.value == "class");
+            }
+        }
+        let res = store.get_path("https://atomicdata.dev/classes/Class requires 0", None).unwrap();
+        match res {
+            crate::storelike::PathReturn::Subject(sub) => {
+                assert!(sub == urls::SHORTNAME);
+            }
+            crate::storelike::PathReturn::Atom(_) => {
+                panic!("Should be an Subject")
+            }
+        }
     }
 }

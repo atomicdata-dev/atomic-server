@@ -74,8 +74,14 @@ pub trait Storelike {
         let resp = ureq::get(&subject)
             .set("Accept", crate::parse::AD3_MIME)
             .call();
-        let body = &resp.into_string()?;
-        let atoms = parse_ad3(body)?;
+        if resp.status() != 200 {
+            return Err(format!("Could not fetch {}. Status: {}", subject, resp.status()).into());
+        }
+        let body = &resp
+            .into_string()
+            .map_err(|e| format!("Could not parse response {}: {}", subject, e))?;
+        let atoms =
+            parse_ad3(body).map_err(|e| format!("Error parsing body of {}: {}", subject, e))?;
         let mut resource = ResourceString::new();
         for atom in atoms {
             if atom.subject == subject {
@@ -183,8 +189,7 @@ pub trait Storelike {
                 .get(urls::DESCRIPTION)
                 .ok_or(format!("Description not found for property {}", url))?
                 .into(),
-            class_type: property_resource
-                .get(urls::CLASSTYPE_PROP).cloned(),
+            class_type: property_resource.get(urls::CLASSTYPE_PROP).cloned(),
             subject: url.into(),
         };
 
@@ -472,9 +477,7 @@ pub trait Storelike {
                         Ok(resources::resourcestring_to_atoms(sub, resource))
                     }
                 }
-                Err(_) => {
-                    Ok(vec)
-                }
+                Err(_) => Ok(vec),
             },
             None => {
                 for (subj, properties) in self.all_resources()? {
@@ -489,13 +492,17 @@ pub trait Storelike {
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(&self, atomic_path: &str, mapping: &Mapping) -> AtomicResult<PathReturn> {
+    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
-        // For the first item, check the user mapping
-        let id_url: String = mapping
-            .try_mapping_or_url(&String::from(path_items[0]))
-            .ok_or(&*format!("No url found for {}", path_items[0]))?;
+        let first_item = String::from(path_items[0]);
+        let mut id_url = first_item;
+        if mapping.is_some() {
+            // For the first item, check the user mapping
+            id_url = mapping.unwrap()
+                .try_mapping_or_url(&id_url)
+                .ok_or(&*format!("No url found for {}", path_items[0]))?;
+        }
         if path_items.len() == 1 {
             return Ok(PathReturn::Subject(id_url));
         }

@@ -23,7 +23,7 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
       };
 
   // Returns a URL or Value
-  let result = context.store.get_path(path_string, &context.mapping);
+  let result = context.store.get_path(path_string, Some(&context.mapping));
   let store = &context.store;
   match result {
       Ok(res) => match res {
@@ -46,7 +46,7 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
                   println!("{}", out);
               }
               Format::PRETTY => {
-                  pretty_print_resource(&subject, store).unwrap();
+                  pretty_print_resource(&subject, store)?;
               }
           },
           storelike::PathReturn::Atom(atom) => match serialization {

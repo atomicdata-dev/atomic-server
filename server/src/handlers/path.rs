@@ -27,7 +27,7 @@ pub async fn path(
     log::info!("path: {:?}", path);
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let mut builder = HttpResponse::Ok();
-    let path_result = context.store.get_path(&path, &context.mapping)?;
+    let path_result = context.store.get_path(&path, Some(&context.mapping))?;
     match content_type {
         ContentType::JSON => {
             builder.set(http::header::ContentType::json());

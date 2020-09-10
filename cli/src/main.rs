@@ -1,8 +1,6 @@
-use atomic_lib::errors::AtomicResult;
+use atomic_lib::{errors::AtomicResult, Storelike};
 use atomic_lib::mapping::Mapping;
 use atomic_lib::serialize;
-use atomic_lib::Storelike;
-use atomic_lib::Db;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
 use colored::*;
 use dirs::home_dir;
@@ -15,11 +13,10 @@ mod path;
 
 #[allow(dead_code)]
 pub struct Context<'a> {
-    store: Db,
+    store: atomic_lib::Store,
     mapping: Mapping,
     matches: ArgMatches<'a>,
     config_folder: PathBuf,
-    user_store_path: PathBuf,
     user_mapping_path: PathBuf,
 }
 
@@ -127,18 +124,23 @@ fn main() -> AtomicResult<()> {
         mapping.read_mapping_from_file(&user_mapping_path)?;
     }
 
-    // Currenlty uses the Sled store, just like the server.
-    // Unfortunately, these can't be used at the same time!
-    let user_store_path = config_folder.join("db");
-    let store_path = &user_store_path;
-    let store: Db = Db::init(store_path).expect("Failed opening store. Is another program using it?");
+    let _use_db = false;
+
+    if _use_db {
+        // Currenlty uses the Sled store, just like the server.
+        // Unfortunately, these can't be used at the same time!
+        // let user_store_path = config_folder.join("db");
+        // let store_path = &user_store_path;
+        // let store = atomic_lib::Db::init(store_path).expect("Failed opening store. Is another program using it?");
+    }
+    let store = atomic_lib::Store::init();
+
 
     let mut context = Context {
         mapping,
         store,
         matches,
         config_folder,
-        user_store_path: user_store_path.clone(),
         user_mapping_path,
     };
 

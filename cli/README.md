@@ -62,11 +62,11 @@ atomic new class
 - [x] A `get` command for finding resources and parts of data using Atomic Paths with...
   - [x] AD3 Serialization
   - [x] Basic JSON Serialization
-  - [ ] RDF (Turtle / N-Triples / RDF/XML) Serialization
-- [ ] Fetch data from the interwebs with `get` commands
+  - [x] RDF (Turtle / N-Triples / RDF/XML) Serialization
+- [x] Fetch data from the interwebs with `get` commands
 - [ ] Works with [`atomic-server`](../server) (fetches from there, stores there, uses domain etc.)
 - [ ] A `map` command for creating a bookmark and storing a copy
-- [ ] An `edit` command for manipulating existing resources
+- [x] A `delta` command for manipulating existing resources
 
 ## Config
 
