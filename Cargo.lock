@@ -380,7 +380,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.11.0"
+version = "0.11.1"
 dependencies = [
  "atomic_lib",
  "clap",
@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.10.1"
+version = "0.11.0"
 dependencies = [
  "bincode",
  "regex",
