@@ -10,7 +10,7 @@ If you want to share some thoughts on Atomic Data as a standard, please [drop an
 ## Local development
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
-Make sure to `cargo test` before opening a PR!
+Make sure to `cargo test --all` before opening a PR!
 
 ## Publishing to Cargo
 
