@@ -16,9 +16,9 @@ pub async fn get_resource(
     let path = Path::new(_id.as_str());
     let id: &str = path.file_stem().unwrap().to_str().ok_or("Issue with URL")?;
 
-    let content_type = get_accept(req);
+    let mut content_type = get_accept(req);
     if content_type == ContentType::HTML {
-        let _content_type: ContentType = match path.extension() {
+        content_type = match path.extension() {
             Some(extension) => match extension
                 .to_str()
                 .ok_or("Extension cannot be parsed. Try a different URL.")?
