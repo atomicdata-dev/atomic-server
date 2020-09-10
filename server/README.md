@@ -17,8 +17,8 @@ A lightweight HTTP server that shares created Atomic data on the web.
 - [x] Homepage
 - [x] Static asset support for .css / .ico / etc.
 - [x] HTTPS (WIP, kind of working)
+- [x] Content-type negotiation
 - [ ] CSS / design
-- [ ] Content-type negotiation
 - [ ] Collections / dynamic resources
 - [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support
 - [ ] Auth support (WebID-OICD possibly?)
@@ -48,6 +48,28 @@ You can also install with `cargo install atomic-server`, but this binary will al
 - the `.env` from this repo, although the defaults should work just fine.
 - the `/templates` directory
 - the `/static` directory
+
+## Usage
+
+### Get individual resources
+
+You can fetch individual items by sending a GET request to their URL.
+
+```sh
+# Fetch as AD3 triples
+curl -i -H "Accept: application/ad3-ndjson" http://127.0.0.1:8081/test
+# Fetch as JSON-LD
+curl -i -H "Accept: application/ld+json" http://127.0.0.1:8081/test
+# Fetch as JSON
+curl -i -H "Accept: application/json" http://127.0.0.1:8081/test
+```
+
+### Query the store with Triple Pattern Fragments
+
+```sh
+# Fetch as AD3 triples
+curl -i -H "Accept: application/ad3-ndjson" "http://127.0.0.1:8081/tpf?subject=&property=&value=test"
+```
 
 ## Testing
 

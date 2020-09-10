@@ -1,4 +1,4 @@
-use crate::appstate::AppState;
+use crate::{appstate::AppState, content_types::get_accept};
 use crate::{
     content_types::ContentType,
     errors::BetterResult,
@@ -18,10 +18,11 @@ pub struct GetQuery {
 pub async fn path(
     data: web::Data<Mutex<AppState>>,
     query: web::Query<GetQuery>,
+    req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let path = &query.path.clone().unwrap_or_default();
     let context = data.lock().unwrap();
-    let content_type: ContentType = ContentType::HTML;
+    let content_type = get_accept(req);
 
     log::info!("path: {:?}", path);
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data

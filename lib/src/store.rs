@@ -6,9 +6,9 @@
 use crate::errors::AtomicResult;
 use crate::mutations;
 use crate::{
-    ResourceString,
     atoms::Atom,
-    storelike::{Storelike, ResourceCollection},
+    storelike::{ResourceCollection, Storelike},
+    ResourceString,
 };
 use std::{collections::HashMap, fs, path::PathBuf};
 
@@ -75,7 +75,11 @@ impl Storelike for Store {
         Ok(())
     }
 
-    fn add_resource_string(&mut self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
+    fn add_resource_string(
+        &mut self,
+        subject: String,
+        resource: &ResourceString,
+    ) -> AtomicResult<()> {
         self.hashmap.insert(subject, resource.clone());
         Ok(())
     }
@@ -93,7 +97,6 @@ impl Storelike for Store {
     }
 }
 
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -107,7 +110,7 @@ mod test {
         let atoms = parse_ad3(&string).unwrap();
         store.add_atoms(atoms).unwrap();
         store
-}
+    }
 
     #[test]
     fn get() {
@@ -142,7 +145,10 @@ mod test {
     fn get_full_resource_and_shortname() {
         let store = init_store();
         let resource = store.get_resource(urls::CLASS).unwrap();
-        let shortname = resource.get_shortname("shortname", &store).unwrap().to_string();
+        let shortname = resource
+            .get_shortname("shortname", &store)
+            .unwrap()
+            .to_string();
         assert!(shortname == "class");
     }
 

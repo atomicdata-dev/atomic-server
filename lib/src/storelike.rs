@@ -309,7 +309,7 @@ pub trait Storelike {
     fn resource_to_json(
         &self,
         resource_url: &str,
-        _depth: u32,
+        _depth: u8,
         json_ld: bool,
     ) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};

@@ -1,7 +1,7 @@
 use serde::{Deserialize};
 use tera::{Context as TeraCtx};
 use actix_web::{web, http, HttpResponse};
-use crate::appstate::AppState;
+use crate::{appstate::AppState, content_types::get_accept};
 use crate::render::atom::RenderAtom;
 use crate::{content_types::ContentType, errors::BetterResult, helpers::empty_to_nothing};
 use atomic_lib::Storelike;
@@ -18,12 +18,13 @@ pub struct TPFQuery {
 /// Reads optional 'subject' 'property' 'value' from query params, searches the store, return triples.
 pub async fn tpf(
   data: web::Data<Mutex<AppState>>,
-  query: web::Query<TPFQuery>,
+    req: actix_web::HttpRequest,
+    query: web::Query<TPFQuery>,
 ) -> BetterResult<HttpResponse> {
   let context = data.lock().unwrap();
   // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
   let mut builder = HttpResponse::Ok();
-  let content_type = ContentType::HTML;
+  let content_type = get_accept(req);
   let subject = empty_to_nothing(query.subject.clone());
   let property = empty_to_nothing(query.property.clone());
   let value = empty_to_nothing(query.value.clone());
@@ -34,7 +35,9 @@ pub async fn tpf(
           builder.set(
               http::header::ContentType::json()
           );
-          Ok(builder.body(""))
+          // TODO
+          log::error!("Not implemented");
+          Ok(builder.body("Not implemented"))
       }
       ContentType::HTML => {
           let mut renderedatoms: Vec<RenderAtom> = Vec::new();

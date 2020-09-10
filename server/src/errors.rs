@@ -68,7 +68,6 @@ impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
     }
 }
 
-
 impl From<tera::Error> for AppError {
     fn from(error: tera::Error) -> Self {
         AppError {

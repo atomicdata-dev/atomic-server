@@ -1,9 +1,9 @@
-use crate::appstate::AppState;
 use crate::{
-    content_types::ContentType, errors::BetterResult, render::propvals::from_hashmap_resource,
+    appstate::AppState, content_types::get_accept, content_types::ContentType,
+    errors::BetterResult, render::propvals::from_hashmap_resource,
 };
-use atomic_lib::Storelike;
 use actix_web::{http, web, HttpResponse};
+use atomic_lib::Storelike;
 use std::path::Path;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
@@ -11,21 +11,27 @@ use tera::Context as TeraCtx;
 pub async fn get_resource(
     _id: web::Path<String>,
     data: web::Data<Mutex<AppState>>,
+    req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let path = Path::new(_id.as_str());
-    let id = path.file_stem().unwrap().to_str().unwrap();
-    let _content_type: ContentType = match path.extension() {
-        Some(extension) => match extension.to_str().unwrap() {
-            "ad3" => ContentType::AD3,
-            "json" => ContentType::JSON,
-            "jsonld" => ContentType::JSONLD,
-            "html" => ContentType::HTML,
-            _ => ContentType::HTML,
-        },
-        None => ContentType::HTML,
-    };
-    // TODO: Make this listen to Accept headers
-    let content_type = ContentType::AD3;
+    let id: &str = path.file_stem().unwrap().to_str().ok_or("Issue with URL")?;
+
+    let content_type = get_accept(req);
+    if content_type == ContentType::HTML {
+        let _content_type: ContentType = match path.extension() {
+            Some(extension) => match extension
+                .to_str()
+                .ok_or("Extension cannot be parsed. Try a different URL.")?
+            {
+                "ad3" => ContentType::AD3,
+                "json" => ContentType::JSON,
+                "jsonld" => ContentType::JSONLD,
+                "html" => ContentType::HTML,
+                _ => ContentType::HTML,
+            },
+            None => ContentType::HTML,
+        };
+    }
 
     log::info!("id: {:?}", id);
     let context = data.lock().unwrap();
