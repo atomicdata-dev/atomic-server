@@ -2,7 +2,7 @@ use crate::{
     appstate::AppState, content_types::get_accept, content_types::ContentType,
     errors::BetterResult, render::propvals::from_hashmap_resource,
 };
-use actix_web::{http, web, HttpResponse};
+use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
 use std::path::Path;
 use std::sync::Mutex;
@@ -27,6 +27,7 @@ pub async fn get_resource(
                 "json" => ContentType::JSON,
                 "jsonld" => ContentType::JSONLD,
                 "html" => ContentType::HTML,
+                "ttl" => ContentType::TURTLE,
                 _ => ContentType::HTML,
             },
             None => ContentType::HTML,
@@ -35,36 +36,42 @@ pub async fn get_resource(
 
     log::info!("id: {:?}", id);
     let context = data.lock().unwrap();
-    // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
+    let store = &context.store;
+    // This is how locally defined items are stored (which don't know their full subject URL) in Atomic Data
     let subject = format!("_:{}", id);
     let mut builder = HttpResponse::Ok();
     match content_type {
         ContentType::JSON => {
-            builder.set(http::header::ContentType::json());
-            let body = context.store.resource_to_json(&subject, 1, false)?;
+            builder.header("Content-Type", content_type.to_mime());
+            let body = store.resource_to_json(&subject, 1, false)?;
             Ok(builder.body(body))
         }
         ContentType::JSONLD => {
-            builder.set(http::header::ContentType::json());
-            let body = context.store.resource_to_json(&subject, 1, true)?;
+            builder.header("Content-Type", content_type.to_mime());
+            let body = store.resource_to_json(&subject, 1, true)?;
             Ok(builder.body(body))
         }
         ContentType::HTML => {
-            builder.set(http::header::ContentType::html());
+            builder.header("Content-Type", content_type.to_mime());
             let mut tera_context = TeraCtx::new();
-            let resource = context.store.get_resource_string(&subject)?;
+            let resource = store.get_resource_string(&subject)?;
 
-            let propvals = from_hashmap_resource(&resource, &context.store, subject)?;
+            let propvals = from_hashmap_resource(&resource, store, subject)?;
 
             tera_context.insert("resource", &propvals);
             let body = context.tera.render("resource.html", &tera_context).unwrap();
             Ok(builder.body(body))
         }
         ContentType::AD3 => {
-            builder.set(http::header::ContentType::html());
-            let body = context
-                .store
+            builder.header("Content-Type", content_type.to_mime());
+            let body = store
                 .resource_to_ad3(subject, Some(&context.config.local_base_url))?;
+            Ok(builder.body(body))
+        }
+        ContentType::TURTLE | ContentType::NT => {
+            builder.header("Content-Type", content_type.to_mime());
+            let atoms = atomic_lib::resources::resourcestring_to_atoms(&subject,store.get_resource_string(&subject)?);
+            let body = atomic_lib::serialize::serialize_atoms_to_n_triples(atoms, store)?;
             Ok(builder.body(body))
         }
     }

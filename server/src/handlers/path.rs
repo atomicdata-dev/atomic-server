@@ -29,16 +29,6 @@ pub async fn path(
     let mut builder = HttpResponse::Ok();
     let path_result = context.store.get_path(&path, Some(&context.mapping))?;
     match content_type {
-        ContentType::JSON => {
-            builder.set(http::header::ContentType::json());
-            //   let body = context.store.resource_to_json(&subject, 1)?;
-            Ok(builder.body("Not implemented"))
-        }
-        ContentType::JSONLD => {
-            builder.set(http::header::ContentType::json());
-            //   let body = context.store.resource_to_json(&subject, 1)?;
-            Ok(builder.body("Not implemented"))
-        }
         ContentType::HTML => {
             let mut propvals: Vec<PropVal> = Vec::new();
             match path_result {
@@ -65,10 +55,9 @@ pub async fn path(
             let body = context.tera.render("path.html", &tera_context).unwrap();
             Ok(builder.body(body))
         }
-        ContentType::AD3 => {
+        unsupported => {
             builder.set(http::header::ContentType::html());
-            //   let body = context.store.resource_to_ad3(&subject, Some(&context.config.domain))?;
-            Ok(builder.body("Not implemented"))
+            Ok(builder.body(format!("/path endpoint not yet implemented for {}", unsupported.to_mime())))
         }
     }
 }

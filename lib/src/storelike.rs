@@ -59,7 +59,7 @@ pub trait Storelike {
     ) -> AtomicResult<()>;
 
     /// Returns a hashmap ResourceString with string Values
-    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString>;
+    fn get_resource_string(&self, subject: &str) -> AtomicResult<ResourceString>;
 
     /// Adds a Resource to the store
     fn add_resource(&mut self, resource: &Resource) -> AtomicResult<()> {

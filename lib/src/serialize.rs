@@ -69,8 +69,6 @@ fn escape_turtle_value (string: &str) -> &str {
     string
 }
 
-pub const SERIALIZE_OPTIONS: [&str; 5] = ["pretty", "json", "jsonld", "ad3", "nt"];
-
 /// Should list all the supported serialization formats
 pub enum Format {
     JSON,

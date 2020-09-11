@@ -1,10 +1,9 @@
+use path::SERIALIZE_OPTIONS;
 use atomic_lib::{errors::AtomicResult, Storelike};
 use atomic_lib::mapping::Mapping;
-use atomic_lib::serialize;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
 use colored::*;
 use dirs::home_dir;
-use serialize::{SERIALIZE_OPTIONS, serialize_atoms_to_ad3};
 use std::path::PathBuf;
 
 mod delta;
@@ -86,9 +85,6 @@ fn main() -> AtomicResult<()> {
             SubCommand::with_name("delta")
                     .about("Update the store using an single Delta",
                     )
-                    .after_help("\
-                    Use a dot to indicate that you don't need to filter. \
-                    ")
                 .arg(Arg::with_name("method")
                     .help("Method URL or bookmark, describes how the resource will be changed. Only suppports Insert at the time")
                     .required(true)
@@ -157,7 +153,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()>{
             list(context);
         }
         Some("get") => {
-            path::get(context)?;
+            path::get_path(context)?;
         }
         Some("tpf") => {
             tpf(context)?;
@@ -218,7 +214,7 @@ fn tpf(context: &mut Context) -> AtomicResult<()>{
         .store
         .tpf(subject, property, value)
         .expect("TPF failed");
-    let serialized = serialize_atoms_to_ad3(found_atoms)?;
+    let serialized = atomic_lib::serialize::serialize_atoms_to_ad3(found_atoms)?;
     println!("{}", serialized);
     Ok(())
 }

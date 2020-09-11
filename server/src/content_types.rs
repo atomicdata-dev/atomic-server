@@ -3,7 +3,30 @@ pub enum ContentType {
     JSON,
     JSONLD,
     HTML,
+    TURTLE,
+    NT,
     AD3,
+}
+
+const MIME_AD3: &str = "application/ad3-ndjson";
+const MIME_HTML: &str = "text/html";
+const MIME_XML: &str = "application/xml";
+const MIME_JSON: &str = "application/json";
+const MIME_JSONLD: &str = "application/ld+json";
+const MIME_TURTLE: &str = "text/turtle";
+const MIME_NT: &str = "application/n-triples";
+
+impl ContentType {
+    pub fn to_mime(&self) -> &str {
+        match self {
+            ContentType::JSON => MIME_JSON,
+            ContentType::JSONLD => MIME_JSONLD,
+            ContentType::HTML => MIME_HTML,
+            ContentType::TURTLE => MIME_TURTLE,
+            ContentType::AD3 => MIME_AD3,
+            ContentType::NT => MIME_NT
+        }
+    }
 }
 
 /// Returns the preffered content type.
@@ -18,19 +41,19 @@ pub fn get_accept(req: actix_web::HttpRequest) -> ContentType {
 /// Defaults to HTML
 fn parse_accept_header(header: &str) -> ContentType {
     for mimepart in header.split(',') {
-        if mimepart.contains("application/ad3-ndjson") {
+        if mimepart.contains(MIME_AD3) {
             return ContentType::AD3
         }
-        if mimepart.contains("text/html") {
+        if mimepart.contains(MIME_HTML) {
             return ContentType::HTML
         }
-        if mimepart.contains("application/xml") {
+        if mimepart.contains(MIME_XML) {
             return ContentType::HTML
         }
-        if mimepart.contains("application/json") {
+        if mimepart.contains(MIME_JSON) {
             return ContentType::JSON
         }
-        if mimepart.contains("application/ld+json") {
+        if mimepart.contains(MIME_JSONLD) {
             return ContentType::JSONLD
         }
     }

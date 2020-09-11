@@ -1,9 +1,12 @@
 use crate::{pretty_print_resource, Context};
-use atomic_lib::{storelike, serialize, Storelike, errors::AtomicResult, Atom};
+use atomic_lib::{storelike, serialize, Storelike, errors::AtomicResult, Atom, resources::resourcestring_to_atoms};
 use serialize::Format;
 
+/// List of serialization options. Should match /path.rs/get
+pub const SERIALIZE_OPTIONS: [&str; 7] = ["pretty", "json", "jsonld", "ad3", "nt", "turtle", "n3"];
+
 /// Resolves an Atomic Path query
-pub fn get(context: &mut Context) -> AtomicResult<()> {
+pub fn get_path(context: &mut Context) -> AtomicResult<()> {
   let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
   let path_string = subcommand_matches
       .value_of("path")
@@ -41,7 +44,9 @@ pub fn get(context: &mut Context) -> AtomicResult<()> {
                   println!("{}", out);
               }
               Format::NT => {
-                  let atoms = context.store.tpf(Some(&subject), None, None)?;
+                //   let atoms = store.tpf(Some(&subject), None, None)?;
+                  let resource = store.get_resource_string(&subject)?;
+                  let atoms = resourcestring_to_atoms(&subject, resource);
                   let out = serialize::serialize_atoms_to_n_triples(atoms, store)?;
                   println!("{}", out);
               }
