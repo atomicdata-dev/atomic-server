@@ -1,21 +1,31 @@
 # Atomic
 
+[![Discord chat][discord-badge]][discord-url]
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 Create, share, fetch and model linked [Atomic Data](https://docs.atomicdata.dev)!
 This repo consists of three components: A library, a server and a CLI.
 
 ## `atomic-server`
 
+[![crates.io](https://meritbadge.herokuapp.com/atomic-server)](https://crates.io/crates/atomic-server)
+
 The easiest way to share Atomic Data on the web.
 
 [→ Read more](server/README.md)
 
-## `atomic` (CLI)
+## `atomic-cli` (CLI)
+
+[![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
 
 A simple Command Line Interface tool to fetch, create and query Atomic Data.
 
 [→ Read more](cli/README.md)
 
 ## `atomic-lib`
+
+[![crates.io](https://meritbadge.herokuapp.com/atomic_lib)](https://crates.io/crates/atomic_lib)
+[![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
 
 A Rust library to serialize, parse, store, convert, validate and store Atomic Data.
 
@@ -39,4 +49,8 @@ This repository serves the following purposes:
 ## Contribute
 
 Issues and PR's are welcome!
+And join our [Discord][discord-url]!
 [Read more.](CONTRIBUTE.md)
+
+[discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
+[discord-url]: https://discord.gg/a72Rv2P

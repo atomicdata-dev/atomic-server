@@ -1,5 +1,9 @@
 # `atomic` (CLI)
 
+[![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
+[![Discord chat][discord-badge]][discord-url]
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 _Status: pre-alpha_
 
 A command-line application to create, read and interact with Atomic Data.
@@ -65,8 +69,9 @@ atomic new class
   - [x] RDF (Turtle / N-Triples / RDF/XML) Serialization
 - [x] Fetch data from the interwebs with `get` commands
 - [ ] Works with [`atomic-server`](../server) (fetches from there, stores there, uses domain etc.)
-- [ ] A `map` command for creating a bookmark and storing a copy
 - [x] A `delta` command for manipulating existing resources
+- [ ] Tests for the cli
+- [ ] A `map` command for creating a bookmark and storing a copy
 
 ## Config
 
@@ -107,3 +112,6 @@ $ atomic install https://atomicdata.dev/ontologies/meetings
 # when no URL is given, use the Ontola repo's ontologies
 $ atomic install meetings
 ```
+
+[discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
+[discord-url]: https://discord.gg/a72Rv2P

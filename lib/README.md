@@ -1,5 +1,10 @@
 # atomic-lib
 
+[![crates.io](https://meritbadge.herokuapp.com/atomic_lib)](https://crates.io/crates/atomic_lib)
+[![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
+[![Discord chat][discord-badge]][discord-url]
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 _Status: pre-alpha_
 
 Rust library for using [Atomic Data](https://docs.atomicdata.dev).
@@ -9,7 +14,7 @@ Rust library for using [Atomic Data](https://docs.atomicdata.dev).
 The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) applications both use this `atomic-lib` library.
 
 - [x] In-memory store for getting / setting data (`Store`)
-- [x] On disk ACID compliant store / database (`Db`)
+- [x] On disk ACID compliant store / database (`Db`, uses Sled)
 - [x] [Path](https://docs.atomicdata.dev/core/paths.html) traversal
 - [x] Parse and serialize [AD3](https://docs.atomicdata.dev/core/serialization.html)
 - [x] JSON + JSON-LD Serialization
@@ -19,6 +24,7 @@ The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) 
 - [x] Mutations (linked-delta's)
 - [ ] RDF (turtle / N-Triples) Serialization
 - [ ] Strategy for extending datatypes (Currently uses an `enum`)
+- [ ] Async resource fetching (faster)
 
 ## Usage
 
@@ -45,3 +51,16 @@ fn main() {
   assert!(my_value == "Test")
 }
 ```
+
+## Features
+
+Some features of this library are optional, to minimize bundle size and compile times.
+
+**db**
+
+The db features adds persistence, which means that you can store stuff on a HDD / SSD.
+It uses [Sled], a performant, embedded key-value store.
+
+**rdf**
+
+If you need RDF serialization options, use this feature.

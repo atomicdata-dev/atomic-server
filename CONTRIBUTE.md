@@ -4,6 +4,7 @@ I'm glad you're reading this!
 If you encounter issues, add them to the Github issue tracker.
 Same goes for feature requests.
 PR's are welcome, too!
+And join our [Discord](https://discord.gg/a72Rv2P)!
 
 If you want to share some thoughts on Atomic Data as a standard, please [drop an issue in the Atomic Data docs repo](https://github.com/ontola/atomic-data/issues).
 
