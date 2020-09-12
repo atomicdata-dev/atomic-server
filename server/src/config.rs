@@ -21,9 +21,9 @@ pub struct Config {
     pub port: u32,
     /// The port where the HTTPS app is available (defaults to 443)
     pub port_https: u32,
-    /// Where the .ad3 store is located
+    /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
     pub store_path: PathBuf,
-    /// The IP address of the serer. (defaults to 127.0.0.1)
+    /// The IP address of the serer. (defaults to 0.0.0.0)
     pub ip: IpAddr,
     /// If we're using SSL or plaintext HTTP.
     /// Is disabled when using cert_init
@@ -32,8 +32,6 @@ pub struct Config {
     pub key_path: String,
     /// Path where ssl certificate should be stored for HTTPS. (defaults to .ssl/cert.pem)
     pub cert_path: String,
-    /// This is only true when the Let's Encrypt initialization is running
-    pub cert_init: bool,
 }
 
 /// Creates the server config, reads .env values and sets defaults
@@ -43,9 +41,8 @@ pub fn init() -> Config {
     let mut domain = String::from("localhost");
     let cert_path = String::from(".ssl/cert.pem");
     let key_path = String::from(".ssl/key.pem");
-    let mut cert_init = false;
     let mut https = false;
-    let mut ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    let mut ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
     let mut port = 80;
     let mut port_https = 443;
     let mut store_path = home_dir()
@@ -79,23 +76,14 @@ pub fn init() -> Config {
             "ATOMIC_HTTPS" => {
                 https = value.parse().expect("ATOMIC_HTTPS is not a boolean");
             }
-            "ATOMIC_CERT_INIT" => {
-                cert_init = value.parse().expect("ATOMIC_CERT_INIT is not a boolean");
-            }
             _ => {}
         }
-    }
-
-    // Always disable HTTPS when initializing certificates
-    if cert_init {
-        https = false;
     }
 
     let schema = if https {"https"} else {"http"};
     let local_base_url = format!("{}://{}/", schema, domain);
 
     Config {
-        cert_init,
         cert_path,
         email,
         development,
