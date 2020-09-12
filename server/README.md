@@ -85,7 +85,6 @@ To setup HTTPS, we'll need to set some environment variables.
 Open `.env` and set:
 
 ```env
-ATOMIC_CERT_INIT=true
 ATOMIC_EMAIL=youremail@example.com
 ATOMIC_DOMAIN=example.com
 ```
@@ -93,7 +92,7 @@ ATOMIC_DOMAIN=example.com
 Run the server `cargo run`.
 Make sure the server is accessible at your domain, because Let's Encrypt will send a request to this server's `/.well-known` directory, w
 It will now initialize the certificate.
-Read the logs, watch for errors
+Read the logs, watch for errors.
 
 ## Testing
 

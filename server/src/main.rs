@@ -1,7 +1,6 @@
 use actix_web::{middleware, web, App, HttpServer};
 use std::{io, sync::Mutex};
 // use actix_web_middleware_redirect_https::RedirectHTTPS;
-
 mod appstate;
 mod config;
 mod errors;
@@ -34,29 +33,37 @@ async fn main() -> io::Result<()> {
             .service(web::scope("/").service(web::resource("").route(web::get().to(handlers::home::home))))
     });
 
-    if config.cert_init {
-        log::warn!("ATOMIC_CERT_INIT is enabled, server running in HTTP mode, running Let's Encrypt Certificate initialization...");
-        let http_endpoint = format!("{}:{}", config.ip, config.port);
-        server
-            .bind(&http_endpoint).expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
-            .run();
-        crate::https::request_cert(&config).expect("Certification init failed.");
-        return Ok(())
-    }
-
     if config.https {
+        // If there is no certificate file, start initialization
+        let cert_path_is_some = std::fs::File::open(&config.cert_path).is_ok();
+        if !cert_path_is_some {
+            log::warn!("ATOMIC_CERT_INIT is enabled, server running in HTTP mode, running Let's Encrypt Certificate initialization...");
+            let http_endpoint = format!("{}:{}", config.ip, config.port);
+            let init_server = HttpServer::new(move || {
+                App::new()
+                    .wrap(middleware::Logger::default())
+                    .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
+            });
+            let running_server = init_server
+                .bind(&http_endpoint).expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
+                .run();
+            crate::https::request_cert(&config).expect("Certification init failed.");
+            running_server.stop(true).await;
+        }
         let https_config = crate::https::get_ssl_config(&config)
             .expect("HTTPS SSL Configuration with Let's Encrypt failed.");
         let endpoint = format!("{}:{}", config.ip, config.port_https);
         server.bind_rustls(&endpoint, https_config).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
             .run()
-            .await
+            .await?;
+            Ok(())
     } else {
         let endpoint = format!("{}:{}", config.ip, config.port);
         server
-        .bind(&format!("{}:{}", config.ip, config.port)).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
-        .run()
-        .await
+            .bind(&format!("{}:{}", config.ip, config.port)).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
+            .run()
+            .await?;
+            Ok(())
     }
 
 }
