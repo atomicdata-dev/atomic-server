@@ -25,8 +25,10 @@ pub struct Config {
     /// If we're using SSL or plaintext HTTP.
     /// Is disabled when using cert_init
     pub https: bool,
-    pub key_path: Option<String>,
-    pub cert_path: Option<String>,
+    /// Path where ssl key should be stored for HTTPS. (defaults to .ssl/key.pem)
+    pub key_path: String,
+    /// Path where ssl certificate should be stored for HTTPS. (defaults to .ssl/cert.pem)
+    pub cert_path: String,
     /// This is only true when the Let's Encrypt initialization is running
     pub cert_init: bool,
 }
@@ -36,8 +38,8 @@ pub fn init() -> Config {
     dotenv().ok();
     let development = true;
     let mut domain = String::from("localhost");
-    let cert_path = None;
-    let key_path = None;
+    let cert_path = String::from(".ssl/cert.pem");
+    let key_path = String::from(".ssl/key.pem");
     let mut cert_init = false;
     let mut https = false;
     let mut ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));

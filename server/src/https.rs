@@ -120,11 +120,9 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     log::info!("Downloading certificate...");
     let cert = ord_cert.download_and_save_cert()?;
 
-    let cert_path = ".ssl/cert.pem";
-    let key_path = ".ssl/key.pem";
-
-    fs::write(cert_path, cert.certificate()).expect("Unable to write file");
-    fs::write(key_path, cert.private_key()).expect("Unable to write file");
+    fs::write(config.cert_path.clone(), cert.certificate()).expect("Unable to write file");
+    fs::write(config.key_path.clone(), cert.private_key()).expect("Unable to write file");
+    log::info!("Written cert keys to ...");
 
     Ok(())
 }
@@ -133,9 +131,9 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 pub fn get_ssl_config(config: &crate::config::Config) -> Result<ServerConfig, Error> {
     let mut ssl_config = ServerConfig::new(NoClientAuth::new());
     let cert_file =
-        &mut BufReader::new(File::open(config.cert_path.clone().expect("No cert_path")).unwrap());
+        &mut BufReader::new(File::open(config.cert_path.clone()).unwrap());
     let key_file =
-        &mut BufReader::new(File::open(config.key_path.clone().expect("No cert_path")).unwrap());
+        &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
     let mut keys = rsa_private_keys(key_file).unwrap();
     ssl_config
