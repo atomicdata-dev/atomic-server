@@ -22,9 +22,12 @@ The [`atomic` CLI](../cli/readme.md) and [`atomic-server`](../server/readme.md) 
 - [x] Resolve / parse mappings (bookmarks)
 - [x] Validate Atomic Graphs
 - [x] Mutations (linked-delta's)
-- [ ] RDF (turtle / N-Triples) Serialization
+- [x] RDF (turtle / N-Triples) Serialization
 - [ ] Strategy for extending datatypes (Currently uses an `enum`)
+- [x] TPF queries
+- [ ] Performant TPF queries from Db (create index)
 - [ ] Async resource fetching (faster)
+- [ ] Store - server write interaction (update resource, send deltas to server)
 
 ## Usage
 

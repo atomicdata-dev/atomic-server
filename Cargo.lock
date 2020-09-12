@@ -585,10 +585,11 @@ version = "0.11.0"
 dependencies = [
  "bincode",
  "regex",
+ "rio_api",
+ "rio_turtle",
  "serde",
  "serde_json",
  "sled",
- "sophia",
  "ureq",
 ]
 
@@ -1702,12 +1703,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mownstr"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "342a407881dbd200f13a08ff8a5413232e035ed7ba56dba8c81137e3afce4f84"
-
-[[package]]
 name = "net2"
 version = "0.2.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1826,6 +1821,12 @@ name = "oxilangtag"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91b91e9ce02b749ae761eaa3686f24bc97d5b75ca9a17c774f5de4e5d788d451"
+
+[[package]]
+name = "oxiri"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8e54fb37480ffa01a9af93f991ba229b3091f2e6ac84c8f6df2c509356cc473"
 
 [[package]]
 name = "parking_lot"
@@ -2086,12 +2087,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 
 [[package]]
-name = "resiter"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd69ab1e90258b7769f0b5c46bfd802b8206d0707ced4ca4b9d5681b744de1be"
-
-[[package]]
 name = "resolv-conf"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2118,16 +2113,18 @@ dependencies = [
 
 [[package]]
 name = "rio_api"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "454f750912d688cf950ff54c65f63345523385b9a86da8f8b8e85df67f10baf6"
+checksum = "5f3057bb5d32a656ed84e7680b0ff792a0d0a9f528749930bfd8701625f7b387"
 
 [[package]]
 name = "rio_turtle"
-version = "0.4.2"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "405bb0dc1c95fea106ac223626598b6b1d9b838cec38117af149ae7c64922da6"
+checksum = "fbeb18a70b16b9497be10e5562b059dac70298aa8db061dcba2b4d6b6c5785c8"
 dependencies = [
+ "oxilangtag",
+ "oxiri",
  "rio_api",
 ]
 
@@ -2373,60 +2370,6 @@ dependencies = [
  "libc",
  "redox_syscall",
  "winapi 0.3.9",
-]
-
-[[package]]
-name = "sophia"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8319fc11ea4492dde0c5051547be44108ed586a098e7542c024293eecc419c77"
-dependencies = [
- "resiter",
- "rio_api",
- "rio_turtle",
- "sophia_api",
- "sophia_term",
- "thiserror",
-]
-
-[[package]]
-name = "sophia_api"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6709ffef59ae501289e7c4b9cff5c42a9571687d0a0e5358ed3636351abc883b"
-dependencies = [
- "mownstr",
- "resiter",
- "sophia_iri",
- "thiserror",
-]
-
-[[package]]
-name = "sophia_iri"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cf616688b714ead8dde2e0d39170a90135159c57f75b63bc5679ef1c8455c50"
-dependencies = [
- "lazy_static",
- "mownstr",
- "regex",
- "thiserror",
-]
-
-[[package]]
-name = "sophia_term"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "882054282720538f6744dad692a37ab2eb9f685a70d4bcb11bc4398c4086dd95"
-dependencies = [
- "lazy_static",
- "mownstr",
- "oxilangtag",
- "regex",
- "sophia_api",
- "sophia_iri",
- "thiserror",
- "weak-table",
 ]
 
 [[package]]
@@ -3135,12 +3078,6 @@ name = "wasm-bindgen-shared"
 version = "0.2.67"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93b162580e34310e5931c4b792560108b10fd14d64915d7fff8ff00180e70092"
-
-[[package]]
-name = "weak-table"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a8f3bf74f2d43500dea6a8291b6ac943e3465ea9936b94bd017e61b7b21dd01"
 
 [[package]]
 name = "web-sys"

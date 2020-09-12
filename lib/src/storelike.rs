@@ -2,10 +2,11 @@ use crate::errors::AtomicResult;
 use crate::urls;
 use crate::{
     delta::Delta,
+    datatype::{match_datatype, DataType},
     mapping::Mapping,
     parse::parse_ad3,
     resources::{self, ResourceString},
-    values::{match_datatype, DataType, Value},
+    values::Value,
     Atom, Resource, RichAtom,
 };
 use serde::{Deserialize, Serialize};

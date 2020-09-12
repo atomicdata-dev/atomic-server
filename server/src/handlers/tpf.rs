@@ -63,7 +63,7 @@ pub async fn tpf(
         }
         ContentType::TURTLE | ContentType::NT => {
             builder.header("Content-Type", content_type.to_mime());
-            let bod_string = atomic_lib::serialize::serialize_atoms_to_n_triples(atoms, store)?;
+            let bod_string = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(bod_string))
         }
     }

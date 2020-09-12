@@ -1,6 +1,5 @@
-
-use crate::errors::AtomicResult;
-use crate::{Storelike, Atom, urls};
+use crate::{datatype::DataType, errors::AtomicResult};
+use crate::{Atom, Storelike};
 
 pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
     let string = serde_json::to_string(items)?;
@@ -17,56 +16,51 @@ pub fn serialize_json_array_owned(items: &[String]) -> AtomicResult<String> {
 pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
     let mut string = String::new();
     for atom in atoms {
-        let mut ad3_atom = serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value])?;
+        let mut ad3_atom =
+            serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value])?;
         ad3_atom.push_str("\n");
         string.push_str(&*ad3_atom);
     }
     Ok(string)
 }
 
-/// N-Triples serialization.
-/// Note that N-Triples is also valid Turtle, N3 and Notation3.
-/// This is an expensive function, as every atom's datatype has to be fetched.
-pub fn serialize_atoms_to_n_triples(atoms: Vec<Atom>, store: &dyn Storelike) -> AtomicResult<String> {
-    eprintln!("CAUTION: N-Triples serialization is not implemented correctly, values are not escaped correctly.");
-    if atoms.is_empty() {
-        return Err("No atoms to serialize".into())
-    }
-    let mut string = String::new();
+#[cfg(feature = "rdf")]
+/// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
+pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &dyn Storelike) -> AtomicResult<String> {
+    use rio_api::formatter::TriplesFormatter;
+    use rio_api::model::{Literal, NamedNode, Term, Triple};
+    use rio_turtle::NTriplesFormatter;
+
+    let mut formatter = NTriplesFormatter::new(Vec::default());
     for atom in atoms {
+        let subject = NamedNode { iri: &atom.subject }.into();
+        let predicate = NamedNode {
+            iri: &atom.property,
+        };
         let datatype = store.get_property(&atom.property)?.data_type;
-
-        // TODO: Implement this!
-        let esc_value = escape_turtle_value(&atom.value);
-
-        // e.g. "That Seventies Show"^^<http://www.w3.org/2001/XMLSchema#string>
-        let dtstring = |dt: &str| {
-            format!("\"{}\"^^<{}>", esc_value, dt)
+        let value = &atom.value;
+        let datatype_url = datatype.to_string();
+        let object: Term = match &datatype {
+            DataType::AtomicUrl => NamedNode { iri: value }.into(),
+            // Maybe these should be converted to RDF collections / lists?
+            // DataType::ResourceArray => {}
+            DataType::String => Literal::Simple { value }.into(),
+            _dt => Literal::Typed {
+                value,
+                datatype: NamedNode { iri: &datatype_url },
+            }
+            .into(),
         };
 
-        let value = match datatype {
-            crate::values::DataType::AtomicUrl => format!("<{}>", esc_value),
-            crate::values::DataType::Date => dtstring(urls::DATE),
-            crate::values::DataType::Integer => dtstring(urls::INTEGER),
-            crate::values::DataType::Markdown => dtstring(urls::MARKDOWN),
-            crate::values::DataType::ResourceArray => dtstring(urls::RESOURCE_ARRAY),
-            crate::values::DataType::Slug => dtstring(urls::SLUG),
-            crate::values::DataType::String => format!("\"{}\"", esc_value),
-            crate::values::DataType::Timestamp => dtstring(urls::TIMESTAMP),
-            crate::values::DataType::Unsupported(uns) => dtstring(&uns),
-        };
-        let ad3_atom = format!("<{}> <{}> {} . \n", atom.subject, atom.property, value);
-        string.push_str(&*ad3_atom);
+        formatter.format(&Triple {
+            subject,
+            predicate,
+            object,
+        })?
     }
-    Ok(string)
-}
-
-/// SHOULD escape turtle value strings
-/// Probably will need to use an external library...
-// US-ASCII
-// https://www.w3.org/TR/rdf-testcases/#ntriples
-fn escape_turtle_value (string: &str) -> &str {
-    string
+    let turtle = formatter.finish();
+    let out = String::from_utf8(turtle)?;
+    Ok(out)
 }
 
 /// Should list all the supported serialization formats
@@ -76,4 +70,29 @@ pub enum Format {
     AD3,
     NT,
     PRETTY,
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "rdf")]
+    fn serialize_ntriples() {
+        use crate::Storelike;
+        let mut store = crate::Store::init();
+        store.populate().unwrap();
+        let subject = crate::urls::DESCRIPTION;
+        let resource = store.get_resource_string(subject).unwrap();
+        let atoms = crate::resources::resourcestring_to_atoms(subject, resource);
+        let serialized = atoms_to_ntriples(atoms, &store).unwrap();
+        let _out = r#"
+        <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/description> "A textual description of the thing."^^<https://atomicdata.dev/datatypes/markdown> .
+<https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/isA> "[\"https://atomicdata.dev/classes/Property\"]"^^<https://atomicdata.dev/datatypes/resourceArray> .
+<https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/datatype> <https://atomicdata.dev/datatypes/markdown> .
+<https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/shortname> "description"^^<https://atomicdata.dev/datatypes/slug> ."#;
+        assert!(serialized.contains(r#""description"^^<https://atomicdata.dev/datatypes/slug>"#));
+        // This could fail when the `description` resource changes
+        assert!(serialized.lines().count() == 4);
+    }
 }

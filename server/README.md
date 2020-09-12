@@ -11,11 +11,12 @@ A lightweight HTTP server that shares created Atomic data on the web.
 ## Progress
 
 - [x] Respond to GET request for individual resources
-- [x] URL extension recognition
+- [x] URL extension recognition (.json, .ad3, .nt, etc.)
 - [x] HTML serialization
 - [x] JSON serialization
 - [x] JSON-LD serialization
 - [x] AD3 serialization
+- [ ] RDF (Turtle / N-Triples) serialization
 - [x] Basic error handling
 - [x] TPF endpoint
 - [x] Homepage
@@ -66,6 +67,8 @@ curl -i -H "Accept: application/ad3-ndjson" http://127.0.0.1:8081/test
 curl -i -H "Accept: application/ld+json" http://127.0.0.1:8081/test
 # Fetch as JSON
 curl -i -H "Accept: application/json" http://127.0.0.1:8081/test
+# Fetch as Turtle / N3
+curl -i -H "Accept: text/turtle" http://127.0.0.1:8081/test
 ```
 
 ### Query the store with Triple Pattern Fragments

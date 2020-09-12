@@ -37,6 +37,7 @@ pub mod atoms;
 #[cfg(feature = "db")]
 pub mod db;
 pub mod delta;
+pub mod datatype;
 pub mod errors;
 pub mod fetcher;
 pub mod mapping;

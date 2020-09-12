@@ -154,6 +154,16 @@ impl Resource {
         }
         hashmap
     }
+
+    // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
+    // pub fn to_atoms(&self) -> Vec<RichAtom> {
+    //     let mut atoms: Vec<RichAtom> = Vec::new();
+    //     for (property, value) in self.propvals.iter() {
+    //         let atom = RichAtom::new(self.subject, property, value).unwrap();
+    //         atoms.push(value);
+    //     }
+    //     atoms
+    // }
 }
 
 /// A plainstring hashmap, which represents an (unvalidated?) Atomic Resource.

@@ -47,7 +47,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
                 //   let atoms = store.tpf(Some(&subject), None, None)?;
                   let resource = store.get_resource_string(&subject)?;
                   let atoms = resourcestring_to_atoms(&subject, resource);
-                  let out = serialize::serialize_atoms_to_n_triples(atoms, store)?;
+                  let out = serialize::atoms_to_ntriples(atoms, store)?;
                   println!("{}", out);
               }
               Format::PRETTY => {
@@ -65,7 +65,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
               Format::NT => {
                   let mut atoms: Vec<Atom> = Vec::new();
                   atoms.push(Atom::from(*atom));
-                  let out = serialize::serialize_atoms_to_n_triples(atoms, store)?;
+                  let out = serialize::atoms_to_ntriples(atoms, store)?;
                   println!("{}", out);
               }
               Format::PRETTY => println!("{:?}", &atom.native_value),

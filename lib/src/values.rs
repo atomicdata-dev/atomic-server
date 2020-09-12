@@ -1,5 +1,4 @@
-use crate::errors::AtomicResult;
-use crate::urls;
+use crate::{errors::AtomicResult, datatype::DataType, datatype::match_datatype};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -15,19 +14,6 @@ pub enum Value {
     String(String),
     Timestamp(i64),
     Unsupported(UnsupportedValue),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum DataType {
-    AtomicUrl,
-    Date,
-    Integer,
-    Markdown,
-    ResourceArray,
-    Slug,
-    String,
-    Timestamp,
-    Unsupported(String),
 }
 
 /// When the Datatype of a Value is not handled by this library
@@ -87,20 +73,6 @@ impl Value {
     /// Returns a new Value, accepts a datatype string
     pub fn new_from_string(value: &str, datatype: &str) -> AtomicResult<Value> {
         Value::new(value, &match_datatype(datatype))
-    }
-}
-
-pub fn match_datatype(string: &str) -> DataType {
-    match string {
-        urls::INTEGER => DataType::Integer,
-        urls::STRING => DataType::String,
-        urls::MARKDOWN => DataType::Markdown,
-        urls::SLUG => DataType::Slug,
-        urls::ATOMIC_URL => DataType::AtomicUrl,
-        urls::RESOURCE_ARRAY => DataType::ResourceArray,
-        urls::DATE => DataType::Date,
-        urls::TIMESTAMP => DataType::Timestamp,
-        unsupported_datatype => DataType::Unsupported(unsupported_datatype.into()),
     }
 }
 

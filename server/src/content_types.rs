@@ -56,6 +56,9 @@ fn parse_accept_header(header: &str) -> ContentType {
         if mimepart.contains(MIME_JSONLD) {
             return ContentType::JSONLD
         }
+        if mimepart.contains(MIME_TURTLE) {
+            return ContentType::TURTLE
+        }
     }
     log::info!("Unknown Accept header, defaut to HTML: {}", header);
     ContentType::HTML

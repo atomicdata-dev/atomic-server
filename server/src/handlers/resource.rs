@@ -8,6 +8,8 @@ use std::path::Path;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
 
+/// Respond to a single resource.
+/// The URL should match the Subject of the resource.
 pub async fn get_resource(
     _id: web::Path<String>,
     data: web::Data<Mutex<AppState>>,
@@ -71,7 +73,7 @@ pub async fn get_resource(
         ContentType::TURTLE | ContentType::NT => {
             builder.header("Content-Type", content_type.to_mime());
             let atoms = atomic_lib::resources::resourcestring_to_atoms(&subject,store.get_resource_string(&subject)?);
-            let body = atomic_lib::serialize::serialize_atoms_to_n_triples(atoms, store)?;
+            let body = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(body))
         }
     }
