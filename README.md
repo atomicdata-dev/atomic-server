@@ -10,11 +10,15 @@ This repo consists of three components: A library, a server and a CLI.
 
 [![crates.io](https://meritbadge.herokuapp.com/atomic-server)](https://crates.io/crates/atomic-server)
 
-The easiest way to share Atomic Data on the web.
+The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
+
+- Host Atomic data over HTTP or HTTPS (built-in!)
+- No runtime dependencies, crazy fast, runs on all platforms (including on your Raspberry Pi)
+- Serialization to HTML, JSON, RDF (N-Triples / Turtle / JSON-LD) and AD3
 
 [→ Read more](server/README.md)
 
-## `atomic-cli` (CLI)
+## `atomic-cli`
 
 [![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
 
@@ -28,6 +32,7 @@ A simple Command Line Interface tool to fetch, create and query Atomic Data.
 [![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
 
 A Rust library to serialize, parse, store, convert, validate and store Atomic Data.
+Powers `atomic-cli` and `atomic-server`.
 
 [→ Read more](lib/README.md)
 
