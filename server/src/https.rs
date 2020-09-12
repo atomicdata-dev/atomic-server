@@ -121,8 +121,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     fs::write(config.cert_path.clone(), cert.certificate()).expect("Unable to write file");
     fs::write(config.key_path.clone(), cert.private_key()).expect("Unable to write file");
-    log::info!("Written cert keys to ...");
-
+    log::info!("HTTPS init Success!");
     Ok(())
 }
 
@@ -147,6 +146,5 @@ pub fn get_ssl_config(config: &crate::config::Config) -> Result<rustls::ServerCo
     ssl_config
         .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
-
     Ok(ssl_config)
 }

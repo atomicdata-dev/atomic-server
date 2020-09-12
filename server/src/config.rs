@@ -8,6 +8,7 @@ use dirs::home_dir;
 /// These values are set when the server initializes, and do not change while running.
 #[derive(Clone)]
 pub struct Config {
+    /// If you're running in Development mode.
     pub development: bool,
     /// Where the app is hosted (defaults to localhost).
     /// Without the port and schema values.
@@ -16,8 +17,10 @@ pub struct Config {
     pub local_base_url: String,
     /// The contact mail address for Let's Encrypt HTTPS setup
     pub email: Option<String>,
-    /// The port where the app is available (defaults to 80)
+    /// The port where the HTTP app is available (defaults to 80)
     pub port: u32,
+    /// The port where the HTTPS app is available (defaults to 443)
+    pub port_https: u32,
     /// Where the .ad3 store is located
     pub store_path: PathBuf,
     /// The IP address of the serer. (defaults to 127.0.0.1)
@@ -43,7 +46,8 @@ pub fn init() -> Config {
     let mut cert_init = false;
     let mut https = false;
     let mut ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-    let mut port = if https { 443 } else { 80 };
+    let mut port = 80;
+    let mut port_https = 443;
     let mut store_path = home_dir()
         .expect("Home dir could not be opened")
         .join(".config/atomic/db");
@@ -54,10 +58,17 @@ pub fn init() -> Config {
                 store_path = value.parse().expect("Could not parse ATOMIC_STORE_PATH. Is it a valid path?");
             }
             "ATOMIC_DOMAIN" => {
+                // Perhaps this should have some regex check
                 domain = value;
+            }
+            "ATOMIC_DEVELOPMENT" => {
+                domain = value.parse().expect("ATOMIC_DEVELOPMENT is not a boolean");
             }
             "ATOMIC_PORT" => {
                 port = value.parse().expect("ATOMIC_PORT is not a number");
+            }
+            "ATOMIC_PORT_HTTPS" => {
+                port_https = value.parse().expect("ATOMIC_PORT_HTTPS is not a number");
             }
             "ATOMIC_IP" => {
                 ip = value.parse().expect("Could not parse ATOMIC_IP. Is it a valid IP address?");
@@ -93,6 +104,7 @@ pub fn init() -> Config {
         ip,
         key_path,
         port,
+        port_https,
         local_base_url,
         store_path,
     }

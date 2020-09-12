@@ -78,6 +78,23 @@ curl -i -H "Accept: text/turtle" http://127.0.0.1:8081/test
 curl -i -H "Accept: application/ad3-ndjson" "http://127.0.0.1:8081/tpf?subject=&property=&value=test"
 ```
 
+### HTTPS / SSL Setup (using LetsEncrypt)
+
+You can choose to use existing infrastructure (e.g. a fully setup NGINX with SSL), but you can also use the included HTTPS setup features of this server.
+To setup HTTPS, we'll need to set some environment variables.
+Open `.env` and set:
+
+```env
+ATOMIC_CERT_INIT=true
+ATOMIC_EMAIL=youremail@example.com
+ATOMIC_DOMAIN=example.com
+```
+
+Run the server `cargo run`.
+Make sure the server is accessible at your domain, because Let's Encrypt will send a request to this server's `/.well-known` directory, w
+It will now initialize the certificate.
+Read the logs, watch for errors
+
 ## Testing
 
 ```sh
