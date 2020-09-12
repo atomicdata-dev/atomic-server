@@ -36,7 +36,7 @@ pub struct Config {
 /// Creates the server config, reads .env values and sets defaults
 pub fn init() -> Config {
     dotenv().ok();
-    let development = true;
+    let development = false;
     let mut domain = String::from("localhost");
     let cert_path = String::from(".ssl/cert.pem");
     let key_path = String::from(".ssl/key.pem");

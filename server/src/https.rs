@@ -14,8 +14,10 @@ use std::{
 /// Writes keys to disk using LetsEncrypt
 pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     // Use DirectoryUrl::LetsEncrypStaging for dev/testing.
-    // let url = DirectoryUrl::LetsEncrypt;
-    let url = DirectoryUrl::LetsEncryptStaging;
+    let mut url = DirectoryUrl::LetsEncrypt;
+    if config.development {
+        url = DirectoryUrl::LetsEncryptStaging;
+    }
 
     let ssl_path = ".ssl";
 
