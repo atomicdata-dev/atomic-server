@@ -127,18 +127,21 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 // RUSTLS
 pub fn get_ssl_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
     log::info!("Getting SSL info...");
-    use rustls::internal::pemfile::{certs, rsa_private_keys};
+    use rustls::internal::pemfile::{certs, pkcs8_private_keys};
     let mut ssl_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
     let cert_file = &mut BufReader::new(
         File::open(config.cert_path.clone())
             .expect("No SSL key found. Try with ATOMIC_CERT_INIT=true."),
     );
-    log::info!("Opening key file...");
+    log::info!("Opening key file at {:?}", config.key_path.clone());
     let key_file = &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
-    log::info!("Opening private keys...");
-    let mut keys = rsa_private_keys(key_file).unwrap();
+    log::info!("Opening private key file: {:?}", key_file);
+    let mut keys = pkcs8_private_keys(key_file).unwrap();
     log::info!("Setting certs... {:?}", keys);
+    if keys.len() == 0 {
+        panic!("No key found.")
+    }
     ssl_config
         .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
