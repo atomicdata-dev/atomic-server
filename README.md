@@ -47,8 +47,8 @@ Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a
 This repository serves the following purposes:
 
 - Test some of the core ideas of Atomic Data ([Atomic Schema](https://docs.atomicdata.dev/schema/intro.html), [Paths](https://docs.atomicdata.dev/core/paths.html), [AD3 Serialization](https://docs.atomicdata.dev/core/serialization.html))
-- Learn me more about how Rust works (it's a cool language, and this is my first Rust project - keep that in mind while traversing the code!)
-- Serve the first Atomic Data (soon available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the The constantly evolving [Atomic Data Docs](https://docs.atomicdata.dev/)
+- Learn how Rust works (it's a cool language, and this is my first Rust project - keep that in mind while traversing the code!)
+- Serve the first Atomic Data (now available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [Atomic Data Docs](https://docs.atomicdata.dev/)
 - Provide developers with tools and inspiration to use Atomic Data in their own projects.
 
 ## Contribute
