@@ -37,11 +37,10 @@ async fn main() -> io::Result<()> {
 
     if config.cert_init {
         log::warn!("ATOMIC_CERT_INIT is enabled, server running in HTTP mode, running Let's Encrypt Certificate initialization...");
-        crate::https::request_cert(&config).expect("Certification init failed.");
         server
-        .bind(&endpoint).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
-        .run()
-        .await?;
+            .bind(&endpoint).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
+            .run();
+        crate::https::request_cert(&config).expect("Certification init failed.");
         return Ok(())
     }
 

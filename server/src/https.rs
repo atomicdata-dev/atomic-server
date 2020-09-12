@@ -1,3 +1,6 @@
+//! Everything required for setting up SSL / HTTPS.
+//! This should make it unnecessary to use NGINX or the like for HTTPS support.
+
 use acme_lib::create_p384_key;
 use acme_lib::persist::FilePersist;
 use acme_lib::{Directory, DirectoryUrl, Error};
@@ -19,8 +22,6 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     fs::create_dir_all(
         PathBuf::from(&ssl_path)
-            .parent()
-            .expect("Could not find parent folder"),
     )?;
 
     // Save/load keys and certificates to current dir.
