@@ -4,8 +4,7 @@
 use acme_lib::create_p384_key;
 use acme_lib::persist::FilePersist;
 use acme_lib::{Directory, DirectoryUrl, Error};
-use rustls::internal::pemfile::{certs, rsa_private_keys};
-use rustls::{NoClientAuth, ServerConfig};
+
 use std::{
     fs::{self, File},
     io::BufReader,
@@ -20,9 +19,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     let ssl_path = ".ssl";
 
-    fs::create_dir_all(
-        PathBuf::from(&ssl_path)
-    )?;
+    fs::create_dir_all(PathBuf::from(&ssl_path))?;
 
     // Save/load keys and certificates to current dir.
     let persist = FilePersist::new(ssl_path);
@@ -128,14 +125,20 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 }
 
 // RUSTLS
-pub fn get_ssl_config(config: &crate::config::Config) -> Result<ServerConfig, Error> {
-    let mut ssl_config = ServerConfig::new(NoClientAuth::new());
-    let cert_file =
-        &mut BufReader::new(File::open(config.cert_path.clone()).unwrap());
-    let key_file =
-        &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
+pub fn get_ssl_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
+    log::info!("Getting SSL info...");
+    use rustls::internal::pemfile::{certs, rsa_private_keys};
+    let mut ssl_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
+    let cert_file = &mut BufReader::new(
+        File::open(config.cert_path.clone())
+            .expect("No SSL key found. Try with ATOMIC_CERT_INIT=true."),
+    );
+    log::info!("Opening key file...");
+    let key_file = &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
+    log::info!("Opening private keys...");
     let mut keys = rsa_private_keys(key_file).unwrap();
+    log::info!("Setting certs...");
     ssl_config
         .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
