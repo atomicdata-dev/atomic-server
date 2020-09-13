@@ -47,9 +47,9 @@ fn prompt_instance(
     // I think URL generation could be better, though. Perhaps use a
     let path = SystemTime::now().duration_since(UNIX_EPOCH)?.subsec_nanos();
 
-    let mut subject = format!("_:{}", path);
+    let mut subject = format!("{}/{}", context.base_url, path);
     if preffered_shortname.is_some() {
-        subject = format!("_:{}-{}", path, preffered_shortname.clone().unwrap());
+        subject = format!("{}/{}-{}", context.base_url, path, preffered_shortname.clone().unwrap());
     }
 
     let mut new_resource: Resource = Resource::new(subject.clone());

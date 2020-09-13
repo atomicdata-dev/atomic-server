@@ -17,7 +17,6 @@ pub async fn get_resource(
 ) -> BetterResult<HttpResponse> {
     let path = Path::new(_id.as_str());
     let id: &str = path.file_stem().unwrap().to_str().ok_or("Issue with URL")?;
-
     let mut content_type = get_accept(req);
     if content_type == ContentType::HTML {
         content_type = match path.extension() {
@@ -38,10 +37,10 @@ pub async fn get_resource(
 
     log::info!("id: {:?}", id);
     let context = data.lock().unwrap();
-    let store = &context.store;
-    // This is how locally defined items are stored (which don't know their full subject URL) in Atomic Data
-    let subject = format!("_:{}", id);
+    let subject = format!("{}/{}", &context.config.local_base_url, id);
+    log::info!("subject: {:?}", subject);
     let mut builder = HttpResponse::Ok();
+    let store = &context.store;
     match content_type {
         ContentType::JSON => {
             builder.header("Content-Type", content_type.to_mime());

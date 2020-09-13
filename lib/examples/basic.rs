@@ -8,7 +8,7 @@ fn main() {
     // Load the default Atomic Data Atoms
     store.populate().unwrap();
     // Let's parse this AD3 string. It looks awkward because of the escaped quotes.
-    let string = "[\"_:test\",\"https://atomicdata.dev/properties/description\",\"Test\"]";
+    let string = r#"["_:test","https://atomicdata.dev/properties/description","Test"]"#;
     // The parser returns a Vector of Atoms
     let atoms = atomic_lib::parse::parse_ad3(&string).unwrap();
     // Add the Atoms to the Store

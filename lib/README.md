@@ -41,7 +41,7 @@ use atomic_lib;
 
 fn main() {
   // Let's parse this AD3 string
-  let string = String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"Test\"]");
+  let string = String::from(r#"["_:test","https://atomicdata.dev/properties/shortname","Test"]"#);
   // Start with initializing our store
   let mut store = atomic_lib::store::Store::init();
   // Run parse...
@@ -55,15 +55,15 @@ fn main() {
 }
 ```
 
-## Features
+## Optional features
 
 Some features of this library are optional, to minimize bundle size and compile times.
 
 **db**
 
-The db features adds persistence, which means that you can store stuff on a HDD / SSD.
+The db features adds persistence, which means that you can store stuff on an HDD / SSD.
 It uses [Sled], a performant, embedded key-value store.
 
 **rdf**
 
-If you need RDF serialization options, use this feature.
+If you need RDF serialization options (Turtle / N-Triples), use this feature.

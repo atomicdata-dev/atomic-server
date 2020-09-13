@@ -103,6 +103,7 @@ impl Mapping {
 
 /// Check if something is a URL
 pub fn is_url(string: &str) -> bool {
+    // TODO: Probably delete this second one, might break some tests though.
     string.starts_with("http") || string.starts_with("_:")
 }
 

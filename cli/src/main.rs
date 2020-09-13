@@ -12,6 +12,7 @@ mod path;
 
 #[allow(dead_code)]
 pub struct Context<'a> {
+    base_url: String,
     store: atomic_lib::Store,
     mapping: Mapping,
     matches: ArgMatches<'a>,
@@ -133,6 +134,8 @@ fn main() -> AtomicResult<()> {
 
 
     let mut context = Context {
+        // TODO: This should be configurable
+        base_url: "http://localhost/".into(),
         mapping,
         store,
         matches,

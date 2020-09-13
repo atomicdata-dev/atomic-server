@@ -280,24 +280,14 @@ pub trait Storelike {
     }
 
     /// fetches a resource, serializes it to .ad3
-    /// The local_base_url is needed to convert the local identifier to the domain
-    /// It should be something like `https://example.com/`
     fn resource_to_ad3(
         &self,
         subject: String,
-        local_base_url: Option<&String>,
     ) -> AtomicResult<String> {
         let mut string = String::new();
         let resource = self.get_resource_string(&subject)?;
         let mut mod_subject = subject;
-        // Replace local schema with actual local domain
-        if mod_subject.starts_with("_:") && local_base_url.is_some() {
-            // Remove first two characters
-            let mut chars = mod_subject.chars();
-            chars.next();
-            chars.next();
-            mod_subject = format!("{}{}", &local_base_url.unwrap(), &chars.as_str());
-        }
+
         for (property, value) in resource {
             let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])?;
             ad3_atom.push_str("\n");
@@ -309,14 +299,12 @@ pub trait Storelike {
     /// Serializes a single Resource to a JSON object.
     /// It uses the Shortnames of properties for Keys.
     /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
-    // Very naive implementation, should actually turn:
-    // [x] ResourceArrays into arrrays
-    // [x] URLS into @id things
-    // [x] Numbers into native numbers
-    // [ ] Resoures into objects, if the nesting depth allows it
+    // Todo:
+    // [ ] Resources into objects, if the nesting depth allows it
     fn resource_to_json(
         &self,
         resource_url: &str,
+        // Not yet used
         _depth: u8,
         json_ld: bool,
     ) -> AtomicResult<String> {

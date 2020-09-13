@@ -15,7 +15,7 @@ let mut store = atomic_lib::Store::init();
 // Load the default Atomic Data Atoms
 store.populate().unwrap( );
 // Let's parse this AD3 string. It looks awkward because of the escaped quotes.
-let string = "[\"_:test\",\"https://atomicdata.dev/properties/description\",\"Test\"]";
+let string = String::from(r#"["_:test","https://atomicdata.dev/properties/shortname","Test"]"#);
 // Parse the string
 let atoms = atomic_lib::parse::parse_ad3(&string).unwrap();
 // Add the atoms to the store
