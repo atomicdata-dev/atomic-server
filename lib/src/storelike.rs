@@ -282,14 +282,13 @@ pub trait Storelike {
     /// fetches a resource, serializes it to .ad3
     fn resource_to_ad3(
         &self,
-        subject: String,
+        subject: &str,
     ) -> AtomicResult<String> {
         let mut string = String::new();
-        let resource = self.get_resource_string(&subject)?;
-        let mut mod_subject = subject;
+        let resource = self.get_resource_string(subject)?;
 
         for (property, value) in resource {
-            let mut ad3_atom = serde_json::to_string(&vec![&mod_subject, &property, &value])?;
+            let mut ad3_atom = serde_json::to_string(&vec![subject, &property, &value])?;
             ad3_atom.push_str("\n");
             string.push_str(&*ad3_atom);
         }
