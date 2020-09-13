@@ -11,33 +11,34 @@ use tera::Context as TeraCtx;
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
 pub async fn get_resource(
-    // _id: web::Path<String>,
+    subject_end: web::Path<String>,
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
-    let subject_with_ext = req.uri().to_string();
-    let path = Path::new(&subject_with_ext);
-    let id: &str = path.file_stem().unwrap().to_str().ok_or("Issue with URL")?;
-    let mut content_type = get_accept(req);
-    if content_type == ContentType::HTML {
-        content_type = match path.extension() {
-            Some(extension) => match extension
-                .to_str()
-                .ok_or("Extension cannot be parsed. Try a different URL.")?
-            {
-                "ad3" => ContentType::AD3,
-                "json" => ContentType::JSON,
-                "jsonld" => ContentType::JSONLD,
-                "html" => ContentType::HTML,
-                "ttl" => ContentType::TURTLE,
-                _ => ContentType::HTML,
-            },
-            None => ContentType::HTML,
-        };
-    }
-
     let context = data.lock().unwrap();
-    let subject = format!("{}{}", &context.config.local_base_url, id);
+    log::info!("subject_end: {}", subject_end);
+    let subj_end_string = subject_end.to_string();
+    let content_type = get_accept(req);
+    // Check extensions and set datatype. Harder than it looks to get right...
+    // let path = Path::new(&subj_end_string);
+    // log::info!("path: {:?}", path);
+    // if content_type == ContentType::HTML {
+    //     content_type = match path.extension() {
+    //         Some(extension) => match extension
+    //             .to_str()
+    //             .ok_or("Extension cannot be parsed. Try a different URL.")?
+    //         {
+    //             "ad3" => ContentType::AD3,
+    //             "json" => ContentType::JSON,
+    //             "jsonld" => ContentType::JSONLD,
+    //             "html" => ContentType::HTML,
+    //             "ttl" => ContentType::TURTLE,
+    //             _ => ContentType::HTML,
+    //         },
+    //         None => ContentType::HTML,
+    //     };
+    // }
+    let subject = format!("{}{}", &context.config.local_base_url, subj_end_string);
     let mut builder = HttpResponse::Ok();
     let store = &context.store;
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
