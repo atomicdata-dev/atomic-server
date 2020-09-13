@@ -66,7 +66,7 @@ pub async fn get_resource(
         ContentType::AD3 => {
             builder.header("Content-Type", content_type.to_mime());
             let body = store
-                .resource_to_ad3(subject, Some(&context.config.local_base_url))?;
+                .resource_to_ad3(subject)?;
             Ok(builder.body(body))
         }
         ContentType::TURTLE | ContentType::NT => {

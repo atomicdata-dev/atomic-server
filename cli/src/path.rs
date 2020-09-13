@@ -40,7 +40,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
                   println!("{}", out);
               }
               Format::AD3 => {
-                  let out = store.resource_to_ad3(subject, None)?;
+                  let out = store.resource_to_ad3(subject)?;
                   println!("{}", out);
               }
               Format::NT => {
