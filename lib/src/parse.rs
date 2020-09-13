@@ -1,3 +1,5 @@
+//! Parsing / deserialization / decoding
+
 use crate::{errors::AtomicResult, Atom};
 
 pub const AD3_MIME: &str = "application/ad3-ndjson";

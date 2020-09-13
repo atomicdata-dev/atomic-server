@@ -1,8 +1,10 @@
+//! Setup on boot, reads .env values
+
+use dirs::home_dir;
 use dotenv::dotenv;
 use std::env;
-use std::{path::PathBuf};
 use std::net::{IpAddr, Ipv4Addr};
-use dirs::home_dir;
+use std::path::PathBuf;
 
 /// Configuration for the server.
 /// These values are set when the server initializes, and do not change while running.
@@ -52,7 +54,9 @@ pub fn init() -> Config {
     for (key, value) in env::vars() {
         match &*key {
             "ATOMIC_STORE_PATH" => {
-                store_path = value.parse().expect("Could not parse ATOMIC_STORE_PATH. Is it a valid path?");
+                store_path = value
+                    .parse()
+                    .expect("Could not parse ATOMIC_STORE_PATH. Is it a valid path?");
             }
             "ATOMIC_DOMAIN" => {
                 // Perhaps this should have some regex check
@@ -68,7 +72,9 @@ pub fn init() -> Config {
                 port_https = value.parse().expect("ATOMIC_PORT_HTTPS is not a number");
             }
             "ATOMIC_IP" => {
-                ip = value.parse().expect("Could not parse ATOMIC_IP. Is it a valid IP address?");
+                ip = value
+                    .parse()
+                    .expect("Could not parse ATOMIC_IP. Is it a valid IP address?");
             }
             "ATOMIC_EMAIL" => {
                 email = Some(value);
@@ -80,7 +86,11 @@ pub fn init() -> Config {
         }
     }
 
-    let schema = if https {"https"} else {"http"};
+    if https & email.is_none() {
+        email = Some(promptly::prompt("What is your e-mail?").unwrap());
+    }
+
+    let schema = if https { "https" } else { "http" };
     let local_base_url = format!("{}://{}/", schema, domain);
 
     Config {

@@ -1,3 +1,4 @@
+//! App state, which is accessible from handlers
 use crate::{errors::BetterResult, config::Config};
 use atomic_lib::{Storelike, mapping::Mapping};
 use tera::Tera;

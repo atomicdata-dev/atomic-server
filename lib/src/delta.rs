@@ -1,3 +1,5 @@
+//! Describe changes / mutations to data
+
 /// Individual change to a resource. Unvalidated.
 pub struct DeltaLine {
     pub method: String,

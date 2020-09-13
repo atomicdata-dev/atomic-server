@@ -1,3 +1,5 @@
+//! For handling HTTP requests / content type negotiation
+
 use crate::{ResourceString, errors::AtomicResult, parse::parse_ad3};
 
 /// Fetches a resource by Subject using HTTP.

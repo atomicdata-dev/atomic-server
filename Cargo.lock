@@ -569,6 +569,7 @@ dependencies = [
  "dotenv",
  "env_logger",
  "log",
+ "promptly",
  "regex",
  "rustls",
  "serde",

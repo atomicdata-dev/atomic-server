@@ -1,6 +1,6 @@
 //! Everything required for setting up SSL / HTTPS.
-//! This should make it unnecessary to use NGINX or the like for HTTPS support.
 
+use actix_web::{HttpServer, App};
 use acme_lib::create_p384_key;
 use acme_lib::persist::FilePersist;
 use acme_lib::{Directory, DirectoryUrl, Error};
@@ -10,6 +10,22 @@ use std::{
     io::BufReader,
     path::PathBuf,
 };
+
+pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
+    log::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
+    let http_endpoint = format!("{}:{}", config.ip, config.port);
+    let init_server = HttpServer::new(move || {
+        App::new()
+            .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
+    });
+    let running_server = init_server
+        .bind(&http_endpoint).expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
+        .run();
+    crate::https::request_cert(&config).expect("Certification init failed.");
+    log::warn!("HTTPS SSL Cert init sucesful! Stopping HTTP server, starting HTTPS...");
+    running_server.stop(true).await;
+    Ok(())
+}
 
 /// Writes keys to disk using LetsEncrypt
 pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
@@ -127,21 +143,17 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
 // RUSTLS
 pub fn get_ssl_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
-    log::info!("Getting SSL info...");
     use rustls::internal::pemfile::{certs, pkcs8_private_keys};
     let mut ssl_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
     let cert_file = &mut BufReader::new(
         File::open(config.cert_path.clone())
-            .expect("No SSL key found. Try with ATOMIC_CERT_INIT=true."),
+            .expect("No SSL key found."),
     );
-    log::info!("Opening key file at {:?}", config.key_path.clone());
     let key_file = &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
-    log::info!("Opening private key file: {:?}", key_file);
     let mut keys = pkcs8_private_keys(key_file).unwrap();
-    log::info!("Setting certs... {:?}", keys);
-    if keys.len() == 0 {
-        panic!("No key found.")
+    if keys.is_empty() {
+        panic!("No key found. Consider deleting the `.ssl` directory and restart to create new keys.")
     }
     ssl_config
         .set_single_cert(cert_chain, keys.remove(0))

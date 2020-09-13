@@ -1,3 +1,5 @@
+//! Trait for all stores to use
+
 use crate::errors::AtomicResult;
 use crate::urls;
 use crate::{

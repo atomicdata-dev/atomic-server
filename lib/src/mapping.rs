@@ -1,4 +1,3 @@
-//! # Mappings
 //! Because writing full URLs is error prone and time consuming, we map URLs to shortnames.
 //! These are often user-specific.
 //! This section provides tools to store, share and resolve these Mappings.

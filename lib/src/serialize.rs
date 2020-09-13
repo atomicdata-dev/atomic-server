@@ -1,3 +1,5 @@
+//! Serialization / formatting / encoding (JSON, RDF, N-Triples, AD3)
+
 use crate::{datatype::DataType, errors::AtomicResult};
 use crate::{Atom, Storelike};
 

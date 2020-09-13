@@ -1,3 +1,5 @@
+//! A resource is a set of Atoms that share a URL
+
 use crate::errors::AtomicResult;
 use crate::values::Value;
 use crate::{

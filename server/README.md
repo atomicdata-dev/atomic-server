@@ -80,7 +80,8 @@ curl -i -H "Accept: application/ad3-ndjson" "http://127.0.0.1:8081/tpf?subject=&
 
 ### HTTPS / SSL Setup (using LetsEncrypt)
 
-You can choose to use existing infrastructure (e.g. a fully setup NGINX with SSL), but you can also use the included HTTPS setup features of this server.
+You can use the embedded HTTPS setup, using LetsEncrypt.
+This is probably the easiest way to set up `atomic-server`.
 To setup HTTPS, we'll need to set some environment variables.
 Open `.env` and set:
 
