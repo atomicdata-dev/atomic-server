@@ -1,3 +1,5 @@
+//! Content-type / Accept header negotiation, MIME types
+
 #[derive(PartialEq)]
 pub enum ContentType {
     JSON,

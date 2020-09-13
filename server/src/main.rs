@@ -24,6 +24,7 @@ async fn main() -> io::Result<()> {
         App::new()
             .app_data(data)
             .wrap(middleware::Logger::default())
+            .wrap(middleware::Compress::default())
             // .wrap(actix_web_middleware_redirect_https::RedirectHTTPS::default())
             .service(actix_files::Files::new("/static", "static/").show_files_listing())
             .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
@@ -34,21 +35,9 @@ async fn main() -> io::Result<()> {
     });
 
     if config.https {
-        // If there is no certificate file, start initialization
-        let cert_path_is_some = std::fs::File::open(&config.cert_path).is_ok();
-        if !cert_path_is_some {
-            log::warn!("ATOMIC_CERT_INIT is enabled, server running in HTTP mode, running Let's Encrypt Certificate initialization...");
-            let http_endpoint = format!("{}:{}", config.ip, config.port);
-            let init_server = HttpServer::new(move || {
-                App::new()
-                    .wrap(middleware::Logger::default())
-                    .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
-            });
-            let running_server = init_server
-                .bind(&http_endpoint).expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
-                .run();
-            crate::https::request_cert(&config).expect("Certification init failed.");
-            running_server.stop(true).await;
+        // If there is no certificate file, start HTTPS initialization
+        if std::fs::File::open(&config.cert_path).is_err() {
+            https::cert_init_server(&config).await.unwrap();
         }
         let https_config = crate::https::get_ssl_config(&config)
             .expect("HTTPS SSL Configuration with Let's Encrypt failed.");
@@ -63,7 +52,6 @@ async fn main() -> io::Result<()> {
             .bind(&format!("{}:{}", config.ip, config.port)).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
             .run()
             .await?;
-            Ok(())
+        Ok(())
     }
-
 }

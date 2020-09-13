@@ -1,3 +1,5 @@
+//! A value is the part of an Atom that contains the actual information.
+
 use crate::{errors::AtomicResult, datatype::DataType, datatype::match_datatype};
 use regex::Regex;
 use serde::{Deserialize, Serialize};

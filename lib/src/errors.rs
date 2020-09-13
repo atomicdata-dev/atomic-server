@@ -1,3 +1,5 @@
+//! The Error type that you can expect when using this library
+
 use std::error::Error;
 use std::fmt;
 
