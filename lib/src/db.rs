@@ -21,11 +21,13 @@ pub struct Db {
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
     index_vals: sled::Tree,
     index_props: sled::Tree,
+    // The current URL
+    base_url: String,
 }
 
 impl Db {
     // Creates a new store at the specified path
-    pub fn init<P: AsRef<std::path::Path>>(path: P) -> AtomicResult<Db> {
+    pub fn init<P: AsRef<std::path::Path>>(path: P, base_url: String) -> AtomicResult<Db> {
         let db = sled::open(path)?;
         let resources = db.open_tree("resources")?;
         let index_props = db.open_tree("index_props")?;
@@ -35,6 +37,7 @@ impl Db {
             resources,
             index_vals,
             index_props,
+            base_url,
         })
     }
 
@@ -85,12 +88,17 @@ impl Storelike for Db {
                     .expect("Can't deserialize resource. Your database may be corrupt!");
                 Ok(resource)
             }
-            None => match self.fetch_resource(resource_url) {
+            None => {
+                if resource_url.starts_with(&self.base_url) {
+                    return Err(format!("Failed to retrieve {}, does not exist locally", resource_url).into())
+                }
+
+                match self.fetch_resource(resource_url) {
                 Ok(got) => Ok(got),
                 Err(e) => {
                     Err(format!("Failed to retrieve {} from the web: {}", resource_url, e).into())
                 }
-            },
+            }},
         }
     }
 

@@ -30,7 +30,7 @@ async fn main() -> io::Result<()> {
             .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
             .service(web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))))
             .service(web::scope("/get").service(web::resource("").route(web::get().to(handlers::path::path))))
-            .service(web::scope("/{path}").service(web::resource("").route(web::get().to(handlers::resource::get_resource))))
+            .service(web::scope("/{path:[^{}]+}").service(web::resource("").route(web::get().to(handlers::resource::get_resource))))
             .service(web::scope("/").service(web::resource("").route(web::get().to(handlers::home::home))))
     });
 

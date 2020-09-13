@@ -76,6 +76,7 @@ pub trait Storelike {
     fn fetch_resource(&self, subject: &str) -> AtomicResult<ResourceString> {
         let resp = ureq::get(&subject)
             .set("Accept", crate::parse::AD3_MIME)
+            .timeout_read(500)
             .call();
         if resp.status() != 200 {
             return Err(format!("Could not fetch {}. Status: {}", subject, resp.status()).into());
@@ -95,6 +96,7 @@ pub trait Storelike {
             return Err("No valid atoms in resource".into());
         }
         Ok(resource)
+        // Err("hoshfe".into())
     }
 
     /// Returns a full Resource with native Values

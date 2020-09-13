@@ -11,11 +11,12 @@ use tera::Context as TeraCtx;
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
 pub async fn get_resource(
-    _id: web::Path<String>,
+    // _id: web::Path<String>,
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
-    let path = Path::new(_id.as_str());
+    let subject_with_ext = req.uri().to_string();
+    let path = Path::new(&subject_with_ext);
     let id: &str = path.file_stem().unwrap().to_str().ok_or("Issue with URL")?;
     let mut content_type = get_accept(req);
     if content_type == ContentType::HTML {
@@ -35,12 +36,11 @@ pub async fn get_resource(
         };
     }
 
-    log::info!("id: {:?}", id);
     let context = data.lock().unwrap();
-    let subject = format!("{}/{}", &context.config.local_base_url, id);
-    log::info!("subject: {:?}", subject);
+    let subject = format!("{}{}", &context.config.local_base_url, id);
     let mut builder = HttpResponse::Ok();
     let store = &context.store;
+    log::info!("get_resource: {} - {}", subject, content_type.to_mime());
     match content_type {
         ContentType::JSON => {
             builder.header("Content-Type", content_type.to_mime());
@@ -56,9 +56,7 @@ pub async fn get_resource(
             builder.header("Content-Type", content_type.to_mime());
             let mut tera_context = TeraCtx::new();
             let resource = store.get_resource_string(&subject)?;
-
             let propvals = from_hashmap_resource(&resource, store, subject)?;
-
             tera_context.insert("resource", &propvals);
             let body = context.tera.render("resource.html", &tera_context).unwrap();
             Ok(builder.body(body))
