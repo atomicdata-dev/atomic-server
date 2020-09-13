@@ -33,6 +33,9 @@
 ["https://atomicdata.dev/datatypes/resourceArray","https://atomicdata.dev/properties/shortname","resourcearray"]
 ["https://atomicdata.dev/datatypes/resourceArray","https://atomicdata.dev/properties/description","A JSON serialized array of Atomic URL strings."]
 ["https://atomicdata.dev/datatypes/resourceArray","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Datatype\"]"]
+["https://atomicdata.dev/datatypes/atomicURL","https://atomicdata.dev/properties/shortname","atomicurl"]
+["https://atomicdata.dev/datatypes/atomicURL","https://atomicdata.dev/properties/description","A URL that points to an Atomic Data resource. When a HTTP(S) GET request is sent to that URL with an `Accept: application/ad3` header, the server should reply with MIME type `application/ad3`, and a body with valid AD3 describing the entire resource, with all Atoms."]
+["https://atomicdata.dev/datatypes/atomicURL","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Datatype\"]"]
 # Properties
 ["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
 ["https://atomicdata.dev/properties/description","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/markdown"]
