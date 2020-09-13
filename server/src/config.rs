@@ -39,7 +39,7 @@ pub struct Config {
 /// Creates the server config, reads .env values and sets defaults
 pub fn init() -> Config {
     dotenv().ok();
-    let development = false;
+    let mut development = false;
     let mut domain = String::from("localhost");
     let cert_path = String::from(".ssl/cert.pem");
     let key_path = String::from(".ssl/key.pem");
@@ -63,7 +63,7 @@ pub fn init() -> Config {
                 domain = value;
             }
             "ATOMIC_DEVELOPMENT" => {
-                domain = value.parse().expect("ATOMIC_DEVELOPMENT is not a boolean");
+                development = value.parse().expect("ATOMIC_DEVELOPMENT is not a boolean");
             }
             "ATOMIC_PORT" => {
                 port = value.parse().expect("ATOMIC_PORT is not a number");
