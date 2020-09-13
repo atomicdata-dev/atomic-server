@@ -1,10 +1,10 @@
 ---
-  base: 'http://surfy.ddns.net'
+  base: 'https://atomicdata.dev'
   iterations: 5000
   concurrency: 50
   rampup: 2
 
   plan:
-    - name: Test resource
+    - name: Test tpf
       request:
         url: /tpf

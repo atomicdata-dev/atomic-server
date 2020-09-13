@@ -5,33 +5,23 @@
     {% block head %}
     <meta charset="UTF-8">
     <link rel="stylesheet" href="/static/styles.css" />
+    <link rel="stylesheet" href="https://unpkg.com/spectre.css/dist/spectre.min.css">
     <link rel="icon" type="image/png" href="/static/favicon.png" />
     <title>{% block title %}{% endblock title %} - Atomic Data</title>
     {% endblock head %}
 </head>
 
 <body>
-    <div id="nav">
-        <ul>
-            <li>
-                <a href="/">Home</a>
-            </li>
-            <li>
-                <a href="https://docs.atomicdata.dev">Docs</a>
-            </li>
-            <li>
-                <a href="/tpf">TPF</a>
-            </li>
-        </ul>
+    <div id="nav" class="navbar container grid-lg">
+        <section class="navbar-section">
+            <a href="/" class="navbar-brand mr-2">Atomic Data</a>
+            <a href="https://docs.atomicdata.dev" class="btn btn-link">Docs</a>
+            <a href="https://github.com/joepio/atomic/tree/master/server" class="btn btn-link">Github</a>
+            <a href="/tpf" class="btn btn-link">TPF</a>
+            <a href="/get?path=https%3A%2F%2Fatomicdata.dev%2Fclasses%2FClass" class="btn btn-link">path</a>
+        </section>
     </div>
     <div id="content">{% block content %}{% endblock content %}</div>
-    <div id="footer">
-        {% block footer %}
-        <em>Powered by an early pre-alpha of the <a href="https://github.com/joepio/atomic">Atomic library for
-                Rust</a>.</em>
-        <em>Check out the <a href="https://docs.atomicdata.dev/">Atomic Data docs</a>.</em>
-        {% endblock footer %}
-    </div>
 </body>
 
 </html>

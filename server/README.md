@@ -11,18 +11,18 @@ A lightweight HTTP server that shares created Atomic data on the web.
 ## Progress
 
 - [x] Respond to GET request for individual resources
-- [x] URL extension recognition (.json, .ad3, .nt, etc.)
 - [x] HTML serialization
 - [x] JSON serialization
 - [x] JSON-LD serialization
 - [x] AD3 serialization
-- [ ] RDF (Turtle / N-Triples) serialization
+- [x] RDF (Turtle / N-Triples) serialization
 - [x] Basic error handling
 - [x] TPF endpoint
 - [x] Homepage
 - [x] Static asset support for .css / .ico / etc.
 - [x] HTTPS (WIP, kind of working)
 - [x] Content-type negotiation
+- [ ] URL extension recognition (.json, .ad3, .nt, etc.)
 - [ ] CSS / design
 - [ ] Collections / dynamic resources
 - [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support

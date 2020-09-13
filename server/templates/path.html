@@ -2,9 +2,11 @@
 {% extends "base.html" %}
 {% block title %}Path{% endblock title %}
 {% block content %}
-<form method="GET" action="/get">
-  <input name="path" value="{{ path }}" />
-  <input type="submit" value="get"/>
-</form>
-{{ macros::propvals(vector=propvals) }}
+<div class="container grid-lg">
+  <form method="GET" action="/get">
+    <input name="path" value="{{ path }}" />
+    <input type="submit" value="get"/>
+  </form>
+  {{ macros::propvals(vector=propvals) }}
+</div>
 {% endblock content %}

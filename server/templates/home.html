@@ -1,8 +1,36 @@
 {% extends "base.html" %}
 {% block title %}Atomic Data{% endblock title %}
 {% block content %}
-<p>Atomic Data server. Visit
-  <a href="https://docs.atomicdata.dev">docs.atomicdata.dev</a>
-  for more information about Atomic Data.
-</p>
+<div class="hero">
+  <div class="grid-hero container grid-lg text-center" id="overview">
+    <h1>Atomic Data</h1>
+    <h2>The easiest way to
+      <u>create</u>,
+      <u>share</u> and
+      <u>model</u> linked data
+    </h2>
+    <p><a class="btn btn-primary btn-lg mr-2" href="https://docs.atomicdata.dev">Docs</a><a
+        class="btn btn-primary btn-lg" href="https://github.com/joepio/atomic" target="_blank">GitHub</a></p>
+    <div class="columns">
+      <div class="column col-4 col-xs-12">
+        <div class="card">
+          <div class="card-header"><span class="card-title h5">Typed</span></div>
+          <div class="card-body">All data is fully typed, and these types can be extended by anyone.</div>
+        </div>
+      </div>
+      <div class="column col-4 col-xs-12">
+        <div class="card">
+          <div class="card-header"><span class="card-title h5">Easy to use</span></div>
+          <div class="card-body">It serializes to pretty JSON - but it's all linked data!</div>
+        </div>
+      </div>
+      <div class="column col-4 col-xs-12">
+        <div class="card">
+          <div class="card-header"><span class="card-title h5">Decentralized</span></div>
+          <div class="card-body">Use the entire web as a database - reuse data by including links</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}

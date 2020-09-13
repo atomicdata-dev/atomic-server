@@ -1,33 +1,35 @@
 {% extends "base.html" %}
 {% block title %}TPF{% endblock title %}
 {% block content %}
-<p>
-  This is a <a href="https://linkeddatafragments.org/specification/triple-pattern-fragments/">Triple Pattern
-    Fragments</a> endpoint.
-  It lets you query the store of this server by subject, property and / or value.
-  You can use the Accept header to get machine-readable AD3 results.
-</p>
-<table style="width:100%">
-  <tr class="tpfForm">
-    <form method="GET" action="/tpf">
-      <th>
-        <input id="subject" placeholder="subject" name="subject" type="url" value="{{ subject }}" />
-      </th>
-      <th>
-        <input id="property" placeholder="property"  name="property" type="url" value="{{ property }}" />
-      </th>
-      <th>
-        <input id="value" placeholder="value" name="value" value="{{ value }}" />
-        <input type="submit" value="get"/>
-      </th>
-    </form>
-  </tr>
-  {% for atom in atoms -%}
-  <tr>
-    <td><a href="get?path={{ atom.subject }}">{{ atom.subject }}</a></td>
-    <td><a href="get?path={{ atom.property.subject }}">{{ atom.property.shortname }}</a></td>
-    <td>{{ atom.html | safe}}</td>
-  </tr>
-  {%- endfor %}
-</table>
+<div class="container grid-lg">
+  <p>
+    This is a <a href="https://linkeddatafragments.org/specification/triple-pattern-fragments/">Triple Pattern
+      Fragments</a> endpoint.
+    It lets you query the store of this server by subject, property and / or value.
+    You can use the Accept header to get machine-readable AD3 results.
+  </p>
+  <table style="width:100%">
+    <tr class="tpfForm">
+      <form method="GET" action="/tpf">
+        <th>
+          <input id="subject" placeholder="subject" name="subject" type="url" value="{{ subject }}" />
+        </th>
+        <th>
+          <input id="property" placeholder="property" name="property" type="url" value="{{ property }}" />
+        </th>
+        <th>
+          <input id="value" placeholder="value" name="value" value="{{ value }}" />
+          <input type="submit" value="get" />
+        </th>
+      </form>
+    </tr>
+    {% for atom in atoms -%}
+    <tr>
+      <td><a href="get?path={{ atom.subject }}">{{ atom.subject }}</a></td>
+      <td><a href="get?path={{ atom.property.subject }}">{{ atom.property.shortname }}</a></td>
+      <td>{{ atom.html | safe}}</td>
+    </tr>
+    {%- endfor %}
+  </table>
+</div>
 {% endblock content %}
