@@ -78,10 +78,10 @@ curl -i -H "Accept: text/turtle" http://127.0.0.1:8081/test
 curl -i -H "Accept: application/ad3-ndjson" "http://127.0.0.1:8081/tpf?subject=&property=&value=test"
 ```
 
-### HTTPS / SSL Setup (using LetsEncrypt)
+### HTTPS Setup
 
-You can use the embedded HTTPS setup, using LetsEncrypt.
-This is probably the easiest way to set up `atomic-server`.
+You'll probably want to make your Atomic Data available through HTTPS.
+You can use the embedded HTTPS / SSL setup powered by [LetsEncrypt](https://letsencrypt.org/), [acme_lib](https://docs.rs/acme-lib/0.8.1/acme_lib/index.html) and [rustls](https://github.com/ctz/rustls).
 To setup HTTPS, we'll need to set some environment variables.
 Open `.env` and set:
 
@@ -91,9 +91,11 @@ ATOMIC_DOMAIN=example.com
 ```
 
 Run the server `cargo run`.
-Make sure the server is accessible at your domain, because Let's Encrypt will send a request to this server's `/.well-known` directory, w
+Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's Encrypt will send an HTTP request to this server's `/.well-known` directory to check the keys.
 It will now initialize the certificate.
 Read the logs, watch for errors.
+
+Note that there is no logic yet for renewing certificates - I think removing the generated `.ssl` folder is the easiest approach.
 
 ## Testing
 
