@@ -24,10 +24,10 @@ pub fn value_to_html(value: &Value) -> String {
         Value::String(s) => escape_html(&*s),
         Value::Markdown(s) => markdown_to_html(&*s, &ComrakOptions::default()),
         Value::Slug(s) => escape_html(&*s),
-        Value::AtomicUrl(s) => format!("<a href=\"/get?path={}\">{}</a>", escape_html(&*s), escape_html(&*s)),
+        Value::AtomicUrl(s) => format!(r#"<a href="{}">{}</a>"#, escape_html(&*s), escape_html(&*s)),
         Value::ResourceArray(v) => {
             let mut string = String::from("");
-            v.iter().for_each(|item| string.push_str(&*format!("<a href=\"/get?path={}\">{}</a>, ", escape_html(item), escape_html(item))));
+            v.iter().for_each(|item| string.push_str(&*format!(r#"<a href="{}">{}</a>, "#, escape_html(item), escape_html(item))));
             string
         },
         Value::Date(s) => format!("{:?}", s),

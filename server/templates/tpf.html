@@ -25,8 +25,8 @@
     </tr>
     {% for atom in atoms -%}
     <tr>
-      <td><a href="get?path={{ atom.subject }}">{{ atom.subject }}</a></td>
-      <td><a href="get?path={{ atom.property.subject }}">{{ atom.property.shortname }}</a></td>
+      <td><a href="{{ atom.subject }}">{{ atom.subject }}</a></td>
+      <td><a href="{{ atom.property.subject }}">{{ atom.property.shortname }}</a></td>
       <td>{{ atom.html | safe}}</td>
     </tr>
     {%- endfor %}

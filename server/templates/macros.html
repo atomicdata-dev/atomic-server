@@ -10,7 +10,7 @@
 {% for propval in vector -%}
 <p>
   <b class="propertyLabel">
-    <a href="/get?path={{ propval.property.subject }}">{{ propval.property.shortname }}</a>
+    <a href="{{ propval.property.subject }}">{{ propval.property.shortname }}</a>
     <!-- <span> </span> -->
     <!-- <a href="/delta?subject={{ propval.subject }}&property={{ propval.property.subject }}&value={{ propval.value }}">edit</a> -->
   </b>
