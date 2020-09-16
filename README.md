@@ -12,8 +12,8 @@ This repo consists of three components: A library, a server and a CLI.
 
 The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
 
-- Host Atomic data over HTTP or HTTPS (built-in!)
 - No runtime dependencies, crazy fast, runs on all platforms (including on your Raspberry Pi)
+- Embedded HTTP / HTTPS / HTTP2.0 server
 - Serialization to HTML, JSON, RDF (N-Triples / Turtle / JSON-LD) and AD3
 
 [→ Read more](server/README.md)

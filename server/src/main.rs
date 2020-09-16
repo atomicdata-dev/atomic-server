@@ -39,8 +39,8 @@ async fn main() -> io::Result<()> {
         if std::fs::File::open(&config.cert_path).is_err() {
             https::cert_init_server(&config).await.unwrap();
         }
-        let https_config = crate::https::get_ssl_config(&config)
-            .expect("HTTPS SSL Configuration with Let's Encrypt failed.");
+        let https_config = crate::https::get_https_config(&config)
+            .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
         let endpoint = format!("{}:{}", config.ip, config.port_https);
         server.bind_rustls(&endpoint, https_config).expect(&*format!("Cannot bind to endpoint {}", &endpoint))
             .run()

@@ -43,7 +43,7 @@ cargo run
 ```
 
 * Run `atomic-server` inside a directory with `/static` folder for files
-* If you want to use HTTPS / SSL, set `ATOMIC_CERT_INIT` to `true` and run the server. After that, set it to `false` and set `ATOMIC_HTTPS` to `true`.
+* If you want to use HTTPS / TLS, set `ATOMIC_CERT_INIT` to `true` and run the server. After that, set it to `false` and set `ATOMIC_HTTPS` to `true`.
 * If no `.ad3` store path is given, a new store will be created from memory.
 
 ## Running from cargo
@@ -81,7 +81,7 @@ curl -i -H "Accept: application/ad3-ndjson" "http://127.0.0.1:8081/tpf?subject=&
 ### HTTPS Setup
 
 You'll probably want to make your Atomic Data available through HTTPS.
-You can use the embedded HTTPS / SSL setup powered by [LetsEncrypt](https://letsencrypt.org/), [acme_lib](https://docs.rs/acme-lib/0.8.1/acme_lib/index.html) and [rustls](https://github.com/ctz/rustls).
+You can use the embedded HTTPS / TLS setup powered by [LetsEncrypt](https://letsencrypt.org/), [acme_lib](https://docs.rs/acme-lib/0.8.1/acme_lib/index.html) and [rustls](https://github.com/ctz/rustls).
 To setup HTTPS, we'll need to set some environment variables.
 Open `.env` and set:
 
@@ -95,7 +95,7 @@ Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's 
 It will now initialize the certificate.
 Read the logs, watch for errors.
 
-Note that there is no logic yet for renewing certificates - I think removing the generated `.ssl` folder is the easiest approach.
+Note that there is no logic yet for renewing certificates - I think removing the generated `.https` folder is the easiest approach.
 
 ## Testing
 

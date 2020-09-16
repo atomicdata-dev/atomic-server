@@ -1,4 +1,4 @@
-//! Everything required for setting up SSL / HTTPS.
+//! Everything required for setting up HTTPS.
 
 use actix_web::{HttpServer, App};
 use acme_lib::create_p384_key;
@@ -142,21 +142,21 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 }
 
 // RUSTLS
-pub fn get_ssl_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
+pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
     use rustls::internal::pemfile::{certs, pkcs8_private_keys};
-    let mut ssl_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
+    let mut https_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
     let cert_file = &mut BufReader::new(
         File::open(config.cert_path.clone())
-            .expect("No SSL key found."),
+            .expect("No HTTPS TLS key found."),
     );
     let key_file = &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
     let cert_chain = certs(cert_file).unwrap();
     let mut keys = pkcs8_private_keys(key_file).unwrap();
     if keys.is_empty() {
-        panic!("No key found. Consider deleting the `.ssl` directory and restart to create new keys.")
+        panic!("No key found. Consider deleting the `.https` directory and restart to create new keys.")
     }
-    ssl_config
+    https_config
         .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
-    Ok(ssl_config)
+    Ok(https_config)
 }

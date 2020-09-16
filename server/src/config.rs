@@ -27,12 +27,12 @@ pub struct Config {
     pub store_path: PathBuf,
     /// The IP address of the serer. (defaults to 0.0.0.0)
     pub ip: IpAddr,
-    /// If we're using SSL or plaintext HTTP.
+    /// If we're using HTTPS or plaintext HTTP.
     /// Is disabled when using cert_init
     pub https: bool,
-    /// Path where ssl key should be stored for HTTPS. (defaults to .ssl/key.pem)
+    /// Path where TLS key should be stored for HTTPS. (defaults to .https/key.pem)
     pub key_path: String,
-    /// Path where ssl certificate should be stored for HTTPS. (defaults to .ssl/cert.pem)
+    /// Path where TLS certificate should be stored for HTTPS. (defaults to .https/cert.pem)
     pub cert_path: String,
 }
 
@@ -41,8 +41,8 @@ pub fn init() -> Config {
     dotenv().ok();
     let mut development = false;
     let mut domain = String::from("localhost");
-    let cert_path = String::from(".ssl/cert.pem");
-    let key_path = String::from(".ssl/key.pem");
+    let cert_path = String::from(".https/cert.pem");
+    let key_path = String::from(".https/key.pem");
     let mut https = false;
     let mut ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
     let mut port = 80;

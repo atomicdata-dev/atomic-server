@@ -1,3 +1,3 @@
 This folder contains:
 
-- ACME challenges for Let's Encrypt HTTPS SSL certificates
+- ACME challenges for Let's Encrypt HTTPS TLS certificates
