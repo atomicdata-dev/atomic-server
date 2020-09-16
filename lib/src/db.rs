@@ -124,7 +124,7 @@ mod test {
     fn basic() {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let mut store = Db::init("tmp/db").unwrap();
+        let mut store = Db::init("tmp/db", "localhost".into()).unwrap();
         store.populate().unwrap();
         let atoms = parse_ad3(&string).unwrap();
         store.add_atoms(atoms).unwrap();

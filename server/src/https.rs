@@ -22,7 +22,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
         .bind(&http_endpoint).expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
         .run();
     crate::https::request_cert(&config).expect("Certification init failed.");
-    log::warn!("HTTPS SSL Cert init sucesful! Stopping HTTP server, starting HTTPS...");
+    log::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
     running_server.stop(true).await;
     Ok(())
 }
@@ -35,12 +35,12 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
         url = DirectoryUrl::LetsEncryptStaging;
     }
 
-    let ssl_path = ".ssl";
+    let https_path = ".https";
 
-    fs::create_dir_all(PathBuf::from(&ssl_path))?;
+    fs::create_dir_all(PathBuf::from(&https_path))?;
 
     // Save/load keys and certificates to current dir.
-    let persist = FilePersist::new(ssl_path);
+    let persist = FilePersist::new(https_path);
 
     // Create a directory entrypoint.
     let dir = Directory::from_url(persist, url)?;
