@@ -8,7 +8,7 @@
 <!-- Requires a Resource -->
 {% macro propvals(vector) %}
 {% for propval in vector -%}
-<p>
+<div class="propval">
   <b class="propertyLabel">
     <a href="{{ propval.property.subject }}">{{ propval.property.shortname }}</a>
     <!-- <span> </span> -->
@@ -16,6 +16,6 @@
   </b>
   <br/>
   {{ propval.value_html | safe }}
-</p>
+</div>
 {%- endfor %}
 {% endmacro propvals %}

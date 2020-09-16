@@ -17,6 +17,10 @@ body {
   display: inline;
 }
 
+.propval {
+  margin-bottom: 1rem;
+}
+
 .propertyLabel {
   font-size: .7rem;
   font-weight: bold;
