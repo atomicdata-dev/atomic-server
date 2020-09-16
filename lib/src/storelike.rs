@@ -543,26 +543,30 @@ pub trait Storelike {
             }
             // Since the selector isn't an array index, we can assume it's a property URL
             let property_url;
+            match current {
+                PathReturn::Subject(_) => {}
+                PathReturn::Atom(_) => {
+                    return Err("No more linked resources down this path.".into())
+                }
+            }
             // Get the shortname or use the URL
-            if crate::mapping::is_url(&String::from(item)) {
-                property_url = Some(String::from(item));
+            if crate::mapping::is_url(item) {
+                property_url = item.into();
             } else {
                 // Traverse relations, don't use mapping here, but do use classes
                 property_url =
-                    Some(self.property_shortname_to_url(&String::from(item), &resource.clone())?);
+                    self.property_shortname_to_url(item, &resource)?;
             }
             // Set the parent for the next loop equal to the next node.
-            let value = Some(
-                resource
-                    .clone()
-                    .get(&property_url.clone().unwrap())
-                    .unwrap()
-                    .clone(),
-            );
+            // TODO: skip this step if the current iteration is the last one
+            let value = resource
+                    .get(&property_url)
+                    .unwrap();
+            let property = self.get_property(&property_url)?;
             current = PathReturn::Atom(Box::new(RichAtom::new(
                 subject.clone(),
-                self.get_property(&property_url.clone().unwrap()).unwrap(),
-                value.clone().unwrap().clone(),
+                property,
+                value.clone(),
             )?))
         }
         Ok(current)

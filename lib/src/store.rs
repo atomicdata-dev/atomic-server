@@ -184,4 +184,18 @@ mod test {
             }
         }
     }
+
+    #[test]
+    #[should_panic]
+    fn path_fail() {
+        let store = init_store();
+        store.get_path("https://atomicdata.dev/classes/Class requires isa description", None).unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    fn path_fail2() {
+        let store = init_store();
+        store.get_path("https://atomicdata.dev/classes/Class requires requires", None).unwrap();
+    }
 }
