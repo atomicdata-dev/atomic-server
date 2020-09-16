@@ -2,7 +2,8 @@
 {% extends "base.html" %}
 {% block title %}Resource{% endblock title %}
 {% block content %}
-{{ macros::propvals(vector=resource) }}
-
-<em>You can use HTTP content negotation to fetch this resource as JSON, AD3 or Turtle.</em>
+<div class="container grid-lg">
+  {{ macros::propvals(vector=resource) }}
+  <em>You can use HTTP content negotation to fetch this resource as JSON, AD3 or Turtle.</em>
+</div>
 {% endblock content %}
