@@ -46,16 +46,6 @@ impl RichAtom {
     }
 }
 
-impl From<DeltaLine> for Atom {
-    fn from(delta: DeltaLine) -> Self {
-        Atom::new(
-            delta.subject,
-            delta.property,
-            delta.value,
-        )
-    }
-}
-
 impl From<RichAtom> for Atom {
     fn from(richatom: RichAtom) -> Self {
         Atom::new(

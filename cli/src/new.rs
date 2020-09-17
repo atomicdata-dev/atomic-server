@@ -64,7 +64,7 @@ fn prompt_instance(
             new_resource.insert_string(
                 field.subject.clone(),
                 &preffered_shortname.clone().unwrap(),
-                &context.store,
+                &mut context.store,
             )?;
             println!(
                 "Shortname set to {}",
@@ -78,7 +78,7 @@ fn prompt_instance(
         let mut input = prompt_field(&field, false, context)?;
         loop {
             if let Some(i) = input {
-                new_resource.insert_string(field.subject.clone(), &i, &context.store)?;
+                new_resource.insert_string(field.subject.clone(), &i, &mut context.store)?;
                 break;
             } else {
                 println!("Required field, please enter a value.");
@@ -91,7 +91,7 @@ fn prompt_instance(
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         let input = prompt_field(&field, true, context)?;
         if let Some(i) = input {
-            new_resource.insert_string(field.subject.clone(), &i, &context.store)?;
+            new_resource.insert_string(field.subject.clone(), &i, &mut context.store)?;
         }
     }
 
@@ -210,10 +210,11 @@ fn prompt_field(
                             }
                             None => {
                                 println!("Define the Property named {}", item.bold().green(),);
+                                let class = &context.store.get_class(urls::PROPERTY)?.clone();
                                 // TODO: This currently creates Property instances, but this should depend on the class!
                                 let (resource, _shortname) = prompt_instance(
                                     context,
-                                    &context.store.get_class(urls::PROPERTY)?,
+                                    class,
                                     Some(item.into()),
                                 )?;
                                 urls.push(resource.subject().clone());

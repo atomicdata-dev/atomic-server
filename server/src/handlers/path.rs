@@ -21,13 +21,14 @@ pub async fn path(
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let path = &query.path.clone().unwrap_or_default();
-    let context = data.lock().unwrap();
+    let mut context = data.lock().unwrap();
     let content_type = get_accept(req);
+    let mapping = context.mapping.clone();
 
     log::info!("path: {:?}", path);
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let mut builder = HttpResponse::Ok();
-    let path_result = context.store.get_path(&path, Some(&context.mapping))?;
+    let path_result = context.store.get_path(&path, Some(&mapping))?;
     match content_type {
         ContentType::HTML => {
             let mut propvals: Vec<PropVal> = Vec::new();
@@ -36,7 +37,7 @@ pub async fn path(
                     let resource = context
                         .store
                         .get_resource_string(&subject)?;
-                    propvals = from_hashmap_resource(&resource, &context.store, subject)?;
+                    propvals = from_hashmap_resource(&resource, &mut context.store, subject)?;
                 }
                 atomic_lib::storelike::PathReturn::Atom(atom) => {
                     propvals.push(PropVal {

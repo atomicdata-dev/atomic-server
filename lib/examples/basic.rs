@@ -21,7 +21,7 @@ fn main() {
         .unwrap();
     assert!(my_value.to_string() == "Test");
     // We can also use the shortname of description
-    let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
+    let my_value_from_shortname = my_resource.get_shortname("description", &mut store).unwrap();
     assert!(my_value_from_shortname.to_string() == "Test");
     // We can find any Atoms matching some value using Triple Pattern Fragments:
     let found_atoms = store.tpf(None, None, Some("Test")).unwrap();

@@ -12,9 +12,10 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
         // If it's a shortname available from the Class of the resource, use that;
         Err(_) => {
             let shortname = subcommand_matches.value_of("property").unwrap();
+            let resource = &context.store.get_resource_string(&subject)?;
             context.store.property_shortname_to_url(
                 shortname,
-                &context.store.get_resource_string(&subject)?,
+                resource,
             )
         }
     };
@@ -23,12 +24,12 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
     // let property_in = subcommand_matches.value_of("value").unwrap();
     let value = subcommand_matches.value_of("value").unwrap();
 
-    let delta = DeltaLine::new(method, subject, property?, value.into());
+    let delta = DeltaLine::new(method, property?, value.into());
     let mut deltas: Vec<DeltaLine> = Vec::new();
     deltas.push(delta);
     context
         .store
-        .process_delta(Delta::new_from_lines(deltas))?;
+        .process_delta(Delta::new_from_lines(subject, deltas))?;
     Ok(())
 }
 

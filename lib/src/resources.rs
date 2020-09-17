@@ -38,7 +38,7 @@ impl Resource {
     pub fn new_from_resource_string(
         subject: String,
         resource_string: &ResourceString,
-        store: &dyn Storelike,
+        store: &mut dyn Storelike,
     ) -> AtomicResult<Resource> {
         let mut res = Resource::new(subject);
         for (prop_string, val_string) in resource_string {
@@ -59,7 +59,7 @@ impl Resource {
 
     /// Gets a value by its shortname
     // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str, store: &dyn Storelike) -> AtomicResult<&Value> {
+    pub fn get_shortname(&self, shortname: &str, store: &mut dyn Storelike) -> AtomicResult<&Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
             if let Ok(prop) = store.get_property(url) {
@@ -77,7 +77,7 @@ impl Resource {
     pub fn resolve_shortname(
         &mut self,
         shortname: &str,
-        store: &dyn Storelike,
+        store: &mut dyn Storelike,
     ) -> AtomicResult<Option<Property>> {
         if self.classes.is_none() {
             self.classes = Some(store.get_classes_for_subject(self.subject())?);
@@ -106,7 +106,7 @@ impl Resource {
         &mut self,
         property_url: String,
         value: &str,
-        store: &dyn Storelike,
+        store: &mut dyn Storelike,
     ) -> AtomicResult<()> {
         let fullprop = &store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
@@ -201,7 +201,7 @@ mod test {
         let mut resource = store.get_resource(urls::CLASS).unwrap();
         assert!(
             resource
-                .get_shortname("shortname", &store)
+                .get_shortname("shortname", &mut store)
                 .unwrap()
                 .to_string()
                 == "class"
@@ -211,7 +211,7 @@ mod test {
             .unwrap();
         assert!(
             resource
-                .get_shortname("shortname", &store)
+                .get_shortname("shortname", &mut store)
                 .unwrap()
                 .to_string()
                 == "something-valid"

@@ -28,7 +28,7 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
 
 #[cfg(feature = "rdf")]
 /// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
-pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &dyn Storelike) -> AtomicResult<String> {
+pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &mut dyn Storelike) -> AtomicResult<String> {
     use rio_api::formatter::TriplesFormatter;
     use rio_api::model::{Literal, NamedNode, Term, Triple};
     use rio_turtle::NTriplesFormatter;
@@ -87,7 +87,7 @@ mod test {
         let subject = crate::urls::DESCRIPTION;
         let resource = store.get_resource_string(subject).unwrap();
         let atoms = crate::resources::resourcestring_to_atoms(subject, resource);
-        let serialized = atoms_to_ntriples(atoms, &store).unwrap();
+        let serialized = atoms_to_ntriples(atoms, &mut store).unwrap();
         let _out = r#"
         <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/description> "A textual description of the thing."^^<https://atomicdata.dev/datatypes/markdown> .
 <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/isA> "[\"https://atomicdata.dev/classes/Property\"]"^^<https://atomicdata.dev/datatypes/resourceArray> .

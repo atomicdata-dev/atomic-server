@@ -15,7 +15,7 @@ pub async fn get_resource(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
-    let context = data.lock().unwrap();
+    let mut context = data.lock().unwrap();
     log::info!("subject_end: {}", subject_end);
     let subj_end_string = subject_end.to_string();
     let content_type = get_accept(req);
@@ -39,8 +39,8 @@ pub async fn get_resource(
     //     };
     // }
     let subject = format!("{}{}", &context.config.local_base_url, subj_end_string);
+    let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
-    let store = &context.store;
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
     match content_type {
         ContentType::JSON => {

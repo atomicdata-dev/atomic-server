@@ -45,7 +45,7 @@ impl Store {
     }
 
     /// Serializes the current store and saves to path
-    pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
+    pub fn write_store_to_disk(&mut self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
         for (subject, _) in self.all_resources()? {
             let resourcestring = self.resource_to_ad3(&subject)?;
@@ -89,7 +89,7 @@ impl Storelike for Store {
         Ok(res)
     }
 
-    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
+    fn get_resource_string(&mut self, resource_url: &str) -> AtomicResult<ResourceString> {
         match self.hashmap.get(resource_url) {
             Some(result) => Ok(result.clone()),
             None => {
@@ -116,7 +116,7 @@ mod test {
 
     #[test]
     fn get() {
-        let store = init_store();
+        let mut store = init_store();
         let my_resource = store.get_resource_string("_:test").unwrap();
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")
@@ -127,7 +127,7 @@ mod test {
 
     #[test]
     fn validate() {
-        let store = init_store();
+        let mut store = init_store();
         store.validate_store().unwrap();
     }
 
@@ -145,10 +145,10 @@ mod test {
 
     #[test]
     fn get_full_resource_and_shortname() {
-        let store = init_store();
+        let mut store = init_store();
         let resource = store.get_resource(urls::CLASS).unwrap();
         let shortname = resource
-            .get_shortname("shortname", &store)
+            .get_shortname("shortname", &mut store)
             .unwrap()
             .to_string();
         assert!(shortname == "class");
@@ -156,7 +156,7 @@ mod test {
 
     #[test]
     fn serialize() {
-        let store = init_store();
+        let mut store = init_store();
         store
             .resource_to_json(&String::from(urls::CLASS), 1, true)
             .unwrap();
@@ -164,7 +164,7 @@ mod test {
 
     #[test]
     fn path() {
-        let store = init_store();
+        let mut store = init_store();
         let res = store.get_path("https://atomicdata.dev/classes/Class shortname", None).unwrap();
         match res {
             crate::storelike::PathReturn::Subject(_) => {
@@ -188,14 +188,14 @@ mod test {
     #[test]
     #[should_panic]
     fn path_fail() {
-        let store = init_store();
+        let mut store = init_store();
         store.get_path("https://atomicdata.dev/classes/Class requires isa description", None).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn path_fail2() {
-        let store = init_store();
+        let mut store = init_store();
         store.get_path("https://atomicdata.dev/classes/Class requires requires", None).unwrap();
     }
 }

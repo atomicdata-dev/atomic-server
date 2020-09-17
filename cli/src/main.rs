@@ -190,7 +190,7 @@ fn list(context: &mut Context) {
 }
 
 /// Prints a resource to the terminal with readble formatting and colors
-fn pretty_print_resource(url: &str, store: &dyn Storelike) -> AtomicResult<()> {
+fn pretty_print_resource(url: &str, store: &mut dyn Storelike) -> AtomicResult<()> {
     let mut output = String::new();
     let resource = store
         .get_resource_string(url)?;

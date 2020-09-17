@@ -33,6 +33,7 @@ Powered by Rust, Actix-Web, Sled and [more](cargo.toml).
 - [ ] Collections / dynamic resources
 - [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support
 - [ ] Auth support (WebID-OICD possibly?)
+- [ ] Be able to manage the AtomicData.dev website without git
 
 ## Install from source
 
