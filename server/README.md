@@ -4,9 +4,15 @@
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-_Status: pre-alpha_
+_Status: alpha_
 
-A lightweight HTTP server that shares created Atomic data on the web.
+The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
+
+- No runtime dependencies, crazy fast, runs on all platforms (including on your Raspberry Pi)
+- Embedded HTTP / HTTPS / HTTP2.0 server
+- Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and AD3
+
+Powered by Rust, Actix-Web, Sled and [more](cargo.toml).
 
 ## Progress
 

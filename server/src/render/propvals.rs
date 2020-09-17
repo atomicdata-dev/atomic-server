@@ -15,6 +15,7 @@ pub struct PropVal {
 
 pub type PropVals = Vec<PropVal>;
 
+/// Creates a vector of PropVals, which have easy to print HTML values
 pub fn from_hashmap_resource(
     resource: &HashMap<String, String>,
     store: &dyn Storelike,

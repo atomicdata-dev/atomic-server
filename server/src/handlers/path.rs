@@ -40,7 +40,6 @@ pub async fn path(
                 }
                 atomic_lib::storelike::PathReturn::Atom(atom) => {
                     propvals.push(PropVal {
-
                         property: context.store.get_property(&atom.property.subject)?,
                         value_html: crate::render::atom::value_to_html(&atom.native_value),
                         value: atom.value,
