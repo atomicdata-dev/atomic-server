@@ -3,7 +3,6 @@
 use crate::errors::AtomicResult;
 use crate::storelike::Property;
 use crate::values::Value;
-use crate::DeltaLine;
 use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.

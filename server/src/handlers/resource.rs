@@ -4,7 +4,6 @@ use crate::{
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
-use std::path::Path;
 use std::sync::Mutex;
 use tera::Context as TeraCtx;
 

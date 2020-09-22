@@ -4,7 +4,7 @@
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-_Status: alpha_
+_Status: alpha, not ready for production usage. Can panic at runtime._
 
 The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
 
@@ -28,11 +28,12 @@ Powered by Rust, Actix-Web, Sled and [more](cargo.toml).
 - [x] Static asset support for .css / .ico / etc.
 - [x] HTTPS (WIP, kind of working)
 - [x] Content-type negotiation
+- [x] Basic design / use CSS framework
+- [ ] Eliminate all preventable runtime panics (most already done)
 - [ ] URL extension recognition (.json, .ad3, .nt, etc.)
-- [ ] CSS / design
 - [ ] Collections / dynamic resources
-- [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support
-- [ ] Auth support (WebID-OICD possibly?)
+- [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support (might need #16)
+- [ ] Auth support (WebID-OICD possibly?) #13
 - [ ] Be able to manage the AtomicData.dev website without git
 
 ## Install from source
