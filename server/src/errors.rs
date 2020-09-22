@@ -79,3 +79,13 @@ impl From<tera::Error> for AppError {
         }
     }
 }
+
+impl<T> From<std::sync::PoisonError<T>> for AppError {
+    fn from(error: std::sync::PoisonError<T>) -> Self {
+        AppError {
+          message: Some(error.to_string()),
+          cause: None,
+          error_type: AppErrorType::OtherError,
+        }
+    }
+}
