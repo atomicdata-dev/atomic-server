@@ -21,7 +21,7 @@ pub async fn tpf(
     req: actix_web::HttpRequest,
     query: web::Query<TPFQuery>,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data.lock().unwrap();
+    let mut context = data.lock()?;
     let store = &mut context.store;
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let mut builder = HttpResponse::Ok();
@@ -52,7 +52,7 @@ pub async fn tpf(
             tera_context.insert("subject", &subject);
             tera_context.insert("property", &property);
             tera_context.insert("value", &value);
-            let body = context.tera.render("tpf.html", &tera_context).unwrap();
+            let body = context.tera.render("tpf.html", &tera_context)?;
             Ok(builder.body(body))
         }
         ContentType::AD3 => {

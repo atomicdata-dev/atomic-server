@@ -15,7 +15,7 @@ pub async fn get_resource(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data.lock().unwrap();
+    let mut context = data.lock()?;
     log::info!("subject_end: {}", subject_end);
     let subj_end_string = subject_end.to_string();
     let content_type = get_accept(req);
@@ -59,7 +59,7 @@ pub async fn get_resource(
             let resource = store.get_resource_string(&subject)?;
             let propvals = from_hashmap_resource(&resource, store, subject)?;
             tera_context.insert("resource", &propvals);
-            let body = context.tera.render("resource.html", &tera_context).unwrap();
+            let body = context.tera.render("resource.html", &tera_context)?;
             Ok(builder.body(body))
         }
         ContentType::AD3 => {

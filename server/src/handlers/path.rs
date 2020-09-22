@@ -21,7 +21,7 @@ pub async fn path(
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let path = &query.path.clone().unwrap_or_default();
-    let mut context = data.lock().unwrap();
+    let mut context = data.lock()?;
     let content_type = get_accept(req);
     let mapping = context.mapping.clone();
 
@@ -52,7 +52,7 @@ pub async fn path(
             let mut tera_context = TeraCtx::new();
             tera_context.insert("propvals", &propvals);
             tera_context.insert("path", &path);
-            let body = context.tera.render("path.html", &tera_context).unwrap();
+            let body = context.tera.render("path.html", &tera_context)?;
             Ok(builder.body(body))
         }
         unsupported => {

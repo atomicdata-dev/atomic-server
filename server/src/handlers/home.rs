@@ -8,11 +8,10 @@ pub async fn home(
   data: web::Data<Mutex<AppState>>,
 ) -> BetterResult<HttpResponse> {
   let tera_context = TeraCtx::new();
-  let context = data.lock().unwrap();
+  let context = data.lock()?;
   let body = context
               .tera
-              .render("home.html", &tera_context)
-              .unwrap();
+              .render("home.html", &tera_context)?;
   let mut builder = HttpResponse::Ok();
   Ok(builder.body(body))
 }
