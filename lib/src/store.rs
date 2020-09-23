@@ -163,6 +163,38 @@ mod test {
     }
 
     #[test]
+    fn tpf() {
+        let mut store = init_store();
+        // All atoms
+        let atoms = store
+            .tpf(None, None, None)
+            .unwrap();
+        assert!(atoms.len() > 10);
+        // Find by subject
+        let atoms = store
+            .tpf(Some(urls::CLASS), None, None)
+            .unwrap();
+        assert!(atoms.len() == 5);
+        // Find by value
+        let atoms = store
+            .tpf(None, None, Some("class"))
+            .unwrap();
+        assert!(atoms[0].subject == urls::CLASS);
+        assert!(atoms.len() == 1);
+        // Find by property and value
+        let atoms = store
+            .tpf(None, Some(urls::SHORTNAME), Some("class"))
+            .unwrap();
+        assert!(atoms[0].subject == urls::CLASS);
+        assert!(atoms.len() == 1);
+        // Find item in array
+        let atoms = store
+            .tpf(None, Some(urls::IS_A), Some(urls::CLASS))
+            .unwrap();
+        assert!(atoms.len() > 3);
+    }
+
+    #[test]
     fn path() {
         let mut store = init_store();
         let res = store.get_path("https://atomicdata.dev/classes/Class shortname", None).unwrap();

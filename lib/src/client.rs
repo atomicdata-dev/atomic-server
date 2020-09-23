@@ -33,5 +33,14 @@ pub fn post_delta(endpoint: &str, delta: Delta) -> AtomicResult<()> {
         .set("Accept", crate::parse::AD3_MIME)
         .timeout_read(500)
         .call();
+    // So what happens next?
+    // If we'd only have deltalines, serialization could be a simple json array with some strings.
+    // However, now it becomes a bit more complicated.
+    // We could create an empty store, create a Resource from the Delta, serialize it as .AD3.
+    // However, what to do with the deltalines?
+    // One (ugly) solution is to serialize it to JSON arrays... But this feels wrong.
+    // Another one is to create nested Resources for every deltaline.
+    // I think having JSON compatibility should be top priority.
+    todo!();
     Ok(())
 }

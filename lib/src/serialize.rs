@@ -1,7 +1,6 @@
 //! Serialization / formatting / encoding (JSON, RDF, N-Triples, AD3)
 
-use crate::{datatype::DataType, errors::AtomicResult};
-use crate::{Atom, Storelike};
+use crate::{Atom, Storelike, datatype::DataType, errors::AtomicResult};
 
 pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
     let string = serde_json::to_string(items)?;

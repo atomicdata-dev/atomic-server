@@ -36,6 +36,7 @@ assert!(found_atoms.len() == 1);
 
 pub mod atoms;
 pub mod client;
+pub mod collections;
 #[cfg(feature = "db")]
 pub mod db;
 pub mod delta;

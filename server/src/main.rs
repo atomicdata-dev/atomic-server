@@ -1,6 +1,5 @@
 use actix_web::{middleware, web, App, HttpServer};
 use std::{io, sync::Mutex};
-// use actix_web_middleware_redirect_https::RedirectHTTPS;
 mod appstate;
 mod config;
 mod errors;
@@ -17,21 +16,26 @@ async fn main() -> io::Result<()> {
     env_logger::init();
 
     let config = config::init();
+    let https = config.https;
     let appstate = appstate::init(config.clone()).expect("Failed to build appstate.");
 
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
-        App::new()
+        let app = App::new()
             .app_data(data)
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
-            // .wrap(actix_web_middleware_redirect_https::RedirectHTTPS::default())
             .service(actix_files::Files::new("/static", "static/").show_files_listing())
             .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
             .service(web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))))
             .service(web::scope("/path").service(web::resource("").route(web::get().to(handlers::path::path))))
             .service(web::scope("/{path:[^{}]+}").service(web::resource("").route(web::get().to(handlers::resource::get_resource))))
-            .service(web::scope("/").service(web::resource("").route(web::get().to(handlers::home::home))))
+            .service(web::scope("/").service(web::resource("").route(web::get().to(handlers::home::home))));
+        if https {
+            // Needs upate
+            // app.wrap(actix_web_middleware_redirect_https::RedirectHTTPS::default())
+        }
+        app
     });
 
     if config.https {

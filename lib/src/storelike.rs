@@ -1,7 +1,10 @@
 //! Trait for all stores to use
 
-use crate::{errors::AtomicResult, delta::Delta};
 use crate::urls;
+use crate::{
+    collections::Collection, collections::Page, collections::TPFQuery, delta::Delta,
+    errors::AtomicResult,
+};
 use crate::{
     datatype::{match_datatype, DataType},
     mapping::Mapping,
@@ -156,6 +159,45 @@ pub trait Storelike {
         Ok(classes)
     }
 
+    /// Constructs a Collection, which is a paginated list of items with some sorting applied.
+    fn get_collection(
+        &mut self,
+        tpf: TPFQuery,
+        sort_by: String,
+        sort_desc: bool,
+        _page_nr: u8,
+        _page_size: u8,
+    ) -> AtomicResult<Collection> {
+        // Execute the TPF query, get all the subjects.
+        let atoms = self.tpf(None, tpf.property.as_deref(), tpf.value.as_deref())?;
+        // Iterate over the fetched resources
+        let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
+        let mut resources: Vec<ResourceString> = Vec::new();
+        for sub in subjects.clone() {
+            resources.push(self.get_resource_string(&sub)?);
+        }
+        // Sort the resources (TODO), use sortBy and sortDesc
+        let sorted_subjects: Vec<String> = subjects.clone();
+        // Construct the pages (TODO), use pageSize
+        let mut pages: Vec<Page> = Vec::new();
+        // Construct the requested page (TODO)
+        let page = Page {
+            members: sorted_subjects,
+        };
+        pages.push(page);
+        let collection = Collection {
+            tpf,
+            total_pages: pages.len() as u8,
+            pages,
+            sort_by,
+            sort_desc,
+            current_page: 0,
+            total_items: subjects.len() as u8,
+            page_size: subjects.len() as u8,
+        };
+        Ok(collection)
+    }
+
     /// Fetches a property by URL, returns a Property instance
     fn get_property(&mut self, url: &str) -> AtomicResult<Property> {
         let property_resource = self.get_resource_string(url)?;
@@ -218,7 +260,8 @@ pub trait Storelike {
                         .data_type;
                     Value::new(&deltaline.value, &datatype)?;
                     updated_resources.push(delta.subject.clone());
-                    let atom = Atom::new(delta.subject.clone(), deltaline.property, deltaline.value);
+                    let atom =
+                        Atom::new(delta.subject.clone(), deltaline.property, deltaline.value);
                     self.add_atom(atom)?;
                 }
                 urls::DELETE | "delete" => {
@@ -228,7 +271,8 @@ pub trait Storelike {
             };
         }
         Ok(())
-    }    /// Finds the URL of a shortname used in the context of a specific Resource.
+    }
+    /// Finds the URL of a shortname used in the context of a specific Resource.
     /// The Class, Properties and Shortnames of the Resource are used to find this URL
     fn property_shortname_to_url(
         &mut self,
@@ -415,18 +459,34 @@ pub trait Storelike {
             return Ok(vec);
         }
 
+        // If the value is a resourcearray, check if it is inside
+        let val_equals = |val: &str| {
+            let q = q_value.unwrap();
+            val == q || {
+                if val.starts_with('[') {
+                match crate::parse::parse_json_array(val) {
+                        Ok(vec) => {
+                            return vec.contains(&q.into())
+                        }
+                        Err(_) => return false
+                    }
+                }
+                false
+            }
+        };
+
         // Find atoms matching the TPF query in a single resource
         let mut find_in_resource = |subj: &str, resource: &ResourceString| {
             for (prop, val) in resource.iter() {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                     if hasval {
-                        if val == q_value.as_ref().unwrap() {
+                        if val_equals(val) {
                             vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                         }
                     } else {
                         vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                     }
-                } else if hasval && q_value.as_ref().unwrap() == val {
+                } else if hasval && val_equals(val) {
                     vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                 }
             }
@@ -457,7 +517,11 @@ pub trait Storelike {
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(&mut self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
+    fn get_path(
+        &mut self,
+        atomic_path: &str,
+        mapping: Option<&Mapping>,
+    ) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
