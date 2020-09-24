@@ -47,7 +47,7 @@ impl Store {
     /// Serializes the current store and saves to path
     pub fn write_store_to_disk(&mut self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
-        for (subject, _) in self.all_resources()? {
+        for (subject, _) in self.all_resources() {
             let resourcestring = self.resource_to_ad3(&subject)?;
             file_string.push_str(&*resourcestring);
         }
@@ -85,9 +85,8 @@ impl Storelike for Store {
         Ok(())
     }
 
-    fn all_resources(&self) -> AtomicResult<ResourceCollection> {
-        let res = self.hashmap.lock().unwrap().clone().into_iter().collect();
-        Ok(res)
+    fn all_resources(&self) -> ResourceCollection {
+        self.hashmap.lock().unwrap().clone().into_iter().collect()
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
@@ -106,17 +105,12 @@ mod test {
     use crate::{parse::parse_ad3, urls};
 
     fn init_store() -> Store {
-        println!("HALLO");
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let store = Store::init();
-        println!("POPULATE");
         store.populate().unwrap();
-        println!("PARSE");
         let atoms = parse_ad3(&string).unwrap();
-        println!("ADD");
         store.add_atoms(atoms).unwrap();
-        println!("DONE INIT");
         store
     }
 
@@ -134,11 +128,10 @@ mod test {
     #[test]
     fn validate() {
         let store = init_store();
-        store.validate_store().unwrap();
+        assert!(store.validate().is_valid())
     }
 
     #[test]
-    #[should_panic]
     fn validate_invalid() {
         let store = init_store();
         let invalid_ad3 =
@@ -146,7 +139,8 @@ mod test {
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
         let atoms = parse_ad3(&invalid_ad3).unwrap();
         store.add_atoms(atoms).unwrap();
-        store.validate_store().unwrap();
+        let report = store.validate();
+        assert!(!report.is_valid());
     }
 
     #[test]

@@ -51,6 +51,7 @@ pub mod store;
 pub mod store_native;
 pub mod storelike;
 pub mod urls;
+pub mod validate;
 pub mod values;
 
 pub use atoms::Atom;

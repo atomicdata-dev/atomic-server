@@ -239,7 +239,7 @@ fn populate(context: &mut Context) -> AtomicResult<()> {
 
 /// Validates the store
 fn validate(context: &mut Context) -> AtomicResult<()> {
-    context.store.validate_store()?;
-    println!("Store is valid!");
+    let reportstring = context.store.validate().to_string();
+    println!("{}", reportstring);
     Ok(())
 }

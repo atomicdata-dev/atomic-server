@@ -105,15 +105,15 @@ impl Storelike for Db {
         }
     }
 
-    fn all_resources(&self) -> AtomicResult<ResourceCollection> {
+    fn all_resources(&self) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         for item in self.resources.into_iter() {
-            let (subject_bin, resource_bin) = item?;
-            let subby: String = bincode::deserialize(&subject_bin)?;
-            let resource: ResourceString = bincode::deserialize(&resource_bin)?;
-            resources.push((subby, resource));
+            let (subject_bin, resource_bin) = item.unwrap();
+            let subject: String = bincode::deserialize(&subject_bin).unwrap();
+            let resource: ResourceString = bincode::deserialize(&resource_bin).unwrap();
+            resources.push((subject, resource));
         }
-        Ok(resources)
+        resources
     }
 }
 
