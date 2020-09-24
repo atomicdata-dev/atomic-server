@@ -468,7 +468,7 @@ pub trait Storelike {
                         Ok(vec) => {
                             return vec.contains(&q.into())
                         }
-                        Err(_) => return false
+                        Err(_) => return val == q
                     }
                 }
                 false
