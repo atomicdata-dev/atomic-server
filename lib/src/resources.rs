@@ -59,7 +59,11 @@ impl Resource {
 
     /// Gets a value by its shortname
     // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str, store: &mut dyn Storelike) -> AtomicResult<&Value> {
+    pub fn get_shortname(
+        &self,
+        shortname: &str,
+        store: &mut dyn Storelike,
+    ) -> AtomicResult<&Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
             if let Ok(prop) = store.get_property(url) {
@@ -72,6 +76,15 @@ impl Resource {
         Err("No match".into())
     }
 
+    /// Checks if the classes are there, if not, fetches them
+    pub fn get_classes(&mut self, store: &mut dyn Storelike) -> AtomicResult<Vec<Class>> {
+        if self.classes.is_none() {
+            self.classes = Some(store.get_classes_for_subject(self.subject())?);
+        }
+        let classes = self.classes.clone().unwrap();
+        Ok(classes)
+    }
+
     /// Tries to resolve the shortname to a URL.
     // Currently assumes that classes have been set before.
     pub fn resolve_shortname(
@@ -79,10 +92,7 @@ impl Resource {
         shortname: &str,
         store: &mut dyn Storelike,
     ) -> AtomicResult<Option<Property>> {
-        if self.classes.is_none() {
-            self.classes = Some(store.get_classes_for_subject(self.subject())?);
-        }
-        let classes = self.classes.clone().unwrap();
+        let classes = self.get_classes(store)?;
         // Loop over all Requires and Recommends props
         for class in classes {
             for required_prop in class.requires {
