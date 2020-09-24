@@ -51,7 +51,7 @@ impl Db {
 }
 
 impl Storelike for Db {
-    fn add_atoms(&mut self, atoms: Vec<Atom>) -> AtomicResult<()> {
+    fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
         for atom in atoms {
             self.add_atom(atom)?;
         }
@@ -59,16 +59,12 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn add_resource(&mut self, resource: &Resource) -> AtomicResult<()> {
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
         self.add_resource_string(resource.subject().clone(), &resource.to_plain())?;
         Ok(())
     }
 
-    fn add_resource_string(
-        &mut self,
-        subject: String,
-        resource: &ResourceString,
-    ) -> AtomicResult<()> {
+    fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
         let res_bin = bincode::serialize(resource)?;
         let sub_bin = bincode::serialize(&subject)?;
         self.resources.insert(sub_bin, res_bin)?;
@@ -76,7 +72,7 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_resource_string(&mut self, resource_url: &str) -> AtomicResult<ResourceString> {
+    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         match self
             .resources
             // Todo: return some custom error types here
@@ -90,15 +86,22 @@ impl Storelike for Db {
             }
             None => {
                 if resource_url.starts_with(&self.base_url) {
-                    return Err(format!("Failed to retrieve {}, does not exist locally", resource_url).into())
+                    return Err(format!(
+                        "Failed to retrieve {}, does not exist locally",
+                        resource_url
+                    )
+                    .into());
                 }
 
                 match self.fetch_resource(resource_url) {
-                Ok(got) => Ok(got),
-                Err(e) => {
-                    Err(format!("Failed to retrieve {} from the web: {}", resource_url, e).into())
+                    Ok(got) => Ok(got),
+                    Err(e) => Err(format!(
+                        "Failed to retrieve {} from the web: {}",
+                        resource_url, e
+                    )
+                    .into()),
                 }
-            }},
+            }
         }
     }
 
@@ -117,19 +120,18 @@ impl Storelike for Db {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{parse::parse_ad3, Storelike};
 
     // Same as examples/basic.rs
     #[test]
     fn basic() {
-        let string =
-            String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let mut store = Db::init("tmp/db", "localhost".into()).unwrap();
+        // Import the `Storelike` trait to get access to most functions
+        use crate::Storelike;
+        // Start with initializing our store
+        let store = Db::init("tmp/db", "localhost".into()).unwrap();
+        // Load the default Atomic Data Atoms
         store.populate().unwrap();
-        let atoms = parse_ad3(&string).unwrap();
-        store.add_atoms(atoms).unwrap();
         // Let's parse this AD3 string. It looks awkward because of the escaped quotes.
-        let string = "[\"_:test\",\"https://atomicdata.dev/properties/description\",\"Test\"]";
+        let string = r#"["_:test","https://atomicdata.dev/properties/description","Test"]"#;
         // The parser returns a Vector of Atoms
         let atoms = crate::parse::parse_ad3(&string).unwrap();
         // Add the Atoms to the Store
@@ -142,7 +144,10 @@ mod test {
             .unwrap();
         assert!(my_value.to_string() == "Test");
         // We can also use the shortname of description
-        let my_value_from_shortname = my_resource.get_shortname("description", &mut store).unwrap();
-        assert!(my_value_from_shortname.to_string() == "Test")
+        let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
+        assert!(my_value_from_shortname.to_string() == "Test");
+        // We can find any Atoms matching some value using Triple Pattern Fragments:
+        let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
+        assert!(found_atoms.len() == 1);
     }
 }

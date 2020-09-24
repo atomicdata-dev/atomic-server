@@ -10,13 +10,13 @@ use crate::{
     storelike::{ResourceCollection, Storelike},
     ResourceString,
 };
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
 #[derive(Clone)]
 pub struct Store {
     // The store currently holds two stores - that is not ideal
-    hashmap: HashMap<String, ResourceString>,
+    hashmap: Arc<Mutex<HashMap<String, ResourceString>>>,
     log: mutations::Log,
 }
 
@@ -27,7 +27,7 @@ impl Store {
     /// let store = Store::init();
     pub fn init() -> Store {
         Store {
-            hashmap: HashMap::new(),
+            hashmap: Arc::new(Mutex::new(HashMap::new())),
             log: Vec::new(),
         }
     }
@@ -59,16 +59,17 @@ impl Store {
 }
 
 impl Storelike for Store {
-    fn add_atoms(&mut self, atoms: Vec<Atom>) -> AtomicResult<()> {
+    fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
+        let mut hm = self.hashmap.lock().unwrap();
         for atom in atoms {
-            match self.hashmap.get_mut(&atom.subject) {
+            match hm.get_mut(&atom.subject) {
                 Some(resource) => {
                     resource.insert(atom.property, atom.value);
                 }
                 None => {
                     let mut resource: ResourceString = HashMap::new();
                     resource.insert(atom.property, atom.value);
-                    self.hashmap.insert(atom.subject, resource);
+                    hm.insert(atom.subject, resource);
                 }
             }
         }
@@ -76,21 +77,21 @@ impl Storelike for Store {
     }
 
     fn add_resource_string(
-        &mut self,
+        &self,
         subject: String,
         resource: &ResourceString,
     ) -> AtomicResult<()> {
-        self.hashmap.insert(subject, resource.clone());
+        self.hashmap.lock().unwrap().insert(subject, resource.clone());
         Ok(())
     }
 
     fn all_resources(&self) -> AtomicResult<ResourceCollection> {
-        let res = self.hashmap.clone().into_iter().collect();
+        let res = self.hashmap.lock().unwrap().clone().into_iter().collect();
         Ok(res)
     }
 
-    fn get_resource_string(&mut self, resource_url: &str) -> AtomicResult<ResourceString> {
-        match self.hashmap.get(resource_url) {
+    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
+        match self.hashmap.lock().unwrap().get(resource_url) {
             Some(result) => Ok(result.clone()),
             None => {
                 Ok(self.fetch_resource(resource_url)?)
@@ -105,18 +106,23 @@ mod test {
     use crate::{parse::parse_ad3, urls};
 
     fn init_store() -> Store {
+        println!("HALLO");
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let mut store = Store::init();
+        let store = Store::init();
+        println!("POPULATE");
         store.populate().unwrap();
+        println!("PARSE");
         let atoms = parse_ad3(&string).unwrap();
+        println!("ADD");
         store.add_atoms(atoms).unwrap();
+        println!("DONE INIT");
         store
     }
 
     #[test]
     fn get() {
-        let mut store = init_store();
+        let store = init_store();
         let my_resource = store.get_resource_string("_:test").unwrap();
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")
@@ -127,14 +133,14 @@ mod test {
 
     #[test]
     fn validate() {
-        let mut store = init_store();
+        let store = init_store();
         store.validate_store().unwrap();
     }
 
     #[test]
     #[should_panic]
     fn validate_invalid() {
-        let mut store = init_store();
+        let store = init_store();
         let invalid_ad3 =
             // 'requires' should be an array, but is a string
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
@@ -145,10 +151,10 @@ mod test {
 
     #[test]
     fn get_full_resource_and_shortname() {
-        let mut store = init_store();
+        let store = init_store();
         let resource = store.get_resource(urls::CLASS).unwrap();
         let shortname = resource
-            .get_shortname("shortname", &mut store)
+            .get_shortname("shortname", &store)
             .unwrap()
             .to_string();
         assert!(shortname == "class");
@@ -156,7 +162,7 @@ mod test {
 
     #[test]
     fn serialize() {
-        let mut store = init_store();
+        let store = init_store();
         store
             .resource_to_json(&String::from(urls::CLASS), 1, true)
             .unwrap();
@@ -164,7 +170,7 @@ mod test {
 
     #[test]
     fn tpf() {
-        let mut store = init_store();
+        let store = init_store();
         // All atoms
         let atoms = store
             .tpf(None, None, None)
@@ -196,7 +202,7 @@ mod test {
 
     #[test]
     fn path() {
-        let mut store = init_store();
+        let store = init_store();
         let res = store.get_path("https://atomicdata.dev/classes/Class shortname", None).unwrap();
         match res {
             crate::storelike::PathReturn::Subject(_) => {
@@ -220,14 +226,14 @@ mod test {
     #[test]
     #[should_panic]
     fn path_fail() {
-        let mut store = init_store();
+        let store = init_store();
         store.get_path("https://atomicdata.dev/classes/Class requires isa description", None).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn path_fail2() {
-        let mut store = init_store();
+        let store = init_store();
         store.get_path("https://atomicdata.dev/classes/Class requires requires", None).unwrap();
     }
 }

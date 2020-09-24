@@ -51,23 +51,23 @@ pub type ResourceCollection = Vec<(String, ResourceString)>;
 pub trait Storelike {
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
-    fn add_atoms(&mut self, atoms: Vec<Atom>) -> AtomicResult<()>;
+    fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
 
     /// Replaces existing resource with the contents
     /// Accepts a simple nested string only hashmap
     /// Adds to hashmap and to the resource store
     fn add_resource_string(
-        &mut self,
+        &self,
         subject: String,
         resource: &ResourceString,
     ) -> AtomicResult<()>;
 
     /// Returns a hashmap ResourceString with string Values.
     /// Fetches the resource if it is not in the store.
-    fn get_resource_string(&mut self, subject: &str) -> AtomicResult<ResourceString>;
+    fn get_resource_string(&self, subject: &str) -> AtomicResult<ResourceString>;
 
     /// Adds a Resource to the store
-    fn add_resource(&mut self, resource: &Resource) -> AtomicResult<()> {
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
         self.add_resource_string(resource.subject().clone(), &resource.to_plain())?;
         Ok(())
     }
@@ -75,14 +75,14 @@ pub trait Storelike {
     /// Fetches a resource, makes sure its subject matches.
     /// Save to the store.
     /// Only adds atoms with matching subjects will be added.
-    fn fetch_resource(&mut self, subject: &str) -> AtomicResult<ResourceString> {
+    fn fetch_resource(&self, subject: &str) -> AtomicResult<ResourceString> {
         let resource: ResourceString = crate::client::fetch_resource(subject)?;
         self.add_resource_string(subject.into(), &resource)?;
         Ok(resource)
     }
 
     /// Returns a full Resource with native Values
-    fn get_resource(&mut self, subject: &str) -> AtomicResult<Resource> {
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
         let resource_string = self.get_resource_string(subject)?;
         let mut res = Resource::new(subject.into());
         for (prop_string, val_string) in resource_string {
@@ -98,7 +98,7 @@ pub trait Storelike {
     }
 
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
-    fn get_class(&mut self, subject: &str) -> AtomicResult<Class> {
+    fn get_class(&self, subject: &str) -> AtomicResult<Class> {
         // The string representation of the Class
         let class_strings = self.get_resource_string(subject).expect("Class not found");
         let shortname = class_strings
@@ -112,7 +112,7 @@ pub trait Storelike {
 
         let mut requires: Vec<Property> = Vec::new();
         let mut recommends: Vec<Property> = Vec::new();
-        let mut get_properties = |resource_array: &str| -> Vec<Property> {
+        let get_properties = |resource_array: &str| -> Vec<Property> {
             let mut properties: Vec<Property> = vec![];
             let string_vec: Vec<String> = crate::parse::parse_json_array(&resource_array).unwrap();
             for prop_url in string_vec {
@@ -139,7 +139,7 @@ pub trait Storelike {
 
     /// Finds all classes (isA) for any subject.
     /// Returns an empty vector if there are none.
-    fn get_classes_for_subject(&mut self, subject: &str) -> AtomicResult<Vec<Class>> {
+    fn get_classes_for_subject(&self, subject: &str) -> AtomicResult<Vec<Class>> {
         let resource = self.get_resource_string(subject)?;
         let classes_array_opt = resource.get(urls::IS_A);
         let classes_array = match classes_array_opt {
@@ -161,7 +161,7 @@ pub trait Storelike {
 
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     fn get_collection(
-        &mut self,
+        &self,
         tpf: TPFQuery,
         sort_by: String,
         sort_desc: bool,
@@ -199,7 +199,7 @@ pub trait Storelike {
     }
 
     /// Fetches a property by URL, returns a Property instance
-    fn get_property(&mut self, url: &str) -> AtomicResult<Property> {
+    fn get_property(&self, url: &str) -> AtomicResult<Property> {
         let property_resource = self.get_resource_string(url)?;
         let property = Property {
             data_type: match_datatype(
@@ -227,7 +227,7 @@ pub trait Storelike {
     fn all_resources(&self) -> AtomicResult<ResourceCollection>;
 
     /// Adds an atom to the store. Does not do any validations
-    fn add_atom(&mut self, atom: Atom) -> AtomicResult<()> {
+    fn add_atom(&self, atom: Atom) -> AtomicResult<()> {
         match self.get_resource_string(&atom.subject).as_mut() {
             Ok(resource) => {
                 // Overwrites existing properties
@@ -248,7 +248,7 @@ pub trait Storelike {
     /// Processes a vector of deltas and updates the store.
     /// Panics if the
     /// Use this for ALL updates to the store!
-    fn process_delta(&mut self, delta: Delta) -> AtomicResult<()> {
+    fn process_delta(&self, delta: Delta) -> AtomicResult<()> {
         let mut updated_resources = Vec::new();
 
         for deltaline in delta.lines.into_iter() {
@@ -275,7 +275,7 @@ pub trait Storelike {
     /// Finds the URL of a shortname used in the context of a specific Resource.
     /// The Class, Properties and Shortnames of the Resource are used to find this URL
     fn property_shortname_to_url(
-        &mut self,
+        &self,
         shortname: &str,
         resource: &ResourceString,
     ) -> AtomicResult<String> {
@@ -292,7 +292,7 @@ pub trait Storelike {
     }
 
     /// Finds
-    fn property_url_to_shortname(&mut self, url: &str) -> AtomicResult<String> {
+    fn property_url_to_shortname(&self, url: &str) -> AtomicResult<String> {
         let resource = self.get_resource_string(url)?;
         let property_resource = resource
             .get(urls::SHORTNAME)
@@ -302,7 +302,7 @@ pub trait Storelike {
     }
 
     /// fetches a resource, serializes it to .ad3
-    fn resource_to_ad3(&mut self, subject: &str) -> AtomicResult<String> {
+    fn resource_to_ad3(&self, subject: &str) -> AtomicResult<String> {
         let mut string = String::new();
         let resource = self.get_resource_string(subject)?;
 
@@ -320,7 +320,7 @@ pub trait Storelike {
     // Todo:
     // [ ] Resources into objects, if the nesting depth allows it
     fn resource_to_json(
-        &mut self,
+        &self,
         resource_url: &str,
         // Not yet used
         _depth: u8,
@@ -438,7 +438,7 @@ pub trait Storelike {
     // Very costly, slow implementation.
     // Does not assume any indexing.
     fn tpf(
-        &mut self,
+        &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
         q_value: Option<&str>,
@@ -518,7 +518,7 @@ pub trait Storelike {
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
     fn get_path(
-        &mut self,
+        &self,
         atomic_path: &str,
         mapping: Option<&Mapping>,
     ) -> AtomicResult<PathReturn> {
@@ -617,7 +617,7 @@ pub trait Storelike {
     /// - [ ] If the URLs are publicly accessible and return the right type of data
     /// - [ ] Returns a report, instead of throws an error
     #[allow(dead_code, unreachable_code)]
-    fn validate_store(&mut self) -> AtomicResult<()> {
+    fn validate_store(&self) -> AtomicResult<()> {
         for (subject, resource) in self.all_resources()? {
             println!("Subject: {:?}", subject);
             println!("Resource: {:?}", resource);
@@ -652,10 +652,12 @@ pub trait Storelike {
     }
 
     /// Loads the default store
-    fn populate(&mut self) -> AtomicResult<()> {
+    fn populate(&self) -> AtomicResult<()> {
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
+        println!("POPULATE INSIDE PARSED");
         self.add_atoms(atoms)?;
+        println!("POPULATE INSIDE ADDED");
         Ok(())
     }
 }

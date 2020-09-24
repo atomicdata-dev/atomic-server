@@ -62,7 +62,7 @@ impl Resource {
     pub fn get_shortname(
         &self,
         shortname: &str,
-        store: &mut dyn Storelike,
+        store: &dyn Storelike,
     ) -> AtomicResult<&Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
@@ -77,7 +77,7 @@ impl Resource {
     }
 
     /// Checks if the classes are there, if not, fetches them
-    pub fn get_classes(&mut self, store: &mut dyn Storelike) -> AtomicResult<Vec<Class>> {
+    pub fn get_classes(&mut self, store: &dyn Storelike) -> AtomicResult<Vec<Class>> {
         if self.classes.is_none() {
             self.classes = Some(store.get_classes_for_subject(self.subject())?);
         }
@@ -90,7 +90,7 @@ impl Resource {
     pub fn resolve_shortname(
         &mut self,
         shortname: &str,
-        store: &mut dyn Storelike,
+        store: &dyn Storelike,
     ) -> AtomicResult<Option<Property>> {
         let classes = self.get_classes(store)?;
         // Loop over all Requires and Recommends props
@@ -138,7 +138,7 @@ impl Resource {
         &mut self,
         property: &str,
         value: &str,
-        store: &mut dyn Storelike,
+        store: &dyn Storelike,
     ) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
             store.get_property(property)?
@@ -198,7 +198,7 @@ mod test {
     fn init_store() -> Store {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let mut store = Store::init();
+        let store = Store::init();
         store.populate().unwrap();
         let atoms = parse_ad3(&string).unwrap();
         store.add_atoms(atoms).unwrap();
@@ -207,27 +207,27 @@ mod test {
 
     #[test]
     fn get_and_set_resource_props() {
-        let mut store = init_store();
+        let store = init_store();
         let mut resource = store.get_resource(urls::CLASS).unwrap();
         assert!(
             resource
-                .get_shortname("shortname", &mut store)
+                .get_shortname("shortname", &store)
                 .unwrap()
                 .to_string()
                 == "class"
         );
         resource
-            .set_prop("shortname", "something-valid", &mut store)
+            .set_prop("shortname", "something-valid", &store)
             .unwrap();
         assert!(
             resource
-                .get_shortname("shortname", &mut store)
+                .get_shortname("shortname", &store)
                 .unwrap()
                 .to_string()
                 == "something-valid"
         );
         resource
-            .set_prop("shortname", "should not contain spaces", &mut store)
+            .set_prop("shortname", "should not contain spaces", &store)
             .unwrap_err();
     }
 }
