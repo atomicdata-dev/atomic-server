@@ -8,11 +8,11 @@ _Status: alpha, not ready for production usage. Can panic at runtime._
 
 The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
 
-- No runtime dependencies, crazy fast, runs on all platforms (including on your Raspberry Pi)
+- No runtime dependencies, fast, runs on all platforms (including on your Raspberry Pi)
 - Embedded HTTP / HTTPS / HTTP2.0 server
 - Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and AD3
 
-Powered by Rust, Actix-Web, Sled and [more](cargo.toml).
+Powered by Rust, atomic_lib, actix-web, Sled and [more](cargo.toml).
 
 ## Progress
 
@@ -31,7 +31,7 @@ Powered by Rust, Actix-Web, Sled and [more](cargo.toml).
 - [x] Basic design / use CSS framework
 - [ ] Eliminate all preventable runtime panics (most already done)
 - [ ] URL extension recognition (.json, .ad3, .nt, etc.)
-- [ ] Collections / dynamic resources
+- [ ] Collections / dynamic resources #17
 - [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support (might need #16)
 - [ ] Auth support (WebID-OICD possibly?) #13
 - [ ] Be able to manage the AtomicData.dev website without git
