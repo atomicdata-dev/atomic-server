@@ -26,7 +26,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
       };
 
   // Returns a URL or Value
-  let result = context.store.get_path(path_string, Some(&context.mapping));
+  let result = context.store.get_path(path_string, Some(&context.mapping.lock().unwrap()));
   let store = &mut context.store;
   match result {
       Ok(res) => match res {

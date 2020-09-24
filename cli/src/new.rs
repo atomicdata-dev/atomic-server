@@ -21,7 +21,7 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
         .unwrap()
         .value_of("class")
         .expect("Add a class value");
-    let class_url = context.mapping.try_mapping_or_url(class_input).unwrap();
+    let class_url = context.mapping.lock().unwrap().try_mapping_or_url(class_input).unwrap();
     let class = context.store.get_class(&class_url)?;
     println!("Enter a new {}: {}", class.shortname, class.description);
     let (resource, _bookmark) = prompt_instance(context, &class, None)?;
@@ -36,11 +36,11 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
 /// Lets the user enter an instance of an Atomic Class through multiple prompts
 /// Adds the instance to the store, and writes to disk.
 /// Returns the Resource, its URL and its Bookmark.
-fn prompt_instance(
-    context: &mut Context,
+fn prompt_instance<'a>(
+    context: &'a Context,
     class: &Class,
     preffered_shortname: Option<String>,
-) -> AtomicResult<(Resource, Option<String>)> {
+) -> AtomicResult<(Resource<'a>, Option<String>)> {
     // Not sure about the best way t
     // The Path is the thing at the end of the URL, from the domain
     // Here I set some (kind of) random numbers.
@@ -52,7 +52,7 @@ fn prompt_instance(
         subject = format!("{}/{}-{}", context.base_url, path, preffered_shortname.clone().unwrap());
     }
 
-    let mut new_resource: Resource = Resource::new(subject.clone());
+    let mut new_resource: Resource = Resource::new(subject.clone(), &context.store);
 
     new_resource.insert(
         "https://atomicdata.dev/properties/isA".into(),
@@ -64,7 +64,6 @@ fn prompt_instance(
             new_resource.insert_string(
                 field.subject.clone(),
                 &preffered_shortname.clone().unwrap(),
-                &mut context.store,
             )?;
             println!(
                 "Shortname set to {}",
@@ -78,7 +77,7 @@ fn prompt_instance(
         let mut input = prompt_field(&field, false, context)?;
         loop {
             if let Some(i) = input {
-                new_resource.insert_string(field.subject.clone(), &i, &mut context.store)?;
+                new_resource.insert_string(field.subject.clone(), &i)?;
                 break;
             } else {
                 println!("Required field, please enter a value.");
@@ -91,20 +90,20 @@ fn prompt_instance(
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         let input = prompt_field(&field, true, context)?;
         if let Some(i) = input {
-            new_resource.insert_string(field.subject.clone(), &i, &mut context.store)?;
+            new_resource.insert_string(field.subject.clone(), &i)?;
         }
     }
 
     println!("{} created with URL: {}", &class.shortname, &subject);
 
-    let map = prompt_bookmark(&mut context.mapping, &subject);
+    let map = prompt_bookmark(&mut context.mapping.lock().unwrap(), &subject);
 
     // Add created_instance to store
     context
         .store
         .add_resource_string(new_resource.subject().clone(), &new_resource.to_plain())?;
     context
-        .mapping
+        .mapping.lock().unwrap()
         .write_mapping_to_disk(&context.user_mapping_path);
     Ok((new_resource, map))
 }
@@ -113,7 +112,7 @@ fn prompt_instance(
 fn prompt_field(
     property: &Property,
     optional: bool,
-    context: &mut Context,
+    context: &Context,
 ) -> AtomicResult<Option<String>> {
     let mut input: Option<String> = None;
     let msg_appendix;
@@ -182,7 +181,7 @@ fn prompt_field(
             }
             if let Some(u) = url {
                 // TODO: Check if string or if map
-                input = context.mapping.try_mapping_or_url(&u);
+                input = context.mapping.lock().unwrap().try_mapping_or_url(&u);
                 match input {
                     Some(url) => return Ok(Some(url)),
                     None => {
@@ -204,7 +203,7 @@ fn prompt_field(
                     let mut urls: Vec<String> = Vec::new();
                     let length = string_items.clone().count();
                     for item in string_items.into_iter() {
-                        match context.mapping.try_mapping_or_url(item) {
+                        match context.mapping.lock().unwrap().try_mapping_or_url(item) {
                             Some(url) => {
                                 urls.push(url);
                             }

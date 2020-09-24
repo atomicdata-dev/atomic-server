@@ -4,7 +4,7 @@ use atomic_lib::mapping::Mapping;
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
 use colored::*;
 use dirs::home_dir;
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::Mutex};
 
 mod delta;
 mod new;
@@ -14,7 +14,7 @@ mod path;
 pub struct Context<'a> {
     base_url: String,
     store: atomic_lib::Store,
-    mapping: Mapping,
+    mapping: Mutex<Mapping>,
     matches: ArgMatches<'a>,
     config_folder: PathBuf,
     user_mapping_path: PathBuf,
@@ -136,7 +136,7 @@ fn main() -> AtomicResult<()> {
     let mut context = Context {
         // TODO: This should be configurable
         base_url: "http://localhost/".into(),
-        mapping,
+        mapping: Mutex::new(mapping),
         store,
         matches,
         config_folder,
@@ -179,7 +179,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()>{
 /// List all bookmarks
 fn list(context: &mut Context) {
     let mut string = String::new();
-    for (shortname, url) in context.mapping.clone().into_iter() {
+    for (shortname, url) in context.mapping.lock().unwrap().clone().into_iter() {
         string.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             shortname.blue().bold(),
