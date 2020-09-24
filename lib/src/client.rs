@@ -28,8 +28,8 @@ pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
 }
 
 /// Posts a delta to an endpoint
-pub fn post_delta(endpoint: &str, delta: Delta) -> AtomicResult<()> {
-    let resp = ureq::post(&endpoint)
+pub fn post_delta(endpoint: &str, _delta: Delta) -> AtomicResult<()> {
+    let _resp = ureq::post(&endpoint)
         .set("Accept", crate::parse::AD3_MIME)
         .timeout_read(500)
         .call();
@@ -42,5 +42,4 @@ pub fn post_delta(endpoint: &str, delta: Delta) -> AtomicResult<()> {
     // Another one is to create nested Resources for every deltaline.
     // I think having JSON compatibility should be top priority.
     todo!();
-    Ok(())
 }

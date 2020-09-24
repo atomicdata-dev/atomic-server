@@ -43,7 +43,7 @@ mod test {
 
     #[test]
     fn create_collection() {
-        let mut store = crate::Store::init();
+        let store = crate::Store::init();
         store.populate().unwrap();
         let tpf = TPFQuery {
             subject: None,
