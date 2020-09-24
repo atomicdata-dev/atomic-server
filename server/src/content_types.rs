@@ -32,8 +32,17 @@ impl ContentType {
 }
 
 /// Returns the preffered content type.
+/// Defaults to HTML if none is found.
 pub fn get_accept(req: actix_web::HttpRequest) -> ContentType {
-    let accept_header = req.headers().get("Accept").unwrap().to_str().unwrap();
+    let accept_header = match req.headers().get("Accept") {
+        Some(header) => {
+            header.to_str().unwrap_or("")
+        }
+        None => {
+            return ContentType::HTML
+        }
+    };
+    // let accept_header = req.headers().get("Accept").unwrap().to_str().unwrap();
     parse_accept_header(accept_header)
 }
 
