@@ -9,7 +9,7 @@ The [Store](struct.Store) contains most of the logic that you need.
 // Import the `Storelike` trait to get access to most functions
 use atomic_lib::Storelike;
 // Start with initializing our store
-let mut store = atomic_lib::Store::init();
+let store = atomic_lib::Store::init();
 // Load the default Atomic Data Atoms
 store.populate().unwrap();
 // Let's parse this AD3 string. It looks awkward because of the escaped quotes.
@@ -26,7 +26,7 @@ let my_value = my_resource
     .unwrap();
 assert!(my_value.to_string() == "Test");
 // We can also use the shortname of description
-let my_value_from_shortname = my_resource.get_shortname("description", &mut store).unwrap();
+let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
 assert!(my_value_from_shortname.to_string() == "Test");
 // We can find any Atoms matching some value using Triple Pattern Fragments:
 let found_atoms = store.tpf(None, None, Some("Test")).unwrap();

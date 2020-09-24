@@ -38,7 +38,7 @@ pub fn subcommand_to_url(context: &Context, subcommand: &str) -> AtomicResult<St
     let subcommand_matches = context.matches.subcommand_matches("delta").unwrap();
     let user_arg = subcommand_matches.value_of(subcommand).unwrap();
     let id_url: String = context
-        .mapping
+        .mapping.lock().unwrap()
         .try_mapping_or_url(&String::from(user_arg))
         .ok_or(&*format!("No url found for {}", user_arg))?;
     Ok(id_url)

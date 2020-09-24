@@ -7,40 +7,41 @@ use crate::{
     storelike::{Class, Property},
     Atom, Storelike,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// A resource is a set of Atoms that shares a single Subject
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Resource {
+// #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct Resource<'a> {
     propvals: PropVals,
     subject: String,
     // The isA relationship of the resource
     // Useful for quick access to shortnames and datatypes
     // Should be an empty vector if it's checked, should be None if unknown
     classes: Option<Vec<Class>>,
+    store: &'a dyn Storelike,
 }
 
 /// Maps Property URLs to their values
 type PropVals = HashMap<String, Value>;
 
-impl Resource {
+impl <'a> Resource<'a> {
     /// Create a new, empty Resource.
-    pub fn new(subject: String) -> Resource {
+    pub fn new(subject: String, store: &'a dyn Storelike) -> Resource<'a> {
         let properties: PropVals = HashMap::new();
         Resource {
             propvals: properties,
             subject,
             classes: None,
+            store,
         }
     }
 
     pub fn new_from_resource_string(
         subject: String,
         resource_string: &ResourceString,
-        store: &mut dyn Storelike,
-    ) -> AtomicResult<Resource> {
-        let mut res = Resource::new(subject);
+        store: &'a dyn Storelike,
+    ) -> AtomicResult<Resource<'a>> {
+        let mut res = Resource::new(subject, store);
         for (prop_string, val_string) in resource_string {
             let propertyfull = store.get_property(prop_string).expect("Prop not found");
             let fullvalue = Value::new(val_string, &propertyfull.data_type)?;
@@ -62,11 +63,10 @@ impl Resource {
     pub fn get_shortname(
         &self,
         shortname: &str,
-        store: &dyn Storelike,
     ) -> AtomicResult<&Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
-            if let Ok(prop) = store.get_property(url) {
+            if let Ok(prop) = self.store.get_property(url) {
                 if prop.shortname == shortname {
                     return Ok(self.get(url)?);
                 }
@@ -77,9 +77,9 @@ impl Resource {
     }
 
     /// Checks if the classes are there, if not, fetches them
-    pub fn get_classes(&mut self, store: &dyn Storelike) -> AtomicResult<Vec<Class>> {
+    pub fn get_classes(&mut self) -> AtomicResult<Vec<Class>> {
         if self.classes.is_none() {
-            self.classes = Some(store.get_classes_for_subject(self.subject())?);
+            self.classes = Some(self.store.get_classes_for_subject(self.subject())?);
         }
         let classes = self.classes.clone().unwrap();
         Ok(classes)
@@ -90,9 +90,8 @@ impl Resource {
     pub fn resolve_shortname(
         &mut self,
         shortname: &str,
-        store: &dyn Storelike,
     ) -> AtomicResult<Option<Property>> {
-        let classes = self.get_classes(store)?;
+        let classes = self.get_classes()?;
         // Loop over all Requires and Recommends props
         for class in classes {
             for required_prop in class.requires {
@@ -116,9 +115,8 @@ impl Resource {
         &mut self,
         property_url: String,
         value: &str,
-        store: &mut dyn Storelike,
     ) -> AtomicResult<()> {
-        let fullprop = &store.get_property(&property_url)?;
+        let fullprop = &self.store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.propvals.insert(property_url, val);
         Ok(())
@@ -138,12 +136,11 @@ impl Resource {
         &mut self,
         property: &str,
         value: &str,
-        store: &dyn Storelike,
     ) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
-            store.get_property(property)?
+            self.store.get_property(property)?
         } else {
-            self.resolve_shortname(property, store)?.unwrap()
+            self.resolve_shortname(property)?.unwrap()
         };
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.insert(fullprop.subject, fullval)?;
@@ -211,23 +208,23 @@ mod test {
         let mut resource = store.get_resource(urls::CLASS).unwrap();
         assert!(
             resource
-                .get_shortname("shortname", &store)
+                .get_shortname("shortname")
                 .unwrap()
                 .to_string()
                 == "class"
         );
         resource
-            .set_prop("shortname", "something-valid", &store)
+            .set_prop("shortname", "something-valid")
             .unwrap();
         assert!(
             resource
-                .get_shortname("shortname", &store)
+                .get_shortname("shortname")
                 .unwrap()
                 .to_string()
                 == "something-valid"
         );
         resource
-            .set_prop("shortname", "should not contain spaces", &store)
+            .set_prop("shortname", "should not contain spaces")
             .unwrap_err();
     }
 }

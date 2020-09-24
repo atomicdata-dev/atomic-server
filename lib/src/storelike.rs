@@ -82,9 +82,9 @@ pub trait Storelike {
     }
 
     /// Returns a full Resource with native Values
-    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> where Self: std::marker::Sized {
         let resource_string = self.get_resource_string(subject)?;
-        let mut res = Resource::new(subject.into());
+        let mut res = Resource::new(subject.into(), self);
         for (prop_string, val_string) in resource_string {
             let propertyfull = self.get_property(&prop_string)?;
             let fullvalue =
@@ -655,9 +655,7 @@ pub trait Storelike {
     fn populate(&self) -> AtomicResult<()> {
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
-        println!("POPULATE INSIDE PARSED");
         self.add_atoms(atoms)?;
-        println!("POPULATE INSIDE ADDED");
         Ok(())
     }
 }
