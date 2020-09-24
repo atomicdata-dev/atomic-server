@@ -19,7 +19,7 @@ pub struct AppState {
 /// Creates the server context.
 /// Initializes a store.
 pub fn init(config: Config) -> BetterResult<AppState> {
-    let mut store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
+    let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     store.populate()?;
 
     let mapping = Mapping::init();
