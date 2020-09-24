@@ -21,7 +21,7 @@ pub async fn path(
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let path = &query.path.clone().unwrap_or_default();
-    let mut context = data.lock()?;
+    let mut context = data.lock().unwrap();
     let content_type = get_accept(req);
     let mapping = context.mapping.clone();
 

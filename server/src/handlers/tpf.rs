@@ -21,7 +21,7 @@ pub async fn tpf(
     req: actix_web::HttpRequest,
     query: web::Query<TPFQuery>,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data.lock()?;
+    let mut context = data.lock().unwrap();
     let store = &mut context.store;
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let mut builder = HttpResponse::Ok();

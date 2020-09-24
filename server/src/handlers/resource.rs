@@ -14,7 +14,7 @@ pub async fn get_resource(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data.lock()?;
+    let mut context = data.lock().unwrap();
     log::info!("subject_end: {}", subject_end);
     let subj_end_string = subject_end.to_string();
     let content_type = get_accept(req);
