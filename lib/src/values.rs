@@ -90,6 +90,12 @@ impl From<i32> for Value {
     }
 }
 
+impl From<Vec<String>> for Value {
+    fn from(val: Vec<String>) -> Self {
+        Value::ResourceArray(val)
+    }
+}
+
 use std::fmt;
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

@@ -585,6 +585,7 @@ name = "atomic_lib"
 version = "0.13.0"
 dependencies = [
  "bincode",
+ "rand",
  "regex",
  "rio_api",
  "rio_turtle",

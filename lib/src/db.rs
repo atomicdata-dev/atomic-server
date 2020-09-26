@@ -60,7 +60,7 @@ impl Storelike for Db {
     }
 
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        self.add_resource_string(resource.subject().clone(), &resource.to_plain())?;
+        self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
         Ok(())
     }
 
@@ -70,6 +70,10 @@ impl Storelike for Db {
         self.resources.insert(sub_bin, res_bin)?;
         // Note that this does not do anything with indexes, so it might have to be replaced!
         Ok(())
+    }
+
+    fn get_base_url(&self) -> Option<String> {
+        Some(self.base_url.clone())
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {

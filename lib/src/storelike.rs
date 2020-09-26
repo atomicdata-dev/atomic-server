@@ -66,9 +66,17 @@ pub trait Storelike {
     /// Fetches the resource if it is not in the store.
     fn get_resource_string(&self, subject: &str) -> AtomicResult<ResourceString>;
 
+    /// Returns the root URL where the store is hosted.
+    /// E.g. `https://example.com`
+    /// This is where deltas should be sent to.
+    /// Also useful for Subject URL generation.
+    fn get_base_url(&self) -> Option<String> {
+        None
+    }
+
     /// Adds a Resource to the store
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        self.add_resource_string(resource.subject().clone(), &resource.to_plain())?;
+        self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
         Ok(())
     }
 
@@ -89,7 +97,7 @@ pub trait Storelike {
             let propertyfull = self.get_property(&prop_string)?;
             let fullvalue =
                 Value::new(&val_string, &propertyfull.data_type).expect("Could not convert value");
-            res.insert(prop_string.clone(), fullvalue)?;
+            res.set_propval(prop_string.clone(), fullvalue)?;
         }
         Ok(res)
         // Above code is a copy from:

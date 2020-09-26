@@ -50,17 +50,13 @@ cargo run
 # Visit http://localhost:8080/test
 ```
 
-* Run `atomic-server` inside a directory with `/static` folder for files
-* If you want to use HTTPS / TLS, set `ATOMIC_CERT_INIT` to `true` and run the server. After that, set it to `false` and set `ATOMIC_HTTPS` to `true`.
-* If no `.ad3` store path is given, a new store will be created from memory.
-
 ## Running from cargo
 
 You can also install with `cargo install atomic-server`, but this binary will also require:
 
-- the `.env` from this repo, although the defaults should work just fine.
 - the `/templates` directory
 - the `/static` directory
+- the `.env` from this repo, (if you need modifications).
 
 ## Usage
 

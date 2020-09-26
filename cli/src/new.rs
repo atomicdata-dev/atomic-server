@@ -28,7 +28,7 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
     println!(
         "Succesfully created a new {}: subject: {}",
         class.shortname,
-        resource.subject()
+        resource.get_subject()
     );
     Ok(())
 }
@@ -54,14 +54,14 @@ fn prompt_instance<'a>(
 
     let mut new_resource: Resource = Resource::new(subject.clone(), &context.store);
 
-    new_resource.insert(
+    new_resource.set_propval(
         "https://atomicdata.dev/properties/isA".into(),
         Value::ResourceArray(Vec::from([class.subject.clone()])),
     )?;
 
     for field in &class.requires {
         if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
-            new_resource.insert_string(
+            new_resource.set_propval_string(
                 field.subject.clone(),
                 &preffered_shortname.clone().unwrap(),
             )?;
@@ -77,7 +77,7 @@ fn prompt_instance<'a>(
         let mut input = prompt_field(&field, false, context)?;
         loop {
             if let Some(i) = input {
-                new_resource.insert_string(field.subject.clone(), &i)?;
+                new_resource.set_propval_string(field.subject.clone(), &i)?;
                 break;
             } else {
                 println!("Required field, please enter a value.");
@@ -90,7 +90,7 @@ fn prompt_instance<'a>(
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         let input = prompt_field(&field, true, context)?;
         if let Some(i) = input {
-            new_resource.insert_string(field.subject.clone(), &i)?;
+            new_resource.set_propval_string(field.subject.clone(), &i)?;
         }
     }
 
@@ -98,10 +98,6 @@ fn prompt_instance<'a>(
 
     let map = prompt_bookmark(&mut context.mapping.lock().unwrap(), &subject);
 
-    // Add created_instance to store
-    context
-        .store
-        .add_resource_string(new_resource.subject().clone(), &new_resource.to_plain())?;
     context
         .mapping.lock().unwrap()
         .write_mapping_to_disk(&context.user_mapping_path);
@@ -216,7 +212,7 @@ fn prompt_field(
                                     class,
                                     Some(item.into()),
                                 )?;
-                                urls.push(resource.subject().clone());
+                                urls.push(resource.get_subject().clone());
                                 continue;
                             }
                         }
