@@ -1,0 +1,36 @@
+### Get a thing as JSON
+GET https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: application/json
+
+### Get a thing as AD3
+GET https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: application/ad3-ndjson
+
+### Get a thing as turtle
+GET https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: text/turtle
+
+### Use TPF endpoint to get all atoms with an 'isA' property
+GET https://atomicdata.dev/tpf?property=https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: application/ad3-ndjson
+
+### Send a Commit
+POST http://localhost:8081/commit HTTP/1.1
+Accept: application/json
+Content-Type: application/json
+
+{
+  "subject": "http://localhost/somresource",
+  "created_at": 1601239744,
+  "actor": "https://example.com/profile",
+  "set": {
+    "https://atomicdata.dev/properties/description": "A new desription"
+  },
+  "remove": ["https://atomicdata.dev/properties/shortname"],
+  "destroy": false,
+  "signature": "correcthash"
+}
+
+### Check if above commit has been applied correctly
+GET http://localhost:8081/somresource HTTP/1.1
+Accept: application/ad3-ndjson

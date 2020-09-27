@@ -2,7 +2,7 @@
 
 use crate::urls;
 use crate::{
-    collections::Collection, collections::Page, collections::TPFQuery, delta::Delta,
+    collections::Collection, collections::Page, collections::TPFQuery, delta::DeltaDeprecated,
     errors::AtomicResult,
 };
 use crate::{
@@ -49,6 +49,9 @@ pub type ResourceCollection = Vec<(String, ResourceString)>;
 /// This is useful, because we can create methods for Storelike that will work with either in-memory
 /// stores, as well as with persistend on-disk stores.
 pub trait Storelike {
+    // Not default yet
+    // type Default = dyn std::marker::Sized;
+
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
@@ -70,8 +73,33 @@ pub trait Storelike {
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_base_url(&self) -> Option<String> {
-        None
+    fn get_base_url(&self) -> Option<String>;
+
+    /// Apply a single Commit to the store
+    fn commit(&self, commit: crate::Commit) -> AtomicResult<()> where Self: std::marker::Sized {
+        let mut resource = match self.get_resource(&commit.subject) {
+            Ok(rs) => rs,
+            Err(_) => Resource::new(commit.subject.clone(), self),
+        };
+        match commit.signature.as_str() {
+            // TODO: check hash
+            "correcthash" => {},
+            _ => return Err("Incorrect signature".into()),
+        }
+        // TOOD: Persist delta to store, use hash as ID
+        if commit.destroy {
+            self.remove_resource(&commit.subject);
+            return Ok(())
+        }
+        for (prop, val) in commit.set.iter() {
+            // Warning: this is a very inefficient operation
+            resource.set_propval_string(prop.into(), val)?;
+        }
+        for prop in commit.remove.iter() {
+            // Warning: this is a very inefficient operation
+            resource.remove_propval(&prop);
+        }
+        Ok(())
     }
 
     /// Adds a Resource to the store
@@ -256,7 +284,7 @@ pub trait Storelike {
     /// Processes a vector of deltas and updates the store.
     /// Panics if the
     /// Use this for ALL updates to the store!
-    fn process_delta(&self, delta: Delta) -> AtomicResult<()> {
+    fn process_delta(&self, delta: DeltaDeprecated) -> AtomicResult<()> {
         let mut updated_resources = Vec::new();
 
         for deltaline in delta.lines.into_iter() {
@@ -299,7 +327,7 @@ pub trait Storelike {
         Err(format!("Could not find shortname {}", shortname).into())
     }
 
-    /// Finds
+    /// Finds the shortname for some property URL
     fn property_url_to_shortname(&self, url: &str) -> AtomicResult<String> {
         let resource = self.get_resource_string(url)?;
         let property_resource = resource
@@ -308,6 +336,9 @@ pub trait Storelike {
 
         Ok(property_resource.into())
     }
+
+    /// Removes a resource from the store
+    fn remove_resource(&self, subject: &str);
 
     /// fetches a resource, serializes it to .ad3
     fn resource_to_ad3(&self, subject: &str) -> AtomicResult<String> {

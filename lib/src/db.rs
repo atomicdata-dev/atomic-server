@@ -65,8 +65,8 @@ impl Storelike for Db {
     }
 
     fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
-        let res_bin = bincode::serialize(resource)?;
         let sub_bin = bincode::serialize(&subject)?;
+        let res_bin = bincode::serialize(resource)?;
         self.resources.insert(sub_bin, res_bin)?;
         // Note that this does not do anything with indexes, so it might have to be replaced!
         Ok(())
@@ -77,10 +77,11 @@ impl Storelike for Db {
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
+        let subject_binary = bincode::serialize(resource_url).expect("Can't serialize subject");
         match self
             .resources
             // Todo: return some custom error types here
-            .get(bincode::serialize(resource_url).expect("Can't deserialize subject"))
+            .get(subject_binary)
             .expect("cant even access store")
         {
             Some(res_bin) => {
@@ -118,6 +119,10 @@ impl Storelike for Db {
             resources.push((subject, resource));
         }
         resources
+    }
+
+    fn remove_resource(&self, subject: &str) {
+        self.db.remove(bincode::serialize(subject).unwrap()).unwrap().unwrap();
     }
 }
 

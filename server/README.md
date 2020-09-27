@@ -60,6 +60,8 @@ You can also install with `cargo install atomic-server`, but this binary will al
 
 ## Usage
 
+Check out [./example_requests.http](/example_requests.http) for various HTTP requests to the server.
+
 ### Get individual resources
 
 You can fetch individual items by sending a GET request to their URL.

@@ -1,5 +1,5 @@
 use crate::Context;
-use atomic_lib::{delta::Delta, errors::AtomicResult, DeltaLine, Storelike};
+use atomic_lib::{delta::DeltaDeprecated, errors::AtomicResult, DeltaLine, Storelike};
 
 /// Processes a singe delta
 pub fn delta(context: &mut Context) -> AtomicResult<()> {
@@ -29,7 +29,7 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
     deltas.push(delta);
     context
         .store
-        .process_delta(Delta::new_from_lines(subject, deltas))?;
+        .process_delta(DeltaDeprecated::new_from_lines(subject, deltas))?;
     Ok(())
 }
 

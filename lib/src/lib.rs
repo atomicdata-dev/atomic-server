@@ -58,6 +58,7 @@ pub use atoms::Atom;
 pub use atoms::RichAtom;
 #[cfg(feature = "db")]
 pub use db::Db;
+pub use delta::Commit;
 pub use delta::DeltaLine;
 pub use resources::Resource;
 pub use resources::ResourceString;

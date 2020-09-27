@@ -130,6 +130,15 @@ impl<'a> Resource<'a> {
         Err("No match".into())
     }
 
+    /// Insert a Property/Value combination.
+    /// Overwrites existing Property/Value.
+    /// Validates the datatype.
+    pub fn remove_propval(&mut self, property_url: &str) {
+        self.propvals.remove_entry(property_url);
+        // Could fail, but unlikely
+        self.save().ok();
+    }
+
     /// Tries to resolve the shortname to a URL.
     // Currently assumes that classes have been set before.
     pub fn resolve_shortname(&mut self, shortname: &str) -> AtomicResult<Option<Property>> {

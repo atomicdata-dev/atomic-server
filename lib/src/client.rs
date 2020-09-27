@@ -1,5 +1,5 @@
 //! Functions for interacting with an Atomic Server
-use crate::{delta::Delta, errors::AtomicResult, parse::parse_ad3, ResourceString};
+use crate::{delta::DeltaDeprecated, errors::AtomicResult, parse::parse_ad3, ResourceString};
 
 /// Fetches a resource, makes sure its subject matches.
 /// Only adds atoms with matching subjects match.
@@ -28,7 +28,7 @@ pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
 }
 
 /// Posts a delta to an endpoint
-pub fn post_delta(endpoint: &str, _delta: Delta) -> AtomicResult<()> {
+pub fn post_delta(endpoint: &str, _delta: DeltaDeprecated) -> AtomicResult<()> {
     let _resp = ureq::post(&endpoint)
         .set("Accept", crate::parse::AD3_MIME)
         .timeout_read(500)

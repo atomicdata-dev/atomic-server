@@ -103,6 +103,10 @@ impl Storelike for Store {
             },
         }
     }
+
+    fn remove_resource(&self, subject: &str) {
+        self.hashmap.lock().unwrap().remove_entry(subject);
+    }
 }
 
 #[cfg(test)]
