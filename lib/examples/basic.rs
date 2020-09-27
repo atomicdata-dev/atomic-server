@@ -3,9 +3,10 @@
 fn main() {
     // Import the `Storelike` trait to get access to most functions
     use atomic_lib::Storelike;
-    // Start with initializing our store
+    // Start with initializing the in-memory store
     let store = atomic_lib::Store::init();
-    // Load the default Atomic Data Atoms
+    // Pre-load the default Atomic Data Atoms (from atomicdata.dev),
+    // this is not necessary, but will probably make your project a bit faster
     store.populate().unwrap();
     // Let's parse this AD3 string.
     let ad3 = r#"["https://localhost/test","https://atomicdata.dev/properties/description","Test"]"#;
@@ -28,7 +29,15 @@ fn main() {
     assert!(found_atoms.len() == 1);
 
     // We can also create a new Resource, linked to the store.
+    // Note that since this store only exists in memory, it's data cannot be accessed from the internet.
     // Let's make a new Property instance!
-    let new_property = atomic_lib::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
-    new_property.
+    let mut new_property = atomic_lib::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
+    // And add a description for that Property
+    new_property.set_by_shortname("description", "the age of a person").unwrap();
+    // The modified resource is saved to the store after this
+
+    // A subject URL has been created automatically.
+    let subject = new_property.get_subject();
+    let fetched_new_resource = store.get_resource(subject).unwrap();
+    assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "age");
 }

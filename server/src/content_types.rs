@@ -42,7 +42,6 @@ pub fn get_accept(req: actix_web::HttpRequest) -> ContentType {
             return ContentType::HTML
         }
     };
-    // let accept_header = req.headers().get("Accept").unwrap().to_str().unwrap();
     parse_accept_header(accept_header)
 }
 
