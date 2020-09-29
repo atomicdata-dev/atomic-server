@@ -76,12 +76,13 @@ impl Storelike for Store {
         Ok(())
     }
 
-    fn add_resource_string(
-        &self,
-        subject: String,
-        resource: &ResourceString,
-    ) -> AtomicResult<()> {
-        self.hashmap.lock().unwrap().insert(subject, resource.clone());
+    fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
+        println!("Trying lock add");
+        self.hashmap
+            .lock()
+            .unwrap()
+            .insert(subject, resource.clone());
+        println!("no probs adding");
         Ok(())
     }
 
@@ -96,11 +97,14 @@ impl Storelike for Store {
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
-        match self.hashmap.lock().unwrap().get(resource_url) {
-            Some(result) => Ok(result.clone()),
-            None => {
-                Ok(self.fetch_resource(resource_url)?)
-            },
+        let resource: Option<ResourceString> = match self.hashmap.lock().unwrap().get(resource_url)
+        {
+            Some(result) => return Ok(result.clone()),
+            None => None,
+        };
+        match resource {
+            Some(_) => Err("This is not possible.".into()),
+            None => Ok(self.fetch_resource(resource_url)?),
         }
     }
 
@@ -157,10 +161,7 @@ mod test {
     fn get_full_resource_and_shortname() {
         let store = init_store();
         let resource = store.get_resource(urls::CLASS).unwrap();
-        let shortname = resource
-            .get_shortname("shortname")
-            .unwrap()
-            .to_string();
+        let shortname = resource.get_shortname("shortname").unwrap().to_string();
         assert!(shortname == "class");
     }
 
@@ -176,19 +177,13 @@ mod test {
     fn tpf() {
         let store = init_store();
         // All atoms
-        let atoms = store
-            .tpf(None, None, None)
-            .unwrap();
+        let atoms = store.tpf(None, None, None).unwrap();
         assert!(atoms.len() > 10);
         // Find by subject
-        let atoms = store
-            .tpf(Some(urls::CLASS), None, None)
-            .unwrap();
+        let atoms = store.tpf(Some(urls::CLASS), None, None).unwrap();
         assert!(atoms.len() == 5);
         // Find by value
-        let atoms = store
-            .tpf(None, None, Some("class"))
-            .unwrap();
+        let atoms = store.tpf(None, None, Some("class")).unwrap();
         assert!(atoms[0].subject == urls::CLASS);
         assert!(atoms.len() == 1);
         // Find by property and value
@@ -207,37 +202,54 @@ mod test {
     #[test]
     fn path() {
         let store = init_store();
-        let res = store.get_path("https://atomicdata.dev/classes/Class shortname", None).unwrap();
+        let res = store
+            .get_path("https://atomicdata.dev/classes/Class shortname", None)
+            .unwrap();
         match res {
-            crate::storelike::PathReturn::Subject(_) => {
-                panic!("Should be an Atom")
-            }
+            crate::storelike::PathReturn::Subject(_) => panic!("Should be an Atom"),
             crate::storelike::PathReturn::Atom(atom) => {
                 assert!(atom.value == "class");
             }
         }
-        let res = store.get_path("https://atomicdata.dev/classes/Class requires 0", None).unwrap();
+        let res = store
+            .get_path("https://atomicdata.dev/classes/Class requires 0", None)
+            .unwrap();
         match res {
             crate::storelike::PathReturn::Subject(sub) => {
                 assert!(sub == urls::SHORTNAME);
             }
-            crate::storelike::PathReturn::Atom(_) => {
-                panic!("Should be an Subject")
-            }
+            crate::storelike::PathReturn::Atom(_) => panic!("Should be an Subject"),
         }
+    }
+
+    #[test]
+    fn get_external_resource() {
+        let store = Store::init();
+        // If nothing happens - this is deadlock.
+        store.get_resource_string(urls::CLASS).unwrap();
     }
 
     #[test]
     #[should_panic]
     fn path_fail() {
         let store = init_store();
-        store.get_path("https://atomicdata.dev/classes/Class requires isa description", None).unwrap();
+        store
+            .get_path(
+                "https://atomicdata.dev/classes/Class requires isa description",
+                None,
+            )
+            .unwrap();
     }
 
     #[test]
     #[should_panic]
     fn path_fail2() {
         let store = init_store();
-        store.get_path("https://atomicdata.dev/classes/Class requires requires", None).unwrap();
+        store
+            .get_path(
+                "https://atomicdata.dev/classes/Class requires requires",
+                None,
+            )
+            .unwrap();
     }
 }
