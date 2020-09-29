@@ -31,6 +31,7 @@ async fn main() -> io::Result<()> {
             .service(web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))))
             .service(web::scope("/path").service(web::resource("").route(web::get().to(handlers::path::path))))
             .service(web::scope("/commit").service(web::resource("").route(web::post().to(handlers::commit::post_commit))))
+            .service(web::scope("/validate").service(web::resource("").route(web::get().to(handlers::validate::validate))))
             .service(web::scope("/{path:[^{}]+}").service(web::resource("").route(web::get().to(handlers::resource::get_resource))))
             .service(web::scope("/").service(web::resource("").route(web::get().to(handlers::home::home))))
             .app_data(
