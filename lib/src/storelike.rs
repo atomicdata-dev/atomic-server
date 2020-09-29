@@ -139,10 +139,10 @@ pub trait Storelike {
         let class_strings = self.get_resource_string(subject).expect("Class not found");
         let shortname = class_strings
             .get(urls::SHORTNAME)
-            .expect("Class has no shortname");
+            .ok_or("Class has no shortname")?;
         let description = class_strings
             .get(urls::DESCRIPTION)
-            .expect("Class has no description");
+            .ok_or("Class has no description")?;
         let requires_string = class_strings.get(urls::REQUIRES);
         let recommends_string = class_strings.get(urls::RECOMMENDS);
 
