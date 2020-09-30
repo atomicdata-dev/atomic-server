@@ -15,8 +15,10 @@ pub fn parse_ad3(string: &str) -> AtomicResult<Vec<Atom>> {
             Some(' ') => {}
             // That's an array, awesome
             Some('[') => {
-                let string_vec: Vec<String> =
-                    parse_json_array(line).expect(&*format!("Parsing error in {:?}", line));
+                let string_vec: Vec<String> = match parse_json_array(line) {
+                    Ok(vec) => vec,
+                    Err(e) => {return Err(format!("Parsing error in {:?}. Needs to be a JSON array of three strings. {}", line, e).into())}
+                };
                 if string_vec.len() != 3 {
                     return Err(format!(
                         "Wrong length of array at line {:?}: wrong length of array, should be 3",
