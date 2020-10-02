@@ -29,10 +29,11 @@ Powered by Rust, atomic_lib, actix-web, Sled and [more](cargo.toml).
 - [x] HTTPS (WIP, kind of working)
 - [x] Content-type negotiation
 - [x] Basic design / use CSS framework
+- [x] Validation endpoint
+- [x] Write / Commit / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support (might need #16, #24)
 - [ ] Eliminate all preventable runtime panics (most already done)
 - [ ] URL extension recognition (.json, .ad3, .nt, etc.)
 - [ ] Collections / dynamic resources #17
-- [ ] Write / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support (might need #16)
 - [ ] Auth support (WebID-OICD possibly?) #13
 - [ ] Be able to manage the AtomicData.dev website without git
 
