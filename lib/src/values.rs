@@ -26,7 +26,9 @@ pub struct UnsupportedValue {
     pub datatype: String,
 }
 
+/// Only alphanumeric characters, no spaces
 pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
+/// YYYY-MM-DD
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
@@ -43,12 +45,12 @@ impl Value {
                 if re.is_match(&*value) {
                     return Ok(Value::Slug(value.into()));
                 }
-                Err(format!("Not a valid slug: {}", value).into())
+                Err(format!("Not a valid slug: {}. Only alphanumerics, no spaces allowed.", value).into())
             }
             DataType::AtomicUrl => Ok(Value::AtomicUrl(value.into())),
             DataType::ResourceArray => {
                 let vector: Vec<String> = crate::parse::parse_json_array(&value).map_err(|e| {
-                    return format!("Could not deserialize ResourceArray: {}. {}", &value, e);
+                    return format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e);
                 })?;
                 Ok(Value::ResourceArray(vector))
             }
@@ -57,7 +59,7 @@ impl Value {
                 if re.is_match(&*value) {
                     return Ok(Value::Date(value.into()));
                 }
-                Err(format!("Not a valid date: {}", value).into())
+                Err(format!("Not a valid date: {}. Needs to be YYYY-MM-DD.", value).into())
             }
             DataType::Timestamp => {
                 let val: i64 = value

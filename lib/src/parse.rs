@@ -33,7 +33,7 @@ pub fn parse_ad3(string: &str) -> AtomicResult<Vec<Atom>> {
             }
             Some(char) => {
                 return Err(format!(
-                    "AD3 Parsing error at {:?}, cannot start with {}",
+                    "AD3 Parsing error at '{}', line cannot start with {}. Should start with JSON Array '['",
                     line, char
                 )
                 .into())
