@@ -83,8 +83,17 @@ pub trait Storelike {
         };
         match commit.signature.as_str() {
             // TODO: check hash
-            "correcthash" => {},
+            "correct_signature" => {},
             _ => return Err("Incorrect signature".into()),
+        }
+        // Check if the created_at lies in the past
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_millis();
+        // TODO: also check that no younger commits exist
+        if commit.created_at > now {
+            return Err("Commit created_at timestamp must lie in the past.".into())
         }
         // TOOD: Persist delta to store, use hash as ID
         if commit.destroy {
