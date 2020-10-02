@@ -77,16 +77,16 @@ impl Storelike for Db {
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
-        let subject_binary = bincode::serialize(resource_url).expect("Can't serialize subject");
+        let subject_binary = bincode::serialize(resource_url).map_err(|e| format!("Can't serialize {}: {}", resource_url, e))?;
         match self
             .resources
             // Todo: return some custom error types here
             .get(subject_binary)
-            .expect("cant even access store")
+            .map_err(|e| format!("Can't open {} from store: {}", resource_url, e))?
         {
             Some(res_bin) => {
                 let resource: ResourceString = bincode::deserialize(&res_bin)
-                    .expect("Can't deserialize resource. Your database may be corrupt!");
+                    .map_err(|e| format!("Can't deserialize {}. Your database may be corrupt! {}", resource_url, e))?;
                 Ok(resource)
             }
             None => {

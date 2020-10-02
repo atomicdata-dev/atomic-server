@@ -77,12 +77,10 @@ impl Storelike for Store {
     }
 
     fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
-        println!("Trying lock add");
         self.hashmap
             .lock()
             .unwrap()
             .insert(subject, resource.clone());
-        println!("no probs adding");
         Ok(())
     }
 
