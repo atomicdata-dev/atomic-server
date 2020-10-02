@@ -481,7 +481,7 @@ pub trait Storelike {
     ///     Some("https://atomicdata.dev/properties/isA"),
     ///     Some("[\"https://atomicdata.dev/classes/Class\"]")
     /// ).unwrap();
-    /// assert!(atoms.len() == 3)
+    /// assert!(atoms.len() == 4)
     /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.
