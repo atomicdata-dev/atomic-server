@@ -33,3 +33,7 @@ body {
 .tpfForm input[type=submit] {
   display: none;
 }
+
+textarea {
+  width: 100%;
+}
