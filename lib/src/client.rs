@@ -1,8 +1,8 @@
 //! Functions for interacting with an Atomic Server
-use crate::{delta::DeltaDeprecated, errors::AtomicResult, parse::parse_ad3, ResourceString};
+use crate::{errors::AtomicResult, parse::parse_ad3, ResourceString};
 
 /// Fetches a resource, makes sure its subject matches.
-/// Only adds atoms with matching subjects match.
+/// Ignores all atoms where the subject is different.
 pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
     let resp = ureq::get(&subject)
         .set("Accept", crate::parse::AD3_MIME)
@@ -27,19 +27,36 @@ pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
     Ok(resource)
 }
 
-/// Posts a delta to an endpoint
-pub fn post_delta(endpoint: &str, _delta: DeltaDeprecated) -> AtomicResult<()> {
-    let _resp = ureq::post(&endpoint)
-        .set("Accept", crate::parse::AD3_MIME)
+/// Posts a Commit to an endpoint
+pub fn post_commit(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
+    let json = serde_json::to_string(commit)?;
+
+    let resp = ureq::post(&endpoint)
+        .set("Content-Type", "application/json")
         .timeout_read(500)
-        .call();
-    // So what happens next?
-    // If we'd only have deltalines, serialization could be a simple json array with some strings.
-    // However, now it becomes a bit more complicated.
-    // We could create an empty store, create a Resource from the Delta, serialize it as .AD3.
-    // However, what to do with the deltalines?
-    // One (ugly) solution is to serialize it to JSON arrays... But this feels wrong.
-    // Another one is to create nested Resources for every deltaline.
-    // I think having JSON compatibility should be top priority.
-    todo!();
+        .send_string(&json);
+
+    if resp.error() {
+        Err(format!("Failed sending commit. Status: {} Body: {}", resp.status(), resp.into_string()?).into())
+    } else {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test] #[ignore]
+    fn fetch_resource_basic() {
+        let resource = fetch_resource(crate::urls::SHORTNAME).unwrap();
+        let shortname = resource.get(crate::urls::SHORTNAME).unwrap();
+        assert!(shortname == "shortname");
+    }
+
+    #[test] #[ignore]
+    fn post_commit_basic() {
+        let commit = crate::delta::PartialCommit::new("subject".into(), "actor".into()).sign("private_key");
+        post_commit("https://atomicdata.dev/commit", &commit).unwrap();
+    }
 }

@@ -59,11 +59,7 @@ pub trait Storelike {
     /// Replaces existing resource with the contents
     /// Accepts a simple nested string only hashmap
     /// Adds to hashmap and to the resource store
-    fn add_resource_string(
-        &self,
-        subject: String,
-        resource: &ResourceString,
-    ) -> AtomicResult<()>;
+    fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()>;
 
     /// Returns a hashmap ResourceString with string Values.
     /// Fetches the resource if it is not in the store.
@@ -76,38 +72,52 @@ pub trait Storelike {
     fn get_base_url(&self) -> Option<String>;
 
     /// Apply a single Commit to the store
-    fn commit(&self, commit: crate::Commit) -> AtomicResult<()> where Self: std::marker::Sized {
+    /// Creates, edits or destroys a resource.
+    /// TODO: Should verify the author and the signature.
+    fn commit(&self, commit: crate::Commit) -> AtomicResult<()>
+    where
+        Self: std::marker::Sized,
+    {
         let mut resource = match self.get_resource(&commit.subject) {
             Ok(rs) => rs,
             Err(_) => Resource::new(commit.subject.clone(), self),
         };
         match commit.signature.as_str() {
             // TODO: check hash
-            "correct_signature" => {},
+            "correct_signature" => {}
             _ => return Err("Incorrect signature".into()),
         }
+        // TODO: Check if commit.actor has the rights to update the resource
+        // TODO: Check if commit.signature matches the actor
         // Check if the created_at lies in the past
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
             .as_millis();
-        // TODO: also check that no younger commits exist
         if commit.created_at > now {
-            return Err("Commit created_at timestamp must lie in the past.".into())
+            return Err("Commit created_at timestamp must lie in the past.".into());
+            // TODO: also check that no younger commits exist
+        }
+        if let Some(destroy) = commit.destroy {
+            if destroy {
+                self.remove_resource(&commit.subject);
+                return Ok(());
+            }
+        }
+        if let Some(set) = commit.set {
+            for (prop, val) in set.iter() {
+                // Warning: this is a very inefficient operation
+                resource.set_propval_string(prop.into(), val)?;
+            }
+        }
+        if let Some(remove) = commit.remove {
+            for prop in remove.iter() {
+                // Warning: this is a very inefficient operation
+                resource.remove_propval(&prop);
+            }
         }
         // TOOD: Persist delta to store, use hash as ID
-        if commit.destroy {
-            self.remove_resource(&commit.subject);
-            return Ok(())
-        }
-        for (prop, val) in commit.set.iter() {
-            // Warning: this is a very inefficient operation
-            resource.set_propval_string(prop.into(), val)?;
-        }
-        for prop in commit.remove.iter() {
-            // Warning: this is a very inefficient operation
-            resource.remove_propval(&prop);
-        }
+        // let commit_resource: Resource = commit.into_resource(store: self);
         Ok(())
     }
 
@@ -127,7 +137,10 @@ pub trait Storelike {
     }
 
     /// Returns a full Resource with native Values
-    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> where Self: std::marker::Sized {
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource>
+    where
+        Self: std::marker::Sized,
+    {
         let resource_string = self.get_resource_string(subject)?;
         let mut res = Resource::new(subject.into(), self);
         for (prop_string, val_string) in resource_string {
@@ -512,11 +525,9 @@ pub trait Storelike {
             let q = q_value.unwrap();
             val == q || {
                 if val.starts_with('[') {
-                match crate::parse::parse_json_array(val) {
-                        Ok(vec) => {
-                            return vec.contains(&q.into())
-                        }
-                        Err(_) => return val == q
+                    match crate::parse::parse_json_array(val) {
+                        Ok(vec) => return vec.contains(&q.into()),
+                        Err(_) => return val == q,
                     }
                 }
                 false
@@ -565,11 +576,7 @@ pub trait Storelike {
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(
-        &self,
-        atomic_path: &str,
-        mapping: Option<&Mapping>,
-    ) -> AtomicResult<PathReturn> {
+    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
@@ -664,7 +671,10 @@ pub trait Storelike {
     }
 
     /// Performs a light validation, without fetching external data
-    fn validate(&self) -> crate::validate::ValidationReport where Self: std::marker::Sized {
+    fn validate(&self) -> crate::validate::ValidationReport
+    where
+        Self: std::marker::Sized,
+    {
         crate::validate::validate_store(self, false)
     }
 }

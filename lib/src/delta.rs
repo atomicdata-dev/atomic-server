@@ -3,24 +3,24 @@
 /// A set of changes to a resource.
 use std::collections::HashMap;
 
-use serde::Deserialize;
-#[derive(Debug, Deserialize)]
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Deserialize, Serialize)]
 pub struct Commit {
-    /// The subject URL that is to be modified by this Delta
-    pub subject: String,
-    /// The date it was created, as a unix timestamp
-    pub created_at: u128,
-    /// The URL of the one suggesting this Commit
-    pub actor: String,
-    /// The set of PropVals that need to be added.
-    /// Overwrites existing values
-    pub set: std::collections::HashMap<String, String>,
-    /// The set of property URLs that need to be removed
-    pub remove: Vec<String>,
-    /// If set to true, deletes the entire resource
-    pub destroy: bool,
-    /// Hash signed by the actor
-    pub signature: String,
+/// The subject URL that is to be modified by this Delta
+pub subject: String,
+/// The date it was created, as a unix timestamp
+pub created_at: u128,
+/// The URL of the one suggesting this Commit
+pub actor: String,
+/// The set of PropVals that need to be added.
+/// Overwrites existing values
+pub set: Option<std::collections::HashMap<String, String>>,
+/// The set of property URLs that need to be removed
+pub remove: Option<Vec<String>>,
+/// If set to true, deletes the entire resource
+pub destroy: Option<bool>,
+/// Hash signed by the actor
+pub signature: String,
 }
 
 pub struct PartialCommit {
@@ -51,7 +51,7 @@ impl PartialCommit {
         }
     }
 
-    pub fn sign(&self, _private_key: String) -> Commit {
+    pub fn sign(&self, _private_key: &str) -> Commit {
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
@@ -60,9 +60,9 @@ impl PartialCommit {
         Commit {
             subject: self.subject.clone(),
             actor: self.actor.clone(),
-            set: self.set.clone(),
-            remove: self.remove.clone(),
-            destroy: self.destroy,
+            set: Some(self.set.clone()),
+            remove: Some(self.remove.clone()),
+            destroy: Some(self.destroy),
             created_at,
             // TODO: Hashing signature logic
             signature: "correct_signature".into(),
