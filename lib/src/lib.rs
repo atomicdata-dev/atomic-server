@@ -37,6 +37,7 @@ assert!(found_atoms.len() == 1);
 pub mod atoms;
 pub mod client;
 pub mod collections;
+pub mod commit;
 #[cfg(feature = "db")]
 pub mod db;
 pub mod delta;
@@ -58,7 +59,7 @@ pub use atoms::Atom;
 pub use atoms::RichAtom;
 #[cfg(feature = "db")]
 pub use db::Db;
-pub use delta::Commit;
+pub use commit::Commit;
 pub use delta::DeltaLine;
 pub use resources::Resource;
 pub use resources::ResourceString;
