@@ -15,6 +15,14 @@ pub const CLASSTYPE_PROP: &str = "https://atomicdata.dev/properties/classtype";
 // ... for Classes
 pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
 pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
+// ... for Commits
+pub const SUBJECT: &str = "https://atomicdata.dev/properties/subject";
+pub const SET: &str = "https://atomicdata.dev/properties/set";
+pub const REMOVE: &str = "https://atomicdata.dev/properties/remove";
+pub const DESTROY: &str = "https://atomicdata.dev/properties/destroy";
+pub const ACTOR: &str = "https://atomicdata.dev/properties/actor";
+pub const CREATED_AT: &str = "https://atomicdata.dev/properties/createdAt";
+pub const SIGNATURE: &str = "https://atomicdata.dev/properties/signature";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
