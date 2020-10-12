@@ -6,7 +6,7 @@ use crate::{errors::AtomicResult, parse::parse_ad3, ResourceString};
 pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
     let resp = ureq::get(&subject)
         .set("Accept", crate::parse::AD3_MIME)
-        .timeout_read(500)
+        .timeout_read(2000)
         .call();
     if resp.status() != 200 {
         return Err(format!("Could not fetch {}. Status: {}", subject, resp.status()).into());
@@ -33,7 +33,7 @@ pub fn post_commit(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
 
     let resp = ureq::post(&endpoint)
         .set("Content-Type", "application/json")
-        .timeout_read(500)
+        .timeout_read(2000)
         .send_string(&json);
 
     if resp.error() {
@@ -56,7 +56,7 @@ mod test {
 
     #[test] #[ignore]
     fn post_commit_basic() {
-        let commit = crate::delta::PartialCommit::new("subject".into(), "actor".into()).sign("private_key");
+        let commit = crate::commit::CommitBuilder::new("subject".into(), "actor".into()).sign("private_key");
         post_commit("https://atomicdata.dev/commit", &commit).unwrap();
     }
 }
