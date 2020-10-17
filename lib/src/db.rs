@@ -3,6 +3,7 @@
 
 use crate::{
     errors::AtomicResult,
+    resources::PropVals,
     resources::ResourceString,
     storelike::{ResourceCollection, Storelike},
     Atom, Resource,
@@ -16,7 +17,7 @@ pub struct Db {
     // Resources can be found using their Subject.
     // Try not to use this directly, but use the Trees.
     db: sled::Db,
-    // Stores all resources. The Key is a string, the value a ResourceString. Both must be serialized using bincode.
+    // Stores all resources. The Key is the Subject as a string, the value a PropVals. Both must be serialized using bincode.
     resources: sled::Tree,
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
     index_vals: sled::Tree,
@@ -26,7 +27,9 @@ pub struct Db {
 }
 
 impl Db {
-    // Creates a new store at the specified path
+    /// Creates a new store at the specified path.
+    /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
+    /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init<P: AsRef<std::path::Path>>(path: P, base_url: String) -> AtomicResult<Db> {
         let db = sled::open(path)?;
         let resources = db.open_tree("resources")?;
@@ -48,6 +51,31 @@ impl Db {
     // fn index_value_remove(&mut self, atom: Atom) -> AtomicResult<()> {
     //     todo!();
     // }
+
+    fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
+        let resource_bin = bincode::serialize(propvals)?;
+        let subject_bin = bincode::serialize(subject)?;
+        self.resources.insert(subject_bin, resource_bin)?;
+        Ok(())
+    }
+
+    /// Finds resource by Subject, return PropVals HashMap
+    /// Deals with the binary API of Sled
+    fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
+        let subject_binary = bincode::serialize(subject)
+            .map_err(|e| format!("Can't serialize {}: {}", subject, e))?;
+        let propval_maybe = self
+            .resources
+            .get(subject_binary)
+            .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
+        match propval_maybe.as_ref() {
+            Some(binpropval) => {
+                let propval: PropVals = bincode::deserialize(binpropval)?;
+                Ok(propval)
+            }
+            None => Err("Not found".into()),
+        }
+    }
 }
 
 impl Storelike for Db {
@@ -59,15 +87,34 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
+    /// Adds a single atom to the store
+    /// If the resource already exists, it will be inserted into it.
+    /// Existing data will be overwritten.
+    /// If the resource does not exist, it will be created.
+    fn add_atom(&self, atom: Atom) -> AtomicResult<()> {
+        let mut resource: PropVals = match self.get_propvals(&atom.subject) {
+            Ok(r) => r,
+            Err(_) => PropVals::new(),
+        };
+
+        resource.insert(atom.property, atom.value.into());
+        self.set_propvals(&atom.subject, &resource)?;
         Ok(())
     }
 
-    fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
-        let sub_bin = bincode::serialize(&subject)?;
-        let res_bin = bincode::serialize(resource)?;
-        self.resources.insert(sub_bin, res_bin)?;
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        self.set_propvals(resource.get_subject(), &resource.get_propvals())?;
+        Ok(())
+    }
+
+    fn add_resource_string(
+        &self,
+        subject: String,
+        resource_string: &ResourceString,
+    ) -> AtomicResult<()> {
+        let resource =
+            crate::resources::Resource::new_from_resource_string(subject, resource_string, self)?;
+        self.add_resource(&resource)?;
         // Note that this does not do anything with indexes, so it might have to be replaced!
         Ok(())
     }
@@ -77,19 +124,13 @@ impl Storelike for Db {
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
-        let subject_binary = bincode::serialize(resource_url).map_err(|e| format!("Can't serialize {}: {}", resource_url, e))?;
-        match self
-            .resources
-            // Todo: return some custom error types here
-            .get(subject_binary)
-            .map_err(|e| format!("Can't open {} from store: {}", resource_url, e))?
-        {
-            Some(res_bin) => {
-                let resource: ResourceString = bincode::deserialize(&res_bin)
-                    .map_err(|e| format!("Can't deserialize {}. Your database may be corrupt! {}", resource_url, e))?;
+        let propvals = self.get_propvals(resource_url);
+        match propvals {
+            Ok(propvals) => {
+                let resource = crate::resources::propvals_to_resourcestring(propvals);
                 Ok(resource)
             }
-            None => {
+            Err(e) => {
                 if resource_url.starts_with(&self.base_url) {
                     return Err(format!(
                         "Failed to retrieve {}, does not exist locally",
@@ -113,16 +154,20 @@ impl Storelike for Db {
     fn all_resources(&self) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         for item in self.resources.into_iter() {
-            let (subject_bin, resource_bin) = item.unwrap();
-            let subject: String = bincode::deserialize(&subject_bin).unwrap();
-            let resource: ResourceString = bincode::deserialize(&resource_bin).unwrap();
+            let (subject, resource_bin) = item.unwrap();
+            let subject: String = bincode::deserialize(&subject).unwrap();
+            let propvals: PropVals = bincode::deserialize(&resource_bin).unwrap();
+            let resource: ResourceString = crate::resources::propvals_to_resourcestring(propvals);
             resources.push((subject, resource));
         }
         resources
     }
 
     fn remove_resource(&self, subject: &str) {
-        self.db.remove(bincode::serialize(subject).unwrap()).unwrap().unwrap();
+        self.db
+            .remove(bincode::serialize(subject).unwrap())
+            .unwrap()
+            .unwrap();
     }
 }
 
@@ -130,23 +175,27 @@ impl Storelike for Db {
 mod test {
     use super::*;
 
-    // Same as examples/basic.rs
+    /// Creates new temporary database, populates it, removes previous one
+    fn init() -> Db {
+        let tmp_dir_path = "tmp/db";
+        std::fs::remove_dir_all(tmp_dir_path).unwrap();
+        let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
+        store.populate().unwrap();
+        store
+    }
+
     #[test]
     fn basic() {
-        // Import the `Storelike` trait to get access to most functions
-        use crate::Storelike;
-        // Start with initializing our store
-        let store = Db::init("tmp/db", "localhost".into()).unwrap();
-        // Load the default Atomic Data Atoms
-        store.populate().unwrap();
-        // Let's parse this AD3 string. It looks awkward because of the escaped quotes.
-        let string = r#"["_:test","https://atomicdata.dev/properties/description","Test"]"#;
+        let store = init();
+        // Let's parse this AD3 string.
+        let ad3 =
+            r#"["https://localhost/test","https://atomicdata.dev/properties/description","Test"]"#;
         // The parser returns a Vector of Atoms
-        let atoms = crate::parse::parse_ad3(&string).unwrap();
+        let atoms = crate::parse::parse_ad3(&ad3).unwrap();
         // Add the Atoms to the Store
         store.add_atoms(atoms).unwrap();
         // Get our resource...
-        let my_resource = store.get_resource("_:test").unwrap();
+        let my_resource = store.get_resource("https://localhost/test").unwrap();
         // Get our value by filtering on our property...
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/description")
@@ -158,5 +207,28 @@ mod test {
         // We can find any Atoms matching some value using Triple Pattern Fragments:
         let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
         assert!(found_atoms.len() == 1);
+        assert!(found_atoms[0].value == "Test");
+
+        // We can also create a new Resource, linked to the store.
+        // Note that since this store only exists in memory, it's data cannot be accessed from the internet.
+        // Let's make a new Property instance!
+        let mut new_property =
+            crate::Resource::new_instance("https://atomicdata.dev/classes/Property", &store)
+                .unwrap();
+        // And add a description for that Property
+        new_property
+            .set_by_shortname("description", "the age of a person")
+            .unwrap();
+        // The modified resource is saved to the store after this
+
+        // A subject URL has been created automatically.
+        let subject = new_property.get_subject();
+        let fetched_new_resource = store.get_resource(subject).unwrap();
+        let description_val = fetched_new_resource
+            .get_shortname("description")
+            .unwrap()
+            .to_string();
+        println!("desc {}", description_val);
+        assert!(description_val == "the age of a person");
     }
 }
