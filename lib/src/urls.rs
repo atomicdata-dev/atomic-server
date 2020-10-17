@@ -4,6 +4,7 @@
 pub const CLASS: &str = "https://atomicdata.dev/classes/Class";
 pub const PROPERTY: &str = "https://atomicdata.dev/classes/Property";
 pub const DATATYPE_CLASS: &str = "https://atomicdata.dev/classes/Datatype";
+pub const COMMIT: &str = "https://atomicdata.dev/classes/Commit";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";

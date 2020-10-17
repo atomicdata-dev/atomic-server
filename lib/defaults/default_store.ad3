@@ -104,3 +104,7 @@
 ["https://atomicdata.dev/properties/createdAt","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/Timestamp"]
 ["https://atomicdata.dev/properties/createdAt","https://atomicdata.dev/properties/shortname","createdat"]
 ["https://atomicdata.dev/properties/createdAt","https://atomicdata.dev/properties/description","Timestamp when the Commit was created (usually when it was signed)."]
+["https://atomicdata.dev/properties/subject","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
+["https://atomicdata.dev/properties/subject","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/atomicURL"]
+["https://atomicdata.dev/properties/subject","https://atomicdata.dev/properties/shortname","subject"]
+["https://atomicdata.dev/properties/subject","https://atomicdata.dev/properties/description","The subject of a Delta - the resource ID that is being changed."]

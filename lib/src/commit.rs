@@ -1,43 +1,81 @@
 //! Describe changes / mutations to data
 
-use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
 
-use crate::{ResourceString, urls};
+use crate::{
+    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, Resource,
+    Storelike, Value,
+};
 
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Commit {
-/// The subject URL that is to be modified by this Delta
-pub subject: String,
-/// The date it was created, as a unix timestamp
-pub created_at: u128,
-/// The URL of the one suggesting this Commit
-pub actor: String,
-/// The set of PropVals that need to be added.
-/// Overwrites existing values
-pub set: Option<std::collections::HashMap<String, String>>,
-/// The set of property URLs that need to be removed
-pub remove: Option<Vec<String>>,
-/// If set to true, deletes the entire resource
-pub destroy: Option<bool>,
-/// Hash signed by the actor
-pub signature: String,
+    /// The subject URL that is to be modified by this Delta
+    pub subject: String,
+    /// The date it was created, as a unix timestamp
+    pub created_at: u128,
+    /// The URL of the one suggesting this Commit
+    pub actor: String,
+    /// The set of PropVals that need to be added.
+    /// Overwrites existing values
+    pub set: Option<std::collections::HashMap<String, String>>,
+    /// The set of property URLs that need to be removed
+    pub remove: Option<Vec<String>>,
+    /// If set to true, deletes the entire resource
+    pub destroy: Option<bool>,
+    /// Hash signed by the actor
+    pub signature: String,
 }
 
 impl Commit {
     /// Converts the Commit into a HashMap of strings.
-    pub fn to_resourcestring(&self) -> ResourceString {
-        let mut resource = ResourceString::new();
-        resource.insert(urls::SUBJECT.into(), self.subject.clone());
-        resource.insert(urls::CREATED_AT.into(), self.created_at.to_string());
-        resource.insert(urls::ACTOR.into(), self.actor.clone());
-        // How to serialize nested resources?
-        // https://github.com/joepio/atomic/issues/16
-        // resource.insert(urls::SET.into(), some_conversion_func);
-        todo!();
-        resource
+    pub fn into_resource<'a>(&self, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
+        let subject = format!(
+            "{}/{}",
+            store.get_base_url().unwrap_or("https://localhost".into()),
+            self.signature
+        );
+        let mut resource = Resource::new_instance(urls::COMMIT, store)?;
+        resource.set_subject(subject);
+        resource.set_propval(
+            urls::SUBJECT.into(),
+            Value::new(&self.subject, &DataType::AtomicUrl).unwrap(),
+        )?;
+        resource.set_propval(
+            urls::CREATED_AT.into(),
+            Value::new(&self.created_at.to_string(), &DataType::Timestamp).unwrap(),
+        )?;
+        resource.set_propval(
+            urls::ACTOR.into(),
+            Value::new(&self.actor, &DataType::AtomicUrl).unwrap(),
+        )?;
+        if self.set.is_some() {
+            let mut newset = PropVals::new();
+            for (prop, stringval) in self.set.clone().unwrap() {
+                let datatype = store.get_property(&prop)?.data_type;
+                let val = Value::new(&stringval, &datatype)?;
+                newset.insert(prop, val);
+            }
+            resource.set_propval(urls::SET.into(), newset.into())?;
+        };
+        if self.remove.is_some() && !self.remove.clone().unwrap().is_empty() {
+            let remove_vec: Vec<String> = self.remove.clone().unwrap();
+            resource.set_propval(urls::REMOVE.into(), remove_vec.into())?;
+        };
+        if self.destroy.is_some() && self.destroy.unwrap() {
+            resource.set_propval(urls::DESTROY.into(), true.into())?;
+        }
+        resource.set_propval(
+            urls::ACTOR.into(),
+            Value::new(&self.actor, &DataType::AtomicUrl).unwrap(),
+        )?;
+        resource.set_propval(
+            urls::SIGNATURE.into(),
+            self.signature.clone().into(),
+        )?;
+        Ok(resource)
     }
 }
 
@@ -100,7 +138,7 @@ impl CommitBuilder {
 
     /// Whether the resource needs to be removed fully
     pub fn destroy(&mut self, destroy: bool) {
-      self.destroy = destroy
+        self.destroy = destroy
     }
 }
 
@@ -112,6 +150,7 @@ mod test {
     #[test]
     fn apply_commit() {
         let store = crate::Store::init();
+        store.populate().unwrap();
         let subject = String::from("https://example.com/somesubject");
         let actor = "HashedThing".into();
         let mut partial_commit = CommitBuilder::new(subject.clone(), actor);
@@ -119,8 +158,11 @@ mod test {
         let value = "Some value";
         partial_commit.set(property.into(), value.into());
         let full_commit = partial_commit.sign("correct_signature");
-        store.commit(full_commit).unwrap();
+        let stored_commit = store.commit(full_commit).unwrap();
         let resource = store.get_resource(&subject).unwrap();
         assert!(resource.get(property).unwrap().to_string() == value);
+        let found_commit = store.get_resource(stored_commit.get_subject()).unwrap();
+        println!("{}",found_commit.get_subject());
+        assert!(found_commit.get_shortname("subject").unwrap().to_string() == subject);
     }
 }
