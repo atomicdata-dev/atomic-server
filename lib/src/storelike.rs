@@ -74,7 +74,7 @@ pub trait Storelike {
     /// Apply a single Commit to the store
     /// Creates, edits or destroys a resource.
     /// TODO: Should verify the author and the signature.
-    fn commit(&self, commit: crate::Commit) -> AtomicResult<()>
+    fn commit(&self, commit: crate::Commit) -> AtomicResult<Resource>
     where
         Self: std::marker::Sized,
     {
@@ -101,24 +101,24 @@ pub trait Storelike {
         if let Some(destroy) = commit.destroy {
             if destroy {
                 self.remove_resource(&commit.subject);
-                return Ok(());
             }
         }
-        if let Some(set) = commit.set {
+        if let Some(set) = commit.set.clone() {
             for (prop, val) in set.iter() {
                 // Warning: this is a very inefficient operation
                 resource.set_propval_string(prop.into(), val)?;
             }
         }
-        if let Some(remove) = commit.remove {
+        if let Some(remove) = commit.remove.clone() {
             for prop in remove.iter() {
                 // Warning: this is a very inefficient operation
                 resource.remove_propval(&prop);
             }
         }
         // TOOD: Persist delta to store, use hash as ID
-        // let commit_resource: Resource = commit.into_resource(store: self);
-        Ok(())
+        let commit_resource: Resource = commit.into_resource(self)?;
+        self.add_resource(&commit_resource)?;
+        Ok(commit_resource)
     }
 
     /// Adds a Resource to the store
@@ -158,7 +158,7 @@ pub trait Storelike {
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &str) -> AtomicResult<Class> {
         // The string representation of the Class
-        let class_strings = self.get_resource_string(subject).expect("Class not found");
+        let class_strings = self.get_resource_string(subject).map_err(|e| format!("Class {} not found: {}", subject, e))?;
         let shortname = class_strings
             .get(urls::SHORTNAME)
             .ok_or("Class has no shortname")?;
@@ -404,7 +404,7 @@ pub trait Storelike {
             if json_ld {
                 // In JSON-LD, the value of a Context Item can be a string or an object.
                 // This object can contain information about the translation or datatype of the value
-                let ctx_value: SerdeValue = match property.data_type {
+                let ctx_value: SerdeValue = match property.data_type.clone() {
                     DataType::AtomicUrl => {
                         let mut obj = Map::new();
                         obj.insert("@id".into(), prop_url.as_str().into());
@@ -438,10 +438,7 @@ pub trait Storelike {
                         obj.insert("@container".into(), "@list".into());
                         obj.into()
                     }
-                    DataType::Slug => prop_url.as_str().into(),
-                    DataType::String => prop_url.as_str().into(),
-                    DataType::Timestamp => prop_url.as_str().into(),
-                    DataType::Unsupported(_) => prop_url.as_str().into(),
+                    _other => prop_url.as_str().into(),
                 };
                 context.insert(property.shortname.as_str().into(), ctx_value);
             }
@@ -452,7 +449,8 @@ pub trait Storelike {
             let jsonval = match native_value {
                 Value::AtomicUrl(val) => SerdeValue::String(val),
                 Value::Date(val) => SerdeValue::String(val),
-                Value::Integer(val) => SerdeValue::Number(val.into()),
+                // TODO: Handle big numbers
+                Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
                 Value::Markdown(val) => SerdeValue::String(val),
                 Value::ResourceArray(val) => SerdeValue::Array(
                     val.iter()
@@ -463,6 +461,8 @@ pub trait Storelike {
                 Value::String(val) => SerdeValue::String(val),
                 Value::Timestamp(val) => SerdeValue::Number(val.into()),
                 Value::Unsupported(val) => SerdeValue::String(val.value),
+                Value::Boolean(val) => SerdeValue::Bool(val),
+                Value::NestedResource(_) => {todo!()},
             };
             root.insert(property.shortname, jsonval);
         }

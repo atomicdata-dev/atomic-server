@@ -1,6 +1,6 @@
 //! A value is the part of an Atom that contains the actual information.
 
-use crate::{errors::AtomicResult, datatype::DataType, datatype::match_datatype};
+use crate::{datatype::DataType, datatype::match_datatype, errors::AtomicResult, resources::PropVals};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -9,12 +9,14 @@ use serde::{Deserialize, Serialize};
 pub enum Value {
     AtomicUrl(String),
     Date(String),
-    Integer(i32),
+    Integer(i128),
     Markdown(String),
     ResourceArray(Vec<String>),
     Slug(String),
     String(String),
     Timestamp(i64),
+    NestedResource(PropVals),
+    Boolean(bool),
     Unsupported(UnsupportedValue),
 }
 
@@ -32,10 +34,12 @@ pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
+    /// Creates a new Value from an explicit DataType.
+    /// Fails if the input string does not convert.
     pub fn new(value: &str, datatype: &DataType) -> AtomicResult<Value> {
         match datatype {
             DataType::Integer => {
-                let val: i32 = value.parse()?;
+                let val: i128 = value.parse()?;
                 Ok(Value::Integer(val))
             }
             DataType::String => Ok(Value::String(value.into())),
@@ -67,10 +71,24 @@ impl Value {
                     .map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e))?;
                 Ok(Value::Timestamp(val))
             }
+            DataType::NestedResource => {
+                let val: i64 = value
+                    .parse()
+                    .map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e))?;
+                Ok(Value::Timestamp(val))
+            }
             DataType::Unsupported(unsup_url) => Ok(Value::Unsupported(UnsupportedValue {
                 value: value.into(),
                 datatype: unsup_url.into(),
             })),
+            DataType::Boolean => {
+                let bool = match value {
+                    "true" => true,
+                    "false" => false,
+                    other => return Err(format!("Not a valid boolean value: {}, should be 'true' or 'false'.", other).into()),
+                };
+                Ok(Value::Boolean(bool))
+            }
         }
     }
 
@@ -88,13 +106,31 @@ impl From<String> for Value {
 
 impl From<i32> for Value {
     fn from(val: i32) -> Self {
-        Value::Integer(val)
+        Value::Integer(val.into())
+    }
+}
+
+impl From<u64> for Value {
+    fn from(val: u64) -> Self {
+        Value::Integer(val.into())
     }
 }
 
 impl From<Vec<String>> for Value {
     fn from(val: Vec<String>) -> Self {
         Value::ResourceArray(val)
+    }
+}
+
+impl From<PropVals> for Value {
+    fn from(val: PropVals) -> Self {
+        Value::NestedResource(val)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(val: bool) -> Self {
+        Value::Boolean(val)
     }
 }
 
@@ -114,6 +150,8 @@ impl fmt::Display for Value {
             Value::Slug(s) => write!(f, "{}", s),
             Value::String(s) => write!(f, "{}", s),
             Value::Timestamp(i) => write!(f, "{}", i),
+            Value::NestedResource(n) => write!(f, "{:?}", n),
+            Value::Boolean(b) => write!(f, "{}", b),
             Value::Unsupported(u) => write!(f, "{}", u.value),
         }
     }
