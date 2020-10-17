@@ -39,5 +39,5 @@ fn main() {
     // A subject URL has been created automatically.
     let subject = new_property.get_subject();
     let fetched_new_resource = store.get_resource(subject).unwrap();
-    assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "age");
+    assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "the age of a person");
 }

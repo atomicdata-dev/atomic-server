@@ -23,19 +23,10 @@ pub struct Resource<'a> {
     classes: Option<Vec<Class>>,
     /// A reference to the store
     store: &'a dyn Storelike,
-    /// A hashmap of nested Resources.
-    /// A nested resource is a sub-resource, whose Subject is its path.
-    /// For example, a Class might have a nested Property resource with a subject like this:
-    /// "https://example.com/someClass https://atomicdata.dev/properties/requires 0"
-    nested: Nested<'a>,
 }
 
 /// Maps Property URLs to their values
-type PropVals = HashMap<String, Value>;
-
-/// Map of nested resources.
-/// A path and a SubResource
-type Nested<'a> = HashMap<String, Resource<'a>>;
+pub type PropVals = HashMap<String, Value>;
 
 impl<'a> Resource<'a> {
     /// Checks if the classes are there, if not, fetches them
@@ -50,13 +41,11 @@ impl<'a> Resource<'a> {
     /// Create a new, empty Resource.
     pub fn new(subject: String, store: &'a dyn Storelike) -> Resource<'a> {
         let propvals: PropVals = HashMap::new();
-        let nested: Nested = HashMap::new();
         Resource {
             propvals,
             subject,
             classes: None,
             store,
-            nested,
         }
     }
 
@@ -64,7 +53,6 @@ impl<'a> Resource<'a> {
     /// The subject is generated, but can be changed.
     pub fn new_instance(class_url: &str, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
         let propvals: PropVals = HashMap::new();
-        let nested: Nested = HashMap::new();
         let mut classes_vec = Vec::new();
         classes_vec.push(store.get_class(class_url)?);
         use rand::Rng;
@@ -86,7 +74,6 @@ impl<'a> Resource<'a> {
             subject,
             classes,
             store,
-            nested,
         };
         let class_urls = Vec::from([String::from(class_url)]);
         resource.set_propval(crate::urls::IS_A.into(), class_urls.into())?;
@@ -113,6 +100,10 @@ impl<'a> Resource<'a> {
             "Property {} for resource {} not found",
             property_url, self.subject
         ))?)
+    }
+
+    pub fn get_propvals(&self) -> PropVals {
+        self.propvals.clone()
     }
 
     /// Gets a value by its shortname
@@ -236,6 +227,14 @@ pub fn resourcestring_to_atoms(subject: &str, resource: ResourceString) -> Vec<A
         vec.push(Atom::new(subject.into(), prop.into(), val.into()));
     }
     vec
+}
+
+pub fn propvals_to_resourcestring(propvals: PropVals) -> ResourceString {
+    let mut resource_string: ResourceString = HashMap::new();
+    for (prop, val) in propvals.iter() {
+        resource_string.insert(prop.clone(), val.to_string());
+    }
+    resource_string
 }
 
 #[cfg(test)]

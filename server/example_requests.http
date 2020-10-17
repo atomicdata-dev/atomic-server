@@ -2,6 +2,10 @@
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: application/json
 
+### Get a thing as JSON-LD
+GET https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: application/ld+json
+
 ### Get a thing as AD3
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: application/ad3-ndjson
@@ -20,15 +24,15 @@ Accept: application/json
 Content-Type: application/json
 
 {
-  "subject": "http://localhost/somresource",
+  "subject": "http://0.0.0.0:8081/ttest",
   "created_at": 1601239744,
   "actor": "https://example.com/profile",
   "set": {
-    "https://atomicdata.dev/properties/description": "A new desription"
+    "https://atomicdata.dev/properties/requires": "[\"http/properties/requires\"]"
   },
   "remove": ["https://atomicdata.dev/properties/shortname"],
   "destroy": false,
-  "signature": "correcthash"
+  "signature": "correct_signature"
 }
 
 ### Check if above commit has been applied correctly
