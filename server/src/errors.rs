@@ -60,6 +60,7 @@ impl From<&str> for AppError {
     }
 }
 
+
 impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         AppError {

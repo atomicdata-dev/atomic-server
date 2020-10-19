@@ -56,7 +56,7 @@ mod test {
 
     #[test] #[ignore]
     fn post_commit_basic() {
-        let commit = crate::commit::CommitBuilder::new("subject".into(), "actor".into()).sign("private_key");
+        let commit = crate::commit::CommitBuilder::new("subject".into(), "actor".into()).sign("private_key").unwrap();
         post_commit("https://atomicdata.dev/commit", &commit).unwrap();
     }
 }

@@ -63,8 +63,7 @@ impl<'a> Resource<'a> {
         let subject = format!(
             "{}/{}/{}",
             store
-                .get_base_url()
-                .ok_or("No base_url set in this store.")?,
+                .get_base_url(),
             classes_vec[0].shortname.clone(),
             random_string
         );
@@ -130,7 +129,7 @@ impl<'a> Resource<'a> {
         self.save().ok();
     }
 
-    /// Tries to resolve the shortname to a URL.
+    /// Tries to resolve the shortname of a Property to a Property URL.
     // Currently assumes that classes have been set before.
     pub fn resolve_shortname(&mut self, shortname: &str) -> AtomicResult<Option<Property>> {
         let classes = self.get_classes()?;
@@ -181,7 +180,7 @@ impl<'a> Resource<'a> {
         let fullprop = if is_url(property) {
             self.store.get_property(property)?
         } else {
-            self.resolve_shortname(property)?.unwrap()
+            self.resolve_shortname(property)?.ok_or(format!("Shortname {} not found in {}", property, self.get_subject()))?
         };
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.set_propval(fullprop.subject, fullval)?;

@@ -69,11 +69,12 @@ pub trait Storelike {
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_base_url(&self) -> Option<String>;
+    fn get_base_url(&self) -> String;
 
     /// Apply a single Commit to the store
     /// Creates, edits or destroys a resource.
-    /// TODO: Should verify the author and the signature.
+    /// Checks if the signature is created by the Agent.
+    /// Should check if the Agent has the correct rights.
     fn commit(&self, commit: crate::Commit) -> AtomicResult<Resource>
     where
         Self: std::marker::Sized,
@@ -82,13 +83,16 @@ pub trait Storelike {
             Ok(rs) => rs,
             Err(_) => Resource::new(commit.subject.clone(), self),
         };
-        match commit.signature.as_str() {
-            // TODO: check hash
-            "correct_signature" => {}
-            _ => return Err("Incorrect signature".into()),
-        }
-        // TODO: Check if commit.actor has the rights to update the resource
-        // TODO: Check if commit.signature matches the actor
+        // TODO: Check if commit.agent has the rights to update the resource
+        let pubkey_b64 = self.get_resource(&commit.signer)?
+            .get(urls::PUBLIC_KEY)?.to_string();
+        let agent_pubkey = base64::decode(pubkey_b64)?;
+        // TODO: actually use the stringified resource
+        let stringified = "full_resource";
+        let peer_public_key =
+            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
+        let signature_bytes = base64::decode(commit.signature.clone())?;
+        peer_public_key.verify(stringified.as_bytes(), &signature_bytes).map_err(|_| "Incorrect signature")?;
         // Check if the created_at lies in the past
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -127,6 +131,31 @@ pub trait Storelike {
         Ok(())
     }
 
+    /// Create an Agent, storing its public key.
+    /// An Agent is required for signing Commits.
+    /// Returns a tuple of (subject, private_key).
+    /// Make sure to store the private_key somewhere safe!
+    fn create_agent(&self, name: &str) -> AtomicResult<(String, String)>
+    where
+        Self: std::marker::Sized,
+    {
+        use ring::signature::KeyPair;
+        let subject = format!("{}agents/{}", self.get_base_url(), name);
+        let rng = ring::rand::SystemRandom::new();
+        let pkcs8_bytes = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)
+            .map_err(|_| "Error generating seed")?;
+        let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
+            .map_err(|_| "Error generating keypair")?;
+        let mut agent = Resource::new_instance(urls::AGENT, self)?;
+        let pubkey = base64::encode(key_pair.public_key().as_ref());
+        let private_key = base64::encode(pkcs8_bytes.as_ref());
+        agent.set_subject(subject.clone());
+        agent.set_by_shortname("name", name)?;
+        agent.set_by_shortname("publickey", &pubkey)?;
+        self.add_resource(&agent)?;
+        Ok((subject, private_key))
+    }
+
     /// Fetches a resource, makes sure its subject matches.
     /// Save to the store.
     /// Only adds atoms with matching subjects will be added.
@@ -158,7 +187,9 @@ pub trait Storelike {
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &str) -> AtomicResult<Class> {
         // The string representation of the Class
-        let class_strings = self.get_resource_string(subject).map_err(|e| format!("Class {} not found: {}", subject, e))?;
+        let class_strings = self
+            .get_resource_string(subject)
+            .map_err(|e| format!("Class {} not found: {}", subject, e))?;
         let shortname = class_strings
             .get(urls::SHORTNAME)
             .ok_or("Class has no shortname")?;
@@ -303,9 +334,8 @@ pub trait Storelike {
         };
         Ok(())
     }
+    /// DEPRECATED - PREFER COMMITS
     /// Processes a vector of deltas and updates the store.
-    /// Panics if the
-    /// Use this for ALL updates to the store!
     fn process_delta(&self, delta: DeltaDeprecated) -> AtomicResult<()> {
         let mut updated_resources = Vec::new();
 
@@ -462,7 +492,7 @@ pub trait Storelike {
                 Value::Timestamp(val) => SerdeValue::Number(val.into()),
                 Value::Unsupported(val) => SerdeValue::String(val.value),
                 Value::Boolean(val) => SerdeValue::Bool(val),
-                Value::NestedResource(_) => {todo!()},
+                Value::NestedResource(_) => todo!(),
             };
             root.insert(property.shortname, jsonval);
         }
@@ -494,7 +524,7 @@ pub trait Storelike {
     ///     Some("https://atomicdata.dev/properties/isA"),
     ///     Some("[\"https://atomicdata.dev/classes/Class\"]")
     /// ).unwrap();
-    /// assert!(atoms.len() == 4)
+    /// assert!(atoms.len() == 5)
     /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.
