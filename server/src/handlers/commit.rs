@@ -15,7 +15,7 @@ pub async fn post_commit(
     let mut context = data.lock().unwrap();
     let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
-    store.commit(commit.into_inner())?;
-    let body = "Commit succesfully applied";
+    let commit_resource = store.commit(commit.into_inner())?;
+    let body = format!("Commit succesfully applied. Can be seen at {}", commit_resource.get_subject());
     Ok(builder.body(body))
 }

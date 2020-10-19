@@ -33,6 +33,8 @@ pub fn value_to_html(value: &Value) -> String {
         Value::Date(s) => format!("{:?}", s),
         Value::Timestamp(i) => format!("{}", i),
         Value::Unsupported(unsup_url) => format!("{:?}", unsup_url),
+        Value::NestedResource(n) => format!("{:?}", n),
+        Value::Boolean(b) => format!("{}", b),
     }
 }
 

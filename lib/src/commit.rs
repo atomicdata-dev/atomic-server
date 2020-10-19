@@ -31,10 +31,12 @@ pub struct Commit {
 
 impl Commit {
     /// Converts the Commit into a HashMap of strings.
-    pub fn into_resource<'a>(&self, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
+    /// Creates an identifier using the base_url or a default.
+    pub fn into_resource<'a>(self, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
+        let default_base_url = String::from("https://localhost/");
         let subject = format!(
-            "{}/{}",
-            store.get_base_url().unwrap_or("https://localhost".into()),
+            "{}commits/{}",
+            store.get_base_url().unwrap_or(default_base_url),
             self.signature
         );
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
@@ -73,18 +75,19 @@ impl Commit {
         )?;
         resource.set_propval(
             urls::SIGNATURE.into(),
-            self.signature.clone().into(),
+            self.signature.into(),
         )?;
         Ok(resource)
     }
 }
 
 /// Use this for creating Commits
+#[derive(Serialize)]
 pub struct CommitBuilder {
     /// The subject URL that is to be modified by this Delta
     subject: String,
     /// The date it was created, as a unix timestamp
-    // pub created_at: u128,
+    created_at: Option<u128>,
     /// The URL of the one suggesting this Commit
     actor: String,
     /// The set of PropVals that need to be added.
@@ -101,6 +104,7 @@ impl CommitBuilder {
     pub fn new(subject: String, actor: String) -> Self {
         CommitBuilder {
             subject,
+            created_at: None,
             actor,
             set: HashMap::new(),
             remove: HashSet::new(),
@@ -108,13 +112,17 @@ impl CommitBuilder {
         }
     }
 
-    /// Creates the Commit.
+    /// Creates the Commit and signs it using a signature.
     /// Does not send it - see atomic_lib::client::post_commit
-    pub fn sign(self, _private_key: &str) -> Commit {
-        let created_at = std::time::SystemTime::now()
+    pub fn sign(mut self, _private_key: &str) -> Commit {
+        self.created_at = Some(std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_millis();
+            .as_millis());
+
+        // Todo: Implement signature
+        // let string = serde_json::to_string(&self);
+        // let signature = some_lib::sign(string, private_key);
 
         Commit {
             subject: self.subject,
@@ -122,7 +130,7 @@ impl CommitBuilder {
             set: Some(self.set),
             remove: Some(self.remove.into_iter().collect()),
             destroy: Some(self.destroy),
-            created_at,
+            created_at: self.created_at.unwrap(),
             // TODO: Hashing signature logic
             signature: "correct_signature".into(),
         }
