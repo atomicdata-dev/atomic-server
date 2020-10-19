@@ -130,7 +130,7 @@ impl Storelike for Db {
                 let resource = crate::resources::propvals_to_resourcestring(propvals);
                 Ok(resource)
             }
-            Err(e) => {
+            Err(_e) => {
                 if resource_url.starts_with(&self.base_url) {
                     return Err(format!(
                         "Failed to retrieve {}, does not exist locally",
