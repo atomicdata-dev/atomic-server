@@ -544,7 +544,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
  "atomic_lib",
  "clap",
@@ -582,11 +582,13 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.13.0"
+version = "0.14.0"
 dependencies = [
+ "base64 0.13.0",
  "bincode",
  "rand",
  "regex",
+ "ring",
  "rio_api",
  "rio_turtle",
  "serde",
@@ -690,6 +692,12 @@ name = "base64"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3441f0f7b02788e948e47f457ca01f1d7e6d92c693bc132c22b087d3141c03ff"
+
+[[package]]
+name = "base64"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 
 [[package]]
 name = "bincode"

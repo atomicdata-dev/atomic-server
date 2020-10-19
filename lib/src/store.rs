@@ -88,10 +88,10 @@ impl Storelike for Store {
         self.hashmap.lock().unwrap().clone().into_iter().collect()
     }
 
-    fn get_base_url(&self) -> Option<String> {
+    fn get_base_url(&self) -> String {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/joepio/atomic/issues/6
-        Some("https://localhost".into())
+        "https://localhost/".into()
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
