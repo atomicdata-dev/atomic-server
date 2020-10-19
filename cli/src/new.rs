@@ -228,6 +228,8 @@ fn prompt_field(
         },
         DataType::Timestamp => todo!(),
         DataType::Unsupported(unsup) => panic!("Unsupported datatype: {:?}", unsup),
+        DataType::Boolean => todo!(),
+        DataType::NestedResource => todo!(),
     };
     Ok(input)
 }

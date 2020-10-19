@@ -22,7 +22,7 @@ pub struct Db {
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
     index_vals: sled::Tree,
     index_props: sled::Tree,
-    // The current URL
+    /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
     base_url: String,
 }
 
@@ -119,8 +119,8 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_base_url(&self) -> Option<String> {
-        Some(self.base_url.clone())
+    fn get_base_url(&self) -> String {
+        self.base_url.clone()
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
