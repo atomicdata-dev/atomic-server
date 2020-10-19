@@ -18,6 +18,8 @@ ureq = "1.4.0"
 rio_turtle = { version = "0.5.0", optional = true}
 rio_api = { version = "0.5.0", optional = true}
 rand = "0.7.3"
+ring = "0.16.15"
+base64 = "0.13.0"
 
 [features]
 db = ["sled", "bincode"]

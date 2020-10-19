@@ -5,6 +5,7 @@ pub const CLASS: &str = "https://atomicdata.dev/classes/Class";
 pub const PROPERTY: &str = "https://atomicdata.dev/classes/Property";
 pub const DATATYPE_CLASS: &str = "https://atomicdata.dev/classes/Datatype";
 pub const COMMIT: &str = "https://atomicdata.dev/classes/Commit";
+pub const AGENT: &str = "https://atomicdata.dev/classes/Agent";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -21,9 +22,11 @@ pub const SUBJECT: &str = "https://atomicdata.dev/properties/subject";
 pub const SET: &str = "https://atomicdata.dev/properties/set";
 pub const REMOVE: &str = "https://atomicdata.dev/properties/remove";
 pub const DESTROY: &str = "https://atomicdata.dev/properties/destroy";
-pub const ACTOR: &str = "https://atomicdata.dev/properties/actor";
+pub const SIGNER: &str = "https://atomicdata.dev/properties/signer";
 pub const CREATED_AT: &str = "https://atomicdata.dev/properties/createdAt";
 pub const SIGNATURE: &str = "https://atomicdata.dev/properties/signature";
+// ... for Agents
+pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
