@@ -83,21 +83,25 @@ pub trait Storelike {
             Ok(rs) => rs,
             Err(_) => Resource::new(commit.subject.clone(), self),
         };
+        let signature = match commit.signature.as_ref() {
+            Some(sig) => sig,
+            None => return Err("No signature set".into())
+        };
         // TODO: Check if commit.agent has the rights to update the resource
         let pubkey_b64 = self.get_resource(&commit.signer)?
             .get(urls::PUBLIC_KEY)?.to_string();
         let agent_pubkey = base64::decode(pubkey_b64)?;
         // TODO: actually use the stringified resource
-        let stringified = "full_resource";
+        let stringified = commit.serialize_deterministically()?;
         let peer_public_key =
             ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
-        let signature_bytes = base64::decode(commit.signature.clone())?;
+        let signature_bytes = base64::decode(signature.clone())?;
         peer_public_key.verify(stringified.as_bytes(), &signature_bytes).map_err(|_| "Incorrect signature")?;
         // Check if the created_at lies in the past
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_millis();
+            .as_millis() as u64;
         if commit.created_at > now {
             return Err("Commit created_at timestamp must lie in the past.".into());
             // TODO: also check that no younger commits exist
