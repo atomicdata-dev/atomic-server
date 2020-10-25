@@ -235,4 +235,26 @@ mod test {
                 == value1
         );
     }
+
+    #[test]
+    fn serialize_commit() {
+        let mut set: HashMap<String, String> = HashMap::new();
+        set.insert(urls::SHORTNAME.into(), "shortname".into());
+        set.insert(urls::DESCRIPTION.into(), "Some description".into());
+        let mut remove = Vec::new();
+        remove.push(String::from(urls::IS_A));
+        let destroy = false;
+        let commit = Commit {
+            subject: String::from("https://localhost/test"),
+            created_at: 1603638837,
+            signer: String::from("https://localhost/author"),
+            set: Some(set),
+            remove: Some(remove),
+            destroy: Some(destroy),
+            signature: None,
+        };
+        let serialized = commit.serialize_deterministically().unwrap();
+        let should_be = r#"{"createdAt":1603638837,"remove":["https://atomicdata.dev/properties/isA"],"set":{"https://atomicdata.dev/properties/description":"Some description","https://atomicdata.dev/properties/shortname":"shortname"},"signer":"https://localhost/author","subject":"https://localhost/test"}"#;
+        assert!(serialized == should_be)
+    }
 }
