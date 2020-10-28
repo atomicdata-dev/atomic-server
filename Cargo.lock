@@ -595,6 +595,7 @@ dependencies = [
  "serde_json",
  "sled",
  "ureq",
+ "url",
 ]
 
 [[package]]

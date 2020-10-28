@@ -36,8 +36,8 @@ pub async fn path(
                 atomic_lib::storelike::PathReturn::Subject(subject) => {
                     let resource = context
                         .store
-                        .get_resource_string(&subject)?;
-                    propvals = from_hashmap_resource(&resource, &mut context.store, subject)?;
+                        .get_resource_extended(&subject)?;
+                    propvals = from_hashmap_resource(&resource.to_plain(), &mut context.store, subject)?;
                 }
                 atomic_lib::storelike::PathReturn::Atom(atom) => {
                     propvals.push(PropVal {

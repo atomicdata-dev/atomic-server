@@ -40,15 +40,15 @@ Powers `atomic-cli` and `atomic-server`.
 
 I've been working with Linked Data for a couple of years, and I believe it has some incredible merits.
 URLs are great identifiers, and using them for keys makes sense as well.
-However, using the RDF data model has [some characteristics](https://docs.atomicdata.dev/interoperability/rdf.html) that make it difficult for many developers, and that limits adoption.
+It has the potential to help a more democratic and decentralized web, where people control their own data.
+However, the RDF data model has [some characteristics](https://docs.atomicdata.dev/interoperability/rdf.html) that make it difficult for many developers, and I think that limits adoption.
 That's why I've been working on a new way to think about linked data: [Atomic Data](https://docs.atomicdata.dev/).
 Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a strict subset), but introduces some new concepts that aim to make it easier to use for developers.
 
 This repository serves the following purposes:
 
-- Test some of the core ideas of Atomic Data ([Atomic Schema](https://docs.atomicdata.dev/schema/intro.html), [Paths](https://docs.atomicdata.dev/core/paths.html), [AD3 Serialization](https://docs.atomicdata.dev/core/serialization.html))
-- Learn how Rust works (it's a cool language, and this is my first Rust project - keep that in mind while traversing the code!)
-- Serve the first Atomic Data (now available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [Atomic Data Docs](https://docs.atomicdata.dev/)
+- Test and experiment with some of the core ideas of Atomic Data, such as [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html) (share models and data types), [Paths](https://docs.atomicdata.dev/core/paths.html) (traversing data), [AD3 Serialization](https://docs.atomicdata.dev/core/serialization.html) and [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html) (storing signed state changes).
+- Serve the first Atomic Data, including the core schema (now available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [docs](https://docs.atomicdata.dev/)
 - Provide developers with tools and inspiration to use Atomic Data in their own projects.
 
 ## Contribute

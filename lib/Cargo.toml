@@ -20,6 +20,7 @@ rio_api = { version = "0.5.0", optional = true}
 rand = "0.7.3"
 ring = "0.16.15"
 base64 = "0.13.0"
+url = "2.1.1"
 
 [features]
 db = ["sled", "bincode"]
