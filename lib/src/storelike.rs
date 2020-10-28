@@ -628,10 +628,12 @@ pub trait Storelike {
                         if val_equals(val) {
                             vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                         }
+                        break;
                     } else {
                         vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                     }
-                } else if hasval && val_equals(val) {
+                    break;
+                } else if hasval && !hasprop && val_equals(val) {
                     vec.push(Atom::new(subj.into(), prop.into(), val.into()))
                 }
             }
@@ -640,7 +642,7 @@ pub trait Storelike {
         match q_subject {
             Some(sub) => match self.get_resource_string(&sub) {
                 Ok(resource) => {
-                    if q_property.is_some() | q_value.is_some() {
+                    if hasprop | hasval {
                         find_in_resource(&sub, &resource);
                         Ok(vec)
                     } else {
