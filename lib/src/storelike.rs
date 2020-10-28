@@ -256,7 +256,7 @@ pub trait Storelike {
     fn get_collection(
         &self,
         tpf: TPFQuery,
-        sort_by: String,
+        sort_by: Option<String>,
         sort_desc: bool,
         _page_nr: u8,
         _page_size: u8,
@@ -275,13 +275,14 @@ pub trait Storelike {
         let mut pages: Vec<Page> = Vec::new();
         // Construct the requested page (TODO)
         let page = Page {
-            members: sorted_subjects,
+            members: sorted_subjects.clone(),
         };
         pages.push(page);
         let collection = Collection {
             tpf,
             total_pages: pages.len() as u8,
             pages,
+            members: sorted_subjects,
             sort_by,
             sort_desc,
             current_page: 0,
@@ -315,6 +316,56 @@ pub trait Storelike {
         Ok(property)
     }
 
+    /// Get's the resource, parses the Query parameters and calculates dynamic properties.
+    /// Currently only used for getting
+    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> where Self: std::marker::Sized {
+        let url = url::Url::parse(subject)?;
+        let query_params = url.query_pairs();
+        let mut resource = self.get_resource(subject)?;
+        for class in resource.get_classes()? {
+            let mut tpf = TPFQuery {
+                subject: None,
+                property: None,
+                value: None,
+            };
+            let mut sort_by = None;
+            let mut sort_desc = false;
+            let mut page_nr = 0;
+            let mut page_size = 100;
+
+            if let Ok(val) = resource.get(urls::COLLECTION_SUBJECT) {
+                tpf.subject = Some(val.to_string());
+            }
+            if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
+                tpf.property = Some(val.to_string());
+            }
+            if let Ok(val) = resource.get(urls::COLLECTION_VALUE) {
+                tpf.value = Some(val.to_string());
+            }
+
+            if class.subject == urls::COLLECTION {
+                for (k, v) in query_params {
+                    match k.as_ref() {
+                        "subject" => {tpf.subject = Some(v.to_string())},
+                        "property" => {tpf.property = Some(v.to_string())},
+                        "value" => {tpf.value = Some(v.to_string())},
+                        "sort_by" => {sort_by = Some(v.to_string())},
+                        // TODO: parse bool
+                        "sort_desc" => {sort_desc = true},
+                        // TODO: parse page nr
+                        "page_nr" => {page_nr = 0},
+                        // TODO: parse page nr
+                        "page_size" => { page_size = 100},
+                        _ => {},
+                    };
+                };
+                let collection = self.get_collection(tpf, sort_by, sort_desc, page_nr, page_size)?;
+                return Ok(collection.to_resource(self)?)
+            }
+        }
+        Ok(resource)
+    }
+
     /// Returns a collection with all resources in the store.
     /// WARNING: This could be very expensive!
     fn all_resources(&self) -> ResourceCollection;
@@ -338,6 +389,7 @@ pub trait Storelike {
         };
         Ok(())
     }
+
     /// DEPRECATED - PREFER COMMITS
     /// Processes a vector of deltas and updates the store.
     fn process_delta(&self, delta: DeltaDeprecated) -> AtomicResult<()> {
