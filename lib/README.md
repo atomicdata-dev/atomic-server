@@ -67,3 +67,6 @@ It uses [Sled], a performant, embedded key-value store.
 **rdf**
 
 If you need RDF serialization options (Turtle / N-Triples), use this feature.
+
+[discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
+[discord-url]: https://discord.gg/a72Rv2P
