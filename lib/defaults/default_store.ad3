@@ -158,3 +158,6 @@
 ["https://atomicdata.dev/agents","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Collection\"]"]
 ["https://atomicdata.dev/agents","https://atomicdata.dev/properties/collection/property","https://atomicdata.dev/properties/isA"]
 ["https://atomicdata.dev/agents","https://atomicdata.dev/properties/collection/value","https://atomicdata.dev/classes/Agent"]
+["https://atomicdata.dev/collections","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Collection\"]"]
+["https://atomicdata.dev/collections","https://atomicdata.dev/properties/collection/property","https://atomicdata.dev/properties/isA"]
+["https://atomicdata.dev/collections","https://atomicdata.dev/properties/collection/value","https://atomicdata.dev/classes/Collection"]
