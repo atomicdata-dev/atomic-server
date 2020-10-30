@@ -2,7 +2,7 @@
 
 use crate::urls;
 use crate::{
-    collections::Collection, collections::Page, collections::TPFQuery, delta::DeltaDeprecated,
+    collections::Collection, delta::DeltaDeprecated,
     errors::AtomicResult,
 };
 use crate::{
@@ -79,10 +79,6 @@ pub trait Storelike {
     where
         Self: std::marker::Sized,
     {
-        let mut resource = match self.get_resource(&commit.subject) {
-            Ok(rs) => rs,
-            Err(_) => Resource::new(commit.subject.clone(), self),
-        };
         let signature = match commit.signature.as_ref() {
             Some(sig) => sig,
             None => return Err("No signature set".into())
@@ -111,17 +107,23 @@ pub trait Storelike {
                 self.remove_resource(&commit.subject);
             }
         }
+        let mut resource = match self.get_resource(&commit.subject) {
+            Ok(rs) => rs,
+            Err(_) => Resource::new(commit.subject.clone(), self),
+        };
         if let Some(set) = commit.set.clone() {
             for (prop, val) in set.iter() {
                 // Warning: this is a very inefficient operation
                 resource.set_propval_string(prop.into(), val)?;
             }
+            resource.save()?;
         }
         if let Some(remove) = commit.remove.clone() {
             for prop in remove.iter() {
                 // Warning: this is a very inefficient operation
                 resource.remove_propval(&prop);
             }
+            resource.save()?;
         }
         // TOOD: Persist delta to store, use hash as ID
         let commit_resource: Resource = commit.into_resource(self)?;
@@ -253,41 +255,52 @@ pub trait Storelike {
     }
 
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
-    fn get_collection(
+    fn new_collection(
         &self,
-        tpf: TPFQuery,
+        subject: &str,
+        property: Option<String>,
+        value: Option<String>,
         sort_by: Option<String>,
         sort_desc: bool,
-        _page_nr: u8,
-        _page_size: u8,
+        current_page: usize,
+        page_size: usize,
     ) -> AtomicResult<Collection> {
         // Execute the TPF query, get all the subjects.
-        let atoms = self.tpf(None, tpf.property.as_deref(), tpf.value.as_deref())?;
+        let atoms = self.tpf(None, property.as_deref(), value.as_deref())?;
         // Iterate over the fetched resources
         let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
-        let mut resources: Vec<ResourceString> = Vec::new();
-        for sub in subjects.clone() {
-            resources.push(self.get_resource_string(&sub)?);
-        }
         // Sort the resources (TODO), use sortBy and sortDesc
-        let sorted_subjects: Vec<String> = subjects.clone();
+        if sort_by.is_some() {
+            return Err("Sorting is not yet implemented".into())
+        }
+        let sorted_subjects: Vec<String> = subjects;
+        let mut all_pages: Vec<Vec<&str>> = Vec::new();
+        let mut page: Vec<&str> = Vec::new();
+        for subject in sorted_subjects.iter() {
+            page.push(subject);
+            if page.len() >= page_size {
+                all_pages.push(page);
+                page = Vec::new();
+                // No need to calculte more than necessary
+                if all_pages.len() > current_page {
+                    break;
+                }
+            }
+        }
+        let total_items = sorted_subjects.len();
         // Construct the pages (TODO), use pageSize
-        let mut pages: Vec<Page> = Vec::new();
-        // Construct the requested page (TODO)
-        let page = Page {
-            members: sorted_subjects.clone(),
-        };
-        pages.push(page);
+        let total_pages = total_items / page_size;
         let collection = Collection {
-            tpf,
-            total_pages: pages.len() as u8,
-            pages,
+            subject: subject.into(),
+            property,
+            value,
+            total_pages,
             members: sorted_subjects,
             sort_by,
             sort_desc,
-            current_page: 0,
-            total_items: subjects.len() as u8,
-            page_size: subjects.len() as u8,
+            current_page,
+            total_items,
+            page_size,
         };
         Ok(collection)
     }
@@ -323,32 +336,26 @@ pub trait Storelike {
         let query_params = url.query_pairs();
         let mut resource = self.get_resource(subject)?;
         for class in resource.get_classes()? {
-            let mut tpf = TPFQuery {
-                subject: None,
-                property: None,
-                value: None,
-            };
             let mut sort_by = None;
             let mut sort_desc = false;
             let mut page_nr = 0;
             let mut page_size = 100;
+            let mut value = None;
+            let mut property = None;
 
-            if let Ok(val) = resource.get(urls::COLLECTION_SUBJECT) {
-                tpf.subject = Some(val.to_string());
-            }
             if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
-                tpf.property = Some(val.to_string());
+                property = Some(val.to_string());
             }
             if let Ok(val) = resource.get(urls::COLLECTION_VALUE) {
-                tpf.value = Some(val.to_string());
+                value = Some(val.to_string());
             }
 
             if class.subject == urls::COLLECTION {
                 for (k, v) in query_params {
                     match k.as_ref() {
-                        "subject" => {tpf.subject = Some(v.to_string())},
-                        "property" => {tpf.property = Some(v.to_string())},
-                        "value" => {tpf.value = Some(v.to_string())},
+                        // "subject" => {tpf.subject = Some(v.to_string())},
+                        "property" => {property = Some(v.to_string())},
+                        "value" => {value = Some(v.to_string())},
                         "sort_by" => {sort_by = Some(v.to_string())},
                         // TODO: parse bool
                         "sort_desc" => {sort_desc = true},
@@ -359,7 +366,7 @@ pub trait Storelike {
                         _ => {},
                     };
                 };
-                let collection = self.get_collection(tpf, sort_by, sort_desc, page_nr, page_size)?;
+                let collection = self.new_collection(subject, property, value, sort_by, sort_desc, page_nr, page_size)?;
                 return Ok(collection.to_resource(self)?)
             }
         }
@@ -580,7 +587,8 @@ pub trait Storelike {
     ///     Some("https://atomicdata.dev/properties/isA"),
     ///     Some("[\"https://atomicdata.dev/classes/Class\"]")
     /// ).unwrap();
-    /// assert!(atoms.len() == 5)
+    /// println!("Count: {}", atoms.len());
+    /// assert!(atoms.len() == 6)
     /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.

@@ -30,9 +30,9 @@ pub const SIGNATURE: &str = "https://atomicdata.dev/properties/signature";
 pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
 // ... for Collections
 pub const MEMBERS: &str = "https://atomicdata.dev/properties/members";
-pub const COLLECTION_SUBJECT: &str = "https://atomicdata.dev/properties/collection/subject";
 pub const COLLECTION_PROPERTY: &str = "https://atomicdata.dev/properties/collection/property";
 pub const COLLECTION_VALUE: &str = "https://atomicdata.dev/properties/collection/value";
+pub const COLLECTION_ITEM_COUNT: &str = "https://atomicdata.dev/properties/collection/itemCount";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
