@@ -228,6 +228,14 @@ mod test {
     }
 
     #[test]
+    fn get_extended_resource() {
+        let store = Store::init();
+        store.populate().unwrap();
+        let resource = store.get_resource_extended("https://atomicdata.dev/classes").unwrap();
+        resource.get(urls::MEMBERS).unwrap();
+    }
+
+    #[test]
     #[should_panic]
     fn path_fail() {
         let store = init_store();
