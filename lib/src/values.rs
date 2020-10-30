@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 pub enum Value {
     AtomicUrl(String),
     Date(String),
-    Integer(i128),
+    Integer(isize),
     Markdown(String),
     ResourceArray(Vec<String>),
     Slug(String),
@@ -39,7 +39,7 @@ impl Value {
     pub fn new(value: &str, datatype: &DataType) -> AtomicResult<Value> {
         match datatype {
             DataType::Integer => {
-                let val: i128 = value.parse()?;
+                let val: isize = value.parse()?;
                 Ok(Value::Integer(val))
             }
             DataType::String => Ok(Value::String(value.into())),
@@ -106,13 +106,19 @@ impl From<String> for Value {
 
 impl From<i32> for Value {
     fn from(val: i32) -> Self {
-        Value::Integer(val.into())
+        Value::Integer(val as isize)
     }
 }
 
 impl From<u64> for Value {
     fn from(val: u64) -> Self {
-        Value::Integer(val.into())
+        Value::Integer(val as isize)
+    }
+}
+
+impl From<usize> for Value {
+    fn from(val: usize) -> Self {
+        Value::Integer(val as isize)
     }
 }
 
