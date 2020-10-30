@@ -26,7 +26,7 @@
 ["https://atomicdata.dev/classes/Agent","https://atomicdata.dev/properties/description","An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The publik key is for proving that the "]
 ["https://atomicdata.dev/classes/Agent","https://atomicdata.dev/properties/shortname","agent"]
 ["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
-["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/property\"]"]
+["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/collection/property\"]"]
 ["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/description","A paginated set of resources that can be sorted."]
 ["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/shortname","collection"]
 # Datatypes
@@ -138,7 +138,7 @@
 ["https://atomicdata.dev/properties/collection/value","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/atomicURL"]
 ["https://atomicdata.dev/properties/collection/value","https://atomicdata.dev/properties/shortname","value"]
 ["https://atomicdata.dev/properties/collection/value","https://atomicdata.dev/properties/description","The property is the third field of an atom. Similar to `object` in RDF. In this context, it is used as a filter in a collection."]
-["https://atomicdata.dev/properties/members","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/members\"]"]
+["https://atomicdata.dev/properties/members","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
 ["https://atomicdata.dev/properties/members","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/resourceArray"]
 ["https://atomicdata.dev/properties/members","https://atomicdata.dev/properties/shortname","members"]
 ["https://atomicdata.dev/properties/members","https://atomicdata.dev/properties/description","The members are the list of resources in a collection."]
