@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
-/// All changes to the Resource are immediately applied to the Store as well.
+/// All changes to the Resource are applied after calling `.save()`.
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Resource<'a> {
     /// A hashMap of all the Property Value combinations
@@ -125,8 +125,6 @@ impl<'a> Resource<'a> {
     /// Validates the datatype.
     pub fn remove_propval(&mut self, property_url: &str) {
         self.propvals.remove_entry(property_url);
-        // Could fail, but unlikely
-        self.save().ok();
     }
 
     /// Tries to resolve the shortname of a Property to a Property URL.
@@ -150,8 +148,8 @@ impl<'a> Resource<'a> {
     }
 
     /// Saves the resource (with all the changes) to the store
-    /// Should be called automatically, but we might add some form of batching later
-    fn save(&self) -> AtomicResult<()> {
+    /// Should be run after any (batch of) changes to the Resource!
+    pub fn save(&self) -> AtomicResult<()> {
         self.store.add_resource(self)
     }
 
@@ -169,7 +167,6 @@ impl<'a> Resource<'a> {
     /// Overwrites existing.
     pub fn set_propval(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property, value);
-        self.save()?;
         Ok(())
     }
 
@@ -272,6 +269,7 @@ mod test {
         new_resource.set_by_shortname("shortname", "person").unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
         new_resource.set_by_shortname("shortname", "human").unwrap();
+        new_resource.save().unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(resource_from_store.get_shortname("shortname").unwrap().to_string() == "human");
