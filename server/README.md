@@ -30,12 +30,13 @@ Powered by Rust, atomic_lib, actix-web, Sled and [more](cargo.toml).
 - [x] Content-type negotiation
 - [x] Basic design / use CSS framework
 - [x] Validation endpoint
-- [x] Write / Commit / [Mutations](https://docs.atomicdata.dev/mutations/intro.html) support (might need #16, #24)
-- [ ] Eliminate all preventable runtime panics (most already done)
-- [ ] URL extension recognition (.json, .ad3, .nt, etc.)
-- [ ] Collections / dynamic resources #17
-- [ ] Auth support (WebID-OICD possibly?) #13
-- [ ] Be able to manage the AtomicData.dev website without git
+- [x] Atomic Commits (#16, #24)
+- [x] Eliminate all preventable runtime panics (most already done)
+- [x] URL extension recognition (.json, .ad3, .nt, etc.)
+- [x] Collections / dynamic resources #17
+- [ ] Authentication #13
+- [ ] Authorization model (implemented for write, not read)
+- [ ] Be able to manage the AtomicData.dev website without git (cli integration, implement required endpoints) [#6](https://github.com/joepio/atomic/issues/6)
 
 ## Install from source
 
