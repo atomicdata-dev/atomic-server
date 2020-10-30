@@ -16,44 +16,30 @@ pub async fn get_resource(
 ) -> BetterResult<HttpResponse> {
     let mut context = data.lock().unwrap();
     log::info!("subject_end: {}", subject_end);
-    let subj_end_string = subject_end.to_string();
-    let content_type = get_accept(req);
+    let mut subj_end_string = subject_end.as_str();
+    let mut content_type = get_accept(req);
     // Check extensions and set datatype. Harder than it looks to get right...
-    // let path = Path::new(&subj_end_string);
-    // log::info!("path: {:?}", path);
-    // if content_type == ContentType::HTML {
-    //     content_type = match path.extension() {
-    //         Some(extension) => match extension
-    //             .to_str()
-    //             .ok_or("Extension cannot be parsed. Try a different URL.")?
-    //         {
-    //             "ad3" => ContentType::AD3,
-    //             "json" => ContentType::JSON,
-    //             "jsonld" => ContentType::JSONLD,
-    //             "html" => ContentType::HTML,
-    //             "ttl" => ContentType::TURTLE,
-    //             _ => ContentType::HTML,
-    //         },
-    //         None => ContentType::HTML,
-    //     };
-    // }
+    if content_type == ContentType::HTML {
+        if let Some((ext, path)) = try_extension(subj_end_string) {
+            content_type = ext;
+            subj_end_string = path;
+        }
+    }
     let subject = format!("{}{}", &context.config.local_base_url, subj_end_string);
     let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
+    builder.header("Content-Type", content_type.to_mime());
     match content_type {
         ContentType::JSON => {
-            builder.header("Content-Type", content_type.to_mime());
             let body = store.resource_to_json(&subject, 1, false)?;
             Ok(builder.body(body))
         }
         ContentType::JSONLD => {
-            builder.header("Content-Type", content_type.to_mime());
             let body = store.resource_to_json(&subject, 1, true)?;
             Ok(builder.body(body))
         }
         ContentType::HTML => {
-            builder.header("Content-Type", content_type.to_mime());
             let mut tera_context = TeraCtx::new();
             let resource = store.get_resource_string(&subject)?;
             let propvals = from_hashmap_resource(&resource, store, subject)?;
@@ -62,16 +48,34 @@ pub async fn get_resource(
             Ok(builder.body(body))
         }
         ContentType::AD3 => {
-            builder.header("Content-Type", content_type.to_mime());
-            let body = store
-                .resource_to_ad3(&subject)?;
+            let body = store.resource_to_ad3(&subject)?;
             Ok(builder.body(body))
         }
         ContentType::TURTLE | ContentType::NT => {
-            builder.header("Content-Type", content_type.to_mime());
-            let atoms = atomic_lib::resources::resourcestring_to_atoms(&subject,store.get_resource_string(&subject)?);
+            let atoms = atomic_lib::resources::resourcestring_to_atoms(
+                &subject,
+                store.get_resource_string(&subject)?,
+            );
             let body = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(body))
         }
     }
+}
+
+/// Finds the extension
+fn try_extension(path: &str) -> Option<(ContentType, &str)> {
+    let items: Vec<&str> = path.split('.').collect();
+    if items.len() == 2 {
+        let path = items[0];
+        let content_type = match items[1] {
+            "ad3" => ContentType::AD3,
+            "json" => ContentType::JSON,
+            "jsonld" => ContentType::JSONLD,
+            "html" => ContentType::HTML,
+            "ttl" => ContentType::TURTLE,
+            _ => return None,
+        };
+        return Some((content_type, path));
+    }
+    None
 }
