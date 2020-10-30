@@ -10,6 +10,16 @@ pub struct TPFQuery {
   pub value: Option<String>,
 }
 
+pub struct CollectionBuilder {
+  pub subject: String,
+  pub property: Option<String>,
+  pub value: Option<String>,
+  pub sort_by: Option<String>,
+  pub sort_desc: bool,
+  pub current_page: usize,
+  pub page_size: usize,
+}
+
 /// Dynamic resource used for ordering, filtering and querying content.
 /// Features pagination.
 #[derive(Debug)]
@@ -65,7 +75,16 @@ mod test {
         let store = crate::Store::init();
         store.populate().unwrap();
         // Get all Classes, sorted by shortname
-        let collection = store.new_collection("test_subject", Some(urls::IS_A.into()), Some(urls::CLASS.into()) , None, false, 1, 1).unwrap();
+        let collection_builder = CollectionBuilder {
+          subject: "test_subject".into(),
+          property: Some(urls::IS_A.into()),
+          value: Some(urls::CLASS.into()),
+          sort_by: None,
+          sort_desc: false,
+          page_size: 1000,
+          current_page: 0,
+        };
+        let collection = store.new_collection(collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 

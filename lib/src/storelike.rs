@@ -257,20 +257,14 @@ pub trait Storelike {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     fn new_collection(
         &self,
-        subject: &str,
-        property: Option<String>,
-        value: Option<String>,
-        sort_by: Option<String>,
-        sort_desc: bool,
-        current_page: usize,
-        page_size: usize,
+        collection: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
         // Execute the TPF query, get all the subjects.
-        let atoms = self.tpf(None, property.as_deref(), value.as_deref())?;
+        let atoms = self.tpf(None, collection.property.as_deref(), collection.value.as_deref())?;
         // Iterate over the fetched resources
         let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
         // Sort the resources (TODO), use sortBy and sortDesc
-        if sort_by.is_some() {
+        if collection.sort_by.is_some() {
             return Err("Sorting is not yet implemented".into())
         }
         let sorted_subjects: Vec<String> = subjects;
@@ -278,31 +272,31 @@ pub trait Storelike {
         let mut page: Vec<&str> = Vec::new();
         for subject in sorted_subjects.iter() {
             page.push(subject);
-            if page.len() >= page_size {
+            if page.len() >= collection.page_size {
                 all_pages.push(page);
                 page = Vec::new();
                 // No need to calculte more than necessary
-                if all_pages.len() > current_page {
+                if all_pages.len() > collection.current_page {
                     break;
                 }
             }
         }
         let total_items = sorted_subjects.len();
         // Construct the pages (TODO), use pageSize
-        let total_pages = total_items / page_size;
-        let collection = Collection {
-            subject: subject.into(),
-            property,
-            value,
+        let total_pages = total_items / collection.page_size;
+        let collection_return = Collection {
             total_pages,
             members: sorted_subjects,
-            sort_by,
-            sort_desc,
-            current_page,
             total_items,
-            page_size,
+            subject: collection.subject,
+            property: collection.property,
+            value: collection.value,
+            sort_by: collection.sort_by,
+            sort_desc: collection.sort_desc,
+            current_page: collection.current_page,
+            page_size: collection.page_size,
         };
-        Ok(collection)
+        Ok(collection_return)
     }
 
     /// Fetches a property by URL, returns a Property instance
@@ -366,7 +360,10 @@ pub trait Storelike {
                         _ => {},
                     };
                 };
-                let collection = self.new_collection(subject, property, value, sort_by, sort_desc, page_nr, page_size)?;
+                let collection_builder = crate::collections::CollectionBuilder {
+                    subject: subject.into(), property, value, sort_by, sort_desc, current_page: page_nr, page_size,
+                };
+                let collection = self.new_collection(collection_builder)?;
                 return Ok(collection.to_resource(self)?)
             }
         }
