@@ -219,6 +219,8 @@ mod test {
         new_property
             .set_by_shortname("description", "the age of a person")
             .unwrap();
+        // Changes are only applied to the store after calling `.save()`
+        new_property.save().unwrap();
         // The modified resource is saved to the store after this
 
         // A subject URL has been created automatically.
