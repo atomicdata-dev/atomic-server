@@ -33,6 +33,7 @@ pub const MEMBERS: &str = "https://atomicdata.dev/properties/members";
 pub const COLLECTION_PROPERTY: &str = "https://atomicdata.dev/properties/collection/property";
 pub const COLLECTION_VALUE: &str = "https://atomicdata.dev/properties/collection/value";
 pub const COLLECTION_ITEM_COUNT: &str = "https://atomicdata.dev/properties/collection/itemCount";
+pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collection/members";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

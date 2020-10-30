@@ -58,7 +58,7 @@ impl Collection {
     if let Some(prop) = self.value.clone() {
       resource.set_propval(crate::urls::COLLECTION_VALUE.into(), prop.into())?;
     }
-    // resource.set_propval(crate::urls::COLLECTION_ITEM_COUNT.into(), self.members.clone().into())?;
+    resource.set_propval(crate::urls::COLLECTION_ITEM_COUNT.into(), self.total_items.clone().into())?;
     // Maybe include items directly
     Ok(resource)
   }
@@ -93,6 +93,8 @@ mod test {
       let store = crate::Store::init();
       store.populate().unwrap();
       let collection = store.get_resource_extended("https://atomicdata.dev/classes").unwrap();
-      assert!(collection.get(urls::COLLECTION_PROPERTY).unwrap().to_string() == urls::IS_A)
+      assert!(collection.get(urls::COLLECTION_PROPERTY).unwrap().to_string() == urls::IS_A);
+      println!("Count is {}", collection.get(urls::COLLECTION_ITEM_COUNT).unwrap().to_string());
+      assert!(collection.get(urls::COLLECTION_ITEM_COUNT).unwrap().to_string() == "6");
     }
 }
