@@ -1,10 +1,7 @@
 //! Trait for all stores to use
 
 use crate::urls;
-use crate::{
-    collections::Collection, delta::DeltaDeprecated,
-    errors::AtomicResult,
-};
+use crate::{collections::Collection, delta::DeltaDeprecated, errors::AtomicResult};
 use crate::{
     datatype::{match_datatype, DataType},
     mapping::Mapping,
@@ -81,18 +78,22 @@ pub trait Storelike {
     {
         let signature = match commit.signature.as_ref() {
             Some(sig) => sig,
-            None => return Err("No signature set".into())
+            None => return Err("No signature set".into()),
         };
         // TODO: Check if commit.agent has the rights to update the resource
-        let pubkey_b64 = self.get_resource(&commit.signer)?
-            .get(urls::PUBLIC_KEY)?.to_string();
+        let pubkey_b64 = self
+            .get_resource(&commit.signer)?
+            .get(urls::PUBLIC_KEY)?
+            .to_string();
         let agent_pubkey = base64::decode(pubkey_b64)?;
         // TODO: actually use the stringified resource
         let stringified = commit.serialize_deterministically()?;
         let peer_public_key =
             ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
         let signature_bytes = base64::decode(signature.clone())?;
-        peer_public_key.verify(stringified.as_bytes(), &signature_bytes).map_err(|_| "Incorrect signature")?;
+        peer_public_key
+            .verify(stringified.as_bytes(), &signature_bytes)
+            .map_err(|_| "Incorrect signature")?;
         // Check if the created_at lies in the past
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -260,33 +261,48 @@ pub trait Storelike {
         collection: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
         // Execute the TPF query, get all the subjects.
-        let atoms = self.tpf(None, collection.property.as_deref(), collection.value.as_deref())?;
+        let atoms = self.tpf(
+            None,
+            collection.property.as_deref(),
+            collection.value.as_deref(),
+        )?;
         // Iterate over the fetched resources
         let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
         // Sort the resources (TODO), use sortBy and sortDesc
         if collection.sort_by.is_some() {
-            return Err("Sorting is not yet implemented".into())
+            return Err("Sorting is not yet implemented".into());
         }
         let sorted_subjects: Vec<String> = subjects;
-        let mut all_pages: Vec<Vec<&str>> = Vec::new();
-        let mut page: Vec<&str> = Vec::new();
-        for subject in sorted_subjects.iter() {
-            page.push(subject);
+        let mut all_pages: Vec<Vec<String>> = Vec::new();
+        let mut page: Vec<String> = Vec::new();
+        let current_page = collection.current_page;
+        for (i, subject) in sorted_subjects.iter().enumerate() {
+            page.push(subject.into());
             if page.len() >= collection.page_size {
                 all_pages.push(page);
                 page = Vec::new();
                 // No need to calculte more than necessary
-                if all_pages.len() > collection.current_page {
+                if all_pages.len() > current_page {
                     break;
                 }
             }
+            // Add the last page when handling the last subject
+            if i == sorted_subjects.len() - 1 {
+                all_pages.push(page);
+                break;
+            }
         }
+        if all_pages.is_empty() {
+            all_pages.push(Vec::new())
+        }
+        // Maybe I should default to last page, if current_page is too high?
+        let members = all_pages.get(current_page).ok_or("Page number is too high")?.clone();
         let total_items = sorted_subjects.len();
         // Construct the pages (TODO), use pageSize
-        let total_pages = total_items / collection.page_size;
+        let total_pages = (total_items + collection.page_size - 1) / collection.page_size;
         let collection_return = Collection {
             total_pages,
-            members: sorted_subjects,
+            members,
             total_items,
             subject: collection.subject,
             property: collection.property,
@@ -325,14 +341,20 @@ pub trait Storelike {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Currently only used for getting
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> where Self: std::marker::Sized {
-        let url = url::Url::parse(subject)?;
-        let query_params = url.query_pairs();
-        let mut resource = self.get_resource(subject)?;
+    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource>
+    where
+        Self: std::marker::Sized,
+    {
+        let mut url = url::Url::parse(subject)?;
+        let clone = url.clone();
+        let query_params = clone.query_pairs();
+        url.set_query(None);
+        let removed_query_params = url.to_string();
+        let mut resource = self.get_resource(&removed_query_params)?;
         for class in resource.get_classes()? {
             let mut sort_by = None;
             let mut sort_desc = false;
-            let mut page_nr = 0;
+            let mut current_page = 0;
             let mut page_size = 100;
             let mut value = None;
             let mut property = None;
@@ -347,24 +369,27 @@ pub trait Storelike {
             if class.subject == urls::COLLECTION {
                 for (k, v) in query_params {
                     match k.as_ref() {
-                        // "subject" => {tpf.subject = Some(v.to_string())},
-                        "property" => {property = Some(v.to_string())},
-                        "value" => {value = Some(v.to_string())},
-                        "sort_by" => {sort_by = Some(v.to_string())},
+                        "property" => property = Some(v.to_string()),
+                        "value" => value = Some(v.to_string()),
+                        "sort_by" => sort_by = Some(v.to_string()),
                         // TODO: parse bool
-                        "sort_desc" => {sort_desc = true},
-                        // TODO: parse page nr
-                        "page_nr" => {page_nr = 0},
-                        // TODO: parse page nr
-                        "page_size" => { page_size = 100},
-                        _ => {},
+                        "sort_desc" => sort_desc = true,
+                        "current_page" => current_page = v.parse::<usize>()?,
+                        "page_size" => page_size = v.parse::<usize>()?,
+                        _ => {}
                     };
-                };
+                }
                 let collection_builder = crate::collections::CollectionBuilder {
-                    subject: subject.into(), property, value, sort_by, sort_desc, current_page: page_nr, page_size,
+                    subject: subject.into(),
+                    property,
+                    value,
+                    sort_by,
+                    sort_desc,
+                    current_page,
+                    page_size,
                 };
                 let collection = self.new_collection(collection_builder)?;
-                return Ok(collection.to_resource(self)?)
+                return Ok(collection.to_resource(self)?);
             }
         }
         Ok(resource)
@@ -669,7 +694,10 @@ pub trait Storelike {
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
+    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn>
+    where
+        Self: std::marker::Sized,
+    {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
@@ -687,7 +715,8 @@ pub trait Storelike {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource = self.get_resource_string(&subject)?;
+        // let mut resource = self.get_resource_string(&subject)?;
+        let mut resource = self.get_resource_extended(&subject)?;
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -703,22 +732,20 @@ pub trait Storelike {
             if let Ok(i) = item.parse::<u32>() {
                 match current {
                     PathReturn::Atom(atom) => {
-                        // let resource_check = resource.ok_or("Resource not found")?;
-                        let array_string = resource
-                            .get(&atom.property.subject)
-                            .ok_or(format!("Property {} not found", &atom.property.subject))?;
-                        let vector: Vec<String> = crate::parse::parse_json_array(array_string)
-                            .expect(&*format!("Failed to parse array: {}", array_string));
+                        let vector = match resource.get(&atom.property.subject)? {
+                            Value::ResourceArray(vec) => vec,
+                            _ => return Err("Should be Vector!".into()),
+                        };
                         if vector.len() <= i as usize {
                             eprintln!(
                                 "Too high index ({}) for array with length {}",
                                 i,
-                                array_string.len()
+                                vector.len()
                             );
                         }
                         let url = &vector[i as usize];
                         subject = url.into();
-                        resource = self.get_resource_string(&subject)?;
+                        resource = self.get_resource_extended(&subject)?;
                         current = PathReturn::Subject(subject.clone());
                         continue;
                     }
@@ -728,28 +755,20 @@ pub trait Storelike {
                 }
             }
             // Since the selector isn't an array index, we can assume it's a property URL
-            let property_url;
             match current {
                 PathReturn::Subject(_) => {}
                 PathReturn::Atom(_) => {
                     return Err("No more linked resources down this path.".into())
                 }
             }
-            // Get the shortname or use the URL
-            if crate::mapping::is_url(item) {
-                property_url = item.into();
-            } else {
-                // Traverse relations, don't use mapping here, but do use classes
-                property_url = self.property_shortname_to_url(item, &resource)?;
-            }
             // Set the parent for the next loop equal to the next node.
             // TODO: skip this step if the current iteration is the last one
-            let value = resource.get(&property_url).unwrap();
-            let property = self.get_property(&property_url)?;
+            let value = resource.get_shortname(&item).unwrap();
+            let property = resource.resolve_shortname_to_property(item)?.unwrap();
             current = PathReturn::Atom(Box::new(RichAtom::new(
                 subject.clone(),
                 property,
-                value.clone(),
+                value.to_string(),
             )?))
         }
         Ok(current)
