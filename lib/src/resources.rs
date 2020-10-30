@@ -107,12 +107,12 @@ impl<'a> Resource<'a> {
 
     /// Gets a value by its shortname
     // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str) -> AtomicResult<&Value> {
+    pub fn get_shortname(&self, shortname: &str) -> AtomicResult<Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
             if let Ok(prop) = self.store.get_property(url) {
                 if prop.shortname == shortname {
-                    return Ok(self.get(url)?);
+                    return Ok(self.get(url)?.clone());
                 }
             }
         }
@@ -129,7 +129,7 @@ impl<'a> Resource<'a> {
 
     /// Tries to resolve the shortname of a Property to a Property URL.
     // Currently assumes that classes have been set before.
-    pub fn resolve_shortname(&mut self, shortname: &str) -> AtomicResult<Option<Property>> {
+    pub fn resolve_shortname_to_property(&mut self, shortname: &str) -> AtomicResult<Option<Property>> {
         let classes = self.get_classes()?;
         // Loop over all Requires and Recommends props
         for class in classes {
@@ -177,7 +177,7 @@ impl<'a> Resource<'a> {
         let fullprop = if is_url(property) {
             self.store.get_property(property)?
         } else {
-            self.resolve_shortname(property)?.ok_or(format!("Shortname {} not found in {}", property, self.get_subject()))?
+            self.resolve_shortname_to_property(property)?.ok_or(format!("Shortname {} not found in {}", property, self.get_subject()))?
         };
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.set_propval(fullprop.subject, fullval)?;

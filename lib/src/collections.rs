@@ -59,6 +59,8 @@ impl Collection {
       resource.set_propval(crate::urls::COLLECTION_VALUE.into(), prop.into())?;
     }
     resource.set_propval(crate::urls::COLLECTION_ITEM_COUNT.into(), self.total_items.clone().into())?;
+    resource.set_propval(crate::urls::COLLECTION_TOTAL_PAGES.into(), self.total_pages.clone().into())?;
+    resource.set_propval(crate::urls::COLLECTION_CURRENT_PAGE.into(), self.current_page.clone().into())?;
     // Maybe include items directly
     Ok(resource)
   }
