@@ -17,3 +17,13 @@ Make sure to `cargo test --all` before opening a PR!
 
 1. Update the versions in cargo.toml files using Semantic Versioning.
 1. run `cargo publish` in `lib`, than you can run the same in `cli` and `server`
+
+## Deploy
+
+1. `cd server`
+1. `cargo build --release`
+1. `scp ../target/release/atomic-server atomic:~/atomic/server/atomic-server-v0.15`
+1. `ssh atomic`
+1. `htop` and kill `atomic`
+1. `cd atomic/server`
+1. `./atomic-server-v0.15 &> log-v0.15-1` to start and log to file
