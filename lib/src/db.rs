@@ -70,9 +70,9 @@ impl Db {
             .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
         match propval_maybe.as_ref() {
             Some(binpropval) => {
-                let propval: PropVals = bincode::deserialize(binpropval)?;
+                let propval: PropVals = bincode::deserialize(binpropval).map_err(|e| format!("{} {}", DB_CORRUPT_MSG, e))?;
                 Ok(propval)
-            }
+            },
             None => Err("Not found".into()),
         }
     }
@@ -154,9 +154,9 @@ impl Storelike for Db {
     fn all_resources(&self) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         for item in self.resources.into_iter() {
-            let (subject, resource_bin) = item.unwrap();
-            let subject: String = bincode::deserialize(&subject).unwrap();
-            let propvals: PropVals = bincode::deserialize(&resource_bin).unwrap();
+            let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
+            let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
+            let propvals: PropVals = bincode::deserialize(&resource_bin).expect(DB_CORRUPT_MSG);
             let resource: ResourceString = crate::resources::propvals_to_resourcestring(propvals);
             resources.push((subject, resource));
         }
@@ -170,6 +170,8 @@ impl Storelike for Db {
             .unwrap();
     }
 }
+
+const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to update. Restore to a previous version, export / serialize the data and import your data.";
 
 #[cfg(test)]
 mod test {
