@@ -48,7 +48,7 @@ pub struct Collection {
 
 impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
-    pub fn new (
+    pub fn new(
         store: &dyn Storelike,
         collection: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
@@ -117,7 +117,10 @@ impl Collection {
         // TODO: Should not persist, because now it is spammimg the store!
         // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
         let mut resource = crate::Resource::new(self.subject.clone(), store);
-        resource.set_propval(crate::urls::COLLECTION_MEMBERS.into(), self.members.clone().into())?;
+        resource.set_propval(
+            crate::urls::COLLECTION_MEMBERS.into(),
+            self.members.clone().into(),
+        )?;
         if let Some(prop) = self.property.clone() {
             resource.set_propval(crate::urls::COLLECTION_PROPERTY.into(), prop.into())?;
         }
@@ -135,6 +138,10 @@ impl Collection {
         resource.set_propval(
             crate::urls::COLLECTION_CURRENT_PAGE.into(),
             self.current_page.clone().into(),
+        )?;
+        resource.set_propval(
+            crate::urls::COLLECTION_PAGE_SIZE.into(),
+            self.page_size.clone().into(),
         )?;
         // Maybe include items directly
         Ok(resource)
@@ -182,7 +189,7 @@ pub fn construct_collection<'a>(
         page_size,
     };
     let collection = Collection::new(store, collection_builder)?;
-    return Ok(collection.to_resource(store)?);
+    Ok(collection.to_resource(store)?)
 }
 
 #[cfg(test)]
@@ -236,6 +243,45 @@ mod test {
                 .unwrap()
                 .to_string()
                 == "6"
+        );
+    }
+
+    #[test]
+    fn get_collection_params() {
+        let store = crate::Store::init();
+        store.populate().unwrap();
+
+        let collection_page_size = store
+            .get_resource_extended("https://atomicdata.dev/classes?page_size=1")
+            .unwrap();
+        assert!(
+            collection_page_size
+                .get(urls::COLLECTION_PAGE_SIZE)
+                .unwrap()
+                .to_string()
+                == "1"
+        );
+        let collection_page_nr = store
+            .get_resource_extended("https://atomicdata.dev/classes?current_page=2&page_size=1")
+            .unwrap();
+        assert!(
+            collection_page_nr
+                .get(urls::COLLECTION_PAGE_SIZE)
+                .unwrap()
+                .to_string()
+                == "1"
+        );
+        let members_vec = match collection_page_nr.get(urls::COLLECTION_MEMBERS).unwrap() {
+            crate::Value::ResourceArray(vec) => vec,
+            _ => panic!(),
+        };
+        assert!(members_vec.len() == 1);
+        assert!(
+            collection_page_nr
+                .get(urls::COLLECTION_CURRENT_PAGE)
+                .unwrap()
+                .to_string()
+                == "2"
         );
     }
 }

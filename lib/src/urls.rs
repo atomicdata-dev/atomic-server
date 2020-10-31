@@ -35,6 +35,7 @@ pub const COLLECTION_ITEM_COUNT: &str = "https://atomicdata.dev/properties/colle
 pub const COLLECTION_TOTAL_PAGES: &str = "https://atomicdata.dev/properties/collection/totalPages";
 pub const COLLECTION_CURRENT_PAGE: &str = "https://atomicdata.dev/properties/collection/currentPage";
 pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collection/members";
+pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collection/pageSize";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
