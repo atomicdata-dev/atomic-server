@@ -340,7 +340,7 @@ pub trait Storelike {
     }
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
-    /// Currently only used for getting
+    /// Currently only used for constructing Collections.
     fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource>
     where
         Self: std::marker::Sized,
@@ -352,44 +352,9 @@ pub trait Storelike {
         let removed_query_params = url.to_string();
         let mut resource = self.get_resource(&removed_query_params)?;
         for class in resource.get_classes()? {
-            let mut sort_by = None;
-            let mut sort_desc = false;
-            let mut current_page = 0;
-            let mut page_size = 100;
-            let mut value = None;
-            let mut property = None;
-
-            if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
-                property = Some(val.to_string());
-            }
-            if let Ok(val) = resource.get(urls::COLLECTION_VALUE) {
-                value = Some(val.to_string());
-            }
-
-            if class.subject == urls::COLLECTION {
-                for (k, v) in query_params {
-                    match k.as_ref() {
-                        "property" => property = Some(v.to_string()),
-                        "value" => value = Some(v.to_string()),
-                        "sort_by" => sort_by = Some(v.to_string()),
-                        // TODO: parse bool
-                        "sort_desc" => sort_desc = true,
-                        "current_page" => current_page = v.parse::<usize>()?,
-                        "page_size" => page_size = v.parse::<usize>()?,
-                        _ => {}
-                    };
-                }
-                let collection_builder = crate::collections::CollectionBuilder {
-                    subject: subject.into(),
-                    property,
-                    value,
-                    sort_by,
-                    sort_desc,
-                    current_page,
-                    page_size,
-                };
-                let collection = self.new_collection(collection_builder)?;
-                return Ok(collection.to_resource(self)?);
+            match class.subject.as_ref() {
+                urls::COLLECTION => return crate::collections::construct_collection(self, query_params, resource),
+                _ => {},
             }
         }
         Ok(resource)
@@ -478,9 +443,9 @@ pub trait Storelike {
     fn remove_resource(&self, subject: &str);
 
     /// fetches a resource, serializes it to .ad3
-    fn resource_to_ad3(&self, subject: &str) -> AtomicResult<String> {
+    fn resource_to_ad3(&self, subject: &str) -> AtomicResult<String> where Self: std::marker::Sized  {
         let mut string = String::new();
-        let resource = self.get_resource_string(subject)?;
+        let resource = self.get_resource_extended(subject)?.to_plain();
 
         for (property, value) in resource {
             let mut ad3_atom = serde_json::to_string(&vec![subject, &property, &value])?;
@@ -497,14 +462,14 @@ pub trait Storelike {
     // [ ] Resources into objects, if the nesting depth allows it
     fn resource_to_json(
         &self,
-        resource_url: &str,
+        subject: &str,
         // Not yet used
         _depth: u8,
         json_ld: bool,
-    ) -> AtomicResult<String> {
+    ) -> AtomicResult<String> where Self: std::marker::Sized  {
         use serde_json::{Map, Value as SerdeValue};
 
-        let resource = self.get_resource_string(resource_url)?;
+        let resource = self.get_resource_extended(subject)?.to_plain();
 
         // Initiate JSON object
         let mut root = Map::new();
@@ -584,7 +549,7 @@ pub trait Storelike {
 
         if json_ld {
             root.insert("@context".into(), context.into());
-            root.insert("@id".into(), resource_url.into());
+            root.insert("@id".into(), subject.into());
         }
         let obj = SerdeValue::Object(root);
         let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
