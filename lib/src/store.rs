@@ -234,7 +234,7 @@ mod test {
         let store = Store::init();
         store.populate().unwrap();
         let resource = store.get_resource_extended("https://atomicdata.dev/classes").unwrap();
-        resource.get(urls::MEMBERS).unwrap();
+        resource.get(urls::COLLECTION_MEMBERS).unwrap();
     }
 
     #[test]

@@ -117,7 +117,7 @@ impl Collection {
         // TODO: Should not persist, because now it is spammimg the store!
         // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
         let mut resource = crate::Resource::new(self.subject.clone(), store);
-        resource.set_propval(crate::urls::MEMBERS.into(), self.members.clone().into())?;
+        resource.set_propval(crate::urls::COLLECTION_MEMBERS.into(), self.members.clone().into())?;
         if let Some(prop) = self.property.clone() {
             resource.set_propval(crate::urls::COLLECTION_PROPERTY.into(), prop.into())?;
         }

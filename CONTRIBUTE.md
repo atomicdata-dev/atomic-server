@@ -27,3 +27,8 @@ Make sure to `cargo test --all` before opening a PR!
 1. `htop` and kill `atomic`
 1. `cd atomic/server`
 1. `./atomic-server-v0.15 &> log-v0.15-1` to start and log to file
+
+## Publishing to WAPM
+
+1. run `cargo wasi build --release` (note: this fails, as ring does not compile to WASI [at this moment](https://github.com/briansmith/ring/issues/657))
+1. `wapm publish`
