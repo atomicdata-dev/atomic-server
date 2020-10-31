@@ -32,20 +32,20 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
       Ok(res) => match res {
           storelike::PathReturn::Subject(subject) => match serialization {
               Format::JSON => {
-                  let out = store.resource_to_json(&subject, 1, false)?;
+                  let out = store.get_resource_extended(&subject)?.to_json(store, 1, false)?;
                   println!("{}", out);
               }
               Format::JSONLD => {
-                  let out = store.resource_to_json(&subject, 1, true)?;
+                  let out = store.get_resource_extended(&subject)?.to_json(store, 1, true)?;
                   println!("{}", out);
               }
               Format::AD3 => {
-                  let out = store.resource_to_ad3(&subject)?;
+                  let out = store.get_resource_extended(&subject)?.to_ad3()?;
                   println!("{}", out);
               }
               Format::NT => {
                 //   let atoms = store.tpf(Some(&subject), None, None)?;
-                  let resource = store.get_resource_string(&subject)?;
+                  let resource = store.get_resource_extended(&subject)?.to_plain();
                   let atoms = resourcestring_to_atoms(&subject, resource);
                   let out = serialize::atoms_to_ntriples(atoms, store)?;
                   println!("{}", out);

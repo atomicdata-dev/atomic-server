@@ -48,7 +48,7 @@ impl Store {
     pub fn write_store_to_disk(&mut self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
         for (subject, _) in self.all_resources() {
-            let resourcestring = self.resource_to_ad3(&subject)?;
+            let resourcestring = self.get_resource(&subject)?.to_ad3()?;
             file_string.push_str(&*resourcestring);
         }
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
@@ -166,9 +166,11 @@ mod test {
     #[test]
     fn serialize() {
         let store = init_store();
-        store
-            .resource_to_json(&String::from(urls::CLASS), 1, true)
+        let subject = urls::CLASS;
+        let resource = store
+            .get_resource(subject)
             .unwrap();
+        resource.to_json(&store,  1, true).unwrap();
     }
 
     #[test]

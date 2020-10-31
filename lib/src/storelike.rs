@@ -172,7 +172,9 @@ pub trait Storelike {
         Ok(resource)
     }
 
-    /// Returns a full Resource with native Values
+    /// Returns a full Resource with native Values.
+    /// Note that this does _not_ construct dynamic Resources, such as collections.
+    /// If you're not sure what to use, use `get_resource_extended`.
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource>
     where
         Self: std::marker::Sized,
@@ -441,121 +443,6 @@ pub trait Storelike {
 
     /// Removes a resource from the store
     fn remove_resource(&self, subject: &str);
-
-    /// fetches a resource, serializes it to .ad3
-    fn resource_to_ad3(&self, subject: &str) -> AtomicResult<String> where Self: std::marker::Sized  {
-        let mut string = String::new();
-        let resource = self.get_resource_extended(subject)?.to_plain();
-
-        for (property, value) in resource {
-            let mut ad3_atom = serde_json::to_string(&vec![subject, &property, &value])?;
-            ad3_atom.push_str("\n");
-            string.push_str(&*ad3_atom);
-        }
-        Ok(string)
-    }
-
-    /// Serializes a single Resource to a JSON object.
-    /// It uses the Shortnames of properties for Keys.
-    /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
-    // Todo:
-    // [ ] Resources into objects, if the nesting depth allows it
-    fn resource_to_json(
-        &self,
-        subject: &str,
-        // Not yet used
-        _depth: u8,
-        json_ld: bool,
-    ) -> AtomicResult<String> where Self: std::marker::Sized  {
-        use serde_json::{Map, Value as SerdeValue};
-
-        let resource = self.get_resource_extended(subject)?.to_plain();
-
-        // Initiate JSON object
-        let mut root = Map::new();
-
-        // For JSON-LD serialization
-        let mut context = Map::new();
-
-        // For every atom, find the key, datatype and add it to the @context
-        for (prop_url, value) in resource.iter() {
-            // We need the Property for shortname and Datatype
-            let property = self.get_property(prop_url)?;
-            if json_ld {
-                // In JSON-LD, the value of a Context Item can be a string or an object.
-                // This object can contain information about the translation or datatype of the value
-                let ctx_value: SerdeValue = match property.data_type.clone() {
-                    DataType::AtomicUrl => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        obj.insert("@type".into(), "@id".into());
-                        obj.into()
-                    }
-                    DataType::Date => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        obj.insert(
-                            "@type".into(),
-                            "http://www.w3.org/2001/XMLSchema#date".into(),
-                        );
-                        obj.into()
-                    }
-                    DataType::Integer => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        // I'm not sure whether we should use XSD or Atomic Datatypes
-                        obj.insert(
-                            "@type".into(),
-                            "http://www.w3.org/2001/XMLSchema#integer".into(),
-                        );
-                        obj.into()
-                    }
-                    DataType::Markdown => prop_url.as_str().into(),
-                    DataType::ResourceArray => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        // Plain JSON-LD Arrays are not ordered. Here, they are converted into an RDF List.
-                        obj.insert("@container".into(), "@list".into());
-                        obj.into()
-                    }
-                    _other => prop_url.as_str().into(),
-                };
-                context.insert(property.shortname.as_str().into(), ctx_value);
-            }
-            let native_value = Value::new(value, &property.data_type).expect(&*format!(
-                "Could not convert value {:?} with property type {:?} into native value",
-                value, &property.data_type
-            ));
-            let jsonval = match native_value {
-                Value::AtomicUrl(val) => SerdeValue::String(val),
-                Value::Date(val) => SerdeValue::String(val),
-                // TODO: Handle big numbers
-                Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
-                Value::Markdown(val) => SerdeValue::String(val),
-                Value::ResourceArray(val) => SerdeValue::Array(
-                    val.iter()
-                        .map(|item| SerdeValue::String(item.clone()))
-                        .collect(),
-                ),
-                Value::Slug(val) => SerdeValue::String(val),
-                Value::String(val) => SerdeValue::String(val),
-                Value::Timestamp(val) => SerdeValue::Number(val.into()),
-                Value::Unsupported(val) => SerdeValue::String(val.value),
-                Value::Boolean(val) => SerdeValue::Bool(val),
-                Value::NestedResource(_) => todo!(),
-            };
-            root.insert(property.shortname, jsonval);
-        }
-
-        if json_ld {
-            root.insert("@context".into(), context.into());
-            root.insert("@id".into(), subject.into());
-        }
-        let obj = SerdeValue::Object(root);
-        let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
-
-        Ok(string)
-    }
 
     /// Triple Pattern Fragments interface.
     /// Use this for most queries, e.g. finding all items with some property / value combination.

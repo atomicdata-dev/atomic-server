@@ -30,25 +30,26 @@ pub async fn get_resource(
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
+    let resource = store.get_resource_extended(&subject)?;
     match content_type {
         ContentType::JSON => {
-            let body = store.resource_to_json(&subject, 1, false)?;
+            let body = resource.to_json(store, 1, false)?;
             Ok(builder.body(body))
         }
         ContentType::JSONLD => {
-            let body = store.resource_to_json(&subject, 1, true)?;
+            let body = resource.to_json(store, 1, true)?;
             Ok(builder.body(body))
         }
         ContentType::HTML => {
             let mut tera_context = TeraCtx::new();
-            let resource = store.get_resource_string(&subject)?;
+            let resource = resource.to_plain();
             let propvals = from_hashmap_resource(&resource, store, subject)?;
             tera_context.insert("resource", &propvals);
             let body = context.tera.render("resource.html", &tera_context)?;
             Ok(builder.body(body))
         }
         ContentType::AD3 => {
-            let body = store.resource_to_ad3(&subject)?;
+            let body = resource.to_ad3()?;
             Ok(builder.body(body))
         }
         ContentType::TURTLE | ContentType::NT => {

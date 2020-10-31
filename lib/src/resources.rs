@@ -5,7 +5,7 @@ use crate::values::Value;
 use crate::{
     mapping::is_url,
     storelike::{Class, Property},
-    Atom, Storelike,
+    Atom, Storelike, datatype::DataType,
 };
 use std::collections::HashMap;
 
@@ -26,6 +26,7 @@ pub struct Resource<'a> {
 }
 
 /// Maps Property URLs to their values
+/// Similar to ResourceString, but uses Values instead of Strings
 pub type PropVals = HashMap<String, Value>;
 
 impl<'a> Resource<'a> {
@@ -201,6 +202,121 @@ impl<'a> Resource<'a> {
         hashmap
     }
 
+    /// Serializes Resource to Atomic Data Triples (ad3), and NDJSON serialized representation.
+    pub fn to_ad3(&self) -> AtomicResult<String> where Self: std::marker::Sized  {
+        let mut string = String::new();
+        let resource = self.to_plain();
+
+        for (property, value) in resource {
+            let mut ad3_atom = serde_json::to_string(&vec![self.get_subject(), &property, &value])?;
+            ad3_atom.push_str("\n");
+            string.push_str(&*ad3_atom);
+        }
+        Ok(string)
+    }
+
+    /// Serializes a single Resource to a JSON object.
+    /// It uses the Shortnames of properties for Keys.
+    /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
+    // Todo:
+    // [ ] Resources into objects, if the nesting depth allows it
+    pub fn to_json(
+        &self,
+        store: &dyn Storelike,
+        // Not yet used
+        _depth: u8,
+        json_ld: bool,
+    ) -> AtomicResult<String> where Self: std::marker::Sized  {
+        use serde_json::{Map, Value as SerdeValue};
+
+        let resource = self.to_plain();
+
+        // Initiate JSON object
+        let mut root = Map::new();
+
+        // For JSON-LD serialization
+        let mut context = Map::new();
+
+        // For every atom, find the key, datatype and add it to the @context
+        for (prop_url, value) in resource.iter() {
+            // We need the Property for shortname and Datatype
+            let property = store.get_property(prop_url)?;
+            if json_ld {
+                // In JSON-LD, the value of a Context Item can be a string or an object.
+                // This object can contain information about the translation or datatype of the value
+                let ctx_value: SerdeValue = match property.data_type.clone() {
+                    DataType::AtomicUrl => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        obj.insert("@type".into(), "@id".into());
+                        obj.into()
+                    }
+                    DataType::Date => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        obj.insert(
+                            "@type".into(),
+                            "http://www.w3.org/2001/XMLSchema#date".into(),
+                        );
+                        obj.into()
+                    }
+                    DataType::Integer => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        // I'm not sure whether we should use XSD or Atomic Datatypes
+                        obj.insert(
+                            "@type".into(),
+                            "http://www.w3.org/2001/XMLSchema#integer".into(),
+                        );
+                        obj.into()
+                    }
+                    DataType::Markdown => prop_url.as_str().into(),
+                    DataType::ResourceArray => {
+                        let mut obj = Map::new();
+                        obj.insert("@id".into(), prop_url.as_str().into());
+                        // Plain JSON-LD Arrays are not ordered. Here, they are converted into an RDF List.
+                        obj.insert("@container".into(), "@list".into());
+                        obj.into()
+                    }
+                    _other => prop_url.as_str().into(),
+                };
+                context.insert(property.shortname.as_str().into(), ctx_value);
+            }
+            let native_value = Value::new(value, &property.data_type).expect(&*format!(
+                "Could not convert value {:?} with property type {:?} into native value",
+                value, &property.data_type
+            ));
+            let jsonval = match native_value {
+                Value::AtomicUrl(val) => SerdeValue::String(val),
+                Value::Date(val) => SerdeValue::String(val),
+                // TODO: Handle big numbers
+                Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
+                Value::Markdown(val) => SerdeValue::String(val),
+                Value::ResourceArray(val) => SerdeValue::Array(
+                    val.iter()
+                        .map(|item| SerdeValue::String(item.clone()))
+                        .collect(),
+                ),
+                Value::Slug(val) => SerdeValue::String(val),
+                Value::String(val) => SerdeValue::String(val),
+                Value::Timestamp(val) => SerdeValue::Number(val.into()),
+                Value::Unsupported(val) => SerdeValue::String(val.value),
+                Value::Boolean(val) => SerdeValue::Bool(val),
+                Value::NestedResource(_) => todo!(),
+            };
+            root.insert(property.shortname, jsonval);
+        }
+
+        if json_ld {
+            root.insert("@context".into(), context.into());
+            root.insert("@id".into(), SerdeValue::String(self.get_subject().into()));
+        }
+        let obj = SerdeValue::Object(root);
+        let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
+
+        Ok(string)
+    }
+
     // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
     // pub fn to_atoms(&self) -> Vec<RichAtom> {
     //     let mut atoms: Vec<RichAtom> = Vec::new();
@@ -225,6 +341,7 @@ pub fn resourcestring_to_atoms(subject: &str, resource: ResourceString) -> Vec<A
     vec
 }
 
+/// Converts PropVals to a ResourceString (serializes values to AD3)
 pub fn propvals_to_resourcestring(propvals: PropVals) -> ResourceString {
     let mut resource_string: ResourceString = HashMap::new();
     for (prop, val) in propvals.iter() {
