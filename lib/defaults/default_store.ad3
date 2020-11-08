@@ -154,6 +154,10 @@
 ["https://atomicdata.dev/properties/collection/currentPage","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/integer"]
 ["https://atomicdata.dev/properties/collection/currentPage","https://atomicdata.dev/properties/shortname","current-page"]
 ["https://atomicdata.dev/properties/collection/currentPage","https://atomicdata.dev/properties/description","The curent page number of the collection. Defaults to 0."]
+["https://atomicdata.dev/properties/collection/pageSize","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
+["https://atomicdata.dev/properties/collection/pageSize","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/integer"]
+["https://atomicdata.dev/properties/collection/pageSize","https://atomicdata.dev/properties/shortname","page-size"]
+["https://atomicdata.dev/properties/collection/pageSize","https://atomicdata.dev/properties/description","The amount of members per page."]
 # Collections
 ["https://atomicdata.dev/classes","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Collection\"]"]
 ["https://atomicdata.dev/classes","https://atomicdata.dev/properties/collection/property","https://atomicdata.dev/properties/isA"]
