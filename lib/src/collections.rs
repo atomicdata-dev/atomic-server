@@ -128,7 +128,7 @@ impl Collection {
             resource.set_propval(crate::urls::COLLECTION_VALUE.into(), prop.into())?;
         }
         resource.set_propval(
-            crate::urls::COLLECTION_ITEM_COUNT.into(),
+            crate::urls::COLLECTION_MEMBER_COUNT.into(),
             self.total_items.clone().into(),
         )?;
         resource.set_propval(
@@ -233,13 +233,13 @@ mod test {
         println!(
             "Count is {}",
             collection
-                .get(urls::COLLECTION_ITEM_COUNT)
+                .get(urls::COLLECTION_MEMBER_COUNT)
                 .unwrap()
                 .to_string()
         );
         assert!(
             collection
-                .get(urls::COLLECTION_ITEM_COUNT)
+                .get(urls::COLLECTION_MEMBER_COUNT)
                 .unwrap()
                 .to_string()
                 == "6"
