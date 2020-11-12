@@ -45,6 +45,10 @@ impl Commit {
             Value::new(&self.subject, &DataType::AtomicUrl).unwrap(),
         )?;
         resource.set_propval(
+            urls::IS_A.into(),
+            Value::new(urls::COMMIT, &DataType::AtomicUrl).unwrap(),
+        )?;
+        resource.set_propval(
             urls::CREATED_AT.into(),
             Value::new(&self.created_at.to_string(), &DataType::Timestamp).unwrap(),
         )?;
@@ -141,6 +145,8 @@ pub struct CommitBuilder {
 }
 
 impl CommitBuilder {
+    /// Use this to start constructing a Commit.
+    /// The signer is the URL of the Author, which contains the public key.
     pub fn new(subject: String, signer: String) -> Self {
         CommitBuilder {
             subject,
