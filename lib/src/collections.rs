@@ -131,6 +131,10 @@ impl Collection {
             crate::urls::COLLECTION_MEMBER_COUNT.into(),
             self.total_items.clone().into(),
         )?;
+        resource.set_propval_string(
+            crate::urls::IS_A.into(),
+            crate::urls::COLLECTION,
+        )?;
         resource.set_propval(
             crate::urls::COLLECTION_TOTAL_PAGES.into(),
             self.total_pages.clone().into(),
@@ -270,6 +274,13 @@ mod test {
                 .unwrap()
                 .to_string()
                 == "1"
+        );
+        assert!(
+            collection_page_nr
+                .get(urls::IS_A)
+                .unwrap()
+                .to_string()
+                == urls::COLLECTION
         );
         let members_vec = match collection_page_nr.get(urls::COLLECTION_MEMBERS).unwrap() {
             crate::Value::ResourceArray(vec) => vec,
