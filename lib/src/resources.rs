@@ -166,6 +166,7 @@ impl<'a> Resource<'a> {
 
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
+    /// Does not validate property / datatype combination
     pub fn set_propval(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property, value);
         Ok(())
