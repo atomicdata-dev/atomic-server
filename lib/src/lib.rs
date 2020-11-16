@@ -34,12 +34,15 @@ assert!(found_atoms.len() == 1);
 ```
 */
 
+pub mod agents;
 pub mod atoms;
 pub mod client;
 pub mod collections;
 pub mod commit;
 #[cfg(feature = "db")]
 pub mod db;
+#[cfg(feature = "config")]
+pub mod config;
 pub mod delta;
 pub mod datatype;
 pub mod errors;

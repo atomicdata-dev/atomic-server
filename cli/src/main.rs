@@ -1,23 +1,29 @@
-use path::SERIALIZE_OPTIONS;
-use atomic_lib::{errors::AtomicResult, Storelike};
 use atomic_lib::mapping::Mapping;
-use clap::{App, AppSettings, Arg, ArgMatches, SubCommand, crate_version};
+use atomic_lib::{errors::AtomicResult, Storelike};
+use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
 use colored::*;
 use dirs::home_dir;
+use path::SERIALIZE_OPTIONS;
 use std::{path::PathBuf, sync::Mutex};
 
+mod commit;
 mod delta;
 mod new;
 mod path;
 
 #[allow(dead_code)]
 pub struct Context<'a> {
-    base_url: String,
+    /// URL of the Atomic Server to write to
+    base_url: Option<String>,
     store: atomic_lib::Store,
     mapping: Mutex<Mapping>,
     matches: ArgMatches<'a>,
     config_folder: PathBuf,
     user_mapping_path: PathBuf,
+    /// URL of the Author of Commits
+    author_subject: Option<String>,
+    /// Private key of the Author of Commits
+    author_private_key: Option<String>,
 }
 
 fn main() -> AtomicResult<()> {
@@ -83,8 +89,24 @@ fn main() -> AtomicResult<()> {
                 )
         )
         .subcommand(
+            SubCommand::with_name("set")
+                .about("Update an Atom's value. Writes a commit to the store using the current Author.")
+                .arg(Arg::with_name("suject")
+                    .help("Subject URL or bookmark of the resourece")
+                    .required(true)
+                )
+                .arg(Arg::with_name("property")
+                    .help("Property URL or shortname of the property")
+                    .required(true)
+                )
+                .arg(Arg::with_name("value")
+                    .help("String representation of the Value to be changed")
+                    .required(true)
+                )
+        )
+        .subcommand(
             SubCommand::with_name("delta")
-                    .about("Update the store using an single Delta",
+                    .about("Update the store using an single Delta. Deprecated in favor of `set`, `remove` and `",
                     )
                 .arg(Arg::with_name("method")
                     .help("Method URL or bookmark, describes how the resource will be changed. Only suppports Insert at the time")
@@ -132,22 +154,25 @@ fn main() -> AtomicResult<()> {
     }
     let store = atomic_lib::Store::init();
 
+    let agent_config = atomic_lib::config::Config.init();
 
     let mut context = Context {
         // TODO: This should be configurable
-        base_url: "http://localhost/".into(),
+        base_url: agent_config.server,
         mapping: Mutex::new(mapping),
         store,
         matches,
         config_folder,
         user_mapping_path,
+        author_private_key: agent_config.private_key,
+        author_subject: agent_config.agent,
     };
 
     exec_command(&mut context)?;
     Ok(())
 }
 
-fn exec_command(context: &mut Context) -> AtomicResult<()>{
+fn exec_command(context: &mut Context) -> AtomicResult<()> {
     match context.matches.subcommand_name() {
         Some("new") => {
             new::new(context)?;
@@ -163,6 +188,9 @@ fn exec_command(context: &mut Context) -> AtomicResult<()>{
         }
         Some("delta") => {
             delta::delta(context)?;
+        }
+        Some("set") => {
+            commit::set(context)?;
         }
         Some("populate") => {
             populate(context)?;
@@ -192,8 +220,7 @@ fn list(context: &mut Context) {
 /// Prints a resource to the terminal with readble formatting and colors
 fn pretty_print_resource(url: &str, store: &mut dyn Storelike) -> AtomicResult<()> {
     let mut output = String::new();
-    let resource = store
-        .get_resource_string(url)?;
+    let resource = store.get_resource_string(url)?;
     for (prop_url, val) in resource {
         let prop_shortname = store.property_url_to_shortname(&prop_url)?;
         output.push_str(&*format!(
@@ -208,7 +235,7 @@ fn pretty_print_resource(url: &str, store: &mut dyn Storelike) -> AtomicResult<(
 }
 
 /// Triple Pattern Fragment Query
-fn tpf(context: &mut Context) -> AtomicResult<()>{
+fn tpf(context: &mut Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
     let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());

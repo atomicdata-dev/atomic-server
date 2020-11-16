@@ -21,10 +21,9 @@ pub struct AppState {
 pub fn init(config: Config) -> BetterResult<AppState> {
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     store.populate()?;
-
     let mapping = Mapping::init();
-
     let tera = Tera::new("templates/*.html")?;
+    // Create a new identity if it does not yet exist.
 
     Ok(AppState {
         store,

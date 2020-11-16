@@ -146,21 +146,14 @@ pub trait Storelike {
     where
         Self: std::marker::Sized,
     {
-        use ring::signature::KeyPair;
         let subject = format!("{}agents/{}", self.get_base_url(), name);
-        let rng = ring::rand::SystemRandom::new();
-        let pkcs8_bytes = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)
-            .map_err(|_| "Error generating seed")?;
-        let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
-            .map_err(|_| "Error generating keypair")?;
+        let keypair = crate::agents::generate_keypair();
         let mut agent = Resource::new_instance(urls::AGENT, self)?;
-        let pubkey = base64::encode(key_pair.public_key().as_ref());
-        let private_key = base64::encode(pkcs8_bytes.as_ref());
         agent.set_subject(subject.clone());
         agent.set_by_shortname("name", name)?;
-        agent.set_by_shortname("publickey", &pubkey)?;
+        agent.set_by_shortname("publickey", &keypair.public)?;
         self.add_resource(&agent)?;
-        Ok((subject, private_key))
+        Ok((subject, keypair.private))
     }
 
     /// Fetches a resource, makes sure its subject matches.
@@ -298,7 +291,10 @@ pub trait Storelike {
             all_pages.push(Vec::new())
         }
         // Maybe I should default to last page, if current_page is too high?
-        let members = all_pages.get(current_page).ok_or("Page number is too high")?.clone();
+        let members = all_pages
+            .get(current_page)
+            .ok_or("Page number is too high")?
+            .clone();
         let total_items = sorted_subjects.len();
         // Construct the pages (TODO), use pageSize
         let total_pages = (total_items + collection.page_size - 1) / collection.page_size;
@@ -355,8 +351,10 @@ pub trait Storelike {
         let mut resource = self.get_resource(&removed_query_params)?;
         for class in resource.get_classes()? {
             match class.subject.as_ref() {
-                urls::COLLECTION => return crate::collections::construct_collection(self, query_params, resource),
-                _ => {},
+                urls::COLLECTION => {
+                    return crate::collections::construct_collection(self, query_params, resource)
+                }
+                _ => {}
             }
         }
         Ok(resource)
