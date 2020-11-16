@@ -4,9 +4,9 @@ use atomic_lib::{delta::DeltaDeprecated, errors::AtomicResult, DeltaLine, Storel
 /// Processes a singe delta
 pub fn delta(context: &mut Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("delta").unwrap();
-    let method = subcommand_to_url(context, "method")?;
-    let subject = subcommand_to_url(context, "subject")?;
-    let property = match subcommand_to_url(context, "property") {
+    let method = argument_to_url(context, "delta", "method")?;
+    let subject = argument_to_url(context, "delta", "subject")?;
+    let property = match argument_to_url(context, "delta", "property") {
         // If it's a valid URL, use that.
         Ok(prop) => Ok(prop),
         // If it's a shortname available from the Class of the resource, use that;
@@ -34,9 +34,9 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
 }
 
 /// Parses a single argument (URL or Bookmark), should return a valid URL
-pub fn subcommand_to_url(context: &Context, subcommand: &str) -> AtomicResult<String> {
-    let subcommand_matches = context.matches.subcommand_matches("delta").unwrap();
-    let user_arg = subcommand_matches.value_of(subcommand).unwrap();
+pub fn argument_to_url(context: &Context, subcommand: &str, argument: &str) -> AtomicResult<String> {
+    let subcommand_matches = context.matches.subcommand_matches(subcommand).unwrap();
+    let user_arg = subcommand_matches.value_of(argument).unwrap();
     let id_url: String = context
         .mapping.lock().unwrap()
         .try_mapping_or_url(&String::from(user_arg))

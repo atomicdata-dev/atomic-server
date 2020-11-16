@@ -582,10 +582,11 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.15.0"
+version = "0.16.0"
 dependencies = [
  "base64 0.13.0",
  "bincode",
+ "dirs",
  "rand",
  "regex",
  "ring",
@@ -594,6 +595,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sled",
+ "toml",
  "ureq",
  "url",
 ]
@@ -2666,6 +2668,15 @@ dependencies = [
  "log",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "toml"
+version = "0.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75cf45bb0bef80604d001caaec0d09da99611b3c0fd39d3080468875cdb65645"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

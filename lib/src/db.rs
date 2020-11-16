@@ -35,13 +35,14 @@ impl Db {
         let resources = db.open_tree("resources")?;
         let index_props = db.open_tree("index_props")?;
         let index_vals = db.open_tree("index_vals")?;
-        Ok(Db {
+        let store = Db {
             db,
             resources,
             index_vals,
             index_props,
             base_url,
-        })
+        };
+        Ok(store)
     }
 
     // fn index_value_add(&mut self, atom: Atom) -> AtomicResult<()> {

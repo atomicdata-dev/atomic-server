@@ -71,8 +71,11 @@ atomic new class
   - [x] Basic JSON Serialization
   - [x] RDF (Turtle / N-Triples / RDF/XML) Serialization
 - [x] Fetch data from the interwebs with `get` commands
-- [ ] Works with [`atomic-server`](../server) (fetches from there, stores there, uses domain etc.) [#6](https://github.com/joepio/atomic/issues/6)
-- [x] A `delta` command for manipulating existing resources
+- [ ] Works with [`atomic-server`](../server) [#6](https://github.com/joepio/atomic/issues/6)
+  - [x] fetches data
+  - [ ] `set`, `remove` and `destroy` commands for commits
+  - [ ] `new` creates commits
+- [x] A `delta` command for manipulating existing local resources
 - [ ] Tests for the cli
 - [ ] A `map` command for creating a bookmark and storing a copy
 
