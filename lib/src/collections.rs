@@ -10,13 +10,22 @@ pub struct TPFQuery {
     pub value: Option<String>,
 }
 
+/// Used to construct a Collection.
+/// Has to be constructed using `Collection::new()` or `storelike.new_collection()`.
 pub struct CollectionBuilder {
+    /// Full Subject URL of the resource, including query parameters
     pub subject: String,
+    /// The TPF property which the results are to be filtered by
     pub property: Option<String>,
+    /// The TPF value which the results are to be filtered by
     pub value: Option<String>,
+    /// URL of the value to sort by
     pub sort_by: Option<String>,
+    /// Sorts ascending by default
     pub sort_desc: bool,
+    /// Current page number, defaults to 0 (first page)
     pub current_page: usize,
+    /// How many items per page
     pub page_size: usize,
 }
 
@@ -24,25 +33,25 @@ pub struct CollectionBuilder {
 /// Features pagination.
 #[derive(Debug)]
 pub struct Collection {
-    // Full Subject URL of the resource, including query parameters
+    /// Full Subject URL of the resource, including query parameters
     pub subject: String,
     /// The TPF property which the results are to be filtered by
     pub property: Option<String>,
     /// The TPF value which the results are to be filtered by
     pub value: Option<String>,
-    // The actual items that you're interested in. List the member subjects of the current page.
+    /// The actual items that you're interested in. List the member subjects of the current page.
     pub members: Vec<String>,
-    // URL of the value to sort by
+    /// URL of the value to sort by
     pub sort_by: Option<String>,
     // Sorts ascending by default
     pub sort_desc: bool,
-    // How many items per page
+    /// How many items per page
     pub page_size: usize,
-    // Current page number, defaults to 0 (first page)
+    /// Current page number, defaults to 0 (first page)
     pub current_page: usize,
-    // Total number of items
+    /// Total number of items
     pub total_items: usize,
-    // Total number of pages
+    /// Total number of pages
     pub total_pages: usize,
 }
 
@@ -50,27 +59,27 @@ impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     pub fn new(
         store: &dyn Storelike,
-        collection: crate::collections::CollectionBuilder,
+        collection_builder: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
         // Execute the TPF query, get all the subjects.
         let atoms = store.tpf(
             None,
-            collection.property.as_deref(),
-            collection.value.as_deref(),
+            collection_builder.property.as_deref(),
+            collection_builder.value.as_deref(),
         )?;
         // Iterate over the fetched resources
         let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
         // Sort the resources (TODO), use sortBy and sortDesc
-        if collection.sort_by.is_some() {
+        if collection_builder.sort_by.is_some() {
             return Err("Sorting is not yet implemented".into());
         }
         let sorted_subjects: Vec<String> = subjects;
         let mut all_pages: Vec<Vec<String>> = Vec::new();
         let mut page: Vec<String> = Vec::new();
-        let current_page = collection.current_page;
+        let current_page = collection_builder.current_page;
         for (i, subject) in sorted_subjects.iter().enumerate() {
             page.push(subject.into());
-            if page.len() >= collection.page_size {
+            if page.len() >= collection_builder.page_size {
                 all_pages.push(page);
                 page = Vec::new();
                 // No need to calculte more than necessary
@@ -94,20 +103,20 @@ impl Collection {
             .clone();
         let total_items = sorted_subjects.len();
         // Construct the pages (TODO), use pageSize
-        let total_pages = (total_items + collection.page_size - 1) / collection.page_size;
-        let collection_return = Collection {
+        let total_pages = (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
+        let collection = Collection {
             total_pages,
             members,
             total_items,
-            subject: collection.subject,
-            property: collection.property,
-            value: collection.value,
-            sort_by: collection.sort_by,
-            sort_desc: collection.sort_desc,
-            current_page: collection.current_page,
-            page_size: collection.page_size,
+            subject: collection_builder.subject,
+            property: collection_builder.property,
+            value: collection_builder.value,
+            sort_by: collection_builder.sort_by,
+            sort_desc: collection_builder.sort_desc,
+            current_page: collection_builder.current_page,
+            page_size: collection_builder.page_size,
         };
-        Ok(collection_return)
+        Ok(collection)
     }
 
     pub fn to_resource<'a>(
@@ -217,6 +226,24 @@ mod test {
             current_page: 0,
         };
         let collection = store.new_collection(collection_builder).unwrap();
+        assert!(collection.members.contains(&urls::PROPERTY.into()));
+    }
+
+    #[test]
+    fn create_collection_2() {
+        let store = crate::Store::init();
+        store.populate().unwrap();
+        // Get all Classes, sorted by shortname
+        let collection_builder = CollectionBuilder {
+            subject: "test_subject".into(),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::CLASS.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        };
+        let collection = Collection::new(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 

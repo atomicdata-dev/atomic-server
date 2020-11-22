@@ -253,64 +253,9 @@ pub trait Storelike {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     fn new_collection(
         &self,
-        collection: crate::collections::CollectionBuilder,
-    ) -> AtomicResult<Collection> {
-        // Execute the TPF query, get all the subjects.
-        let atoms = self.tpf(
-            None,
-            collection.property.as_deref(),
-            collection.value.as_deref(),
-        )?;
-        // Iterate over the fetched resources
-        let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
-        // Sort the resources (TODO), use sortBy and sortDesc
-        if collection.sort_by.is_some() {
-            return Err("Sorting is not yet implemented".into());
-        }
-        let sorted_subjects: Vec<String> = subjects;
-        let mut all_pages: Vec<Vec<String>> = Vec::new();
-        let mut page: Vec<String> = Vec::new();
-        let current_page = collection.current_page;
-        for (i, subject) in sorted_subjects.iter().enumerate() {
-            page.push(subject.into());
-            if page.len() >= collection.page_size {
-                all_pages.push(page);
-                page = Vec::new();
-                // No need to calculte more than necessary
-                if all_pages.len() > current_page {
-                    break;
-                }
-            }
-            // Add the last page when handling the last subject
-            if i == sorted_subjects.len() - 1 {
-                all_pages.push(page);
-                break;
-            }
-        }
-        if all_pages.is_empty() {
-            all_pages.push(Vec::new())
-        }
-        // Maybe I should default to last page, if current_page is too high?
-        let members = all_pages
-            .get(current_page)
-            .ok_or("Page number is too high")?
-            .clone();
-        let total_items = sorted_subjects.len();
-        // Construct the pages (TODO), use pageSize
-        let total_pages = (total_items + collection.page_size - 1) / collection.page_size;
-        let collection_return = Collection {
-            total_pages,
-            members,
-            total_items,
-            subject: collection.subject,
-            property: collection.property,
-            value: collection.value,
-            sort_by: collection.sort_by,
-            sort_desc: collection.sort_desc,
-            current_page: collection.current_page,
-            page_size: collection.page_size,
-        };
-        Ok(collection_return)
+        collection_builder: crate::collections::CollectionBuilder,
+    ) -> AtomicResult<Collection> where Self: std::marker::Sized  {
+        crate::collections::Collection::new(self, collection_builder)
     }
 
     /// Fetches a property by URL, returns a Property instance
@@ -624,11 +569,70 @@ pub trait Storelike {
         Ok(current)
     }
 
-    /// Loads the default store
-    fn populate(&self) -> AtomicResult<()> {
+    /// Loads the default store.
+    /// Constructs various default collections.
+    fn populate(&self) -> AtomicResult<()> where Self: std::marker::Sized  {
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
         self.add_atoms(atoms)?;
+
+        use crate::collections::CollectionBuilder;
+
+        let classes = CollectionBuilder {
+            subject: format!("{}classes", self.get_base_url()),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::CLASS.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        };
+        self.new_collection(classes)?.to_resource(self)?.save()?;
+
+        let properties = CollectionBuilder {
+            subject: format!("{}properties", self.get_base_url()),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::PROPERTY.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        };
+        self.new_collection(properties)?.to_resource(self)?.save()?;
+
+        let commits = CollectionBuilder {
+            subject: format!("{}commits", self.get_base_url()),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::COMMIT.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        };
+        self.new_collection(commits)?.to_resource(self)?.save()?;
+
+        let agents = CollectionBuilder {
+            subject: format!("{}agents", self.get_base_url()),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::AGENT.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        };
+        self.new_collection(agents)?.to_resource(self)?.save()?;
+
+        let collections = CollectionBuilder {
+            subject: format!("{}collections", self.get_base_url()),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::COLLECTION.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        };
+        self.new_collection(collections)?.to_resource(self)?.save()?;
+
         Ok(())
     }
 
