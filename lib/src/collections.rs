@@ -141,7 +141,7 @@ impl Collection {
             self.total_items.clone().into(),
         )?;
         let mut classes: Vec<String> = Vec::new();
-        classes.push(crate::urls::IS_A.into());
+        classes.push(crate::urls::COLLECTION.into());
         resource.set_propval(
             crate::urls::IS_A.into(),
             classes.into(),
@@ -303,13 +303,6 @@ mod test {
                 .unwrap()
                 .to_string()
                 == "1"
-        );
-        assert!(
-            collection_page_nr
-                .get(urls::IS_A)
-                .unwrap()
-                .to_string()
-                == urls::COLLECTION
         );
         let members_vec = match collection_page_nr.get(urls::COLLECTION_MEMBERS).unwrap() {
             crate::Value::ResourceArray(vec) => vec,
