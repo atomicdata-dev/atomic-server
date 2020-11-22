@@ -44,9 +44,11 @@ impl Commit {
             urls::SUBJECT.into(),
             Value::new(&self.subject, &DataType::AtomicUrl).unwrap(),
         )?;
+        let mut classes: Vec<String> = Vec::new();
+        classes.push(urls::COMMIT.into());
         resource.set_propval(
             urls::IS_A.into(),
-            Value::new(urls::COMMIT, &DataType::AtomicUrl).unwrap(),
+            classes.into()
         )?;
         resource.set_propval(
             urls::CREATED_AT.into(),
