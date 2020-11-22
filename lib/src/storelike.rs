@@ -177,7 +177,7 @@ pub trait Storelike {
         for (prop_string, val_string) in resource_string {
             let propertyfull = self.get_property(&prop_string)?;
             let fullvalue =
-                Value::new(&val_string, &propertyfull.data_type).expect("Could not convert value");
+                Value::new(&val_string, &propertyfull.data_type)?;
             res.set_propval(prop_string.clone(), fullvalue)?;
         }
         Ok(res)
@@ -320,15 +320,15 @@ pub trait Storelike {
             data_type: match_datatype(
                 &property_resource
                     .get(urls::DATATYPE_PROP)
-                    .ok_or(format!("Datatype not found for property {}", url))?,
+                    .ok_or(format!("Datatype not found for Property {}.", url))?,
             ),
             shortname: property_resource
                 .get(urls::SHORTNAME)
-                .ok_or(format!("Shortname not found for property {}", url))?
+                .ok_or(format!("Shortname not found for Property {}", url))?
                 .into(),
             description: property_resource
                 .get(urls::DESCRIPTION)
-                .ok_or(format!("Description not found for property {}", url))?
+                .ok_or(format!("Description not found for Property {}", url))?
                 .into(),
             class_type: property_resource.get(urls::CLASSTYPE_PROP).cloned(),
             subject: url.into(),

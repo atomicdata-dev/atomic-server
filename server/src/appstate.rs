@@ -25,6 +25,23 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     let tera = Tera::new("templates/*.html")?;
     // Create a new identity if it does not yet exist.
 
+    let path = atomic_lib::config::default_path()?;
+    match atomic_lib::config::read_config(&path) {
+        Ok(agent_config) => {
+            store.get_resource(&agent_config.agent).expect(&format!("An agent is present in {:?}, but this agent is not present in the store", path));
+        }
+        Err(_) => {
+            let (agent, private_key) = store.create_agent("root")?;
+            let cfg = atomic_lib::config::Config {
+                agent,
+                server: config.local_base_url.clone(),
+                private_key
+            };
+            atomic_lib::config::write_config(&path, cfg)?;
+            log::info!("Agent created. Check newly created config file: {:?}", path);
+        }
+    }
+
     Ok(AppState {
         store,
         config,
