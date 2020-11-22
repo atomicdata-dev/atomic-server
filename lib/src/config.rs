@@ -1,6 +1,9 @@
 //! Configuration logic which can be used in both CLI and Server contexts
+use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
+use crate::errors::AtomicResult;
 
+/// A set of options that are shared between CLI and Server contexts
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
     /// Companion Atomic Server, where data is written by default.
@@ -11,37 +14,22 @@ pub struct Config {
     pub private_key: String,
 }
 
-pub fn read_default() -> Config {
-    let home = dirs::home_dir().expect("Could not open home dir").join(".config/atomic/config.toml");
-    read_config(&home)
+/// Returns the default path for the config file: `~/.config/atomic/config.toml`
+pub fn default_path () -> AtomicResult<PathBuf> {
+    Ok(dirs::home_dir().ok_or("Could not open home dir")?.join(".config/atomic/config.toml"))
 }
 
 /// Reads config file from a specified path
-pub fn read_config(path: &std::path::Path) -> Config {
-    match std::fs::read_to_string(path) {
-        Ok(config_string) => {
-            let config: Config = toml::from_str(&config_string).unwrap();
-            config
-        }
-        Err(_) => create_default_config("https://localhost"),
-    }
+pub fn read_config(path: &PathBuf) -> AtomicResult<Config> {
+    let config_string = std::fs::read_to_string(path)?;
+    let config: Config = toml::from_str(&config_string).unwrap();
+    Ok(config)
 }
 
 /// Writes config file from a specified path
 /// Overwrites any existing config
-pub fn write_config(path: &std::path::Path, config: Config) {
-
-    let out = toml::to_string_pretty(&config);
-    std::fs::write
-}
-
-
-fn create_default_config(base_url: &str) -> Config {
-    let keypair = crate::agents::generate_keypair();
-    // TODO: This makes no sense, currenlty.
-    Config {
-        server: base_url.into(),
-        agent: format!("{}/agents/root", base_url),
-        private_key: keypair.private,
-    }
+pub fn write_config(path: &PathBuf, config: Config) -> AtomicResult<()> {
+    let out = toml::to_string_pretty(&config).map_err(|e|  format!("Error serializing config. {}", e))?;
+    std::fs::write(path, out)?;
+    Ok(())
 }
