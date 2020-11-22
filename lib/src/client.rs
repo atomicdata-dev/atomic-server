@@ -28,6 +28,7 @@ pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
 }
 
 /// Posts a Commit to an endpoint
+/// Default commit endpoint is `https://example.com/commit`
 pub fn post_commit(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
     let json = serde_json::to_string(commit)?;
 

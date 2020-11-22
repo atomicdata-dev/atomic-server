@@ -108,7 +108,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("set")
-                .about("Update an Atom's value. Writes a commit to the store using the current Author.")
+                .about("Update an Atom's value. Writes a commit to the store using the current Agent.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resourece")
                     .required(true)
@@ -119,6 +119,18 @@ fn main() -> AtomicResult<()> {
                 )
                 .arg(Arg::with_name("value")
                     .help("String representation of the Value to be changed")
+                    .required(true)
+                )
+        )
+        .subcommand(
+            SubCommand::with_name("remove")
+                .about("Remove a single Atom from a Resource. Writes a commit to the store using the current Agent.")
+                .arg(Arg::with_name("subject")
+                    .help("Subject URL or bookmark of the resource")
+                    .required(true)
+                )
+                .arg(Arg::with_name("property")
+                    .help("Property URL or shortname of the property to be deleted")
                     .required(true)
                 )
         )
@@ -213,6 +225,9 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
         }
         Some("set") => {
             commit::set(context)?;
+        }
+        Some("remove") => {
+            commit::remove(context)?;
         }
         Some("populate") => {
             populate(context)?;
