@@ -22,10 +22,12 @@ Make sure to `cargo test --all` before opening a PR!
 
 1. `cd server`
 1. `cargo build --release`
-1. `scp ../target/release/atomic-server atomic:~/atomic/server/atomic-server-v0.15`
+1. `scp ../target/release/atomic-server atomic:~/atomic/server/atomic-server-v0.17`
 1. `ssh atomic`
 1. `htop` and kill `atomic`
 1. `cd atomic/server`
+1. `git pull` (if relevant static files have changed)
+1. `rm -rf  ~/.config/atomic/db` (if the db is corrupted / migrated)
 1. `./atomic-server-v0.15 &> log-v0.15-1` to start and log to file
 
 ## Publishing to WAPM
