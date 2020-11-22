@@ -24,9 +24,9 @@ Accept: application/json
 Content-Type: application/json
 
 {
-  "subject": "http://0.0.0.0:8081/ttest",
+  "subject": "http://localhost:8081/test",
   "created_at": 1601239744,
-  "actor": "https://example.com/profile",
+  "signer": "http://localhost:8081/agents/root",
   "set": {
     "https://atomicdata.dev/properties/requires": "[\"http/properties/requires\"]"
   },

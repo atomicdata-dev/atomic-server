@@ -36,7 +36,7 @@ pub fn delta(context: &mut Context) -> AtomicResult<()> {
 /// Parses a single argument (URL or Bookmark), should return a valid URL
 pub fn argument_to_url(context: &Context, subcommand: &str, argument: &str) -> AtomicResult<String> {
     let subcommand_matches = context.matches.subcommand_matches(subcommand).unwrap();
-    let user_arg = subcommand_matches.value_of(argument).unwrap();
+    let user_arg = subcommand_matches.value_of(argument).ok_or(format!("No argument value for {} found", argument))?;
     let id_url: String = context
         .mapping.lock().unwrap()
         .try_mapping_or_url(&String::from(user_arg))

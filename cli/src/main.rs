@@ -13,17 +13,35 @@ mod path;
 
 #[allow(dead_code)]
 pub struct Context<'a> {
-    /// URL of the Atomic Server to write to
-    base_url: Option<String>,
     store: atomic_lib::Store,
     mapping: Mutex<Mapping>,
     matches: ArgMatches<'a>,
     config_folder: PathBuf,
     user_mapping_path: PathBuf,
+    write: Option<WriteContext>,
+}
+
+impl Context<'_> {
+    pub fn get_write_context(&self) -> WriteContext {
+        match self.write {
+            Some(_) => {
+                self.write.clone().unwrap()
+            }
+            None => {
+                panic!("No write context set");
+            }
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct WriteContext {
+    /// URL of the Atomic Server to write to
+    base_url: String,
     /// URL of the Author of Commits
-    author_subject: Option<String>,
+    author_subject: String,
     /// Private key of the Author of Commits
-    author_private_key: Option<String>,
+    author_private_key: String,
 }
 
 fn main() -> AtomicResult<()> {
@@ -91,7 +109,7 @@ fn main() -> AtomicResult<()> {
         .subcommand(
             SubCommand::with_name("set")
                 .about("Update an Atom's value. Writes a commit to the store using the current Author.")
-                .arg(Arg::with_name("suject")
+                .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resourece")
                     .required(true)
                 )
@@ -154,18 +172,22 @@ fn main() -> AtomicResult<()> {
     }
     let store = atomic_lib::Store::init();
 
-    let agent_config = atomic_lib::config::Config.init();
+    let agent_config_path = atomic_lib::config::default_path()?;
+    let agent_config = atomic_lib::config::read_config(&agent_config_path)?;
+    let write_context = WriteContext {
+        base_url: agent_config.server,
+        author_private_key: agent_config.private_key,
+        author_subject: agent_config.agent,
+    };
 
     let mut context = Context {
         // TODO: This should be configurable
-        base_url: agent_config.server,
         mapping: Mutex::new(mapping),
         store,
         matches,
         config_folder,
         user_mapping_path,
-        author_private_key: agent_config.private_key,
-        author_subject: agent_config.agent,
+        write: Some(write_context),
     };
 
     exec_command(&mut context)?;

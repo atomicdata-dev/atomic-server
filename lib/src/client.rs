@@ -37,7 +37,7 @@ pub fn post_commit(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
         .send_string(&json);
 
     if resp.error() {
-        Err(format!("Failed sending commit. Status: {} Body: {}", resp.status(), resp.into_string()?).into())
+        Err(format!("Failed applying commit. Status: {} Body: {}", resp.status(), resp.into_string()?).into())
     } else {
         Ok(())
     }
