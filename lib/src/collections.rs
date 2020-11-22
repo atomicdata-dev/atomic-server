@@ -140,9 +140,11 @@ impl Collection {
             crate::urls::COLLECTION_MEMBER_COUNT.into(),
             self.total_items.clone().into(),
         )?;
-        resource.set_propval_string(
+        let mut classes: Vec<String> = Vec::new();
+        classes.push(crate::urls::IS_A.into());
+        resource.set_propval(
             crate::urls::IS_A.into(),
-            crate::urls::COLLECTION,
+            classes.into(),
         )?;
         resource.set_propval(
             crate::urls::COLLECTION_TOTAL_PAGES.into(),
