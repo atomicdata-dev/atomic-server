@@ -9,7 +9,7 @@ _Status: pre-alpha_
 A command-line application to create, read and interact with Atomic Data.
 
 ```
-atomic 0.12.1
+atomic 0.17.1
 Joep Meindertsma <joep@ontola.io>
 Create, share, fetch and model linked atomic data!
 
@@ -21,14 +21,15 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    delta       Update the store using an single Delta
-    get         Traverses a Path and prints the resulting Resource or Value.
-    help        Prints this message or the help of the given subcommand(s)
-    list        List all bookmarks
-    new         Create a Resource
-    populate    Adds the default Atoms to the store
-    tpf         Finds Atoms using Triple Pattern Fragments
-    validate    Validates the store
+    destroy    Permanently removes a Resource. Uses Commits.
+    edit       Edit a single Atom from a Resource using your text editor. Uses Commits.
+    get        Traverses a Path and prints the resulting Resource or Value.
+    help       Prints this message or the help of the given subcommand(s)
+    list       List all bookmarks
+    remove     Remove a single Atom from a Resource. Uses Commits.
+    set        Update an Atom's value. Uses Commits.
+
+Visit https://github.com/joepio/atomic for more info
 ```
 
 ## Installation
@@ -71,9 +72,9 @@ atomic new class
   - [x] Basic JSON Serialization
   - [x] RDF (Turtle / N-Triples / RDF/XML) Serialization
 - [x] Fetch data from the interwebs with `get` commands
-- [ ] Works with [`atomic-server`](../server) [#6](https://github.com/joepio/atomic/issues/6)
+- [x] Works with [`atomic-server`](../server) [#6](https://github.com/joepio/atomic/issues/6)
   - [x] fetches data
-  - [ ] `set`, `remove` and `destroy` commands for commits
+  - [x] `set`, `remove`, `edit` and `destroy` commands for commits
   - [ ] `new` creates commits
 - [x] A `delta` command for manipulating existing local resources
 - [ ] Tests for the cli

@@ -58,6 +58,7 @@ fn main() -> AtomicResult<()> {
                     .help("The URL or shortname of the Class that should be created")
                     .required(true),
             )
+            .setting(AppSettings::Hidden)
         )
         .subcommand(
             SubCommand::with_name("get")
@@ -87,7 +88,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("tpf")
-                    .about("Finds Atoms using Triple Pattern Fragments",
+                    .about("Finds Atoms using Triple Pattern Fragments.",
                     )
                     .after_help("\
                     Filter the store by <subject> <property> and <value>. \
@@ -105,10 +106,11 @@ fn main() -> AtomicResult<()> {
                     .help("The value URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
                     .required(true)
                 )
+                .setting(clap::AppSettings::Hidden)
         )
         .subcommand(
             SubCommand::with_name("set")
-                .about("Update an Atom's value. Writes a commit to the store using the current Agent.")
+                .about("Update an Atom's value. Uses Commits.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resourece")
                     .required(true)
@@ -124,7 +126,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("remove")
-                .about("Remove a single Atom from a Resource. Writes a commit to the store using the current Agent.")
+                .about("Remove a single Atom from a Resource. Uses Commits.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
@@ -136,7 +138,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("edit")
-                .about("Edit a single Atom from a Resource using your text editor. Writes a commit to the store using the current Agent.")
+                .about("Edit a single Atom from a Resource using your text editor. Uses Commits.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
@@ -148,7 +150,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("destroy")
-                .about("Permanently removes a Resource. Writes a commit to the store using the current Agent.")
+                .about("Permanently removes a Resource. Uses Commits.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource to be destroyed")
                     .required(true)
@@ -174,10 +176,10 @@ fn main() -> AtomicResult<()> {
                     .help("The new Value serialized as a a string")
                     .required(true)
                 )
+                .setting(AppSettings::Hidden)
         )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
-        .subcommand(SubCommand::with_name("populate").about("Adds the default Atoms to the store"))
-        .subcommand(SubCommand::with_name("validate").about("Validates the store"))
+        .subcommand(SubCommand::with_name("validate").about("Validates the store").setting(AppSettings::Hidden))
         .get_matches();
 
     let config_folder = home_dir()
@@ -246,14 +248,8 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
         Some("new") => {
             new::new(context)?;
         }
-        Some("populate") => {
-            populate(context)?;
-        }
         Some("remove") => {
             commit::remove(context)?;
-        }
-        Some("populate") => {
-            populate(context)?;
         }
         Some("set") => {
             commit::set(context)?;
@@ -321,13 +317,6 @@ fn tpf_value(string: &str) -> Option<&str> {
     } else {
         Some(string)
     }
-}
-
-/// Adds the default store to the store
-fn populate(context: &mut Context) -> AtomicResult<()> {
-    context.store.populate()?;
-    println!("Succesfully added default Atoms to the store. Run `atomic-cli tpf . . .` to list them all!");
-    Ok(())
 }
 
 /// Validates the store
