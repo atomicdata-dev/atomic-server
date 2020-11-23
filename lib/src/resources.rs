@@ -167,8 +167,8 @@ impl<'a> Resource<'a> {
     }
 
     /// Saves the resource (with all the changes) to the store.
-    /// Should be run after any (batch of) changes to the Resource!
     /// Does NOT create a Commit, so other servers will not be notified of these changes.
+    /// Use `resource.commit()`
     /// https://github.com/joepio/atomic/issues/24
     pub fn save(&self) -> AtomicResult<()> {
         self.store.add_resource(self)
@@ -186,7 +186,8 @@ impl<'a> Resource<'a> {
 
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
-    /// Does not validate property / datatype combination
+    /// Adds it to the commit builder.
+    /// Does not validate property / datatype combination.
     pub fn set_propval(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property.clone(), value.clone());
         self.commit.set(property, value.to_string());
@@ -231,10 +232,7 @@ impl<'a> Resource<'a> {
     }
 
     /// Serializes Resource to Atomic Data Triples (ad3), and NDJSON serialized representation.
-    pub fn to_ad3(&self) -> AtomicResult<String>
-    where
-        Self: std::marker::Sized,
-    {
+    pub fn to_ad3(&self) -> AtomicResult<String> {
         let mut string = String::new();
         let resource = self.to_plain();
 
@@ -257,10 +255,7 @@ impl<'a> Resource<'a> {
         // Not yet used
         _depth: u8,
         json_ld: bool,
-    ) -> AtomicResult<String>
-    where
-        Self: std::marker::Sized,
-    {
+    ) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};
 
         let resource = self.to_plain();
