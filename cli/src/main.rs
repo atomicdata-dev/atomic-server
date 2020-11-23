@@ -135,6 +135,14 @@ fn main() -> AtomicResult<()> {
                 )
         )
         .subcommand(
+            SubCommand::with_name("destroy")
+                .about("Permanently removes a Resource. Writes a commit to the store using the current Agent.")
+                .arg(Arg::with_name("subject")
+                    .help("Subject URL or bookmark of the resource to be destroyed")
+                    .required(true)
+                )
+        )
+        .subcommand(
             SubCommand::with_name("delta")
                     .about("Update the store using an single Delta. Deprecated in favor of `set`, `remove` and `",
                     )
@@ -228,6 +236,9 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
         }
         Some("remove") => {
             commit::remove(context)?;
+        }
+        Some("destroy") => {
+            commit::destroy(context)?;
         }
         Some("populate") => {
             populate(context)?;

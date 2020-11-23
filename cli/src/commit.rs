@@ -25,6 +25,16 @@ pub fn remove(context: &Context) -> AtomicResult<()> {
     Ok(())
 }
 
+/// Apply a Commit using the destroy method - removes a resource
+pub fn destroy(context: &Context) -> AtomicResult<()> {
+    let subcommand = "destroy";
+    let subject = argument_to_url(context, subcommand, "subject")?;
+    let mut commit_builder = builder(context, subject);
+    commit_builder.destroy(true);
+    post(context, commit_builder)?;
+    Ok(())
+}
+
 fn builder(context: &Context, subject: String) -> atomic_lib::commit::CommitBuilder {
     let write_ctx = context.get_write_context();
     atomic_lib::commit::CommitBuilder::new(subject, write_ctx.author_subject)
