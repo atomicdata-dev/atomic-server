@@ -130,12 +130,10 @@ impl Commit {
 }
 
 /// Use this for creating Commits
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 pub struct CommitBuilder {
     /// The subject URL that is to be modified by this Delta
     subject: String,
-    /// The URL of the one suggesting this Commit
-    signer: String,
     /// The set of PropVals that need to be added.
     /// Overwrites existing values
     set: std::collections::HashMap<String, String>,
@@ -149,10 +147,9 @@ pub struct CommitBuilder {
 impl CommitBuilder {
     /// Use this to start constructing a Commit.
     /// The signer is the URL of the Author, which contains the public key.
-    pub fn new(subject: String, signer: String) -> Self {
+    pub fn new(subject: String) -> Self {
         CommitBuilder {
             subject,
-            signer,
             set: HashMap::new(),
             remove: HashSet::new(),
             destroy: false,
@@ -162,7 +159,7 @@ impl CommitBuilder {
     /// Creates the Commit and signs it using a signature.
     /// Does not send it - see atomic_lib::client::post_commit
     /// Private key is the base64 encoded pkcs8 for the signer
-    pub fn sign(self, private_key: &str) -> AtomicResult<Commit> {
+    pub fn sign(self, private_key: &str, signer: String) -> AtomicResult<Commit> {
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("You're a time traveler")
@@ -170,7 +167,7 @@ impl CommitBuilder {
 
         let mut commit = Commit {
             subject: self.subject,
-            signer: self.signer,
+            signer: signer,
             set: Some(self.set),
             remove: Some(self.remove.into_iter().collect()),
             destroy: Some(self.destroy),
@@ -219,14 +216,14 @@ mod test {
         // Creates a new Agent with some crypto stuff
         let (agent_subject, private_key) = store.create_agent("test_actor").unwrap();
         let subject = "https://localhost/new_thing";
-        let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into(), agent_subject);
+        let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
         let value1 = "Some value";
         commitbuiler.set(property1.into(), value1.into());
         let property2 = crate::urls::SHORTNAME;
         let value2 = "someval";
         commitbuiler.set(property2.into(), value2.into());
-        let commit = commitbuiler.sign(&private_key).unwrap();
+        let commit = commitbuiler.sign(&private_key, agent_subject).unwrap();
         let commit_subject = commit.subject.clone();
         let _created_resource = store.commit(commit).unwrap();
 
