@@ -221,7 +221,7 @@ mod test {
                 .unwrap();
         // And add a description for that Property
         new_property
-            .set_by_shortname("description", "the age of a person")
+            .set_propval_by_shortname("description", "the age of a person")
             .unwrap();
         // Changes are only applied to the store after calling `.save()`
         new_property.save().unwrap();

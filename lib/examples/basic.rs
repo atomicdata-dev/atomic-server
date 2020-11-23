@@ -33,7 +33,7 @@ fn main() {
     // Let's make a new Property instance!
     let mut new_property = atomic_lib::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
     // And add a description for that Property
-    new_property.set_by_shortname("description", "the age of a person").unwrap();
+    new_property.set_propval_by_shortname("description", "the age of a person").unwrap();
     // The modified resource is saved to the store after this
 
     // A subject URL has been created automatically.
