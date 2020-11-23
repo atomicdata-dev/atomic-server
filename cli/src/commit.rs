@@ -1,5 +1,5 @@
 use crate::{Context, delta::argument_to_url};
-use atomic_lib::{errors::AtomicResult};
+use atomic_lib::{Storelike, errors::AtomicResult};
 
 /// Apply a Commit using the Set method - create or update a value in a resource
 pub fn set(context: &Context) -> AtomicResult<()> {
@@ -10,6 +10,19 @@ pub fn set(context: &Context) -> AtomicResult<()> {
     let val = subcommand_matches.value_of("value").unwrap();
     let mut commit_builder = builder(context, subject);
     commit_builder.set(prop, val.into());
+    post(context, commit_builder)?;
+    Ok(())
+}
+
+/// Apply a Commit using the Set method, where the value is edited in the user's text editor.
+pub fn edit(context: &Context) -> AtomicResult<()> {
+    let subcommand = "edit";
+    let subject = argument_to_url(context, subcommand, "subject")?;
+    let prop = argument_to_url(context, subcommand, "property")?;
+    let current_val = context.store.get_resource(&subject)?.get_shortname(&prop)?;
+    let edited = edit::edit(current_val.to_string())?;
+    let mut commit_builder = builder(context, subject);
+    commit_builder.set(prop, edited);
     post(context, commit_builder)?;
     Ok(())
 }

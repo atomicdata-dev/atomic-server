@@ -135,6 +135,18 @@ fn main() -> AtomicResult<()> {
                 )
         )
         .subcommand(
+            SubCommand::with_name("edit")
+                .about("Edit a single Atom from a Resource using your text editor. Writes a commit to the store using the current Agent.")
+                .arg(Arg::with_name("subject")
+                    .help("Subject URL or bookmark of the resource")
+                    .required(true)
+                )
+                .arg(Arg::with_name("property")
+                    .help("Property URL or shortname of the property to be edited")
+                    .required(true)
+                )
+        )
+        .subcommand(
             SubCommand::with_name("destroy")
                 .about("Permanently removes a Resource. Writes a commit to the store using the current Agent.")
                 .arg(Arg::with_name("subject")
@@ -216,32 +228,38 @@ fn main() -> AtomicResult<()> {
 
 fn exec_command(context: &mut Context) -> AtomicResult<()> {
     match context.matches.subcommand_name() {
-        Some("new") => {
-            new::new(context)?;
-        }
-        Some("list") => {
-            list(context);
-        }
-        Some("get") => {
-            path::get_path(context)?;
-        }
-        Some("tpf") => {
-            tpf(context)?;
-        }
         Some("delta") => {
             delta::delta(context)?;
-        }
-        Some("set") => {
-            commit::set(context)?;
-        }
-        Some("remove") => {
-            commit::remove(context)?;
         }
         Some("destroy") => {
             commit::destroy(context)?;
         }
+        Some("edit") => {
+            commit::edit(context)?;
+        }
+        Some("get") => {
+            path::get_path(context)?;
+        }
+        Some("list") => {
+            list(context);
+        }
+        Some("new") => {
+            new::new(context)?;
+        }
         Some("populate") => {
             populate(context)?;
+        }
+        Some("remove") => {
+            commit::remove(context)?;
+        }
+        Some("populate") => {
+            populate(context)?;
+        }
+        Some("set") => {
+            commit::set(context)?;
+        }
+        Some("tpf") => {
+            tpf(context)?;
         }
         Some("validate") => {
             validate(context)?;

@@ -102,11 +102,12 @@ impl<'a> Resource<'a> {
         ))?)
     }
 
+    /// Returns all PropVals
     pub fn get_propvals(&self) -> PropVals {
         self.propvals.clone()
     }
 
-    /// Gets a value by its shortname
+    /// Gets a value by its property shortname or property URL.
     // Todo: should use both the Classes AND the existing props
     pub fn get_shortname(&self, shortname: &str) -> AtomicResult<Value> {
         // If there is a class
@@ -118,7 +119,11 @@ impl<'a> Resource<'a> {
             }
         }
 
-        Err("No match".into())
+        if let Ok(val) = self.get(shortname) {
+            return Ok(val.clone())
+        }
+
+        Err(format!("No property found for shortname {} in resource {}", shortname, self.get_subject()).into())
     }
 
     /// Insert a Property/Value combination.
