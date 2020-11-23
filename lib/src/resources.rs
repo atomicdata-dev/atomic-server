@@ -141,7 +141,7 @@ impl<'a> Resource<'a> {
     /// Validates the datatype.
     pub fn remove_propval(&mut self, property_url: &str) {
         self.propvals.remove_entry(property_url);
-        self.commit.remove(property_url)
+        self.commit.remove(property_url.into())
     }
 
     /// Tries to resolve the shortname of a Property to a Property URL.
