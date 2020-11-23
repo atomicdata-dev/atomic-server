@@ -1,6 +1,6 @@
 //! A resource is a set of Atoms that share a URL
 
-use crate::errors::AtomicResult;
+use crate::{errors::AtomicResult, commit::CommitBuilder};
 use crate::values::Value;
 use crate::{
     datatype::DataType,
@@ -24,6 +24,7 @@ pub struct Resource<'a> {
     classes: Option<Vec<Class>>,
     /// A reference to the store
     store: &'a dyn Storelike,
+    commit: CommitBuilder,
 }
 
 /// Maps Property URLs to their values
@@ -45,9 +46,10 @@ impl<'a> Resource<'a> {
         let propvals: PropVals = HashMap::new();
         Resource {
             propvals,
-            subject,
+            subject: subject.clone(),
             classes: None,
             store,
+            commit: CommitBuilder::new(subject),
         }
     }
 
@@ -73,9 +75,10 @@ impl<'a> Resource<'a> {
         let classes = Some(classes_vec);
         let mut resource = Resource {
             propvals,
-            subject,
+            subject: subject.clone(),
             classes,
             store,
+            commit: CommitBuilder::new(subject)
         };
         let class_urls = Vec::from([String::from(class_url)]);
         resource.set_propval(crate::urls::IS_A.into(), class_urls.into())?;
@@ -163,8 +166,10 @@ impl<'a> Resource<'a> {
         Ok(None)
     }
 
-    /// Saves the resource (with all the changes) to the store
+    /// Saves the resource (with all the changes) to the store.
     /// Should be run after any (batch of) changes to the Resource!
+    /// Does NOT create a Commit, so other servers will not be notified of these changes.
+    /// https://github.com/joepio/atomic/issues/24
     pub fn save(&self) -> AtomicResult<()> {
         self.store.add_resource(self)
     }
