@@ -183,14 +183,15 @@ impl<'a> Resource<'a> {
     /// Overwrites existing.
     /// Does not validate property / datatype combination
     pub fn set_propval(&mut self, property: String, value: Value) -> AtomicResult<()> {
-        self.propvals.insert(property, value);
+        self.propvals.insert(property.clone(), value.clone());
+        self.commit.set(property, value.to_string());
         Ok(())
     }
 
     /// Sets a property / value combination.
     /// Property can be a shortname (e.g. 'description' instead of the full URL), if the Resource has a Class.
     /// Validates the datatype.
-    pub fn set_by_shortname(&mut self, property: &str, value: &str) -> AtomicResult<()> {
+    pub fn set_propval_by_shortname(&mut self, property: &str, value: &str) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
             self.store.get_property(property)?
         } else {
@@ -208,6 +209,7 @@ impl<'a> Resource<'a> {
 
     pub fn set_subject(&mut self, url: String) {
         self.subject = url;
+        // TODO: change subject URL in commit, introduce 'move' command? https://github.com/joepio/atomic/issues/44
     }
 
     pub fn get_subject(&self) -> &String {
@@ -398,11 +400,11 @@ mod test {
         let mut resource = store.get_resource(urls::CLASS).unwrap();
         assert!(resource.get_shortname("shortname").unwrap().to_string() == "class");
         resource
-            .set_by_shortname("shortname", "something-valid")
+            .set_propval_by_shortname("shortname", "something-valid")
             .unwrap();
         assert!(resource.get_shortname("shortname").unwrap().to_string() == "something-valid");
         resource
-            .set_by_shortname("shortname", "should not contain spaces")
+            .set_propval_by_shortname("shortname", "should not contain spaces")
             .unwrap_err();
     }
 
@@ -410,11 +412,9 @@ mod test {
     fn new_instance() {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
-        new_resource
-            .set_by_shortname("shortname", "person")
-            .unwrap();
+        new_resource.set_propval_by_shortname("shortname", "person").unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
-        new_resource.set_by_shortname("shortname", "human").unwrap();
+        new_resource.set_propval_by_shortname("shortname", "human").unwrap();
         new_resource.save().unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
