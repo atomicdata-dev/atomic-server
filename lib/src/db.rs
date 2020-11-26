@@ -165,10 +165,11 @@ impl Storelike for Db {
     }
 
     fn remove_resource(&self, subject: &str) {
-        self.db
+        // This errors when the resource is not present.
+        // https://github.com/joepio/atomic/issues/46
+        let _discard_error = self.db
             .remove(bincode::serialize(subject).unwrap())
-            .unwrap()
-            .unwrap();
+            .ok();
     }
 }
 
