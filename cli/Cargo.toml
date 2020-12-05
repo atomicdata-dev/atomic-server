@@ -1,6 +1,6 @@
 [package]
 name = "atomic-cli"
-version = "0.17.1"
+version = "0.17.2"
 authors = ["Joep Meindertsma <joep@argu.co>"]
 edition = "2018"
 license = "MIT"
