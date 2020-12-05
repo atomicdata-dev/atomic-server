@@ -182,7 +182,7 @@ mod test {
     /// Creates new temporary database, populates it, removes previous one
     fn init() -> Db {
         let tmp_dir_path = "tmp/db";
-        std::fs::remove_dir_all(tmp_dir_path).unwrap();
+        let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
         store.populate().unwrap();
         store

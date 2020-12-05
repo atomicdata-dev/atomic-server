@@ -19,7 +19,7 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
     for atom in atoms {
         let mut ad3_atom =
             serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value])?;
-        ad3_atom.push_str("\n");
+        ad3_atom.push('\n');
         string.push_str(&*ad3_atom);
     }
     Ok(string)

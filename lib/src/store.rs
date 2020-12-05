@@ -270,6 +270,6 @@ mod test {
             .get(urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert!(my_value.to_string() == "6");
+        assert!(my_value.to_string() == "5");
     }
 }

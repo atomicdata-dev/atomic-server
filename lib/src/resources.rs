@@ -215,7 +215,7 @@ impl<'a> Resource<'a> {
 
         for (property, value) in resource {
             let mut ad3_atom = serde_json::to_string(&vec![self.get_subject(), &property, &value])?;
-            ad3_atom.push_str("\n");
+            ad3_atom.push('\n');
             string.push_str(&*ad3_atom);
         }
         Ok(string)
