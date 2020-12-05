@@ -4,7 +4,8 @@ use atomic_lib::{Storelike, errors::AtomicResult};
 /// Apply a Commit using the Set method - create or update a value in a resource
 pub fn set(context: &Context) -> AtomicResult<()> {
     let subcommand = "set";
-    let subcommand_matches = context.matches.subcommand_matches(subcommand).clone().unwrap();
+    let matches = context.matches.clone();
+    let subcommand_matches = matches.subcommand_matches(subcommand).clone().unwrap();
     let subject = argument_to_url(context, subcommand, "subject")?;
     let prop = argument_to_url(context, subcommand, "property")?;
     let val = subcommand_matches.value_of("value").unwrap();
@@ -50,13 +51,13 @@ pub fn destroy(context: &Context) -> AtomicResult<()> {
 
 fn builder(context: &Context, subject: String) -> atomic_lib::commit::CommitBuilder {
     let write_ctx = context.get_write_context();
-    atomic_lib::commit::CommitBuilder::new(subject, write_ctx.author_subject)
+    atomic_lib::commit::CommitBuilder::new(subject, write_ctx.agent)
 }
 
 /// Posts the Commit and applies it to the server
 fn post(context: &Context , commit_builder: atomic_lib::commit::CommitBuilder) -> AtomicResult<()> {
     let write_ctx = context.get_write_context();
-    let commit = commit_builder.sign(&write_ctx.author_private_key)?;
-    atomic_lib::client::post_commit(&format!("{}commit", &write_ctx.base_url), &commit)?;
+    let commit = commit_builder.sign(&write_ctx.private_key)?;
+    atomic_lib::client::post_commit(&format!("{}commit", &write_ctx.server), &commit)?;
     Ok(())
 }

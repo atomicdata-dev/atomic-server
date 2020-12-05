@@ -49,9 +49,9 @@ fn prompt_instance<'a>(
 
     let write_ctx = context.get_write_context();
 
-    let mut subject = format!("{}/{}", write_ctx.base_url, path);
+    let mut subject = format!("{}/{}", write_ctx.server, path);
     if preffered_shortname.is_some() {
-        subject = format!("{}/{}-{}", write_ctx.base_url, path, preffered_shortname.clone().unwrap());
+        subject = format!("{}/{}-{}", write_ctx.server, path, preffered_shortname.clone().unwrap());
     }
 
     let mut new_resource: Resource = Resource::new(subject.clone(), &context.store);

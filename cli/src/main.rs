@@ -1,10 +1,11 @@
+use atomic_lib::config::Config;
 use atomic_lib::mapping::Mapping;
 use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
 use colored::*;
 use dirs::home_dir;
 use path::SERIALIZE_OPTIONS;
-use std::{path::PathBuf, sync::Mutex};
+use std::{cell::RefCell, path::PathBuf, sync::Mutex};
 
 mod commit;
 mod delta;
@@ -18,30 +19,44 @@ pub struct Context<'a> {
     matches: ArgMatches<'a>,
     config_folder: PathBuf,
     user_mapping_path: PathBuf,
-    write: Option<WriteContext>,
+    /// A set of configuration options that are required for writing data on some server
+    write: RefCell<Option<Config>>,
 }
 
 impl Context<'_> {
-    pub fn get_write_context(&self) -> WriteContext {
-        match self.write {
-            Some(_) => {
-                self.write.clone().unwrap()
-            }
-            None => {
-                panic!("No write context set");
-            }
-        }
+    pub fn get_write_context(&self) -> Config {
+        if let Some(write_ctx) = self.write.borrow().as_ref() {
+            return write_ctx.clone()
+        };
+
+        let write_ctx = set_agent_config().expect("Issue while generating Context");
+        self.write.borrow_mut().replace(write_ctx.clone());
+        write_ctx
     }
 }
 
-#[derive(Clone)]
-pub struct WriteContext {
-    /// URL of the Atomic Server to write to
-    base_url: String,
-    /// URL of the Author of Commits
-    author_subject: String,
-    /// Private key of the Author of Commits
-    author_private_key: String,
+fn set_agent_config() -> AtomicResult<Config> {
+    let agent_config_path = atomic_lib::config::default_path()?;
+    match atomic_lib::config::read_config(&agent_config_path) {
+        Ok(found) => Ok(found),
+        Err(_e) => {
+            println!("No config found. Let's create one!");
+            let server = promptly::prompt("What's the base url of your Atomic Server?")?;
+            let agent = promptly::prompt("What's the URL of your Agent?")?;
+            let private_key = promptly::prompt("What's the private key of this Agent?")?;
+            let config = atomic_lib::config::Config {
+                server,
+                private_key,
+                agent,
+            };
+            atomic_lib::config::write_config(&agent_config_path, config.clone())?;
+            println!(
+                "New config file created at {:?}",
+                agent_config_path.to_str()
+            );
+            Ok(config)
+        }
+    }
 }
 
 fn main() -> AtomicResult<()> {
@@ -206,14 +221,6 @@ fn main() -> AtomicResult<()> {
     }
     let store = atomic_lib::Store::init();
 
-    let agent_config_path = atomic_lib::config::default_path()?;
-    let agent_config = atomic_lib::config::read_config(&agent_config_path)?;
-    let write_context = WriteContext {
-        base_url: agent_config.server,
-        author_private_key: agent_config.private_key,
-        author_subject: agent_config.agent,
-    };
-
     let mut context = Context {
         // TODO: This should be configurable
         mapping: Mutex::new(mapping),
@@ -221,7 +228,7 @@ fn main() -> AtomicResult<()> {
         matches,
         config_folder,
         user_mapping_path,
-        write: Some(write_context),
+        write: RefCell::new(None),
     };
 
     exec_command(&mut context)?;
