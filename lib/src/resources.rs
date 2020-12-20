@@ -3,9 +3,10 @@
 use crate::errors::AtomicResult;
 use crate::values::Value;
 use crate::{
+    datatype::DataType,
     mapping::is_url,
     storelike::{Class, Property},
-    Atom, Storelike, datatype::DataType,
+    Atom, Storelike,
 };
 use std::collections::HashMap;
 
@@ -57,14 +58,15 @@ impl<'a> Resource<'a> {
         let mut classes_vec = Vec::new();
         classes_vec.push(store.get_class(class_url)?);
         use rand::Rng;
-        let random_string = rand::thread_rng()
+        let random_string: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
-            .take(10)
-            .collect::<String>();
+            .take(7)
+            .map(char::from)
+            .collect();
+
         let subject = format!(
             "{}/{}/{}",
-            store
-                .get_base_url(),
+            store.get_base_url(),
             classes_vec[0].shortname.clone(),
             random_string
         );
@@ -120,10 +122,15 @@ impl<'a> Resource<'a> {
         }
 
         if let Ok(val) = self.get(shortname) {
-            return Ok(val.clone())
+            return Ok(val.clone());
         }
 
-        Err(format!("No property found for shortname {} in resource {}", shortname, self.get_subject()).into())
+        Err(format!(
+            "No property found for shortname {} in resource {}",
+            shortname,
+            self.get_subject()
+        )
+        .into())
     }
 
     /// Insert a Property/Value combination.
@@ -135,7 +142,10 @@ impl<'a> Resource<'a> {
 
     /// Tries to resolve the shortname of a Property to a Property URL.
     // Currently assumes that classes have been set before.
-    pub fn resolve_shortname_to_property(&mut self, shortname: &str) -> AtomicResult<Option<Property>> {
+    pub fn resolve_shortname_to_property(
+        &mut self,
+        shortname: &str,
+    ) -> AtomicResult<Option<Property>> {
         let classes = self.get_classes()?;
         // Loop over all Requires and Recommends props
         for class in classes {
@@ -184,7 +194,12 @@ impl<'a> Resource<'a> {
         let fullprop = if is_url(property) {
             self.store.get_property(property)?
         } else {
-            self.resolve_shortname_to_property(property)?.ok_or(format!("Shortname {} not found in {}", property, self.get_subject()))?
+            self.resolve_shortname_to_property(property)?
+                .ok_or(format!(
+                    "Shortname {} not found in {}",
+                    property,
+                    self.get_subject()
+                ))?
         };
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.set_propval(fullprop.subject, fullval)?;
@@ -209,7 +224,10 @@ impl<'a> Resource<'a> {
     }
 
     /// Serializes Resource to Atomic Data Triples (ad3), and NDJSON serialized representation.
-    pub fn to_ad3(&self) -> AtomicResult<String> where Self: std::marker::Sized  {
+    pub fn to_ad3(&self) -> AtomicResult<String>
+    where
+        Self: std::marker::Sized,
+    {
         let mut string = String::new();
         let resource = self.to_plain();
 
@@ -232,7 +250,10 @@ impl<'a> Resource<'a> {
         // Not yet used
         _depth: u8,
         json_ld: bool,
-    ) -> AtomicResult<String> where Self: std::marker::Sized  {
+    ) -> AtomicResult<String>
+    where
+        Self: std::marker::Sized,
+    {
         use serde_json::{Map, Value as SerdeValue};
 
         let resource = self.to_plain();
@@ -389,15 +410,35 @@ mod test {
     fn new_instance() {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
-        new_resource.set_by_shortname("shortname", "person").unwrap();
+        new_resource
+            .set_by_shortname("shortname", "person")
+            .unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
         new_resource.set_by_shortname("shortname", "human").unwrap();
         new_resource.save().unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
-        assert!(resource_from_store.get_shortname("shortname").unwrap().to_string() == "human");
-        println!("{}", resource_from_store.get_shortname("isa").unwrap().to_string());
-        assert!(resource_from_store.get_shortname("isa").unwrap().to_string() == r#"["https://atomicdata.dev/classes/Class"]"#);
+        assert!(
+            resource_from_store
+                .get_shortname("shortname")
+                .unwrap()
+                .to_string()
+                == "human"
+        );
+        println!(
+            "{}",
+            resource_from_store
+                .get_shortname("isa")
+                .unwrap()
+                .to_string()
+        );
+        assert!(
+            resource_from_store
+                .get_shortname("isa")
+                .unwrap()
+                .to_string()
+                == r#"["https://atomicdata.dev/classes/Class"]"#
+        );
         assert!(resource_from_store.get_classes().unwrap()[0].shortname == "class");
     }
 }
