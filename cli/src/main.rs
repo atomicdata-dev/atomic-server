@@ -73,6 +73,8 @@ fn main() -> AtomicResult<()> {
                     .help("The URL or shortname of the Class that should be created")
                     .required(true),
             )
+            // Hidden, until the `new` command is properly reimplemented using Commits
+            // https://github.com/joepio/atomic/issues/49
             .setting(AppSettings::Hidden)
         )
         .subcommand(
