@@ -68,6 +68,11 @@ pub trait Storelike {
     /// Also useful for Subject URL generation.
     fn get_base_url(&self) -> String;
 
+    /// Returns the default Agent for applying commits.
+    fn get_default_agent(&self) -> Option<&crate::agents::Agent> {
+        None
+    }
+
     /// Apply a single Commit to the store
     /// Creates, edits or destroys a resource.
     /// Checks if the signature is created by the Agent.
@@ -142,7 +147,7 @@ pub trait Storelike {
     /// An Agent is required for signing Commits.
     /// Returns a tuple of (subject, private_key).
     /// Make sure to store the private_key somewhere safe!
-    fn create_agent(&self, name: &str) -> AtomicResult<(String, String)>
+    fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent>
     where
         Self: std::marker::Sized,
     {
@@ -153,7 +158,11 @@ pub trait Storelike {
         agent.set_propval_by_shortname("name", name)?;
         agent.set_propval_by_shortname("publickey", &keypair.public)?;
         self.add_resource(&agent)?;
-        Ok((subject, keypair.private))
+        let agent = crate::agents::Agent {
+            subject,
+            key: keypair.private
+        };
+        Ok(agent)
     }
 
     /// Fetches a resource, makes sure its subject matches.
@@ -635,6 +644,9 @@ pub trait Storelike {
 
         Ok(())
     }
+
+    /// Sets the default Agent for applying commits.
+    fn set_default_agent(&mut self, agent: crate::agents::Agent);
 
     /// Performs a light validation, without fetching external data
     fn validate(&self) -> crate::validate::ValidationReport

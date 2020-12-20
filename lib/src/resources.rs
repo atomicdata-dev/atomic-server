@@ -32,6 +32,14 @@ pub struct Resource<'a> {
 pub type PropVals = HashMap<String, Value>;
 
 impl<'a> Resource<'a> {
+    /// Clones the CommitBuilder from this resource, which contains the previous changes.
+    /// Pass this to `store.commit` to apply the commit.
+    pub fn get_commit_and_reset(&mut self) -> CommitBuilder {
+        let commit = self.commit.clone();
+        self.commit = CommitBuilder::new(self.subject.clone());
+        commit
+    }
+
     /// Checks if the classes are there, if not, fetches them
     pub fn get_classes(&mut self) -> AtomicResult<Vec<Class>> {
         if self.classes.is_none() {
@@ -145,7 +153,7 @@ impl<'a> Resource<'a> {
     }
 
     /// Tries to resolve the shortname of a Property to a Property URL.
-    // Currently assumes that classes have been set before.
+    /// Currently only tries the shortnames for linked classes - not for other properties.
     pub fn resolve_shortname_to_property(
         &mut self,
         shortname: &str,
@@ -388,9 +396,11 @@ mod test {
     fn init_store() -> Store {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let store = Store::init();
+        let mut store = Store::init();
         store.populate().unwrap();
         let atoms = parse_ad3(&string).unwrap();
+        let agent = store.create_agent("testman").unwrap();
+        store.set_default_agent(agent);
         store.add_atoms(atoms).unwrap();
         store
     }
@@ -429,13 +439,49 @@ mod test {
         println!(
             "{}",
             resource_from_store
-                .get_shortname("isa")
+                .get_shortname("is-a")
                 .unwrap()
                 .to_string()
         );
         assert!(
             resource_from_store
-                .get_shortname("isa")
+                .get_shortname("is-a")
+                .unwrap()
+                .to_string()
+                == r#"["https://atomicdata.dev/classes/Class"]"#
+        );
+        assert!(resource_from_store.get_classes().unwrap()[0].shortname == "class");
+    }
+
+    #[test]
+    fn new_instance_using_commit() {
+        let store = init_store();
+        let agent = store.get_default_agent().unwrap();
+        let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
+        new_resource.set_propval_by_shortname("shortname", "person").unwrap();
+        assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
+        new_resource.set_propval_by_shortname("shortname", "human").unwrap();
+        let commit = new_resource.get_commit_and_reset().sign(agent).unwrap();
+        store.commit(commit).unwrap();
+        assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
+        let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
+        assert!(
+            resource_from_store
+                .get_shortname("shortname")
+                .unwrap()
+                .to_string()
+                == "human"
+        );
+        println!(
+            "{}",
+            resource_from_store
+                .get_shortname("is-a")
+                .unwrap()
+                .to_string()
+        );
+        assert!(
+            resource_from_store
+                .get_shortname("is-a")
                 .unwrap()
                 .to_string()
                 == r#"["https://atomicdata.dev/classes/Class"]"#

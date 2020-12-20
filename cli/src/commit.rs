@@ -1,5 +1,5 @@
-use crate::{Context, delta::argument_to_url};
-use atomic_lib::{Storelike, errors::AtomicResult};
+use crate::{delta::argument_to_url, Context};
+use atomic_lib::{errors::AtomicResult, Storelike};
 
 /// Apply a Commit using the Set method - create or update a value in a resource
 pub fn set(context: &Context) -> AtomicResult<()> {
@@ -9,7 +9,7 @@ pub fn set(context: &Context) -> AtomicResult<()> {
     let subject = argument_to_url(context, subcommand, "subject")?;
     let prop = argument_to_url(context, subcommand, "property")?;
     let val = subcommand_matches.value_of("value").unwrap();
-    let mut commit_builder = builder(context, subject);
+    let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.set(prop, val.into());
     post(context, commit_builder)?;
     Ok(())
@@ -22,7 +22,7 @@ pub fn edit(context: &Context) -> AtomicResult<()> {
     let prop = argument_to_url(context, subcommand, "property")?;
     let current_val = context.store.get_resource(&subject)?.get_shortname(&prop)?;
     let edited = edit::edit(current_val.to_string())?;
-    let mut commit_builder = builder(context, subject);
+    let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.set(prop, edited);
     post(context, commit_builder)?;
     Ok(())
@@ -33,7 +33,7 @@ pub fn remove(context: &Context) -> AtomicResult<()> {
     let subcommand = "remove";
     let subject = argument_to_url(context, subcommand, "subject")?;
     let prop = argument_to_url(context, subcommand, "property")?;
-    let mut commit_builder = builder(context, subject);
+    let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.remove(prop);
     post(context, commit_builder)?;
     Ok(())
@@ -43,21 +43,20 @@ pub fn remove(context: &Context) -> AtomicResult<()> {
 pub fn destroy(context: &Context) -> AtomicResult<()> {
     let subcommand = "destroy";
     let subject = argument_to_url(context, subcommand, "subject")?;
-    let mut commit_builder = builder(context, subject);
+    let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.destroy(true);
     post(context, commit_builder)?;
     Ok(())
 }
 
-fn builder(context: &Context, subject: String) -> atomic_lib::commit::CommitBuilder {
-    let write_ctx = context.get_write_context();
-    atomic_lib::commit::CommitBuilder::new(subject, write_ctx.agent)
-}
-
 /// Posts the Commit and applies it to the server
-fn post(context: &Context , commit_builder: atomic_lib::commit::CommitBuilder) -> AtomicResult<()> {
+fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) -> AtomicResult<()> {
     let write_ctx = context.get_write_context();
-    let commit = commit_builder.sign(&write_ctx.private_key)?;
+    let agent = atomic_lib::agents::Agent {
+        subject: write_ctx.agent,
+        key: write_ctx.private_key,
+    };
+    let commit = commit_builder.sign(&agent)?;
     atomic_lib::client::post_commit(&format!("{}commit", &write_ctx.server), &commit)?;
     Ok(())
 }

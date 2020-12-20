@@ -1,5 +1,13 @@
 //! Logic for Agents - which are like Users
 
+#[derive(Clone)]
+pub struct Agent {
+  /// Private key for signing commits
+  pub key: String,
+  /// URL of the Agent
+  pub subject: String,
+}
+
 /// PKCS#8 keypair, serialized using base64
 pub struct Pair {
   pub private: String,

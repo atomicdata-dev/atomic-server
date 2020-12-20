@@ -159,7 +159,7 @@ impl CommitBuilder {
     /// Creates the Commit and signs it using a signature.
     /// Does not send it - see atomic_lib::client::post_commit
     /// Private key is the base64 encoded pkcs8 for the signer
-    pub fn sign(self, private_key: &str, signer: String) -> AtomicResult<Commit> {
+    pub fn sign(self, agent: &crate::agents::Agent) -> AtomicResult<Commit> {
         let created_at = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("You're a time traveler")
@@ -167,7 +167,7 @@ impl CommitBuilder {
 
         let mut commit = Commit {
             subject: self.subject,
-            signer: signer,
+            signer: agent.subject.clone(),
             set: Some(self.set),
             remove: Some(self.remove.into_iter().collect()),
             destroy: Some(self.destroy),
@@ -179,7 +179,7 @@ impl CommitBuilder {
         // let stringified = serde_json::to_string(&self)?;
         // let stringified = "full_resource";
         let stringified = commit.serialize_deterministically()?;
-        let private_key_bytes = base64::decode(private_key)?;
+        let private_key_bytes = base64::decode(agent.key.clone())?;
         let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
             .map_err(|_| "Can't create keypair")?;
         // let signax   ture = some_lib::sign(string, private_key);
@@ -214,7 +214,7 @@ mod test {
         let store = crate::Store::init();
         store.populate().unwrap();
         // Creates a new Agent with some crypto stuff
-        let (agent_subject, private_key) = store.create_agent("test_actor").unwrap();
+        let agent = store.create_agent("test_actor").unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
@@ -223,7 +223,7 @@ mod test {
         let property2 = crate::urls::SHORTNAME;
         let value2 = "someval";
         commitbuiler.set(property2.into(), value2.into());
-        let commit = commitbuiler.sign(&private_key, agent_subject).unwrap();
+        let commit = commitbuiler.sign(&agent).unwrap();
         let commit_subject = commit.subject.clone();
         let _created_resource = store.commit(commit).unwrap();
 

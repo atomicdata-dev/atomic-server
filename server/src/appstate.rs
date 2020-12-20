@@ -1,6 +1,6 @@
 //! App state, which is accessible from handlers
-use crate::{errors::BetterResult, config::Config};
-use atomic_lib::{Storelike, mapping::Mapping};
+use crate::{config::Config, errors::BetterResult};
+use atomic_lib::{mapping::Mapping, Storelike};
 use tera::Tera;
 
 /// Context for the server (not an individual request)
@@ -28,14 +28,19 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     let path = atomic_lib::config::default_path()?;
     match atomic_lib::config::read_config(&path) {
         Ok(agent_config) => {
-            store.get_resource(&agent_config.agent).expect(&format!("An agent is present in {:?}, but this agent is not present in the store", path));
+            store.get_resource(&agent_config.agent).unwrap_or_else(|_| {
+                panic!(
+                    "An agent is present in {:?}, but this agent is not present in the store",
+                    path
+                )
+            });
         }
         Err(_) => {
-            let (agent, private_key) = store.create_agent("root")?;
+            let agent = store.create_agent("root")?;
             let cfg = atomic_lib::config::Config {
-                agent,
+                agent: agent.subject,
                 server: config.local_base_url.clone(),
-                private_key
+                private_key: agent.key,
             };
             atomic_lib::config::write_config(&path, cfg)?;
             log::info!("Agent created. Check newly created config file: {:?}", path);

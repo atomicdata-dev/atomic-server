@@ -18,6 +18,7 @@ pub struct Store {
     // The store currently holds two stores - that is not ideal
     hashmap: Arc<Mutex<HashMap<String, ResourceString>>>,
     log: mutations::Log,
+    default_agent: Option<crate::agents::Agent>,
 }
 
 impl Store {
@@ -29,6 +30,7 @@ impl Store {
         Store {
             hashmap: Arc::new(Mutex::new(HashMap::new())),
             log: Vec::new(),
+            default_agent: None,
         }
     }
 
@@ -94,6 +96,13 @@ impl Storelike for Store {
         "https://localhost/".into()
     }
 
+    fn get_default_agent(&self) -> Option<&crate::agents::Agent> {
+        match &self.default_agent {
+            Some(agent) => Some(agent),
+            None => None,
+        }
+    }
+
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         let resource: Option<ResourceString> = match self.hashmap.lock().unwrap().get(resource_url)
         {
@@ -108,6 +117,10 @@ impl Storelike for Store {
 
     fn remove_resource(&self, subject: &str) {
         self.hashmap.lock().unwrap().remove_entry(subject);
+    }
+
+    fn set_default_agent(&mut self, agent: crate::agents::Agent) {
+        self.default_agent = Some(agent);
     }
 }
 

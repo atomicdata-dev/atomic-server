@@ -17,6 +17,7 @@ pub struct Db {
     // Resources can be found using their Subject.
     // Try not to use this directly, but use the Trees.
     db: sled::Db,
+    default_agent: Option<crate::agents::Agent>,
     // Stores all resources. The Key is the Subject as a string, the value a PropVals. Both must be serialized using bincode.
     resources: sled::Tree,
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
@@ -37,6 +38,7 @@ impl Db {
         let index_vals = db.open_tree("index_vals")?;
         let store = Db {
             db,
+            default_agent: None,
             resources,
             index_vals,
             index_props,
@@ -124,6 +126,13 @@ impl Storelike for Db {
         self.base_url.clone()
     }
 
+    fn get_default_agent(&self) -> Option<&crate::agents::Agent> {
+        match &self.default_agent {
+            Some(agent) => Some(agent),
+            None => None,
+        }
+    }
+
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         let propvals = self.get_propvals(resource_url);
         match propvals {
@@ -162,6 +171,10 @@ impl Storelike for Db {
             resources.push((subject, resource));
         }
         resources
+    }
+
+    fn set_default_agent(&mut self, agent: crate::agents::Agent) {
+        self.default_agent = Some(agent);
     }
 
     fn remove_resource(&self, subject: &str) {
