@@ -103,7 +103,7 @@ Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's 
 It will now initialize the certificate.
 Read the logs, watch for errors.
 
-Note that there is no logic yet for renewing certificates - I think removing the generated `.https` folder is the easiest approach.
+HTTPS certificates are automatically renewed when the server is restarted, and the certs are 4 weeks or older.
 
 ## Testing
 
