@@ -53,14 +53,10 @@ cargo install --path ./
 
 ## Usage
 
-```sh
-# Learn how to use it
-atomic --help
-# Try some commands
-atomic get class
-atomic get "class description"
-atomic new class
-```
+Run `atomic-cli command --help` for mor information about specific commands.
+
+The write commands (`set`, `remove`, `edit`, `destroy`) require some authentication config, which needs to match with the target [atomic-server](https://crates.io/crates/atomic-server).
+It will read the `~/.config/atomic/config.toml` file, and create one using some prompts if it is not yet present.
 
 ## Progress
 
@@ -71,9 +67,8 @@ atomic new class
   - [x] AD3 Serialization
   - [x] Basic JSON Serialization
   - [x] RDF (Turtle / N-Triples / RDF/XML) Serialization
-- [x] Fetch data from the interwebs with `get` commands
 - [x] Works with [`atomic-server`](../server) [#6](https://github.com/joepio/atomic/issues/6)
-  - [x] fetches data
+  - [x] fetches data using `get`, handles `paths` client side
   - [x] `set`, `remove`, `edit` and `destroy` commands for commits
   - [ ] `new` creates commits
 - [x] A `delta` command for manipulating existing local resources
