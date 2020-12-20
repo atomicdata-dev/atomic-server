@@ -11,6 +11,10 @@ use std::{
     path::PathBuf,
 };
 
+/// Path to a file that contains the date where the certificate was created
+const CERTS_CREATED_AT: &str = "./.https/certs_created_at";
+
+/// Starts an HTTP Actix server for HTTPS certificate initialization
 pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
     log::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
     let http_endpoint = format!("{}:{}", config.ip, config.port);
@@ -137,6 +141,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     fs::write(config.cert_path.clone(), cert.certificate()).expect("Unable to write file");
     fs::write(config.key_path.clone(), cert.private_key()).expect("Unable to write file");
+    add_certs_created_at();
     log::info!("HTTPS init Success!");
     Ok(())
 }
@@ -159,4 +164,27 @@ pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::Server
         .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
     Ok(https_config)
+}
+
+/// Adds a file to the .https folder to indicate age of certificates
+fn add_certs_created_at() {
+    let now_string = chrono::Utc::now();
+    fs::write(CERTS_CREATED_AT, now_string.to_string())
+        .expect(&*format!("Unable to write {}", CERTS_CREATED_AT));
+}
+
+/// Checks if the certificates need to be renewed.
+pub fn check_expiration_certs() -> bool {
+    let created_at = std::fs::read_to_string(CERTS_CREATED_AT)
+        .expect(&*format!("Unable to read {}", CERTS_CREATED_AT))
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .expect(&*format!("failed to parse {}", CERTS_CREATED_AT));
+    let certs_age: chrono::Duration = chrono::Utc::now() - created_at;
+    // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX.
+    let expired = certs_age > chrono::Duration::weeks(4);
+    if expired {
+        log::warn!("HTTPS Certificates expired, requesting new ones...")
+        // This is where I might need to remove the `.https/` folder, but it seems like it's not necessary
+    };
+    expired
 }
