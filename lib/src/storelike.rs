@@ -296,6 +296,7 @@ pub trait Storelike {
         let mut resource = self.get_resource(&removed_query_params)?;
         for class in resource.get_classes()? {
             match class.subject.as_ref() {
+                // This might need to iterate over all registered plugins¸ and call a particular function
                 urls::COLLECTION => {
                     return crate::collections::construct_collection(self, query_params, resource)
                 }
