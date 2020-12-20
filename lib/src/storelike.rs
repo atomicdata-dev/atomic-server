@@ -122,14 +122,14 @@ pub trait Storelike {
                 // Warning: this is a very inefficient operation
                 resource.set_propval_string(prop.into(), val)?;
             }
-            resource.save()?;
+            self.add_resource(&resource);
         }
         if let Some(remove) = commit.remove.clone() {
             for prop in remove.iter() {
                 // Warning: this is a very inefficient operation
                 resource.remove_propval(&prop);
             }
-            resource.save()?;
+            self.add_resource(&resource);
         }
         // TOOD: Persist delta to store, use hash as ID
         let commit_resource: Resource = commit.into_resource(self)?;
@@ -137,7 +137,9 @@ pub trait Storelike {
         Ok(commit_resource)
     }
 
-    /// Adds a Resource to the store
+    /// Adds a Resource to the store.
+    /// Replaces existing resource with the contents.
+    /// In most cases, you should use `.commit()` instead.
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
         self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
         Ok(())
@@ -160,7 +162,7 @@ pub trait Storelike {
         self.add_resource(&agent)?;
         let agent = crate::agents::Agent {
             subject,
-            key: keypair.private
+            key: keypair.private,
         };
         Ok(agent)
     }
@@ -185,8 +187,7 @@ pub trait Storelike {
         let mut res = Resource::new(subject.into(), self);
         for (prop_string, val_string) in resource_string {
             let propertyfull = self.get_property(&prop_string)?;
-            let fullvalue =
-                Value::new(&val_string, &propertyfull.data_type)?;
+            let fullvalue = Value::new(&val_string, &propertyfull.data_type)?;
             res.set_propval(prop_string.clone(), fullvalue)?;
         }
         Ok(res)
@@ -263,7 +264,10 @@ pub trait Storelike {
     fn new_collection(
         &self,
         collection_builder: crate::collections::CollectionBuilder,
-    ) -> AtomicResult<Collection> where Self: std::marker::Sized  {
+    ) -> AtomicResult<Collection>
+    where
+        Self: std::marker::Sized,
+    {
         crate::collections::Collection::new(self, collection_builder)
     }
 
@@ -580,7 +584,10 @@ pub trait Storelike {
 
     /// Loads the default store.
     /// Constructs various default collections.
-    fn populate(&self) -> AtomicResult<()> where Self: std::marker::Sized  {
+    fn populate(&self) -> AtomicResult<()>
+    where
+        Self: std::marker::Sized,
+    {
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
         self.add_atoms(atoms)?;
@@ -640,7 +647,9 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.new_collection(collections)?.to_resource(self)?.save()?;
+        self.new_collection(collections)?
+            .to_resource(self)?
+            .save()?;
 
         Ok(())
     }
