@@ -179,8 +179,11 @@ impl<'a> Resource<'a> {
     /// Does NOT create a Commit, so other servers will not be notified of these changes.
     /// Use `resource.commit()`
     /// https://github.com/joepio/atomic/issues/24
-    pub fn save(&self) -> AtomicResult<()> {
-        self.store.add_resource(self)
+    pub fn save(&mut self) -> AtomicResult<()> {
+        let agent = self.store.get_default_agent().ok_or("No default agent set!")?;
+        let commit = self.get_commit_and_reset().sign(agent)?;
+        self.store.commit(commit);
+        Ok(())
     }
 
     /// Insert a Property/Value combination.
