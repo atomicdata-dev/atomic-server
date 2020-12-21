@@ -18,7 +18,7 @@ pub struct Store {
     // The store currently holds two stores - that is not ideal
     hashmap: Arc<Mutex<HashMap<String, ResourceString>>>,
     log: mutations::Log,
-    default_agent: Option<crate::agents::Agent>,
+    default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
 }
 
 impl Store {
@@ -30,12 +30,12 @@ impl Store {
         Store {
             hashmap: Arc::new(Mutex::new(HashMap::new())),
             log: Vec::new(),
-            default_agent: None,
+            default_agent: Arc::new(Mutex::new(None)),
         }
     }
 
     /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
-    pub fn read_store_from_file<'a>(&mut self, path: &'a PathBuf) -> AtomicResult<()> {
+    pub fn read_store_from_file<'a>(&self, path: &'a PathBuf) -> AtomicResult<()> {
         match std::fs::read_to_string(path) {
             Ok(contents) => {
                 let atoms = crate::parse::parse_ad3(&contents)?;
@@ -47,7 +47,7 @@ impl Store {
     }
 
     /// Serializes the current store and saves to path
-    pub fn write_store_to_disk(&mut self, path: &PathBuf) -> AtomicResult<()> {
+    pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
         for (subject, _) in self.all_resources() {
             let resourcestring = self.get_resource(&subject)?.to_ad3()?;
@@ -96,8 +96,8 @@ impl Storelike for Store {
         "https://localhost/".into()
     }
 
-    fn get_default_agent(&self) -> Option<&crate::agents::Agent> {
-        match &self.default_agent {
+    fn get_default_agent(&self) -> Option<crate::agents::Agent> {
+        match self.default_agent.lock().unwrap().to_owned() {
             Some(agent) => Some(agent),
             None => None,
         }
@@ -119,8 +119,8 @@ impl Storelike for Store {
         self.hashmap.lock().unwrap().remove_entry(subject);
     }
 
-    fn set_default_agent(&mut self, agent: crate::agents::Agent) {
-        self.default_agent = Some(agent);
+    fn set_default_agent(&self, agent: crate::agents::Agent) {
+        self.default_agent.lock().unwrap().replace(agent);
     }
 }
 
