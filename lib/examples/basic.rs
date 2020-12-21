@@ -41,9 +41,9 @@ fn main() {
     // which are signed pieces of data that contain state changes.
     // Because these are signed, we need an Agent, which has a private key to sign Commits.
     let agent = store.create_agent("my_agent").unwrap();
-    // Setting a default agent should in most cases be done early on.
     store.set_default_agent(agent);
     store.commit_resource_changes(&mut new_property).unwrap();
+    // Now the changes to the resource applied to the store, and we can fetch the newly created resource!
     let fetched_new_resource = store.get_resource(&subject).unwrap();
     assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "the age of a person");
 }

@@ -179,9 +179,7 @@ impl Storelike for Db {
     }
 
     fn set_default_agent(&self, agent: crate::agents::Agent) {
-        println!("Setting...");
         self.default_agent.lock().unwrap().replace(agent);
-        println!("Set!");
     }
 
     fn remove_resource(&self, subject: &str) {
@@ -202,7 +200,6 @@ mod test {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
-        println!("Create");
         store.populate().unwrap();
         let agent = store.create_agent("name").unwrap();
         store.set_default_agent(agent);
@@ -212,11 +209,10 @@ mod test {
     /// TODO: find bug!
     /// For some reason, this one keeps going on forever.
     /// It calles create_agent before populating, and keeps requesting stuff.
-    fn init_faulty() -> Db {
+    fn _init_faulty() -> Db {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
-        println!("Create");
         let agent = store.create_agent("name").unwrap();
         store.populate().unwrap();
         store.set_default_agent(agent);
@@ -259,7 +255,6 @@ mod test {
             .set_propval_by_shortname("description", "the age of a person")
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
-        println!("commit");
         store.commit_resource_changes(&mut new_property).unwrap();
         // The modified resource is saved to the store after this
 
