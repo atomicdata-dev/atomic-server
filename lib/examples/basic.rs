@@ -34,10 +34,16 @@ fn main() {
     let mut new_property = atomic_lib::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
     // And add a description for that Property
     new_property.set_propval_by_shortname("description", "the age of a person").unwrap();
-    // The modified resource is saved to the store after this
-
     // A subject URL has been created automatically.
-    let subject = new_property.get_subject();
-    let fetched_new_resource = store.get_resource(subject).unwrap();
+    let subject = new_property.get_subject().clone();
+    // Now we need to make sure these changes are also applied to the store.
+    // In order to change things in the store, we should use Commits,
+    // which are signed pieces of data that contain state changes.
+    // Because these are signed, we need an Agent, which has a private key to sign Commits.
+    let agent = store.create_agent("my_agent").unwrap();
+    // Setting a default agent should in most cases be done early on.
+    store.set_default_agent(agent);
+    store.commit_resource_changes(&mut new_property).unwrap();
+    let fetched_new_resource = store.get_resource(&subject).unwrap();
     assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "the age of a person");
 }

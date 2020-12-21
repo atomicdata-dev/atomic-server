@@ -1,6 +1,8 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
+use std::sync::{Arc, Mutex};
+
 use crate::{
     errors::AtomicResult,
     resources::PropVals,
@@ -17,7 +19,7 @@ pub struct Db {
     // Resources can be found using their Subject.
     // Try not to use this directly, but use the Trees.
     db: sled::Db,
-    default_agent: Option<crate::agents::Agent>,
+    default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
     // Stores all resources. The Key is the Subject as a string, the value a PropVals. Both must be serialized using bincode.
     resources: sled::Tree,
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
@@ -38,7 +40,7 @@ impl Db {
         let index_vals = db.open_tree("index_vals")?;
         let store = Db {
             db,
-            default_agent: None,
+            default_agent: Arc::new(Mutex::new(None)),
             resources,
             index_vals,
             index_props,
@@ -73,9 +75,10 @@ impl Db {
             .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
         match propval_maybe.as_ref() {
             Some(binpropval) => {
-                let propval: PropVals = bincode::deserialize(binpropval).map_err(|e| format!("{} {}", DB_CORRUPT_MSG, e))?;
+                let propval: PropVals = bincode::deserialize(binpropval)
+                    .map_err(|e| format!("{} {}", DB_CORRUPT_MSG, e))?;
                 Ok(propval)
-            },
+            }
             None => Err("Not found".into()),
         }
     }
@@ -126,15 +129,17 @@ impl Storelike for Db {
         self.base_url.clone()
     }
 
-    fn get_default_agent(&self) -> Option<&crate::agents::Agent> {
-        match &self.default_agent {
+    fn get_default_agent(&self) -> Option<crate::agents::Agent> {
+        let agent = match self.default_agent.lock().unwrap().to_owned() {
             Some(agent) => Some(agent),
             None => None,
-        }
+        };
+        agent
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         let propvals = self.get_propvals(resource_url);
+        println!("getting resource... {}", resource_url);
         match propvals {
             Ok(propvals) => {
                 let resource = crate::resources::propvals_to_resourcestring(propvals);
@@ -173,16 +178,16 @@ impl Storelike for Db {
         resources
     }
 
-    fn set_default_agent(&mut self, agent: crate::agents::Agent) {
-        self.default_agent = Some(agent);
+    fn set_default_agent(&self, agent: crate::agents::Agent) {
+        println!("Setting...");
+        self.default_agent.lock().unwrap().replace(agent);
+        println!("Set!");
     }
 
     fn remove_resource(&self, subject: &str) {
         // This errors when the resource is not present.
         // https://github.com/joepio/atomic/issues/46
-        let _discard_error = self.db
-            .remove(bincode::serialize(subject).unwrap())
-            .ok();
+        let _discard_error = self.db.remove(bincode::serialize(subject).unwrap()).ok();
     }
 }
 
@@ -197,7 +202,24 @@ mod test {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
+        println!("Create");
         store.populate().unwrap();
+        let agent = store.create_agent("name").unwrap();
+        store.set_default_agent(agent);
+        store
+    }
+
+    /// TODO: find bug!
+    /// For some reason, this one keeps going on forever.
+    /// It calles create_agent before populating, and keeps requesting stuff.
+    fn init_faulty() -> Db {
+        let tmp_dir_path = "tmp/db";
+        let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
+        let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
+        println!("Create");
+        let agent = store.create_agent("name").unwrap();
+        store.populate().unwrap();
+        store.set_default_agent(agent);
         store
     }
 
@@ -236,8 +258,9 @@ mod test {
         new_property
             .set_propval_by_shortname("description", "the age of a person")
             .unwrap();
-        // Changes are only applied to the store after calling `.save()`
-        new_property.save().unwrap();
+        // Changes are only applied to the store after saving them explicitly.
+        println!("commit");
+        store.commit_resource_changes(&mut new_property).unwrap();
         // The modified resource is saved to the store after this
 
         // A subject URL has been created automatically.

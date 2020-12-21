@@ -1,6 +1,6 @@
 //! Trait for all stores to use
 
-use crate::urls;
+use crate::{urls};
 use crate::{collections::Collection, delta::DeltaDeprecated, errors::AtomicResult};
 use crate::{
     datatype::{match_datatype, DataType},
@@ -69,11 +69,11 @@ pub trait Storelike {
     fn get_base_url(&self) -> String;
 
     /// Returns the default Agent for applying commits.
-    fn get_default_agent(&self) -> Option<&crate::agents::Agent> {
+    fn get_default_agent(&self) -> Option<crate::agents::Agent> {
         None
     }
 
-    /// Apply a single Commit to the store
+    /// Apply a single signed Commit to the store
     /// Creates, edits or destroys a resource.
     /// Checks if the signature is created by the Agent.
     /// Should check if the Agent has the correct rights.
@@ -122,19 +122,31 @@ pub trait Storelike {
                 // Warning: this is a very inefficient operation
                 resource.set_propval_string(prop.into(), val)?;
             }
-            self.add_resource(&resource);
+            self.add_resource(&resource)?;
         }
         if let Some(remove) = commit.remove.clone() {
             for prop in remove.iter() {
                 // Warning: this is a very inefficient operation
                 resource.remove_propval(&prop);
             }
-            self.add_resource(&resource);
+            self.add_resource(&resource)?;
         }
         // TOOD: Persist delta to store, use hash as ID
         let commit_resource: Resource = commit.into_resource(self)?;
         self.add_resource(&commit_resource)?;
         Ok(commit_resource)
+    }
+
+    /// Saves the changes done to a Resource.
+    /// Signes the Commit using the Default Agent.
+    fn commit_resource_changes(&self, resource: &mut Resource) -> AtomicResult<()>
+    where
+        Self: std::marker::Sized,
+    {
+        let agent = self.get_default_agent().ok_or("No default agent set!")?;
+        let commit = resource.get_commit_and_reset().sign(&agent)?;
+        self.commit(commit)?;
+        Ok(())
     }
 
     /// Adds a Resource to the store.
@@ -307,6 +319,7 @@ pub trait Storelike {
         url.set_query(None);
         let removed_query_params = url.to_string();
         let mut resource = self.get_resource(&removed_query_params)?;
+        // If a class needs to be extended, add it to this match statement
         for class in resource.get_classes()? {
             match class.subject.as_ref() {
                 urls::COLLECTION => {
@@ -603,7 +616,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.new_collection(classes)?.to_resource(self)?.save()?;
+        self.add_resource(&self.new_collection(classes)?.to_resource(self)?)?;
 
         let properties = CollectionBuilder {
             subject: format!("{}properties", self.get_base_url()),
@@ -614,7 +627,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.new_collection(properties)?.to_resource(self)?.save()?;
+        self.add_resource(&self.new_collection(properties)?.to_resource(self)?)?;
 
         let commits = CollectionBuilder {
             subject: format!("{}commits", self.get_base_url()),
@@ -625,7 +638,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.new_collection(commits)?.to_resource(self)?.save()?;
+        self.add_resource(&self.new_collection(commits)?.to_resource(self)?)?;
 
         let agents = CollectionBuilder {
             subject: format!("{}agents", self.get_base_url()),
@@ -636,7 +649,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.new_collection(agents)?.to_resource(self)?.save()?;
+        self.add_resource(&self.new_collection(agents)?.to_resource(self)?)?;
 
         let collections = CollectionBuilder {
             subject: format!("{}collections", self.get_base_url()),
@@ -647,15 +660,13 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.new_collection(collections)?
-            .to_resource(self)?
-            .save()?;
+        self.add_resource(&self.new_collection(collections)?.to_resource(self)?)?;
 
         Ok(())
     }
 
     /// Sets the default Agent for applying commits.
-    fn set_default_agent(&mut self, agent: crate::agents::Agent);
+    fn set_default_agent(&self, agent: crate::agents::Agent);
 
     /// Performs a light validation, without fetching external data
     fn validate(&self) -> crate::validate::ValidationReport

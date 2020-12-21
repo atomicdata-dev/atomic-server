@@ -12,7 +12,7 @@ use std::collections::HashMap;
 
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
-/// All changes to the Resource are applied after calling `.save()`.
+/// All changes to the Resource are applied after committing them (e.g. by using).
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Resource<'a> {
     /// A hashMap of all the Property Value combinations
@@ -66,7 +66,9 @@ impl<'a> Resource<'a> {
     pub fn new_instance(class_url: &str, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
         let propvals: PropVals = HashMap::new();
         let mut classes_vec = Vec::new();
+        println!("LOCK...");
         classes_vec.push(store.get_class(class_url)?);
+        println!("UNLOCK!");
         use rand::Rng;
         let random_string: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
@@ -175,15 +177,16 @@ impl<'a> Resource<'a> {
         Ok(None)
     }
 
-    /// Saves the resource (with all the changes) to the store.
-    /// Does NOT create a Commit, so other servers will not be notified of these changes.
-    /// Use `resource.commit()`
-    /// https://github.com/joepio/atomic/issues/24
+    /// Saves the resource (with all the changes) to the store by creating a Commit
+    /// Is currently blocked by
+    /// https://github.com/joepio/atomic/issues/45
+    /// Use store.
     pub fn save(&mut self) -> AtomicResult<()> {
-        let agent = self.store.get_default_agent().ok_or("No default agent set!")?;
-        let commit = self.get_commit_and_reset().sign(agent)?;
-        self.store.commit(commit);
-        Ok(())
+        todo!();
+        // let agent = self.store.get_default_agent().ok_or("No default agent set!")?;
+        // let commit = self.get_commit_and_reset().sign(agent)?;
+        // self.store.commit(commit);
+        // Ok(())
     }
 
     /// Insert a Property/Value combination.
@@ -399,7 +402,7 @@ mod test {
     fn init_store() -> Store {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let mut store = Store::init();
+        let store = Store::init();
         store.populate().unwrap();
         let atoms = parse_ad3(&string).unwrap();
         let agent = store.create_agent("testman").unwrap();
@@ -429,7 +432,7 @@ mod test {
         new_resource.set_propval_by_shortname("shortname", "person").unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
         new_resource.set_propval_by_shortname("shortname", "human").unwrap();
-        new_resource.save().unwrap();
+        store.commit_resource_changes(&mut new_resource).unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
@@ -464,7 +467,7 @@ mod test {
         new_resource.set_propval_by_shortname("shortname", "person").unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
         new_resource.set_propval_by_shortname("shortname", "human").unwrap();
-        let commit = new_resource.get_commit_and_reset().sign(agent).unwrap();
+        let commit = new_resource.get_commit_and_reset().sign(&agent).unwrap();
         store.commit(commit).unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
