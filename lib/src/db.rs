@@ -129,12 +129,11 @@ impl Storelike for Db {
         self.base_url.clone()
     }
 
-    fn get_default_agent(&self) -> Option<crate::agents::Agent> {
-        let agent = match self.default_agent.lock().unwrap().to_owned() {
-            Some(agent) => Some(agent),
-            None => None,
-        };
-        agent
+    fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
+        match self.default_agent.lock().unwrap().to_owned() {
+            Some(agent) => Ok(agent),
+            None => Err("No default agent has been set.".into()),
+        }
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
@@ -254,7 +253,9 @@ mod test {
             .set_propval_by_shortname("description", "the age of a person")
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
-        store.commit_resource_changes_locally(&mut new_property).unwrap();
+        store
+            .commit_resource_changes_locally(&mut new_property)
+            .unwrap();
         // The modified resource is saved to the store after this
 
         // A subject URL has been created automatically.

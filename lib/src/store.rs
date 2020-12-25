@@ -93,10 +93,10 @@ impl Storelike for Store {
         "https://localhost/".into()
     }
 
-    fn get_default_agent(&self) -> Option<crate::agents::Agent> {
+    fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
         match self.default_agent.lock().unwrap().to_owned() {
-            Some(agent) => Some(agent),
-            None => None,
+            Some(agent) => Ok(agent),
+            None => Err("No default agent has been set.".into()),
         }
     }
 

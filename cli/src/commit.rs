@@ -51,6 +51,7 @@ pub fn destroy(context: &Context) -> AtomicResult<()> {
 
 /// Posts the Commit and applies it to the server
 fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) -> AtomicResult<()> {
+    context.get_write_context();
     let agent = context.store.get_default_agent().expect("No default agent set");
     let commit = commit_builder.sign(&agent)?;
     atomic_lib::client::post_commit(&commit)?;

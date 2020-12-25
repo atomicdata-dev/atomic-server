@@ -77,8 +77,8 @@ pub trait Storelike {
     fn get_base_url(&self) -> String;
 
     /// Returns the default Agent for applying commits.
-    fn get_default_agent(&self) -> Option<crate::agents::Agent> {
-        None
+    fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
+        Err("No default agent implemented for this store".into())
     }
 
     /// Apply a single signed Commit to the store
@@ -153,7 +153,7 @@ pub trait Storelike {
     where
         Self: std::marker::Sized,
     {
-        let agent = self.get_default_agent().ok_or("No default agent set!")?;
+        let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         self.commit(commit)?;
         Ok(())
@@ -167,7 +167,7 @@ pub trait Storelike {
     where
         Self: std::marker::Sized,
     {
-        let agent = self.get_default_agent().ok_or("No default agent set!")?;
+        let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         crate::client::post_commit(&commit)?;
         self.commit(commit)?;
