@@ -178,8 +178,10 @@ impl CommitBuilder {
         // TODO: use actual stringified resource, also change in Storelike::commit
         // let stringified = serde_json::to_string(&self)?;
         // let stringified = "full_resource";
-        let stringified = commit.serialize_deterministically()?;
-        let private_key_bytes = base64::decode(agent.key.clone())?;
+        let stringified = commit.serialize_deterministically()
+            .map_err(|e| format!("Failed serializing commit: {}", e))?;
+        let private_key_bytes = base64::decode(agent.key.clone())
+            .map_err(|e| format!("Failed decoding private key {}: {}", agent.key.clone(), e))?;
         let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
             .map_err(|_| "Can't create keypair")?;
         // let signax   ture = some_lib::sign(string, private_key);
