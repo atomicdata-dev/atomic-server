@@ -33,8 +33,8 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Lets the user enter an instance of an Atomic Class through multiple prompts
-/// Adds the instance to the store, and writes to disk.
+/// Lets the user enter an instance of an Atomic Class through multiple prompts.
+/// Adds the Resource to the store, and writes to disk.
 /// Returns the Resource, its URL and its Bookmark.
 fn prompt_instance<'a>(
     context: &'a Context,
@@ -95,6 +95,8 @@ fn prompt_instance<'a>(
             new_resource.set_propval_string(field.subject.clone(), &i)?;
         }
     }
+
+    context.store.commit_resource_changes_externally(&mut new_resource)?;
 
     println!("{} created with URL: {}", &class.shortname, &subject);
 

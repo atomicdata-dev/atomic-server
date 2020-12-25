@@ -43,7 +43,6 @@ pub mod commit;
 pub mod db;
 #[cfg(feature = "config")]
 pub mod config;
-pub mod delta;
 pub mod datatype;
 pub mod errors;
 pub mod mapping;
@@ -51,9 +50,8 @@ pub mod parse;
 pub mod resources;
 pub mod serialize;
 pub mod store;
-pub mod store_native;
 pub mod storelike;
-pub mod url_helpers;
+mod url_helpers;
 pub mod urls;
 pub mod validate;
 pub mod values;
@@ -63,7 +61,6 @@ pub use atoms::RichAtom;
 #[cfg(feature = "db")]
 pub use db::Db;
 pub use commit::Commit;
-pub use delta::DeltaLine;
 pub use resources::Resource;
 pub use resources::ResourceString;
 pub use store::Store;

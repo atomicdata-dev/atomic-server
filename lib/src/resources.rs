@@ -429,7 +429,7 @@ mod test {
         new_resource.set_propval_by_shortname("shortname", "person").unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
         new_resource.set_propval_by_shortname("shortname", "human").unwrap();
-        store.commit_resource_changes(&mut new_resource).unwrap();
+        store.commit_resource_changes_locally(&mut new_resource).unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(

@@ -6,7 +6,7 @@ use crate::errors::AtomicResult;
 /// A set of options that are shared between CLI and Server contexts
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Config {
-    /// Companion Atomic Server, where data is written by default.
+    /// URL of Companion Atomic Server, where data is written to by default.
     pub server: String,
     /// The current Agent (user) URL. Usually lives on the server, but not necessarily so.
     pub agent: String,
