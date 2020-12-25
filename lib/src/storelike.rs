@@ -169,9 +169,7 @@ pub trait Storelike {
     {
         let agent = self.get_default_agent().ok_or("No default agent set!")?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
-        let base_url = crate::url_helpers::base_url(commit.get_subject())?;
-        let endpoint = format!("{}commit", base_url);
-        crate::client::post_commit(&endpoint, &commit)?;
+        crate::client::post_commit(&commit)?;
         self.commit(commit)?;
         Ok(())
     }
