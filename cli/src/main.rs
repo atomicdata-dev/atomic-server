@@ -1,4 +1,4 @@
-use atomic_lib::config::Config;
+use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::mapping::Mapping;
 use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
@@ -8,7 +8,6 @@ use path::SERIALIZE_OPTIONS;
 use std::{cell::RefCell, path::PathBuf, sync::Mutex};
 
 mod commit;
-mod delta;
 mod new;
 mod path;
 
@@ -28,9 +27,14 @@ impl Context<'_> {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
             return write_ctx.clone()
         };
-
         let write_ctx = set_agent_config().expect("Issue while generating Context");
         self.write.borrow_mut().replace(write_ctx.clone());
+        self.store.set_default_agent(
+            Agent {
+                subject: write_ctx.agent.clone(),
+                key: write_ctx.private_key.clone(),
+            }
+        );
         write_ctx
     }
 }
@@ -73,9 +77,6 @@ fn main() -> AtomicResult<()> {
                     .help("The URL or shortname of the Class that should be created")
                     .required(true),
             )
-            // Hidden, until the `new` command is properly reimplemented using Commits
-            // https://github.com/joepio/atomic/issues/49
-            .setting(AppSettings::Hidden)
         )
         .subcommand(
             SubCommand::with_name("get")
@@ -173,28 +174,6 @@ fn main() -> AtomicResult<()> {
                     .required(true)
                 )
         )
-        .subcommand(
-            SubCommand::with_name("delta")
-                    .about("Update the store using an single Delta. Deprecated in favor of `set`, `remove` and `",
-                    )
-                .arg(Arg::with_name("method")
-                    .help("Method URL or bookmark, describes how the resource will be changed. Only suppports Insert at the time")
-                    .required(true)
-                )
-                .arg(Arg::with_name("subject")
-                    .help("Subject URL or bookmark of the thing to be changed")
-                    .required(true)
-                )
-                .arg(Arg::with_name("property")
-                    .help("Property URL or bookmark of the thing that needs to be updated")
-                    .required(true)
-                )
-                .arg(Arg::with_name("value")
-                    .help("The new Value serialized as a a string")
-                    .required(true)
-                )
-                .setting(AppSettings::Hidden)
-        )
         .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
         .subcommand(SubCommand::with_name("validate").about("Validates the store").setting(AppSettings::Hidden))
         .get_matches();
@@ -222,6 +201,7 @@ fn main() -> AtomicResult<()> {
         // let store = atomic_lib::Db::init(store_path).expect("Failed opening store. Is another program using it?");
     }
     let store = atomic_lib::Store::init();
+    store.populate()?;
 
     let mut context = Context {
         // TODO: This should be configurable
@@ -239,9 +219,6 @@ fn main() -> AtomicResult<()> {
 
 fn exec_command(context: &mut Context) -> AtomicResult<()> {
     match context.matches.subcommand_name() {
-        Some("delta") => {
-            delta::delta(context)?;
-        }
         Some("destroy") => {
             commit::destroy(context)?;
         }

@@ -1,4 +1,4 @@
-use crate::{delta::argument_to_url, Context};
+use crate::Context;
 use atomic_lib::{errors::AtomicResult, Storelike};
 
 /// Apply a Commit using the Set method - create or update a value in a resource
@@ -52,11 +52,23 @@ pub fn destroy(context: &Context) -> AtomicResult<()> {
 /// Posts the Commit and applies it to the server
 fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) -> AtomicResult<()> {
     let write_ctx = context.get_write_context();
-    let agent = atomic_lib::agents::Agent {
-        subject: write_ctx.agent,
-        key: write_ctx.private_key,
-    };
+    // let agent = atomic_lib::agents::Agent {
+    //     subject: write_ctx.agent,
+    //     key: write_ctx.private_key,
+    // };
+    let agent = context.store.get_default_agent().expect("No default agent set");
     let commit = commit_builder.sign(&agent)?;
     atomic_lib::client::post_commit(&format!("{}commit", &write_ctx.server), &commit)?;
     Ok(())
+}
+
+/// Parses a single argument (URL or Bookmark), should return a valid URL
+pub fn argument_to_url(context: &Context, subcommand: &str, argument: &str) -> AtomicResult<String> {
+    let subcommand_matches = context.matches.subcommand_matches(subcommand).unwrap();
+    let user_arg = subcommand_matches.value_of(argument).ok_or(format!("No argument value for {} found", argument))?;
+    let id_url: String = context
+        .mapping.lock().unwrap()
+        .try_mapping_or_url(&String::from(user_arg))
+        .ok_or(&*format!("No url found for {}", user_arg))?;
+    Ok(id_url)
 }
