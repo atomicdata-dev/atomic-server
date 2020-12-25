@@ -254,7 +254,7 @@ mod test {
             .set_propval_by_shortname("description", "the age of a person")
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
-        store.commit_resource_changes(&mut new_property).unwrap();
+        store.commit_resource_changes_locally(&mut new_property).unwrap();
         // The modified resource is saved to the store after this
 
         // A subject URL has been created automatically.

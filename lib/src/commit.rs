@@ -9,7 +9,7 @@ use crate::{
 
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Commit {
     /// The subject URL that is to be modified by this Delta
     pub subject: String,
@@ -29,7 +29,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Converts the Commit into a HashMap of strings.
+    /// Converts the Commit into a Resource with Atomic Values.
     /// Creates an identifier using the base_url or a default.
     pub fn into_resource<'a>(self, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
         let subject = match self.signature.as_ref() {
@@ -80,6 +80,10 @@ impl Commit {
         )?;
         resource.set_propval(urls::SIGNATURE.into(), self.signature.unwrap().into())?;
         Ok(resource)
+    }
+
+    pub fn get_subject(&self) -> &str {
+        &self.subject
     }
 
     /// Generates a deterministic serialized JSON representation of the Commit.
@@ -145,8 +149,7 @@ pub struct CommitBuilder {
 }
 
 impl CommitBuilder {
-    /// Use this to start constructing a Commit.
-    /// The signer is the URL of the Author, which contains the public key.
+    /// Start constructing a Commit.
     pub fn new(subject: String) -> Self {
         CommitBuilder {
             subject,
@@ -226,7 +229,7 @@ mod test {
         let value2 = "someval";
         commitbuiler.set(property2.into(), value2.into());
         let commit = commitbuiler.sign(&agent).unwrap();
-        let commit_subject = commit.subject.clone();
+        let commit_subject = commit.get_subject().to_string();
         let _created_resource = store.commit(commit).unwrap();
 
         let resource = store.get_resource(&subject).unwrap();

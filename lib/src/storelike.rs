@@ -1,7 +1,7 @@
 //! Trait for all stores to use
 
-use crate::{urls};
-use crate::{collections::Collection, delta::DeltaDeprecated, errors::AtomicResult};
+use crate::urls;
+use crate::{collections::Collection, errors::AtomicResult};
 use crate::{
     datatype::{match_datatype, DataType},
     mapping::Mapping,
@@ -52,6 +52,14 @@ pub trait Storelike {
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
+
+    /// Adds a Resource to the store.
+    /// Replaces existing resource with the contents.
+    /// In most cases, you should use `.commit()` instead.
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
+        Ok(())
+    }
 
     /// Replaces existing resource with the contents
     /// Accepts a simple nested string only hashmap
@@ -138,8 +146,10 @@ pub trait Storelike {
     }
 
     /// Saves the changes done to a Resource.
-    /// Signes the Commit using the Default Agent.
-    fn commit_resource_changes(&self, resource: &mut Resource) -> AtomicResult<()>
+    /// Signs the Commit using the Default Agent.
+    /// Does not send it to an Atomic Server.
+    /// Fails if no Default Agent is set.
+    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()>
     where
         Self: std::marker::Sized,
     {
@@ -149,11 +159,20 @@ pub trait Storelike {
         Ok(())
     }
 
-    /// Adds a Resource to the store.
-    /// Replaces existing resource with the contents.
-    /// In most cases, you should use `.commit()` instead.
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
+    /// Saves the changes done to a Resource to the Store.
+    /// Signs the Commit using the Default Agent.
+    /// Sends the Commit to the Atomic Server of the Subject.
+    /// Fails if no Default Agent is set.
+    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()>
+    where
+        Self: std::marker::Sized,
+    {
+        let agent = self.get_default_agent().ok_or("No default agent set!")?;
+        let commit = resource.get_commit_and_reset().sign(&agent)?;
+        let base_url = crate::url_helpers::base_url(commit.get_subject())?;
+        let endpoint = format!("{}commit", base_url);
+        crate::client::post_commit(&endpoint, &commit)?;
+        self.commit(commit)?;
         Ok(())
     }
 
@@ -319,7 +338,7 @@ pub trait Storelike {
         url.set_query(None);
         let removed_query_params = url.to_string();
         let mut resource = self.get_resource(&removed_query_params)?;
-        // If a class needs to be extended, add it to this match statement
+        // If a certain class needs to be extended, add it to this match statement
         for class in resource.get_classes()? {
             match class.subject.as_ref() {
                 urls::COLLECTION => {
@@ -355,32 +374,6 @@ pub trait Storelike {
         Ok(())
     }
 
-    /// DEPRECATED - PREFER COMMITS
-    /// Processes a vector of deltas and updates the store.
-    fn process_delta(&self, delta: DeltaDeprecated) -> AtomicResult<()> {
-        let mut updated_resources = Vec::new();
-
-        for deltaline in delta.lines.into_iter() {
-            match deltaline.method.as_str() {
-                urls::INSERT | "insert" => {
-                    let datatype = self
-                        .get_property(&deltaline.property)
-                        .expect("Can't get property")
-                        .data_type;
-                    Value::new(&deltaline.value, &datatype)?;
-                    updated_resources.push(delta.subject.clone());
-                    let atom =
-                        Atom::new(delta.subject.clone(), deltaline.property, deltaline.value);
-                    self.add_atom(atom)?;
-                }
-                urls::DELETE | "delete" => {
-                    todo!();
-                }
-                unknown => println!("Ignoring unknown method: {}", unknown),
-            };
-        }
-        Ok(())
-    }
     /// Finds the URL of a shortname used in the context of a specific Resource.
     /// The Class, Properties and Shortnames of the Resource are used to find this URL
     fn property_shortname_to_url(
@@ -597,6 +590,7 @@ pub trait Storelike {
 
     /// Loads the default store.
     /// Constructs various default collections.
+    // Maybe these two functionalities should be split?
     fn populate(&self) -> AtomicResult<()>
     where
         Self: std::marker::Sized,

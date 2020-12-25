@@ -70,7 +70,7 @@ It will read the `~/.config/atomic/config.toml` file, and create one using some 
 - [x] Works with [`atomic-server`](../server) [#6](https://github.com/joepio/atomic/issues/6)
   - [x] fetches data using `get`, handles `paths` client side
   - [x] `set`, `remove`, `edit` and `destroy` commands for commits
-  - [ ] `new` creates commits
+  - [x] `new` creates commits
 - [x] A `delta` command for manipulating existing local resources
 - [ ] Tests for the cli
 - [ ] A `map` command for creating a bookmark and storing a copy
