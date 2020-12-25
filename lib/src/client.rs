@@ -27,9 +27,18 @@ pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
     Ok(resource)
 }
 
+
+/// Posts a Commit to the endpoint of the Subject from the Commit
+pub fn post_commit(commit: &crate::Commit) -> AtomicResult<()> {
+    let base_url = crate::url_helpers::base_url(commit.get_subject())?;
+    // Default Commit endpoint is `https://example.com/commit`
+    let endpoint = format!("{}commit", base_url);
+    post_commit_custom_endpoint(&endpoint, commit)
+}
+
 /// Posts a Commit to an endpoint
 /// Default commit endpoint is `https://example.com/commit`
-pub fn post_commit(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
+pub fn post_commit_custom_endpoint(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
     let json = serde_json::to_string(commit)?;
 
     let resp = ureq::post(&endpoint)
@@ -38,7 +47,7 @@ pub fn post_commit(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
         .send_string(&json);
 
     if resp.error() {
-        Err(format!("Failed applying commit. Status: {} Body: {}", resp.status(), resp.into_string()?).into())
+        Err(format!("Failed applying commit to {}. Status: {} Body: {}", endpoint, resp.status(), resp.into_string()?).into())
     } else {
         Ok(())
     }
@@ -57,11 +66,12 @@ mod test {
 
     #[test] #[ignore]
     fn post_commit_basic() {
+        // This fails - needs actual key
         let agent = crate::agents::Agent {
             subject: "test".into(),
             key: "test".into(),
         };
         let commit = crate::commit::CommitBuilder::new("subject".into()).sign(&agent).unwrap();
-        post_commit("https://atomicdata.dev/commit", &commit).unwrap();
+        post_commit(&commit).unwrap();
     }
 }
