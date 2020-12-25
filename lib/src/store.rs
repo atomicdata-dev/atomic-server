@@ -4,7 +4,6 @@
 //! A more robust persistent storage option will be used later, such as: https://github.com/TheNeikos/rustbreak
 
 use crate::errors::AtomicResult;
-use crate::mutations;
 use crate::{
     atoms::Atom,
     storelike::{ResourceCollection, Storelike},
@@ -17,7 +16,6 @@ use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
 pub struct Store {
     // The store currently holds two stores - that is not ideal
     hashmap: Arc<Mutex<HashMap<String, ResourceString>>>,
-    log: mutations::Log,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
 }
 
@@ -29,7 +27,6 @@ impl Store {
     pub fn init() -> Store {
         Store {
             hashmap: Arc::new(Mutex::new(HashMap::new())),
-            log: Vec::new(),
             default_agent: Arc::new(Mutex::new(None)),
         }
     }

@@ -66,16 +66,13 @@ impl<'a> Resource<'a> {
     pub fn new_instance(class_url: &str, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
         let propvals: PropVals = HashMap::new();
         let mut classes_vec = Vec::new();
-        println!("LOCK...");
         classes_vec.push(store.get_class(class_url)?);
-        println!("UNLOCK!");
         use rand::Rng;
         let random_string: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
             .take(7)
             .map(char::from)
             .collect();
-
         let subject = format!(
             "{}/{}/{}",
             store.get_base_url(),

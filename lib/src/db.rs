@@ -139,7 +139,6 @@ impl Storelike for Db {
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         let propvals = self.get_propvals(resource_url);
-        println!("getting resource... {}", resource_url);
         match propvals {
             Ok(propvals) => {
                 let resource = crate::resources::propvals_to_resourcestring(propvals);
