@@ -9,7 +9,7 @@ _Status: pre-alpha_
 A command-line application to create, read and interact with Atomic Data.
 
 ```
-atomic 0.17.1
+atomic 0.18.0
 Joep Meindertsma <joep@ontola.io>
 Create, share, fetch and model linked atomic data!
 
@@ -26,8 +26,10 @@ SUBCOMMANDS:
     get        Traverses a Path and prints the resulting Resource or Value.
     help       Prints this message or the help of the given subcommand(s)
     list       List all bookmarks
+    new        Create a Resource
     remove     Remove a single Atom from a Resource. Uses Commits.
     set        Update an Atom's value. Uses Commits.
+    tpf        Finds Atoms using Triple Pattern Fragments.
 
 Visit https://github.com/joepio/atomic for more info
 ```

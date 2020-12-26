@@ -188,7 +188,7 @@ pub trait Storelike {
         let mut agent = Resource::new_instance(urls::AGENT, self)?;
         agent.set_subject(subject.clone());
         agent.set_propval_by_shortname("name", name)?;
-        agent.set_propval_by_shortname("publickey", &keypair.public)?;
+        agent.set_propval_by_shortname("public-key", &keypair.public)?;
         self.add_resource(&agent)?;
         let agent = crate::agents::Agent {
             subject,

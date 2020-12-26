@@ -111,6 +111,7 @@ fn main() -> AtomicResult<()> {
                     .after_help("\
                     Filter the store by <subject> <property> and <value>. \
                     Use a dot to indicate that you don't need to filter. \
+                    Subjects and properties need to be full URLs. \
                     ")
                 .arg(Arg::with_name("subject")
                     .help("The subject URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
@@ -124,7 +125,6 @@ fn main() -> AtomicResult<()> {
                     .help("The value URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
                     .required(true)
                 )
-                .setting(clap::AppSettings::Hidden)
         )
         .subcommand(
             SubCommand::with_name("set")
@@ -288,11 +288,9 @@ fn tpf(context: &mut Context) -> AtomicResult<()> {
     let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());
     let value = tpf_value(subcommand_matches.value_of("value").unwrap());
-    let found_atoms = context
-        .store
-        .tpf(subject, property, value)
-        .expect("TPF failed");
-    let serialized = atomic_lib::serialize::serialize_atoms_to_ad3(found_atoms)?;
+    let endpoint = format!("{}/tpf", &context.get_write_context().server);
+    let atoms = atomic_lib::client::fetch_tpf(&endpoint, subject, property, value)?;
+    let serialized = atomic_lib::serialize::serialize_atoms_to_ad3(atoms)?;
     println!("{}", serialized);
     Ok(())
 }

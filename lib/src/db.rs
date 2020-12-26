@@ -252,6 +252,12 @@ mod test {
         new_property
             .set_propval_by_shortname("description", "the age of a person")
             .unwrap();
+        new_property
+            .set_propval_by_shortname("shortname", "age")
+            .unwrap();
+        new_property
+            .set_propval_by_shortname("datatype", crate::urls::INTEGER)
+            .unwrap();
         // Changes are only applied to the store after saving them explicitly.
         store
             .commit_resource_changes_locally(&mut new_property)

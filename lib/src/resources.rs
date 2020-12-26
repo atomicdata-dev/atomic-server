@@ -459,6 +459,9 @@ mod test {
         new_resource
             .set_propval_by_shortname("shortname", "human")
             .unwrap();
+        new_resource
+            .set_propval_by_shortname("description", "A real human being")
+            .unwrap();
         store
             .commit_resource_changes_locally(&mut new_resource)
             .unwrap();
@@ -499,6 +502,9 @@ mod test {
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
         new_resource
             .set_propval_by_shortname("shortname", "human")
+            .unwrap();
+        new_resource
+            .set_propval_by_shortname("description", "A real human being")
             .unwrap();
         let commit = new_resource.get_commit_and_reset().sign(&agent).unwrap();
         store.commit(commit).unwrap();

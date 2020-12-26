@@ -34,10 +34,13 @@ Powered by Rust, atomic_lib, actix-web, Sled and [more](cargo.toml).
 - [x] Eliminate all preventable runtime panics (most already done)
 - [x] URL extension recognition (.json, .ad3, .nt, etc.)
 - [x] Collections / dynamic resources #17
+- [x] Authorization model for writing
+- [ ] Authorization model for reading
 - [ ] Authentication #13
-- [ ] Authorization model (implemented for write, not read)
-- [ ] Be able to manage the AtomicData.dev website without git (cli integration, implement required endpoints) [#6](https://github.com/joepio/atomic/issues/6)
 - [ ] Plugin / apps #
+
+## Ab
+- [ ] Be able to manage the AtomicData.dev website without git (cli integration, implement required endpoints) [#6](https://github.com/joepio/atomic/issues/6)
 
 ## Install from source
 
