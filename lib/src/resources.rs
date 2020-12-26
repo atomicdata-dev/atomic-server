@@ -1,7 +1,7 @@
 //! A resource is a set of Atoms that share a URL
 
-use crate::{errors::AtomicResult, commit::CommitBuilder};
 use crate::values::Value;
+use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     datatype::DataType,
     mapping::is_url,
@@ -32,6 +32,26 @@ pub struct Resource<'a> {
 pub type PropVals = HashMap<String, Value>;
 
 impl<'a> Resource<'a> {
+    /// Fetches all 'required' properties. Fails is any are missing in this Resource.
+    pub fn check_required_props(&mut self) -> AtomicResult<()> {
+        let classvec = self.get_classes()?;
+        for class in classvec.iter() {
+            for required_prop in class.requires.clone() {
+                self.get(&required_prop.subject)
+                    .map_err(|e| format!("Property {} missing in class. {} ", &required_prop.subject, e))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Get a value by property URL
+    pub fn get(&self, property_url: &str) -> AtomicResult<&Value> {
+        Ok(self.propvals.get(property_url).ok_or(format!(
+            "Property {} for resource {} not found",
+            property_url, self.subject
+        ))?)
+    }
+
     /// Clones the CommitBuilder from this resource, which contains the previous changes.
     /// Pass this to `store.commit` to apply the commit.
     pub fn get_commit_and_reset(&mut self) -> CommitBuilder {
@@ -47,6 +67,35 @@ impl<'a> Resource<'a> {
         }
         let classes = self.classes.clone().unwrap();
         Ok(classes)
+    }
+
+    /// Returns all PropVals
+    pub fn get_propvals(&self) -> PropVals {
+        self.propvals.clone()
+    }
+
+    /// Gets a value by its property shortname or property URL.
+    // Todo: should use both the Classes AND the existing props
+    pub fn get_shortname(&self, shortname: &str) -> AtomicResult<Value> {
+        // If there is a class
+        for (url, _val) in self.propvals.iter() {
+            if let Ok(prop) = self.store.get_property(url) {
+                if prop.shortname == shortname {
+                    return Ok(self.get(url)?.clone());
+                }
+            }
+        }
+
+        if let Ok(val) = self.get(shortname) {
+            return Ok(val.clone());
+        }
+
+        Err(format!(
+            "No property found for shortname {} in resource {}",
+            shortname,
+            self.get_subject()
+        )
+        .into())
     }
 
     /// Create a new, empty Resource.
@@ -85,7 +134,7 @@ impl<'a> Resource<'a> {
             subject: subject.clone(),
             classes,
             store,
-            commit: CommitBuilder::new(subject)
+            commit: CommitBuilder::new(subject),
         };
         let class_urls = Vec::from([String::from(class_url)]);
         resource.set_propval(crate::urls::IS_A.into(), class_urls.into())?;
@@ -104,43 +153,6 @@ impl<'a> Resource<'a> {
             res.set_propval(prop_string.into(), fullvalue)?;
         }
         Ok(res)
-    }
-
-    /// Get a value by property URL
-    pub fn get(&self, property_url: &str) -> AtomicResult<&Value> {
-        Ok(self.propvals.get(property_url).ok_or(format!(
-            "Property {} for resource {} not found",
-            property_url, self.subject
-        ))?)
-    }
-
-    /// Returns all PropVals
-    pub fn get_propvals(&self) -> PropVals {
-        self.propvals.clone()
-    }
-
-    /// Gets a value by its property shortname or property URL.
-    // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str) -> AtomicResult<Value> {
-        // If there is a class
-        for (url, _val) in self.propvals.iter() {
-            if let Ok(prop) = self.store.get_property(url) {
-                if prop.shortname == shortname {
-                    return Ok(self.get(url)?.clone());
-                }
-            }
-        }
-
-        if let Ok(val) = self.get(shortname) {
-            return Ok(val.clone());
-        }
-
-        Err(format!(
-            "No property found for shortname {} in resource {}",
-            shortname,
-            self.get_subject()
-        )
-        .into())
     }
 
     /// Insert a Property/Value combination.
@@ -423,13 +435,33 @@ mod test {
     }
 
     #[test]
+    fn check_required_props() {
+        let store = init_store();
+        let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
+        new_resource
+            .set_propval_by_shortname("shortname", "should-fail")
+            .unwrap();
+        new_resource.check_required_props().unwrap_err();
+        new_resource
+            .set_propval_by_shortname("description", "Should succeed!")
+            .unwrap();
+        new_resource.check_required_props().unwrap ();
+    }
+
+    #[test]
     fn new_instance() {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
-        new_resource.set_propval_by_shortname("shortname", "person").unwrap();
+        new_resource
+            .set_propval_by_shortname("shortname", "person")
+            .unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
-        new_resource.set_propval_by_shortname("shortname", "human").unwrap();
-        store.commit_resource_changes_locally(&mut new_resource).unwrap();
+        new_resource
+            .set_propval_by_shortname("shortname", "human")
+            .unwrap();
+        store
+            .commit_resource_changes_locally(&mut new_resource)
+            .unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
@@ -461,9 +493,13 @@ mod test {
         let store = init_store();
         let agent = store.get_default_agent().unwrap();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
-        new_resource.set_propval_by_shortname("shortname", "person").unwrap();
+        new_resource
+            .set_propval_by_shortname("shortname", "person")
+            .unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
-        new_resource.set_propval_by_shortname("shortname", "human").unwrap();
+        new_resource
+            .set_propval_by_shortname("shortname", "human")
+            .unwrap();
         let commit = new_resource.get_commit_and_reset().sign(&agent).unwrap();
         store.commit(commit).unwrap();
         assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");

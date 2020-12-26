@@ -139,6 +139,7 @@ pub trait Storelike {
             }
             self.add_resource(&resource)?;
         }
+        resource.check_required_props()?;
         // TOOD: Persist delta to store, use hash as ID
         let commit_resource: Resource = commit.into_resource(self)?;
         self.add_resource(&commit_resource)?;
