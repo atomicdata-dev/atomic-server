@@ -1,6 +1,6 @@
 use crate::{
     appstate::AppState, content_types::get_accept, content_types::ContentType,
-    errors::BetterResult, render::propvals::from_hashmap_resource,
+    errors::BetterResult, render::propvals::propvals_to_html,
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
@@ -58,8 +58,7 @@ pub async fn get_resource(
                 }
             } else {
                 // If not, fall back to the default renderer
-                let resource = resource.to_plain();
-                let propvals = from_hashmap_resource(&resource, store, subject)?;
+                let propvals = propvals_to_html(&resource.get_propvals(), store, subject)?;
                 tera_context.insert("resource", &propvals);
                 body = context.tera.render("resource.html", &tera_context)?;
             }
