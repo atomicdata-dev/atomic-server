@@ -1,37 +1,34 @@
 use super::atom::value_to_html;
 use crate::errors::BetterResult;
-use atomic_lib::{storelike::Property, Storelike, Value};
+use atomic_lib::{storelike::Property, Storelike};
 use serde::Serialize;
-use std::collections::HashMap;
 
 /// Useful for rendering Atomic Data
 #[derive(Serialize)]
-pub struct PropVal {
+pub struct HTMLAtom {
     pub property: Property,
     pub value: String,
     pub value_html: String,
     pub subject: String,
 }
 
-pub type PropVals = Vec<PropVal>;
-
-/// Creates a vector of PropVals, which have easy to print HTML values
-pub fn from_hashmap_resource(
-    resource: &HashMap<String, String>,
+/// Creates a vector of HTML Atoms, which have easy to print HTML values.
+/// Useful because Tera can then iterate over these.
+pub fn propvals_to_html(
+    propvals: &atomic_lib::resources::PropVals,
     store: &dyn Storelike,
     subject: String,
-) -> BetterResult<PropVals> {
-    let mut hashmap: PropVals = Vec::new();
+) -> BetterResult<Vec<HTMLAtom>> {
+    let mut htmlatoms: Vec<HTMLAtom> = Vec::new();
 
-    for (property, value) in resource.iter() {
+    for (property, value) in propvals.iter() {
         let fullprop = store.get_property(property)?;
-        let val = Value::new(value, &fullprop.data_type)?;
-        hashmap.push(PropVal {
+        htmlatoms.push(HTMLAtom {
             property: fullprop,
-            value: value.into(),
-            value_html: value_to_html(&val),
+            value: value.to_string(),
+            value_html: value_to_html(&value),
             subject: subject.clone(),
         });
     }
-    Ok(hashmap)
+    Ok(htmlatoms)
 }

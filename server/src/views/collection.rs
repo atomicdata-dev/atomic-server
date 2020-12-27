@@ -1,12 +1,12 @@
 use std::sync::MutexGuard;
 use atomic_lib::{Resource, storelike::Property};
 use serde::Serialize;
-use crate::{appstate::AppState, render::propvals::PropVals};
+use crate::{appstate::AppState, render::propvals::HTMLAtom};
 
 #[derive(Serialize)]
 struct CollectionTable {
   header: Vec<Property>,
-  members: Vec<PropVals>,
+  members: Vec<Vec<HTMLAtom>>,
 }
 
 pub fn render_collection(resource: &Resource, context: &MutexGuard<AppState>) -> String {

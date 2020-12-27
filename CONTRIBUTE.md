@@ -21,7 +21,7 @@ Make sure to `cargo test --all` before opening a PR!
 ## Deploy
 
 1. `cd server`
-1. `cargo build --release`
+1. `cargo build --release --target x86_64-unknown-linux-gnu`
 1. `scp ../target/release/atomic-server atomic:~/atomic/server/atomic-server-v0.17`
 1. `ssh atomic`
 1. `htop` and kill `atomic`
