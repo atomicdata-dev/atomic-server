@@ -14,7 +14,7 @@ pub async fn get_resource(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data.lock().unwrap();
+    let context = data.lock().unwrap();
     log::info!("subject_end: {}", subject_end);
     let mut subj_end_string = subject_end.as_str();
     let mut content_type = get_accept(req);
@@ -26,7 +26,7 @@ pub async fn get_resource(
         }
     }
     let subject = format!("{}{}", &context.config.local_base_url, subj_end_string);
-    let store = &mut context.store;
+    let store = &context.store;
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
@@ -42,10 +42,27 @@ pub async fn get_resource(
         }
         ContentType::HTML => {
             let mut tera_context = TeraCtx::new();
-            let resource = resource.to_plain();
-            let propvals = from_hashmap_resource(&resource, store, subject)?;
-            tera_context.insert("resource", &propvals);
-            let body = context.tera.render("resource.html", &tera_context)?;
+            // Check if there is a registered view for this class
+            let mut body: String = format!("Custom view for {} not correctly implemented. The function should overwrite this string.", subject);
+
+            if let Ok(classes_val) = resource.get_shortname("is-a") {
+                if let Ok(classes_vec) = classes_val.to_vec() {
+                    for class in classes_vec {
+                        match class.as_ref() {
+                            atomic_lib::urls::COLLECTION => {
+                                body = crate::views::collection::render_collection(&resource, &context);
+                            },
+                            _ => {},
+                        }
+                    }
+                }
+            } else {
+                // If not, fall back to the default renderer
+                let resource = resource.to_plain();
+                let propvals = from_hashmap_resource(&resource, store, subject)?;
+                tera_context.insert("resource", &propvals);
+                body = context.tera.render("resource.html", &tera_context)?;
+            }
             Ok(builder.body(body))
         }
         ContentType::AD3 => {
