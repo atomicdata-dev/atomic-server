@@ -1,10 +1,10 @@
-use atomic_lib::values::Value;
+use crate::errors::BetterResult;
 use atomic_lib::atoms::RichAtom;
-use atomic_lib::{Storelike, storelike::Property, Atom};
+use atomic_lib::values::Value;
+use atomic_lib::{storelike::Property, Atom, Storelike};
+use comrak::{markdown_to_html, ComrakOptions};
 use serde::Serialize;
 use tera::escape_html;
-use comrak::{markdown_to_html, ComrakOptions};
-use crate::errors::BetterResult;
 
 /// Atom with all the props that make it suitable for rendering.
 #[derive(Serialize)]
@@ -24,12 +24,21 @@ pub fn value_to_html(value: &Value) -> String {
         Value::String(s) => escape_html(&*s),
         Value::Markdown(s) => markdown_to_html(&*s, &ComrakOptions::default()),
         Value::Slug(s) => escape_html(&*s),
-        Value::AtomicUrl(s) => format!(r#"<a href="{}">{}</a>"#, escape_html(&*s), escape_html(&*s)),
+        Value::AtomicUrl(s) => {
+            let url = escape_html(&*s);
+            // let name = store.get_resource(subject)
+            // .unwrap_or(url).get(atomic_lib::urls::SHORTNAME)
+            // .unwrap_or(url);
+            format!(r#"<a href="{}">{}</a>"#, url, url)
+        }
         Value::ResourceArray(v) => {
-            let mut string = String::from("");
-            v.iter().for_each(|item| string.push_str(&*format!(r#"<a href="{}">{}</a>, "#, escape_html(item), escape_html(item))));
-            string
-        },
+            let mut html = String::from("");
+            v.iter().for_each(|item| {
+                let url = escape_html(item);
+                html.push_str(&*format!(r#"<a href="{}">{}</a>, "#, url, url))
+            });
+            html
+        }
         Value::Date(s) => format!("{:?}", s),
         Value::Timestamp(i) => format!("{}", i),
         Value::Unsupported(unsup_url) => format!("{:?}", unsup_url),

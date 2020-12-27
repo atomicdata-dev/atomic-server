@@ -3,6 +3,7 @@ use atomic_lib::{Resource, storelike::Property};
 use serde::Serialize;
 use crate::{appstate::AppState, render::propvals::HTMLAtom};
 
+/// This should be used in Tera for rendering and other data that should be available in the template.
 #[derive(Serialize)]
 struct CollectionTable {
   header: Vec<Property>,
