@@ -9,6 +9,7 @@ mod helpers;
 mod https;
 mod content_types;
 mod render;
+mod views;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {

@@ -14,6 +14,7 @@ use std::collections::HashMap;
 /// A Resource only contains valid Values, but it _might_ lack required properties.
 /// All changes to the Resource are applied after committing them (e.g. by using).
 // #[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone)]
 pub struct Resource<'a> {
     /// A hashMap of all the Property Value combinations
     propvals: PropVals,

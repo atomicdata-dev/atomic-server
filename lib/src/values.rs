@@ -96,6 +96,14 @@ impl Value {
     pub fn new_from_string(value: &str, datatype: &str) -> AtomicResult<Value> {
         Value::new(value, &match_datatype(datatype))
     }
+
+    /// Returns a Vector, if the Atom is one
+    pub fn to_vec(&self) -> AtomicResult<&Vec<String>> {
+        if let Value::ResourceArray(arr) = self {
+            return Ok(arr)
+        }
+        Err("Value is not a Resource Array".into())
+    }
 }
 
 impl From<String> for Value {
