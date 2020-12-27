@@ -18,7 +18,7 @@ pub type PropVals = Vec<PropVal>;
 /// Creates a vector of PropVals, which have easy to print HTML values
 pub fn from_hashmap_resource(
     resource: &HashMap<String, String>,
-    store: &mut dyn Storelike,
+    store: &dyn Storelike,
     subject: String,
 ) -> BetterResult<PropVals> {
     let mut hashmap: PropVals = Vec::new();

@@ -21,7 +21,7 @@ pub async fn path(
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let path = &query.path.clone().unwrap_or_default();
-    let mut context = data.lock().unwrap();
+    let context = data.lock().unwrap();
     let content_type = get_accept(req);
     let mapping = context.mapping.clone();
 
@@ -37,7 +37,7 @@ pub async fn path(
                     let resource = context
                         .store
                         .get_resource_extended(&subject)?;
-                    propvals = from_hashmap_resource(&resource.to_plain(), &mut context.store, subject)?;
+                    propvals = from_hashmap_resource(&resource.to_plain(), &context.store, subject)?;
                 }
                 atomic_lib::storelike::PathReturn::Atom(atom) => {
                     propvals.push(PropVal {
