@@ -70,7 +70,8 @@ impl<'a> Resource<'a> {
         Ok(classes)
     }
 
-    /// Returns all PropVals
+    /// Returns all PropVals.
+    /// Useful if you want to iterate over all Atoms / Properties.
     pub fn get_propvals(&self) -> PropVals {
         self.propvals.clone()
     }
@@ -97,6 +98,10 @@ impl<'a> Resource<'a> {
             self.get_subject()
         )
         .into())
+    }
+
+    pub fn get_subject(&self) -> &String {
+        &self.subject
     }
 
     /// Create a new, empty Resource.
@@ -241,10 +246,6 @@ impl<'a> Resource<'a> {
     pub fn set_subject(&mut self, url: String) {
         self.subject = url;
         // TODO: change subject URL in commit, introduce 'move' command? https://github.com/joepio/atomic/issues/44
-    }
-
-    pub fn get_subject(&self) -> &String {
-        &self.subject
     }
 
     /// Converts a resource to a string only HashMap
@@ -533,5 +534,19 @@ mod test {
                 == r#"["https://atomicdata.dev/classes/Class"]"#
         );
         assert!(resource_from_store.get_classes().unwrap()[0].shortname == "class");
+    }
+
+    #[test]
+    fn iterate() {
+        let store = init_store();
+        let new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
+        let mut success = false;
+        for (prop, val) in new_resource.get_propvals() {
+            if prop == urls::IS_A {
+                assert!(val.to_vec().unwrap()[0] == urls::CLASS);
+                success = true;
+            }
+        }
+        assert!(success);
     }
 }
