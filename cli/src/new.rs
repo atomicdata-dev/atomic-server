@@ -40,7 +40,7 @@ fn prompt_instance<'a>(
     context: &'a Context,
     class: &Class,
     preffered_shortname: Option<String>,
-) -> AtomicResult<(Resource<'a>, Option<String>)> {
+) -> AtomicResult<(Resource, Option<String>)> {
     // Not sure about the best way t
     // The Path is the thing at the end of the URL, from the domain
     // Here I set some (kind of) random numbers.
@@ -50,11 +50,11 @@ fn prompt_instance<'a>(
     let write_ctx = context.get_write_context();
 
     let mut subject = format!("{}/{}", write_ctx.server, path);
-    if preffered_shortname.is_some() {
-        subject = format!("{}/{}-{}", write_ctx.server, path, preffered_shortname.clone().unwrap());
+    if let Some(sn) = &preffered_shortname {
+        subject = format!("{}/{}-{}", write_ctx.server, path, sn);
     }
 
-    let mut new_resource: Resource = Resource::new(subject.clone(), &context.store);
+    let mut new_resource: Resource = Resource::new(subject.clone());
 
     new_resource.set_propval(
         "https://atomicdata.dev/properties/isA".into(),
@@ -66,6 +66,7 @@ fn prompt_instance<'a>(
             new_resource.set_propval_string(
                 field.subject.clone(),
                 &preffered_shortname.clone().unwrap(),
+                &context.store,
             )?;
             println!(
                 "Shortname set to {}",
@@ -79,7 +80,7 @@ fn prompt_instance<'a>(
         let mut input = prompt_field(&field, false, context)?;
         loop {
             if let Some(i) = input {
-                new_resource.set_propval_string(field.subject.clone(), &i)?;
+                new_resource.set_propval_string(field.subject.clone(), &i, &context.store)?;
                 break;
             } else {
                 println!("Required field, please enter a value.");
@@ -92,7 +93,7 @@ fn prompt_instance<'a>(
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         let input = prompt_field(&field, true, context)?;
         if let Some(i) = input {
-            new_resource.set_propval_string(field.subject.clone(), &i)?;
+            new_resource.set_propval_string(field.subject.clone(), &i, &context.store)?;
         }
     }
 
@@ -115,12 +116,11 @@ fn prompt_field(
     context: &Context,
 ) -> AtomicResult<Option<String>> {
     let mut input: Option<String> = None;
-    let msg_appendix;
-    if optional {
-        msg_appendix = " (optional)";
+    let msg_appendix: &str = if optional {
+        " (optional)"
     } else {
-        msg_appendix = " (required)";
-    }
+        " (required)"
+    };
     match &property.data_type {
         DataType::String | DataType::Markdown => {
             let msg = format!("string{}", msg_appendix);

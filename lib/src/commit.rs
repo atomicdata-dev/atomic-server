@@ -31,7 +31,7 @@ pub struct Commit {
 impl Commit {
     /// Converts the Commit into a Resource with Atomic Values.
     /// Creates an identifier using the base_url or a default.
-    pub fn into_resource<'a>(self, store: &'a impl Storelike) -> AtomicResult<Resource> {
+    pub fn into_resource(self, store: &impl Storelike) -> AtomicResult<Resource> {
         let subject = match self.signature.as_ref() {
             Some(sig) => format!("{}commits/{}", store.get_base_url(), sig),
             None => {

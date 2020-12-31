@@ -81,12 +81,12 @@ mod test {
     #[cfg(feature = "rdf")]
     fn serialize_ntriples() {
         use crate::Storelike;
-        let mut store = crate::Store::init();
+        let store = crate::Store::init();
         store.populate().unwrap();
         let subject = crate::urls::DESCRIPTION;
         let resource = store.get_resource_string(subject).unwrap();
         let atoms = crate::resources::resourcestring_to_atoms(subject, resource);
-        let serialized = atoms_to_ntriples(atoms, &mut store).unwrap();
+        let serialized = atoms_to_ntriples(atoms, &store).unwrap();
         let _out = r#"
         <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/description> "A textual description of the thing."^^<https://atomicdata.dev/datatypes/markdown> .
 <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/isA> "[\"https://atomicdata.dev/classes/Property\"]"^^<https://atomicdata.dev/datatypes/resourceArray> .

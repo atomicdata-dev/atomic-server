@@ -20,7 +20,7 @@ pub fn edit(context: &Context) -> AtomicResult<()> {
     let subcommand = "edit";
     let subject = argument_to_url(context, subcommand, "subject")?;
     let prop = argument_to_url(context, subcommand, "property")?;
-    let current_val = context.store.get_resource(&subject)?.get_shortname(&prop)?;
+    let current_val = context.store.get_resource(&subject)?.get_shortname(&prop, &context.store)?;
     let edited = edit::edit(current_val.to_string())?;
     let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.set(prop, edited);

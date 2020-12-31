@@ -37,7 +37,7 @@ impl Resource {
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
                 self.get(&required_prop.subject)
-                    .map_err(|e| format!("Property {} missing in class. {} ", &required_prop.subject, e))?;
+                    .map_err(|e| format!("Property {} missing in class {}. {} ", &required_prop.subject, class.subject, e))?;
             }
         }
         Ok(())
