@@ -119,7 +119,7 @@ impl Collection {
         Ok(collection)
     }
 
-    pub fn to_resource<'a>(
+    pub fn to_resource(
         &self,
     ) -> AtomicResult<crate::Resource> {
         // TODO: Should not persist, because now it is spammimg the store!

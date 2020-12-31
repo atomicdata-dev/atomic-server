@@ -253,7 +253,7 @@ mod test {
             .set_propval_by_shortname("description", "the age of a person", &store)
             .unwrap();
         new_property
-            .set_propval_by_shortname("shortname", "age, &store", &store)
+            .set_propval_by_shortname("shortname", "age", &store)
             .unwrap();
         new_property
             .set_propval_by_shortname("datatype", crate::urls::INTEGER, &store)

@@ -45,7 +45,7 @@ pub async fn get_resource(
             // Check if there is a registered view for this class
             let mut body: String = format!("Custom view for {} not correctly implemented. The function should overwrite this string.", subject);
 
-            if let Ok(classes_val) = resource.get_shortname("is-a") {
+            if let Ok(classes_val) = resource.get_shortname("is-a", store) {
                 if let Ok(classes_vec) = classes_val.to_vec() {
                     for class in classes_vec {
                         match class.as_ref() {

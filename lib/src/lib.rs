@@ -27,19 +27,18 @@ let my_value = my_resource
     .unwrap();
 assert!(my_value.to_string() == "Test");
 // We can also use the shortname of description
-let my_value_from_shortname = my_resource.get_shortname("description").unwrap();
+let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
 assert!(my_value_from_shortname.to_string() == "Test");
 // We can find any Atoms matching some value using Triple Pattern Fragments:
 let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
 assert!(found_atoms.len() == 1);
-
 // We can also create a new Resource, linked to the store.
 // Note that since this store only exists in memory, it's data cannot be accessed from the internet.
-// Let's make a new Property instance!
+// Let's make a new Property instance! Let's create "age".
 let mut new_property = atomic_lib::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
 // And add a description for that Property
 new_property.set_propval_by_shortname("description", "the age of a person", &store).unwrap();
-// A subject URL has been created automatically.
+// A subject URL for the new resource has been created automatically.
 let subject = new_property.get_subject().clone();
 // Now we need to make sure these changes are also applied to the store.
 // In order to change things in the store, we should use Commits,
@@ -47,10 +46,16 @@ let subject = new_property.get_subject().clone();
 // Because these are signed, we need an Agent, which has a private key to sign Commits.
 let agent = store.create_agent("my_agent").unwrap();
 store.set_default_agent(agent);
+store.commit_resource_changes_locally(&mut new_property).unwrap_err();
+// But.. when we commit, we get an error!
+// Because we haven't set all the properties required for the Property class.
+// We still need to set `shortname` and `datatype`.
+new_property.set_propval_by_shortname("shortname", "age", &store).unwrap();
+new_property.set_propval_by_shortname("datatype", atomic_lib::urls::INTEGER, &store).unwrap();
 store.commit_resource_changes_locally(&mut new_property).unwrap();
 // Now the changes to the resource applied to the store, and we can fetch the newly created resource!
 let fetched_new_resource = store.get_resource(&subject).unwrap();
-assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "the age of a person");
+assert!(fetched_new_resource.get_shortname("description", &store).unwrap().to_string() == "the age of a person");
 ```
 */
 

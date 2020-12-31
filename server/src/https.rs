@@ -34,10 +34,11 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
 /// Writes keys to disk using LetsEncrypt
 pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     // Use DirectoryUrl::LetsEncrypStaging for dev/testing.
-    let mut url = DirectoryUrl::LetsEncrypt;
-    if config.development {
-        url = DirectoryUrl::LetsEncryptStaging;
-    }
+    let url = if config.development {
+        DirectoryUrl::LetsEncryptStaging
+    } else {
+        DirectoryUrl::LetsEncrypt
+    };
 
     let https_path = ".https";
 
