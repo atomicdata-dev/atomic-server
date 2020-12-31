@@ -122,7 +122,7 @@ impl Collection {
     pub fn to_resource<'a>(
         &self,
         store: &'a impl crate::Storelike,
-    ) -> AtomicResult<crate::Resource<'a>> {
+    ) -> AtomicResult<crate::Resource<'a, impl Storelike>> {
         // TODO: Should not persist, because now it is spammimg the store!
         // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
         let mut resource = crate::Resource::new(self.subject.clone(), store);
@@ -167,8 +167,8 @@ impl Collection {
 pub fn construct_collection<'a>(
     store: &'a impl Storelike,
     query_params: url::form_urlencoded::Parse,
-    resource: Resource,
-) -> AtomicResult<Resource<'a>> {
+    resource: Resource<impl Storelike>,
+) -> AtomicResult<Resource<'a, impl Storelike>> {
     let mut sort_by = None;
     let mut sort_desc = false;
     let mut current_page = 0;

@@ -108,7 +108,7 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+    fn add_resource(&self, resource: &Resource<Db>) -> AtomicResult<()> {
         self.set_propvals(resource.get_subject(), &resource.get_propvals())?;
         Ok(())
     }

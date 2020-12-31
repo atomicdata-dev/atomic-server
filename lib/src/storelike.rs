@@ -56,7 +56,7 @@ pub trait Storelike: Sized {
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
     /// In most cases, you should use `.commit()` instead.
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+    fn add_resource(&self, resource: &Resource<Self>) -> AtomicResult<()> {
         self.add_resource_string(resource.get_subject().clone(), &resource.to_plain())?;
         Ok(())
     }
@@ -85,7 +85,7 @@ pub trait Storelike: Sized {
     /// Creates, edits or destroys a resource.
     /// Checks if the signature is created by the Agent.
     /// Should check if the Agent has the correct rights.
-    fn commit(&self, commit: crate::Commit) -> AtomicResult<Resource> {
+    fn commit(&self, commit: crate::Commit) -> AtomicResult<Resource<Self>> {
         let signature = match commit.signature.as_ref() {
             Some(sig) => sig,
             None => return Err("No signature set".into()),
@@ -138,7 +138,7 @@ pub trait Storelike: Sized {
         }
         resource.check_required_props()?;
         // TOOD: Persist delta to store, use hash as ID
-        let commit_resource: Resource = commit.into_resource(self)?;
+        let commit_resource: Resource<Self> = commit.into_resource(self)?;
         self.add_resource(&commit_resource)?;
         Ok(commit_resource)
     }
@@ -147,7 +147,7 @@ pub trait Storelike: Sized {
     /// Signs the Commit using the Default Agent.
     /// Does not send it to an Atomic Server.
     /// Fails if no Default Agent is set.
-    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()> {
+    fn commit_resource_changes_locally(&self, resource: &mut Resource<Self>) -> AtomicResult<()> {
         let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         self.commit(commit)?;
@@ -158,7 +158,7 @@ pub trait Storelike: Sized {
     /// Signs the Commit using the Default Agent.
     /// Sends the Commit to the Atomic Server of the Subject.
     /// Fails if no Default Agent is set.
-    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()> {
+    fn commit_resource_changes_externally(&self, resource: &mut Resource<Self>) -> AtomicResult<()> {
         let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         crate::client::post_commit(&commit)?;
@@ -197,7 +197,7 @@ pub trait Storelike: Sized {
     /// Returns a full Resource with native Values.
     /// Note that this does _not_ construct dynamic Resources, such as collections.
     /// If you're not sure what to use, use `get_resource_extended`.
-    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource<Self>> {
         let resource_string = self.get_resource_string(subject)?;
         let mut res = Resource::new(subject.into(), self);
         for (prop_string, val_string) in resource_string {
@@ -309,7 +309,7 @@ pub trait Storelike: Sized {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Currently only used for constructing Collections.
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
+    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource<Self>> {
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
         let query_params = clone.query_pairs();

@@ -15,7 +15,7 @@ use std::collections::HashMap;
 /// All changes to the Resource are applied after committing them (e.g. by using).
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 #[derive(Clone)]
-pub struct Resource<'a> {
+pub struct Resource<'a, S: Storelike> {
     /// A hashMap of all the Property Value combinations
     propvals: PropVals,
     subject: String,
@@ -24,7 +24,7 @@ pub struct Resource<'a> {
     // Should be an empty vector if it's checked, should be None if unknown
     classes: Option<Vec<Class>>,
     /// A reference to the store
-    store: &'a impl Storelike,
+    store: &'a S,
     commit: CommitBuilder,
 }
 
@@ -32,7 +32,7 @@ pub struct Resource<'a> {
 /// Similar to ResourceString, but uses Values instead of Strings
 pub type PropVals = HashMap<String, Value>;
 
-impl<'a> Resource<'a> {
+impl<'a, S: Storelike> Resource<'a, S> {
     /// Fetches all 'required' properties. Fails is any are missing in this Resource.
     pub fn check_required_props(&mut self) -> AtomicResult<()> {
         let classvec = self.get_classes()?;
@@ -105,7 +105,7 @@ impl<'a> Resource<'a> {
     }
 
     /// Create a new, empty Resource.
-    pub fn new(subject: String, store: &'a impl Storelike) -> Resource<'a> {
+    pub fn new(subject: String, store: &'a S) -> Resource<'a, S> {
         let propvals: PropVals = HashMap::new();
         Resource {
             propvals,
@@ -118,7 +118,7 @@ impl<'a> Resource<'a> {
 
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
-    pub fn new_instance(class_url: &str, store: &'a impl Storelike) -> AtomicResult<Resource<'a>> {
+    pub fn new_instance(class_url: &str, store: &'a S) -> AtomicResult<Resource<'a, S>> {
         let propvals: PropVals = HashMap::new();
         let mut classes_vec = Vec::new();
         classes_vec.push(store.get_class(class_url)?);
@@ -150,8 +150,8 @@ impl<'a> Resource<'a> {
     pub fn new_from_resource_string(
         subject: String,
         resource_string: &ResourceString,
-        store: &'a impl Storelike,
-    ) -> AtomicResult<Resource<'a>> {
+        store: &'a S,
+    ) -> AtomicResult<Resource<'a, S>> {
         let mut res = Resource::new(subject, store);
         for (prop_string, val_string) in resource_string {
             let propertyfull = store.get_property(prop_string).expect("Prop not found");
