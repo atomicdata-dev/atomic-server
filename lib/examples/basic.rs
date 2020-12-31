@@ -22,7 +22,7 @@ fn main() {
         .unwrap();
     assert!(my_value.to_string() == "Test");
     // We can also use the shortname of description
-    let my_value_from_shortname = my_resource.get_shortname("description").unwrap();
+    let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
     assert!(my_value_from_shortname.to_string() == "Test");
     // We can find any Atoms matching some value using Triple Pattern Fragments:
     let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
@@ -45,5 +45,5 @@ fn main() {
     store.commit_resource_changes_locally(&mut new_property).unwrap();
     // Now the changes to the resource applied to the store, and we can fetch the newly created resource!
     let fetched_new_resource = store.get_resource(&subject).unwrap();
-    assert!(fetched_new_resource.get_shortname("description").unwrap().to_string() == "the age of a person");
+    assert!(fetched_new_resource.get_shortname("description", &store).unwrap().to_string() == "the age of a person");
 }

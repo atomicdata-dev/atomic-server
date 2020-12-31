@@ -32,7 +32,7 @@ pub type PropVals = HashMap<String, Value>;
 
 impl Resource {
     /// Fetches all 'required' properties. Fails is any are missing in this Resource.
-    pub fn check_required_props(&mut self, store: &dyn Storelike) -> AtomicResult<()> {
+    pub fn check_required_props(&mut self, store: &impl Storelike) -> AtomicResult<()> {
         let classvec = self.get_classes(store)?;
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
@@ -60,7 +60,7 @@ impl Resource {
     }
 
     /// Checks if the classes are there, if not, fetches them
-    pub fn get_classes(&mut self, store: &dyn Storelike) -> AtomicResult<Vec<Class>> {
+    pub fn get_classes(&mut self, store: &impl Storelike) -> AtomicResult<Vec<Class>> {
         if self.classes.is_none() {
             self.classes = Some(store.get_classes_for_subject(self.get_subject())?);
         }
@@ -76,7 +76,7 @@ impl Resource {
 
     /// Gets a value by its property shortname or property URL.
     // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str, store: &dyn Storelike) -> AtomicResult<Value> {
+    pub fn get_shortname(&self, shortname: &str, store: &impl Storelike) -> AtomicResult<Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
             if let Ok(prop) = store.get_property(url) {
@@ -115,7 +115,7 @@ impl Resource {
 
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
-    pub fn new_instance(class_url: &str, store: &dyn Storelike) -> AtomicResult<Resource> {
+    pub fn new_instance(class_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
         let mut classes_vec = Vec::new();
         classes_vec.push(store.get_class(class_url)?);
@@ -146,7 +146,7 @@ impl Resource {
     pub fn new_from_resource_string(
         subject: String,
         resource_string: &ResourceString,
-        store: &dyn Storelike,
+        store: &impl Storelike,
     ) -> AtomicResult<Resource> {
         let mut res = Resource::new(subject);
         for (prop_string, val_string) in resource_string {
@@ -170,7 +170,7 @@ impl Resource {
     pub fn resolve_shortname_to_property(
         &mut self,
         shortname: &str,
-        store: &dyn Storelike,
+        store: &impl Storelike,
     ) -> AtomicResult<Option<Property>> {
         let classes = self.get_classes(store)?;
         // Loop over all Requires and Recommends props
@@ -204,7 +204,7 @@ impl Resource {
     /// Insert a Property/Value combination.
     /// Overwrites existing Property/Value.
     /// Validates the datatype.
-    pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &dyn Storelike) -> AtomicResult<()> {
+    pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.set_propval(property_url, val)?;
@@ -224,7 +224,7 @@ impl Resource {
     /// Sets a property / value combination.
     /// Property can be a shortname (e.g. 'description' instead of the full URL), if the Resource has a Class.
     /// Validates the datatype.
-    pub fn set_propval_by_shortname(&mut self, property: &str, value: &str, store: &dyn Storelike) -> AtomicResult<()> {
+    pub fn set_propval_by_shortname(&mut self, property: &str, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
             store.get_property(property)?
         } else {
@@ -274,7 +274,7 @@ impl Resource {
     // [ ] Resources into objects, if the nesting depth allows it
     pub fn to_json(
         &self,
-        store: &dyn Storelike,
+        store: &impl Storelike,
         // Not yet used
         _depth: u8,
         json_ld: bool,
