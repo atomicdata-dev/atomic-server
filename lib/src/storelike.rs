@@ -46,9 +46,6 @@ pub type ResourceCollection = Vec<(String, ResourceString)>;
 /// This is useful, because we can create methods for Storelike that will work with either in-memory
 /// stores, as well as with persistend on-disk stores.
 pub trait Storelike {
-    // Not default yet
-    // type Default = dyn std::marker::Sized;
-
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
@@ -123,12 +120,12 @@ pub trait Storelike {
         }
         let mut resource = match self.get_resource(&commit.subject) {
             Ok(rs) => rs,
-            Err(_) => Resource::new(commit.subject.clone(), self),
+            Err(_) => Resource::new(commit.subject.clone()),
         };
         if let Some(set) = commit.set.clone() {
             for (prop, val) in set.iter() {
                 // Warning: this is a very inefficient operation
-                resource.set_propval_string(prop.into(), val)?;
+                resource.set_propval_string(prop.into(), val, self)?;
             }
             self.add_resource(&resource)?;
         }
@@ -139,7 +136,7 @@ pub trait Storelike {
             }
             self.add_resource(&resource)?;
         }
-        resource.check_required_props()?;
+        resource.check_required_props(self)?;
         // TOOD: Persist delta to store, use hash as ID
         let commit_resource: Resource = commit.into_resource(self)?;
         self.add_resource(&commit_resource)?;
@@ -187,8 +184,8 @@ pub trait Storelike {
         let keypair = crate::agents::generate_keypair();
         let mut agent = Resource::new_instance(urls::AGENT, self)?;
         agent.set_subject(subject.clone());
-        agent.set_propval_by_shortname("name", name)?;
-        agent.set_propval_by_shortname("public-key", &keypair.public)?;
+        agent.set_propval_by_shortname("name", name, self)?;
+        agent.set_propval_by_shortname("public-key", &keypair.public, self)?;
         self.add_resource(&agent)?;
         let agent = crate::agents::Agent {
             subject,
@@ -209,12 +206,9 @@ pub trait Storelike {
     /// Returns a full Resource with native Values.
     /// Note that this does _not_ construct dynamic Resources, such as collections.
     /// If you're not sure what to use, use `get_resource_extended`.
-    fn get_resource(&self, subject: &str) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
         let resource_string = self.get_resource_string(subject)?;
-        let mut res = Resource::new(subject.into(), self);
+        let mut res = Resource::new(subject.into());
         for (prop_string, val_string) in resource_string {
             let propertyfull = self.get_property(&prop_string)?;
             let fullvalue = Value::new(&val_string, &propertyfull.data_type)?;
@@ -294,10 +288,7 @@ pub trait Storelike {
     fn new_collection(
         &self,
         collection_builder: crate::collections::CollectionBuilder,
-    ) -> AtomicResult<Collection>
-    where
-        Self: std::marker::Sized,
-    {
+    ) -> AtomicResult<Collection> {
         crate::collections::Collection::new(self, collection_builder)
     }
 
@@ -327,10 +318,7 @@ pub trait Storelike {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Currently only used for constructing Collections.
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
+    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
         let query_params = clone.query_pairs();
@@ -338,7 +326,7 @@ pub trait Storelike {
         let removed_query_params = url.to_string();
         let mut resource = self.get_resource(&removed_query_params)?;
         // If a certain class needs to be extended, add it to this match statement
-        for class in resource.get_classes()? {
+        for class in resource.get_classes(self)? {
             match class.subject.as_ref() {
                 urls::COLLECTION => {
                     return crate::collections::construct_collection(self, query_params, resource)
@@ -507,10 +495,7 @@ pub trait Storelike {
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn>
-    where
-        Self: std::marker::Sized,
-    {
+    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
@@ -576,8 +561,8 @@ pub trait Storelike {
             }
             // Set the parent for the next loop equal to the next node.
             // TODO: skip this step if the current iteration is the last one
-            let value = resource.get_shortname(&item).unwrap();
-            let property = resource.resolve_shortname_to_property(item)?.unwrap();
+            let value = resource.get_shortname(&item, self).unwrap();
+            let property = resource.resolve_shortname_to_property(item, self)?.unwrap();
             current = PathReturn::Atom(Box::new(RichAtom::new(
                 subject.clone(),
                 property,
@@ -590,10 +575,7 @@ pub trait Storelike {
     /// Loads the default store.
     /// Constructs various default collections.
     // Maybe these two functionalities should be split?
-    fn populate(&self) -> AtomicResult<()>
-    where
-        Self: std::marker::Sized,
-    {
+    fn populate(&self) -> AtomicResult<()> {
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
         self.add_atoms(atoms)?;
@@ -609,7 +591,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(classes)?.to_resource(self)?)?;
+        self.add_resource(&self.new_collection(classes)?.to_resource()?)?;
 
         let properties = CollectionBuilder {
             subject: format!("{}properties", self.get_base_url()),
@@ -620,7 +602,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(properties)?.to_resource(self)?)?;
+        self.add_resource(&self.new_collection(properties)?.to_resource()?)?;
 
         let commits = CollectionBuilder {
             subject: format!("{}commits", self.get_base_url()),
@@ -631,7 +613,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(commits)?.to_resource(self)?)?;
+        self.add_resource(&self.new_collection(commits)?.to_resource()?)?;
 
         let agents = CollectionBuilder {
             subject: format!("{}agents", self.get_base_url()),
@@ -642,7 +624,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(agents)?.to_resource(self)?)?;
+        self.add_resource(&self.new_collection(agents)?.to_resource()?)?;
 
         let collections = CollectionBuilder {
             subject: format!("{}collections", self.get_base_url()),
@@ -653,7 +635,7 @@ pub trait Storelike {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(collections)?.to_resource(self)?)?;
+        self.add_resource(&self.new_collection(collections)?.to_resource()?)?;
 
         Ok(())
     }

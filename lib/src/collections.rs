@@ -121,11 +121,10 @@ impl Collection {
 
     pub fn to_resource<'a>(
         &self,
-        store: &'a dyn crate::Storelike,
-    ) -> AtomicResult<crate::Resource<'a>> {
+    ) -> AtomicResult<crate::Resource> {
         // TODO: Should not persist, because now it is spammimg the store!
         // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
-        let mut resource = crate::Resource::new(self.subject.clone(), store);
+        let mut resource = crate::Resource::new(self.subject.clone());
         resource.set_propval(
             crate::urls::COLLECTION_MEMBERS.into(),
             self.members.clone().into(),
@@ -164,11 +163,11 @@ impl Collection {
 }
 
 /// Builds a collection from query params
-pub fn construct_collection<'a>(
-    store: &'a dyn Storelike,
+pub fn construct_collection(
+    store: &dyn Storelike,
     query_params: url::form_urlencoded::Parse,
     resource: Resource,
-) -> AtomicResult<Resource<'a>> {
+) -> AtomicResult<Resource> {
     let mut sort_by = None;
     let mut sort_desc = false;
     let mut current_page = 0;
@@ -204,7 +203,7 @@ pub fn construct_collection<'a>(
         page_size,
     };
     let collection = Collection::new(store, collection_builder)?;
-    Ok(collection.to_resource(store)?)
+    Ok(collection.to_resource()?)
 }
 
 #[cfg(test)]

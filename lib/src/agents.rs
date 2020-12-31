@@ -22,9 +22,8 @@ pub fn generate_keypair() -> Pair {
       .map_err(|_| "Error generating seed").unwrap();
   let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
       .map_err(|_| "Error generating keypair").unwrap();
-  let pair = Pair {
+  Pair {
     private: base64::encode(pkcs8_bytes.as_ref()),
     public: base64::encode(key_pair.public_key().as_ref()),
-  };
-  pair
+  }
 }
