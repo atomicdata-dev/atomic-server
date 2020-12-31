@@ -58,7 +58,7 @@ pub struct Collection {
 impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     pub fn new(
-        store: &dyn Storelike,
+        store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
         // Execute the TPF query, get all the subjects.
@@ -164,7 +164,7 @@ impl Collection {
 
 /// Builds a collection from query params
 pub fn construct_collection(
-    store: &dyn Storelike,
+    store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
     resource: Resource,
 ) -> AtomicResult<Resource> {

@@ -45,7 +45,7 @@ pub type ResourceCollection = Vec<(String, ResourceString)>;
 /// It serves as a basic store Trait, agnostic of how it functions under the hood.
 /// This is useful, because we can create methods for Storelike that will work with either in-memory
 /// stores, as well as with persistend on-disk stores.
-pub trait Storelike {
+pub trait Storelike: Sized {
     /// Add individual Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;

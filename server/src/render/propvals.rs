@@ -16,7 +16,7 @@ pub struct HTMLAtom {
 /// Useful because Tera can then iterate over these.
 pub fn propvals_to_html(
     propvals: &atomic_lib::resources::PropVals,
-    store: &dyn Storelike,
+    store: &impl Storelike,
     subject: String,
 ) -> BetterResult<Vec<HTMLAtom>> {
     let mut htmlatoms: Vec<HTMLAtom> = Vec::new();

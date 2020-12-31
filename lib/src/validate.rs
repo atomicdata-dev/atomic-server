@@ -10,7 +10,7 @@
 /// - [X] Returns a report, instead of throwing an error
 #[allow(dead_code, unreachable_code)]
 pub fn validate_store(
-    store: &dyn crate::Storelike,
+    store: &impl crate::Storelike,
     fetch_items: bool,
 ) -> crate::validate::ValidationReport {
     type Error = String;
