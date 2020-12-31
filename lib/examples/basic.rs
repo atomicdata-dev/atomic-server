@@ -33,7 +33,7 @@ fn main() {
     // Let's make a new Property instance!
     let mut new_property = atomic_lib::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
     // And add a description for that Property
-    new_property.set_propval_by_shortname("description", "the age of a person").unwrap();
+    new_property.set_propval_by_shortname("description", "the age of a person", &store).unwrap();
     // A subject URL has been created automatically.
     let subject = new_property.get_subject().clone();
     // Now we need to make sure these changes are also applied to the store.

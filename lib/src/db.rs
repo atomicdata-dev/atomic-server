@@ -235,7 +235,7 @@ mod test {
             .unwrap();
         assert!(my_value.to_string() == "Test");
         // We can also use the shortname of description
-        let my_value_from_shortname = my_resource.get_shortname("description").unwrap();
+        let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
         assert!(my_value_from_shortname.to_string() == "Test");
         // We can find any Atoms matching some value using Triple Pattern Fragments:
         let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
@@ -250,13 +250,13 @@ mod test {
                 .unwrap();
         // And add a description for that Property
         new_property
-            .set_propval_by_shortname("description", "the age of a person")
+            .set_propval_by_shortname("description", "the age of a person", &store)
             .unwrap();
         new_property
-            .set_propval_by_shortname("shortname", "age")
+            .set_propval_by_shortname("shortname", "age, &store", &store)
             .unwrap();
         new_property
-            .set_propval_by_shortname("datatype", crate::urls::INTEGER)
+            .set_propval_by_shortname("datatype", crate::urls::INTEGER, &store)
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
         store
@@ -268,7 +268,7 @@ mod test {
         let subject = new_property.get_subject();
         let fetched_new_resource = store.get_resource(subject).unwrap();
         let description_val = fetched_new_resource
-            .get_shortname("description")
+            .get_shortname("description", &store)
             .unwrap()
             .to_string();
         println!("desc {}", description_val);

@@ -169,7 +169,7 @@ mod test {
     fn get_full_resource_and_shortname() {
         let store = init_store();
         let resource = store.get_resource(urls::CLASS).unwrap();
-        let shortname = resource.get_shortname("shortname").unwrap().to_string();
+        let shortname = resource.get_shortname("shortname", &store).unwrap().to_string();
         assert!(shortname == "class");
     }
 

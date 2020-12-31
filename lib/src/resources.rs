@@ -15,7 +15,7 @@ use std::collections::HashMap;
 /// All changes to the Resource are applied after committing them (e.g. by using).
 // #[derive(Clone, Debug, Serialize, Deserialize)]
 #[derive(Clone)]
-pub struct Resource<'a> {
+pub struct Resource {
     /// A hashMap of all the Property Value combinations
     propvals: PropVals,
     subject: String,
@@ -23,8 +23,6 @@ pub struct Resource<'a> {
     // Useful for quick access to shortnames and datatypes
     // Should be an empty vector if it's checked, should be None if unknown
     classes: Option<Vec<Class>>,
-    /// A reference to the store
-    store: &'a dyn Storelike,
     commit: CommitBuilder,
 }
 
@@ -32,10 +30,10 @@ pub struct Resource<'a> {
 /// Similar to ResourceString, but uses Values instead of Strings
 pub type PropVals = HashMap<String, Value>;
 
-impl<'a> Resource<'a> {
+impl Resource {
     /// Fetches all 'required' properties. Fails is any are missing in this Resource.
-    pub fn check_required_props(&mut self) -> AtomicResult<()> {
-        let classvec = self.get_classes()?;
+    pub fn check_required_props(&mut self, store: &dyn Storelike) -> AtomicResult<()> {
+        let classvec = self.get_classes(store)?;
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
                 self.get(&required_prop.subject)
@@ -62,9 +60,9 @@ impl<'a> Resource<'a> {
     }
 
     /// Checks if the classes are there, if not, fetches them
-    pub fn get_classes(&mut self) -> AtomicResult<Vec<Class>> {
+    pub fn get_classes(&mut self, store: &dyn Storelike) -> AtomicResult<Vec<Class>> {
         if self.classes.is_none() {
-            self.classes = Some(self.store.get_classes_for_subject(self.get_subject())?);
+            self.classes = Some(store.get_classes_for_subject(self.get_subject())?);
         }
         let classes = self.classes.clone().unwrap();
         Ok(classes)
@@ -78,10 +76,10 @@ impl<'a> Resource<'a> {
 
     /// Gets a value by its property shortname or property URL.
     // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str) -> AtomicResult<Value> {
+    pub fn get_shortname(&self, shortname: &str, store: &dyn Storelike) -> AtomicResult<Value> {
         // If there is a class
         for (url, _val) in self.propvals.iter() {
-            if let Ok(prop) = self.store.get_property(url) {
+            if let Ok(prop) = store.get_property(url) {
                 if prop.shortname == shortname {
                     return Ok(self.get(url)?.clone());
                 }
@@ -105,20 +103,19 @@ impl<'a> Resource<'a> {
     }
 
     /// Create a new, empty Resource.
-    pub fn new(subject: String, store: &'a dyn Storelike) -> Resource<'a> {
+    pub fn new(subject: String) -> Resource {
         let propvals: PropVals = HashMap::new();
         Resource {
             propvals,
             subject: subject.clone(),
             classes: None,
-            store,
             commit: CommitBuilder::new(subject),
         }
     }
 
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
-    pub fn new_instance(class_url: &str, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
+    pub fn new_instance(class_url: &str, store: &dyn Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
         let mut classes_vec = Vec::new();
         classes_vec.push(store.get_class(class_url)?);
@@ -139,7 +136,6 @@ impl<'a> Resource<'a> {
             propvals,
             subject: subject.clone(),
             classes,
-            store,
             commit: CommitBuilder::new(subject),
         };
         let class_urls = Vec::from([String::from(class_url)]);
@@ -150,9 +146,9 @@ impl<'a> Resource<'a> {
     pub fn new_from_resource_string(
         subject: String,
         resource_string: &ResourceString,
-        store: &'a dyn Storelike,
-    ) -> AtomicResult<Resource<'a>> {
-        let mut res = Resource::new(subject, store);
+        store: &dyn Storelike,
+    ) -> AtomicResult<Resource> {
+        let mut res = Resource::new(subject);
         for (prop_string, val_string) in resource_string {
             let propertyfull = store.get_property(prop_string).expect("Prop not found");
             let fullvalue = Value::new(val_string, &propertyfull.data_type)?;
@@ -174,8 +170,9 @@ impl<'a> Resource<'a> {
     pub fn resolve_shortname_to_property(
         &mut self,
         shortname: &str,
+        store: &dyn Storelike,
     ) -> AtomicResult<Option<Property>> {
-        let classes = self.get_classes()?;
+        let classes = self.get_classes(store)?;
         // Loop over all Requires and Recommends props
         for class in classes {
             for required_prop in class.requires {
@@ -207,8 +204,8 @@ impl<'a> Resource<'a> {
     /// Insert a Property/Value combination.
     /// Overwrites existing Property/Value.
     /// Validates the datatype.
-    pub fn set_propval_string(&mut self, property_url: String, value: &str) -> AtomicResult<()> {
-        let fullprop = &self.store.get_property(&property_url)?;
+    pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &dyn Storelike) -> AtomicResult<()> {
+        let fullprop = store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.set_propval(property_url, val)?;
         Ok(())
@@ -227,11 +224,11 @@ impl<'a> Resource<'a> {
     /// Sets a property / value combination.
     /// Property can be a shortname (e.g. 'description' instead of the full URL), if the Resource has a Class.
     /// Validates the datatype.
-    pub fn set_propval_by_shortname(&mut self, property: &str, value: &str) -> AtomicResult<()> {
+    pub fn set_propval_by_shortname(&mut self, property: &str, value: &str, store: &dyn Storelike) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
-            self.store.get_property(property)?
+            store.get_property(property)?
         } else {
-            self.resolve_shortname_to_property(property)?
+            self.resolve_shortname_to_property(property, store)?
                 .ok_or(format!(
                     "Shortname {} not found in {}",
                     property,
@@ -426,13 +423,13 @@ mod test {
     fn get_and_set_resource_props() {
         let store = init_store();
         let mut resource = store.get_resource(urls::CLASS).unwrap();
-        assert!(resource.get_shortname("shortname").unwrap().to_string() == "class");
+        assert!(resource.get_shortname("shortname", &store).unwrap().to_string() == "class");
         resource
-            .set_propval_by_shortname("shortname", "something-valid")
+            .set_propval_by_shortname("shortname", "something-valid", &store)
             .unwrap();
-        assert!(resource.get_shortname("shortname").unwrap().to_string() == "something-valid");
+        assert!(resource.get_shortname("shortname", &store).unwrap().to_string() == "something-valid");
         resource
-            .set_propval_by_shortname("shortname", "should not contain spaces")
+            .set_propval_by_shortname("shortname", "should not contain spaces", &store)
             .unwrap_err();
     }
 
@@ -441,13 +438,13 @@ mod test {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_by_shortname("shortname", "should-fail")
+            .set_propval_by_shortname("shortname", "should-fail", &store)
             .unwrap();
-        new_resource.check_required_props().unwrap_err();
+        new_resource.check_required_props(&store).unwrap_err();
         new_resource
-            .set_propval_by_shortname("description", "Should succeed!")
+            .set_propval_by_shortname("description", "Should succeed!", &store)
             .unwrap();
-        new_resource.check_required_props().unwrap ();
+        new_resource.check_required_props(&store).unwrap ();
     }
 
     #[test]
@@ -455,23 +452,23 @@ mod test {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_by_shortname("shortname", "person")
+            .set_propval_by_shortname("shortname", "person", &store)
             .unwrap();
-        assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
+        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "person");
         new_resource
-            .set_propval_by_shortname("shortname", "human")
+            .set_propval_by_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
-            .set_propval_by_shortname("description", "A real human being")
+            .set_propval_by_shortname("description", "A real human being", &store)
             .unwrap();
         store
             .commit_resource_changes_locally(&mut new_resource)
             .unwrap();
-        assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
+        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
             resource_from_store
-                .get_shortname("shortname")
+                .get_shortname("shortname", &store)
                 .unwrap()
                 .to_string()
                 == "human"
@@ -479,18 +476,18 @@ mod test {
         println!(
             "{}",
             resource_from_store
-                .get_shortname("is-a")
+                .get_shortname("is-a", &store)
                 .unwrap()
                 .to_string()
         );
         assert!(
             resource_from_store
-                .get_shortname("is-a")
+                .get_shortname("is-a", &store)
                 .unwrap()
                 .to_string()
                 == r#"["https://atomicdata.dev/classes/Class"]"#
         );
-        assert!(resource_from_store.get_classes().unwrap()[0].shortname == "class");
+        assert!(resource_from_store.get_classes(&store).unwrap()[0].shortname == "class");
     }
 
     #[test]
@@ -499,22 +496,22 @@ mod test {
         let agent = store.get_default_agent().unwrap();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_by_shortname("shortname", "person")
+            .set_propval_by_shortname("shortname", "person", &store)
             .unwrap();
-        assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "person");
+        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "person");
         new_resource
-            .set_propval_by_shortname("shortname", "human")
+            .set_propval_by_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
-            .set_propval_by_shortname("description", "A real human being")
+            .set_propval_by_shortname("description", "A real human being", &store)
             .unwrap();
         let commit = new_resource.get_commit_and_reset().sign(&agent).unwrap();
         store.commit(commit).unwrap();
-        assert!(new_resource.get_shortname("shortname").unwrap().to_string() == "human");
+        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
             resource_from_store
-                .get_shortname("shortname")
+                .get_shortname("shortname", &store)
                 .unwrap()
                 .to_string()
                 == "human"
@@ -522,18 +519,18 @@ mod test {
         println!(
             "{}",
             resource_from_store
-                .get_shortname("is-a")
+                .get_shortname("is-a", &store)
                 .unwrap()
                 .to_string()
         );
         assert!(
             resource_from_store
-                .get_shortname("is-a")
+                .get_shortname("is-a", &store)
                 .unwrap()
                 .to_string()
                 == r#"["https://atomicdata.dev/classes/Class"]"#
         );
-        assert!(resource_from_store.get_classes().unwrap()[0].shortname == "class");
+        assert!(resource_from_store.get_classes(&store).unwrap()[0].shortname == "class");
     }
 
     #[test]
