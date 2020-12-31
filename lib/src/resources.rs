@@ -24,7 +24,7 @@ pub struct Resource<'a> {
     // Should be an empty vector if it's checked, should be None if unknown
     classes: Option<Vec<Class>>,
     /// A reference to the store
-    store: &'a dyn Storelike,
+    store: &'a impl Storelike,
     commit: CommitBuilder,
 }
 
@@ -105,7 +105,7 @@ impl<'a> Resource<'a> {
     }
 
     /// Create a new, empty Resource.
-    pub fn new(subject: String, store: &'a dyn Storelike) -> Resource<'a> {
+    pub fn new(subject: String, store: &'a impl Storelike) -> Resource<'a> {
         let propvals: PropVals = HashMap::new();
         Resource {
             propvals,
@@ -118,7 +118,7 @@ impl<'a> Resource<'a> {
 
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
-    pub fn new_instance(class_url: &str, store: &'a dyn Storelike) -> AtomicResult<Resource<'a>> {
+    pub fn new_instance(class_url: &str, store: &'a impl Storelike) -> AtomicResult<Resource<'a>> {
         let propvals: PropVals = HashMap::new();
         let mut classes_vec = Vec::new();
         classes_vec.push(store.get_class(class_url)?);
@@ -150,7 +150,7 @@ impl<'a> Resource<'a> {
     pub fn new_from_resource_string(
         subject: String,
         resource_string: &ResourceString,
-        store: &'a dyn Storelike,
+        store: &'a impl Storelike,
     ) -> AtomicResult<Resource<'a>> {
         let mut res = Resource::new(subject, store);
         for (prop_string, val_string) in resource_string {
@@ -204,12 +204,12 @@ impl<'a> Resource<'a> {
         // Ok(())
     }
 
-    /// Insert a Property/Value combination.
+    /// Insert a Property/Value combination, where value is a String.
     /// Overwrites existing Property/Value.
     /// Validates the datatype.
     pub fn set_propval_string(&mut self, property_url: String, value: &str) -> AtomicResult<()> {
-        let fullprop = &self.store.get_property(&property_url)?;
-        let val = Value::new(value, &fullprop.data_type)?;
+        let data_type = &self.store.get_property(&property_url)?.data_type;
+        let val = Value::new(value, data_type)?;
         self.set_propval(property_url, val)?;
         Ok(())
     }
@@ -277,7 +277,7 @@ impl<'a> Resource<'a> {
     // [ ] Resources into objects, if the nesting depth allows it
     pub fn to_json(
         &self,
-        store: &dyn Storelike,
+        store: &impl Storelike,
         // Not yet used
         _depth: u8,
         json_ld: bool,

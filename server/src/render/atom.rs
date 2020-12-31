@@ -59,7 +59,7 @@ impl RenderAtom {
         }
     }
 
-    pub fn from_atom(atom: Atom, store: &mut dyn Storelike) -> BetterResult<RenderAtom> {
+    pub fn from_atom(atom: Atom, store: &mut impl Storelike) -> BetterResult<RenderAtom> {
         let property = store.get_property(&atom.property)?;
         let native = Value::new(&atom.value, &property.data_type)?;
 

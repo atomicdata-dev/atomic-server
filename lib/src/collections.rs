@@ -58,7 +58,7 @@ pub struct Collection {
 impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     pub fn new(
-        store: &dyn Storelike,
+        store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
         // Execute the TPF query, get all the subjects.
@@ -121,7 +121,7 @@ impl Collection {
 
     pub fn to_resource<'a>(
         &self,
-        store: &'a dyn crate::Storelike,
+        store: &'a impl crate::Storelike,
     ) -> AtomicResult<crate::Resource<'a>> {
         // TODO: Should not persist, because now it is spammimg the store!
         // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
@@ -165,7 +165,7 @@ impl Collection {
 
 /// Builds a collection from query params
 pub fn construct_collection<'a>(
-    store: &'a dyn Storelike,
+    store: &'a impl Storelike,
     query_params: url::form_urlencoded::Parse,
     resource: Resource,
 ) -> AtomicResult<Resource<'a>> {

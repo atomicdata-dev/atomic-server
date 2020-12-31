@@ -27,7 +27,7 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
 
 #[cfg(feature = "rdf")]
 /// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
-pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &dyn Storelike) -> AtomicResult<String> {
+pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult<String> {
     use rio_api::formatter::TriplesFormatter;
     use rio_api::model::{Literal, NamedNode, Term, Triple};
     use rio_turtle::NTriplesFormatter;

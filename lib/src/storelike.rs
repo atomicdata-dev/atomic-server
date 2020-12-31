@@ -45,7 +45,7 @@ pub type ResourceCollection = Vec<(String, ResourceString)>;
 /// It serves as a basic store Trait, agnostic of how it functions under the hood.
 /// This is useful, because we can create methods for Storelike that will work with either in-memory
 /// stores, as well as with persistend on-disk stores.
-pub trait Storelike {
+pub trait Storelike: Sized {
     // Not default yet
     // type Default = dyn std::marker::Sized;
 
@@ -85,10 +85,7 @@ pub trait Storelike {
     /// Creates, edits or destroys a resource.
     /// Checks if the signature is created by the Agent.
     /// Should check if the Agent has the correct rights.
-    fn commit(&self, commit: crate::Commit) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
+    fn commit(&self, commit: crate::Commit) -> AtomicResult<Resource> {
         let signature = match commit.signature.as_ref() {
             Some(sig) => sig,
             None => return Err("No signature set".into()),
@@ -150,10 +147,7 @@ pub trait Storelike {
     /// Signs the Commit using the Default Agent.
     /// Does not send it to an Atomic Server.
     /// Fails if no Default Agent is set.
-    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()>
-    where
-        Self: std::marker::Sized,
-    {
+    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()> {
         let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         self.commit(commit)?;
@@ -164,10 +158,7 @@ pub trait Storelike {
     /// Signs the Commit using the Default Agent.
     /// Sends the Commit to the Atomic Server of the Subject.
     /// Fails if no Default Agent is set.
-    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()>
-    where
-        Self: std::marker::Sized,
-    {
+    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()> {
         let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         crate::client::post_commit(&commit)?;
@@ -179,10 +170,7 @@ pub trait Storelike {
     /// An Agent is required for signing Commits.
     /// Returns a tuple of (subject, private_key).
     /// Make sure to store the private_key somewhere safe!
-    fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent>
-    where
-        Self: std::marker::Sized,
-    {
+    fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent> {
         let subject = format!("{}agents/{}", self.get_base_url(), name);
         let keypair = crate::agents::generate_keypair();
         let mut agent = Resource::new_instance(urls::AGENT, self)?;
@@ -209,10 +197,7 @@ pub trait Storelike {
     /// Returns a full Resource with native Values.
     /// Note that this does _not_ construct dynamic Resources, such as collections.
     /// If you're not sure what to use, use `get_resource_extended`.
-    fn get_resource(&self, subject: &str) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
         let resource_string = self.get_resource_string(subject)?;
         let mut res = Resource::new(subject.into(), self);
         for (prop_string, val_string) in resource_string {
@@ -294,10 +279,7 @@ pub trait Storelike {
     fn new_collection(
         &self,
         collection_builder: crate::collections::CollectionBuilder,
-    ) -> AtomicResult<Collection>
-    where
-        Self: std::marker::Sized,
-    {
+    ) -> AtomicResult<Collection> {
         crate::collections::Collection::new(self, collection_builder)
     }
 
@@ -327,10 +309,7 @@ pub trait Storelike {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Currently only used for constructing Collections.
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
+    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
         let query_params = clone.query_pairs();
@@ -507,10 +486,7 @@ pub trait Storelike {
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
     //  Todo: return something more useful, give more context.
-    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn>
-    where
-        Self: std::marker::Sized,
-    {
+    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
@@ -590,10 +566,7 @@ pub trait Storelike {
     /// Loads the default store.
     /// Constructs various default collections.
     // Maybe these two functionalities should be split?
-    fn populate(&self) -> AtomicResult<()>
-    where
-        Self: std::marker::Sized,
-    {
+    fn populate(&self) -> AtomicResult<()> {
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
         self.add_atoms(atoms)?;
@@ -662,10 +635,7 @@ pub trait Storelike {
     fn set_default_agent(&self, agent: crate::agents::Agent);
 
     /// Performs a light validation, without fetching external data
-    fn validate(&self) -> crate::validate::ValidationReport
-    where
-        Self: std::marker::Sized,
-    {
+    fn validate(&self) -> crate::validate::ValidationReport {
         crate::validate::validate_store(self, false)
     }
 }
