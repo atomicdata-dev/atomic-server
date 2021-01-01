@@ -32,6 +32,20 @@ pub fn propvals_to_html_vec(
             subject: subject.clone(),
         });
     }
+
+    // Sort props alphabetically by shortname
+    // Always show description first
+    htmlatoms.sort_by(|a, b| {
+        if b.property.subject == atomic_lib::urls::DESCRIPTION {
+            return std::cmp::Ordering::Less
+        }
+        if b.property.shortname > a.property.shortname {
+            std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Greater
+        }
+    });
+
     Ok(htmlatoms)
 }
 
