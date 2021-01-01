@@ -17,7 +17,6 @@
 ["https://atomicdata.dev/classes/Commit","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
 ["https://atomicdata.dev/classes/Commit","https://atomicdata.dev/properties/requires","[\"https://atomicdata.dev/properties/subject\",\"https://atomicdata.dev/properties/createdAt\",\"https://atomicdata.dev/properties/signer\",\"https://atomicdata.dev/properties/signature\"]"]
 ["https://atomicdata.dev/classes/Commit","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/set\",\"https://atomicdata.dev/properties/remove\",\"https://atomicdata.dev/properties/destroy\"]"]
-["https://atomicdata.dev/classes/Commit","https://atomicdata.dev/properties/requires","[\"https://atomicdata.dev/properties/shortname\",\"https://atomicdata.dev/properties/description\"]"]
 ["https://atomicdata.dev/classes/Commit","https://atomicdata.dev/properties/description","A Commit describes a possible type of value, such as 'string' or 'integer'."]
 ["https://atomicdata.dev/classes/Commit","https://atomicdata.dev/properties/shortname","commit"]
 ["https://atomicdata.dev/classes/Agent","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
