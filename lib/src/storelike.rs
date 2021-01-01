@@ -23,6 +23,12 @@ pub struct Property {
     pub description: String,
 }
 
+impl PartialEq for Property {
+    fn eq(&self, other: &Self) -> bool {
+        self.subject == other.subject
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Class {
     pub requires: Vec<Property>,
@@ -582,7 +588,7 @@ pub trait Storelike: Sized {
 
         use crate::collections::CollectionBuilder;
 
-        let classes = CollectionBuilder {
+        let classes = &self.new_collection(CollectionBuilder {
             subject: format!("{}classes", self.get_base_url()),
             property: Some(urls::IS_A.into()),
             value: Some(urls::CLASS.into()),
@@ -590,8 +596,8 @@ pub trait Storelike: Sized {
             sort_desc: false,
             page_size: 1000,
             current_page: 0,
-        };
-        self.add_resource(&self.new_collection(classes)?.to_resource()?)?;
+        })?.to_resource()?;
+        self.add_resource(classes)?;
 
         let properties = CollectionBuilder {
             subject: format!("{}properties", self.get_base_url()),

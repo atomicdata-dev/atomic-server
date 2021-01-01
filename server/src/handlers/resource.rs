@@ -1,10 +1,10 @@
 use crate::{
     appstate::AppState, content_types::get_accept, content_types::ContentType,
-    errors::BetterResult, render::propvals::propvals_to_html,
+    errors::BetterResult, render::propvals::propvals_to_html_vec,
 };
 use actix_web::{web, HttpResponse};
-use atomic_lib::Storelike;
-use std::sync::Mutex;
+use atomic_lib::{errors::AtomicResult, Storelike};
+use std::sync::{Mutex, MutexGuard};
 use tera::Context as TeraCtx;
 
 /// Respond to a single resource.
@@ -41,27 +41,7 @@ pub async fn get_resource(
             Ok(builder.body(body))
         }
         ContentType::HTML => {
-            let mut tera_context = TeraCtx::new();
-            // Check if there is a registered view for this class
-            let mut body: String = format!("Custom view for {} not correctly implemented. The function should overwrite this string.", subject);
-
-            if let Ok(classes_val) = resource.get_shortname("is-a", store) {
-                if let Ok(classes_vec) = classes_val.to_vec() {
-                    for class in classes_vec {
-                        match class.as_ref() {
-                            atomic_lib::urls::COLLECTION => {
-                                body = crate::views::collection::render_collection(&resource, &context);
-                            },
-                            _ => {},
-                        }
-                    }
-                }
-            } else {
-                // If not, fall back to the default renderer
-                let propvals = propvals_to_html(&resource.get_propvals(), store, subject)?;
-                tera_context.insert("resource", &propvals);
-                body = context.tera.render("resource.html", &tera_context)?;
-            }
+            let body: String = render_resource(&resource, &context)?;
             Ok(builder.body(body))
         }
         ContentType::AD3 => {
@@ -77,6 +57,46 @@ pub async fn get_resource(
             Ok(builder.body(body))
         }
     }
+}
+
+/// Renders the HTML view for a given resource.
+/// If there's a (set of) Classes for the Resource, check if they have a custom View.
+/// If not, fall back to the default View
+fn render_resource(
+    resource: &atomic_lib::Resource,
+    context: &MutexGuard<AppState>,
+) -> AtomicResult<String> {
+    if let Ok(classes_val) = resource.get_shortname("is-a", &context.store) {
+        if let Ok(classes_vec) = classes_val.to_vec() {
+            for class in classes_vec {
+                match class.as_ref() {
+                    atomic_lib::urls::COLLECTION => {
+                        return Ok(crate::views::collection::render_collection(
+                            &resource, &context,
+                        )?)
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    default_view(resource, context)
+}
+
+/// The default view for resources
+fn default_view(
+    resource: &atomic_lib::Resource,
+    context: &MutexGuard<AppState>,
+) -> AtomicResult<String> {
+    let mut tera_context = TeraCtx::new();
+    // If not, fall back to the default renderer
+    let propvals = propvals_to_html_vec(
+        &resource.get_propvals(),
+        &context.store,
+        resource.get_subject().clone(),
+    )?;
+    tera_context.insert("resource", &propvals);
+    Ok(context.tera.render("resource.html", &tera_context)?)
 }
 
 /// Finds the extension

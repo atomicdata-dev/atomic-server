@@ -18,7 +18,7 @@ pub struct RenderAtom {
 
 /// Converts an Atomic Value to an HTML string suitable for display
 /// Escapes HTML contents for safe value rendering
-pub fn value_to_html(value: &Value) -> String {
+pub fn value_to_html(value: &Value, store: &impl Storelike) -> String {
     match value {
         Value::Integer(i) => format!("{}", i),
         Value::String(s) => escape_html(&*s),
@@ -26,16 +26,15 @@ pub fn value_to_html(value: &Value) -> String {
         Value::Slug(s) => escape_html(&*s),
         Value::AtomicUrl(s) => {
             let url = escape_html(&*s);
-            // let name = store.get_resource(subject)
-            // .unwrap_or(url).get(atomic_lib::urls::SHORTNAME)
-            // .unwrap_or(url);
-            format!(r#"<a href="{}">{}</a>"#, url, url)
+            let display = try_shortname(s, store);
+            format!(r#"<a href="{}">{}</a>"#, url, display)
         }
         Value::ResourceArray(v) => {
             let mut html = String::from("");
             v.iter().for_each(|item| {
                 let url = escape_html(item);
-                html.push_str(&*format!(r#"<a href="{}">{}</a>, "#, url, url))
+                let display = try_shortname(item, store);
+                html.push_str(&*format!(r#"<a href="{}">{}</a>, "#, url, display))
             });
             html
         }
@@ -47,15 +46,24 @@ pub fn value_to_html(value: &Value) -> String {
     }
 }
 
+fn try_shortname(subject: &str, store: &impl Storelike) -> String {
+    if let Ok(resource) = store.get_resource(subject) {
+        if let Ok(shortname) = resource.get(atomic_lib::urls::SHORTNAME) {
+            return shortname.to_string()
+        }
+    }
+    subject.into()
+}
+
 impl RenderAtom {
     #[allow(dead_code)]
-    pub fn from_rich_atom(atom: &RichAtom) -> RenderAtom {
+    pub fn from_rich_atom(atom: &RichAtom, store: &impl Storelike) -> RenderAtom {
         RenderAtom {
             subject: atom.subject.clone(),
             property: atom.property.clone(),
             value: atom.value.clone(),
             native_value: atom.native_value.clone(),
-            html: value_to_html(&atom.native_value),
+            html: value_to_html(&atom.native_value, store),
         }
     }
 
@@ -67,7 +75,7 @@ impl RenderAtom {
             subject: atom.subject,
             property,
             value: atom.value,
-            html: value_to_html(&native),
+            html: value_to_html(&native, store),
             native_value: native,
         })
     }

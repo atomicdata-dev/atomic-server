@@ -2,7 +2,7 @@ use crate::{appstate::AppState, content_types::get_accept};
 use crate::{
     content_types::ContentType,
     errors::BetterResult,
-    render::propvals::{propvals_to_html, HTMLAtom},
+    render::propvals::{propvals_to_html_vec, HTMLAtomProp},
 };
 use actix_web::{http, web, HttpResponse};
 use serde::Deserialize;
@@ -31,18 +31,18 @@ pub async fn path(
     let path_result = context.store.get_path(&path, Some(&mapping))?;
     match content_type {
         ContentType::HTML => {
-            let mut propvals: Vec<HTMLAtom> = Vec::new();
+            let mut propvals: Vec<HTMLAtomProp> = Vec::new();
             match path_result {
                 atomic_lib::storelike::PathReturn::Subject(subject) => {
                     let resource = context
                         .store
                         .get_resource_extended(&subject)?;
-                    propvals = propvals_to_html(&resource.get_propvals(), &context.store, subject)?;
+                    propvals = propvals_to_html_vec(&resource.get_propvals(), &context.store, subject)?;
                 }
                 atomic_lib::storelike::PathReturn::Atom(atom) => {
-                    propvals.push(HTMLAtom {
+                    propvals.push(HTMLAtomProp {
                         property: context.store.get_property(&atom.property.subject)?,
-                        value_html: crate::render::atom::value_to_html(&atom.native_value),
+                        value_html: crate::render::atom::value_to_html(&atom.native_value, &context.store),
                         value: atom.value,
                         subject: atom.subject,
                     });
