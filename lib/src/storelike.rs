@@ -115,6 +115,7 @@ pub trait Storelike: Sized {
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
             .as_millis() as u64;
+        let commit_resource: Resource = commit.clone().into_resource(self)?;
         if commit.created_at > now {
             return Err("Commit created_at timestamp must lie in the past.".into());
             // TODO: also check that no younger commits exist
@@ -122,6 +123,7 @@ pub trait Storelike: Sized {
         if let Some(destroy) = commit.destroy {
             if destroy {
                 self.remove_resource(&commit.subject);
+                return Ok(commit_resource)
             }
         }
         let mut resource = match self.get_resource(&commit.subject) {
@@ -144,7 +146,6 @@ pub trait Storelike: Sized {
         }
         resource.check_required_props(self)?;
         // TOOD: Persist delta to store, use hash as ID
-        let commit_resource: Resource = commit.into_resource(self)?;
         self.add_resource(&commit_resource)?;
         Ok(commit_resource)
     }
