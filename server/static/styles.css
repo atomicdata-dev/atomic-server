@@ -37,3 +37,12 @@ body {
 textarea {
   width: 100%;
 }
+
+.table-wrapper {
+  overflow-x: auto;
+}
+
+.table td {
+  max-width: 20rem;
+  word-wrap: break-word;
+}
