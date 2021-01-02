@@ -395,15 +395,6 @@ impl Resource {
 /// The key string represents the URL of the Property, the value one its Values.
 pub type ResourceString = HashMap<String, String>;
 
-/// Convert a ResourceString to Atoms
-pub fn resourcestring_to_atoms(subject: &str, resource: ResourceString) -> Vec<Atom> {
-    let mut vec = Vec::new();
-    for (prop, val) in resource.iter() {
-        vec.push(Atom::new(subject.into(), prop.into(), val.into()));
-    }
-    vec
-}
-
 /// Converts PropVals to a ResourceString (serializes values to AD3)
 pub fn propvals_to_resourcestring(propvals: PropVals) -> ResourceString {
     let mut resource_string: ResourceString = HashMap::new();

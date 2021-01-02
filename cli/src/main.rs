@@ -271,13 +271,13 @@ fn list(context: &mut Context) {
 /// Prints a resource to the terminal with readble formatting and colors
 fn pretty_print_resource(url: &str, store: &impl Storelike) -> AtomicResult<()> {
     let mut output = String::new();
-    let resource = store.get_resource_string(url)?;
-    for (prop_url, val) in resource {
-        let prop_shortname = store.property_url_to_shortname(&prop_url)?;
+    let resource = store.get_resource(url)?;
+    for (prop_url, val) in resource.get_propvals() {
+        let prop_shortname = store.get_property(&prop_url)?.shortname;
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),
-            val
+            val.to_string()
         ));
     }
     output.push_str(&*format!("{0: <15}{1: <10} \n", "url".blue().bold(), url));

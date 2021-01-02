@@ -1,5 +1,5 @@
 use crate::{pretty_print_resource, Context};
-use atomic_lib::{storelike, serialize, Storelike, errors::AtomicResult, Atom, resources::resourcestring_to_atoms};
+use atomic_lib::{storelike, serialize, Storelike, errors::AtomicResult, Atom};
 use serialize::Format;
 
 /// List of serialization options. Should match /path.rs/get
@@ -45,9 +45,8 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
               }
               Format::NT => {
                 //   let atoms = store.tpf(Some(&subject), None, None)?;
-                  let resource = store.get_resource_extended(&subject)?.to_resourcestring();
-                  let atoms = resourcestring_to_atoms(&subject, resource);
-                  let out = serialize::atoms_to_ntriples(atoms, store)?;
+                  let resource = store.get_resource_extended(&subject)?;
+                  let out = serialize::atoms_to_ntriples(resource.to_atoms()?, store)?;
                   println!("{}", out);
               }
               Format::PRETTY => {
