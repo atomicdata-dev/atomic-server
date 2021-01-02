@@ -81,7 +81,7 @@ mod test {
     #[cfg(feature = "rdf")]
     fn serialize_ntriples() {
         use crate::Storelike;
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let subject = crate::urls::DESCRIPTION;
         let resource = store.get_resource(subject).unwrap();

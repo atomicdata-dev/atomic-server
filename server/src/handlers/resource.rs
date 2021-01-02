@@ -4,7 +4,7 @@ use crate::{
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::{errors::AtomicResult, Storelike};
-use std::sync::{Mutex, MutexGuard};
+use std::{sync::{Mutex, MutexGuard}, todo};
 use tera::Context as TeraCtx;
 
 /// Respond to a single resource.
@@ -71,6 +71,9 @@ fn render_resource(
                         return Ok(crate::views::collection::render_collection(
                             &resource, &context,
                         )?)
+                    }
+                    "example" => {
+                        todo!()
                     }
                     _ => {}
                 }

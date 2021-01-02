@@ -21,11 +21,13 @@ pub struct Store {
 impl Store {
     /// Creates an empty Store.
     /// Run `.populate()` to get useful standard models loaded into your store.
-    pub fn init() -> Store {
-        Store {
+    pub fn init() -> AtomicResult<Store> {
+        let store = Store {
             hashmap: Arc::new(Mutex::new(HashMap::new())),
             default_agent: Arc::new(Mutex::new(None)),
-        }
+        };
+        crate::populate::populate_base_models(&store)?;
+        Ok(store)
     }
 
     /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
@@ -142,7 +144,7 @@ mod test {
     fn init_store() -> Store {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let store = Store::init();
+        let store = Store::init().unwrap();
         println!("1");
         store.populate().unwrap();
         println!("2");
@@ -154,7 +156,7 @@ mod test {
 
     #[test]
     fn populate_base_models() {
-        let store = Store::init();
+        let store = Store::init().unwrap();
         crate::populate::populate_base_models(&store).unwrap();
         let property=  store.get_property(urls::DESCRIPTION).unwrap();
         assert_eq!(property.shortname, "description")
@@ -162,7 +164,7 @@ mod test {
 
     #[test]
     fn single_get_empty_server_to_class() {
-        let store = Store::init();
+        let store = Store::init().unwrap();
         crate::populate::populate_base_models(&store).unwrap();
         let agent=  store.get_class(urls::AGENT).unwrap();
         assert_eq!(agent.shortname, "agent")
@@ -267,7 +269,7 @@ mod test {
 
     #[test]
     fn get_external_resource() {
-        let store = Store::init();
+        let store = Store::init().unwrap();
         store.populate().unwrap();
         // If nothing happens - this night be deadlock.
         store.get_resource(urls::CLASS).unwrap();
@@ -275,7 +277,7 @@ mod test {
 
     #[test]
     fn get_extended_resource() {
-        let store = Store::init();
+        let store = Store::init().unwrap();
         store.populate().unwrap();
         let resource = store
             .get_resource_extended("https://atomicdata.dev/classes")

@@ -219,7 +219,7 @@ mod test {
 
     #[test]
     fn agent_and_commit() {
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         // Creates a new Agent with some crypto stuff
         let agent = store.create_agent("test_actor").unwrap();

@@ -7,7 +7,7 @@ use crate::{
     schema::{Class, Property},
     urls,
 };
-use crate::{mapping::Mapping, resources::ResourceString, values::Value, Atom, Resource, RichAtom};
+use crate::{mapping::Mapping, values::Value, Atom, Resource, RichAtom};
 
 // A path can return one of many things
 pub enum PathReturn {
@@ -204,6 +204,9 @@ pub trait Storelike: Sized {
             match class.subject.as_ref() {
                 urls::COLLECTION => {
                     return crate::collections::construct_collection(self, query_params, resource)
+                }
+                "example" => {
+                    todo!()
                 }
                 _ => {}
             }

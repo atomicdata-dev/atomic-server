@@ -118,7 +118,7 @@ mod test {
     #[test]
     #[ignore]
     fn fetch_resource_basic() {
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         let resource = fetch_resource(crate::urls::SHORTNAME, &store).unwrap();
         let shortname = resource.get(crate::urls::SHORTNAME).unwrap();
         assert!(shortname.to_string() == "shortname");

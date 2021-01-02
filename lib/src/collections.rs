@@ -243,7 +243,7 @@ mod test {
 
     #[test]
     fn create_collection() {
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         // Get all Classes, sorted by shortname
         let collection_builder = CollectionBuilder {
@@ -261,7 +261,7 @@ mod test {
 
     #[test]
     fn create_collection_2() {
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         // Get all Classes, sorted by shortname
         let collection_builder = CollectionBuilder {
@@ -279,7 +279,7 @@ mod test {
 
     #[test]
     fn get_collection() {
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let collection = store
             .get_resource_extended("https://atomicdata.dev/classes")
@@ -309,7 +309,7 @@ mod test {
 
     #[test]
     fn get_collection_params() {
-        let store = crate::Store::init();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
 
         let collection_page_size = store
