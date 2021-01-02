@@ -64,6 +64,7 @@ pub mod atoms;
 pub mod client;
 pub mod collections;
 pub mod commit;
+pub mod datetime_helpers;
 #[cfg(feature = "db")]
 pub mod db;
 #[cfg(feature = "config")]

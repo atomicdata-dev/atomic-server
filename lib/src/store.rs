@@ -75,7 +75,12 @@ impl Storelike for Store {
         Ok(())
     }
 
-    fn add_resource_string_unsafe(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
+    fn add_resource_string_unsafe(
+        &self,
+        subject: String,
+        resource: &ResourceString,
+    ) -> AtomicResult<()> {
+        println!("adding ressource string {}", subject);
         self.hashmap
             .lock()
             .unwrap()
@@ -101,6 +106,7 @@ impl Storelike for Store {
     }
 
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
+        println!("getting resource stinrg {}", resource_url);
         let resource: Option<ResourceString> = match self.hashmap.lock().unwrap().get(resource_url)
         {
             Some(result) => return Ok(result.clone()),
@@ -130,8 +136,11 @@ mod test {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let store = Store::init();
+        println!("1");
         store.populate().unwrap();
+        println!("2");
         let atoms = parse_ad3(&string).unwrap();
+        println!("3");
         store.add_atoms(atoms).unwrap();
         store
     }
@@ -169,7 +178,10 @@ mod test {
     fn get_full_resource_and_shortname() {
         let store = init_store();
         let resource = store.get_resource(urls::CLASS).unwrap();
-        let shortname = resource.get_shortname("shortname", &store).unwrap().to_string();
+        let shortname = resource
+            .get_shortname("shortname", &store)
+            .unwrap()
+            .to_string();
         assert!(shortname == "class");
     }
 
@@ -177,10 +189,8 @@ mod test {
     fn serialize() {
         let store = init_store();
         let subject = urls::CLASS;
-        let resource = store
-            .get_resource(subject)
-            .unwrap();
-        resource.to_json(&store,  1, true).unwrap();
+        let resource = store.get_resource(subject).unwrap();
+        resource.to_json(&store, 1, true).unwrap();
     }
 
     #[test]
@@ -244,7 +254,9 @@ mod test {
     fn get_extended_resource() {
         let store = Store::init();
         store.populate().unwrap();
-        let resource = store.get_resource_extended("https://atomicdata.dev/classes").unwrap();
+        let resource = store
+            .get_resource_extended("https://atomicdata.dev/classes")
+            .unwrap();
         resource.get(urls::COLLECTION_MEMBERS).unwrap();
     }
 
@@ -276,10 +288,10 @@ mod test {
     fn populate_collections() {
         let store = init_store();
         let collections_collection_url = format!("{}collections", store.get_base_url());
-        let my_resource = store.get_resource_extended(&collections_collection_url).unwrap();
-        let my_value = my_resource
-            .get(urls::COLLECTION_MEMBER_COUNT)
+        let my_resource = store
+            .get_resource_extended(&collections_collection_url)
             .unwrap();
+        let my_value = my_resource.get(urls::COLLECTION_MEMBER_COUNT).unwrap();
         println!("My value: {}", my_value);
         assert!(my_value.to_string() == "5");
     }

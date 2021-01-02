@@ -32,8 +32,8 @@ impl Resource {
         let classvec = self.get_classes(store)?;
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
-                self.get(&required_prop.subject)
-                    .map_err(|e| format!("Property {} missing in class {}. {} ", &required_prop.subject, class.subject, e))?;
+                self.get(&required_prop)
+                    .map_err(|e| format!("Property {} missing in class {}. {} ", &required_prop, class.subject, e))?;
             }
         }
         Ok(())
@@ -173,12 +173,14 @@ impl Resource {
 
         // Loop over all Requires and Recommends props
         for class in classes {
-            for required_prop in class.requires {
+            for required_prop_subject in class.requires {
+                let required_prop = store.get_property(&required_prop_subject)?;
                 if required_prop.shortname == shortname {
                     return Ok(required_prop);
                 }
             }
-            for recommended_prop in class.recommends {
+            for recommended_prop_subject in class.recommends {
+                let recommended_prop = store.get_property(&recommended_prop_subject)?;
                 if recommended_prop.shortname == shortname {
                     return Ok(recommended_prop);
                 }
@@ -202,7 +204,7 @@ impl Resource {
     pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
-        println!("set property {} for {}", property_url, self.get_subject());
+        println!("set in {} property {}", self.get_subject(), property_url);
         self.set_propval_unsafe(property_url, val)?;
         Ok(())
     }

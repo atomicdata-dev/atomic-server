@@ -33,6 +33,9 @@ impl Context<'_> {
             Agent {
                 subject: write_ctx.agent.clone(),
                 key: write_ctx.private_key.clone(),
+                // TODO: use actual data
+                created_at: atomic_lib::datetime_helpers::now() as u64,
+                name: "Random name".into(),
             }
         );
         write_ctx
