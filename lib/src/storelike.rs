@@ -3,9 +3,8 @@
 use crate::{agents::Agent, datetime_helpers, schema::{Class, Property}, urls};
 use crate::errors::AtomicResult;
 use crate::{
-    datatype::DataType,
     mapping::Mapping,
-    resources::{self, ResourceString},
+    resources::{ResourceString},
     values::Value,
     Atom, Resource, RichAtom,
 };
@@ -16,7 +15,7 @@ pub enum PathReturn {
     Atom(Box<RichAtom>),
 }
 
-pub type ResourceCollection = Vec<(String, ResourceString)>;
+pub type ResourceCollection = Vec<Resource>;
 
 /// Storelike provides many useful methods for interacting with an Atomic Store.
 /// It serves as a basic store Trait, agnostic of how it functions under the hood.
@@ -31,25 +30,12 @@ pub trait Storelike: Sized {
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
     /// In most cases, you should use `.commit()` instead.
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        resource.check_required_props(self)?;
-        self.add_resource_string_unsafe(resource.get_subject().clone(), &resource.to_resourcestring())?;
-        Ok(())
-    }
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()>;
 
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
     /// Does not do any validations.
-    fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()> {
-        self.add_resource_string_unsafe(resource.get_subject().clone(), &resource.to_resourcestring())?;
-        Ok(())
-    }
-
-    /// Replaces existing resource with the contents
-    /// Accepts a simple nested string only hashmap
-    /// Adds to hashmap and to the resource store
-    /// Does not do any validations.
-    fn add_resource_string_unsafe(&self, subject: String, resource: &ResourceString) -> AtomicResult<()>;
+    fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()>;
 
     /// Returns a hashmap ResourceString with string Values.
     /// Fetches the resource if it is not in the store.
@@ -178,39 +164,20 @@ pub trait Storelike: Sized {
 
     /// Fetches a resource, makes sure its subject matches.
     /// Save to the store.
-    /// Only adds atoms with matching subjects will be added.
     fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {
-        println!("fetching {}", subject);
         let resource: Resource = crate::client::fetch_resource(subject, self)?;
-        self.add_resource(&resource)?;
+        self.add_resource_unsafe(&resource)?;
         Ok(resource)
     }
 
     /// Returns a full Resource with native Values.
     /// Note that this does _not_ construct dynamic Resources, such as collections.
     /// If you're not sure what to use, use `get_resource_extended`.
-    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
-        println!("Get resource {}", subject);
-        let resource_string = self.get_resource_string(subject)?;
-        println!("got resource string {}", subject);
-        let mut res = Resource::new(subject.into());
-        for (prop_string, val_string) in resource_string {
-            let propertyfull = self.get_property(&prop_string)?;
-            let fullvalue = Value::new(&val_string, &propertyfull.data_type)?;
-            res.set_propval(prop_string.clone(), fullvalue, self)?;
-        }
-        Ok(res)
-        // Above code is a copy from:
-        // let res = Resource::new_from_resource_string(subject.clone(), &resource, self)?;
-        // But has some Size issues
-    }
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource>;
 
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &str) -> AtomicResult<Class> {
-        println!("Get class {}", subject);
-
         let resource = self.get_resource(subject)?;
-        println!("Got class {}", resource.get_subject());
         Class::from_resource(resource)
     }
 
@@ -223,7 +190,6 @@ pub trait Storelike: Sized {
 
     /// Fetches a property by URL, returns a Property instance
     fn get_property(&self, subject: &str) -> AtomicResult<Property> {
-        println!("Get propert {} ", subject);
         let prop = self.get_resource(subject)?;
         Property::from_resource(prop)
     }
@@ -249,28 +215,29 @@ pub trait Storelike: Sized {
         Ok(resource)
     }
 
+    ///
+    fn handle_not_found(&self, subject: &str) -> AtomicResult<Resource> {
+        if subject.starts_with(&self.get_base_url()) {
+            return Err(format!(
+                "Failed to retrieve {}, does not exist locally",
+                subject
+            )
+            .into());
+        }
+
+        match self.fetch_resource(subject) {
+            Ok(got) => Ok(got),
+            Err(e) => Err(format!(
+                "Failed to retrieve {} from the web: {}",
+                subject, e
+            )
+            .into()),
+        }
+    }
+
     /// Returns a collection with all resources in the store.
     /// WARNING: This could be very expensive!
     fn all_resources(&self) -> ResourceCollection;
-
-    /// Finds the URL of a shortname used in the context of a specific Resource.
-    /// The Class, Properties and Shortnames of the Resource are used to find this URL
-    fn property_shortname_to_url(
-        &self,
-        shortname: &str,
-        resource: &ResourceString,
-    ) -> AtomicResult<String> {
-        for (prop_url, _value) in resource.iter() {
-            let prop_resource = self.get_resource_string(&*prop_url)?;
-            let prop_shortname = prop_resource
-                .get(urls::SHORTNAME)
-                .ok_or(format!("Property shortname for '{}' not found", prop_url))?;
-            if prop_shortname == shortname {
-                return Ok(prop_url.clone());
-            }
-        }
-        Err(format!("Could not find shortname {}", shortname).into())
-    }
 
     /// Finds the shortname for some property URL
     fn property_url_to_shortname(&self, url: &str) -> AtomicResult<String> {
@@ -321,9 +288,9 @@ pub trait Storelike: Sized {
 
         // Simply return all the atoms
         if !hassub && !hasprop && !hasval {
-            for (sub, resource) in self.all_resources() {
-                for (property, value) in resource {
-                    vec.push(Atom::new(sub.clone(), property, value))
+            for resource in self.all_resources() {
+                for (property, value) in resource.get_propvals() {
+                    vec.push(Atom::new(resource.get_subject().clone(), property.clone(), value.to_string()))
                 }
             }
             return Ok(vec);
@@ -344,39 +311,41 @@ pub trait Storelike: Sized {
         };
 
         // Find atoms matching the TPF query in a single resource
-        let mut find_in_resource = |subj: &str, resource: &ResourceString| {
-            for (prop, val) in resource.iter() {
+        let mut find_in_resource = |resource: &Resource| {
+            let subj = resource.get_subject();
+            for (prop, val) in resource.get_propvals().iter() {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                     if hasval {
-                        if val_equals(val) {
-                            vec.push(Atom::new(subj.into(), prop.into(), val.into()))
+                        if val_equals(&val.to_string()) {
+                            vec.push(Atom::new(subj.into(), prop.into(), val.to_string()))
                         }
                         break;
                     } else {
-                        vec.push(Atom::new(subj.into(), prop.into(), val.into()))
+                        vec.push(Atom::new(subj.into(), prop.into(), val.to_string()))
                     }
                     break;
-                } else if hasval && !hasprop && val_equals(val) {
-                    vec.push(Atom::new(subj.into(), prop.into(), val.into()))
+                } else if hasval && !hasprop && val_equals(&val.to_string()) {
+                    vec.push(Atom::new(subj.into(), prop.into(), val.to_string()))
                 }
             }
         };
 
         match q_subject {
-            Some(sub) => match self.get_resource_string(&sub) {
+            Some(sub) => match self.get_resource(&sub) {
                 Ok(resource) => {
                     if hasprop | hasval {
-                        find_in_resource(&sub, &resource);
+                        find_in_resource(&resource);
                         Ok(vec)
                     } else {
-                        Ok(resources::resourcestring_to_atoms(sub, resource))
+                        // Ok(resources::resourcestring_to_atoms(sub, resource))
+                        resource.to_atoms()
                     }
                 }
                 Err(_) => Ok(vec),
             },
             None => {
-                for (subj, properties) in self.all_resources() {
-                    find_in_resource(&subj, &properties);
+                for resource in self.all_resources() {
+                    find_in_resource(&resource);
                 }
                 Ok(vec)
             }
@@ -464,156 +433,11 @@ pub trait Storelike: Sized {
         Ok(current)
     }
 
-    /// Loads the default store.
-    /// Constructs various default collections.
-    // Maybe these two functionalities should be split?
+    /// Loads the default store and constructs various default collections.
     fn populate(&self) -> AtomicResult<()> {
-
-        // Start with adding the most fundamental properties - the properties for Properties
-        let mut is_a = Resource::new(urls::IS_A.into());
-        is_a.set_propval_unsafe(urls::IS_A.into(), Value::ResourceArray(vec![urls::PROPERTY.into()]))?;
-        is_a.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug("is-a".into()))?;
-        is_a.set_propval_unsafe(urls::DESCRIPTION.into(), Value::String("A list of Classes of which the thing is an instance of. The Classes of a Resource determine which Properties are recommended and required.".into()))?;
-        is_a.set_propval_unsafe(urls::DATATYPE_PROP.into(), Value::AtomicUrl(urls::RESOURCE_ARRAY.into()))?;
-        is_a.set_propval_unsafe(urls::CLASSTYPE_PROP.into(), Value::AtomicUrl(urls::CLASS.into()))?;
-        self.add_resource_unsafe(&is_a)?;
-
-        let shortname = Property {
-            class_type: None,
-            data_type: DataType::Slug,
-            shortname: "shortname".into(),
-            description: "A short name of something. It can only contain letters, numbers and dashes `-`. Use dashes to denote spaces between words. Not case sensitive - lowercase only. Useful in programming contexts where the user should be able to type something short to identify a specific thing.".into(),
-            subject: urls::SHORTNAME.into(),
-        }.to_resource()?;
-        self.add_resource_unsafe(&shortname)?;
-
-        let description = Property {
-            class_type: None,
-            data_type: DataType::String,
-            shortname: "description".into(),
-            description: "A textual description of something. When making a description, make sure that the first few words tell the most important part. Give examples. Since the text supports markdown, you're free to use links and more.".into(),
-            subject: urls::DESCRIPTION.into(),
-        }.to_resource()?;
-        self.add_resource_unsafe(&description)?;
-
-        let is_a = Property {
-            class_type: Some(urls::CLASS.into()),
-            data_type: DataType::ResourceArray,
-            shortname: "is-a".into(),
-            description: "A list of Classes of which the thing is an instance of. The Classes of a Resource determine which Properties are recommended and required.".into(),
-            subject: urls::IS_A.into(),
-        }.to_resource()?;
-        self.add_resource_unsafe(&is_a)?;
-
-        let datatype = Property {
-            class_type: Some(urls::DATATYPE_CLASS.into()),
-            data_type: DataType::AtomicUrl,
-            shortname: "datatype".into(),
-            description: "The Datatype of a property, such as String or Timestamp.".into(),
-            subject: urls::DATATYPE_PROP.into(),
-        }.to_resource()?;
-        self.add_resource_unsafe(&datatype)?;
-
-        let classtype = Property {
-            class_type: Some(urls::CLASS.into()),
-            data_type: DataType::AtomicUrl,
-            shortname: "classtype".into(),
-            description: "The class-type indicates that the Atomic URL should be an instance of this class.".into(),
-            subject: urls::CLASSTYPE_PROP.into(),
-        }.to_resource()?;
-        self.add_resource_unsafe(&classtype)?;
-
-        let property = Class {
-            requires: vec![urls::SHORTNAME.into()],
-            recommends: vec![],
-            shortname: "property".into(),
-            description: "A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`.".into(),
-            subject: urls::PROPERTY.into(),
-        }
-        .to_resource()?;
-        self.add_resource_unsafe(&property)?;
-
-        let class = Class {
-            requires: vec![urls::SHORTNAME.into(), urls::DESCRIPTION.into()],
-            recommends: vec![urls::RECOMMENDS.into(), urls::REQUIRES.into()],
-            shortname: "class".into(),
-            description: "A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data and explains what the thing represents. It is convention to use Uppercase in its URL. Note that in Atomic Data, a Resource can have several Classes - not just a single one.".into(),
-            subject: urls::CLASS.into(),
-        }
-        .to_resource()?;
-        self.add_resource_unsafe(&class)?;
-
-        println!("properties set correctly");
-
-        let ad3 = include_str!("../defaults/default_store.ad3");
-        let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
-        self.add_atoms(atoms)?;
-
-        println!("atoms set correctly");
-
-        use crate::collections::CollectionBuilder;
-
-        let classes = CollectionBuilder {
-            subject: format!("{}classes", self.get_base_url()),
-            property: Some(urls::IS_A.into()),
-            value: Some(urls::CLASS.into()),
-            sort_by: None,
-            sort_desc: false,
-            page_size: 1000,
-            current_page: 0,
-        };
-        println!("collection resource created");
-        self.add_resource_unsafe(&classes.to_resource(self)?)?;
-
-        println!("first collection done");
-
-        let properties = CollectionBuilder {
-            subject: format!("{}properties", self.get_base_url()),
-            property: Some(urls::IS_A.into()),
-            value: Some(urls::PROPERTY.into()),
-            sort_by: None,
-            sort_desc: false,
-            page_size: 1000,
-            current_page: 0,
-        };
-        self.add_resource_unsafe(&properties.to_resource(self)?)?;
-
-        let commits = CollectionBuilder {
-            subject: format!("{}commits", self.get_base_url()),
-            property: Some(urls::IS_A.into()),
-            value: Some(urls::COMMIT.into()),
-            sort_by: None,
-            sort_desc: false,
-            page_size: 1000,
-            current_page: 0,
-        };
-        self.add_resource_unsafe(&commits.to_resource(self)?)?;
-
-        let agents = CollectionBuilder {
-            subject: format!("{}agents", self.get_base_url()),
-            property: Some(urls::IS_A.into()),
-            value: Some(urls::AGENT.into()),
-            sort_by: None,
-            sort_desc: false,
-            page_size: 1000,
-            current_page: 0,
-        };
-        self.add_resource_unsafe(&agents.to_resource(self)?)?;
-
-        let collections = CollectionBuilder {
-            subject: format!("{}collections", self.get_base_url()),
-            property: Some(urls::IS_A.into()),
-            value: Some(urls::COLLECTION.into()),
-            sort_by: None,
-            sort_desc: false,
-            page_size: 1000,
-            current_page: 0,
-        };
-        self.add_resource_unsafe(&collections.to_resource(self)?)?;
-
-        println!("collections set correctly");
-
-        Ok(())
+        crate::populate::populate_base_models(self)?;
+        crate::populate::populate_default(self)?;
+        crate::populate::populate_collections(self)
     }
 
     /// Sets the default Agent for applying commits.

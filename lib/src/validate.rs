@@ -22,9 +22,11 @@ pub fn validate_store(
     let mut unfetchable_classes: Vec<(String, Error)> = Vec::new();
     // subject, property, class
     let mut missing_props: Vec<(String, String, String)> = Vec::new();
-    for (subject, resource) in store.all_resources() {
+    for resource in store.all_resources() {
+        let subject = resource.get_subject();
+        let propvals = resource.get_propvals();
         println!("Subject: {:?}", subject);
-        println!("Resource: {:?}", resource);
+        println!("Resource: {:?}", propvals);
         resource_count += 1;
 
         if fetch_items {
@@ -36,7 +38,7 @@ pub fn validate_store(
 
         let mut found_props: Vec<String> = Vec::new();
 
-        for (prop_url, value) in resource {
+        for (prop_url, value) in propvals.to_owned() {
             atom_count += 1;
 
             let property = match store.get_property(&prop_url) {
@@ -47,10 +49,11 @@ pub fn validate_store(
                 }
             };
 
-            match crate::Value::new(&value, &property.data_type) {
+            // Maybe this is no longer needed, because no store uses strings anymore
+            match crate::Value::new(&value.to_string(), &property.data_type) {
                 Ok(_) => {}
                 Err(e) => invalid_value.push((
-                    crate::Atom::new(subject.clone(), prop_url.clone(), value),
+                    crate::Atom::new(subject.clone(), prop_url.clone(), value.to_string()),
                     e.to_string(),
                 )),
             };
