@@ -3,7 +3,7 @@ use crate::{
     errors::BetterResult,
     render::propvals::{propvals_to_html_map, HTMLAtom, HTMLAtomProp},
 };
-use atomic_lib::{storelike::Property, Resource, Storelike};
+use atomic_lib::{schema::Property, Resource, Storelike};
 use serde::Serialize;
 use std::{collections::HashMap, sync::MutexGuard};
 
@@ -30,7 +30,7 @@ pub fn render_collection(
     // This works because Tera supports HashMaps.
     let mut resources: Vec<HashMap<String, HTMLAtom>> = Vec::new();
     for member in members {
-        let mut resource = store.get_resource(member)?;
+        let resource = store.get_resource(member)?;
         let propvals = propvals_to_html_map(
             &resource.get_propvals(),
             store,

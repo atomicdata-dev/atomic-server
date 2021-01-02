@@ -1,7 +1,7 @@
 //! The smallest units of data, consiting of a Subject, a Property and a Value
 
 use crate::errors::AtomicResult;
-use crate::storelike::Property;
+use crate::schema::Property;
 use crate::values::Value;
 use serde::Serialize;
 

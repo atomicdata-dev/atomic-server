@@ -103,7 +103,8 @@ impl Collection {
             .clone();
         let total_items = sorted_subjects.len();
         // Construct the pages (TODO), use pageSize
-        let total_pages = (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
+        let total_pages =
+            (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
         let collection = Collection {
             total_pages,
             members,
@@ -119,43 +120,43 @@ impl Collection {
         Ok(collection)
     }
 
-    pub fn to_resource(
-        &self,
-    ) -> AtomicResult<crate::Resource> {
+    pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
         // TODO: Should not persist, because now it is spammimg the store!
         // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
         let mut resource = crate::Resource::new(self.subject.clone());
         resource.set_propval(
             crate::urls::COLLECTION_MEMBERS.into(),
             self.members.clone().into(),
+            store,
         )?;
-        if let Some(prop) = self.property.clone() {
-            resource.set_propval(crate::urls::COLLECTION_PROPERTY.into(), prop.into())?;
+        if let Some(prop) = &self.property {
+            resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), prop, store)?;
         }
-        if let Some(prop) = self.value.clone() {
-            resource.set_propval(crate::urls::COLLECTION_VALUE.into(), prop.into())?;
+        if let Some(val) = &self.value {
+            resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
         }
         resource.set_propval(
             crate::urls::COLLECTION_MEMBER_COUNT.into(),
             self.total_items.clone().into(),
+            store,
         )?;
         let mut classes: Vec<String> = Vec::new();
         classes.push(crate::urls::COLLECTION.into());
-        resource.set_propval(
-            crate::urls::IS_A.into(),
-            classes.into(),
-        )?;
+        resource.set_propval(crate::urls::IS_A.into(), classes.into(), store)?;
         resource.set_propval(
             crate::urls::COLLECTION_TOTAL_PAGES.into(),
             self.total_pages.clone().into(),
+            store,
         )?;
         resource.set_propval(
             crate::urls::COLLECTION_CURRENT_PAGE.into(),
             self.current_page.clone().into(),
+            store,
         )?;
         resource.set_propval(
             crate::urls::COLLECTION_PAGE_SIZE.into(),
             self.page_size.clone().into(),
+            store,
         )?;
         // Maybe include items directly
         Ok(resource)
@@ -203,7 +204,7 @@ pub fn construct_collection(
         page_size,
     };
     let collection = Collection::new(store, collection_builder)?;
-    Ok(collection.to_resource()?)
+    Ok(collection.to_resource(store)?)
 }
 
 #[cfg(test)]

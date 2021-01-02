@@ -43,20 +43,20 @@ impl Commit {
         resource.set_propval(
             urls::SUBJECT.into(),
             Value::new(&self.subject, &DataType::AtomicUrl).unwrap(),
+            store,
         )?;
         let mut classes: Vec<String> = Vec::new();
         classes.push(urls::COMMIT.into());
-        resource.set_propval(
-            urls::IS_A.into(),
-            classes.into()
-        )?;
+        resource.set_propval(urls::IS_A.into(), classes.into(), store)?;
         resource.set_propval(
             urls::CREATED_AT.into(),
             Value::new(&self.created_at.to_string(), &DataType::Timestamp).unwrap(),
+            store,
         )?;
         resource.set_propval(
             urls::SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl).unwrap(),
+            store,
         )?;
         if self.set.is_some() {
             let mut newset = PropVals::new();
@@ -65,20 +65,25 @@ impl Commit {
                 let val = Value::new(&stringval, &datatype)?;
                 newset.insert(prop, val);
             }
-            resource.set_propval(urls::SET.into(), newset.into())?;
+            resource.set_propval(urls::SET.into(), newset.into(), store)?;
         };
         if self.remove.is_some() && !self.remove.clone().unwrap().is_empty() {
             let remove_vec: Vec<String> = self.remove.clone().unwrap();
-            resource.set_propval(urls::REMOVE.into(), remove_vec.into())?;
+            resource.set_propval(urls::REMOVE.into(), remove_vec.into(), store)?;
         };
         if self.destroy.is_some() && self.destroy.unwrap() {
-            resource.set_propval(urls::DESTROY.into(), true.into())?;
+            resource.set_propval(urls::DESTROY.into(), true.into(), store)?;
         }
         resource.set_propval(
             urls::SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl).unwrap(),
+            store,
         )?;
-        resource.set_propval(urls::SIGNATURE.into(), self.signature.unwrap().into())?;
+        resource.set_propval(
+            urls::SIGNATURE.into(),
+            self.signature.unwrap().into(),
+            store,
+        )?;
         Ok(resource)
     }
 
@@ -181,7 +186,8 @@ impl CommitBuilder {
         // TODO: use actual stringified resource, also change in Storelike::commit
         // let stringified = serde_json::to_string(&self)?;
         // let stringified = "full_resource";
-        let stringified = commit.serialize_deterministically()
+        let stringified = commit
+            .serialize_deterministically()
             .map_err(|e| format!("Failed serializing commit: {}", e))?;
         let private_key_bytes = base64::decode(agent.key.clone())
             .map_err(|e| format!("Failed decoding private key {}: {}", agent.key.clone(), e))?;

@@ -582,6 +582,7 @@ dependencies = [
  "base64 0.13.0",
  "bincode",
  "dirs",
+ "ntest",
  "rand 0.8.0",
  "regex",
  "ring",
@@ -1804,6 +1805,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "ntest"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3909e1f9c352eb0a816af6f0ff8b7ab86b146b558cebd369cee6e2848bb6c70"
+dependencies = [
+ "ntest_proc_macro_helper",
+ "ntest_test_cases",
+ "ntest_timeout",
+]
+
+[[package]]
+name = "ntest_proc_macro_helper"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a971d3e5ef11ad60a45ce21691a4ceed08cdbb3c581bf8d5efda953b100e345"
+
+[[package]]
+name = "ntest_test_cases"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36f95849341fe7f83e7f06f00226d01411bc7d77f173ad4fd484a72ba58b8303"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "ntest_timeout"
+version = "0.7.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "99c4a32167a84767f6cdd8560a6d5b99a630505d9879c87d49e3eb1a409e3374"
+dependencies = [
+ "ntest_proc_macro_helper",
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "num-integer"
 version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2047,6 +2089,15 @@ name = "ppv-lite86"
 version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac74c624d6b2d21f425f752262f42188365d7b8ff1aff74c82e45136510a4857"
+
+[[package]]
+name = "proc-macro-crate"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d6ea3c4595b96363c13943497db34af4460fb474a95c43f4446ad341b8c9785"
+dependencies = [
+ "toml",
+]
 
 [[package]]
 name = "proc-macro-hack"

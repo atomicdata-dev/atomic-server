@@ -1,7 +1,7 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
-use std::sync::{Arc, Mutex};
+use std::{collections::HashMap, sync::{Arc, Mutex}};
 
 use crate::{
     errors::AtomicResult,
@@ -57,6 +57,7 @@ impl Db {
     //     todo!();
     // }
 
+    /// Internal method for fetching Resource data.
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
         let subject_bin = bincode::serialize(subject)?;
@@ -79,47 +80,71 @@ impl Db {
                     .map_err(|e| format!("{} {}", DB_CORRUPT_MSG, e))?;
                 Ok(propval)
             }
-            None => Err("Not found".into()),
+            None => Err(format!("Resource {} not found", subject).into()),
+        }
+    }
+
+    fn handle_not_found(&self, subject: &str) -> AtomicResult<Resource> {
+        if subject.starts_with(&self.base_url) {
+            return Err(format!(
+                "Failed to retrieve {}, does not exist locally",
+                subject
+            )
+            .into());
+        }
+
+        match self.fetch_resource(subject) {
+            Ok(got) => Ok(got),
+            Err(e) => Err(format!(
+                "Failed to retrieve {} from the web: {}",
+                subject, e
+            )
+            .into()),
         }
     }
 }
 
 impl Storelike for Db {
+
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
+        // Start with a nested HashMap, containing only strings.
+        let mut map: HashMap<String, Resource> = HashMap::new();
         for atom in atoms {
-            self.add_atom(atom)?;
+            match map.get_mut(&atom.subject) {
+                // Resource exists in map
+                Some(resource) => {
+                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                }
+                // Resource does not exist
+                None => {
+                    let mut resource = Resource::new(atom.subject.clone());
+                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                    map.insert(atom.subject, resource);
+                }
+            }
+        }
+        for (_subject, resource) in map.iter() {
+            self.add_resource(resource)?
         }
         self.db.flush()?;
         Ok(())
     }
 
-    /// Adds a single atom to the store
-    /// If the resource already exists, it will be inserted into it.
-    /// Existing data will be overwritten.
-    /// If the resource does not exist, it will be created.
-    fn add_atom(&self, atom: Atom) -> AtomicResult<()> {
-        let mut resource: PropVals = match self.get_propvals(&atom.subject) {
-            Ok(r) => r,
-            Err(_) => PropVals::new(),
-        };
-
-        resource.insert(atom.property, atom.value.into());
-        self.set_propvals(&atom.subject, &resource)?;
-        Ok(())
-    }
-
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        self.set_propvals(resource.get_subject(), &resource.get_propvals())?;
-        Ok(())
+        // This only works if no external functions rely on using add_resource for atom-like operations!
+        // However, add_atom uses set_propvals, which skips the validation.
+        println!("Add resource {}", resource.get_subject());
+        resource.check_required_props(self)?;
+        self.set_propvals(resource.get_subject(), &resource.get_propvals())
     }
 
-    fn add_resource_string(
-        &self,
-        subject: String,
-        resource_string: &ResourceString,
-    ) -> AtomicResult<()> {
+    fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()> {
+        self.set_propvals(resource.get_subject(), &resource.get_propvals())
+    }
+
+    fn add_resource_string_unsafe(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
         let resource =
-            crate::resources::Resource::new_from_resource_string(subject, resource_string, self)?;
+            crate::resources::Resource::new_from_resource_string(subject, resource, self)?;
         self.add_resource(&resource)?;
         // Note that this does not do anything with indexes, so it might have to be replaced!
         Ok(())
@@ -136,6 +161,22 @@ impl Storelike for Db {
         }
     }
 
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
+        println!("get resource {}", subject);
+        let propvals = self.get_propvals(subject);
+
+        match propvals {
+            Ok(propvals) => {
+                let resource = crate::resources::Resource::from_propvals(propvals, subject.into());
+                Ok(resource)
+            }
+            Err(_e) => {
+                println!("resource not found {} {} ", subject, _e);
+                self.handle_not_found(subject)
+            }
+        }
+    }
+
     fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
         let propvals = self.get_propvals(resource_url);
         match propvals {
@@ -144,22 +185,7 @@ impl Storelike for Db {
                 Ok(resource)
             }
             Err(_e) => {
-                if resource_url.starts_with(&self.base_url) {
-                    return Err(format!(
-                        "Failed to retrieve {}, does not exist locally",
-                        resource_url
-                    )
-                    .into());
-                }
-
-                match self.fetch_resource(resource_url) {
-                    Ok(got) => Ok(got),
-                    Err(e) => Err(format!(
-                        "Failed to retrieve {} from the web: {}",
-                        resource_url, e
-                    )
-                    .into()),
-                }
+                Ok(self.handle_not_found(resource_url)?.to_resourcestring())
             }
         }
     }
@@ -192,6 +218,7 @@ const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is po
 #[cfg(test)]
 mod test {
     use super::*;
+    use ntest::timeout;
 
     /// Creates new temporary database, populates it, removes previous one
     fn init() -> Db {
@@ -218,6 +245,7 @@ mod test {
     }
 
     #[test]
+    #[timeout(30000)]
     fn basic() {
         let store = init();
         // Let's parse this AD3 string.

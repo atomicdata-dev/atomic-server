@@ -5,7 +5,7 @@ use atomic_lib::urls;
 use atomic_lib::{
     datatype::DataType,
     errors::AtomicResult,
-    storelike::{Class, Property},
+    schema::{Class, Property},
     Resource, Storelike, Value,
 };
 use colored::Colorize;
@@ -59,6 +59,7 @@ fn prompt_instance<'a>(
     new_resource.set_propval(
         "https://atomicdata.dev/properties/isA".into(),
         Value::ResourceArray(Vec::from([class.subject.clone()])),
+        &context.store
     )?;
 
     for field in &class.requires {
@@ -233,7 +234,6 @@ fn prompt_field(
         DataType::Timestamp => todo!(),
         DataType::Unsupported(unsup) => panic!("Unsupported datatype: {:?}", unsup),
         DataType::Boolean => todo!(),
-        DataType::NestedResource => todo!(),
     };
     Ok(input)
 }
