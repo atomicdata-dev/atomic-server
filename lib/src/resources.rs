@@ -5,7 +5,7 @@ use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     datatype::DataType,
     mapping::is_url,
-    storelike::{Class, Property},
+    schema::{Class, Property},
     Atom, Storelike,
 };
 use std::collections::HashMap;
@@ -19,10 +19,6 @@ pub struct Resource {
     /// A hashMap of all the Property Value combinations
     propvals: PropVals,
     subject: String,
-    // The isA relationship of the resource
-    // Useful for quick access to shortnames and datatypes
-    // Should be an empty vector if it's checked, should be None if unknown
-    classes: Option<Vec<Class>>,
     commit: CommitBuilder,
 }
 
@@ -32,7 +28,7 @@ pub type PropVals = HashMap<String, Value>;
 
 impl Resource {
     /// Fetches all 'required' properties. Fails is any are missing in this Resource.
-    pub fn check_required_props(&mut self, store: &impl Storelike) -> AtomicResult<()> {
+    pub fn check_required_props(&self, store: &impl Storelike) -> AtomicResult<()> {
         let classvec = self.get_classes(store)?;
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
@@ -41,6 +37,14 @@ impl Resource {
             }
         }
         Ok(())
+    }
+
+    pub fn from_propvals(propvals: PropVals, subject: String) -> Resource {
+        Resource {
+            propvals,
+            commit: CommitBuilder::new(subject.clone()),
+            subject,
+        }
     }
 
     /// Get a value by property URL
@@ -59,43 +63,29 @@ impl Resource {
         commit
     }
 
-    /// Checks if the classes are there, if not, fetches them
-    pub fn get_classes(&mut self, store: &impl Storelike) -> AtomicResult<Vec<Class>> {
-        if self.classes.is_none() {
-            self.classes = Some(store.get_classes_for_subject(self.get_subject())?);
+    /// Checks if the classes are there, if not, fetches them.
+    /// Returns an empty vector if there are no classes found.
+    pub fn get_classes(&self, store: &impl Storelike) -> AtomicResult<Vec<Class>> {
+        let mut classes: Vec<Class> = Vec::new();
+        if let Ok(val) = self.get(crate::urls::IS_A) {
+            for class in val.to_vec()? {
+                classes.push(store.get_class(&class)?)
+            }
         }
-        let classes = self.classes.clone().unwrap();
         Ok(classes)
     }
 
     /// Returns all PropVals.
     /// Useful if you want to iterate over all Atoms / Properties.
-    pub fn get_propvals(&self) -> PropVals {
-        self.propvals.clone()
+    pub fn get_propvals(&self) -> &PropVals {
+        &self.propvals
     }
 
     /// Gets a value by its property shortname or property URL.
     // Todo: should use both the Classes AND the existing props
-    pub fn get_shortname(&self, shortname: &str, store: &impl Storelike) -> AtomicResult<Value> {
-        // If there is a class
-        for (url, _val) in self.propvals.iter() {
-            if let Ok(prop) = store.get_property(url) {
-                if prop.shortname == shortname {
-                    return Ok(self.get(url)?.clone());
-                }
-            }
-        }
-
-        if let Ok(val) = self.get(shortname) {
-            return Ok(val.clone());
-        }
-
-        Err(format!(
-            "No property found for shortname {} in resource {}",
-            shortname,
-            self.get_subject()
-        )
-        .into())
+    pub fn get_shortname(&self, shortname: &str, store: &impl Storelike) -> AtomicResult<&Value> {
+        let prop = self.resolve_shortname_to_property(shortname, store)?;
+        self.get(&prop.subject)
     }
 
     pub fn get_subject(&self) -> &String {
@@ -108,7 +98,6 @@ impl Resource {
         Resource {
             propvals,
             subject: subject.clone(),
-            classes: None,
             commit: CommitBuilder::new(subject),
         }
     }
@@ -117,8 +106,7 @@ impl Resource {
     /// The subject is generated, but can be changed.
     pub fn new_instance(class_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
-        let mut classes_vec = Vec::new();
-        classes_vec.push(store.get_class(class_url)?);
+        let class=  store.get_class(class_url)?;
         use rand::Rng;
         let random_string: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
@@ -128,18 +116,16 @@ impl Resource {
         let subject = format!(
             "{}/{}/{}",
             store.get_base_url(),
-            classes_vec[0].shortname.clone(),
+            &class.shortname,
             random_string
         );
-        let classes = Some(classes_vec);
         let mut resource = Resource {
             propvals,
             subject: subject.clone(),
-            classes,
             commit: CommitBuilder::new(subject),
         };
         let class_urls = Vec::from([String::from(class_url)]);
-        resource.set_propval(crate::urls::IS_A.into(), class_urls.into())?;
+        resource.set_propval(crate::urls::IS_A.into(), class_urls.into(), store)?;
         Ok(resource)
     }
 
@@ -150,9 +136,7 @@ impl Resource {
     ) -> AtomicResult<Resource> {
         let mut res = Resource::new(subject);
         for (prop_string, val_string) in resource_string {
-            let propertyfull = store.get_property(prop_string).expect("Prop not found");
-            let fullvalue = Value::new(val_string, &propertyfull.data_type)?;
-            res.set_propval(prop_string.into(), fullvalue)?;
+            res.set_propval_string(prop_string.into(), val_string, store)?;
         }
         Ok(res)
     }
@@ -165,40 +149,51 @@ impl Resource {
         self.commit.remove(property_url.into())
     }
 
-    /// Tries to resolve the shortname of a Property to a Property URL.
+    /// Tries to resolve the shortname of a Property to a Property.
     /// Currently only tries the shortnames for linked classes - not for other properties.
+    // TODO: Not spec compliant - does not use the correct order (required, recommended, other)
+    // TODO: Seems more costly then needed. Maybe resources need to keep a hashmap for resolving shortnames?
     pub fn resolve_shortname_to_property(
-        &mut self,
+        &self,
         shortname: &str,
         store: &impl Storelike,
-    ) -> AtomicResult<Option<Property>> {
+    ) -> AtomicResult<Property> {
+
+        // First, iterate over all existing properties, see if any of these work.
+        for (url, _val) in self.propvals.iter() {
+            if let Ok(prop) = store.get_property(url) {
+                if prop.shortname == shortname {
+                    return Ok(prop);
+                }
+            }
+        }
+
+        // If that fails, load the classes for the resource, iterate over these
         let classes = self.get_classes(store)?;
+
         // Loop over all Requires and Recommends props
         for class in classes {
             for required_prop in class.requires {
                 if required_prop.shortname == shortname {
-                    return Ok(Some(required_prop));
+                    return Ok(required_prop);
                 }
             }
             for recommended_prop in class.recommends {
                 if recommended_prop.shortname == shortname {
-                    return Ok(Some(recommended_prop));
+                    return Ok(recommended_prop);
                 }
             }
         }
-        Ok(None)
+        Err(format!("Shortname {} for {} not found", shortname, self.subject).into())
     }
 
-    /// Saves the resource (with all the changes) to the store by creating a Commit
-    /// Is currently blocked by
-    /// https://github.com/joepio/atomic/issues/45
-    /// Use store.
-    pub fn save(&mut self) -> AtomicResult<()> {
-        todo!();
-        // let agent = self.store.get_default_agent().ok_or("No default agent set!")?;
-        // let commit = self.get_commit_and_reset().sign(agent)?;
-        // self.store.commit(commit);
-        // Ok(())
+    /// Saves the resource (with all the changes) to the store by creating a Commit.
+    /// Uses default Agent to sign the Commit.
+    /// Returns the generated Commit.
+    pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<Resource> {
+        let agent = store.get_default_agent()?;
+        let commit = self.get_commit_and_reset().sign(&agent)?;
+        store.commit(commit)
     }
 
     /// Insert a Property/Value combination.
@@ -207,15 +202,34 @@ impl Resource {
     pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
-        self.set_propval(property_url, val)?;
+        println!("set property {} for {}", property_url, self.get_subject());
+        self.set_propval_unsafe(property_url, val)?;
         Ok(())
     }
 
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
     /// Adds it to the commit builder.
+    pub fn set_propval(&mut self, property: String, value: Value, store: &impl Storelike) -> AtomicResult<()> {
+        let required_datatype = store.get_property(&property)?.data_type;
+        if required_datatype == value.datatype() {
+            self.set_propval_unsafe(property, value)
+        } else {
+            Err(format!("Datatype for subject {}, property {}, value {} did not match. Wanted {}, got {}",
+            self.get_subject(),
+            property,
+            value.to_string(),
+            required_datatype,
+            value.datatype()
+        ).into())
+        }
+    }
+
     /// Does not validate property / datatype combination.
-    pub fn set_propval(&mut self, property: String, value: Value) -> AtomicResult<()> {
+    /// Inserts a Property/Value combination.
+    /// Overwrites existing.
+    /// Adds it to the commit builder.
+    pub fn set_propval_unsafe(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property.clone(), value.clone());
         self.commit.set(property, value.to_string());
         Ok(())
@@ -223,41 +237,28 @@ impl Resource {
 
     /// Sets a property / value combination.
     /// Property can be a shortname (e.g. 'description' instead of the full URL), if the Resource has a Class.
-    /// Validates the datatype.
     pub fn set_propval_by_shortname(&mut self, property: &str, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
             store.get_property(property)?
         } else {
             self.resolve_shortname_to_property(property, store)?
-                .ok_or(format!(
-                    "Shortname {} not found in {}",
-                    property,
-                    self.get_subject()
-                ))?
         };
         let fullval = Value::new(value, &fullprop.data_type)?;
-        self.set_propval(fullprop.subject, fullval)?;
+        self.set_propval_unsafe(fullprop.subject, fullval)?;
         Ok(())
     }
 
+    /// Changes the subject of the Resource.
+    /// TODO: Handle these changes in Commits
+    /// introduce 'move' command? https://github.com/joepio/atomic/issues/44
     pub fn set_subject(&mut self, url: String) {
         self.subject = url;
-        // TODO: change subject URL in commit, introduce 'move' command? https://github.com/joepio/atomic/issues/44
-    }
-
-    /// Converts a resource to a string only HashMap
-    pub fn to_plain(&self) -> HashMap<String, String> {
-        let mut hashmap: HashMap<String, String> = HashMap::new();
-        for (prop, val) in &mut self.propvals.clone().into_iter() {
-            hashmap.insert(prop, val.to_string());
-        }
-        hashmap
     }
 
     /// Serializes Resource to Atomic Data Triples (ad3), and NDJSON serialized representation.
     pub fn to_ad3(&self) -> AtomicResult<String> {
         let mut string = String::new();
-        let resource = self.to_plain();
+        let resource = self.to_resourcestring();
 
         for (property, value) in resource {
             let mut ad3_atom = serde_json::to_string(&vec![self.get_subject(), &property, &value])?;
@@ -281,7 +282,7 @@ impl Resource {
     ) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};
 
-        let resource = self.to_plain();
+        let resource = self.to_resourcestring();
 
         // Initiate JSON object
         let mut root = Map::new();
@@ -367,6 +368,15 @@ impl Resource {
         let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
 
         Ok(string)
+    }
+
+    /// Converts the Resource to a HashMap
+    pub fn to_resourcestring(&self) -> ResourceString  {
+        let mut rsting: ResourceString = HashMap::new();
+        for (prop, val) in self.get_propvals() {
+            let _ignore = rsting.insert(prop.into(), val.to_string());
+        }
+        rsting
     }
 
     // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
@@ -465,7 +475,7 @@ mod test {
             .commit_resource_changes_locally(&mut new_resource)
             .unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
-        let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
+        let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
             resource_from_store
                 .get_shortname("shortname", &store)
@@ -508,7 +518,7 @@ mod test {
         let commit = new_resource.get_commit_and_reset().sign(&agent).unwrap();
         store.commit(commit).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
-        let mut resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
+        let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
             resource_from_store
                 .get_shortname("shortname", &store)

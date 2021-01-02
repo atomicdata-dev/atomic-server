@@ -45,7 +45,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
               }
               Format::NT => {
                 //   let atoms = store.tpf(Some(&subject), None, None)?;
-                  let resource = store.get_resource_extended(&subject)?.to_plain();
+                  let resource = store.get_resource_extended(&subject)?.to_resourcestring();
                   let atoms = resourcestring_to_atoms(&subject, resource);
                   let out = serialize::atoms_to_ntriples(atoms, store)?;
                   println!("{}", out);

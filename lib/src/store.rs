@@ -75,7 +75,7 @@ impl Storelike for Store {
         Ok(())
     }
 
-    fn add_resource_string(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
+    fn add_resource_string_unsafe(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
         self.hashmap
             .lock()
             .unwrap()
@@ -108,7 +108,7 @@ impl Storelike for Store {
         };
         match resource {
             Some(_) => Err("This is not possible.".into()),
-            None => Ok(self.fetch_resource(resource_url)?),
+            None => Ok(self.fetch_resource(resource_url)?.to_resourcestring()),
         }
     }
 
@@ -235,6 +235,7 @@ mod test {
     #[test]
     fn get_external_resource() {
         let store = Store::init();
+        store.populate().unwrap();
         // If nothing happens - this is deadlock.
         store.get_resource_string(urls::CLASS).unwrap();
     }

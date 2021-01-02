@@ -1,7 +1,7 @@
 //! Functions for interacting with an Atomic Server
 use url::Url;
 
-use crate::{errors::AtomicResult, parse::parse_ad3, ResourceString};
+use crate::{Resource, Storelike, errors::AtomicResult, parse::parse_ad3};
 
 fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
     let resp = ureq::get(&url)
@@ -19,17 +19,17 @@ fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
 }
 
 /// Fetches a resource, makes sure its subject matches.
+/// Checks the datatypes for the Values.
 /// Ignores all atoms where the subject is different.
-pub fn fetch_resource(subject: &str) -> AtomicResult<ResourceString> {
+pub fn fetch_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Resource> {
     let atoms = fetch_basic(subject)?;
-
-    let mut resource = ResourceString::new();
+    let mut resource = Resource::new(subject.into());
     for atom in atoms {
         if atom.subject == subject {
-            resource.insert(atom.property, atom.value);
+            resource.set_propval_string(atom.property, &atom.value, store)?;
         }
     }
-    if resource.is_empty() {
+    if resource.get_propvals().is_empty() {
         return Err("No valid atoms in resource".into());
     }
     Ok(resource)
@@ -94,9 +94,10 @@ mod test {
     #[test]
     #[ignore]
     fn fetch_resource_basic() {
-        let resource = fetch_resource(crate::urls::SHORTNAME).unwrap();
+        let store = crate::Store::init();
+        let resource = fetch_resource(crate::urls::SHORTNAME, &store).unwrap();
         let shortname = resource.get(crate::urls::SHORTNAME).unwrap();
-        assert!(shortname == "shortname");
+        assert!(shortname.to_string() == "shortname");
     }
 
     #[test]

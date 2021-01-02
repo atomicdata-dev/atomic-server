@@ -1,7 +1,7 @@
 use crate::errors::BetterResult;
 use atomic_lib::atoms::RichAtom;
 use atomic_lib::values::Value;
-use atomic_lib::{storelike::Property, Atom, Storelike};
+use atomic_lib::{schema::Property, Atom, Storelike};
 use comrak::{markdown_to_html, ComrakOptions};
 use serde::Serialize;
 use tera::escape_html;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::atom::value_to_html;
 use crate::errors::BetterResult;
-use atomic_lib::{Storelike, Value, storelike::Property};
+use atomic_lib::{Storelike, Value, schema::Property};
 use serde::Serialize;
 
 /// Useful for rendering Atomic Data including a label

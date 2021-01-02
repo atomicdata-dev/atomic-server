@@ -1,17 +1,16 @@
 //! Datatypes constrain values of Atoms
 
-use std::fmt;
+use std::{fmt, string::ParseError};
 use serde::{Deserialize, Serialize};
 use crate::urls;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum DataType {
     AtomicUrl,
     Boolean,
     Date,
     Integer,
     Markdown,
-    NestedResource,
     ResourceArray,
     Slug,
     String,
@@ -34,6 +33,25 @@ pub fn match_datatype(string: &str) -> DataType {
     }
 }
 
+impl std::str::FromStr for DataType {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            urls::ATOMIC_URL => DataType::AtomicUrl,
+            urls::BOOLEAN => DataType::Boolean,
+            urls::DATE => DataType::Date,
+            urls::INTEGER => DataType::Integer,
+            urls::MARKDOWN => DataType::Markdown,
+            urls::RESOURCE_ARRAY => DataType::ResourceArray,
+            urls::SLUG => DataType::Slug,
+            urls::STRING => DataType::String,
+            urls::TIMESTAMP => DataType::Timestamp,
+            unsupported_datatype => DataType::Unsupported(unsupported_datatype.into()),
+        })
+    }
+}
+
 impl fmt::Display for DataType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -42,7 +60,6 @@ impl fmt::Display for DataType {
             DataType::Date => write!(f, "{}", urls::DATE),
             DataType::Integer => write!(f, "{}", urls::INTEGER),
             DataType::Markdown => write!(f, "{}", urls::MARKDOWN),
-            DataType::NestedResource => write!(f, "{}", urls::ATOMIC_URL),
             DataType::ResourceArray => write!(f, "{}", urls::RESOURCE_ARRAY),
             DataType::Slug => write!(f, "{}", urls::SLUG),
             DataType::String => write!(f, "{}", urls::STRING),

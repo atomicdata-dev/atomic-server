@@ -73,6 +73,7 @@ pub mod errors;
 pub mod mapping;
 pub mod parse;
 pub mod resources;
+pub mod schema;
 pub mod serialize;
 pub mod store;
 pub mod storelike;

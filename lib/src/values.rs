@@ -34,6 +34,25 @@ pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
+
+    /// Returns the datatype for the value
+    pub fn datatype(&self) -> DataType {
+        match self {
+            Value::AtomicUrl(_) => DataType::AtomicUrl,
+            Value::Date(_) => DataType::Date,
+            Value::Integer(_) => DataType::Integer,
+            Value::Markdown(_) => DataType::Markdown,
+            Value::ResourceArray(_) => DataType::ResourceArray,
+            Value::Slug(_) => DataType::Slug,
+            Value::String(_) => DataType::String,
+            Value::Timestamp(_) => DataType::Timestamp,
+            // TODO: these datatypes are not the same
+            Value::NestedResource(_) => DataType::AtomicUrl,
+            Value::Boolean(_) => DataType::Boolean,
+            Value::Unsupported(s) => DataType::Unsupported(s.datatype.clone())
+        }
+    }
+
     /// Creates a new Value from an explicit DataType.
     /// Fails if the input string does not convert.
     pub fn new(value: &str, datatype: &DataType) -> AtomicResult<Value> {
@@ -71,12 +90,6 @@ impl Value {
                     .map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e))?;
                 Ok(Value::Timestamp(val))
             }
-            DataType::NestedResource => {
-                let val: i64 = value
-                    .parse()
-                    .map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e))?;
-                Ok(Value::Timestamp(val))
-            }
             DataType::Unsupported(unsup_url) => Ok(Value::Unsupported(UnsupportedValue {
                 value: value.into(),
                 datatype: unsup_url.into(),
@@ -102,7 +115,7 @@ impl Value {
         if let Value::ResourceArray(arr) = self {
             return Ok(arr)
         }
-        Err("Value is not a Resource Array".into())
+        Err(format!("Value {} is not a Resource Array", self).into())
     }
 }
 
