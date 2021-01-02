@@ -168,10 +168,7 @@ impl CommitBuilder {
     /// Does not send it - see atomic_lib::client::post_commit
     /// Private key is the base64 encoded pkcs8 for the signer
     pub fn sign(self, agent: &crate::agents::Agent) -> AtomicResult<Commit> {
-        let created_at = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("You're a time traveler")
-            .as_millis();
+        let created_at = crate::datetime_helpers::now();
 
         let mut commit = Commit {
             subject: self.subject,

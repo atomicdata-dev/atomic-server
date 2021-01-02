@@ -10,7 +10,7 @@ pub struct TPFQuery {
     pub value: Option<String>,
 }
 
-/// Used to construct a Collection.
+/// Used to construct a Collection. Does not contain results / members.
 /// Has to be constructed using `Collection::new()` or `storelike.new_collection()`.
 pub struct CollectionBuilder {
     /// Full Subject URL of the resource, including query parameters
@@ -29,7 +29,35 @@ pub struct CollectionBuilder {
     pub page_size: usize,
 }
 
+impl CollectionBuilder {
+    pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
+        // TODO: Should not persist, because now it is spammimg the store!
+        // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
+        let mut resource = crate::Resource::new_instance(urls::COLLECTION, store)?;
+        resource.set_subject(self.subject.clone());
+        if let Some(prop) = &self.property {
+            resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), prop, store)?;
+        }
+        if let Some(val) = &self.value {
+            resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
+        }
+        resource.set_propval_string(
+            crate::urls::COLLECTION_CURRENT_PAGE.into(),
+            &self.current_page.to_string(),
+            store,
+        )?;
+        resource.set_propval(
+            crate::urls::COLLECTION_PAGE_SIZE.into(),
+            self.page_size.clone().into(),
+            store,
+        )?;
+        // Maybe include items directly
+        Ok(resource)
+    }
+}
+
 /// Dynamic resource used for ordering, filtering and querying content.
+/// Contains members / results. Use CollectionBuilder if you don't (yet) need the results.
 /// Features pagination.
 #[derive(Debug)]
 pub struct Collection {
@@ -57,7 +85,7 @@ pub struct Collection {
 
 impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
-    pub fn new(
+    pub fn new_with_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
@@ -203,7 +231,7 @@ pub fn construct_collection(
         current_page,
         page_size,
     };
-    let collection = Collection::new(store, collection_builder)?;
+    let collection = Collection::new_with_members(store, collection_builder)?;
     Ok(collection.to_resource(store)?)
 }
 
@@ -227,7 +255,7 @@ mod test {
             page_size: 1000,
             current_page: 0,
         };
-        let collection = store.new_collection(collection_builder).unwrap();
+        let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 
@@ -245,7 +273,7 @@ mod test {
             page_size: 1000,
             current_page: 0,
         };
-        let collection = Collection::new(&store, collection_builder).unwrap();
+        let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 

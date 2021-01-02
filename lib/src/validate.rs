@@ -29,7 +29,7 @@ pub fn validate_store(
 
         if fetch_items {
             match crate::client::fetch_resource(&subject, store) {
-                Ok(_) => {},
+                Ok(_) => {}
                 Err(e) => unfetchable.push((subject.clone(), e.to_string())),
             }
         }
@@ -66,14 +66,21 @@ pub fn validate_store(
         for class in classes {
             println!("Class: {:?}", class.shortname);
             println!("Found: {:?}", found_props);
-            for required_prop in class.requires {
-                println!("Required: {:?}", required_prop.shortname);
-                if !found_props.contains(&required_prop.subject) {
-                    missing_props.push((
-                        subject.clone(),
-                        required_prop.subject.clone(),
-                        class.subject.clone(),
-                    ));
+            for required_prop_subject in class.requires {
+                match store.get_property(&required_prop_subject) {
+                    Ok(required_prop) => {
+                        println!("Required: {:?}", required_prop.shortname);
+                        if !found_props.contains(&required_prop.subject) {
+                            missing_props.push((
+                                subject.clone(),
+                                required_prop.subject.clone(),
+                                class.subject.clone(),
+                            ));
+                        }
+                    }
+                    Err(e) => {
+                        unfetchable.push((required_prop_subject, e.to_string()))
+                    }
                 }
             }
         }

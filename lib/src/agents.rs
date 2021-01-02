@@ -1,11 +1,27 @@
 //! Logic for Agents - which are like Users
 
+use crate::{Resource, Storelike, errors::AtomicResult, urls};
+
 #[derive(Clone)]
 pub struct Agent {
   /// Private key for signing commits
   pub key: String,
   /// URL of the Agent
   pub subject: String,
+  pub created_at: u64,
+  pub name: String,
+}
+
+impl Agent {
+  pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
+    let keypair = crate::agents::generate_keypair();
+    let mut agent = Resource::new_instance(urls::AGENT, store)?;
+    agent.set_subject(self.subject.clone());
+    agent.set_propval_string(crate::urls::NAME.into(), &self.name, store)?;
+    agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &keypair.public, store)?;
+    agent.set_propval_string(crate::urls::CREATED_AT.into(), &self.created_at.to_string(), store)?;
+    Ok(agent)
+  }
 }
 
 /// PKCS#8 keypair, serialized using base64

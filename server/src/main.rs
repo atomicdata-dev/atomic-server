@@ -19,7 +19,7 @@ async fn main() -> io::Result<()> {
 
     let config = config::init();
     let https = config.https;
-    let appstate = appstate::init(config.clone()).expect("Failed to build appstate.");
+    let appstate = appstate::init(config.clone()).expect("Failed to build appstate. Your database might be corrupt. The migrations might have failed. Go back to an older version and create an export.");
 
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));

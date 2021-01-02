@@ -42,12 +42,14 @@ pub fn render_collection(
         // Add every new property to the header
         // Currently only adds props from the Class, not randomly used properties.
         for class in classes {
-            for prop in class.requires {
+            for prop_subject in class.requires {
+            let prop = store.get_property(&prop_subject)?;
                 if !header.contains(&prop) {
                     header.push(prop);
                 }
             }
-            for prop in class.recommends {
+            for prop_subject in class.recommends {
+                let prop = store.get_property(&prop_subject)?;
                 if !header.contains(&prop) {
                     header.push(prop);
                 }

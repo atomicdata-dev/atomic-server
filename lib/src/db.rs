@@ -162,7 +162,6 @@ impl Storelike for Db {
     }
 
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
-        println!("get resource {}", subject);
         let propvals = self.get_propvals(subject);
 
         match propvals {

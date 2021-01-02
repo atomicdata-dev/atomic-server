@@ -1,7 +1,7 @@
 //! Trait for all stores to use
 
-use crate::{schema::{Class, Property}, urls};
-use crate::{collections::Collection, errors::AtomicResult};
+use crate::{agents::Agent, datetime_helpers, schema::{Class, Property}, urls};
+use crate::errors::AtomicResult;
 use crate::{
     datatype::DataType,
     mapping::Mapping,
@@ -32,6 +32,7 @@ pub trait Storelike: Sized {
     /// Replaces existing resource with the contents.
     /// In most cases, you should use `.commit()` instead.
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        resource.check_required_props(self)?;
         self.add_resource_string_unsafe(resource.get_subject().clone(), &resource.to_resourcestring())?;
         Ok(())
     }
@@ -135,10 +136,7 @@ pub trait Storelike: Sized {
     /// Signs the Commit using the Default Agent.
     /// Does not send it to an Atomic Server.
     /// Fails if no Default Agent is set.
-    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()>
-    where
-        Self: std::marker::Sized,
-    {
+    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()> {
         let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         self.commit(commit)?;
@@ -149,10 +147,7 @@ pub trait Storelike: Sized {
     /// Signs the Commit using the Default Agent.
     /// Sends the Commit to the Atomic Server of the Subject.
     /// Fails if no Default Agent is set.
-    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()>
-    where
-        Self: std::marker::Sized,
-    {
+    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()> {
         let agent = self.get_default_agent()?;
         let commit = resource.get_commit_and_reset().sign(&agent)?;
         crate::client::post_commit(&commit)?;
@@ -171,15 +166,13 @@ pub trait Storelike: Sized {
     {
         let subject = format!("{}agents/{}", self.get_base_url(), name);
         let keypair = crate::agents::generate_keypair();
-        let mut agent = Resource::new_instance(urls::AGENT, self)?;
-        agent.set_subject(subject.clone());
-        agent.set_propval_string(crate::urls::NAME.into(), name, self)?;
-        agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &keypair.public, self)?;
-        self.add_resource(&agent)?;
-        let agent = crate::agents::Agent {
-            subject,
+        let agent = Agent {
             key: keypair.private,
+            subject,
+            created_at: datetime_helpers::now() as u64,
+            name: name.to_string(),
         };
+        self.add_resource(&agent.to_resource(self)?)?;
         Ok(agent)
     }
 
@@ -187,6 +180,7 @@ pub trait Storelike: Sized {
     /// Save to the store.
     /// Only adds atoms with matching subjects will be added.
     fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {
+        println!("fetching {}", subject);
         let resource: Resource = crate::client::fetch_resource(subject, self)?;
         self.add_resource(&resource)?;
         Ok(resource)
@@ -196,7 +190,9 @@ pub trait Storelike: Sized {
     /// Note that this does _not_ construct dynamic Resources, such as collections.
     /// If you're not sure what to use, use `get_resource_extended`.
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
+        println!("Get resource {}", subject);
         let resource_string = self.get_resource_string(subject)?;
+        println!("got resource string {}", subject);
         let mut res = Resource::new(subject.into());
         for (prop_string, val_string) in resource_string {
             let propertyfull = self.get_property(&prop_string)?;
@@ -211,33 +207,11 @@ pub trait Storelike: Sized {
 
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &str) -> AtomicResult<Class> {
+        println!("Get class {}", subject);
 
         let resource = self.get_resource(subject)?;
-
-        let mut requires = Vec::new();
-        if let Ok(reqs) = resource.get(urls::REQUIRES) {
-            for prop_sub in reqs.to_vec()? {
-                requires.push(self.get_property(prop_sub)?)
-            }
-        }
-
-        let mut recommends = Vec::new();
-        if let Ok(recs) = resource.get(urls::RECOMMENDS) {
-            for rec_subject in recs.to_vec()? {
-               recommends.push(self.get_property(rec_subject)?)
-           }
-        }
-
-        let shortname = resource.get(urls::SHORTNAME)?.to_string();
-        let description = resource.get(urls::DESCRIPTION)?.to_string();
-
-        Ok(Class {
-            requires,
-            recommends,
-            shortname,
-            subject: subject.into(),
-            description,
-        })
+        println!("Got class {}", resource.get_subject());
+        Class::from_resource(resource)
     }
 
     /// Finds all classes (isA) for any subject.
@@ -247,35 +221,11 @@ pub trait Storelike: Sized {
         Ok(classes)
     }
 
-    /// Constructs a Collection, which is a paginated list of items with some sorting applied.
-    fn new_collection(
-        &self,
-        collection_builder: crate::collections::CollectionBuilder,
-    ) -> AtomicResult<Collection> {
-        crate::collections::Collection::new(self, collection_builder)
-    }
-
     /// Fetches a property by URL, returns a Property instance
-    fn get_property(&self, url: &str) -> AtomicResult<Property> {
-        let prop = self.get_resource(url)?;
+    fn get_property(&self, subject: &str) -> AtomicResult<Property> {
+        println!("Get propert {} ", subject);
+        let prop = self.get_resource(subject)?;
         Property::from_resource(prop)
-
-        // let prop = self.get_resource(url)?;
-        // let data_type = prop.get(urls::DATATYPE_PROP)?.to_string().parse()?;
-        // let shortname = prop.get(urls::SHORTNAME)?.to_string();
-        // let description = prop.get(urls::DESCRIPTION)?.to_string();
-        // let class_type = match prop.get(urls::CLASSTYPE_PROP){
-        //     Ok(classtype) => Some(classtype.to_string()),
-        //     Err(_) => None,
-        // };
-
-        // Ok(Property {
-        //     class_type,
-        //     data_type,
-        //     shortname,
-        //     description,
-        //     subject: url.into()
-        // })
     }
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
@@ -528,7 +478,6 @@ pub trait Storelike: Sized {
         is_a.set_propval_unsafe(urls::CLASSTYPE_PROP.into(), Value::AtomicUrl(urls::CLASS.into()))?;
         self.add_resource_unsafe(&is_a)?;
 
-
         let shortname = Property {
             class_type: None,
             data_type: DataType::Slug,
@@ -574,15 +523,37 @@ pub trait Storelike: Sized {
         }.to_resource()?;
         self.add_resource_unsafe(&classtype)?;
 
+        let property = Class {
+            requires: vec![urls::SHORTNAME.into()],
+            recommends: vec![],
+            shortname: "property".into(),
+            description: "A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`.".into(),
+            subject: urls::PROPERTY.into(),
+        }
+        .to_resource()?;
+        self.add_resource_unsafe(&property)?;
+
+        let class = Class {
+            requires: vec![urls::SHORTNAME.into(), urls::DESCRIPTION.into()],
+            recommends: vec![urls::RECOMMENDS.into(), urls::REQUIRES.into()],
+            shortname: "class".into(),
+            description: "A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data and explains what the thing represents. It is convention to use Uppercase in its URL. Note that in Atomic Data, a Resource can have several Classes - not just a single one.".into(),
+            subject: urls::CLASS.into(),
+        }
+        .to_resource()?;
+        self.add_resource_unsafe(&class)?;
+
         println!("properties set correctly");
 
         let ad3 = include_str!("../defaults/default_store.ad3");
         let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
         self.add_atoms(atoms)?;
 
+        println!("atoms set correctly");
+
         use crate::collections::CollectionBuilder;
 
-        let classes = &self.new_collection(CollectionBuilder {
+        let classes = CollectionBuilder {
             subject: format!("{}classes", self.get_base_url()),
             property: Some(urls::IS_A.into()),
             value: Some(urls::CLASS.into()),
@@ -590,8 +561,11 @@ pub trait Storelike: Sized {
             sort_desc: false,
             page_size: 1000,
             current_page: 0,
-        })?.to_resource(self)?;
-        self.add_resource(classes)?;
+        };
+        println!("collection resource created");
+        self.add_resource_unsafe(&classes.to_resource(self)?)?;
+
+        println!("first collection done");
 
         let properties = CollectionBuilder {
             subject: format!("{}properties", self.get_base_url()),
@@ -602,7 +576,7 @@ pub trait Storelike: Sized {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(properties)?.to_resource(self)?)?;
+        self.add_resource_unsafe(&properties.to_resource(self)?)?;
 
         let commits = CollectionBuilder {
             subject: format!("{}commits", self.get_base_url()),
@@ -613,7 +587,7 @@ pub trait Storelike: Sized {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(commits)?.to_resource(self)?)?;
+        self.add_resource_unsafe(&commits.to_resource(self)?)?;
 
         let agents = CollectionBuilder {
             subject: format!("{}agents", self.get_base_url()),
@@ -624,7 +598,7 @@ pub trait Storelike: Sized {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(agents)?.to_resource(self)?)?;
+        self.add_resource_unsafe(&agents.to_resource(self)?)?;
 
         let collections = CollectionBuilder {
             subject: format!("{}collections", self.get_base_url()),
@@ -635,7 +609,9 @@ pub trait Storelike: Sized {
             page_size: 1000,
             current_page: 0,
         };
-        self.add_resource(&self.new_collection(collections)?.to_resource(self)?)?;
+        self.add_resource_unsafe(&collections.to_resource(self)?)?;
+
+        println!("collections set correctly");
 
         Ok(())
     }

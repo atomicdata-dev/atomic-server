@@ -89,6 +89,8 @@ pub fn post_commit_custom_endpoint(endpoint: &str, commit: &crate::Commit) -> At
 
 #[cfg(test)]
 mod test {
+    use crate::datetime_helpers;
+
     use super::*;
 
     #[test]
@@ -107,6 +109,8 @@ mod test {
         let agent = crate::agents::Agent {
             subject: "test".into(),
             key: "test".into(),
+            name: "testname".into(),
+            created_at: datetime_helpers::now() as u64,
         };
         let commit = crate::commit::CommitBuilder::new("subject".into())
             .sign(&agent)
