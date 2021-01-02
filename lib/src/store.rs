@@ -7,7 +7,6 @@ use crate::{Resource, errors::AtomicResult};
 use crate::{
     atoms::Atom,
     storelike::{ResourceCollection, Storelike},
-    ResourceString,
 };
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
 
@@ -20,10 +19,8 @@ pub struct Store {
 }
 
 impl Store {
-    /// Create an empty Store. This is where you start.
-    ///
-    /// # Example
-    /// let store = Store::init();
+    /// Creates an empty Store.
+    /// Run `.populate()` to get useful standard models loaded into your store.
     pub fn init() -> Store {
         Store {
             hashmap: Arc::new(Mutex::new(HashMap::new())),
@@ -128,18 +125,6 @@ impl Storelike for Store {
         self.handle_not_found(subject)
     }
 
-    fn get_resource_string(&self, subject: &str) -> AtomicResult<ResourceString> {
-        println!("getting resource string {}", subject);
-        let resource = if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
-            resource.to_resourcestring()
-        } else {
-            let resource = crate::client::fetch_resource(subject)?;
-            self.add_resource(resource)?;
-            resource
-        };
-        Ok(resource)
-    }
-
     fn remove_resource(&self, subject: &str) {
         self.hashmap.lock().unwrap().remove_entry(subject);
     }
@@ -186,12 +171,12 @@ mod test {
     #[test]
     fn get() {
         let store = init_store();
-        let my_resource = store.get_resource_string("_:test").unwrap();
+        let my_resource = store.get_resource("_:test").unwrap();
         let my_value = my_resource
             .get("https://atomicdata.dev/properties/shortname")
             .unwrap();
         println!("My value: {}", my_value);
-        assert!(my_value == "hi");
+        assert!(my_value.to_string() == "hi");
     }
 
     #[test]
@@ -285,7 +270,7 @@ mod test {
         let store = Store::init();
         store.populate().unwrap();
         // If nothing happens - this night be deadlock.
-        store.get_resource_string(urls::CLASS).unwrap();
+        store.get_resource(urls::CLASS).unwrap();
     }
 
     #[test]

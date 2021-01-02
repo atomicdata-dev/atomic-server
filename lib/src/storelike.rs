@@ -1,13 +1,13 @@
 //! Trait for all stores to use
 
-use crate::{agents::Agent, datetime_helpers, schema::{Class, Property}, urls};
 use crate::errors::AtomicResult;
 use crate::{
-    mapping::Mapping,
-    resources::{ResourceString},
-    values::Value,
-    Atom, Resource, RichAtom,
+    agents::Agent,
+    datetime_helpers,
+    schema::{Class, Property},
+    urls,
 };
+use crate::{mapping::Mapping, resources::ResourceString, values::Value, Atom, Resource, RichAtom};
 
 // A path can return one of many things
 pub enum PathReturn {
@@ -36,10 +36,6 @@ pub trait Storelike: Sized {
     /// Replaces existing resource with the contents.
     /// Does not do any validations.
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()>;
-
-    /// Returns a hashmap ResourceString with string Values.
-    /// Fetches the resource if it is not in the store.
-    fn get_resource_string(&self, subject: &str) -> AtomicResult<ResourceString>;
 
     /// Returns the root URL where the store is hosted.
     /// E.g. `https://example.com`
@@ -91,7 +87,7 @@ pub trait Storelike: Sized {
         if let Some(destroy) = commit.destroy {
             if destroy {
                 self.remove_resource(&commit.subject);
-                return Ok(commit_resource)
+                return Ok(commit_resource);
             }
         }
         let mut resource = match self.get_resource(&commit.subject) {
@@ -218,36 +214,18 @@ pub trait Storelike: Sized {
     ///
     fn handle_not_found(&self, subject: &str) -> AtomicResult<Resource> {
         if subject.starts_with(&self.get_base_url()) {
-            return Err(format!(
-                "Failed to retrieve {}, does not exist locally",
-                subject
-            )
-            .into());
+            return Err(format!("Failed to retrieve {}, does not exist locally", subject).into());
         }
 
         match self.fetch_resource(subject) {
             Ok(got) => Ok(got),
-            Err(e) => Err(format!(
-                "Failed to retrieve {} from the web: {}",
-                subject, e
-            )
-            .into()),
+            Err(e) => Err(format!("Failed to retrieve {} from the web: {}", subject, e).into()),
         }
     }
 
     /// Returns a collection with all resources in the store.
     /// WARNING: This could be very expensive!
     fn all_resources(&self) -> ResourceCollection;
-
-    /// Finds the shortname for some property URL
-    fn property_url_to_shortname(&self, url: &str) -> AtomicResult<String> {
-        let resource = self.get_resource_string(url)?;
-        let property_resource = resource
-            .get(urls::SHORTNAME)
-            .ok_or(format!("Could not get shortname prop for {}", url))?;
-
-        Ok(property_resource.into())
-    }
 
     /// Removes a resource from the store
     fn remove_resource(&self, subject: &str);
@@ -290,7 +268,11 @@ pub trait Storelike: Sized {
         if !hassub && !hasprop && !hasval {
             for resource in self.all_resources() {
                 for (property, value) in resource.get_propvals() {
-                    vec.push(Atom::new(resource.get_subject().clone(), property.clone(), value.to_string()))
+                    vec.push(Atom::new(
+                        resource.get_subject().clone(),
+                        property.clone(),
+                        value.to_string(),
+                    ))
                 }
             }
             return Ok(vec);
@@ -374,7 +356,6 @@ pub trait Storelike: Sized {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        // let mut resource = self.get_resource_string(&subject)?;
         let mut resource = self.get_resource_extended(&subject)?;
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...

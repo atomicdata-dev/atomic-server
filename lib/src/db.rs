@@ -147,19 +147,6 @@ impl Storelike for Db {
         }
     }
 
-    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
-        let propvals = self.get_propvals(resource_url);
-        match propvals {
-            Ok(propvals) => {
-                let resource = crate::resources::propvals_to_resourcestring(propvals);
-                Ok(resource)
-            }
-            Err(_e) => {
-                Ok(self.handle_not_found(resource_url)?.to_resourcestring())
-            }
-        }
-    }
-
     fn all_resources(&self) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         for item in self.resources.into_iter() {
