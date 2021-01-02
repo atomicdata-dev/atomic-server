@@ -204,7 +204,6 @@ impl Resource {
     pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = store.get_property(&property_url)?;
         let val = Value::new(value, &fullprop.data_type)?;
-        println!("set in {} property {}", self.get_subject(), property_url);
         self.set_propval_unsafe(property_url, val)?;
         Ok(())
     }
@@ -382,14 +381,14 @@ impl Resource {
     }
 
     // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
-    // pub fn to_atoms(&self) -> Vec<RichAtom> {
-    //     let mut atoms: Vec<RichAtom> = Vec::new();
-    //     for (property, value) in self.propvals.iter() {
-    //         let atom = RichAtom::new(self.subject, property, value).unwrap();
-    //         atoms.push(value);
-    //     }
-    //     atoms
-    // }
+    pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
+        let mut atoms: Vec<Atom> = Vec::new();
+        for (property, value) in self.propvals.iter() {
+            let atom = Atom::new(self.subject.to_string(), property.clone(), value.to_string());
+            atoms.push(atom);
+        }
+        Ok(atoms)
+    }
 }
 
 /// A plainstring hashmap, which represents a possibly unvalidated Atomic Resource.

@@ -3,7 +3,7 @@
 //! Currently, it can only persist its data as .ad3 (Atomic Data Triples) to disk.
 //! A more robust persistent storage option will be used later, such as: https://github.com/TheNeikos/rustbreak
 
-use crate::errors::AtomicResult;
+use crate::{Resource, errors::AtomicResult};
 use crate::{
     atoms::Atom,
     storelike::{ResourceCollection, Storelike},
@@ -15,7 +15,7 @@ use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
 #[derive(Clone)]
 pub struct Store {
     // The store currently holds two stores - that is not ideal
-    hashmap: Arc<Mutex<HashMap<String, ResourceString>>>,
+    hashmap: Arc<Mutex<HashMap<String, Resource>>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
 }
 
@@ -46,9 +46,8 @@ impl Store {
     /// Serializes the current store and saves to path
     pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
-        for (subject, _) in self.all_resources() {
-            let resourcestring = self.get_resource(&subject)?.to_ad3()?;
-            file_string.push_str(&*resourcestring);
+        for resource in self.all_resources() {
+            file_string.push_str(&*resource.to_ad3()?);
         }
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
             .expect("Unable to create dirs");
@@ -58,38 +57,53 @@ impl Store {
 }
 
 impl Storelike for Store {
+
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
-        let mut hm = self.hashmap.lock().unwrap();
+        // Start with a nested HashMap, containing only strings.
+        let mut map: HashMap<String, Resource> = HashMap::new();
         for atom in atoms {
-            match hm.get_mut(&atom.subject) {
+            match map.get_mut(&atom.subject) {
+                // Resource exists in map
                 Some(resource) => {
-                    resource.insert(atom.property, atom.value);
+                    resource.set_propval_string(atom.property, &atom.value, self)?;
                 }
+                // Resource does not exist
                 None => {
-                    let mut resource: ResourceString = HashMap::new();
-                    resource.insert(atom.property, atom.value);
-                    hm.insert(atom.subject, resource);
+                    let mut resource = Resource::new(atom.subject.clone());
+                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                    map.insert(atom.subject, resource);
                 }
             }
+        }
+        for (_subject, resource) in map.iter() {
+            self.add_resource(resource)?
         }
         Ok(())
     }
 
-    fn add_resource_string_unsafe(
-        &self,
-        subject: String,
-        resource: &ResourceString,
-    ) -> AtomicResult<()> {
-        println!("adding ressource string {}", subject);
+    /// Adds a Resource to the store.
+    /// Replaces existing resource with the contents.
+    /// In most cases, you should use `.commit()` instead.
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        resource.check_required_props(self)?;
+        self.add_resource_unsafe(resource)?;
+        Ok(())
+    }
+
+    fn add_resource_unsafe(&self, resource: &crate::Resource) -> AtomicResult<()> {
         self.hashmap
             .lock()
             .unwrap()
-            .insert(subject, resource.clone());
+            .insert(resource.get_subject().into(), resource.clone());
         Ok(())
     }
 
     fn all_resources(&self) -> ResourceCollection {
-        self.hashmap.lock().unwrap().clone().into_iter().collect()
+        let mut all = Vec::new();
+        for (_subject, resource) in self.hashmap.lock().unwrap().clone().into_iter() {
+            all.push(resource)
+        }
+        all
     }
 
     fn get_base_url(&self) -> String {
@@ -105,17 +119,25 @@ impl Storelike for Store {
         }
     }
 
-    fn get_resource_string(&self, resource_url: &str) -> AtomicResult<ResourceString> {
-        println!("getting resource stinrg {}", resource_url);
-        let resource: Option<ResourceString> = match self.hashmap.lock().unwrap().get(resource_url)
-        {
-            Some(result) => return Ok(result.clone()),
-            None => None,
-        };
-        match resource {
-            Some(_) => Err("This is not possible.".into()),
-            None => Ok(self.fetch_resource(resource_url)?.to_resourcestring()),
+    fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
+        println!("get_resource {}", subject);
+        if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
+            return Ok(resource.clone())
         }
+        println!("resource not found {}", subject);
+        self.handle_not_found(subject)
+    }
+
+    fn get_resource_string(&self, subject: &str) -> AtomicResult<ResourceString> {
+        println!("getting resource string {}", subject);
+        let resource = if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
+            resource.to_resourcestring()
+        } else {
+            let resource = crate::client::fetch_resource(subject)?;
+            self.add_resource(resource)?;
+            resource
+        };
+        Ok(resource)
     }
 
     fn remove_resource(&self, subject: &str) {
@@ -143,6 +165,22 @@ mod test {
         println!("3");
         store.add_atoms(atoms).unwrap();
         store
+    }
+
+    #[test]
+    fn populate_base_models() {
+        let store = Store::init();
+        crate::populate::populate_base_models(&store).unwrap();
+        let property=  store.get_property(urls::DESCRIPTION).unwrap();
+        assert_eq!(property.shortname, "description")
+    }
+
+    #[test]
+    fn single_get_empty_server_to_class() {
+        let store = Store::init();
+        crate::populate::populate_base_models(&store).unwrap();
+        let agent=  store.get_class(urls::AGENT).unwrap();
+        assert_eq!(agent.shortname, "agent")
     }
 
     #[test]
@@ -246,7 +284,7 @@ mod test {
     fn get_external_resource() {
         let store = Store::init();
         store.populate().unwrap();
-        // If nothing happens - this is deadlock.
+        // If nothing happens - this night be deadlock.
         store.get_resource_string(urls::CLASS).unwrap();
     }
 

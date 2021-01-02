@@ -73,6 +73,7 @@ pub mod datatype;
 pub mod errors;
 pub mod mapping;
 pub mod parse;
+pub mod populate;
 pub mod resources;
 pub mod schema;
 pub mod serialize;

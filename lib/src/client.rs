@@ -1,7 +1,7 @@
 //! Functions for interacting with an Atomic Server
 use url::Url;
 
-use crate::{Resource, Storelike, errors::AtomicResult, parse::parse_ad3};
+use crate::{Resource, ResourceString, Storelike, errors::AtomicResult, parse::parse_ad3};
 
 fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
     let resp = ureq::get(&url)
@@ -21,9 +21,11 @@ fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
 /// Fetches a resource, makes sure its subject matches.
 /// Checks the datatypes for the Values.
 /// Ignores all atoms where the subject is different.
+/// WARNING: Calls store methods, and is called by store methods, might get stuck in a loop!
 pub fn fetch_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Resource> {
     let atoms = fetch_basic(subject)?;
     let mut resource = Resource::new(subject.into());
+    println!("!!!!!!!!!!!!! inside fetch {}", subject);
     for atom in atoms {
         if atom.subject == subject {
             resource.set_propval_string(atom.property, &atom.value, store)?;
@@ -32,6 +34,26 @@ pub fn fetch_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Res
     if resource.get_propvals().is_empty() {
         return Err("No valid atoms in resource".into());
     }
+    println!("!!!!!!!!!!!!! outside fetch {}", subject);
+    Ok(resource)
+}
+
+/// Fetches a resource, makes sure its subject matches.
+/// Checks the datatypes for the Values.
+/// Ignores all atoms where the subject is different.
+pub fn fetch_resource_string(subject: &str) -> AtomicResult<ResourceString> {
+    let atoms = fetch_basic(subject)?;
+    let mut resource = ResourceString::new();
+    println!("inside fetch {}", subject);
+    for atom in atoms {
+        if atom.subject == subject {
+            resource.insert(atom.property, atom.value);
+        }
+    }
+    if resource.is_empty() {
+        return Err("No valid atoms in resource".into());
+    }
+    println!("done fetch {}", subject);
     Ok(resource)
 }
 

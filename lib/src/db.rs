@@ -83,25 +83,6 @@ impl Db {
             None => Err(format!("Resource {} not found", subject).into()),
         }
     }
-
-    fn handle_not_found(&self, subject: &str) -> AtomicResult<Resource> {
-        if subject.starts_with(&self.base_url) {
-            return Err(format!(
-                "Failed to retrieve {}, does not exist locally",
-                subject
-            )
-            .into());
-        }
-
-        match self.fetch_resource(subject) {
-            Ok(got) => Ok(got),
-            Err(e) => Err(format!(
-                "Failed to retrieve {} from the web: {}",
-                subject, e
-            )
-            .into()),
-        }
-    }
 }
 
 impl Storelike for Db {
@@ -133,21 +114,12 @@ impl Storelike for Db {
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
-        println!("Add resource {}", resource.get_subject());
         resource.check_required_props(self)?;
         self.set_propvals(resource.get_subject(), &resource.get_propvals())
     }
 
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()> {
         self.set_propvals(resource.get_subject(), &resource.get_propvals())
-    }
-
-    fn add_resource_string_unsafe(&self, subject: String, resource: &ResourceString) -> AtomicResult<()> {
-        let resource =
-            crate::resources::Resource::new_from_resource_string(subject, resource, self)?;
-        self.add_resource(&resource)?;
-        // Note that this does not do anything with indexes, so it might have to be replaced!
-        Ok(())
     }
 
     fn get_base_url(&self) -> String {
@@ -170,7 +142,6 @@ impl Storelike for Db {
                 Ok(resource)
             }
             Err(_e) => {
-                println!("resource not found {} {} ", subject, _e);
                 self.handle_not_found(subject)
             }
         }
@@ -195,8 +166,8 @@ impl Storelike for Db {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
             let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
             let propvals: PropVals = bincode::deserialize(&resource_bin).expect(DB_CORRUPT_MSG);
-            let resource: ResourceString = crate::resources::propvals_to_resourcestring(propvals);
-            resources.push((subject, resource));
+            let resource = Resource::from_propvals(propvals, subject);
+            resources.push(resource);
         }
         resources
     }
