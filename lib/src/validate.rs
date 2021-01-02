@@ -146,7 +146,7 @@ mod test {
 
     #[test]
     fn validate_populated() {
-        let store = Store::init();
+        let store = Store::init().unwrap();
         store.populate().unwrap();
         let report = store.validate();
         assert!(report.atom_count > 30);
@@ -156,7 +156,7 @@ mod test {
 
     #[test]
     fn invalid_ad3() {
-        let store = Store::init();
+        let store = Store::init().unwrap();
         let ad3 = r#"["https://example.com","https://example.com","[\"https://atomicdata.dev/classes/Class\"]"]"#;
         let atoms = parse_ad3(ad3).unwrap();
         store.add_atoms(atoms).unwrap();

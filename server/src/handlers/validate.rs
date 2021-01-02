@@ -22,7 +22,7 @@ pub async fn validate(
     let context = data.lock().unwrap();
     // let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
-    let tempstore = atomic_lib::Store::init();
+    let tempstore = atomic_lib::Store::init()?;
     log::info!("validate {:?}", query.ad3);
     let report: String = match query.ad3.as_ref() {
         Some(ad3) => {

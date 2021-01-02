@@ -6,7 +6,6 @@ use std::{collections::HashMap, sync::{Arc, Mutex}};
 use crate::{
     errors::AtomicResult,
     resources::PropVals,
-    resources::ResourceString,
     storelike::{ResourceCollection, Storelike},
     Atom, Resource,
 };

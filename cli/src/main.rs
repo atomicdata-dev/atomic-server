@@ -203,7 +203,7 @@ fn main() -> AtomicResult<()> {
         // let store_path = &user_store_path;
         // let store = atomic_lib::Db::init(store_path).expect("Failed opening store. Is another program using it?");
     }
-    let store = atomic_lib::Store::init();
+    let store = atomic_lib::Store::init()?;
     store.populate()?;
 
     let mut context = Context {
