@@ -119,11 +119,9 @@ impl Storelike for Store {
     }
 
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
-        println!("get_resource {}", subject);
         if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
             return Ok(resource.clone())
         }
-        println!("resource not found {}", subject);
         self.handle_not_found(subject)
     }
 
@@ -145,11 +143,8 @@ mod test {
         let string =
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let store = Store::init().unwrap();
-        println!("1");
         store.populate().unwrap();
-        println!("2");
         let atoms = parse_ad3(&string).unwrap();
-        println!("3");
         store.add_atoms(atoms).unwrap();
         store
     }
@@ -166,6 +161,7 @@ mod test {
     fn single_get_empty_server_to_class() {
         let store = Store::init().unwrap();
         crate::populate::populate_base_models(&store).unwrap();
+        // Should fetch the agent class, since it's not in the store
         let agent=  store.get_class(urls::AGENT).unwrap();
         assert_eq!(agent.shortname, "agent")
     }
@@ -194,9 +190,10 @@ mod test {
             // 'requires' should be an array, but is a string
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
         let atoms = parse_ad3(&invalid_ad3).unwrap();
-        store.add_atoms(atoms).unwrap();
-        let report = store.validate();
-        assert!(!report.is_valid());
+        store.add_atoms(atoms).unwrap_err();
+        // Throws an error before we even need to validate. Which is good. Maybe the validate function should accept something different.
+        // let report = store.validate();
+        // assert!(!report.is_valid());
     }
 
     #[test]

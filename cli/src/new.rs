@@ -100,7 +100,7 @@ fn prompt_instance<'a>(
         }
     }
 
-    context.store.commit_resource_changes_externally(&mut new_resource)?;
+    new_resource.save(&context.store)?;
 
     println!("{} created with URL: {}", &class.shortname, &subject);
 

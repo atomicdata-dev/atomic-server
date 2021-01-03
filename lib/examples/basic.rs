@@ -41,13 +41,13 @@ fn main() {
     // Because these are signed, we need an Agent, which has a private key to sign Commits.
     let agent = store.create_agent("my_agent").unwrap();
     store.set_default_agent(agent);
-    store.commit_resource_changes_locally(&mut new_property).unwrap_err();
+    new_property.save(&store).unwrap_err();
     // But.. when we commit, we get an error!
     // Because we haven't set all the properties required for the Property class.
     // We still need to set `shortname` and `datatype`.
     new_property.set_propval_by_shortname("shortname", "age", &store).unwrap();
     new_property.set_propval_by_shortname("datatype", atomic_lib::urls::INTEGER, &store).unwrap();
-    store.commit_resource_changes_locally(&mut new_property).unwrap();
+    new_property.save(&store).unwrap();
     // Now the changes to the resource applied to the store, and we can fetch the newly created resource!
     let fetched_new_resource = store.get_resource(&subject).unwrap();
     assert!(fetched_new_resource.get_shortname("description", &store).unwrap().to_string() == "the age of a person");

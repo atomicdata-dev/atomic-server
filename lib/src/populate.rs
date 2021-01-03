@@ -58,6 +58,30 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     .to_resource()?;
     store.add_resource_unsafe(&classtype)?;
 
+    let recommends = Property {
+        class_type: Some(urls::PROPERTY.into()),
+        data_type: DataType::ResourceArray,
+        shortname: "recommends".into(),
+        description:
+            "The Properties that are not required, but recommended for this Class."
+                .into(),
+        subject: urls::RECOMMENDS.into(),
+    }
+    .to_resource()?;
+    store.add_resource_unsafe(&recommends)?;
+
+    let requires = Property {
+        class_type: Some(urls::PROPERTY.into()),
+        data_type: DataType::ResourceArray,
+        shortname: "requires".into(),
+        description:
+            "The Properties that are required for this Class."
+                .into(),
+        subject: urls::REQUIRES.into(),
+    }
+    .to_resource()?;
+    store.add_resource_unsafe(&requires)?;
+
     let property = Class {
         requires: vec![urls::SHORTNAME.into()],
         recommends: vec![],

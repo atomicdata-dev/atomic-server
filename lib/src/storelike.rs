@@ -3,7 +3,6 @@
 use crate::errors::AtomicResult;
 use crate::{
     agents::Agent,
-    datetime_helpers,
     schema::{Class, Property},
     urls,
 };
@@ -66,14 +65,18 @@ pub trait Storelike: Sized {
             .get(urls::PUBLIC_KEY)?
             .to_string();
         let agent_pubkey = base64::decode(pubkey_b64)?;
-        // TODO: actually use the stringified resource
-        let stringified = commit.serialize_deterministically()?;
+        let stringified_commit = commit.serialize_deterministically()?;
         let peer_public_key =
             ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
         let signature_bytes = base64::decode(signature.clone())?;
         peer_public_key
-            .verify(stringified.as_bytes(), &signature_bytes)
-            .map_err(|_| "Incorrect signature")?;
+            .verify(stringified_commit.as_bytes(), &signature_bytes)
+            .map_err(|_e| {
+                format!(
+                    "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Stringified commit: {}. Public key",
+                    stringified_commit,
+                )
+            })?;
         // Check if the created_at lies in the past
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -96,45 +99,19 @@ pub trait Storelike: Sized {
         };
         if let Some(set) = commit.set.clone() {
             for (prop, val) in set.iter() {
-                // Warning: this is a very inefficient operation
                 resource.set_propval_string(prop.into(), val, self)?;
             }
             self.add_resource(&resource)?;
         }
         if let Some(remove) = commit.remove.clone() {
             for prop in remove.iter() {
-                // Warning: this is a very inefficient operation
                 resource.remove_propval(&prop);
             }
             self.add_resource(&resource)?;
         }
         resource.check_required_props(self)?;
-        // TOOD: Persist delta to store, use hash as ID
         self.add_resource(&commit_resource)?;
         Ok(commit_resource)
-    }
-
-    /// Saves the changes done to a Resource.
-    /// Signs the Commit using the Default Agent.
-    /// Does not send it to an Atomic Server.
-    /// Fails if no Default Agent is set.
-    fn commit_resource_changes_locally(&self, resource: &mut Resource) -> AtomicResult<()> {
-        let agent = self.get_default_agent()?;
-        let commit = resource.get_commit_and_reset().sign(&agent)?;
-        self.commit(commit)?;
-        Ok(())
-    }
-
-    /// Saves the changes done to a Resource to the Store.
-    /// Signs the Commit using the Default Agent.
-    /// Sends the Commit to the Atomic Server of the Subject.
-    /// Fails if no Default Agent is set.
-    fn commit_resource_changes_externally(&self, resource: &mut Resource) -> AtomicResult<()> {
-        let agent = self.get_default_agent()?;
-        let commit = resource.get_commit_and_reset().sign(&agent)?;
-        crate::client::post_commit(&commit)?;
-        self.commit(commit)?;
-        Ok(())
     }
 
     /// Create an Agent, storing its public key.
@@ -142,18 +119,8 @@ pub trait Storelike: Sized {
     /// Returns a tuple of (subject, private_key).
     /// Make sure to store the private_key somewhere safe!
     /// Does not create a Commit.
-    fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent>
-    where
-        Self: std::marker::Sized,
-    {
-        let subject = format!("{}agents/{}", self.get_base_url(), name);
-        let keypair = crate::agents::generate_keypair();
-        let agent = Agent {
-            key: keypair.private,
-            subject,
-            created_at: datetime_helpers::now() as u64,
-            name: name.to_string(),
-        };
+    fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent> {
+        let agent = Agent::new(name.to_string(), self);
         self.add_resource(&agent.to_resource(self)?)?;
         Ok(agent)
     }
@@ -205,9 +172,7 @@ pub trait Storelike: Sized {
                 urls::COLLECTION => {
                     return crate::collections::construct_collection(self, query_params, resource)
                 }
-                "example" => {
-                    todo!()
-                }
+                "example" => todo!(),
                 _ => {}
             }
         }
@@ -243,7 +208,7 @@ pub trait Storelike: Sized {
     ///
     /// ```
     /// use atomic_lib::Storelike;
-    /// let mut store = atomic_lib::Store::init();
+    /// let mut store = atomic_lib::Store::init().unwrap();
     /// store.populate();
     /// let atoms = store.tpf(
     ///     None,

@@ -55,12 +55,8 @@ impl Resource {
         ))?)
     }
 
-    /// Clones the CommitBuilder from this resource, which contains the previous changes.
-    /// Pass this to `store.commit` to apply the commit.
-    pub fn get_commit_and_reset(&mut self) -> CommitBuilder {
-        let commit = self.commit.clone();
-        self.commit = CommitBuilder::new(self.subject.clone());
-        commit
+    pub fn get_commit_builder(&self) -> &CommitBuilder {
+        &self.commit
     }
 
     /// Checks if the classes are there, if not, fetches them.
@@ -189,13 +185,27 @@ impl Resource {
         Err(format!("Shortname {} for {} not found", shortname, self.subject).into())
     }
 
+    pub fn reset_commit_builder(&mut self) {
+        self.commit = CommitBuilder::new(self.get_subject().clone());
+    }
+
     /// Saves the resource (with all the changes) to the store by creating a Commit.
     /// Uses default Agent to sign the Commit.
     /// Returns the generated Commit.
-    pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<Resource> {
+    pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
         let agent = store.get_default_agent()?;
-        let commit = self.get_commit_and_reset().sign(&agent)?;
-        store.commit(commit)
+        let commitbuilder = self.get_commit_builder().clone();
+        let commit = commitbuilder.sign(&agent)?;
+        let should_post = false;
+        if should_post {
+            // First, post it to the store where the data must reside
+            crate::client::post_commit(&commit)?;
+        }
+        // If that succeeds, save it locally;
+        store.commit(commit.clone())?;
+        // then, reset the internal CommitBuiler.
+        self.reset_commit_builder();
+        Ok(commit)
     }
 
     /// Insert a Property/Value combination.
@@ -463,9 +473,7 @@ mod test {
         new_resource
             .set_propval_by_shortname("description", "A real human being", &store)
             .unwrap();
-        store
-            .commit_resource_changes_locally(&mut new_resource)
-            .unwrap();
+        new_resource.save(&store).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
@@ -507,7 +515,7 @@ mod test {
         new_resource
             .set_propval_by_shortname("description", "A real human being", &store)
             .unwrap();
-        let commit = new_resource.get_commit_and_reset().sign(&agent).unwrap();
+        let commit = new_resource.get_commit_builder().clone().sign(&agent).unwrap();
         store.commit(commit).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
@@ -547,5 +555,26 @@ mod test {
             }
         }
         assert!(success);
+    }
+
+    #[test]
+    fn save() {
+        let store = init_store();
+        let property: String = urls::DESCRIPTION.into();
+        let value = Value::String("joe".into());
+        let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
+        new_resource.set_propval(property.clone(), value.clone(), &store).unwrap();
+        // Should fail, because a propval is missing
+        assert!(new_resource.save(&store).is_err());
+        new_resource.set_propval(urls::SHORTNAME.into(), Value::Slug("joe".into()), &store).unwrap();
+        let subject = new_resource.get_subject().clone();
+        println!("subject new {}", new_resource.get_subject());
+        new_resource.save(&store).unwrap();
+        let found_resource  = store.get_resource(&subject).unwrap();
+        println!("subject found {}", found_resource.get_subject());
+        println!("subject all {:?}", found_resource.get_propvals());
+
+        let found_prop = found_resource.get(&property).unwrap().clone();
+        assert_eq!(found_prop.to_string(), value.to_string());
     }
 }

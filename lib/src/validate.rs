@@ -141,7 +141,6 @@ impl std::fmt::Display for ValidationReport {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use crate::{parse::parse_ad3, Store, Storelike};
 
     #[test]
@@ -157,14 +156,15 @@ mod test {
     #[test]
     fn invalid_ad3() {
         let store = Store::init().unwrap();
-        let ad3 = r#"["https://example.com","https://example.com","[\"https://atomicdata.dev/classes/Class\"]"]"#;
+        let ad3 = r#"["https://example.com","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]"#;
         let atoms = parse_ad3(ad3).unwrap();
-        store.add_atoms(atoms).unwrap();
-        let report = validate_store(&store, false);
-        println!("resource_count: {}", report.resource_count);
-        assert!(report.resource_count == 1);
-        println!("atom_count: {}", report.resource_count);
-        assert!(report.atom_count == 1);
-        assert!(!report.is_valid());
+        // This used to work, but now the add_atoms process does all the validation. It already checks completeness of resource and datatype compliance.
+        store.add_atoms(atoms).unwrap_err();
+        // let report = validate_store(&store, false);
+        // println!("resource_count: {}", report.resource_count);
+        // assert!(report.resource_count == 10);
+        // println!("atom_count: {}", report.atom_count);
+        // assert!(report.atom_count == 44);
+        // assert!(!report.is_valid());
     }
 }
