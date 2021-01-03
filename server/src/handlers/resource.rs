@@ -15,9 +15,8 @@ pub async fn get_resource(
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let context = data.lock().unwrap();
-    log::info!("subject_end: {}", subject_end);
     let mut subj_end_string = subject_end.as_str();
-    let mut content_type = get_accept(req);
+    let mut content_type = get_accept(req.clone());
     // Check extensions and set datatype. Harder than it looks to get right...
     if content_type == ContentType::HTML {
         if let Some((ext, path)) = try_extension(subj_end_string) {
@@ -25,7 +24,13 @@ pub async fn get_resource(
             subj_end_string = path;
         }
     }
-    let subject = format!("{}{}", &context.config.local_base_url, subj_end_string);
+    // This might not be the best way of creating the subject. But I can't access the full URL from any actix stuff!
+    let querystring = if req.query_string().is_empty() {
+        "".to_string()
+    } else {
+        format!("?{}", req.query_string())
+    };
+    let subject = format!("{}{}{}", &context.config.local_base_url, subj_end_string, querystring);
     let store = &context.store;
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
@@ -63,9 +68,12 @@ fn render_resource(
     resource: &atomic_lib::Resource,
     context: &MutexGuard<AppState>,
 ) -> AtomicResult<String> {
+    // If the Resource has an `is-a` attribute...
     if let Ok(classes_val) = resource.get_shortname("is-a", &context.store) {
+        // And it can be vectorized...
         if let Ok(classes_vec) = classes_val.to_vec() {
             for class in classes_vec {
+                // Check if there's a custom renderer available
                 match class.as_ref() {
                     atomic_lib::urls::COLLECTION => {
                         return Ok(crate::views::collection::render_collection(

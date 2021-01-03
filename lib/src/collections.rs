@@ -1,7 +1,6 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a TPF query
-
-use crate::{errors::AtomicResult, urls, Resource, Storelike};
+use crate::{Resource, Storelike, errors::AtomicResult, storelike::ResourceCollection, urls};
 
 #[derive(Debug)]
 pub struct TPFQuery {
@@ -12,6 +11,7 @@ pub struct TPFQuery {
 
 /// Used to construct a Collection. Does not contain results / members.
 /// Has to be constructed using `Collection::new()` or `storelike.new_collection()`.
+#[derive(Debug)]
 pub struct CollectionBuilder {
     /// Full Subject URL of the resource, including query parameters
     pub subject: String,
@@ -83,8 +83,36 @@ pub struct Collection {
     pub total_pages: usize,
 }
 
+/// Sorts a vector or resources by some property.
+fn sort_resources(mut resources: ResourceCollection, sort_by: &str, sort_desc: bool) -> ResourceCollection {
+    resources.sort_by(
+        |a, b|
+        {
+            let val_a = a.get(sort_by);
+            let val_b = b.get(sort_by);
+            if val_a.is_err() || val_b.is_err() {
+                return std::cmp::Ordering::Equal
+            }
+            if val_b.unwrap().to_string() > val_a.unwrap().to_string() {
+                if sort_desc {
+                    std::cmp::Ordering::Greater
+                } else {
+                    std::cmp::Ordering::Less
+                }
+            } else if sort_desc {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            }
+        }
+    );
+    resources
+}
+
 impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
+    /// Gets the required data from the store.
+    /// Applies sorting settings.
     pub fn new_with_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
@@ -95,17 +123,25 @@ impl Collection {
             collection_builder.property.as_deref(),
             collection_builder.value.as_deref(),
         )?;
-        // Iterate over the fetched resources
-        let subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
-        // Sort the resources (TODO), use sortBy and sortDesc
+        let mut subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
+        // Default to no sorting
         if collection_builder.sort_by.is_some() {
-            return Err("Sorting is not yet implemented".into());
+            let mut resources = Vec::new();
+            for subject in subjects.clone() {
+                resources.push(store.get_resource(&subject)?)
+            };
+            // TODO: Include these resources in the response! They're already fetched. Should speed things up.
+            // https://github.com/joepio/atomic/issues/62
+            resources = sort_resources(resources, &collection_builder.sort_by.clone().unwrap(), collection_builder.sort_desc);
+            subjects.clear();
+            for resource in resources {
+                subjects.push(resource.get_subject().clone())
+            }
         }
-        let sorted_subjects: Vec<String> = subjects;
         let mut all_pages: Vec<Vec<String>> = Vec::new();
         let mut page: Vec<String> = Vec::new();
         let current_page = collection_builder.current_page;
-        for (i, subject) in sorted_subjects.iter().enumerate() {
+        for (i, subject) in subjects.iter().enumerate() {
             page.push(subject.into());
             if page.len() >= collection_builder.page_size {
                 all_pages.push(page);
@@ -116,7 +152,7 @@ impl Collection {
                 }
             }
             // Add the last page when handling the last subject
-            if i == sorted_subjects.len() - 1 {
+            if i == subjects.len() - 1 {
                 all_pages.push(page);
                 break;
             }
@@ -129,7 +165,7 @@ impl Collection {
             .get(current_page)
             .ok_or("Page number is too high")?
             .clone();
-        let total_items = sorted_subjects.len();
+        let total_items = subjects.len();
         // Construct the pages (TODO), use pageSize
         let total_pages =
             (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
