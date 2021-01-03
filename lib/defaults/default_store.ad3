@@ -111,7 +111,6 @@
 ["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/description","A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`."]
 ["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/shortname","property"]
 ["https://atomicdata.dev/classes/Datatype","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
-["https://atomicdata.dev/classes/Datatype","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/recommends\"]"]
 ["https://atomicdata.dev/classes/Datatype","https://atomicdata.dev/properties/requires","[\"https://atomicdata.dev/properties/shortname\",\"https://atomicdata.dev/properties/description\"]"]
 ["https://atomicdata.dev/classes/Datatype","https://atomicdata.dev/properties/description","A Datatype describes a possible type of value, such as 'string' or 'integer'."]
 ["https://atomicdata.dev/classes/Datatype","https://atomicdata.dev/properties/shortname","datatype"]

@@ -102,6 +102,16 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     .to_resource()?;
     store.add_resource_unsafe(&class)?;
 
+    let datatype = Class {
+        requires: vec![urls::SHORTNAME.into(), urls::DESCRIPTION.into()],
+        recommends: vec![],
+        shortname: "datatype".into(),
+        description: "A Datatype describes a possible type of value, such as 'string' or 'integer'.".into(),
+        subject: urls::DATATYPE_CLASS.into(),
+    }
+    .to_resource()?;
+    store.add_resource_unsafe(&datatype)?;
+
     Ok(())
 }
 
