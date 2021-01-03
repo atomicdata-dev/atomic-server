@@ -186,10 +186,10 @@ impl CommitBuilder {
         let stringified = commit
             .serialize_deterministically()
             .map_err(|e| format!("Failed serializing commit: {}", e))?;
-        let private_key_bytes = base64::decode(agent.key.clone())
-            .map_err(|e| format!("Failed decoding private key {}: {}", agent.key.clone(), e))?;
+        let private_key_bytes = base64::decode(agent.private_key.clone())
+            .map_err(|e| format!("Failed decoding private key {}: {}", agent.private_key.clone(), e))?;
         let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
-            .map_err(|_| "Can't create keypair")?;
+            .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
         // let signax   ture = some_lib::sign(string, private_key);
         let signature = base64::encode(key_pair.sign(&stringified.as_bytes()));
         commit.signature = Some(signature);

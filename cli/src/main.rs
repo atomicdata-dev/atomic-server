@@ -32,10 +32,11 @@ impl Context<'_> {
         self.store.set_default_agent(
             Agent {
                 subject: write_ctx.agent.clone(),
-                key: write_ctx.private_key.clone(),
+                private_key: write_ctx.private_key.clone(),
                 // TODO: use actual data
                 created_at: atomic_lib::datetime_helpers::now() as u64,
                 name: "Random name".into(),
+                public_key: "NOT_USED".into(),
             }
         );
         write_ctx

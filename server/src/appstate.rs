@@ -40,7 +40,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
             let cfg = atomic_lib::config::Config {
                 agent: agent.subject,
                 server: config.local_base_url.clone(),
-                private_key: agent.key,
+                private_key: agent.private_key,
             };
             atomic_lib::config::write_config(&path, cfg)?;
             log::info!("Agent created. Check newly created config file: {:?}", path);

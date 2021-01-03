@@ -1,11 +1,13 @@
 //! Logic for Agents - which are like Users
 
-use crate::{Resource, Storelike, errors::AtomicResult, urls};
+use crate::{Resource, Storelike, datetime_helpers, errors::AtomicResult, urls};
 
 #[derive(Clone)]
 pub struct Agent {
   /// Private key for signing commits
-  pub key: String,
+  pub private_key: String,
+  /// Private key for signing commits
+  pub public_key: String,
   /// URL of the Agent
   pub subject: String,
   pub created_at: u64,
@@ -13,14 +15,27 @@ pub struct Agent {
 }
 
 impl Agent {
+  /// Converts Agent to Resource.
+  /// Does not include private key, only public.
   pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-    let keypair = crate::agents::generate_keypair();
     let mut agent = Resource::new_instance(urls::AGENT, store)?;
     agent.set_subject(self.subject.clone());
     agent.set_propval_string(crate::urls::NAME.into(), &self.name, store)?;
-    agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &keypair.public, store)?;
+    agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &self.public_key, store)?;
     agent.set_propval_string(crate::urls::CREATED_AT.into(), &self.created_at.to_string(), store)?;
     Ok(agent)
+  }
+
+  pub fn new(name: String, store: &impl Storelike) -> Agent {
+    let keypair = crate::agents::generate_keypair();
+
+    Agent {
+      private_key: keypair.private,
+      public_key: keypair.public,
+      subject: format!("{}/agents/{}", store.get_base_url(), name),
+      name,
+      created_at: datetime_helpers::now(),
+    }
   }
 }
 
