@@ -6,13 +6,15 @@
       <tr>
         <th class="propval">
           <b class="propertyLabel">
-            <span class="tooltip tooltip-right" data-tooltip="The URL of the resource" >Subject</a>
+            <span class="tooltip tooltip-right" data-tooltip="The URL of the resource" >subject</a>
           </b>
         </th>
         {% for property in header -%}
           <th class="propval">
             <b class="propertyLabel">
               <a class="tooltip tooltip-left" data-tooltip="{{ property.description }}" href="{{ property.subject }}">{{ property.shortname }}</a>
+              <a href="?sort_by={{ property.subject}}">▴</a>
+              <a href="?sort_by={{ property.subject}}&sort_desc=true">▾</a>
             </b>
           </th>
         {%- endfor %}
