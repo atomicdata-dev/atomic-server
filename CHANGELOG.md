@@ -3,6 +3,12 @@
 List of changes for this repo.
 Mostly concerns `atomic-lib`.
 
+## v0.20.0
+
+- Huge refactor of internals. Got rid of all string representations for Atoms, so store should only contain valid data. All Resources have all required props, and data is of the correct datatype.
+- `Resource.save()` can be called! Easy way to store changes, both locally and externally.
+- Added collection sorting #63
+
 ## v0.19.0
 
 - Added table view for `atomic-server` #53
