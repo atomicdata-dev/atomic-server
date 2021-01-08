@@ -1,6 +1,6 @@
 [package]
 name = "atomic-cli"
-version = "0.20.0"
+version = "0.20.1"
 authors = ["Joep Meindertsma <joep@argu.co>"]
 edition = "2018"
 license = "MIT"
@@ -9,6 +9,7 @@ readme = "README.md"
 repository = "https://github.com/joepio/atomic"
 
 [dependencies]
+assert_cmd = "1.0.2"
 atomic_lib = { version = "0.20.0", path = "../lib", features = ["config", "db", "rdf"] }
 clap = "2.33.3"
 colored = "2.0.0"

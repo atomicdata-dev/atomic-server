@@ -1,5 +1,5 @@
-use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::mapping::Mapping;
+use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
 use colored::*;
@@ -25,20 +25,18 @@ pub struct Context<'a> {
 impl Context<'_> {
     pub fn get_write_context(&self) -> Config {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
-            return write_ctx.clone()
+            return write_ctx.clone();
         };
         let write_ctx = set_agent_config().expect("Issue while generating Context");
         self.write.borrow_mut().replace(write_ctx.clone());
-        self.store.set_default_agent(
-            Agent {
-                subject: write_ctx.agent.clone(),
-                private_key: write_ctx.private_key.clone(),
-                // TODO: use actual data
-                created_at: atomic_lib::datetime_helpers::now() as u64,
-                name: "Random name".into(),
-                public_key: "NOT_USED".into(),
-            }
-        );
+        self.store.set_default_agent(Agent {
+            subject: write_ctx.agent.clone(),
+            private_key: write_ctx.private_key.clone(),
+            // TODO: use actual data
+            created_at: atomic_lib::datetime_helpers::now() as u64,
+            name: "Random name".into(),
+            public_key: "NOT_USED".into(),
+        });
         write_ctx
     }
 }
@@ -250,7 +248,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
         Some("validate") => {
             validate(context)?;
         }
-        Some(cmd) => println!("{} is not a valid command. Run atomic --help", cmd),
+        Some(cmd) => return Err(format!("{} is not a valid command. Run atomic --help", cmd).into()),
         None => println!("Run atomic --help for available commands"),
     };
     Ok(())
@@ -269,8 +267,8 @@ fn list(context: &mut Context) {
     println!("{}", string)
 }
 
-/// Prints a resource to the terminal with readble formatting and colors
-fn pretty_print_resource(url: &str, store: &impl Storelike) -> AtomicResult<()> {
+/// Returns a resource for the terminal with readble formatting and colors
+fn pretty_print_resource(url: &str, store: &impl Storelike) -> AtomicResult<String> {
     let mut output = String::new();
     let resource = store.get_resource(url)?;
     for (prop_url, val) in resource.get_propvals() {
@@ -282,8 +280,7 @@ fn pretty_print_resource(url: &str, store: &impl Storelike) -> AtomicResult<()> 
         ));
     }
     output.push_str(&*format!("{0: <15}{1: <10} \n", "url".blue().bold(), url));
-    println!("{}", output);
-    Ok(())
+    Ok(output)
 }
 
 /// Triple Pattern Fragment Query
@@ -312,4 +309,51 @@ fn validate(context: &mut Context) -> AtomicResult<()> {
     let reportstring = context.store.validate().to_string();
     println!("{}", reportstring);
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use assert_cmd::Command;
+
+    #[test]
+    fn get_fail() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","random-non-existent-shortname"]).assert().failure();
+    }
+
+    #[test]
+    fn get_shortname() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","shortname"]).assert().success();
+    }
+
+    #[test]
+    fn get_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections"]).assert().success();
+    }
+
+    #[test]
+    fn get_path() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections members"]).assert().success();
+    }
+
+    #[test]
+    fn get_path_array() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections is-a 0"]).assert().success();
+    }
+
+    #[test]
+    fn get_path_array_non_existent() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections is-a 1"]).assert().failure();
+    }
+
+    #[test]
+    fn set() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["set","https://atomicdata.dev/collections is-a 1"]).assert().failure();
+    }
 }

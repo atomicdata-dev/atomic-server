@@ -3,6 +3,11 @@
 List of changes for this repo.
 Mostly concerns `atomic-lib`.
 
+## v0.20.1
+
+- Improved error handling in cli
+- Added tests for cli #67
+
 ## v0.20.0
 
 - Huge refactor of internals. Got rid of all string representations for Atoms, so store should only contain valid data. All Resources have all required props, and data is of the correct datatype.

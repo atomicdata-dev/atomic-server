@@ -182,7 +182,7 @@ impl Resource {
                 }
             }
         }
-        Err(format!("Shortname {} for {} not found", shortname, self.subject).into())
+        Err(format!("Shortname '{}' for '{}' not found", shortname, self.subject).into())
     }
 
     pub fn reset_commit_builder(&mut self) {
