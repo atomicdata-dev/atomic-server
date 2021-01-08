@@ -91,7 +91,7 @@ pub fn init() -> Config {
     }
 
     let schema = if https { "https" } else { "http" };
-    let local_base_url = format!("{}://{}/", schema, domain);
+    let local_base_url = format!("{}://{}", schema, domain);
 
     Config {
         cert_path,
