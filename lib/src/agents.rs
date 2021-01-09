@@ -26,13 +26,20 @@ impl Agent {
     Ok(agent)
   }
 
+  /// Creates a new Agent, generates a new Keypair.
   pub fn new(name: String, store: &impl Storelike) -> Agent {
-    let keypair = crate::agents::generate_keypair();
+    let keypair = generate_keypair();
+
+    Agent::new_from_private_key(name, store, keypair.private)
+  }
+
+  pub fn new_from_private_key(name: String, store: &impl Storelike, private_key: String) -> Agent {
+    let keypair = generate_public_key(private_key);
 
     Agent {
       private_key: keypair.private,
-      public_key: keypair.public,
-      subject: format!("{}/agents/{}", store.get_base_url(), name),
+      public_key: keypair.public.clone(),
+      subject: format!("{}/agents/{}", store.get_base_url(), keypair.public),
       name,
       created_at: datetime_helpers::now(),
     }
@@ -46,7 +53,7 @@ pub struct Pair {
 }
 
 /// Returns a new random PKCS#8 keypair.
-pub fn generate_keypair() -> Pair {
+fn generate_keypair() -> Pair {
   use ring::signature::KeyPair;
   let rng = ring::rand::SystemRandom::new();
   let pkcs8_bytes = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)
@@ -56,5 +63,30 @@ pub fn generate_keypair() -> Pair {
   Pair {
     private: base64::encode(pkcs8_bytes.as_ref()),
     public: base64::encode(key_pair.public_key().as_ref()),
+  }
+}
+
+/// Returns a Key Pair (including public key) from a private key, PKCS#8 base64 encoded.
+fn generate_public_key(private_key: String) -> Pair {
+  use ring::signature::KeyPair;
+  let pkcs8_bytes = base64::decode(private_key).unwrap();
+  let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
+      .map_err(|_| "Error generating keypair").unwrap();
+  Pair {
+    private: base64::encode(pkcs8_bytes),
+    public: base64::encode(key_pair.public_key().as_ref()),
+  }
+}
+
+#[cfg(test)]
+mod test {
+#[cfg(test)]
+    use super::*;
+
+  #[test]
+  fn keypair() {
+    let pair = generate_keypair();
+    let regenerated_pair = generate_public_key(pair.private);
+    assert_eq!(pair.public, regenerated_pair.public);
   }
 }

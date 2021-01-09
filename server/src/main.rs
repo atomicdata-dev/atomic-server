@@ -18,12 +18,11 @@ async fn main() -> io::Result<()> {
     env_logger::init();
 
     let config = config::init();
-    let https = config.https;
-    let appstate = appstate::init(config.clone()).expect("Failed to build appstate. Your database might be corrupt. The migrations might have failed. Go back to an older version and create an export.");
+    let appstate = appstate::init(config.clone()).expect("Failed to initialize Appstate.");
 
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
-        let app = App::new()
+        App::new()
             .app_data(data)
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
@@ -40,12 +39,6 @@ async fn main() -> io::Result<()> {
                     // register error_handler for JSON extractors.
                     .error_handler(jsonerrors::json_error_handler),
             )
-            ;
-        if https {
-            // Needs upate
-            // app.wrap(actix_web_middleware_redirect_https::RedirectHTTPS::default())
-        }
-        app
     });
 
     if config.https {
