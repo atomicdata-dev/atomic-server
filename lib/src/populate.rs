@@ -20,7 +20,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 
     let description = Property {
         class_type: None,
-        data_type: DataType::String,
+        data_type: DataType::Markdown,
         shortname: "description".into(),
         description: "A textual description of something. When making a description, make sure that the first few words tell the most important part. Give examples. Since the text supports markdown, you're free to use links and more.".into(),
         subject: urls::DESCRIPTION.into(),
