@@ -351,9 +351,17 @@ mod test {
         cmd.args(&["get","https://atomicdata.dev/collections is-a 1"]).assert().failure();
     }
 
+    #[ignore]
     #[test]
-    fn set() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["set","https://atomicdata.dev/collections is-a 1"]).assert().failure();
+    fn set_and_get() {
+        use std::time::SystemTime;
+        let value: String = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string();
+        let mut cmd_set = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd_set.args(&["set","https://atomicdata.dev/test","https://atomicdata.dev/shortname",&value]).assert().success();
+
+        let mut cmd_get = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let result = cmd_get.args(&["get","https://atomicdata.dev/test shortname"]).assert().success().to_string();
+        //             .stdout(predicate::eq(b"Hello, world!\n" as &[u8]));
+        assert!(result.contains(&value));
     }
 }
