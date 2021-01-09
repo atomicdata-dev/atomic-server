@@ -39,7 +39,10 @@ pub fn value_to_html(value: &Value, store: &impl Storelike) -> String {
             html
         }
         Value::Date(s) => format!("{:?}", s),
-        Value::Timestamp(i) => format!("{}", i),
+        Value::Timestamp(i) => {
+            let datetime = chrono::NaiveDateTime::from_timestamp(i / 1000, 0);
+            datetime.to_string()
+        },
         Value::Unsupported(unsup_url) => format!("{:?}", unsup_url),
         Value::NestedResource(n) => format!("{:?}", n),
         Value::Boolean(b) => format!("{}", b),

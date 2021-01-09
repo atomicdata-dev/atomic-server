@@ -14,6 +14,7 @@ pub enum Value {
     ResourceArray(Vec<String>),
     Slug(String),
     String(String),
+    /// Unix Epoch datetime in milliseconds
     Timestamp(i64),
     NestedResource(PropVals),
     Boolean(bool),
