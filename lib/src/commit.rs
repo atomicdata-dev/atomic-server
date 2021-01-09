@@ -33,7 +33,7 @@ impl Commit {
     /// Creates an identifier using the base_url or a default.
     pub fn into_resource(self, store: &impl Storelike) -> AtomicResult<Resource> {
         let subject = match self.signature.as_ref() {
-            Some(sig) => format!("{}commits/{}", store.get_base_url(), sig),
+            Some(sig) => format!("{}/commits/{}", store.get_base_url(), sig),
             None => {
                 return Err("No signature set".into());
             }

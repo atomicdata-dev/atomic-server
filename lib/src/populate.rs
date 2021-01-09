@@ -130,7 +130,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     use crate::collections::CollectionBuilder;
 
     let classes = CollectionBuilder {
-        subject: format!("{}classes", store.get_base_url()),
+        subject: format!("{}/classes", store.get_base_url()),
         property: Some(urls::IS_A.into()),
         value: Some(urls::CLASS.into()),
         sort_by: None,
@@ -141,7 +141,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     store.add_resource_unsafe(&classes.to_resource(store)?)?;
 
     let properties = CollectionBuilder {
-        subject: format!("{}properties", store.get_base_url()),
+        subject: format!("{}/properties", store.get_base_url()),
         property: Some(urls::IS_A.into()),
         value: Some(urls::PROPERTY.into()),
         sort_by: None,
@@ -152,7 +152,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     store.add_resource_unsafe(&properties.to_resource(store)?)?;
 
     let commits = CollectionBuilder {
-        subject: format!("{}commits", store.get_base_url()),
+        subject: format!("{}/commits", store.get_base_url()),
         property: Some(urls::IS_A.into()),
         value: Some(urls::COMMIT.into()),
         sort_by: None,
@@ -163,7 +163,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     store.add_resource_unsafe(&commits.to_resource(store)?)?;
 
     let agents = CollectionBuilder {
-        subject: format!("{}agents", store.get_base_url()),
+        subject: format!("{}/agents", store.get_base_url()),
         property: Some(urls::IS_A.into()),
         value: Some(urls::AGENT.into()),
         sort_by: None,
@@ -174,7 +174,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     store.add_resource_unsafe(&agents.to_resource(store)?)?;
 
     let collections = CollectionBuilder {
-        subject: format!("{}collections", store.get_base_url()),
+        subject: format!("{}/collections", store.get_base_url()),
         property: Some(urls::IS_A.into()),
         value: Some(urls::COLLECTION.into()),
         sort_by: None,
