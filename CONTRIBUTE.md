@@ -18,12 +18,17 @@ Make sure to `cargo test --all` before opening a PR!
 1. Update the versions in cargo.toml files using Semantic Versioning.
 1. run `cargo publish` in `lib`, than you can run the same in `cli` and `server`
 
-## Deploy
+## Publishing to Docker
+
+1. `docker build . -t joepmeneer/atomic-server:v0.20.0 -t joepmeneer/atomic-server:latest`
+1. `docker push joepmeneer/atomic-server`
+
+## Deploy to atomicdata.dev
 
 1. `cd server`
 1. `cargo build --release --target x86_64-unknown-linux-gnu`
 1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.20.0`
-1. `ssh atomic`
+1. `ssh atomic` (@joepio manages server)
 1. `htop` and kill `atomic`
 1. `cd atomic/server`
 1. `git pull` (if relevant static files have changed)
