@@ -30,7 +30,7 @@ pub async fn get_resource(
     } else {
         format!("?{}", req.query_string())
     };
-    let subject = format!("{}{}{}", &context.config.local_base_url, subj_end_string, querystring);
+    let subject = format!("{}/{}{}", &context.config.local_base_url, subj_end_string, querystring);
     let store = &context.store;
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
