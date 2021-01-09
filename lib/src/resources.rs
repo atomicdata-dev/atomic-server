@@ -561,7 +561,7 @@ mod test {
     fn save() {
         let store = init_store();
         let property: String = urls::DESCRIPTION.into();
-        let value = Value::String("joe".into());
+        let value = Value::Markdown("joe".into());
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource.set_propval(property.clone(), value.clone(), &store).unwrap();
         // Should fail, because a propval is missing
