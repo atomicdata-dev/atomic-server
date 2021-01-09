@@ -5,64 +5,45 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
-_Status: alpha, not ready for production usage. Can panic at runtime._
-
 The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
 
-- No runtime dependencies, fast, runs on all platforms (including on your Raspberry Pi)
+- No runtime dependencies, fast, runs on all platforms
 - Embedded HTTP / HTTPS / HTTP2.0 server
 - Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and AD3
 
-Powered by Rust, atomic_lib, actix-web, Sled and [more](cargo.toml).
+Powered by Rust, atomic-lib, actix-web, Sled and [more](cargo.toml).
 
-## Progress
+## When should you use this
 
-- [x] Respond to GET request for individual resources
-- [x] HTML serialization
-- [x] JSON serialization
-- [x] JSON-LD serialization
-- [x] AD3 serialization
-- [x] RDF (Turtle / N-Triples) serialization
-- [x] Basic error handling
-- [x] TPF endpoint
-- [x] Homepage
-- [x] Static asset support for .css / .ico / etc.
-- [x] HTTPS (WIP, kind of working)
-- [x] Content-type negotiation
-- [x] Basic design / use CSS framework
-- [x] Validation endpoint
-- [x] Atomic Commits (#16, #24)
-- [x] Eliminate all preventable runtime panics (most already done)
-- [x] URL extension recognition (.json, .ad3, .nt, etc.)
-- [x] Collections / dynamic resources #17
-- [x] Authorization model for writing
-- [ ] Authorization model for reading
-- [ ] Authentication #13
-- [ ] Plugin / apps #
-- [ ] Be able to manage the AtomicData.dev website without git (cli integration, implement required endpoints) [#6](https://github.com/joepio/atomic/issues/6)
+- You want to make (high-value) datasets as easily accessible as possible
+- You can afford to create or find an Atomic Schema for your dataset (use `atomic-cli new class` for this). Example classes [here](https://atomicdata.dev/classes).
+- You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
 
-## Run using docker
+## Getting started
+
+### Run using docker
 
 The `dockerfile` is located in the project root, above this `server` folder.
 
 - Run: `docker run --name atomic-server -p 80:80 -p 443:443 joepmeneer/atomic-server`
 - Stop: `docker stop atomic-server`
 
-## Install from source
+### Install from source
 
 Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
 
 ```sh
+# Clone this repoo
 git clone git@github.com:joepio/atomic.git
 cd atomic/server
-# Create a new .env using the template
+# Optional, but recommended: Create a new .env using the template.
 cp default.env .env
 # Run the server. It creates a store in ~/.config/atomic/db by default
 cargo run
-# Visit http://localhost:8080/test
+# Visit http://localhost
 ```
 
-## Running from cargo
+### Running from cargo
 
 You can also install with `cargo install atomic-server`, but this binary will also require:
 
@@ -73,26 +54,37 @@ You can also install with `cargo install atomic-server`, but this binary will al
 
 Check out [./example_requests.http](/example_requests.http) for various HTTP requests to the server.
 
+### Set up on own domain
+
+If you want to run Atomic Server on your own VPS + domain, make sure to correctly set the `.env`.
+See `default.env` for a template and explanation of variables.
+
+### Use `atomic-cli` as client
+
+`atomic-cli` is a useful terminal tool for interacting with `atomic-server`.
+It makes it easy to query and edit Atomic Data from the command line.
+[Check it out](https://github.com/joepio/atomic/tree/master/cli).
+
 ### Get individual resources
 
 You can fetch individual items by sending a GET request to their URL.
 
 ```sh
 # Fetch as AD3 triples
-curl -i -H "Accept: application/ad3-ndjson" http://127.0.0.1:8081/test
+curl -i -H "Accept: application/ad3-ndjson" https://atomicdata.dev/properties/shortname
 # Fetch as JSON-LD
-curl -i -H "Accept: application/ld+json" http://127.0.0.1:8081/test
+curl -i -H "Accept: application/ld+json" https://atomicdata.dev/properties/shortname
 # Fetch as JSON
-curl -i -H "Accept: application/json" http://127.0.0.1:8081/test
+curl -i -H "Accept: application/json" https://atomicdata.dev/properties/shortname
 # Fetch as Turtle / N3
-curl -i -H "Accept: text/turtle" http://127.0.0.1:8081/test
+curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
 ### Query the store with Triple Pattern Fragments
 
 ```sh
 # Fetch as AD3 triples
-curl -i -H "Accept: application/ad3-ndjson" "http://127.0.0.1:8081/tpf?subject=&property=&value=test"
+curl -i -H "Accept: application/ad3-ndjson" "https://atomicdata.dev/tpf?subject=&property=&value=description"
 ```
 
 ### HTTPS Setup

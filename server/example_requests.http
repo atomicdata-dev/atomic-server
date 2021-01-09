@@ -19,7 +19,7 @@ GET https://atomicdata.dev/tpf?property=https://atomicdata.dev/properties/isA HT
 Accept: application/ad3-ndjson
 
 ### Send a Commit
-POST http://localhost:8081/commit HTTP/1.1
+POST http://localhost/commit HTTP/1.1
 Accept: application/json
 Content-Type: application/json
 
@@ -36,5 +36,5 @@ Content-Type: application/json
 }
 
 ### Check if above commit has been applied correctly
-GET http://localhost:8081/somresource HTTP/1.1
+GET http://localhost/somresource HTTP/1.1
 Accept: application/ad3-ndjson

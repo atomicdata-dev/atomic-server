@@ -1,12 +1,14 @@
 # Changelog
 
 List of changes for this repo.
-Mostly concerns `atomic-lib`.
+Mostly concerns `atomic-lib`, and mentioned versions match that crate.
 
 ## v0.20.1
 
 - Improved error handling in cli
 - Added tests for cli #67
+- Fixed generated addresses `localhost/collection` vs `localhostcollection`
+- Added dockerfile #69
 
 ## v0.20.0
 

@@ -13,6 +13,12 @@ If you want to share some thoughts on Atomic Data as a standard, please [drop an
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 Make sure to `cargo test --all` before opening a PR!
 
+## Tagging and versioning
+
+- We use [semver](https://semver.org/), and are still quite far from 1.0.0.
+- The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
+- When upgrading versions, update the `Cargo.toml` files and publish to Cargo + Docker and deploy AtomicData.dev.
+
 ## Publishing to Cargo
 
 1. Update the versions in cargo.toml files using Semantic Versioning.
@@ -36,6 +42,8 @@ Make sure to `cargo test --all` before opening a PR!
 1. `./atomic-server-v0.20.0 &> log-v0.20.0-1` to start and log to file
 
 ## Publishing to WAPM
+
+_Not used at this moment_
 
 1. run `cargo wasi build --release` (note: this fails, as ring does not compile to WASI [at this moment](https://github.com/briansmith/ring/issues/657))
 1. `wapm publish`

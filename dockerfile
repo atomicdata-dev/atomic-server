@@ -1,17 +1,28 @@
-FROM rust:1.48.0 as build
-ENV PKG_CONFIG_ALLOW_CROSS=1
-
-WORKDIR /usr/src/atomic-data
+FROM rust as planner
+WORKDIR /app
+# We only pay the installation cost once,
+# it will be cached from the second build onwards
+RUN cargo install cargo-chef
 COPY . .
+RUN cargo chef prepare  --recipe-path recipe.json
 
-RUN cargo install --bin=atomic-server --path server
-# Minimal image, but with OpenSSL support
-FROM gcr.io/distroless/cc-debian10
+FROM rust as cacher
+WORKDIR /app
+RUN cargo install cargo-chef
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
-# Copy compiled executable
-COPY --from=build /usr/local/cargo/bin/atomic-server /usr/local/bin/atomic-server
-# Copy static files, tera templates & default store
-WORKDIR /usr/src/atomic-data
-COPY ./server/ ./server
-WORKDIR /usr/src/atomic-data/server
-CMD ["atomic-server"]
+FROM rust as builder
+WORKDIR /app
+COPY . .
+# Copy over the cached dependencies
+COPY --from=cacher /app/target target
+COPY --from=cacher $CARGO_HOME $CARGO_HOME
+RUN cargo build --release --bin atomic-server
+
+FROM gcr.io/distroless/cc-debian10 as runtime
+
+COPY ./server/ /server
+WORKDIR /server
+COPY --from=builder /app/target/release/atomic-server /atomic-server
+ENTRYPOINT ["/atomic-server"]
