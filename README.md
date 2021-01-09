@@ -2,6 +2,7 @@
 
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
 Create, share, fetch and model linked [Atomic Data](https://docs.atomicdata.dev)!
 This repo consists of three components: A library, a server and a CLI.

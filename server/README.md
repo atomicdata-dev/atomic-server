@@ -3,6 +3,7 @@
 [![crates.io](https://meritbadge.herokuapp.com/atomic-server)](https://crates.io/crates/atomic-server)
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
 _Status: alpha, not ready for production usage. Can panic at runtime._
 
@@ -38,9 +39,14 @@ Powered by Rust, atomic_lib, actix-web, Sled and [more](cargo.toml).
 - [ ] Authorization model for reading
 - [ ] Authentication #13
 - [ ] Plugin / apps #
-
-## Ab
 - [ ] Be able to manage the AtomicData.dev website without git (cli integration, implement required endpoints) [#6](https://github.com/joepio/atomic/issues/6)
+
+## Run using docker
+
+The `dockerfile` is located in the project root, above this `server` folder.
+
+- Run: `docker run --name atomic-server -p 80:80 -p 443:443 joepmeneer/atomic-server`
+- Stop: `docker stop atomic-server`
 
 ## Install from source
 
@@ -62,7 +68,6 @@ You can also install with `cargo install atomic-server`, but this binary will al
 
 - the `/templates` directory
 - the `/static` directory
-- the `.env` from this repo, (if you need modifications).
 
 ## Usage
 

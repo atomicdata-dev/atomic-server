@@ -4,6 +4,7 @@
 [![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepipo/atomic)
 
 _Status: pre-alpha_
 
