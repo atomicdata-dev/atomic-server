@@ -23,7 +23,6 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     store.populate()?;
     let mapping = Mapping::init();
     let tera = Tera::new("templates/*.html")?;
-
     let path = atomic_lib::config::default_path()?;
     // Create a new agent if it does not yet exist.
     match atomic_lib::config::read_config(&path) {

@@ -1,5 +1,6 @@
 target
 Dockerfile
 .dockerignore
+.env
 .git
 .gitignore

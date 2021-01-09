@@ -1,7 +1,7 @@
 //! Configuration logic which can be used in both CLI and Server contexts
-use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 use crate::errors::AtomicResult;
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// A set of options that are shared between CLI and Server contexts
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -15,21 +15,26 @@ pub struct Config {
 }
 
 /// Returns the default path for the config file: `~/.config/atomic/config.toml`
-pub fn default_path () -> AtomicResult<PathBuf> {
-    Ok(dirs::home_dir().ok_or("Could not open home dir")?.join(".config/atomic/config.toml"))
+pub fn default_path() -> AtomicResult<PathBuf> {
+    Ok(dirs::home_dir()
+        .ok_or("Could not open home dir")?
+        .join(".config/atomic/config.toml"))
 }
 
 /// Reads config file from a specified path
 pub fn read_config(path: &PathBuf) -> AtomicResult<Config> {
-    let config_string = std::fs::read_to_string(path)?;
-    let config: Config = toml::from_str(&config_string).unwrap();
+    let config_string = std::fs::read_to_string(path)
+        .map_err(|e| format!("Error reading config from {:?}. {}", path, e))?;
+    let config: Config = toml::from_str(&config_string)
+        .map_err(|e| format!("Could not parse toml in config file {:?}. {}", path, e))?;
     Ok(config)
 }
 
 /// Writes config file from a specified path
 /// Overwrites any existing config
 pub fn write_config(path: &PathBuf, config: Config) -> AtomicResult<()> {
-    let out = toml::to_string_pretty(&config).map_err(|e|  format!("Error serializing config. {}", e))?;
-    std::fs::write(path, out)?;
+    let out =
+        toml::to_string_pretty(&config).map_err(|e| format!("Error serializing config. {}", e))?;
+    std::fs::write(path, out).map_err(|e| format!("Error writing config to {:?}. {}", path, e))?;
     Ok(())
 }

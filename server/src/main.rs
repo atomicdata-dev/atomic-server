@@ -18,7 +18,7 @@ async fn main() -> io::Result<()> {
     env_logger::init();
 
     let config = config::init();
-    let appstate = appstate::init(config.clone()).expect("Failed to initialize Appstate.");
+    let appstate = appstate::init(config.clone()).expect("Failed to initialize Appstate");
 
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
