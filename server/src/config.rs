@@ -1,5 +1,6 @@
 //! Setup on boot, reads .env values
 
+use crate::errors::BetterResult;
 use dirs::home_dir;
 use dotenv::dotenv;
 use std::env;
@@ -34,10 +35,12 @@ pub struct Config {
     pub key_path: String,
     /// Path where TLS certificate should be stored for HTTPS. (defaults to .https/cert.pem)
     pub cert_path: String,
+    /// Path where config.toml is located, which contains info about the Agent
+    pub config_path: PathBuf,
 }
 
 /// Creates the server config, reads .env values and sets defaults
-pub fn init() -> Config {
+pub fn init() -> BetterResult<Config> {
     dotenv().ok();
     let mut development = false;
     let mut domain = String::from("localhost");
@@ -50,13 +53,27 @@ pub fn init() -> Config {
     let mut store_path = home_dir()
         .expect("Home dir could not be opened")
         .join(".config/atomic/db");
+    let mut config_path = atomic_lib::config::default_path()?;
     let mut email = None;
     for (key, value) in env::vars() {
         match &*key {
+            "ATOMIC_CONFIG_PATH" => {
+                config_path = value.parse().map_err(|e| {
+                    format!(
+                        "Could not parse ATOMIC_CONFIG_PATH. Is {} a valid path? {}",
+                        value,
+                        e
+                    )
+                })?;
+            }
             "ATOMIC_STORE_PATH" => {
-                store_path = value
-                    .parse()
-                    .expect("Could not parse ATOMIC_STORE_PATH. Is it a valid path?");
+                store_path = value.parse().map_err(|e| {
+                    format!(
+                        "Could not parse ATOMIC_STORE_PATH. Is {} a valid path? {}",
+                        value,
+                        e
+                    )
+                })?;
             }
             "ATOMIC_DOMAIN" => {
                 // Perhaps this should have some regex check
@@ -93,8 +110,9 @@ pub fn init() -> Config {
     let schema = if https { "https" } else { "http" };
     let local_base_url = format!("{}://{}", schema, domain);
 
-    Config {
+    Ok(Config {
         cert_path,
+        config_path,
         email,
         development,
         domain,
@@ -105,5 +123,5 @@ pub fn init() -> Config {
         port_https,
         local_base_url,
         store_path,
-    }
+    })
 }

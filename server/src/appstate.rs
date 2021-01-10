@@ -23,9 +23,8 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     store.populate()?;
     let mapping = Mapping::init();
     let tera = Tera::new("templates/*.html")?;
-    let path = atomic_lib::config::default_path()?;
     // Create a new agent if it does not yet exist.
-    match atomic_lib::config::read_config(&path) {
+    match atomic_lib::config::read_config(&config.config_path) {
         Ok(agent_config) => {
             match store.get_resource(&agent_config.agent) {
                 Ok(_) => {}
@@ -40,13 +39,12 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                             &store,
                             agent_config.private_key,
                         );
-                        store
-                            .add_resource(&recreated_agent.to_resource(&store)?)?;
+                        store.add_resource(&recreated_agent.to_resource(&store)?)?;
                     } else {
                         return Err(format!(
                             "An agent is present in {:?}, but this agent cannot be retrieved. Either make sure the agent is retrievable, or remove it from your config. {}",
-                            path, e,
-                        ).into())
+                            config.config_path, e,
+                        ).into());
                     }
                 }
             };
@@ -54,12 +52,12 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         Err(_) => {
             let agent = store.create_agent("root")?;
             let cfg = atomic_lib::config::Config {
-                agent: agent.subject,
+                agent: agent.subject.clone(),
                 server: config.local_base_url.clone(),
-                private_key: agent.private_key,
+                private_key: agent.private_key.clone(),
             };
-            atomic_lib::config::write_config(&path, cfg)?;
-            log::info!("No existing config found. Newly created config file contains private key for new Agent: {:?}", path);
+            atomic_lib::config::write_config(&config.config_path, cfg)?;
+            log::warn!("!!! No existing config found, created a new Agent. \nAgent subject:\n    {}\nPrivate Key:\n    {}\nConfig file path:\n    {:?}", &agent.subject, agent.private_key, config.config_path);
         }
     }
 

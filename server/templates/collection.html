@@ -29,7 +29,7 @@
           {% for property in header -%}
             <td>
               {% if resource[property.shortname] %}
-                {{ resource[property.shortname].value_html | safe }}{% else %}.{% endif %}
+                {{ resource[property.shortname].value_html | safe }}{% else %}{% endif %}
             </td>
           {%- endfor %}
         </tr>
