@@ -16,7 +16,7 @@ pub enum AppErrorType {
 // Needs a lot of work, though
 #[derive(Debug)]
 pub struct AppError {
-    pub message: Option<String>,
+    pub message: String,
     pub cause: Option<String>,
     pub error_type: AppErrorType,
 }
@@ -45,7 +45,7 @@ impl ResponseError for AppError {
 
 impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SuperError is here!")
+        write!(f, "{}", &self.message)
     }
 }
 
@@ -53,7 +53,7 @@ impl std::fmt::Display for AppError {
 impl From<&str> for AppError {
     fn from(message: &str) -> Self {
         AppError {
-          message: Some(message.into()),
+          message: message.into(),
           cause: None,
           error_type: AppErrorType::OtherError,
         }
@@ -63,7 +63,7 @@ impl From<&str> for AppError {
 impl From<String> for AppError {
     fn from(message: String) -> Self {
         AppError {
-          message: Some(message),
+          message,
           cause: None,
           error_type: AppErrorType::OtherError,
         }
@@ -73,7 +73,7 @@ impl From<String> for AppError {
 impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         AppError {
-          message: Some(error.to_string()),
+          message: error.to_string(),
           cause: None,
           error_type: AppErrorType::OtherError,
         }
@@ -83,7 +83,7 @@ impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
 impl From<tera::Error> for AppError {
     fn from(error: tera::Error) -> Self {
         AppError {
-          message: Some(error.to_string()),
+          message: error.to_string(),
           cause: None,
           error_type: AppErrorType::OtherError,
         }
@@ -93,7 +93,7 @@ impl From<tera::Error> for AppError {
 impl<T> From<std::sync::PoisonError<T>> for AppError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         AppError {
-          message: Some(error.to_string()),
+          message: error.to_string(),
           cause: None,
           error_type: AppErrorType::OtherError,
         }

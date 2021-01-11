@@ -5,12 +5,12 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/aget_basetomic)
 
-_Status: pre-alpha_
+_Status: Beta. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
 A command-line application to create, read and interact with Atomic Data.
 
 ```
-atomic 0.18.0
+atomic 0.20.0
 Joep Meindertsma <joep@ontola.io>
 Create, share, fetch and model linked atomic data!
 
@@ -75,7 +75,7 @@ It will read the `~/.config/atomic/config.toml` file, and create one using some 
   - [x] `set`, `remove`, `edit` and `destroy` commands for commits
   - [x] `new` creates commits
 - [x] A `delta` command for manipulating existing local resources
-- [ ] Tests for the cli
+- [x] Tests for the cli
 - [ ] A `map` command for creating a bookmark and storing a copy
 
 ## Config

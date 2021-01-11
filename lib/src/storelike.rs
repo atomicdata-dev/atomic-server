@@ -160,7 +160,6 @@ pub trait Storelike: Sized {
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Currently only used for constructing Collections.
     fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
-        println!("got {}", subject);
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
         let query_params = clone.query_pairs();
