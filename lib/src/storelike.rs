@@ -344,15 +344,11 @@ pub trait Storelike: Sized {
                             Value::ResourceArray(vec) => vec,
                             _ => return Err("Should be Vector!".into()),
                         };
-                        if vector.len() <= i as usize {
-                            eprintln!(
-                                "Too high index ({}) for array with length {}",
-                                i,
-                                vector.len()
-                            );
-                        }
-                        let url = &vector[i as usize];
-                        subject = url.into();
+                        let url: String = vector
+                            .get(i as usize)
+                            .ok_or(format!("Too high index {} for array with length {}, max is {}", i, vector.len(), vector.len() - 1))?
+                            .into();
+                        subject = url;
                         resource = self.get_resource_extended(&subject)?;
                         current = PathReturn::Subject(subject.clone());
                         continue;

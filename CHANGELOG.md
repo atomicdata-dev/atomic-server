@@ -1,14 +1,22 @@
 # Changelog
 
-List of changes for this repo.
-Mostly concerns `atomic-lib`, and mentioned versions match that crate.
+List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
+
+## v0.20.4
+
+- Fix array length bug in paths
+
+## v0.20.3
+
+- Added persistence to server docker image #70
+- Improved default Agent setup for server
 
 ## v0.20.1
 
 - Improved error handling in cli
 - Added tests for cli #67
 - Fixed generated addresses `localhost/collection` vs `localhostcollection`
-- Added dockerfile #69
+- Added dockerfile for server #69
 
 ## v0.20.0
 
@@ -38,9 +46,9 @@ Mostly concerns `atomic-lib`, and mentioned versions match that crate.
 
 ## v0.15.0
 
-- Add dynamic collections with pagination #36  #17
+- Add dynamic collections with pagination #36 #17
 - Refactor Db to use native values, for allowing nested resources #16
-- Atomic Commits using deterministic serialization and cryptographic signatures #26 #24  #27 #31
+- Atomic Commits using deterministic serialization and cryptographic signatures #26 #24 #27 #31
 - Recognize filetypes in URL #33
 
 ## v0.13.0
