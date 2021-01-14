@@ -286,7 +286,6 @@ pub trait Storelike: Sized {
                         find_in_resource(&resource);
                         Ok(vec)
                     } else {
-                        // Ok(resources::resourcestring_to_atoms(sub, resource))
                         resource.to_atoms()
                     }
                 }

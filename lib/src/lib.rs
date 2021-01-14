@@ -90,7 +90,6 @@ pub use atoms::RichAtom;
 pub use db::Db;
 pub use commit::Commit;
 pub use resources::Resource;
-pub use resources::ResourceString;
 pub use store::Store;
 pub use storelike::Storelike;
 pub use values::Value;

@@ -23,7 +23,6 @@ pub struct Resource {
 }
 
 /// Maps Property URLs to their values
-/// Similar to ResourceString, but uses Values instead of Strings
 pub type PropVals = HashMap<String, Value>;
 
 impl Resource {
@@ -123,18 +122,6 @@ impl Resource {
         let class_urls = Vec::from([String::from(class_url)]);
         resource.set_propval(crate::urls::IS_A.into(), class_urls.into(), store)?;
         Ok(resource)
-    }
-
-    pub fn new_from_resource_string(
-        subject: String,
-        resource_string: &ResourceString,
-        store: &impl Storelike,
-    ) -> AtomicResult<Resource> {
-        let mut res = Resource::new(subject);
-        for (prop_string, val_string) in resource_string {
-            res.set_propval_string(prop_string.into(), val_string, store)?;
-        }
-        Ok(res)
     }
 
     /// Insert a Property/Value combination.
@@ -269,10 +256,10 @@ impl Resource {
     /// Serializes Resource to Atomic Data Triples (ad3), and NDJSON serialized representation.
     pub fn to_ad3(&self) -> AtomicResult<String> {
         let mut string = String::new();
-        let resource = self.to_resourcestring();
+        let resource = self.get_propvals();
 
         for (property, value) in resource {
-            let mut ad3_atom = serde_json::to_string(&vec![self.get_subject(), &property, &value])?;
+            let mut ad3_atom = serde_json::to_string(&vec![self.get_subject(), &property, &value.to_string()])?;
             ad3_atom.push('\n');
             string.push_str(&*ad3_atom);
         }
@@ -293,7 +280,7 @@ impl Resource {
     ) -> AtomicResult<String> {
         use serde_json::{Map, Value as SerdeValue};
 
-        let resource = self.to_resourcestring();
+        let resource = self.get_propvals();
 
         // Initiate JSON object
         let mut root = Map::new();
@@ -346,11 +333,7 @@ impl Resource {
                 };
                 context.insert(property.shortname.as_str().into(), ctx_value);
             }
-            let native_value = Value::new(value, &property.data_type).expect(&*format!(
-                "Could not convert value {:?} with property type {:?} into native value",
-                value, &property.data_type
-            ));
-            let jsonval = match native_value {
+            let jsonval = match value.to_owned() {
                 Value::AtomicUrl(val) => SerdeValue::String(val),
                 Value::Date(val) => SerdeValue::String(val),
                 // TODO: Handle big numbers
@@ -381,15 +364,6 @@ impl Resource {
         Ok(string)
     }
 
-    /// Converts the Resource to a HashMap
-    pub fn to_resourcestring(&self) -> ResourceString  {
-        let mut rsting: ResourceString = HashMap::new();
-        for (prop, val) in self.get_propvals() {
-            let _ignore = rsting.insert(prop.into(), val.to_string());
-        }
-        rsting
-    }
-
     // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
     pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
         let mut atoms: Vec<Atom> = Vec::new();
@@ -399,19 +373,6 @@ impl Resource {
         }
         Ok(atoms)
     }
-}
-
-/// A plainstring hashmap, which represents a possibly unvalidated Atomic Resource.
-/// The key string represents the URL of the Property, the value one its Values.
-pub type ResourceString = HashMap<String, String>;
-
-/// Converts PropVals to a ResourceString (serializes values to AD3)
-pub fn propvals_to_resourcestring(propvals: PropVals) -> ResourceString {
-    let mut resource_string: ResourceString = HashMap::new();
-    for (prop, val) in propvals.iter() {
-        resource_string.insert(prop.clone(), val.to_string());
-    }
-    resource_string
 }
 
 #[cfg(test)]
