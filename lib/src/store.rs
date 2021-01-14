@@ -31,7 +31,7 @@ impl Store {
     }
 
     /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
-    pub fn read_store_from_file<'a>(&self, path: &'a PathBuf) -> AtomicResult<()> {
+    pub fn read_store_from_file(&self, path: &PathBuf) -> AtomicResult<()> {
         match std::fs::read_to_string(path) {
             Ok(contents) => {
                 let atoms = crate::parse::parse_ad3(&contents)?;

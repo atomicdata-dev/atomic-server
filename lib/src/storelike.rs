@@ -331,7 +331,7 @@ pub trait Storelike: Sized {
         for item in path_items[1..].iter().cloned() {
             // In every iteration, the subject, property_url and current should be set.
             // Ignore double spaces
-            if item == "" {
+            if item.is_empty() {
                 continue;
             }
             // If the item is a number, assume its indexing some array
