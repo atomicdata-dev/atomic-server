@@ -20,6 +20,7 @@ Powered by Rust, atomic-lib, actix-web, Sled and [more](cargo.toml).
 - You want to make (high-value) datasets as easily accessible as possible
 - You can afford to create or find an Atomic Schema for your dataset (use `atomic-cli new class` for this). Example classes [here](https://atomicdata.dev/classes).
 - You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
+- You like living on the edge (this application is not production ready)
 
 ## Getting started
 

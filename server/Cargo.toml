@@ -29,3 +29,5 @@ tera = "1.6.0"
 tokio = "0.3.6"
 use = "0.0.0"
 uuid = { version = "0.8.1", features = ["v4"] }
+tray-item = "0.4.0-alpha"
+webbrowser = "0.5.5"
