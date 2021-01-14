@@ -24,7 +24,7 @@ Make sure to `cargo test --all` before opening a PR!
 1. Update the versions in cargo.toml files using Semantic Versioning.
 1. run `cargo publish` in `lib`, than you can run the same in `cli` and `server`
 
-## Publishing to Docker
+## Publishing server to Docker
 
 1. `docker build . -t joepmeneer/atomic-server:v0.20.0 -t joepmeneer/atomic-server:latest`
 1. `docker push joepmeneer/atomic-server`
@@ -41,9 +41,9 @@ Make sure to `cargo test --all` before opening a PR!
 1. `rm -rf  ~/.config/atomic/db` (if the db is corrupted / migrated)
 1. `./atomic-server-v0.20.0 &> log-v0.20.0-1` to start and log to file
 
-## Publishing to WAPM
+## Publishing atomic-cli to WAPM
 
-_Not used at this moment_
-
-1. run `cargo wasi build --release` (note: this fails, as ring does not compile to WASI [at this moment](https://github.com/briansmith/ring/issues/657))
+1. Install `wasmer` and `cargo-wasi`.
+1. `cd cli`
+1. run `cargo wasi build --release --no-default-features` (note: this fails, as ring does not compile to WASI [at this moment](https://github.com/briansmith/ring/issues/1043))
 1. `wapm publish`

@@ -7,6 +7,8 @@ List of changes for this repo, including `atomic-cli`, `atomic-server` and `atom
 - Fix array length bug in paths
 - Add docker link to homepage
 - Add system tray icon #75
+- Removed `ResourceString`
+- Improved WASM compliance #76
 
 ## v0.20.3
 

@@ -16,6 +16,7 @@ pub fn set(context: &Context) -> AtomicResult<()> {
 }
 
 /// Apply a Commit using the Set method, where the value is edited in the user's text editor.
+#[cfg(feature = "native")]
 pub fn edit(context: &Context) -> AtomicResult<()> {
     let subcommand = "edit";
     let subject = argument_to_url(context, subcommand, "subject")?;

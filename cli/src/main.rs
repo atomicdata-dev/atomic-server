@@ -225,7 +225,12 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
             commit::destroy(context)?;
         }
         Some("edit") => {
-            commit::edit(context)?;
+            #[cfg(feature = "native")] {
+                commit::edit(context)?;
+            }
+            #[cfg(not(feature = "native"))] {
+                return Err("Feature not available. Compile with `native` feature.".into())
+            }
         }
         Some("get") => {
             path::get_path(context)?;
