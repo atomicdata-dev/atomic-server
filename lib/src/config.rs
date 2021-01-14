@@ -32,9 +32,9 @@ pub fn read_config(path: &PathBuf) -> AtomicResult<Config> {
 
 /// Writes config file from a specified path
 /// Overwrites any existing config
-pub fn write_config(path: &PathBuf, config: Config) -> AtomicResult<()> {
+pub fn write_config(path: &PathBuf, config: Config) -> AtomicResult<String> {
     let out =
         toml::to_string_pretty(&config).map_err(|e| format!("Error serializing config. {}", e))?;
-    std::fs::write(path, out).map_err(|e| format!("Error writing config to {:?}. {}", path, e))?;
-    Ok(())
+    std::fs::write(path, out.clone()).map_err(|e| format!("Error writing config to {:?}. {}", path, e))?;
+    Ok(out)
 }
