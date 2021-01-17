@@ -28,8 +28,12 @@ pub async fn validate(
         Some(ad3) => {
             match atomic_lib::parse::parse_ad3(ad3) {
                 Ok(atoms) => {
-                  tempstore.add_atoms(atoms)?;
-                  tempstore.validate().to_string()
+                  match tempstore.add_atoms(atoms) {
+                      Ok(_) => {
+                          tempstore.validate().to_string()
+                      }
+                      Err(e) => e.to_string()
+                  }
                 },
                 Err(e) => e.to_string(),
             }
