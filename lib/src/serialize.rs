@@ -145,7 +145,7 @@ pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
     let mut string = String::new();
     for atom in atoms {
         let mut ad3_atom =
-            serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value])?;
+            serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value.to_string()])?;
         ad3_atom.push('\n');
         string.push_str(&*ad3_atom);
     }
@@ -166,7 +166,7 @@ pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResu
             iri: &atom.property,
         };
         let datatype = store.get_property(&atom.property)?.data_type;
-        let value = &atom.value;
+        let value = &atom.value.to_string();
         let datatype_url = datatype.to_string();
         let object: Term = match &datatype {
             DataType::AtomicUrl => NamedNode { iri: value }.into(),
@@ -186,8 +186,46 @@ pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResu
             object,
         })?
     }
-    let turtle = formatter.finish();
-    let out = String::from_utf8(turtle)?;
+    let out = String::from_utf8(formatter.finish())?;
+    Ok(out)
+}
+
+#[cfg(feature = "rdf")]
+/// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
+pub fn atoms_to_turtle(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult<String> {
+    use rio_api::formatter::TriplesFormatter;
+    use rio_api::model::{Literal, NamedNode, Term, Triple};
+    use rio_turtle::TurtleFormatter;
+
+    let mut formatter = TurtleFormatter::new(Vec::default());
+
+    for atom in atoms {
+        let subject = NamedNode { iri: &atom.subject }.into();
+        let predicate = NamedNode {
+            iri: &atom.property,
+        };
+        let datatype = store.get_property(&atom.property)?.data_type;
+        let value = &atom.value.to_string();
+        let datatype_url = datatype.to_string();
+        let object: Term = match &datatype {
+            DataType::AtomicUrl => NamedNode { iri: value }.into(),
+            // Maybe these should be converted to RDF collections / lists?
+            // DataType::ResourceArray => {}
+            DataType::String => Literal::Simple { value }.into(),
+            _dt => Literal::Typed {
+                value,
+                datatype: NamedNode { iri: &datatype_url },
+            }
+            .into(),
+        };
+
+        formatter.format(&Triple {
+            subject,
+            predicate,
+            object,
+        })?
+    }
+    let out = String::from_utf8(formatter.finish()?)?;
     Ok(out)
 }
 

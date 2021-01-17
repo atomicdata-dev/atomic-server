@@ -11,7 +11,7 @@ fn main() {
     // Let's parse this AD3 string.
     let ad3 = r#"["https://localhost/test","https://atomicdata.dev/properties/description","Test"]"#;
     // The parser returns a Vector of Atoms
-    let atoms = atomic_lib::parse::parse_ad3(&ad3).unwrap();
+    let atoms = atomic_lib::parse::parse_ad3(&ad3, &store).unwrap();
     // Add the Atoms to the Store
     store.add_atoms(atoms).unwrap();
     // Get our resource...

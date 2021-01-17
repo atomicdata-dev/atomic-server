@@ -56,7 +56,7 @@ pub fn validate_store(
             match crate::Value::new(&value.to_string(), &property.data_type) {
                 Ok(_) => {}
                 Err(e) => invalid_value.push((
-                    crate::Atom::new(subject.clone(), prop_url.clone(), value.to_string()),
+                    crate::Atom::new(subject.clone(), prop_url.clone(), value),
                     e.to_string(),
                 )),
             };
@@ -160,7 +160,7 @@ mod test {
     fn invalid_ad3() {
         let store = Store::init().unwrap();
         let ad3 = r#"["https://example.com","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]"#;
-        let atoms = parse_ad3(ad3).unwrap();
+        let atoms = parse_ad3(ad3, &store).unwrap();
         // This used to work, but now the add_atoms process does all the validation. It already checks completeness of resource and datatype compliance.
         store.add_atoms(atoms).unwrap_err();
         // let report = validate_store(&store, false);

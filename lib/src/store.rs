@@ -34,7 +34,7 @@ impl Store {
     pub fn read_store_from_file(&self, path: &PathBuf) -> AtomicResult<()> {
         match std::fs::read_to_string(path) {
             Ok(contents) => {
-                let atoms = crate::parse::parse_ad3(&contents)?;
+                let atoms = crate::parse::parse_ad3(&contents, self)?;
                 self.add_atoms(atoms)?;
                 Ok(())
             }
@@ -63,12 +63,12 @@ impl Storelike for Store {
             match map.get_mut(&atom.subject) {
                 // Resource exists in map
                 Some(resource) => {
-                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                    resource.set_propval(atom.property, atom.value, self)?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
-                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                    resource.set_propval(atom.property, atom.value, self)?;
                     map.insert(atom.subject, resource);
                 }
             }
@@ -151,7 +151,7 @@ mod test {
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let store = Store::init().unwrap();
         store.populate().unwrap();
-        let atoms = parse_ad3(&string).unwrap();
+        let atoms = parse_ad3(&string, &store).unwrap();
         store.add_atoms(atoms).unwrap();
         store
     }
@@ -190,7 +190,7 @@ mod test {
         let invalid_ad3 =
             // 'requires' should be an array, but is a string
             String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
-        let atoms = parse_ad3(&invalid_ad3).unwrap();
+        let atoms = parse_ad3(&invalid_ad3, &store).unwrap();
         store.add_atoms(atoms).unwrap_err();
         // Throws an error before we even need to validate. Which is good. Maybe the validate function should accept something different.
         // let report = store.validate();
@@ -251,7 +251,7 @@ mod test {
         match res {
             crate::storelike::PathReturn::Subject(_) => panic!("Should be an Atom"),
             crate::storelike::PathReturn::Atom(atom) => {
-                assert_eq!(atom.value, "class");
+                assert_eq!(atom.value.to_string(), "class");
             }
         }
         let res = store

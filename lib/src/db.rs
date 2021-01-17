@@ -97,14 +97,14 @@ impl Storelike for Db {
                 // Resource exists in map
                 Some(resource) => {
                     resource
-                        .set_propval_string(atom.property.clone(), &atom.value, self)
+                        .set_propval_string(atom.property.clone(), &atom.value.to_string(), self)
                         .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
                     resource
-                        .set_propval_string(atom.property.clone(), &atom.value, self)
+                        .set_propval_string(atom.property.clone(), &atom.value.to_string(), self)
                         .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                     map.insert(atom.subject, resource);
                 }
@@ -303,7 +303,7 @@ mod test {
         let ad3 =
             r#"["https://localhost/test","https://atomicdata.dev/properties/description","Test"]"#;
         // The parser returns a Vector of Atoms
-        let atoms = crate::parse::parse_ad3(&ad3).unwrap();
+        let atoms = crate::parse::parse_ad3(&ad3, &store).unwrap();
         // Add the Atoms to the Store
         store.add_atoms(atoms).unwrap();
         // Get our resource...
@@ -319,7 +319,7 @@ mod test {
         // We can find any Atoms matching some value using Triple Pattern Fragments:
         let found_atoms = store.tpf(None, None, Some("Test"), true).unwrap();
         assert!(found_atoms.len() == 1);
-        assert!(found_atoms[0].value == "Test");
+        assert!(found_atoms[0].value.to_string() == "Test");
 
         // We can also create a new Resource, linked to the store.
         // Note that since this store only exists in memory, it's data cannot be accessed from the internet.

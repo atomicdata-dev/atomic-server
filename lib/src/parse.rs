@@ -4,9 +4,10 @@ use crate::{errors::AtomicResult, resources::PropVals, urls, Atom, Resource, Sto
 
 pub const AD3_MIME: &str = "application/ad3-ndjson";
 
-/// Parses an Atomic Data Triples (.ad3) string and adds the Atoms to the store.
+/// Parses an Atomic Data Triples (.ad3) string.
+/// Does not add the Atoms to the store - use store.add_atoms() for that.
 /// Allows comments and empty lines.
-pub fn parse_ad3(string: &str) -> AtomicResult<Vec<Atom>> {
+pub fn parse_ad3(string: &str, store: &impl Storelike) -> AtomicResult<Vec<Atom>> {
     let mut atoms: Vec<Atom> = Vec::new();
     for line in string.lines() {
         match line.chars().next() {
@@ -28,7 +29,9 @@ pub fn parse_ad3(string: &str) -> AtomicResult<Vec<Atom>> {
                 }
                 let subject = string_vec[0].clone();
                 let property = string_vec[1].clone();
-                let value = string_vec[2].clone();
+                let value_string = string_vec[2].clone();
+                let datatype = store.get_property(&property)?.data_type;
+                let value = Value::new(&value_string, &datatype)?;
                 atoms.push(Atom::new(subject, property, value));
             }
             Some(char) => {

@@ -355,7 +355,7 @@ impl Resource {
             let atom = Atom::new(
                 self.subject.to_string(),
                 property.clone(),
-                value.to_string(),
+                value.clone(),
             );
             atoms.push(atom);
         }

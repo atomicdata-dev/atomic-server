@@ -91,7 +91,6 @@ pub mod validate;
 pub mod values;
 
 pub use atoms::Atom;
-pub use atoms::RichAtom;
 #[cfg(feature = "db")]
 pub use db::Db;
 pub use commit::Commit;

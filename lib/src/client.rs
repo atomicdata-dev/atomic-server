@@ -3,7 +3,7 @@ use url::Url;
 
 use crate::{errors::AtomicResult, parse::parse_ad3, Resource, Storelike};
 
-fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
+fn fetch_atoms(url: &str, store: &impl Storelike) -> AtomicResult<Vec<crate::Atom>> {
     if !url.starts_with("http") {
         return Err(format!("Could not fetch url '{}', must start with http.", url).into());
     }
@@ -17,7 +17,7 @@ fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
     let body = &resp
         .into_string()
         .map_err(|e| format!("Could not parse response {}: {}", url, e))?;
-    let atoms = parse_ad3(body).map_err(|e| format!("Error parsing body of {}: {}", url, e))?;
+    let atoms = parse_ad3(body, store).map_err(|e| format!("Error parsing body of {}: {}", url, e))?;
     Ok(atoms)
 }
 
@@ -26,10 +26,10 @@ fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
 /// Ignores all atoms where the subject is different.
 /// WARNING: Calls store methods, and is called by store methods, might get stuck in a loop!
 pub fn fetch_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Resource> {
-    let atoms = fetch_basic(subject)?;
+    let atoms = fetch_atoms(subject, store)?;
     let mut resource = Resource::new(subject.into());
     for atom in atoms {
-        resource.set_propval_string(atom.property, &atom.value, store)?;
+        resource.set_propval(atom.property, atom.value, store)?;
     }
     Ok(resource)
 }
@@ -40,6 +40,7 @@ pub fn fetch_tpf(
     q_subject: Option<&str>,
     q_property: Option<&str>,
     q_value: Option<&str>,
+    store: &impl Storelike,
 ) -> AtomicResult<Vec<crate::Atom>> {
     let mut url = Url::parse(endpoint)?;
     if let Some(val) = q_subject {
@@ -52,7 +53,7 @@ pub fn fetch_tpf(
         url.query_pairs_mut().append_pair("value", val);
     }
     // let url = "https://atomicdata.dev/tpf?subject=&property=&value=1";
-    fetch_basic(url.as_str())
+    fetch_atoms(url.as_str(), store)
 }
 
 /// Posts a Commit to the endpoint of the Subject from the Commit

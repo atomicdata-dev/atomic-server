@@ -5,12 +5,12 @@ use crate::{
     agents::Agent,
     schema::{Class, Property},
 };
-use crate::{mapping::Mapping, values::Value, Atom, Resource, RichAtom};
+use crate::{mapping::Mapping, values::Value, Atom, Resource};
 
 // A path can return one of many things
 pub enum PathReturn {
     Subject(String),
-    Atom(Box<RichAtom>),
+    Atom(Box<Atom>),
 }
 
 pub type ResourceCollection = Vec<Resource>;
@@ -189,7 +189,7 @@ pub trait Storelike: Sized {
                     vec.push(Atom::new(
                         resource.get_subject().clone(),
                         property.clone(),
-                        value.to_string(),
+                        value.clone()
                     ))
                 }
             }
@@ -217,15 +217,15 @@ pub trait Storelike: Sized {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                     if hasval {
                         if val_equals(&val.to_string()) {
-                            vec.push(Atom::new(subj.into(), prop.into(), val.to_string()))
+                            vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                         }
                         break;
                     } else {
-                        vec.push(Atom::new(subj.into(), prop.into(), val.to_string()))
+                        vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                     }
                     break;
                 } else if hasval && !hasprop && val_equals(&val.to_string()) {
-                    vec.push(Atom::new(subj.into(), prop.into(), val.to_string()))
+                    vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                 }
             }
         };
@@ -289,7 +289,7 @@ pub trait Storelike: Sized {
             if let Ok(i) = item.parse::<u32>() {
                 match current {
                     PathReturn::Atom(atom) => {
-                        let vector = match resource.get(&atom.property.subject)? {
+                        let vector = match resource.get(&atom.property)? {
                             Value::ResourceArray(vec) => vec,
                             _ => return Err("Should be Vector!".into()),
                         };
@@ -323,11 +323,11 @@ pub trait Storelike: Sized {
             // TODO: skip this step if the current iteration is the last one
             let value = resource.get_shortname(&item, self)?.clone();
             let property = resource.resolve_shortname_to_property(item, self)?;
-            current = PathReturn::Atom(Box::new(RichAtom::new(
+            current = PathReturn::Atom(Box::new(Atom::new(
                 subject.clone(),
-                property,
-                value.to_string(),
-            )?))
+                property.subject,
+                value,
+            )))
         }
         Ok(current)
     }
