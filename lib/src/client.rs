@@ -4,12 +4,15 @@ use url::Url;
 use crate::{Resource, Storelike, errors::AtomicResult, parse::parse_ad3};
 
 fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
+    if !url.starts_with("http") {
+        return Err(format!("Could not fetch url '{}', must start with http.", url).into())
+    }
     let resp = ureq::get(&url)
         .set("Accept", crate::parse::AD3_MIME)
         .timeout_read(2000)
         .call();
     if resp.status() != 200 {
-        return Err(format!("Could not fetch {}. Status: {}", url, resp.status()).into());
+        return Err(format!("Could not fetch url '{}'. Status: {}", url, resp.status()).into());
     };
     let body = &resp
         .into_string()

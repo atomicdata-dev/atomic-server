@@ -199,7 +199,8 @@ impl Resource {
     /// Overwrites existing Property/Value.
     /// Validates the datatype.
     pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &impl Storelike) -> AtomicResult<()> {
-        let fullprop = store.get_property(&property_url)?;
+        let fullprop = store.get_property(&property_url)
+            .map_err(|e| format!("Failed setting propval for '{}' because property '{}' could not be found. {}", self.get_subject(), property_url, e))?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.set_propval_unsafe(property_url, val)?;
         Ok(())
@@ -213,7 +214,7 @@ impl Resource {
         if required_datatype == value.datatype() {
             self.set_propval_unsafe(property, value)
         } else {
-            Err(format!("Datatype for subject {}, property {}, value {} did not match. Wanted {}, got {}",
+            Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
             self.get_subject(),
             property,
             value.to_string(),

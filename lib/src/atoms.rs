@@ -24,6 +24,13 @@ impl Atom {
     }
 }
 
+impl std::fmt::Display for Atom {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        fmt.write_str(&format!("<{}> <{}> '{}'", self.subject, self.property, self.value))?;
+        Ok(())
+    }
+}
+
 /// A more heavyweight atom that is validated,
 /// converted to a native value and has various property details.
 #[derive(Clone, Debug, Serialize)]

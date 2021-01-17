@@ -93,12 +93,12 @@ impl Storelike for Db {
             match map.get_mut(&atom.subject) {
                 // Resource exists in map
                 Some(resource) => {
-                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                    resource.set_propval_string(atom.property.clone(), &atom.value, self).map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
-                    resource.set_propval_string(atom.property, &atom.value, self)?;
+                    resource.set_propval_string(atom.property.clone(), &atom.value, self).map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                     map.insert(atom.subject, resource);
                 }
             }

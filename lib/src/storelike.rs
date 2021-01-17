@@ -36,7 +36,7 @@ pub trait Storelike: Sized {
     /// Does not do any validations.
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()>;
 
-    /// Returns the root URL where the store is hosted.
+    /// Returns the root URL where this instance of the store is hosted.
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
@@ -140,7 +140,9 @@ pub trait Storelike: Sized {
 
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &str) -> AtomicResult<Class> {
-        let resource = self.get_resource(subject)?;
+        let resource = self
+            .get_resource(subject)
+            .map_err(|e| format!("Failed getting class {}. {}", subject, e))?;
         Class::from_resource(resource)
     }
 
@@ -153,7 +155,9 @@ pub trait Storelike: Sized {
 
     /// Fetches a property by URL, returns a Property instance
     fn get_property(&self, subject: &str) -> AtomicResult<Property> {
-        let prop = self.get_resource(subject)?;
+        let prop = self
+            .get_resource(subject)
+            .map_err(|e| format!("Failed getting property {}. {}", subject, e))?;
         Property::from_resource(prop)
     }
 
@@ -181,13 +185,9 @@ pub trait Storelike: Sized {
 
     fn handle_not_found(&self, subject: &str) -> AtomicResult<Resource> {
         if subject.starts_with(&self.get_base_url()) {
-            return Err(format!("Failed to retrieve {}, does not exist locally", subject).into());
+            return Err(format!("Failed to retrieve '{}', does not exist locally, but is expected to, since the base_url is the current Store.", subject).into());
         }
-
-        match self.fetch_resource(subject) {
-            Ok(got) => Ok(got),
-            Err(e) => Err(format!("Failed to retrieve {} from the web: {}", subject, e).into()),
-        }
+        self.fetch_resource(subject)
     }
 
     /// Returns a collection with all resources in the store.

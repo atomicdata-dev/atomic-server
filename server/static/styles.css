@@ -1,3 +1,8 @@
+/*
+This Atomic-Server uses the Spectre CSS framework as a basis.
+If you'd like to change that, go to base.html and change the head.
+*/
+
 @font-face {
   font-family: alata;
   src: url(/static/Alata-Regular.ttf);
