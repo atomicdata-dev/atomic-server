@@ -215,7 +215,14 @@ fn main() -> AtomicResult<()> {
         write: RefCell::new(None),
     };
 
-    exec_command(&mut context)?;
+    match exec_command(&mut context) {
+        Ok(r) => {r}
+        Err(e) => {
+            eprint!("{}", e);
+            std::process::exit(1);
+        }
+    };
+
     Ok(())
 }
 

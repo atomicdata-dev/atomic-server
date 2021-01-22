@@ -7,7 +7,7 @@ pub fn set(context: &Context) -> AtomicResult<()> {
     let matches = context.matches.clone();
     let subcommand_matches = matches.subcommand_matches(subcommand).clone().unwrap();
     let subject = argument_to_url(context, subcommand, "subject")?;
-    let prop = argument_to_url(context, subcommand, "property")?;
+    let prop = argument_to_string(context, subcommand, "property")?;
     let val = subcommand_matches.value_of("value").unwrap();
     let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.set(prop, val.into());
@@ -20,7 +20,7 @@ pub fn set(context: &Context) -> AtomicResult<()> {
 pub fn edit(context: &Context) -> AtomicResult<()> {
     let subcommand = "edit";
     let subject = argument_to_url(context, subcommand, "subject")?;
-    let prop = argument_to_url(context, subcommand, "property")?;
+    let prop = argument_to_string(context, subcommand, "property")?;
     let current_val = context
         .store
         .get_resource(&subject)?
@@ -37,7 +37,7 @@ pub fn edit(context: &Context) -> AtomicResult<()> {
 pub fn remove(context: &Context) -> AtomicResult<()> {
     let subcommand = "remove";
     let subject = argument_to_url(context, subcommand, "subject")?;
-    let prop = argument_to_url(context, subcommand, "property")?;
+    let prop = argument_to_string(context, subcommand, "property")?;
     let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
     commit_builder.remove(prop);
     post(context, commit_builder)?;
@@ -64,6 +64,14 @@ fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) ->
     let commit = commit_builder.sign(&agent)?;
     atomic_lib::client::post_commit(&commit)?;
     Ok(())
+}
+
+fn argument_to_string(context: &Context, subcommand: &str, argument: &str) -> AtomicResult<String> {
+    let subcommand_matches = context.matches.subcommand_matches(subcommand).unwrap();
+    let user_arg = subcommand_matches
+        .value_of(argument)
+        .ok_or(format!("No argument value for {} found", argument))?;
+    Ok(user_arg.into())
 }
 
 /// Parses a single argument (URL or Bookmark), should return a valid URL
