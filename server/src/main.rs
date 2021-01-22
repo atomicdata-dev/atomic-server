@@ -74,6 +74,8 @@ async fn main() -> io::Result<()> {
     };
     // Add tray icon
     // If this turns out to suck, remove the tray_icon and webbrowser crates
+
+    #[cfg(feature="desktop")]
     actix_rt::spawn(async move {
         let mut tray = match tray_item::TrayItem::new("Atomic", "") {
             Ok(item) => item,

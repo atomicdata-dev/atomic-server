@@ -29,5 +29,8 @@ tera = "1.6.0"
 tokio = "0.3.6"
 use = "0.0.0"
 uuid = { version = "0.8.1", features = ["v4"] }
-tray-item = "0.4.0-alpha"
-webbrowser = "0.5.5"
+tray-item = { version = "0.4.0-alpha", optional = true }
+webbrowser = {version = "0.5.5", optional = true }
+
+[features]
+desktop = ["tray-item", "webbrowser"]
