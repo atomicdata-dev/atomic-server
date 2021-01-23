@@ -124,12 +124,18 @@ impl Resource {
         Ok(resource)
     }
 
-    /// Insert a Property/Value combination.
-    /// Overwrites existing Property/Value.
-    /// Validates the datatype.
+    /// Remove a propval from a resource by property URL.
     pub fn remove_propval(&mut self, property_url: &str) {
         self.propvals.remove_entry(property_url);
         self.commit.remove(property_url.into())
+    }
+
+    /// Remove a propval from a resource by property URL or shortname.
+    /// Returns error if propval does not exist in this resource or its class.
+    pub fn remove_propval_shortname(&mut self, property_shortname: &str, store: &impl Storelike) -> AtomicResult<()> {
+        let property_url = self.resolve_shortname_to_property(property_shortname, store)?;
+        self.remove_propval(&property_url.subject);
+        Ok(())
     }
 
     /// Tries to resolve the shortname of a Property to a Property.
@@ -227,7 +233,7 @@ impl Resource {
     /// Does not validate property / datatype combination.
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
-    /// Adds it to the commit builder.
+    /// Adds it to the CommitBuilder.
     pub fn set_propval_unsafe(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property.clone(), value.clone());
         self.commit.set(property, value.to_string());
@@ -235,8 +241,9 @@ impl Resource {
     }
 
     /// Sets a property / value combination.
-    /// Property can be a shortname (e.g. 'description' instead of the full URL), if the Resource has a Class.
-    pub fn set_propval_by_shortname(&mut self, property: &str, value: &str, store: &impl Storelike) -> AtomicResult<()> {
+    /// Property can be a shortname (e.g. 'description' instead of the full URL).
+    /// Returns error if propval does not exist in this resource or its class.
+    pub fn set_propval_shortname(&mut self, property: &str, value: &str, store: &impl Storelike) -> AtomicResult<()> {
         let fullprop = if is_url(property) {
             store.get_property(property)?
         } else {
@@ -399,11 +406,11 @@ mod test {
         let mut resource = store.get_resource(urls::CLASS).unwrap();
         assert!(resource.get_shortname("shortname", &store).unwrap().to_string() == "class");
         resource
-            .set_propval_by_shortname("shortname", "something-valid", &store)
+            .set_propval_shortname("shortname", "something-valid", &store)
             .unwrap();
         assert!(resource.get_shortname("shortname", &store).unwrap().to_string() == "something-valid");
         resource
-            .set_propval_by_shortname("shortname", "should not contain spaces", &store)
+            .set_propval_shortname("shortname", "should not contain spaces", &store)
             .unwrap_err();
     }
 
@@ -412,11 +419,11 @@ mod test {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_by_shortname("shortname", "should-fail", &store)
+            .set_propval_shortname("shortname", "should-fail", &store)
             .unwrap();
         new_resource.check_required_props(&store).unwrap_err();
         new_resource
-            .set_propval_by_shortname("description", "Should succeed!", &store)
+            .set_propval_shortname("description", "Should succeed!", &store)
             .unwrap();
         new_resource.check_required_props(&store).unwrap ();
     }
@@ -426,14 +433,14 @@ mod test {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_by_shortname("shortname", "person", &store)
+            .set_propval_shortname("shortname", "person", &store)
             .unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "person");
         new_resource
-            .set_propval_by_shortname("shortname", "human", &store)
+            .set_propval_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
-            .set_propval_by_shortname("description", "A real human being", &store)
+            .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
         new_resource.save(&store).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
@@ -468,14 +475,14 @@ mod test {
         let agent = store.get_default_agent().unwrap();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_by_shortname("shortname", "person", &store)
+            .set_propval_shortname("shortname", "person", &store)
             .unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "person");
         new_resource
-            .set_propval_by_shortname("shortname", "human", &store)
+            .set_propval_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
-            .set_propval_by_shortname("description", "A real human being", &store)
+            .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
         let commit = new_resource.get_commit_builder().clone().sign(&agent).unwrap();
         store.commit(commit).unwrap();

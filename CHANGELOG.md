@@ -9,6 +9,10 @@ List of changes for this repo, including `atomic-cli`, `atomic-server` and `atom
 - Add system tray icon #75
 - Removed `ResourceString`
 - Improved WASM compliance #76
+- Add ARM Docker compatibility #80
+- Remove dead dependency #82
+- CLI commit commands shortname fix #83
+- rename `set_propval_by_shortname` to `set_propval_shortname`
 
 ## v0.20.3
 

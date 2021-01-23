@@ -234,13 +234,13 @@ mod test {
                 .unwrap();
         // And add a description for that Property
         new_property
-            .set_propval_by_shortname("description", "the age of a person", &store)
+            .set_propval_shortname("description", "the age of a person", &store)
             .unwrap();
         new_property
-            .set_propval_by_shortname("shortname", "age", &store)
+            .set_propval_shortname("shortname", "age", &store)
             .unwrap();
         new_property
-            .set_propval_by_shortname("datatype", crate::urls::INTEGER, &store)
+            .set_propval_shortname("datatype", crate::urls::INTEGER, &store)
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
         new_property.save(&store).unwrap();

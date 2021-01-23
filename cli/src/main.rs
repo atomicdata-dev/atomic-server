@@ -291,7 +291,7 @@ fn pretty_print_resource(url: &str, store: &impl Storelike) -> AtomicResult<Stri
             val.to_string()
         ));
     }
-    output.push_str(&*format!("{0: <15}{1: <10} \n", "url".blue().bold(), url));
+    output.push_str(&*format!("{0: <15}{1: <10} \n", "subject".blue().bold(), url));
     Ok(output)
 }
 
@@ -369,11 +369,10 @@ mod test {
         use std::time::SystemTime;
         let value: String = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string();
         let mut cmd_set = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd_set.args(&["set","https://atomicdata.dev/test","https://atomicdata.dev/shortname",&value]).assert().success();
+        cmd_set.args(&["set","https://atomicdata.dev/test",atomic_lib::urls::SHORTNAME,&value]).assert().success();
 
         let mut cmd_get = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
         let result = cmd_get.args(&["get","https://atomicdata.dev/test shortname"]).assert().success().to_string();
-        //             .stdout(predicate::eq(b"Hello, world!\n" as &[u8]));
         assert!(result.contains(&value));
     }
 }

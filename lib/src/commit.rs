@@ -138,7 +138,7 @@ impl Commit {
     }
 }
 
-/// Use this for creating Commits
+/// Use this for creating Commits.
 #[derive(Clone, Serialize)]
 pub struct CommitBuilder {
     /// The subject URL that is to be modified by this Delta
