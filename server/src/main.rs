@@ -67,31 +67,32 @@ async fn main() -> io::Result<()> {
                 )
         });
 
-    let server_url = if config.https {
-        format!("https://{}:{}", config.ip.to_string(), config.port_https)
-    } else {
-        format!("http://{}:{}", config.ip.to_string(), config.port)
-    };
     // Add tray icon
     // If this turns out to suck, remove the tray_icon and webbrowser crates
-
     #[cfg(feature="desktop")]
-    actix_rt::spawn(async move {
-        let mut tray = match tray_item::TrayItem::new("Atomic", "") {
-            Ok(item) => item,
-            Err(_e) => return,
+    {
+        let server_url = if config.https {
+            format!("https://{}:{}", config.ip.to_string(), config.port_https)
+        } else {
+            format!("http://{}:{}", config.ip.to_string(), config.port)
         };
-        let _ = tray.add_menu_item("Open in browser", move || {
-            if webbrowser::open(&server_url.clone()).is_ok() {
-                log::info!("Opening browser url...")
-            } else {
-                log::info!("Opening browser url failed.")
-            }
+        actix_rt::spawn(async move {
+            let mut tray = match tray_item::TrayItem::new("Atomic", "") {
+                Ok(item) => item,
+                Err(_e) => return,
+            };
+            let _ = tray.add_menu_item("Open in browser", move || {
+                if webbrowser::open(&server_url.clone()).is_ok() {
+                    log::info!("Opening browser url...")
+                } else {
+                    log::info!("Opening browser url failed.")
+                }
+            });
+            let inner = tray.inner_mut();
+            inner.add_quit_item("Quit");
+            inner.display();
         });
-        let inner = tray.inner_mut();
-        inner.add_quit_item("Quit");
-        inner.display();
-    });
+    }
 
     if config.https {
         // If there is no certificate file, or the certs are too old, start HTTPS initialization
