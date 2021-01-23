@@ -1,7 +1,7 @@
 # `atomic-server`
 
 [![crates.io](https://meritbadge.herokuapp.com/atomic-server)](https://crates.io/crates/atomic-server)
-[![Discord chat][discord-badge]][discord-url]
+[![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
@@ -123,6 +123,3 @@ cargo test --all
 cargo install drill
 drill -b benchmark.yml --stats
 ```
-
-[discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
-[discord-url]: https://discord.gg/a72Rv2P

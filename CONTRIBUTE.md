@@ -26,20 +26,24 @@ Make sure to `cargo test --all` before opening a PR!
 
 ## Publishing server to Docker
 
-1. `docker build . -t joepmeneer/atomic-server:v0.20.0 -t joepmeneer/atomic-server:latest`
-1. `docker push joepmeneer/atomic-server`
+1. build: `docker build . -t joepmeneer/atomic-server:v0.20.4 -t joepmeneer/atomic-server:latest`
+1. publish: `docker push joepmeneer/atomic-server`
+
+or:
+
+1. build and publish various builds (warning: building to ARM takes long!): `docker buildx build --platform linux/amd64,linux/arm64 . -t joepmeneer/atomic-server:v0.20.4 -t joepmeneer/atomic-server:latest --push`. Note that including the armv7 platform `linux/arm/v7` currently fails.
 
 ## Deploy to atomicdata.dev
 
 1. `cd server`
 1. `cargo build --release --target x86_64-unknown-linux-gnu`
-1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.20.0`
+1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.20.4`
 1. `ssh atomic` (@joepio manages server)
 1. `htop` and kill `atomic`
 1. `cd atomic/server`
 1. `git pull` (if relevant static files have changed)
 1. `rm -rf  ~/.config/atomic/db` (if the db is corrupted / migrated)
-1. `./atomic-server-v0.20.0 &> log-v0.20.0-1` to start and log to file
+1. `./atomic-server-v0.20.4 &> log-v0.20.4-1` to start and log to file
 
 ## Publishing atomic-cli to WAPM
 

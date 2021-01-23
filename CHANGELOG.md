@@ -2,7 +2,7 @@
 
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 
-## v0.20.x
+## v0.20.4
 
 - Fix array length bug in paths
 - Add docker link to homepage

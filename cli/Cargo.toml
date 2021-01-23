@@ -22,4 +22,5 @@ assert_cmd = "1.0.2"
 
 [features]
 default = ["native"]
+# Non-wasi interface. These features cannot be compiled to WASI.
 native = ["edit"]
