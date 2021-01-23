@@ -1,0 +1,231 @@
+atomic-cli v0.20.1 (/Users/joep/dev/src/github.com/joepio/atomic/cli)
+├── assert_cmd v1.0.2
+│   ├── doc-comment v0.3.3
+│   ├── predicates v1.0.6
+│   │   ├── difference v2.0.0
+│   │   └── predicates-core v1.0.1
+│   ├── predicates-core v1.0.1
+│   ├── predicates-tree v1.0.1
+│   │   ├── predicates-core v1.0.1
+│   │   └── treeline v0.1.0
+│   └── wait-timeout v0.2.0
+│       └── libc v0.2.81
+├── atomic_lib v0.20.1 (/Users/joep/dev/src/github.com/joepio/atomic/lib)
+│   ├── base64 v0.13.0
+│   ├── bincode v1.3.1
+│   │   ├── byteorder v1.3.4
+│   │   └── serde v1.0.118
+│   │       └── serde_derive v1.0.118 (proc-macro)
+│   │           ├── proc-macro2 v1.0.24
+│   │           │   └── unicode-xid v0.2.1
+│   │           ├── quote v1.0.7
+│   │           │   └── proc-macro2 v1.0.24 (*)
+│   │           └── syn v1.0.54
+│   │               ├── proc-macro2 v1.0.24 (*)
+│   │               ├── quote v1.0.7 (*)
+│   │               └── unicode-xid v0.2.1
+│   ├── dirs v3.0.1
+│   │   └── dirs-sys v0.3.5
+│   │       └── libc v0.2.81
+│   ├── rand v0.8.0
+│   │   ├── libc v0.2.81
+│   │   ├── rand_chacha v0.3.0
+│   │   │   ├── ppv-lite86 v0.2.10
+│   │   │   └── rand_core v0.6.0
+│   │   │       └── getrandom v0.2.0
+│   │   │           ├── cfg-if v0.1.10
+│   │   │           └── libc v0.2.81
+│   │   └── rand_core v0.6.0 (*)
+│   ├── regex v1.4.2
+│   │   ├── aho-corasick v0.7.15
+│   │   │   └── memchr v2.3.4
+│   │   ├── memchr v2.3.4
+│   │   ├── regex-syntax v0.6.21
+│   │   └── thread_local v1.0.1
+│   │       └── lazy_static v1.4.0
+│   ├── ring v0.16.19
+│   │   ├── spin v0.5.2
+│   │   └── untrusted v0.7.1
+│   │   [build-dependencies]
+│   │   └── cc v1.0.66
+│   ├── rio_api v0.5.0
+│   ├── rio_turtle v0.5.0
+│   │   ├── oxilangtag v0.1.1
+│   │   ├── oxiri v0.1.1
+│   │   └── rio_api v0.5.0
+│   ├── serde v1.0.118 (*)
+│   ├── serde_json v1.0.60
+│   │   ├── itoa v0.4.6
+│   │   ├── ryu v1.0.5
+│   │   └── serde v1.0.118 (*)
+│   ├── sled v0.34.6
+│   │   ├── crc32fast v1.2.1
+│   │   │   └── cfg-if v1.0.0
+│   │   ├── crossbeam-epoch v0.9.1
+│   │   │   ├── cfg-if v1.0.0
+│   │   │   ├── const_fn v0.4.4 (proc-macro)
+│   │   │   ├── crossbeam-utils v0.8.1
+│   │   │   │   ├── cfg-if v1.0.0
+│   │   │   │   └── lazy_static v1.4.0
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── autocfg v1.0.1
+│   │   │   ├── lazy_static v1.4.0
+│   │   │   ├── memoffset v0.6.1
+│   │   │   │   [build-dependencies]
+│   │   │   │   └── autocfg v1.0.1
+│   │   │   └── scopeguard v1.1.0
+│   │   ├── crossbeam-utils v0.8.1 (*)
+│   │   ├── fs2 v0.4.3
+│   │   │   └── libc v0.2.81
+│   │   ├── fxhash v0.2.1
+│   │   │   └── byteorder v1.3.4
+│   │   ├── libc v0.2.81
+│   │   ├── log v0.4.11
+│   │   │   └── cfg-if v0.1.10
+│   │   └── parking_lot v0.11.1
+│   │       ├── instant v0.1.9
+│   │       │   └── cfg-if v1.0.0
+│   │       ├── lock_api v0.4.2
+│   │       │   └── scopeguard v1.1.0
+│   │       └── parking_lot_core v0.8.1
+│   │           ├── cfg-if v1.0.0
+│   │           ├── instant v0.1.9 (*)
+│   │           ├── libc v0.2.81
+│   │           └── smallvec v1.5.1
+│   ├── toml v0.5.8
+│   │   └── serde v1.0.118 (*)
+│   ├── ureq v1.5.4
+│   │   ├── base64 v0.13.0
+│   │   ├── chunked_transfer v1.3.0
+│   │   ├── cookie v0.14.3
+│   │   │   ├── percent-encoding v2.1.0
+│   │   │   └── time v0.2.23
+│   │   │       ├── const_fn v0.4.4 (proc-macro)
+│   │   │       ├── libc v0.2.81
+│   │   │       ├── standback v0.2.13
+│   │   │       │   [build-dependencies]
+│   │   │       │   └── version_check v0.9.2
+│   │   │       └── time-macros v0.1.1
+│   │   │           ├── proc-macro-hack v0.5.19 (proc-macro)
+│   │   │           └── time-macros-impl v0.1.1 (proc-macro)
+│   │   │               ├── proc-macro-hack v0.5.19 (proc-macro)
+│   │   │               ├── proc-macro2 v1.0.24 (*)
+│   │   │               ├── quote v1.0.7 (*)
+│   │   │               ├── standback v0.2.13 (*)
+│   │   │               └── syn v1.0.54 (*)
+│   │   │       [build-dependencies]
+│   │   │       └── version_check v0.9.2
+│   │   │   [build-dependencies]
+│   │   │   └── version_check v0.9.2
+│   │   ├── cookie_store v0.12.0
+│   │   │   ├── cookie v0.14.3 (*)
+│   │   │   ├── idna v0.2.0
+│   │   │   │   ├── matches v0.1.8
+│   │   │   │   ├── unicode-bidi v0.3.4
+│   │   │   │   │   └── matches v0.1.8
+│   │   │   │   └── unicode-normalization v0.1.16
+│   │   │   │       └── tinyvec v1.1.0
+│   │   │   │           └── tinyvec_macros v0.1.0
+│   │   │   ├── log v0.4.11 (*)
+│   │   │   ├── publicsuffix v1.5.4
+│   │   │   │   ├── error-chain v0.12.4
+│   │   │   │   │   [build-dependencies]
+│   │   │   │   │   └── version_check v0.9.2
+│   │   │   │   ├── idna v0.2.0 (*)
+│   │   │   │   ├── lazy_static v1.4.0
+│   │   │   │   ├── regex v1.4.2 (*)
+│   │   │   │   └── url v2.2.0
+│   │   │   │       ├── form_urlencoded v1.0.0
+│   │   │   │       │   ├── matches v0.1.8
+│   │   │   │       │   └── percent-encoding v2.1.0
+│   │   │   │       ├── idna v0.2.0 (*)
+│   │   │   │       ├── matches v0.1.8
+│   │   │   │       └── percent-encoding v2.1.0
+│   │   │   ├── serde v1.0.118 (*)
+│   │   │   ├── serde_json v1.0.60 (*)
+│   │   │   ├── time v0.2.23 (*)
+│   │   │   └── url v2.2.0 (*)
+│   │   ├── log v0.4.11 (*)
+│   │   ├── once_cell v1.5.2
+│   │   ├── qstring v0.7.2
+│   │   │   └── percent-encoding v2.1.0
+│   │   ├── rustls v0.19.0
+│   │   │   ├── base64 v0.13.0
+│   │   │   ├── log v0.4.11 (*)
+│   │   │   ├── ring v0.16.19 (*)
+│   │   │   ├── sct v0.6.0
+│   │   │   │   ├── ring v0.16.19 (*)
+│   │   │   │   └── untrusted v0.7.1
+│   │   │   └── webpki v0.21.4
+│   │   │       ├── ring v0.16.19 (*)
+│   │   │       └── untrusted v0.7.1
+│   │   ├── url v2.2.0 (*)
+│   │   ├── webpki v0.21.4 (*)
+│   │   └── webpki-roots v0.21.0
+│   │       └── webpki v0.21.4 (*)
+│   └── url v2.2.0 (*)
+│   [dev-dependencies]
+│   └── ntest v0.7.2
+│       ├── ntest_proc_macro_helper v0.7.2
+│       ├── ntest_test_cases v0.7.2 (proc-macro)
+│       │   ├── proc-macro2 v1.0.24 (*)
+│       │   ├── quote v1.0.7 (*)
+│       │   └── syn v1.0.54 (*)
+│       └── ntest_timeout v0.7.2 (proc-macro)
+│           ├── ntest_proc_macro_helper v0.7.2
+│           ├── proc-macro-crate v0.1.5
+│           │   └── toml v0.5.8 (*)
+│           ├── proc-macro2 v1.0.24 (*)
+│           ├── quote v1.0.7 (*)
+│           └── syn v1.0.54 (*)
+├── clap v2.33.3
+│   ├── ansi_term v0.11.0
+│   ├── atty v0.2.14
+│   │   └── libc v0.2.81
+│   ├── bitflags v1.2.1
+│   ├── strsim v0.8.0
+│   ├── textwrap v0.11.0
+│   │   └── unicode-width v0.1.8
+│   ├── unicode-width v0.1.8
+│   └── vec_map v0.8.2
+├── colored v2.0.0
+│   ├── atty v0.2.14 (*)
+│   └── lazy_static v1.4.0
+├── dirs v3.0.1 (*)
+├── edit v0.1.2
+│   ├── tempfile v3.1.0
+│   │   ├── cfg-if v0.1.10
+│   │   ├── libc v0.2.81
+│   │   ├── rand v0.7.3
+│   │   │   ├── getrandom v0.1.15
+│   │   │   │   ├── cfg-if v0.1.10
+│   │   │   │   └── libc v0.2.81
+│   │   │   ├── libc v0.2.81
+│   │   │   ├── rand_chacha v0.2.2
+│   │   │   │   ├── ppv-lite86 v0.2.10
+│   │   │   │   └── rand_core v0.5.1
+│   │   │   │       └── getrandom v0.1.15 (*)
+│   │   │   └── rand_core v0.5.1 (*)
+│   │   └── remove_dir_all v0.5.3
+│   └── which v3.1.1
+│       └── libc v0.2.81
+├── promptly v0.3.0
+│   └── rustyline v6.3.0
+│       ├── cfg-if v0.1.10
+│       ├── dirs-next v1.0.2
+│       │   ├── cfg-if v1.0.0
+│       │   └── dirs-sys-next v0.1.1
+│       │       └── libc v0.2.81
+│       ├── libc v0.2.81
+│       ├── log v0.4.11 (*)
+│       ├── memchr v2.3.4
+│       ├── nix v0.18.0
+│       │   ├── bitflags v1.2.1
+│       │   ├── cfg-if v0.1.10
+│       │   └── libc v0.2.81
+│       ├── unicode-segmentation v1.7.1
+│       ├── unicode-width v0.1.8
+│       └── utf8parse v0.2.0
+└── regex v1.4.2 (*)
+
+atomic_lib v0.20.1 (/Users/joep/dev/src/github.com/joepio/atomic/lib) (*)

@@ -13,7 +13,6 @@ acme-lib = "0.8.1"
 actix-files = "0.4.1"
 actix-rt = "1.1.1"
 actix-web = { version = "3.3.2", features = ["rustls"] }
-actix-web-middleware-redirect-https = "1.0.0"
 chrono = "0.4.19"
 comrak = "0.9.0"
 dirs = "3.0.1"
