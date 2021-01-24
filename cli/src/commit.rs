@@ -6,13 +6,10 @@ pub fn set(context: &Context) -> AtomicResult<()> {
     let subject = argument_to_url(context, "subject")?;
     let property = argument_to_string(context, "property")?;
     let value = argument_to_string(context, "value")?;
-
     // If the resource is not found, create it
     let mut resource = match context.store.get_resource(&subject) {
         Ok(r) => r,
-        Err(_) => {
-            atomic_lib::Resource::new(subject)
-        }
+        Err(_) => atomic_lib::Resource::new(subject),
     };
     resource.set_propval_shortname(&property, &value, &context.store)?;
     post(context, resource.get_commit_builder().clone())?;
@@ -23,11 +20,21 @@ pub fn set(context: &Context) -> AtomicResult<()> {
 #[cfg(feature = "native")]
 pub fn edit(context: &Context) -> AtomicResult<()> {
     let subject = argument_to_url(context, "subject")?;
-    let prop = argument_to_string(context,  "property")?;
-    let mut resource = context.store.get_resource(&subject)?;
-    let current_val = resource.get_shortname(&prop, &context.store)?.to_string();
+    let prop = argument_to_string(context, "property")?;
+    // If the resource is not found, create it
+    let mut resource = match context.store.get_resource(&subject) {
+        Ok(r) => r,
+        Err(_) => atomic_lib::Resource::new(subject),
+    };
+    // If the prop is not found, create it
+    let current_val = match resource.get_shortname(&prop, &context.store) {
+        Ok(val) => val.to_string(),
+        Err(_) => "".to_string()
+    };
     let edited = edit::edit(current_val)?;
-    resource.set_propval_shortname(&prop, &edited, &context.store)?;
+    // Remove newline - or else I can's save shortnames or numbers using vim;
+    let trimmed = edited.trim_end_matches('\n');
+    resource.set_propval_shortname(&prop, trimmed, &context.store)?;
     post(context, resource.get_commit_builder().clone())?;
     Ok(())
 }

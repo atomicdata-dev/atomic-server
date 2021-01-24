@@ -146,7 +146,10 @@ impl Resource {
         shortname: &str,
         store: &impl Storelike,
     ) -> AtomicResult<Property> {
-
+        // If it's a URL, were done quickly!
+        if is_url(shortname) {
+            return store.get_property(shortname)
+        }
         // First, iterate over all existing properties, see if any of these work.
         for (url, _val) in self.propvals.iter() {
             if let Ok(prop) = store.get_property(url) {
@@ -155,10 +158,8 @@ impl Resource {
                 }
             }
         }
-
         // If that fails, load the classes for the resource, iterate over these
         let classes = self.get_classes(store)?;
-
         // Loop over all Requires and Recommends props
         for class in classes {
             for required_prop_subject in class.requires {
@@ -188,7 +189,7 @@ impl Resource {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
         let commit = commitbuilder.sign(&agent)?;
-        let should_post = false;
+        let should_post = store.get_self_url().is_none();
         if should_post {
             // First, post it to the store where the data must reside
             crate::client::post_commit(&commit)?;
@@ -243,11 +244,7 @@ impl Resource {
     /// Property can be a shortname (e.g. 'description' instead of the full URL).
     /// Returns error if propval does not exist in this resource or its class.
     pub fn set_propval_shortname(&mut self, property: &str, value: &str, store: &impl Storelike) -> AtomicResult<()> {
-        let fullprop = if is_url(property) {
-            store.get_property(property)?
-        } else {
-            self.resolve_shortname_to_property(property, store)?
-        };
+        let fullprop = self.resolve_shortname_to_property(property, store)?;
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.set_propval_unsafe(fullprop.subject, fullval)?;
         Ok(())

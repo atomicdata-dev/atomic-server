@@ -36,11 +36,18 @@ pub trait Storelike: Sized {
     /// Does not do any validations.
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()>;
 
-    /// Returns the root URL where this instance of the store is hosted.
+    /// Returns the root URL where the default store is.
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
     fn get_base_url(&self) -> String;
+
+    /// Returns the root URL where this instance of the store is hosted.
+    /// Should return `None` if this is simply a client and not a server.
+    /// E.g. `https://example.com`
+    fn get_self_url(&self) -> Option<String> {
+        None
+    }
 
     /// Returns the default Agent for applying commits.
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -183,9 +190,19 @@ pub trait Storelike: Sized {
         Ok(resource)
     }
 
-    fn handle_not_found(&self, subject: &str) -> AtomicResult<Resource> {
-        if subject.starts_with(&self.get_base_url()) {
-            return Err(format!("Failed to retrieve '{}', does not exist locally, but is expected to, since the base_url is the current Store.", subject).into());
+    fn handle_not_found(
+        &self,
+        subject: &str,
+        error: Box<dyn std::error::Error>,
+    ) -> AtomicResult<Resource> {
+        if let Some(self_url) = self.get_self_url() {
+            if subject.starts_with(&self_url) {
+                return Err(format!(
+                    "Failed to retrieve '{}', does not exist locally, but is expected to, since the base_url is the current Store. {}",
+                    subject,
+                    error
+                ).into());
+            }
         }
         self.fetch_resource(subject)
     }
@@ -344,7 +361,12 @@ pub trait Storelike: Sized {
                         };
                         let url: String = vector
                             .get(i as usize)
-                            .ok_or(format!("Too high index {} for array with length {}, max is {}", i, vector.len(), vector.len() - 1))?
+                            .ok_or(format!(
+                                "Too high index {} for array with length {}, max is {}",
+                                i,
+                                vector.len(),
+                                vector.len() - 1
+                            ))?
                             .into();
                         subject = url;
                         resource = self.get_resource_extended(&subject)?;

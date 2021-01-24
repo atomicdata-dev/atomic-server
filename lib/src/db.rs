@@ -125,6 +125,12 @@ impl Storelike for Db {
         self.base_url.clone()
     }
 
+    // Since the DB is often also the server, this should make sense.
+    // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
+    fn get_self_url(&self) -> Option<String> {
+        Some(self.get_base_url())
+    }
+
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
         match self.default_agent.lock().unwrap().to_owned() {
             Some(agent) => Ok(agent),
@@ -140,8 +146,8 @@ impl Storelike for Db {
                 let resource = crate::resources::Resource::from_propvals(propvals, subject.into());
                 Ok(resource)
             }
-            Err(_e) => {
-                self.handle_not_found(subject)
+            Err(e) => {
+                self.handle_not_found(subject, e)
             }
         }
     }

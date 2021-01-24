@@ -122,7 +122,7 @@ impl Storelike for Store {
         if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
             return Ok(resource.clone())
         }
-        self.handle_not_found(subject)
+        self.handle_not_found(subject, "Not found in HashMap.".into())
     }
 
     fn remove_resource(&self, subject: &str) {
