@@ -3,6 +3,7 @@
 #[derive(PartialEq)]
 pub enum ContentType {
     JSON,
+    JSONAD,
     JSONLD,
     HTML,
     TURTLE,
@@ -15,6 +16,7 @@ const MIME_HTML: &str = "text/html";
 const MIME_XML: &str = "application/xml";
 const MIME_JSON: &str = "application/json";
 const MIME_JSONLD: &str = "application/ld+json";
+const MIME_JSONAD: &str = "application/ad+json";
 const MIME_TURTLE: &str = "text/turtle";
 const MIME_NT: &str = "application/n-triples";
 
@@ -22,6 +24,7 @@ impl ContentType {
     pub fn to_mime(&self) -> &str {
         match self {
             ContentType::JSON => MIME_JSON,
+            ContentType::JSONAD => MIME_JSONAD,
             ContentType::JSONLD => MIME_JSONLD,
             ContentType::HTML => MIME_HTML,
             ContentType::TURTLE => MIME_TURTLE,
@@ -66,6 +69,9 @@ fn parse_accept_header(header: &str) -> ContentType {
         if mimepart.contains(MIME_JSONLD) {
             return ContentType::JSONLD
         }
+        if mimepart.contains(MIME_JSONAD) {
+            return ContentType::JSONAD
+        }
         if mimepart.contains(MIME_TURTLE) {
             return ContentType::TURTLE
         }
@@ -82,6 +88,8 @@ mod test {
     fn parse_types() {
         assert!(parse_accept_header("text/html,application/xml") == ContentType::HTML);
         assert!(parse_accept_header("application/ad3-ndjson") == ContentType::AD3);
+        assert!(parse_accept_header("application/ad+json") == ContentType::JSONAD);
+        assert!(parse_accept_header("application/ld+json") == ContentType::JSONLD);
     }
 
     #[test]

@@ -1,6 +1,6 @@
 //! A resource is a set of Atoms that share a URL
 
-use crate::values::Value;
+use crate::{Store, serialize::JsonType, values::Value};
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     datatype::DataType,
@@ -9,6 +9,7 @@ use crate::{
     Atom, Storelike,
 };
 use std::collections::HashMap;
+use serde_json::{Map, Value as SerdeValue};
 
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
@@ -274,102 +275,37 @@ impl Resource {
         Ok(string)
     }
 
-    /// Serializes a single Resource to a JSON object.
-    /// It uses the Shortnames of properties for Keys.
-    /// The depth is useful, since atomic data allows for cyclical (infinite-depth) relationships
-    // Todo:
-    // [ ] Resources into objects, if the nesting depth allows it
-    pub fn to_json(
-        &self,
-        store: &impl Storelike,
-        // Not yet used
-        _depth: u8,
-        json_ld: bool,
-    ) -> AtomicResult<String> {
-        use serde_json::{Map, Value as SerdeValue};
+    /// Converts Resource to JSON-AD string.
+    pub fn to_json_ad(&self, store: &impl Storelike) -> AtomicResult<String> {
+        let obj = crate::serialize::propvals_to_json_map(
+            self.get_propvals(),
+            Some(self.get_subject().clone()),
+            store,
+            &JsonType::JSONAD
+        )?;
+        serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON-AD".into())
+    }
 
-        let resource = self.get_propvals();
+    /// Converts Resource to plain JSON string.
+    pub fn to_json(&self, store: &impl Storelike) -> AtomicResult<String> {
+        let obj = crate::serialize::propvals_to_json_map(
+            self.get_propvals(),
+            Some(self.get_subject().clone()),
+            store,
+            &JsonType::JSON
+        )?;
+        serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON".into())
+    }
 
-        // Initiate JSON object
-        let mut root = Map::new();
-
-        // For JSON-LD serialization
-        let mut context = Map::new();
-
-        // For every atom, find the key, datatype and add it to the @context
-        for (prop_url, value) in resource.iter() {
-            // We need the Property for shortname and Datatype
-            let property = store.get_property(prop_url)?;
-            if json_ld {
-                // In JSON-LD, the value of a Context Item can be a string or an object.
-                // This object can contain information about the translation or datatype of the value
-                let ctx_value: SerdeValue = match property.data_type.clone() {
-                    DataType::AtomicUrl => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        obj.insert("@type".into(), "@id".into());
-                        obj.into()
-                    }
-                    DataType::Date => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        obj.insert(
-                            "@type".into(),
-                            "http://www.w3.org/2001/XMLSchema#date".into(),
-                        );
-                        obj.into()
-                    }
-                    DataType::Integer => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        // I'm not sure whether we should use XSD or Atomic Datatypes
-                        obj.insert(
-                            "@type".into(),
-                            "http://www.w3.org/2001/XMLSchema#integer".into(),
-                        );
-                        obj.into()
-                    }
-                    DataType::Markdown => prop_url.as_str().into(),
-                    DataType::ResourceArray => {
-                        let mut obj = Map::new();
-                        obj.insert("@id".into(), prop_url.as_str().into());
-                        // Plain JSON-LD Arrays are not ordered. Here, they are converted into an RDF List.
-                        obj.insert("@container".into(), "@list".into());
-                        obj.into()
-                    }
-                    _other => prop_url.as_str().into(),
-                };
-                context.insert(property.shortname.as_str().into(), ctx_value);
-            }
-            let jsonval = match value.to_owned() {
-                Value::AtomicUrl(val) => SerdeValue::String(val),
-                Value::Date(val) => SerdeValue::String(val),
-                // TODO: Handle big numbers
-                Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
-                Value::Markdown(val) => SerdeValue::String(val),
-                Value::ResourceArray(val) => SerdeValue::Array(
-                    val.iter()
-                        .map(|item| SerdeValue::String(item.clone()))
-                        .collect(),
-                ),
-                Value::Slug(val) => SerdeValue::String(val),
-                Value::String(val) => SerdeValue::String(val),
-                Value::Timestamp(val) => SerdeValue::Number(val.into()),
-                Value::Unsupported(val) => SerdeValue::String(val.value),
-                Value::Boolean(val) => SerdeValue::Bool(val),
-                Value::NestedResource(_) => todo!(),
-            };
-            root.insert(property.shortname, jsonval);
-        }
-
-        if json_ld {
-            root.insert("@context".into(), context.into());
-            root.insert("@id".into(), SerdeValue::String(self.get_subject().into()));
-        }
-        let obj = SerdeValue::Object(root);
-        let string = serde_json::to_string_pretty(&obj).expect("Could not serialize to JSON");
-
-        Ok(string)
+    /// Converts Resource to JSON-LD string, with @context object and RDF compatibility.
+    pub fn to_json_ld(&self, store: &impl Storelike) -> AtomicResult<String> {
+        let obj = crate::serialize::propvals_to_json_map(
+            self.get_propvals(),
+            Some(self.get_subject().clone()),
+            store,
+            &JsonType::JSONLD
+        )?;
+        serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON-LD".into())
     }
 
     // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.

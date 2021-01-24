@@ -2,6 +2,10 @@
 
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 
+## v0.21.0
+
+- Add JSON-AD serialization #79
+
 ## v0.20.4
 
 - Fix array length bug in paths

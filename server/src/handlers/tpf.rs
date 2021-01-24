@@ -33,7 +33,7 @@ pub async fn tpf(
         .tpf(subject.as_deref(), property.as_deref(), value.as_deref())?;
     log::info!("{:?}", query);
     match content_type {
-        ContentType::JSON | ContentType::JSONLD => {
+        ContentType::JSON | ContentType::JSONLD | ContentType::JSONAD => {
             builder.header("Content-Type", content_type.to_mime());
             // TODO
             log::error!("Not implemented");

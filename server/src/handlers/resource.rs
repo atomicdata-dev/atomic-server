@@ -38,11 +38,15 @@ pub async fn get_resource(
     let resource = store.get_resource_extended(&subject)?;
     match content_type {
         ContentType::JSON => {
-            let body = resource.to_json(store, 1, false)?;
+            let body = resource.to_json(store)?;
             Ok(builder.body(body))
         }
         ContentType::JSONLD => {
-            let body = resource.to_json(store, 1, true)?;
+            let body = resource.to_json_ld(store)?;
+            Ok(builder.body(body))
+        }
+        ContentType::JSONAD => {
+            let body = resource.to_json_ad(store)?;
             Ok(builder.body(body))
         }
         ContentType::HTML => {
@@ -116,6 +120,7 @@ fn try_extension(path: &str) -> Option<(ContentType, &str)> {
             "ad3" => ContentType::AD3,
             "json" => ContentType::JSON,
             "jsonld" => ContentType::JSONLD,
+            "jsonad" => ContentType::JSONAD,
             "html" => ContentType::HTML,
             "ttl" => ContentType::TURTLE,
             _ => return None,

@@ -3,7 +3,7 @@ use atomic_lib::{errors::AtomicResult, serialize, storelike, Atom, Storelike};
 use serialize::Format;
 
 /// List of serialization options. Should match /path.rs/get
-pub const SERIALIZE_OPTIONS: [&str; 7] = ["pretty", "json", "jsonld", "ad3", "nt", "turtle", "n3"];
+pub const SERIALIZE_OPTIONS: [&str; 8] = ["pretty", "json", "jsonld", "jsonad", "ad3", "nt", "turtle", "n3"];
 
 /// Resolves an Atomic Path query
 pub fn get_path(context: &mut Context) -> AtomicResult<()> {
@@ -15,6 +15,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
         "pretty" => (Format::PRETTY),
         "json" => (Format::JSON),
         "jsonld" => (Format::JSONLD),
+        "jsonad" => (Format::JSONAD),
         "ad3" => (Format::AD3),
         "nt" => (Format::NT),
         "turtle" => (Format::NT),
@@ -32,10 +33,13 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
         storelike::PathReturn::Subject(subject) => match serialization {
             Format::JSON => store
                 .get_resource_extended(&subject)?
-                .to_json(store, 1, false)?,
+                .to_json(store)?,
             Format::JSONLD => store
                 .get_resource_extended(&subject)?
-                .to_json(store, 1, true)?,
+                .to_json_ld(store)?,
+            Format::JSONAD => store
+                .get_resource_extended(&subject)?
+                .to_json_ad(store)?,
             Format::AD3 => store.get_resource_extended(&subject)?.to_ad3()?,
             Format::NT => {
                 let resource = store.get_resource_extended(&subject)?;
@@ -44,7 +48,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
             Format::PRETTY => pretty_print_resource(&subject, store)?,
         },
         storelike::PathReturn::Atom(atom) => match serialization {
-            Format::JSONLD | Format::JSON => {
+            Format::JSONLD | Format::JSON | Format::JSONAD => {
                 atom.value
             }
             Format::AD3 => {
