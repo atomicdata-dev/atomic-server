@@ -12,19 +12,26 @@ use crate::{
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Commit {
     /// The subject URL that is to be modified by this Delta
+    #[serde(rename="https://atomicdata.dev/properties/subject")]
     pub subject: String,
     /// The date it was created, as a unix timestamp
+    #[serde(rename="https://atomicdata.dev/properties/createdAt")]
     pub created_at: u64,
     /// The URL of the one signing this Commit
+    #[serde(rename="https://atomicdata.dev/properties/signer")]
     pub signer: String,
     /// The set of PropVals that need to be added.
     /// Overwrites existing values
+    #[serde(rename="https://atomicdata.dev/properties/set")]
     pub set: Option<std::collections::HashMap<String, String>>,
     /// The set of property URLs that need to be removed
+    #[serde(rename="https://atomicdata.dev/properties/remove")]
     pub remove: Option<Vec<String>>,
     /// If set to true, deletes the entire resource
+    #[serde(rename="https://atomicdata.dev/properties/destroy")]
     pub destroy: Option<bool>,
     /// Base64 encoded signature of the JSON serialized Commit
+    #[serde(rename="https://atomicdata.dev/properties/signature")]
     pub signature: Option<String>,
 }
 
