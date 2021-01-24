@@ -3,7 +3,6 @@
 use crate::{datatype::DataType, datatype::match_datatype, errors::AtomicResult, resources::PropVals};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value as SerdeValue};
 
 /// An individual Value in an Atom, represented as a native Rust enum.
 #[derive(Clone, Debug, Serialize, Deserialize)]

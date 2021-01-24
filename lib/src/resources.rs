@@ -1,15 +1,13 @@
 //! A resource is a set of Atoms that share a URL
 
-use crate::{Store, serialize::JsonType, values::Value};
+use crate::{serialize::JsonType, values::Value};
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
-    datatype::DataType,
     mapping::is_url,
     schema::{Class, Property},
     Atom, Storelike,
 };
 use std::collections::HashMap;
-use serde_json::{Map, Value as SerdeValue};
 
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
@@ -316,6 +314,20 @@ impl Resource {
             atoms.push(atom);
         }
         Ok(atoms)
+    }
+
+    /// Checks if the properties match the datatypes of the values.
+    pub fn validate_datatypes(&self, store: &impl Storelike) -> AtomicResult<()> {
+        for (prop, val) in self.get_propvals().iter() {
+            let fullprop = store.get_property(prop)?;
+            if fullprop.data_type != val.datatype() {
+                return Err(format!(
+                    "Datatype mismatch with prop {} and val {}, expected {} ",
+                    prop, val, fullprop.data_type
+                ).into())
+            }
+        }
+        Ok(())
     }
 }
 
