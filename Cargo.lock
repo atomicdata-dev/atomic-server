@@ -403,7 +403,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.20.1"
+version = "0.21.0"
 dependencies = [
  "assert_cmd",
  "atomic_lib",
@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.20.3"
+version = "0.21.0"
 dependencies = [
  "acme-lib",
  "actix-files",

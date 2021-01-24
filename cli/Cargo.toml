@@ -6,7 +6,7 @@ license = "MIT"
 name = "atomic-cli"
 readme = "README.md"
 repository = "https://github.com/joepio/atomic"
-version = "0.20.1"
+version = "0.21.0"
 
 [dependencies]
 atomic_lib = {version = "0.21.0", path = "../lib", features = ["config", "db", "rdf"]}
