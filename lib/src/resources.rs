@@ -184,6 +184,7 @@ impl Resource {
 
     /// Saves the resource (with all the changes) to the store by creating a Commit.
     /// Uses default Agent to sign the Commit.
+    /// Stores changes on the Subject's Server by sending a Commit.
     /// Returns the generated Commit.
     pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
         let agent = store.get_default_agent()?;
@@ -197,6 +198,19 @@ impl Resource {
         // If that succeeds, save it locally;
         store.commit(commit.clone())?;
         // then, reset the internal CommitBuiler.
+        self.reset_commit_builder();
+        Ok(commit)
+    }
+
+    /// Saves the resource (with all the changes) to the store by creating a Commit.
+    /// Uses default Agent to sign the Commit.
+    /// Returns the generated Commit.
+    /// Does not store these changes on the server of the Subject - the Commit will be lost, unless you handle it manually.
+    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
+        let agent = store.get_default_agent()?;
+        let commitbuilder = self.get_commit_builder().clone();
+        let commit = commitbuilder.sign(&agent)?;
+        store.commit(commit.clone())?;
         self.reset_commit_builder();
         Ok(commit)
     }
@@ -373,7 +387,7 @@ mod test {
         new_resource
             .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
-        new_resource.save(&store).unwrap();
+        new_resource.save_locally(&store).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
@@ -465,11 +479,11 @@ mod test {
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource.set_propval(property.clone(), value.clone(), &store).unwrap();
         // Should fail, because a propval is missing
-        assert!(new_resource.save(&store).is_err());
+        assert!(new_resource.save_locally(&store).is_err());
         new_resource.set_propval(urls::SHORTNAME.into(), Value::Slug("joe".into()), &store).unwrap();
         let subject = new_resource.get_subject().clone();
         println!("subject new {}", new_resource.get_subject());
-        new_resource.save(&store).unwrap();
+        new_resource.save_locally(&store).unwrap();
         let found_resource  = store.get_resource(&subject).unwrap();
         println!("subject found {}", found_resource.get_subject());
         println!("subject all {:?}", found_resource.get_propvals());

@@ -7,6 +7,7 @@ List of changes for this repo, including `atomic-cli`, `atomic-server` and `atom
 - Add JSON-AD serialization #79, use it in Commits
 - Servers are aware of their own URL #51
 - Improved CLI edit feature, more flexible (create new resources if none exist, fix newlines)
+- Add `resource.save_locally()`
 
 ## v0.20.4
 

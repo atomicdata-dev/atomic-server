@@ -249,7 +249,7 @@ mod test {
             .set_propval_shortname("datatype", crate::urls::INTEGER, &store)
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
-        new_property.save(&store).unwrap();
+        new_property.save_locally(&store).unwrap();
         // The modified resource is saved to the store after this
 
         // A subject URL has been created automatically.

@@ -198,7 +198,7 @@ pub trait Storelike: Sized {
         if let Some(self_url) = self.get_self_url() {
             if subject.starts_with(&self_url) {
                 return Err(format!(
-                    "Failed to retrieve '{}', does not exist locally, but is expected to, since the base_url is the current Store. {}",
+                    "Failed to retrieve '{}', does not exist locally. {}",
                     subject,
                     error
                 ).into());
