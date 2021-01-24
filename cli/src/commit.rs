@@ -4,11 +4,18 @@ use atomic_lib::{errors::AtomicResult, Storelike};
 /// Apply a Commit using the Set method - create or update a value in a resource
 pub fn set(context: &Context) -> AtomicResult<()> {
     let subject = argument_to_url(context, "subject")?;
-    let prop = argument_to_string(context, "property")?;
-    let val = argument_to_string(context, "value")?;
-    let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
-    commit_builder.set(prop, val);
-    post(context, commit_builder)?;
+    let property = argument_to_string(context, "property")?;
+    let value = argument_to_string(context, "value")?;
+
+    // If the resource is not found, create it
+    let mut resource = match context.store.get_resource(&subject) {
+        Ok(r) => r,
+        Err(_) => {
+            atomic_lib::Resource::new(subject)
+        }
+    };
+    resource.set_propval_shortname(&property, &value, &context.store)?;
+    post(context, resource.get_commit_builder().clone())?;
     Ok(())
 }
 

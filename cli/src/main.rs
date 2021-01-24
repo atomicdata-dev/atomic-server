@@ -130,9 +130,9 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("set")
-                .about("Update an Atom's value. Uses Commits.")
+                .about("Update a single Atom. Creates both the Resource if they don't exist. Overwrites existing.")
                 .arg(Arg::with_name("subject")
-                    .help("Subject URL or bookmark of the resourece")
+                    .help("Subject URL or bookmark of the resource")
                     .required(true)
                 )
                 .arg(Arg::with_name("property")
@@ -146,7 +146,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("remove")
-                .about("Remove a single Atom from a Resource. Uses Commits.")
+                .about("Remove a single Atom from a Resource.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
@@ -158,7 +158,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("edit")
-                .about("Edit a single Atom from a Resource using your text editor. Uses Commits.")
+                .about("Edit a single Atom from a Resource using your text editor.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
@@ -170,7 +170,7 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("destroy")
-                .about("Permanently removes a Resource. Uses Commits.")
+                .about("Permanently removes a Resource.")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource to be destroyed")
                     .required(true)
