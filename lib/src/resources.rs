@@ -315,20 +315,6 @@ impl Resource {
         }
         Ok(atoms)
     }
-
-    /// Checks if the properties match the datatypes of the values.
-    pub fn validate_datatypes(&self, store: &impl Storelike) -> AtomicResult<()> {
-        for (prop, val) in self.get_propvals().iter() {
-            let fullprop = store.get_property(prop)?;
-            if fullprop.data_type != val.datatype() {
-                return Err(format!(
-                    "Datatype mismatch with prop {} and val {}, expected {} ",
-                    prop, val, fullprop.data_type
-                ).into())
-            }
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]

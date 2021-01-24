@@ -52,7 +52,7 @@ pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
 use serde_json::Map;
 
 /// Parse a single Json AD string, convert to Atoms
-/// Does not match all props to datatypes, so it could result in invalid data.
+/// Does not match all props to datatypes (in Nested Resources), so it could result in invalid data.
 pub fn parse_json_ad_resource(
     string: &str,
     store: &impl crate::Storelike,
@@ -64,46 +64,10 @@ pub fn parse_json_ad_resource(
         .as_str()
         .ok_or("`@id` is not a string - should be the Subject of the Resource (a URL)")?;
     let mut resource = Resource::new(subject.to_string());
-    for (key, val) in json {
-
-        if key == "@id" {
-        } else {
-            println!("k: {} v: {}", key, val.to_string());
-            match val {
-                serde_json::Value::Null => return Err("Null not allowed in JSON-AD".into()),
-                serde_json::Value::Bool(bool) => {
-                    resource.set_propval(key, Value::Boolean(bool), store)
-                }
-                serde_json::Value::Number(num) => {
-                    // Turns invalid numbers into valid strings - not cool.
-                    resource.set_propval_string(key, &num.to_string(), store)
-                }
-                serde_json::Value::String(str) => {
-                    println!("STRING: {} TO_STRING: {}", str, str.to_string());
-                    resource.set_propval_string(key, &str.to_string(), store)
-                }
-                // In Atomic Data, all arrays are Resource Arrays which are serialized JSON things.
-                // Maybe this step could be simplified? Just serialize to string?
-                serde_json::Value::Array(arr) => {
-                    let mut newvec: Vec<String> = Vec::new();
-                    for v in arr {
-                        match v {
-                            serde_json::Value::String(str) => newvec.push(str),
-                            _err => return Err("Found non-string item in resource array.".into()),
-                        }
-                    }
-                    resource.set_propval(key, Value::ResourceArray(newvec), store)
-                }
-                serde_json::Value::Object(map) => {
-                    let atomic_val =
-                        Value::NestedResource(parse_json_ad_map_to_propvals(map, store)?);
-                    resource.set_propval(key, atomic_val, store)
-                }
-            }?;
-        }
+    let propvals = parse_json_ad_map_to_propvals(json, store)?;
+    for (prop, val) in propvals {
+        resource.set_propval(prop, val, store)?
     }
-    // parse_json_ad_map_to_propvals(json)
-    resource.validate_datatypes(store)?;
     Ok(resource)
 }
 
@@ -126,6 +90,8 @@ pub fn parse_json_ad_map_to_propvals(
             serde_json::Value::Bool(bool) => Value::Boolean(bool),
             serde_json::Value::Number(num) => {
                 let property = store.get_property(&prop)?;
+                // Also converts numbers to strings, not sure what to think about this.
+                // Does not result in invalid atomic data, but does allow for weird inputs
                 Value::new(&num.to_string(), &property.data_type)?
             }
             serde_json::Value::String(str) => {
@@ -199,13 +165,25 @@ mod test {
 
     #[test]
     // This test should actually fail, I think, because the datatype should match the property.
-    #[should_panic(expected = "Datatype")]
-    fn parse_and_serialize_json_ad_wrong_datatype() {
+    // #[should_panic(expected = "Datatype")]
+    fn parse_and_serialize_json_ad_wrong_datatype_int_to_str() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let json_input = r#"{
             "@id": "https://atomicdata.dev/classes/Agent",
             "https://atomicdata.dev/properties/description": 1
+          }"#;
+        parse_json_ad_resource(json_input, &store).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Not a valid Timestamp: 1.124. invalid digit found in string")]
+    fn parse_and_serialize_json_ad_wrong_datatype_float() {
+        let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
+        let json_input = r#"{
+            "@id": "https://atomicdata.dev/classes/Agent",
+            "https://atomicdata.dev/properties/createdAt": 1.124
           }"#;
         parse_json_ad_resource(json_input, &store).unwrap();
     }
