@@ -150,7 +150,7 @@ pub trait Storelike: Sized {
         let resource = self
             .get_resource(subject)
             .map_err(|e| format!("Failed getting class {}. {}", subject, e))?;
-        Class::from_resource(resource)
+        Class::from_resource(&resource)
     }
 
     /// Finds all classes (isA) for any subject.

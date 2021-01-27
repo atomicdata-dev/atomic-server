@@ -19,3 +19,11 @@
 </div>
 {%- endfor %}
 {% endmacro propvals %}
+
+{% macro properties(vector) %}
+{% for property in vector -%}
+<div class="property">
+  <a class="tooltip" data-tooltip="{{ property.description }}" href="{{ property.subject }}">{{ property.shortname }}</a>
+</div>
+{%- endfor %}
+{% endmacro properties %}

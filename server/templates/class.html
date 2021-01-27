@@ -1,0 +1,21 @@
+{% import "macros.html" as macros %}
+{% extends "base.html" %}
+{% block title %}Resource{% endblock title %}
+{% block content %}
+<div class="container grid-lg">
+  <h2>{{ class.shortname }}</h2>
+  <em>This is an <a href="https://atomicdata.dev/classes/Class">Atomic Class</a>.</em>
+  <p>{{ class.description }}</p>
+  <p>Required props:</p>
+  {{ macros::properties(vector=requires) }}
+  <p>Recommended props:</p>
+  {{ macros::properties(vector=recommends) }}
+
+  </br>
+  </br>
+  </br>
+  <p>Other properties:</p>
+  {{ macros::propvals(vector=propvals) }}
+  <em>You can use HTTP content negotation to fetch this resource as JSON, JSON-LD, AD3 or Turtle. You can also try putting .json, .jsonld, .ttl or .ad3 behind the URL.</em>
+</div>
+{% endblock content %}

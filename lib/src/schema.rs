@@ -67,7 +67,7 @@ pub struct Class {
 
 impl Class {
     /// Creates a Class from a Resource
-    pub fn from_resource(resource: Resource) -> AtomicResult<Class> {
+    pub fn from_resource(resource: &Resource) -> AtomicResult<Class> {
         let mut requires = Vec::new();
         if let Ok(reqs) = resource.get(urls::REQUIRES) {
             for prop_sub in reqs.to_vec()? {
