@@ -7,7 +7,9 @@
 
 _Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
-The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
+The easiest way to share Atomic Data on the web.
+It's a database and a server for storing and sharing typed linked data.
+Demo on [atomicdata.dev](https://atomicdata.dev)
 
 - No runtime dependencies, fast, runs on all platforms
 - Embedded HTTP / HTTPS / HTTP2.0 server

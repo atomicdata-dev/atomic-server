@@ -1,6 +1,8 @@
 //! A value is the part of an Atom that contains the actual information.
 
-use crate::{datatype::DataType, datatype::match_datatype, errors::AtomicResult, resources::PropVals};
+use crate::{
+    datatype::match_datatype, datatype::DataType, errors::AtomicResult, resources::PropVals,
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -9,7 +11,7 @@ use serde::{Deserialize, Serialize};
 pub enum Value {
     AtomicUrl(String),
     Date(String),
-    Integer(isize),
+    Integer(i64),
     Float(f64),
     Markdown(String),
     ResourceArray(Vec<String>),
@@ -36,7 +38,6 @@ pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
-
     /// Returns the datatype for the value
     pub fn datatype(&self) -> DataType {
         match self {
@@ -52,7 +53,7 @@ impl Value {
             // TODO: these datatypes are not the same
             Value::NestedResource(_) => DataType::AtomicUrl,
             Value::Boolean(_) => DataType::Boolean,
-            Value::Unsupported(s) => DataType::Unsupported(s.datatype.clone())
+            Value::Unsupported(s) => DataType::Unsupported(s.datatype.clone()),
         }
     }
 
@@ -61,7 +62,7 @@ impl Value {
     pub fn new(value: &str, datatype: &DataType) -> AtomicResult<Value> {
         match datatype {
             DataType::Integer => {
-                let val: isize = value.parse()?;
+                let val: i64 = value.parse()?;
                 Ok(Value::Integer(val))
             }
             DataType::Float => {
@@ -75,7 +76,11 @@ impl Value {
                 if re.is_match(&*value) {
                     return Ok(Value::Slug(value.into()));
                 }
-                Err(format!("Not a valid slug: {}. Only alphanumerics, no spaces allowed.", value).into())
+                Err(format!(
+                    "Not a valid slug: {}. Only alphanumerics, no spaces allowed.",
+                    value
+                )
+                .into())
             }
             DataType::AtomicUrl => Ok(Value::AtomicUrl(value.into())),
             DataType::ResourceArray => {
@@ -105,7 +110,13 @@ impl Value {
                 let bool = match value {
                     "true" => true,
                     "false" => false,
-                    other => return Err(format!("Not a valid boolean value: {}, should be 'true' or 'false'.", other).into()),
+                    other => {
+                        return Err(format!(
+                            "Not a valid boolean value: {}, should be 'true' or 'false'.",
+                            other
+                        )
+                        .into())
+                    }
                 };
                 Ok(Value::Boolean(bool))
             }
@@ -117,36 +128,37 @@ impl Value {
         Value::new(value, &match_datatype(datatype))
     }
 
-    pub fn to_bool(&self) -> AtomicResult<bool> {
-        if let Value::Boolean(bool) = self {
-            return Ok(bool.clone())
-        }
-        Err(format!("Value {} is not a nested resource", self).into())
-    }
-
-    /// Returns an Integer, if the Value is one.
-    pub fn to_int(&self) -> AtomicResult<i64> {
-        match self {
-            // Is this unsafe? Maybe?
-            Value::Integer(i) => Ok(*i as i64),
-            Value::Timestamp(i) => Ok(*i),
-            _other => Err(format!("Not an integer: {}", self).into())
-        }
-    }
-
-    pub fn to_nested(&self) -> AtomicResult<PropVals> {
-        if let Value::NestedResource(arr) = self {
-            return Ok(arr.clone())
-        }
-        Err(format!("Value {} is not a nested resource", self).into())
-    }
-
     /// Returns a Vector, if the Value is one
     pub fn to_vec(&self) -> AtomicResult<&Vec<String>> {
         if let Value::ResourceArray(arr) = self {
-            return Ok(arr)
+            return Ok(arr);
         }
         Err(format!("Value {} is not a Resource Array", self).into())
+    }
+
+    pub fn to_bool(&self) -> AtomicResult<bool> {
+        if let Value::Boolean(bool) = self {
+            return Ok(bool.to_owned());
+        }
+        Err(format!("Value {} is not a Boolean", self).into())
+    }
+
+    /// Returns an Integer, if the Atom is one.
+    pub fn to_int(&self) -> AtomicResult<i64> {
+        match self {
+            Value::Timestamp(int) | Value::Integer(int) => Ok(int.to_owned()),
+            _ => self.to_string().parse::<i64>().map_err(|e| {
+                format!("Value {} cannot be converted into integer. {}", self, e).into()
+            }),
+        }
+    }
+
+    /// Returns a PropVals Hashmap, if the Atom is a NestedResource
+    pub fn to_nested(&self) -> AtomicResult<&PropVals> {
+        if let Value::NestedResource(nested) = self {
+            return Ok(nested);
+        }
+        Err(format!("Value {} is not a Nested Resource", self).into())
     }
 }
 
@@ -158,19 +170,20 @@ impl From<String> for Value {
 
 impl From<i32> for Value {
     fn from(val: i32) -> Self {
-        Value::Integer(val as isize)
+        Value::Integer(val as i64)
     }
 }
 
-impl From<u64> for Value {
-    fn from(val: u64) -> Self {
-        Value::Integer(val as isize)
-    }
-}
+// impl From<u64> for Value {
+//     fn from(val: u64) -> Self {
+//         // This might panic. Perhaps this is not a good idea
+//         Value::Integer(val as i64)
+//     }
+// }
 
 impl From<usize> for Value {
     fn from(val: usize) -> Self {
-        Value::Integer(val as isize)
+        Value::Integer(val as i64)
     }
 }
 

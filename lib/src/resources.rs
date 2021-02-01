@@ -206,13 +206,14 @@ impl Resource {
     /// Uses default Agent to sign the Commit.
     /// Returns the generated Commit.
     /// Does not store these changes on the server of the Subject - the Commit will be lost, unless you handle it manually.
-    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
+    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
         let commit = commitbuilder.sign(&agent, store)?;
         store.commit(commit.clone())?;
         self.reset_commit_builder();
-        Ok(commit)
+        let resource = commit.into_resource(store)?;
+        Ok(resource)
     }
 
     /// Insert a Property/Value combination.
