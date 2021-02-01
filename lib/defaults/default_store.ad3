@@ -1,4 +1,5 @@
 # Properties
+# Base properties are commented out, because these are described in `populate.rs`
 # ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
 # ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/resourceArray"]
 # ["https://atomicdata.dev/properties/isA","https://atomicdata.dev/properties/classtype","https://atomicdata.dev/classes/Class"]

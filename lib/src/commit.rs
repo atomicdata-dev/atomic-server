@@ -35,16 +35,103 @@ pub struct Commit {
     /// Base64 encoded signature of the JSON serialized Commit
     #[serde(rename = "https://atomicdata.dev/properties/signature")]
     pub signature: Option<String>,
+    /// The URL of the Commit
+    pub url: Option<String>,
 }
 
 impl Commit {
+    /// Apply a single signed Commit to the store
+    /// Creates, edits or destroys a resource.
+    /// Checks if the signature is created by the Agent.
+    /// TODO: Should check if the Agent has the correct rights.
+    fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
+        self.apply_opts(store, true, true)
+    }
+
+    fn apply_opts(&self, store: &impl Storelike, validate_schema: bool, validate_signature: bool) -> AtomicResult<Resource>
+    where
+        Self: std::marker::Sized,
+    {
+        let signature = match self.signature.as_ref() {
+            Some(sig) => sig,
+            None => return Err("No signature set".into()),
+        };
+        // TODO: Check if commit.agent has the rights to update the resource
+        let pubkey_b64 = store
+            .get_resource(&self.signer)?
+            .get(urls::PUBLIC_KEY)?
+            .to_string();
+        let agent_pubkey = base64::decode(pubkey_b64)?;
+        let stringified_commit = self.serialize_deterministically_json_ad(store)?;
+        let peer_public_key =
+            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
+        let signature_bytes = base64::decode(signature.clone())?;
+        peer_public_key
+            .verify(stringified_commit.as_bytes(), &signature_bytes)
+            .map_err(|_e| {
+                format!(
+                    "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Stringified commit: {}. Public key",
+                    stringified_commit,
+                )
+            })?;
+        // Check if the created_at lies in the past
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Time went backwards")
+            .as_millis() as i64;
+        let commit_resource: Resource = self.clone().into_resource(store)?;
+        let acceptable_ms_difference = 10000;
+        if self.created_at > now + acceptable_ms_difference {
+            return Err(format!(
+                "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
+                now, self.created_at
+            )
+            .into());
+            // TODO: also check that no younger commits exist
+        }
+        if let Some(destroy) = self.destroy {
+            if destroy {
+                store.remove_resource(&self.subject)?;
+                return Ok(commit_resource);
+            }
+        }
+        let mut resource = match store.get_resource(&self.subject) {
+            Ok(rs) => rs,
+            Err(_) => Resource::new(self.subject.clone()),
+        };
+        if let Some(set) = self.set.clone() {
+            for (prop, val) in set.iter() {
+                resource.set_propval(prop.into(), val.to_owned(), store)?;
+            }
+            store.add_resource(&resource)?;
+        }
+        if let Some(remove) = self.remove {
+            for prop in remove.iter() {
+                resource.remove_propval(&prop);
+            }
+            store.add_resource(&resource)?;
+        }
+        resource.check_required_props(store)?;
+        // Save the Commit to the Store
+        store.add_resource(&commit_resource)?;
+        Ok(commit_resource)
+    }
+
+    /// Applies a commit without performing the necessary authorization / signature / schema checks.
+    pub fn apply_unsafe(&self, commit: crate::Commit) -> AtomicResult<Resource>
+    where
+        Self: std::marker::Sized,
+    {
+        self.apply_opts(commit, false, false, false)
+    }
+
     /// Converts a Resource of a Commit into a Commit
     pub fn from_resource(resource: Resource) -> AtomicResult<Commit> {
         let subject = resource.get(urls::SUBJECT)?.to_string();
         let created_at = resource.get(urls::CREATED_AT)?.to_int()?;
         let signer = resource.get(SIGNER)?.to_string();
         let set = match resource.get(SET) {
-            Ok(found) => Some(found.to_nested()?),
+            Ok(found) => Some(found.to_nested()?.to_owned()),
             Err(_) => None,
         };
         let remove = match resource.get(urls::REMOVE) {
@@ -56,6 +143,7 @@ impl Commit {
             Err(_) => None,
         };
         let signature = resource.get(urls::SIGNATURE)?.to_string();
+        let url = Some(resource.get_subject().into());
 
         Ok(Commit {
             subject,
@@ -65,6 +153,7 @@ impl Commit {
             remove,
             destroy,
             signature: Some(signature),
+            url,
         })
     }
 
@@ -221,6 +310,7 @@ fn sign_at(
         destroy: Some(commitbuilder.destroy),
         created_at: sign_date,
         signature: None,
+        url: None,
     };
     println!("Agent: {:?}", agent);
     let stringified = commit
@@ -285,7 +375,7 @@ mod test {
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store).unwrap();
         let commit_subject = commit.get_subject().to_string();
-        let _created_resource = store.commit(commit).unwrap();
+        let _created_resource = commit.apply(&store).unwrap();
 
         let resource = store.get_resource(&subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
@@ -321,6 +411,7 @@ mod test {
             remove: Some(remove),
             destroy: Some(destroy),
             signature: None,
+            url: None,
         };
         let serialized = commit.serialize_deterministically_json_ad(&store).unwrap();
         let should_be = "{\"https://atomicdata.dev/properties/createdAt\":1603638837,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/remove\":[\"https://atomicdata.dev/properties/isA\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some description\",\"https://atomicdata.dev/properties/shortname\":\"shortname\"},\"https://atomicdata.dev/properties/signer\":\"https://localhost/author\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/test\"}";

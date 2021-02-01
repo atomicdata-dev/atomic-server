@@ -41,7 +41,7 @@ fn main() {
     // Because these are signed, we need an Agent, which has a private key to sign Commits.
     let agent = store.create_agent("my_agent").unwrap();
     store.set_default_agent(agent);
-    new_property.save_locally(&store).unwrap_err();
+    let _fails   = new_property.save_locally(&store);
     // But.. when we commit, we get an error!
     // Because we haven't set all the properties required for the Property class.
     // We still need to set `shortname` and `datatype`.
