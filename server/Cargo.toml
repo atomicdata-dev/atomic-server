@@ -30,6 +30,7 @@ use = "0.0.0"
 uuid = { version = "0.8.1", features = ["v4"] }
 tray-item = { version = "0.4.0-alpha", optional = true }
 webbrowser = {version = "0.5.5", optional = true }
+actix-cors = "0.5.4"
 
 [features]
 desktop = ["tray-item", "webbrowser"]

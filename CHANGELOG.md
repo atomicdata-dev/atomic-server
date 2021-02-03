@@ -2,6 +2,10 @@
 
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 
+## v0.21.1
+
+- Permissive CORS #92
+
 ## v0.21.0
 
 - Add JSON-AD serialization #79, use it in Commits

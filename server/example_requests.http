@@ -2,6 +2,10 @@
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: application/json
 
+### Get a thing as JSON-AD
+GET https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: application/ad+json
+
 ### Get a thing as JSON-LD
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: application/ld+json

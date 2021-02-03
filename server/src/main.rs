@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use std::{io, sync::Mutex};
 mod appstate;
@@ -28,8 +29,12 @@ async fn main() -> io::Result<()> {
     let server =
         HttpServer::new(move || {
             let data = web::Data::new(Mutex::new(appstate.clone()));
+            // Allow requests from other domains
+            let cors = Cors::permissive();
+
             App::new()
                 .app_data(data)
+                .wrap(cors)
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
                 .service(actix_files::Files::new("/static", "static/").show_files_listing())
