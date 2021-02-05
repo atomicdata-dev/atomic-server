@@ -175,32 +175,8 @@ impl CommitBuilder {
     /// Does not send it - see atomic_lib::client::post_commit
     /// Private key is the base64 encoded pkcs8 for the signer
     pub fn sign(self, agent: &crate::agents::Agent) -> AtomicResult<Commit> {
-        let created_at = crate::datetime_helpers::now();
-
-        let mut commit = Commit {
-            subject: self.subject,
-            signer: agent.subject.clone(),
-            set: Some(self.set),
-            remove: Some(self.remove.into_iter().collect()),
-            destroy: Some(self.destroy),
-            created_at: created_at as u64,
-            signature: None,
-        };
-
-        // TODO: use actual stringified resource, also change in Storelike::commit
-        // let stringified = serde_json::to_string(&self)?;
-        // let stringified = "full_resource";
-        let stringified = commit
-            .serialize_deterministically()
-            .map_err(|e| format!("Failed serializing commit: {}", e))?;
-        let private_key_bytes = base64::decode(agent.private_key.clone())
-            .map_err(|e| format!("Failed decoding private key {}: {}", agent.private_key.clone(), e))?;
-        let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
-            .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
-        // let signax   ture = some_lib::sign(string, private_key);
-        let signature = base64::encode(key_pair.sign(&stringified.as_bytes()));
-        commit.signature = Some(signature);
-        Ok(commit)
+        let now = crate::datetime_helpers::now();
+        sign_at(self, agent, now)
     }
 
     /// Set Property / Value combinations that will either be created or overwritten.
@@ -219,16 +195,38 @@ impl CommitBuilder {
     }
 }
 
+/// Signs a CommitBuilder at a specific unix timestamp.
+fn sign_at(commitbuilder: CommitBuilder, agent: &crate::agents::Agent, sign_date: u64) -> AtomicResult<Commit> {
+    let mut commit = Commit {
+        subject: commitbuilder.subject,
+        signer: agent.subject.clone(),
+        set: Some(commitbuilder.set),
+        remove: Some(commitbuilder.remove.into_iter().collect()),
+        destroy: Some(commitbuilder.destroy),
+        created_at: sign_date as u64,
+        signature: None,
+    };
+    let stringified = commit
+        .serialize_deterministically()
+        .map_err(|e| format!("Failed serializing commit: {}", e))?;
+    let private_key_bytes = base64::decode(agent.private_key.clone())
+        .map_err(|e| format!("Failed decoding private key {}: {}", agent.private_key.clone(), e))?;
+    let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
+        .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
+    let signature = base64::encode(key_pair.sign(&stringified.as_bytes()));
+    commit.signature = Some(signature);
+    Ok(commit)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Storelike;
+    use crate::{Storelike, agents::Agent};
 
     #[test]
     fn agent_and_commit() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        // Creates a new Agent with some crypto stuff
         let agent = store.create_agent("test_actor").unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into());
@@ -276,5 +274,26 @@ mod test {
         let serialized = commit.serialize_deterministically().unwrap();
         let should_be = r#"{"createdAt":1603638837,"remove":["https://atomicdata.dev/properties/isA"],"set":{"https://atomicdata.dev/properties/description":"Some description","https://atomicdata.dev/properties/shortname":"shortname"},"signer":"https://localhost/author","subject":"https://localhost/test"}"#;
         assert!(serialized == should_be)
+    }
+
+    #[test]
+    fn signature_matches() {
+        let private_key = "MFMCAQEwBQYDK2VwBCIEIItEZm3wbIpx7qK/+UPT2DqsZWwsD50M3QDLyTwPGVKEoSMDIQAivODlyb+pfdNQGbu7EJ2w3f8+2suBNenGNsE8KsI6pA==";
+        let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
+        let agent = Agent::new_from_private_key("name".into(), &store, private_key.into());
+        assert_eq!(&agent.subject, "http://localhost/agents/Irzg5cm/qX3TUBm7uxCdsN3/PtrLgTXpxjbBPCrCOqQ=");
+        store.add_resource(&agent.to_resource(&store).unwrap()).unwrap();
+        let subject = "https://localhost/new_thing";
+        let mut commitbuilder = crate::commit::CommitBuilder::new(subject.into());
+        let property1 = crate::urls::DESCRIPTION;
+        let value1 = "Some value";
+        commitbuilder.set(property1.into(), value1.into());
+        let property2 = crate::urls::SHORTNAME;
+        let value2 = "someval";
+        commitbuilder.set(property2.into(), value2.into());
+        let commit = sign_at(commitbuilder, &agent, 0).unwrap();
+        let signature = commit.signature.clone().unwrap();
+        assert_eq!(signature, "Nmyp7gmLhf5GZw2mCOXjXqfsSDeA4GIiYFQh2P/0xsJENwetnzmDDA1lUyzr9mpc32JxIzCVEgTsyi2GzK/ACQ==");
     }
 }
