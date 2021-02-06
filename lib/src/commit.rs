@@ -209,13 +209,19 @@ fn sign_at(commitbuilder: CommitBuilder, agent: &crate::agents::Agent, sign_date
     let stringified = commit
         .serialize_deterministically()
         .map_err(|e| format!("Failed serializing commit: {}", e))?;
-    let private_key_bytes = base64::decode(agent.private_key.clone())
-        .map_err(|e| format!("Failed decoding private key {}: {}", agent.private_key.clone(), e))?;
-    let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
-        .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
-    let signature = base64::encode(key_pair.sign(&stringified.as_bytes()));
+    let signature = sign_message(&stringified, &agent.private_key)?;
     commit.signature = Some(signature);
     Ok(commit)
+}
+
+/// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
+fn sign_message(message: &str, private_key: &str) -> AtomicResult<String> {
+    let private_key_bytes = base64::decode(private_key.to_string())
+        .map_err(|e| format!("Failed decoding private key {}: {}", private_key.to_string(), e))?;
+    let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
+        .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
+    let signature = base64::encode(key_pair.sign(&message.as_bytes()));
+    Ok(signature)
 }
 
 #[cfg(test)]
@@ -294,6 +300,16 @@ mod test {
         commitbuilder.set(property2.into(), value2.into());
         let commit = sign_at(commitbuilder, &agent, 0).unwrap();
         let signature = commit.signature.clone().unwrap();
+        let serialized = commit.serialize_deterministically().unwrap();
+        assert_eq!(serialized, r#"{"createdAt":0,"set":{"https://atomicdata.dev/properties/description":"Some value","https://atomicdata.dev/properties/shortname":"someval"},"signer":"http://localhost/agents/Irzg5cm/qX3TUBm7uxCdsN3/PtrLgTXpxjbBPCrCOqQ=","subject":"https://localhost/new_thing"}"#);
         assert_eq!(signature, "Nmyp7gmLhf5GZw2mCOXjXqfsSDeA4GIiYFQh2P/0xsJENwetnzmDDA1lUyzr9mpc32JxIzCVEgTsyi2GzK/ACQ==");
+    }
+
+    #[test]
+    fn signature_basics() {
+        let private_key = "MFMCAQEwBQYDK2VwBCIEIItEZm3wbIpx7qK/+UPT2DqsZWwsD50M3QDLyTwPGVKEoSMDIQAivODlyb+pfdNQGbu7EJ2w3f8+2suBNenGNsE8KsI6pA==";
+        let message = "val";
+        let signature = sign_message(message, private_key).unwrap();
+        assert_eq!(signature, "+RVIN+DVu6khCAo8M+BE2IrS9HT+L89I2b5YDC+AddTwPNiaYX6wQX+ANZVSIblMKYUiy9l0QxS3j7UvlYYRAg==");
     }
 }
