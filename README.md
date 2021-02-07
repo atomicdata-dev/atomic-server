@@ -54,6 +54,10 @@ This repository serves the following purposes:
 - Serve the first Atomic Data, including the core schema (now available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [docs](https://docs.atomicdata.dev/)
 - Provide developers with tools and inspiration to use Atomic Data in their own projects.
 
+## Also check out
+
+- [Atomic-React](https://github.com/joepio/atomic-react), a WIP typescript front-end library + app that will soon replace most of the HTML templating stuff from `atomic-server`.
+
 ## Contribute
 
 Issues and PR's are welcome!
