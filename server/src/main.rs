@@ -38,7 +38,6 @@ async fn main() -> io::Result<()> {
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
                 .service(actix_files::Files::new("/static", "static/").show_files_listing())
-                .service(actix_files::Files::new("/react", "static/atomic-react.html"))
                 .service(
                     actix_files::Files::new("/.well-known", "static/well-known/")
                         .show_files_listing(),

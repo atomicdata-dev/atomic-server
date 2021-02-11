@@ -52,7 +52,7 @@ pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
 use serde_json::Map;
 
 /// Parse a single Json AD string, convert to Atoms
-/// Does not match all props to datatypes (in Nested Resources), so it could result in invalid data.
+/// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
 pub fn parse_json_ad_resource(
     string: &str,
     store: &impl crate::Storelike,
@@ -187,4 +187,17 @@ mod test {
           }"#;
         parse_json_ad_resource(json_input, &store).unwrap();
     }
+
+    // #[test]
+    // fn parse_and_serialize_round_trip() {
+    //     let store = crate::Store::init().unwrap();
+    //     // Populate the store
+    //     store.populate().unwrap();
+    //     // Get all the atoms
+    //     // Serialize all as JSON-AD
+    //     // Parse JSON-AD in a new store, without populating it. (only the base models)
+    //     // Get all the atoms from this new store
+    //     // Check if they are the same!
+    //     parse_json_ad_resource(json_input, &store).unwrap();
+    // }
 }
