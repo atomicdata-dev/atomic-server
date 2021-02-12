@@ -2,7 +2,7 @@
 
 use crate::{Resource, Storelike, datetime_helpers, errors::AtomicResult, urls};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Agent {
   /// Private key for signing commits
   pub private_key: String,
@@ -46,13 +46,13 @@ impl Agent {
   }
 }
 
-/// PKCS#8 keypair, serialized using base64
+/// keypair, serialized using base64
 pub struct Pair {
   pub private: String,
   pub public: String,
 }
 
-/// Returns a new random PKCS#8 keypair.
+/// Returns a new random keypair.
 fn generate_keypair() -> AtomicResult<Pair> {
   use ring::signature::KeyPair;
   let rng = ring::rand::SystemRandom::new();
@@ -66,8 +66,8 @@ fn generate_keypair() -> AtomicResult<Pair> {
   })
 }
 
-/// Returns a Key Pair (including public key) from a private key, PKCS#8 base64 encoded.
-fn generate_public_key(private_key: &str) -> Pair {
+/// Returns a Key Pair (including public key) from a private key, base64 encoded.
+pub fn generate_public_key(private_key: &str) -> Pair {
   use ring::signature::KeyPair;
   let private_key_bytes = base64::decode(private_key).unwrap();
   let key_pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(private_key_bytes.as_ref())

@@ -1,4 +1,4 @@
-use atomic_lib::mapping::Mapping;
+use atomic_lib::{agents::generate_public_key, mapping::Mapping};
 use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
@@ -35,7 +35,7 @@ impl Context<'_> {
             // TODO: use actual data
             created_at: atomic_lib::datetime_helpers::now() as u64,
             name: "Random name".into(),
-            public_key: "NOT_USED".into(),
+            public_key: generate_public_key(&write_ctx.private_key).public,
         });
         write_ctx
     }

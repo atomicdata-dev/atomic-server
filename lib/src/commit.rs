@@ -12,26 +12,26 @@ use crate::{
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Commit {
     /// The subject URL that is to be modified by this Delta
-    #[serde(rename="https://atomicdata.dev/properties/subject")]
+    #[serde(rename = "https://atomicdata.dev/properties/subject")]
     pub subject: String,
     /// The date it was created, as a unix timestamp
-    #[serde(rename="https://atomicdata.dev/properties/createdAt")]
+    #[serde(rename = "https://atomicdata.dev/properties/createdAt")]
     pub created_at: u64,
     /// The URL of the one signing this Commit
-    #[serde(rename="https://atomicdata.dev/properties/signer")]
+    #[serde(rename = "https://atomicdata.dev/properties/signer")]
     pub signer: String,
     /// The set of PropVals that need to be added.
     /// Overwrites existing values
-    #[serde(rename="https://atomicdata.dev/properties/set")]
+    #[serde(rename = "https://atomicdata.dev/properties/set")]
     pub set: Option<std::collections::HashMap<String, String>>,
     /// The set of property URLs that need to be removed
-    #[serde(rename="https://atomicdata.dev/properties/remove")]
+    #[serde(rename = "https://atomicdata.dev/properties/remove")]
     pub remove: Option<Vec<String>>,
     /// If set to true, deletes the entire resource
-    #[serde(rename="https://atomicdata.dev/properties/destroy")]
+    #[serde(rename = "https://atomicdata.dev/properties/destroy")]
     pub destroy: Option<bool>,
     /// Base64 encoded signature of the JSON serialized Commit
-    #[serde(rename="https://atomicdata.dev/properties/signature")]
+    #[serde(rename = "https://atomicdata.dev/properties/signature")]
     pub signature: Option<String>,
 }
 
@@ -124,20 +124,29 @@ impl Commit {
                 for (k, v) in collect.iter() {
                     set_map.insert(k.into(), serde_json::Value::String(v.into()));
                 }
-                obj.insert("https://atomicdata.dev/properties/set".into(), serde_json::Value::Object(set_map));
+                obj.insert(
+                    "https://atomicdata.dev/properties/set".into(),
+                    serde_json::Value::Object(set_map),
+                );
             }
         }
         if let Some(mut remove) = self.remove.clone() {
             if !remove.is_empty() {
                 // These, too, should be sorted alphabetically
                 remove.sort();
-                obj.insert("https://atomicdata.dev/properties/remove".into(), remove.into());
+                obj.insert(
+                    "https://atomicdata.dev/properties/remove".into(),
+                    remove.into(),
+                );
             }
         }
         if let Some(destroy) = self.destroy {
             // Only include this key if it is true
             if destroy {
-                obj.insert("https://atomicdata.dev/properties/destroy".into(), serde_json::Value::Bool(true));
+                obj.insert(
+                    "https://atomicdata.dev/properties/destroy".into(),
+                    serde_json::Value::Bool(true),
+                );
             }
         }
         let string = serde_json::to_string(&obj)?;
@@ -196,7 +205,11 @@ impl CommitBuilder {
 }
 
 /// Signs a CommitBuilder at a specific unix timestamp.
-fn sign_at(commitbuilder: CommitBuilder, agent: &crate::agents::Agent, sign_date: u64) -> AtomicResult<Commit> {
+fn sign_at(
+    commitbuilder: CommitBuilder,
+    agent: &crate::agents::Agent,
+    sign_date: u64,
+) -> AtomicResult<Commit> {
     let mut commit = Commit {
         subject: commitbuilder.subject,
         signer: agent.subject.clone(),
@@ -206,22 +219,37 @@ fn sign_at(commitbuilder: CommitBuilder, agent: &crate::agents::Agent, sign_date
         created_at: sign_date as u64,
         signature: None,
     };
+    println!("Agent: {:?}", agent);
     let stringified = commit
         .serialize_deterministically()
         .map_err(|e| format!("Failed serializing commit: {}", e))?;
-    let signature = sign_message(&stringified, &agent.private_key, &agent.public_key)?;
+    let signature = sign_message(&stringified, &agent.private_key, &agent.public_key)
+        .map_err(|e| format!("Failed to sign message for resource {} with agent {}: {}", commit.subject, agent.subject, e))?;
     commit.signature = Some(signature);
     Ok(commit)
 }
 
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
 fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
-    let private_key_bytes = base64::decode(private_key.to_string())
-        .map_err(|e| format!("Failed decoding private key {}: {}", private_key.to_string(), e))?;
-    let public_key_bytes = base64::decode(public_key.to_string())
-        .map_err(|e| format!("Failed decoding public key {}: {}", private_key.to_string(), e))?;
-    let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(&private_key_bytes, &public_key_bytes)
-        .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
+    let private_key_bytes = base64::decode(private_key.to_string()).map_err(|e| {
+        format!(
+            "Failed decoding private key {}: {}",
+            private_key.to_string(),
+            e
+        )
+    })?;
+    let public_key_bytes = base64::decode(public_key.to_string()).map_err(|e| {
+        format!(
+            "Failed decoding public key {}: {}",
+            public_key.to_string(),
+            e
+        )
+    })?;
+    let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(
+        &private_key_bytes,
+        &public_key_bytes,
+    )
+    .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
     let message_bytes = message.as_bytes();
     let signature = key_pair.sign(message_bytes);
     let signature_bytes = signature.as_ref();
@@ -232,7 +260,7 @@ fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicRes
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{Storelike, agents::Agent};
+    use crate::{agents::Agent, Storelike};
 
     #[test]
     fn agent_and_commit() {
@@ -292,9 +320,14 @@ mod test {
         let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        let agent = Agent::new_from_private_key("name".into(), &store, private_key.into());
-        assert_eq!(&agent.subject, "http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=");
-        store.add_resource(&agent.to_resource(&store).unwrap()).unwrap();
+        let agent = Agent::new_from_private_key("name".into(), &store, private_key);
+        assert_eq!(
+            &agent.subject,
+            "http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="
+        );
+        store
+            .add_resource(&agent.to_resource(&store).unwrap())
+            .unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuilder = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
