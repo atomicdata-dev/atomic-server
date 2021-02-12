@@ -2,6 +2,10 @@
 
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 
+## v0.22.0
+
+- Change Commit serialization to [match atomic-react](https://github.com/joepio/atomic-react/issues/3) implementation #98. !Warning!: This will break existing Agents.
+
 ## v0.21.1
 
 - Permissive CORS #92
