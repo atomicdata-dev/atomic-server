@@ -37,7 +37,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                         let recreated_agent = Agent::new_from_private_key(
                             "root".into(),
                             &store,
-                            agent_config.private_key,
+                            &agent_config.private_key,
                         );
                         store.add_resource(&recreated_agent.to_resource(&store)?)?;
                     } else {

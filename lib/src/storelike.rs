@@ -1,4 +1,4 @@
-//! Trait for all stores to use
+//! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
 use crate::errors::AtomicResult;
 use crate::{
@@ -127,7 +127,7 @@ pub trait Storelike: Sized {
     /// Make sure to store the private_key somewhere safe!
     /// Does not create a Commit.
     fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent> {
-        let agent = Agent::new(name.to_string(), self);
+        let agent = Agent::new(name.to_string(), self)?;
         self.add_resource(&agent.to_resource(self)?)?;
         Ok(agent)
     }
