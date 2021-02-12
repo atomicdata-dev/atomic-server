@@ -103,15 +103,15 @@ impl Commit {
     pub fn serialize_deterministically(&self) -> AtomicResult<String> {
         let mut obj = serde_json::Map::new();
         obj.insert(
-            "subject".into(),
+            "https://atomicdata.dev/properties/subject".into(),
             serde_json::Value::String(self.subject.clone()),
         );
         obj.insert(
-            "createdAt".into(),
+            "https://atomicdata.dev/properties/createdAt".into(),
             serde_json::Value::Number(self.created_at.into()),
         );
         obj.insert(
-            "signer".into(),
+            "https://atomicdata.dev/properties/signer".into(),
             serde_json::Value::String(self.signer.clone()),
         );
         if let Some(set) = self.set.clone() {
@@ -124,20 +124,20 @@ impl Commit {
                 for (k, v) in collect.iter() {
                     set_map.insert(k.into(), serde_json::Value::String(v.into()));
                 }
-                obj.insert("set".into(), serde_json::Value::Object(set_map));
+                obj.insert("https://atomicdata.dev/properties/set".into(), serde_json::Value::Object(set_map));
             }
         }
         if let Some(mut remove) = self.remove.clone() {
             if !remove.is_empty() {
                 // These, too, should be sorted alphabetically
                 remove.sort();
-                obj.insert("remove".into(), remove.into());
+                obj.insert("https://atomicdata.dev/properties/remove".into(), remove.into());
             }
         }
         if let Some(destroy) = self.destroy {
             // Only include this key if it is true
             if destroy {
-                obj.insert("destroy".into(), serde_json::Value::Bool(true));
+                obj.insert("https://atomicdata.dev/properties/destroy".into(), serde_json::Value::Bool(true));
             }
         }
         let string = serde_json::to_string(&obj)?;
@@ -209,19 +209,24 @@ fn sign_at(commitbuilder: CommitBuilder, agent: &crate::agents::Agent, sign_date
     let stringified = commit
         .serialize_deterministically()
         .map_err(|e| format!("Failed serializing commit: {}", e))?;
-    let signature = sign_message(&stringified, &agent.private_key)?;
+    let signature = sign_message(&stringified, &agent.private_key, &agent.public_key)?;
     commit.signature = Some(signature);
     Ok(commit)
 }
 
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
-fn sign_message(message: &str, private_key: &str) -> AtomicResult<String> {
+fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
     let private_key_bytes = base64::decode(private_key.to_string())
         .map_err(|e| format!("Failed decoding private key {}: {}", private_key.to_string(), e))?;
-    let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_bytes)
+    let public_key_bytes = base64::decode(public_key.to_string())
+        .map_err(|e| format!("Failed decoding public key {}: {}", private_key.to_string(), e))?;
+    let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(&private_key_bytes, &public_key_bytes)
         .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
-    let signature = base64::encode(key_pair.sign(&message.as_bytes()));
-    Ok(signature)
+    let message_bytes = message.as_bytes();
+    let signature = key_pair.sign(message_bytes);
+    let signature_bytes = signature.as_ref();
+    let signatureb64 = base64::encode(signature_bytes);
+    Ok(signatureb64)
 }
 
 #[cfg(test)]
@@ -278,17 +283,17 @@ mod test {
             signature: None,
         };
         let serialized = commit.serialize_deterministically().unwrap();
-        let should_be = r#"{"createdAt":1603638837,"remove":["https://atomicdata.dev/properties/isA"],"set":{"https://atomicdata.dev/properties/description":"Some description","https://atomicdata.dev/properties/shortname":"shortname"},"signer":"https://localhost/author","subject":"https://localhost/test"}"#;
-        assert!(serialized == should_be)
+        let should_be = "{\"https://atomicdata.dev/properties/createdAt\":1603638837,\"https://atomicdata.dev/properties/remove\":[\"https://atomicdata.dev/properties/isA\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some description\",\"https://atomicdata.dev/properties/shortname\":\"shortname\"},\"https://atomicdata.dev/properties/signer\":\"https://localhost/author\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/test\"}";
+        assert_eq!(serialized, should_be)
     }
 
     #[test]
     fn signature_matches() {
-        let private_key = "MFMCAQEwBQYDK2VwBCIEIItEZm3wbIpx7qK/+UPT2DqsZWwsD50M3QDLyTwPGVKEoSMDIQAivODlyb+pfdNQGbu7EJ2w3f8+2suBNenGNsE8KsI6pA==";
+        let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = Agent::new_from_private_key("name".into(), &store, private_key.into());
-        assert_eq!(&agent.subject, "http://localhost/agents/Irzg5cm/qX3TUBm7uxCdsN3/PtrLgTXpxjbBPCrCOqQ=");
+        assert_eq!(&agent.subject, "http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=");
         store.add_resource(&agent.to_resource(&store).unwrap()).unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuilder = crate::commit::CommitBuilder::new(subject.into());
@@ -301,15 +306,17 @@ mod test {
         let commit = sign_at(commitbuilder, &agent, 0).unwrap();
         let signature = commit.signature.clone().unwrap();
         let serialized = commit.serialize_deterministically().unwrap();
-        assert_eq!(serialized, r#"{"createdAt":0,"set":{"https://atomicdata.dev/properties/description":"Some value","https://atomicdata.dev/properties/shortname":"someval"},"signer":"http://localhost/agents/Irzg5cm/qX3TUBm7uxCdsN3/PtrLgTXpxjbBPCrCOqQ=","subject":"https://localhost/new_thing"}"#);
-        assert_eq!(signature, "Nmyp7gmLhf5GZw2mCOXjXqfsSDeA4GIiYFQh2P/0xsJENwetnzmDDA1lUyzr9mpc32JxIzCVEgTsyi2GzK/ACQ==");
+        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
+        assert_eq!(signature, "YUdaEModMZPanrvbbtmtczN9PrV8wofTRWYRRguPoqxFlii4CsEWyeg9VMJXt9NNPl31L0m1T5G5mDC6wGCwDA==");
     }
 
     #[test]
     fn signature_basics() {
-        let private_key = "MFMCAQEwBQYDK2VwBCIEIItEZm3wbIpx7qK/+UPT2DqsZWwsD50M3QDLyTwPGVKEoSMDIQAivODlyb+pfdNQGbu7EJ2w3f8+2suBNenGNsE8KsI6pA==";
+        let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
+        let public_key = "7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=";
+        let signature_expected = "YtDR/xo0272LHNBQtDer4LekzdkfUANFTI0eHxZhITXnbC3j0LCqDWhr6itNvo4tFnep6DCbev5OKAHH89+TDA==";
         let message = "val";
-        let signature = sign_message(message, private_key).unwrap();
-        assert_eq!(signature, "+RVIN+DVu6khCAo8M+BE2IrS9HT+L89I2b5YDC+AddTwPNiaYX6wQX+ANZVSIblMKYUiy9l0QxS3j7UvlYYRAg==");
+        let signature = sign_message(message, private_key, public_key).unwrap();
+        assert_eq!(signature, signature_expected);
     }
 }

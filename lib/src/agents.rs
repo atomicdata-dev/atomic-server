@@ -27,13 +27,13 @@ impl Agent {
   }
 
   /// Creates a new Agent, generates a new Keypair.
-  pub fn new(name: String, store: &impl Storelike) -> Agent {
-    let keypair = generate_keypair();
+  pub fn new(name: String, store: &impl Storelike) -> AtomicResult<Agent> {
+    let keypair = generate_keypair()?;
 
-    Agent::new_from_private_key(name, store, keypair.private)
+    Ok(Agent::new_from_private_key(name, store, &keypair.private))
   }
 
-  pub fn new_from_private_key(name: String, store: &impl Storelike, private_key: String) -> Agent {
+  pub fn new_from_private_key(name: String, store: &impl Storelike, private_key: &str) -> Agent {
     let keypair = generate_public_key(private_key);
 
     Agent {
@@ -53,27 +53,27 @@ pub struct Pair {
 }
 
 /// Returns a new random PKCS#8 keypair.
-fn generate_keypair() -> Pair {
+fn generate_keypair() -> AtomicResult<Pair> {
   use ring::signature::KeyPair;
   let rng = ring::rand::SystemRandom::new();
-  let pkcs8_bytes = ring::signature::Ed25519KeyPair::generate_pkcs8(&rng)
-      .map_err(|_| "Error generating seed").unwrap();
-  let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
-      .map_err(|_| "Error generating keypair").unwrap();
-  Pair {
-    private: base64::encode(pkcs8_bytes.as_ref()),
-    public: base64::encode(key_pair.public_key().as_ref()),
-  }
+  const SEED_LEN: usize = 32;
+  let seed: [u8; SEED_LEN] = ring::rand::generate(&rng).map_err(|_| "Error generating random seed: {}")?.expose();
+  let key_pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(&seed)
+      .map_err(|e| format!("Error generating keypair {}", e)).unwrap();
+  Ok(Pair {
+    private: base64::encode(&seed),
+    public: base64::encode(&key_pair.public_key()),
+  })
 }
 
 /// Returns a Key Pair (including public key) from a private key, PKCS#8 base64 encoded.
-fn generate_public_key(private_key: String) -> Pair {
+fn generate_public_key(private_key: &str) -> Pair {
   use ring::signature::KeyPair;
-  let pkcs8_bytes = base64::decode(private_key).unwrap();
-  let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(pkcs8_bytes.as_ref())
+  let private_key_bytes = base64::decode(private_key).unwrap();
+  let key_pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(private_key_bytes.as_ref())
       .map_err(|_| "Error generating keypair").unwrap();
   Pair {
-    private: base64::encode(pkcs8_bytes),
+    private: base64::encode(private_key_bytes),
     public: base64::encode(key_pair.public_key().as_ref()),
   }
 }
@@ -85,8 +85,16 @@ mod test {
 
   #[test]
   fn keypair() {
-    let pair = generate_keypair();
-    let regenerated_pair = generate_public_key(pair.private);
+    let pair = generate_keypair().unwrap();
+    let regenerated_pair = generate_public_key(&pair.private);
     assert_eq!(pair.public, regenerated_pair.public);
+  }
+
+  #[test]
+  fn generate_from_private_key() {
+    let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
+    let public_key = "7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=";
+    let regenerated_pair = generate_public_key(private_key);
+    assert_eq!(public_key, regenerated_pair.public);
   }
 }
