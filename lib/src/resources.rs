@@ -189,7 +189,7 @@ impl Resource {
     pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
-        let commit = commitbuilder.sign(&agent)?;
+        let commit = commitbuilder.sign(&agent, store)?;
         let should_post = store.get_self_url().is_none();
         if should_post {
             // First, post it to the store where the data must reside
@@ -209,7 +209,7 @@ impl Resource {
     pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
-        let commit = commitbuilder.sign(&agent)?;
+        let commit = commitbuilder.sign(&agent, store)?;
         store.commit(commit.clone())?;
         self.reset_commit_builder();
         Ok(commit)
@@ -250,7 +250,7 @@ impl Resource {
     /// Adds it to the CommitBuilder.
     pub fn set_propval_unsafe(&mut self, property: String, value: Value) -> AtomicResult<()> {
         self.propvals.insert(property.clone(), value.clone());
-        self.commit.set(property, value.to_string());
+        self.commit.set(property, value);
         Ok(())
     }
 
@@ -429,7 +429,7 @@ mod test {
         new_resource
             .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
-        let commit = new_resource.get_commit_builder().clone().sign(&agent).unwrap();
+        let commit = new_resource.get_commit_builder().clone().sign(&agent, &store).unwrap();
         store.commit(commit).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();

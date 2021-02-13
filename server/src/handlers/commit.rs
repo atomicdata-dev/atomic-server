@@ -1,22 +1,26 @@
 use crate::{appstate::AppState, errors::BetterResult};
-use actix_web::{web, HttpResponse};
-use atomic_lib::Storelike;
+use actix_web::{HttpResponse, web};
+use atomic_lib::{Commit, Storelike, parse::parse_json_ad_commit_resource};
 use std::sync::Mutex;
 
 /// Send and process a Commit.
-/// Currently only accepts JSON
+/// Currently only accepts JSON-AD
 pub async fn post_commit(
-    commit: web::Json<atomic_lib::Commit>,
-    // commit: web::Json<Demo>,
+    // commit: web::Json<atomic_lib::Commit>,
     data: web::Data<Mutex<AppState>>,
     // req: actix_web::HttpRequest,
+    // payload: &mut web::Payload,
+    body: String,
 ) -> BetterResult<HttpResponse> {
-    log::info!("commit: {:?}", commit);
+    // log::info!("commit: {:?}", commit);
     let mut context = data.lock().unwrap();
     let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
-    let commit_resource = store.commit(commit.into_inner())?;
-    let message = format!("Commit succesfully applied. Can be seen at {}", commit_resource.get_subject());
+    let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
+    let incoming_commit = Commit::from_resource(incoming_commit_resource)?;
+    let saved_commit_resource = store.commit(incoming_commit)?;
+    // TODO: better response
+    let message = format!("Commit succesfully applied. Can be seen at {}", saved_commit_resource.get_subject());
     log::info!("{}", &message);
     Ok(builder.body(message))
 }

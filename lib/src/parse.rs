@@ -1,6 +1,6 @@
 //! Parsing / deserialization / decoding
 
-use crate::{errors::AtomicResult, resources::PropVals, Atom, Resource, Value};
+use crate::{Atom, Resource, Value, errors::AtomicResult, resources::PropVals, urls};
 
 pub const AD3_MIME: &str = "application/ad3-ndjson";
 
@@ -64,6 +64,23 @@ pub fn parse_json_ad_resource(
         .as_str()
         .ok_or("`@id` is not a string - should be the Subject of the Resource (a URL)")?;
     let mut resource = Resource::new(subject.to_string());
+    let propvals = parse_json_ad_map_to_propvals(json, store)?;
+    for (prop, val) in propvals {
+        resource.set_propval(prop, val, store)?
+    }
+    Ok(resource)
+}
+
+/// Parse a single Json AD string, convert to Atoms
+/// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
+pub fn parse_json_ad_commit_resource(
+    string: &str,
+    store: &impl crate::Storelike,
+) -> AtomicResult<Resource> {
+    let json: Map<String, serde_json::Value> = serde_json::from_str(string)?;
+    let signature = json.get(urls::SUBJECT).ok_or("No subject field in Commit.")?.to_string();
+    let subject = format!("{}/commits/{}", store.get_base_url(), signature);
+    let mut resource = Resource::new(subject);
     let propvals = parse_json_ad_map_to_propvals(json, store)?;
     for (prop, val) in propvals {
         resource.set_propval(prop, val, store)?

@@ -72,7 +72,7 @@ pub trait Storelike: Sized {
             .get(urls::PUBLIC_KEY)?
             .to_string();
         let agent_pubkey = base64::decode(pubkey_b64)?;
-        let stringified_commit = commit.serialize_deterministically()?;
+        let stringified_commit = commit.serialize_deterministically_json_ad(self)?;
         let peer_public_key =
             ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
         let signature_bytes = base64::decode(signature.clone())?;
@@ -88,7 +88,7 @@ pub trait Storelike: Sized {
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("Time went backwards")
-            .as_millis() as u64;
+            .as_millis() as i64;
         let commit_resource: Resource = commit.clone().into_resource(self)?;
         if commit.created_at > now {
             return Err("Commit created_at timestamp must lie in the past.".into());
@@ -106,7 +106,7 @@ pub trait Storelike: Sized {
         };
         if let Some(set) = commit.set.clone() {
             for (prop, val) in set.iter() {
-                resource.set_propval_string(prop.into(), val, self)?;
+                resource.set_propval(prop.into(), val.to_owned(), self)?;
             }
             self.add_resource(&resource)?;
         }

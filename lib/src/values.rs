@@ -111,7 +111,31 @@ impl Value {
         Value::new(value, &match_datatype(datatype))
     }
 
-    /// Returns a Vector, if the Atom is one
+    pub fn to_bool(&self) -> AtomicResult<bool> {
+        if let Value::Boolean(bool) = self {
+            return Ok(bool.clone())
+        }
+        Err(format!("Value {} is not a nested resource", self).into())
+    }
+
+    /// Returns an Integer, if the Value is one.
+    pub fn to_int(&self) -> AtomicResult<i64> {
+        match self {
+            // Is this unsafe? Maybe?
+            Value::Integer(i) => Ok(*i as i64),
+            Value::Timestamp(i) => Ok(*i),
+            other => return Err("Not an integer".into())
+        }
+    }
+
+    pub fn to_nested(&self) -> AtomicResult<PropVals> {
+        if let Value::NestedResource(arr) = self {
+            return Ok(arr.clone())
+        }
+        Err(format!("Value {} is not a nested resource", self).into())
+    }
+
+    /// Returns a Vector, if the Value is one
     pub fn to_vec(&self) -> AtomicResult<&Vec<String>> {
         if let Value::ResourceArray(arr) = self {
             return Ok(arr)
@@ -197,7 +221,6 @@ mod test {
         assert!(string.to_string() == "string");
         let date = Value::new("1200-02-02", &DataType::Date).unwrap();
         assert!(date.to_string() == "1200-02-02");
-
         let converted  = Value::from(8);
         assert!(converted.to_string() == "8");
     }
