@@ -1,21 +1,17 @@
 //! Describe changes / mutations to data
 
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
-use crate::{Resource, Storelike, Value, datatype::DataType, errors::AtomicResult, resources::PropVals, serialize::JsonType, urls};
-
-// #[derive(Clone, Debug, Deserialize, Serialize)]
-// #[serde(untagged)]
-// pub enum JSONVAL {
-//     Nested(std::collections::HashMap<String, JSONVAL>),
-//     String(String),
-// }
+use crate::{
+    datatype::DataType, errors::AtomicResult, resources::PropVals, serialize::JsonType, urls,
+    Resource, Storelike, Value,
+};
 
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Commit {
     /// The subject URL that is to be modified by this Delta
     #[serde(rename = "https://atomicdata.dev/properties/subject")]
@@ -73,12 +69,14 @@ impl Commit {
     }
 
     /// Converts the Commit into a Resource with Atomic Values.
-    /// Creates an identifier using the base_url or a default.
+    /// Creates an identifier using the base_url
+    /// Works for both Signed and Unsigned Commits
     pub fn into_resource(self, store: &impl Storelike) -> AtomicResult<Resource> {
         let commit_subject = match self.signature.as_ref() {
             Some(sig) => format!("{}/commits/{}", store.get_base_url(), sig),
             None => {
-                return Err("No signature set".into());
+                let now = crate::datetime_helpers::now();
+                format!("{}/commitsUnsigned/{}", store.get_base_url(), now)
             }
         };
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
@@ -120,11 +118,13 @@ impl Commit {
             Value::new(&self.signer, &DataType::AtomicUrl).unwrap(),
             store,
         )?;
-        resource.set_propval(
-            urls::SIGNATURE.into(),
-            self.signature.unwrap().into(),
-            store,
-        )?;
+        if self.signature.is_some() {
+            resource.set_propval(
+                urls::SIGNATURE.into(),
+                self.signature.unwrap().into(),
+                store,
+            )?;
+        }
         Ok(resource)
     }
 
@@ -146,65 +146,9 @@ impl Commit {
             commit_resource.get_propvals(),
             None,
             store,
-            &JsonType::JSONAD
+            &JsonType::JSONAD,
         )?;
         serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into())
-    }
-
-    /// Generates a deterministic serialized JSON representation of the Commit.
-    /// Does not contain the signature, since this function is used to check if the signature is correct.
-    pub fn serialize_deterministically(&self) -> AtomicResult<String> {
-        let mut obj = serde_json::Map::new();
-        obj.insert(
-            "https://atomicdata.dev/properties/subject".into(),
-            serde_json::Value::String(self.subject.clone()),
-        );
-        obj.insert(
-            "https://atomicdata.dev/properties/createdAt".into(),
-            serde_json::Value::Number(self.created_at.into()),
-        );
-        obj.insert(
-            "https://atomicdata.dev/properties/signer".into(),
-            serde_json::Value::String(self.signer.clone()),
-        );
-        if let Some(set) = self.set.clone() {
-            todo!();
-            // if !set.is_empty() {
-            //     let mut collect: Vec<(String, Value)> = set.into_iter().collect();
-            //     // All keys should be ordered alphabetically
-            //     collect.sort();
-            //     // Make sure that the serializer does not mess up the order!
-            //     let mut set_map = serde_json::Map::new();
-            //     for (k, v) in collect.iter() {
-            //         set_map.insert(k.into(), serde_json::Value::String(v.into()));
-            //     }
-            //     obj.insert(
-            //         "https://atomicdata.dev/properties/set".into(),
-            //         serde_json::Value::Object(set_map),
-            //     );
-            // }
-        }
-        if let Some(mut remove) = self.remove.clone() {
-            if !remove.is_empty() {
-                // These, too, should be sorted alphabetically
-                remove.sort();
-                obj.insert(
-                    "https://atomicdata.dev/properties/remove".into(),
-                    remove.into(),
-                );
-            }
-        }
-        if let Some(destroy) = self.destroy {
-            // Only include this key if it is true
-            if destroy {
-                obj.insert(
-                    "https://atomicdata.dev/properties/destroy".into(),
-                    serde_json::Value::Bool(true),
-                );
-            }
-        }
-        let string = serde_json::to_string(&obj)?;
-        Ok(string)
     }
 }
 
@@ -334,10 +278,10 @@ mod test {
         let subject = "https://localhost/new_thing";
         let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
-        let value1 = Value::new("Some value", &DataType::String).unwrap();
+        let value1 = Value::new("Some value", &DataType::Markdown).unwrap();
         commitbuiler.set(property1.into(), value1.clone());
         let property2 = crate::urls::SHORTNAME;
-        let value2 = Value::new("someval", &DataType::String).unwrap();
+        let value2 = Value::new("someval", &DataType::Slug).unwrap();
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store).unwrap();
         let commit_subject = commit.get_subject().to_string();
@@ -379,7 +323,7 @@ mod test {
             signature: None,
         };
         let serialized = commit.serialize_deterministically_json_ad(&store).unwrap();
-        let should_be = "{\"https://atomicdata.dev/properties/createdAt\":1603638837,\"https://atomicdata.dev/properties/remove\":[\"https://atomicdata.dev/properties/isA\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some description\",\"https://atomicdata.dev/properties/shortname\":\"shortname\"},\"https://atomicdata.dev/properties/signer\":\"https://localhost/author\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/test\"}";
+        let should_be = "{\"https://atomicdata.dev/properties/createdAt\":1603638837,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/remove\":[\"https://atomicdata.dev/properties/isA\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some description\",\"https://atomicdata.dev/properties/shortname\":\"shortname\"},\"https://atomicdata.dev/properties/signer\":\"https://localhost/author\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/test\"}";
         assert_eq!(serialized, should_be)
     }
 
@@ -407,8 +351,9 @@ mod test {
         let commit = sign_at(commitbuilder, &agent, 0, &store).unwrap();
         let signature = commit.signature.clone().unwrap();
         let serialized = commit.serialize_deterministically_json_ad(&store).unwrap();
-        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
-        assert_eq!(signature, "YUdaEModMZPanrvbbtmtczN9PrV8wofTRWYRRguPoqxFlii4CsEWyeg9VMJXt9NNPl31L0m1T5G5mDC6wGCwDA==");
+
+        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
+        assert_eq!(signature, "kLh+mxy/lgFD6WkbIbhJANgRhyu39USL9up1zCmqU8Jmc+4rlvLZwxSlfxKTISP2BiXLSiz/5NJZrN5XpXJ/Cg==");
     }
 
     #[test]

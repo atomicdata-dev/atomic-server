@@ -65,7 +65,7 @@ fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) ->
         .store
         .get_default_agent()
         .expect("No default agent set");
-    let commit = commit_builder.sign(&agent)?;
+    let commit = commit_builder.sign(&agent, &context.store)?;
     atomic_lib::client::post_commit(&commit)?;
     Ok(())
 }

@@ -124,7 +124,7 @@ impl Value {
             // Is this unsafe? Maybe?
             Value::Integer(i) => Ok(*i as i64),
             Value::Timestamp(i) => Ok(*i),
-            other => return Err("Not an integer".into())
+            _other => Err(format!("Not an integer: {}", self).into())
         }
     }
 
