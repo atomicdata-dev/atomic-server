@@ -168,10 +168,15 @@ impl Storelike for Db {
         self.default_agent.lock().unwrap().replace(agent);
     }
 
-    fn remove_resource(&self, subject: &str) {
+    fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
         // This errors when the resource is not present.
         // https://github.com/joepio/atomic/issues/46
-        let _discard_error = self.db.remove(bincode::serialize(subject).unwrap()).ok();
+        let binary_subject = bincode::serialize(subject).unwrap();
+        let found = self.resources.remove(&binary_subject)?;
+        if found.is_none() {
+            return Err(format!("Resource {} could not be deleted, because it was not found in the store.", subject).into())
+        }
+        Ok(())
     }
 }
 
@@ -204,6 +209,17 @@ mod test {
         store.populate().unwrap();
         store.set_default_agent(agent);
         store
+    }
+
+    #[test]
+    fn removes_resource() {
+        let store = init();
+        store.get_resource(crate::urls::CLASS).unwrap();
+        store.remove_resource(crate::urls::CLASS).unwrap();
+        // Should throw an error, because can't remove non-existent resource
+        store.remove_resource(crate::urls::CLASS).unwrap_err();
+        // Should throw an error, because resource is deleted
+        store.get_propvals(crate::urls::CLASS).unwrap_err();
     }
 
     #[test]
