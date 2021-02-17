@@ -19,6 +19,14 @@ Make sure to `cargo test --all` before opening a PR!
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 - When upgrading versions, update the `Cargo.toml` files and publish to Cargo + Docker and deploy AtomicData.dev.
 
+## Building and publishing binaries
+
+1. `cargo build --release`
+1. `cargo build --release --features desktop` if you want the tray item (mac + win support)
+1. Create a release on github, add the binaries.
+
+I've got to automate this process some day...
+
 ## Publishing to Cargo
 
 1. Update the versions in cargo.toml files using Semantic Versioning.

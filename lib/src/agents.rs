@@ -10,7 +10,7 @@ pub struct Agent {
   pub public_key: String,
   /// URL of the Agent
   pub subject: String,
-  pub created_at: u64,
+  pub created_at: i64,
   pub name: String,
 }
 

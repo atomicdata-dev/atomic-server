@@ -4,7 +4,7 @@ List of changes for this repo, including `atomic-cli`, `atomic-server` and `atom
 
 ## v0.22.0
 
-- Change Commit serialization to [match atomic-react](https://github.com/joepio/atomic-react/issues/3) implementation #98. !Warning!: This will break existing Agents.
+- Change Commit serialization to [match atomic-data-browser](https://github.com/joepio/atomic-data-browser/issues/3) implementation #98. !Warning!: This will break existing Agents.
 
 ## v0.21.1
 

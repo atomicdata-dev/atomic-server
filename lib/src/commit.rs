@@ -153,7 +153,7 @@ impl Commit {
 }
 
 /// Use this for creating Commits.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct CommitBuilder {
     /// The subject URL that is to be modified by this Delta
     subject: String,
@@ -210,7 +210,7 @@ impl CommitBuilder {
 fn sign_at(
     commitbuilder: CommitBuilder,
     agent: &crate::agents::Agent,
-    sign_date: u64,
+    sign_date: i64,
     store: &impl Storelike,
 ) -> AtomicResult<Commit> {
     let mut commit = Commit {
@@ -219,7 +219,7 @@ fn sign_at(
         set: Some(commitbuilder.set),
         remove: Some(commitbuilder.remove.into_iter().collect()),
         destroy: Some(commitbuilder.destroy),
-        created_at: sign_date as i64,
+        created_at: sign_date,
         signature: None,
     };
     println!("Agent: {:?}", agent);

@@ -18,7 +18,12 @@ async fn main() -> io::Result<()> {
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
 
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    log::info!("Atomic-server {}. Visit https://atomicdata.dev and https://github.com/joepio/atomic for more information.", VERSION);
+
+    // Read .env vars, https certs
     let config = config::init().expect("Error setting config");
+    // Initialize DB and HTML templating engine
     let appstate = match appstate::init(config.clone()) {
         Ok(state) => state,
         Err(e) => {
@@ -91,6 +96,13 @@ async fn main() -> io::Result<()> {
                     log::info!("Opening browser url...")
                 } else {
                     log::info!("Opening browser url failed.")
+                }
+            });
+            let _ = tray.add_menu_item("About", move || {
+                if webbrowser::open("https://github.com/joepio/atomic").is_ok() {
+                    log::info!("Opening about url...")
+                } else {
+                    log::info!("Opening about url failed.")
                 }
             });
             let inner = tray.inner_mut();

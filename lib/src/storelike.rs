@@ -96,7 +96,7 @@ pub trait Storelike: Sized {
         }
         if let Some(destroy) = commit.destroy {
             if destroy {
-                self.remove_resource(&commit.subject);
+                self.remove_resource(&commit.subject)?;
                 return Ok(commit_resource);
             }
         }
@@ -211,8 +211,8 @@ pub trait Storelike: Sized {
     /// WARNING: This could be very expensive!
     fn all_resources(&self) -> ResourceCollection;
 
-    /// Removes a resource from the store
-    fn remove_resource(&self, subject: &str);
+    /// Removes a resource from the store. Errors if not present.
+    fn remove_resource(&self, subject: &str) -> AtomicResult<()>;
 
     /// Triple Pattern Fragments interface.
     /// Use this for most queries, e.g. finding all items with some property / value combination.

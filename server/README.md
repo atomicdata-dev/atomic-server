@@ -29,7 +29,8 @@ Powered by Rust, atomic-lib, actix-web, Sled and [more](cargo.toml).
 The `dockerfile` is located in the project root, above this `server` folder.
 
 - Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
-- Take note of the Agent Subject and Private key, you should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) client for authorization.
+- Take note of the Agent Subject and Private key, you should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
+- If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
 
 ### Install from source
 

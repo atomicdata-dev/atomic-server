@@ -3,11 +3,11 @@
 //! Currently, it can only persist its data as .ad3 (Atomic Data Triples) to disk.
 //! A more robust persistent storage option will be used later, such as: https://github.com/TheNeikos/rustbreak
 
-use crate::{Resource, errors::AtomicResult};
 use crate::{
     atoms::Atom,
     storelike::{ResourceCollection, Storelike},
 };
+use crate::{errors::AtomicResult, Resource};
 use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -56,7 +56,6 @@ impl Store {
 }
 
 impl Storelike for Store {
-
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
         // Start with a nested HashMap, containing only strings.
         let mut map: HashMap<String, Resource> = HashMap::new();
@@ -120,13 +119,21 @@ impl Storelike for Store {
 
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
         if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
-            return Ok(resource.clone())
+            return Ok(resource.clone());
         }
         self.handle_not_found(subject, "Not found in HashMap.".into())
     }
 
-    fn remove_resource(&self, subject: &str) {
-        self.hashmap.lock().unwrap().remove_entry(subject);
+    fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
+        self.hashmap
+            .lock()
+            .unwrap()
+            .remove_entry(subject)
+            .ok_or(format!(
+                "Resource {} could not be deleted, because it is not found",
+                subject
+            ))?;
+        Ok(())
     }
 
     fn set_default_agent(&self, agent: crate::agents::Agent) {
@@ -153,7 +160,7 @@ mod test {
     fn populate_base_models() {
         let store = Store::init().unwrap();
         crate::populate::populate_base_models(&store).unwrap();
-        let property=  store.get_property(urls::DESCRIPTION).unwrap();
+        let property = store.get_property(urls::DESCRIPTION).unwrap();
         assert_eq!(property.shortname, "description")
     }
 
@@ -162,7 +169,7 @@ mod test {
         let store = Store::init().unwrap();
         crate::populate::populate_base_models(&store).unwrap();
         // Should fetch the agent class, since it's not in the store
-        let agent=  store.get_class(urls::AGENT).unwrap();
+        let agent = store.get_class(urls::AGENT).unwrap();
         assert_eq!(agent.shortname, "agent")
     }
 

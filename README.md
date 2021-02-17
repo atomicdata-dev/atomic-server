@@ -56,7 +56,7 @@ This repository serves the following purposes:
 
 ## Also check out
 
-- [Atomic-React](https://github.com/joepio/atomic-react), a WIP typescript front-end library + app that will soon replace most of the HTML templating stuff from `atomic-server`.
+- [Atomic-Data-Browser](https://github.com/joepio/atomic-data-browser), an in-browser app for viewing and editing atomic data. Also contains a typescript / react front-end library. Will replace most of the html templating in this project.
 
 ## Contribute
 
