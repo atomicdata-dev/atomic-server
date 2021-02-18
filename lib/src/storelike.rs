@@ -90,8 +90,13 @@ pub trait Storelike: Sized {
             .expect("Time went backwards")
             .as_millis() as i64;
         let commit_resource: Resource = commit.clone().into_resource(self)?;
-        if commit.created_at > now {
-            return Err("Commit created_at timestamp must lie in the past.".into());
+        let acceptable_ms_difference = 10000;
+        if commit.created_at > now + acceptable_ms_difference {
+            return Err(format!(
+                "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
+                now, commit.created_at
+            )
+            .into());
             // TODO: also check that no younger commits exist
         }
         if let Some(destroy) = commit.destroy {
@@ -199,9 +204,9 @@ pub trait Storelike: Sized {
             if subject.starts_with(&self_url) {
                 return Err(format!(
                     "Failed to retrieve '{}', does not exist locally. {}",
-                    subject,
-                    error
-                ).into());
+                    subject, error
+                )
+                .into());
             }
         }
         self.fetch_resource(subject)
