@@ -1,7 +1,10 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
-use std::{collections::HashMap, sync::{Arc, Mutex}};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     errors::AtomicResult,
@@ -76,7 +79,7 @@ impl Db {
         match propval_maybe.as_ref() {
             Some(binpropval) => {
                 let propval: PropVals = bincode::deserialize(binpropval)
-                    .map_err(|e| format!("{} {}", DB_CORRUPT_MSG, e))?;
+                    .map_err(|e| format!("{} {}", corrupt_db_message(subject), e))?;
                 Ok(propval)
             }
             None => Err(format!("Resource {} not found", subject).into()),
@@ -85,7 +88,6 @@ impl Db {
 }
 
 impl Storelike for Db {
-
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
         // Start with a nested HashMap, containing only strings.
         let mut map: HashMap<String, Resource> = HashMap::new();
@@ -93,12 +95,16 @@ impl Storelike for Db {
             match map.get_mut(&atom.subject) {
                 // Resource exists in map
                 Some(resource) => {
-                    resource.set_propval_string(atom.property.clone(), &atom.value, self).map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
+                    resource
+                        .set_propval_string(atom.property.clone(), &atom.value, self)
+                        .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
-                    resource.set_propval_string(atom.property.clone(), &atom.value, self).map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
+                    resource
+                        .set_propval_string(atom.property.clone(), &atom.value, self)
+                        .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                     map.insert(atom.subject, resource);
                 }
             }
@@ -146,9 +152,7 @@ impl Storelike for Db {
                 let resource = crate::resources::Resource::from_propvals(propvals, subject.into());
                 Ok(resource)
             }
-            Err(e) => {
-                self.handle_not_found(subject, e)
-            }
+            Err(e) => self.handle_not_found(subject, e),
         }
     }
 
@@ -157,7 +161,8 @@ impl Storelike for Db {
         for item in self.resources.into_iter() {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
             let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
-            let propvals: PropVals = bincode::deserialize(&resource_bin).expect(DB_CORRUPT_MSG);
+            let propvals: PropVals = bincode::deserialize(&resource_bin)
+                .unwrap_or_else(|e| panic!(format!("{}. {}", corrupt_db_message(&subject), e)));
             let resource = Resource::from_propvals(propvals, subject);
             resources.push(resource);
         }
@@ -174,13 +179,21 @@ impl Storelike for Db {
         let binary_subject = bincode::serialize(subject).unwrap();
         let found = self.resources.remove(&binary_subject)?;
         if found.is_none() {
-            return Err(format!("Resource {} could not be deleted, because it was not found in the store.", subject).into())
+            return Err(format!(
+                "Resource {} could not be deleted, because it was not found in the store.",
+                subject
+            )
+            .into());
         }
         Ok(())
     }
 }
 
-const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to update. Restore to a previous version, export / serialize the data and import your data.";
+fn corrupt_db_message(subject: &str) -> String {
+    return format!("Could not deserialize item {} from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.", subject);
+}
+
+const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.";
 
 #[cfg(test)]
 mod test {

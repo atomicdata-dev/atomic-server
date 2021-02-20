@@ -5,7 +5,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
-_Status: Beta. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
+_Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
 The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
 
@@ -44,6 +44,8 @@ cd atomic/server
 cp default.env .env
 # Run the server. It creates a store in ~/.config/atomic/db by default
 cargo run
+# Or tun the extra-cool desktop version with a presence in your app tray
+cargo run --features desktop
 # Visit http://localhost
 ```
 

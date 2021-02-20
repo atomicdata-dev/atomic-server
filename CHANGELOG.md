@@ -2,9 +2,17 @@
 
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 
+## v0.22.1
+
+Warning: existing databases will _not_ work with this version.
+
+- Add a datatype for floats #93.
+
 ## v0.22.0
 
-- Change Commit serialization to [match atomic-data-browser](https://github.com/joepio/atomic-data-browser/issues/3) implementation #98. !Warning!: This will break existing Agents.
+Warning: existing Agents and Commits will no longer work. Be sure to create new ones.
+
+- Change Commit serialization to [match atomic-data-browser](https://github.com/joepio/atomic-data-browser/issues/3) implementation #98.
 
 ## v0.21.1
 
