@@ -1,5 +1,5 @@
 use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
+use actix_web::{App, HttpServer, http::header::qitem, middleware, web};
 use std::{io, sync::Mutex};
 mod appstate;
 mod config;
@@ -42,6 +42,13 @@ async fn main() -> io::Result<()> {
                 .wrap(cors)
                 .wrap(middleware::Logger::default())
                 .wrap(middleware::Compress::default())
+                // Catch all HTML requests and send them to the single page app
+                .service(
+                web::resource("/*")
+                            .guard(actix_web::guard::fn_guard(|head|
+                                content_types::get_accept(&head.headers()) == content_types::ContentType::HTML ))
+                            .to(handlers::single_page_app::single_page)
+                )
                 .service(actix_files::Files::new("/static", "static/").show_files_listing())
                 .service(
                     actix_files::Files::new("/.well-known", "static/well-known/")

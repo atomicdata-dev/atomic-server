@@ -16,7 +16,7 @@ pub async fn get_resource(
 ) -> BetterResult<HttpResponse> {
     let context = data.lock().unwrap();
     let mut subj_end_string = subject_end.as_str();
-    let mut content_type = get_accept(req.clone());
+    let mut content_type = get_accept(req.headers());
     // Check extensions and set datatype. Harder than it looks to get right...
     if content_type == ContentType::HTML {
         if let Some((ext, path)) = try_extension(subj_end_string) {

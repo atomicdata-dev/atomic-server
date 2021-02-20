@@ -22,7 +22,7 @@ pub async fn path(
 ) -> BetterResult<HttpResponse> {
     let path = &query.path.clone().unwrap_or_default();
     let context = data.lock().unwrap();
-    let content_type = get_accept(req);
+    let content_type = get_accept(req.headers());
     let mapping = context.mapping.clone();
 
     log::info!("path: {:?}", path);

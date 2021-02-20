@@ -200,9 +200,10 @@ mod test {
     use super::*;
     use ntest::timeout;
 
-    /// Creates new temporary database, populates it, removes previous one
+    /// Creates new temporary database, populates it, removes previous one.
+    /// Can only be run one thread at a time, because it requires a lock on the DB file.
     fn init() -> Db {
-        let tmp_dir_path = "/tmp/db";
+        let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
         store.populate().unwrap();
@@ -222,17 +223,6 @@ mod test {
         store.populate().unwrap();
         store.set_default_agent(agent);
         store
-    }
-
-    #[test]
-    fn removes_resource() {
-        let store = init();
-        store.get_resource(crate::urls::CLASS).unwrap();
-        store.remove_resource(crate::urls::CLASS).unwrap();
-        // Should throw an error, because can't remove non-existent resource
-        store.remove_resource(crate::urls::CLASS).unwrap_err();
-        // Should throw an error, because resource is deleted
-        store.get_propvals(crate::urls::CLASS).unwrap_err();
     }
 
     #[test]
@@ -290,5 +280,13 @@ mod test {
             .to_string();
         println!("desc {}", description_val);
         assert!(description_val == "the age of a person");
+
+        // Try removing something
+        store.get_resource(crate::urls::CLASS).unwrap();
+        store.remove_resource(crate::urls::CLASS).unwrap();
+        // Should throw an error, because can't remove non-existent resource
+        store.remove_resource(crate::urls::CLASS).unwrap_err();
+        // Should throw an error, because resource is deleted
+        store.get_propvals(crate::urls::CLASS).unwrap_err();
     }
 }

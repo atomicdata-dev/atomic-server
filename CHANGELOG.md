@@ -1,12 +1,22 @@
 # Changelog
 
-List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
+List of changes for this repo, including `atomic-cli`,
+`atomic-server` and `atomic-lib`.
 
-## v0.22.1
+## v0.22.3
+
+- Use atomic-data-browser js frontent by default #103
+
+## v0.22.2
 
 Warning: existing databases will _not_ work with this version.
 
+- Fix deleting items #101
 - Add a datatype for floats #93.
+
+## v0.22.1
+
+- Switch to JSON-AD parsing & serialization for Commits #100
 
 ## v0.22.0
 

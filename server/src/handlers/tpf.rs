@@ -25,7 +25,7 @@ pub async fn tpf(
     let store = &mut context.store;
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let mut builder = HttpResponse::Ok();
-    let content_type = get_accept(req);
+    let content_type = get_accept(req.headers());
     let subject = empty_to_nothing(query.subject.clone());
     let property = empty_to_nothing(query.property.clone());
     let value = empty_to_nothing(query.value.clone());

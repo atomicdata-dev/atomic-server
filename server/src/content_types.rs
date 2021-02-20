@@ -1,5 +1,7 @@
 //! Content-type / Accept header negotiation, MIME types
 
+use actix_web::{http::HeaderMap};
+
 #[derive(PartialEq)]
 pub enum ContentType {
     JSON,
@@ -36,8 +38,8 @@ impl ContentType {
 
 /// Returns the preffered content type.
 /// Defaults to HTML if none is found.
-pub fn get_accept(req: actix_web::HttpRequest) -> ContentType {
-    let accept_header = match req.headers().get("Accept") {
+pub fn get_accept(map: &HeaderMap) -> ContentType {
+    let accept_header = match map.get("Accept") {
         Some(header) => {
             header.to_str().unwrap_or("")
         }
@@ -52,7 +54,7 @@ pub fn get_accept(req: actix_web::HttpRequest) -> ContentType {
 /// Does not fully adhere to the RFC spec: https://tools.ietf.org/html/rfc7231
 /// Does not take into consideration the q value, simply reads the first thing before the comma
 /// Defaults to HTML
-fn parse_accept_header(header: &str) -> ContentType {
+pub fn parse_accept_header(header: &str) -> ContentType {
     for mimepart in header.split(',') {
         if mimepart.contains(MIME_AD3) {
             return ContentType::AD3
