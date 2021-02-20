@@ -155,6 +155,16 @@ fn prompt_field(
                 None => (return Ok(None)),
             }
         }
+        DataType::Float => {
+            let msg = format!("float{}", msg_appendix);
+            let number: Option<f64> = prompt_opt(&msg)?;
+            match number {
+                Some(nr) => {
+                    input = Some(nr.to_string());
+                }
+                None => (return Ok(None)),
+            }
+        }
         DataType::Date => {
             let msg = format!("date YYYY-MM-DD{}", msg_appendix);
             let date: Option<String> = prompt_opt(&msg).unwrap();

@@ -10,6 +10,7 @@ pub enum Value {
     AtomicUrl(String),
     Date(String),
     Integer(isize),
+    Float(f64),
     Markdown(String),
     ResourceArray(Vec<String>),
     Slug(String),
@@ -42,6 +43,7 @@ impl Value {
             Value::AtomicUrl(_) => DataType::AtomicUrl,
             Value::Date(_) => DataType::Date,
             Value::Integer(_) => DataType::Integer,
+            Value::Float(_) => DataType::Float,
             Value::Markdown(_) => DataType::Markdown,
             Value::ResourceArray(_) => DataType::ResourceArray,
             Value::Slug(_) => DataType::Slug,
@@ -61,6 +63,10 @@ impl Value {
             DataType::Integer => {
                 let val: isize = value.parse()?;
                 Ok(Value::Integer(val))
+            }
+            DataType::Float => {
+                let val: f64 = value.parse()?;
+                Ok(Value::Float(val))
             }
             DataType::String => Ok(Value::String(value.into())),
             DataType::Markdown => Ok(Value::Markdown(value.into())),
@@ -193,6 +199,7 @@ impl fmt::Display for Value {
             Value::AtomicUrl(s) => write!(f, "{}", s),
             Value::Date(s) => write!(f, "{}", s),
             Value::Integer(i) => write!(f, "{}", i),
+            Value::Float(float) => write!(f, "{}", float),
             Value::Markdown(i) => write!(f, "{}", i),
             Value::ResourceArray(v) => {
                 let s = crate::serialize::serialize_json_array_owned(v)
@@ -221,6 +228,8 @@ mod test {
         assert!(string.to_string() == "string");
         let date = Value::new("1200-02-02", &DataType::Date).unwrap();
         assert!(date.to_string() == "1200-02-02");
+        let date = Value::new("1.123123", &DataType::Float).unwrap();
+        assert!(date.to_string() == "1.123123");
         let converted  = Value::from(8);
         assert!(converted.to_string() == "8");
     }
@@ -228,8 +237,10 @@ mod test {
     #[test]
     fn fails_wrong_values() {
         Value::new("no int", &DataType::Integer).unwrap_err();
+        Value::new("1.1", &DataType::Integer).unwrap_err();
         Value::new("no spaces", &DataType::Slug).unwrap_err();
         Value::new("120-02-02", &DataType::Date).unwrap_err();
         Value::new("12000-02-02", &DataType::Date).unwrap_err();
+        Value::new("a", &DataType::Float).unwrap_err();
     }
 }

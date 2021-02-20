@@ -21,6 +21,7 @@ pub struct RenderAtom {
 pub fn value_to_html(value: &Value, store: &impl Storelike) -> String {
     match value {
         Value::Integer(i) => format!("{}", i),
+        Value::Float(i) => format!("{}", i),
         Value::String(s) => escape_html(&*s),
         Value::Markdown(s) => markdown_to_html(&*s, &ComrakOptions::default()),
         Value::Slug(s) => escape_html(&*s),

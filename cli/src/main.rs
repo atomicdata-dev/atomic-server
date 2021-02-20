@@ -33,7 +33,7 @@ impl Context<'_> {
             subject: write_ctx.agent.clone(),
             private_key: write_ctx.private_key.clone(),
             // TODO: use actual data
-            created_at: atomic_lib::datetime_helpers::now() as u64,
+            created_at: atomic_lib::datetime_helpers::now(),
             name: "Random name".into(),
             public_key: generate_public_key(&write_ctx.private_key).public,
         });

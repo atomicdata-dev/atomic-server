@@ -156,3 +156,6 @@
 ["https://atomicdata.dev/datatypes/timestamp","https://atomicdata.dev/properties/shortname","timestamp"]
 ["https://atomicdata.dev/datatypes/timestamp","https://atomicdata.dev/properties/description","Similar to [Unix Timestamp](https://www.unixtimestamp.com/).\nMilliseconds since midnight UTC 1970 jan 01 (aka the [Unix Epoch](https://en.wikipedia.org/wiki/Unix_time)).\nUse this for most DateTime fields.\nSigned 64 bit integer (instead of 32 bit in Unix systems).\n\ne.g. `1596798919` (= 07 Aug 2020 11:15:19)"]
 ["https://atomicdata.dev/datatypes/timestamp","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Datatype\"]"]
+["https://atomicdata.dev/datatypes/float","https://atomicdata.dev/properties/shortname","float"]
+["https://atomicdata.dev/datatypes/float","https://atomicdata.dev/properties/description","Number with a comma / decimal place. Not an integer. Serialized as string with a dot `1.123`."]
+["https://atomicdata.dev/datatypes/float","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Datatype\"]"]

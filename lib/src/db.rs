@@ -33,7 +33,7 @@ impl Db {
     /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init<P: AsRef<std::path::Path>>(path: P, base_url: String) -> AtomicResult<Db> {
-        let db = sled::open(path).map_err(|e|format!("Failed creating DB at this location. {}", e))?;
+        let db = sled::open(path).map_err(|e|format!("Failed creating DB at this location. Is another instance of Atomic Server running? {}", e))?;
         let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
         let index_props = db.open_tree("index_props")?;
         let index_vals = db.open_tree("index_vals")?;
@@ -189,7 +189,7 @@ mod test {
 
     /// Creates new temporary database, populates it, removes previous one
     fn init() -> Db {
-        let tmp_dir_path = "tmp/db";
+        let tmp_dir_path = "/tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
         store.populate().unwrap();

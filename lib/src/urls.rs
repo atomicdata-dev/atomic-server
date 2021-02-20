@@ -44,6 +44,7 @@ pub const MARKDOWN: &str = "https://atomicdata.dev/datatypes/markdown";
 pub const SLUG: &str = "https://atomicdata.dev/datatypes/slug";
 pub const ATOMIC_URL: &str = "https://atomicdata.dev/datatypes/atomicURL";
 pub const INTEGER: &str = "https://atomicdata.dev/datatypes/integer";
+pub const FLOAT: &str = "https://atomicdata.dev/datatypes/float";
 pub const RESOURCE_ARRAY: &str = "https://atomicdata.dev/datatypes/resourceArray";
 pub const BOOLEAN: &str = "https://atomicdata.dev/datatypes/boolean";
 pub const DATE: &str = "https://atomicdata.dev/datatypes/date";

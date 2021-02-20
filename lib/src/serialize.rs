@@ -89,6 +89,7 @@ pub fn propvals_to_json_map(
             Value::Date(val) => SerdeValue::String(val),
             // TODO: Handle big numbers
             Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
+            Value::Float(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
             Value::Markdown(val) => SerdeValue::String(val),
             Value::ResourceArray(val) => SerdeValue::Array(
                 val.iter()
