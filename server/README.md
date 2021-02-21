@@ -11,7 +11,8 @@ The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https:
 
 - No runtime dependencies, fast, runs on all platforms
 - Embedded HTTP / HTTPS / HTTP2.0 server
-- Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and AD3
+- Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad)
+- Uses [atomic-data-abrowser](https://github.com/joepio/atomic-data-browser) as front-end.
 
 Powered by Rust, atomic-lib, actix-web, Sled and [more](Cargo.toml).
 
