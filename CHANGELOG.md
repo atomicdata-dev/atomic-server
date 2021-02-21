@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.22.4
+
+- Reject commits if they are editing a non-owned resource #106
+- Correct response codes (404) #105
+
 ## v0.22.3
 
 - Use atomic-data-browser js frontent by default #103

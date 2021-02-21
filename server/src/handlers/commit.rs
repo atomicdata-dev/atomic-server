@@ -26,7 +26,15 @@ pub async fn post_commit(
         return Err(format!(
             "Commit was was createdAt {}ms ago, which is more than the maximum of {}ms.",
             time_ago, acceptable_milliseconds
-        ).into());
+        )
+        .into());
+    }
+    if !incoming_commit.subject.contains(
+        &store
+            .get_self_url()
+            .ok_or("Cannot apply commits to this store. No self_url is set.")?,
+    ) {
+        return Err("Subject of commit should be sent to other domain - this store can not own this resource.".into());
     }
     let saved_commit_resource = store.commit(incoming_commit)?;
     // TODO: better response

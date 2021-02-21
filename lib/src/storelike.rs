@@ -40,7 +40,7 @@ pub trait Storelike: Sized {
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_base_url(&self) -> String;
+    fn get_base_url(&self) -> &str;
 
     /// Returns the root URL where this instance of the store is hosted.
     /// Should return `None` if this is simply a client and not a server.

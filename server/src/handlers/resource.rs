@@ -1,10 +1,10 @@
-use crate::{
-    appstate::AppState, content_types::get_accept, content_types::ContentType,
-    errors::BetterResult, render::propvals::propvals_to_html_vec,
-};
+use crate::{appstate::AppState, content_types::ContentType, content_types::get_accept, errors::{AppError, BetterResult}, render::propvals::propvals_to_html_vec};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{errors::AtomicResult, Storelike};
-use std::{sync::{Mutex, MutexGuard}, todo};
+use std::{
+    sync::{Mutex, MutexGuard},
+    todo,
+};
 use tera::Context as TeraCtx;
 
 /// Respond to a single resource.
@@ -30,12 +30,17 @@ pub async fn get_resource(
     } else {
         format!("?{}", req.query_string())
     };
-    let subject = format!("{}/{}{}", &context.config.local_base_url, subj_end_string, querystring);
+    let subject = format!(
+        "{}/{}{}",
+        &context.config.local_base_url, subj_end_string, querystring
+    );
     let store = &context.store;
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} - {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
-    let resource = store.get_resource_extended(&subject)?;
+    let resource = store
+        .get_resource_extended(&subject)
+        .map_err(|e| AppError::not_found(e.to_string()))?;
     match content_type {
         ContentType::JSON => {
             let body = resource.to_json(store)?;
