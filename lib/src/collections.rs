@@ -54,6 +54,19 @@ impl CollectionBuilder {
         // Maybe include items directly
         Ok(resource)
     }
+
+    /// Default CollectionBuilder for Classes. Finds all resources by class URL. Has sensible defaults.
+    pub fn class_collection(class_url: &str, path: &str, store: &impl Storelike) -> CollectionBuilder {
+        CollectionBuilder {
+            subject: format!("{}/{}", store.get_base_url(), path),
+            property: Some(urls::IS_A.into()),
+            value: Some(class_url.into()),
+            sort_by: None,
+            sort_desc: false,
+            page_size: 1000,
+            current_page: 0,
+        }
+    }
 }
 
 /// Dynamic resource used for ordering, filtering and querying content.

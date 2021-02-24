@@ -129,59 +129,22 @@ pub fn populate_default(store: &impl Storelike) -> AtomicResult<()> {
 pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     use crate::collections::CollectionBuilder;
 
-    let classes = CollectionBuilder {
-        subject: format!("{}/classes", store.get_base_url()),
-        property: Some(urls::IS_A.into()),
-        value: Some(urls::CLASS.into()),
-        sort_by: None,
-        sort_desc: false,
-        page_size: 1000,
-        current_page: 0,
-    };
+    let classes = CollectionBuilder::class_collection(urls::CLASS, "classes", store);
     store.add_resource_unsafe(&classes.to_resource(store)?)?;
 
-    let properties = CollectionBuilder {
-        subject: format!("{}/properties", store.get_base_url()),
-        property: Some(urls::IS_A.into()),
-        value: Some(urls::PROPERTY.into()),
-        sort_by: None,
-        sort_desc: false,
-        page_size: 1000,
-        current_page: 0,
-    };
+    let properties = CollectionBuilder::class_collection(urls::PROPERTY, "properties", store);
     store.add_resource_unsafe(&properties.to_resource(store)?)?;
 
-    let commits = CollectionBuilder {
-        subject: format!("{}/commits", store.get_base_url()),
-        property: Some(urls::IS_A.into()),
-        value: Some(urls::COMMIT.into()),
-        sort_by: None,
-        sort_desc: false,
-        page_size: 1000,
-        current_page: 0,
-    };
+    let commits = CollectionBuilder::class_collection(urls::COMMIT, "commits", store);
     store.add_resource_unsafe(&commits.to_resource(store)?)?;
 
-    let agents = CollectionBuilder {
-        subject: format!("{}/agents", store.get_base_url()),
-        property: Some(urls::IS_A.into()),
-        value: Some(urls::AGENT.into()),
-        sort_by: None,
-        sort_desc: false,
-        page_size: 1000,
-        current_page: 0,
-    };
+    let agents = CollectionBuilder::class_collection(urls::AGENT, "agents", store);
     store.add_resource_unsafe(&agents.to_resource(store)?)?;
 
-    let collections = CollectionBuilder {
-        subject: format!("{}/collections", store.get_base_url()),
-        property: Some(urls::IS_A.into()),
-        value: Some(urls::COLLECTION.into()),
-        sort_by: None,
-        sort_desc: false,
-        page_size: 1000,
-        current_page: 0,
-    };
+    let datatypes = CollectionBuilder::class_collection(urls::DATATYPE_CLASS, "datatypes", store);
+    store.add_resource_unsafe(&datatypes.to_resource(store)?)?;
+
+    let collections = CollectionBuilder::class_collection(urls::COLLECTION, "collections", store);
     store.add_resource_unsafe(&collections.to_resource(store)?)?;
 
     Ok(())

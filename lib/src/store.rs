@@ -322,6 +322,6 @@ mod test {
             .unwrap();
         let my_value = my_resource.get(urls::COLLECTION_MEMBER_COUNT).unwrap();
         println!("My value: {}", my_value);
-        assert!(my_value.to_string() == "5");
+        assert!(my_value.to_string() == "6");
     }
 }

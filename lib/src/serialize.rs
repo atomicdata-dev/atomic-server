@@ -207,7 +207,7 @@ mod test {
         println!("json: {}", json);
         let correct_json = r#"{
   "@id": "https://atomicdata.dev/classes/Agent",
-  "https://atomicdata.dev/properties/description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The publik key is for proving that the ",
+  "https://atomicdata.dev/properties/description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The public key is used to verify signatures (on [Commits](https://atomicdata.dev/classes/Commit)) set by the of the Agent.",
   "https://atomicdata.dev/properties/isA": [
      "https://atomicdata.dev/classes/Class"
   ],
@@ -241,7 +241,7 @@ mod test {
         println!("json: {}", json);
         let correct_json = r#"{
             "@id": "https://atomicdata.dev/classes/Agent",
-            "description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The publik key is for proving that the ",
+            "description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The public key is used to verify signatures (on [Commits](https://atomicdata.dev/classes/Commit)) set by the of the Agent.",
             "is-a": [
               "https://atomicdata.dev/classes/Class"
             ],
@@ -291,7 +291,7 @@ mod test {
               "shortname": "https://atomicdata.dev/properties/shortname"
             },
             "@id": "https://atomicdata.dev/classes/Agent",
-            "description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The publik key is for proving that the ",
+            "description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The public key is used to verify signatures (on [Commits](https://atomicdata.dev/classes/Commit)) set by the of the Agent.",
             "is-a": [
               "https://atomicdata.dev/classes/Class"
             ],
