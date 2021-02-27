@@ -9,6 +9,8 @@ pub struct TPFQuery {
     pub value: Option<String>,
 }
 
+const DEFAULT_PAGE_SIZE: usize = 30;
+
 /// Used to construct a Collection. Does not contain results / members.
 /// Has to be constructed using `Collection::new()` or `storelike.new_collection()`.
 #[derive(Debug)]
@@ -63,7 +65,7 @@ impl CollectionBuilder {
             value: Some(class_url.into()),
             sort_by: None,
             sort_desc: false,
-            page_size: 1000,
+            page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
         }
     }
@@ -252,7 +254,7 @@ pub fn construct_collection(
     let mut sort_by = None;
     let mut sort_desc = false;
     let mut current_page = 0;
-    let mut page_size = 100;
+    let mut page_size = DEFAULT_PAGE_SIZE;
     let mut value = None;
     let mut property = None;
 
@@ -304,7 +306,7 @@ mod test {
             value: Some(urls::CLASS.into()),
             sort_by: None,
             sort_desc: false,
-            page_size: 1000,
+            page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
@@ -322,7 +324,7 @@ mod test {
             value: Some(urls::CLASS.into()),
             sort_by: None,
             sort_desc: false,
-            page_size: 1000,
+            page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
