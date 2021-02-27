@@ -293,7 +293,8 @@ mod test {
             .get_resource_extended(subject)
             .unwrap();
         let cur_page = resource.get(urls::COLLECTION_CURRENT_PAGE).unwrap().to_int().unwrap();
-        assert_eq!(cur_page, 2)
+        assert_eq!(cur_page, 2);
+        assert_eq!(resource.get_subject(), subject);
     }
 
     #[test]

@@ -130,6 +130,9 @@ impl Collection {
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
     ) -> AtomicResult<Collection> {
+        if collection_builder.page_size < 1 {
+            return Err("Page size must be greater than 0".into());
+        }
         // Execute the TPF query, get all the subjects.
         let atoms = store.tpf(
             None,
