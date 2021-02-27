@@ -175,13 +175,15 @@ pub trait Storelike: Sized {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Currently only used for constructing Collections.
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
+fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
         let query_params = clone.query_pairs();
         url.set_query(None);
         let removed_query_params = url.to_string();
-        let resource = self.get_resource(&removed_query_params)?;
+        let mut resource = self.get_resource(&removed_query_params)?;
+        // make sure the actual subject matches the one requested
+        resource.set_subject(subject.into());
         // If a certain class needs to be extended, add it to this match statement
         for class in resource.get_classes(self)? {
             match class.subject.as_ref() {

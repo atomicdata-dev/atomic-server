@@ -283,10 +283,17 @@ mod test {
     fn get_extended_resource() {
         let store = Store::init().unwrap();
         store.populate().unwrap();
+        let subject = "https://atomicdata.dev/classes?current_page=2";
+        // Should throw, because page 2 is out of bounds for default page size
+        let _wrong_resource = store
+            .get_resource_extended(subject)
+            .unwrap_err();
+        let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
         let resource = store
-            .get_resource_extended("https://atomicdata.dev/classes")
+            .get_resource_extended(subject)
             .unwrap();
-        resource.get(urls::COLLECTION_MEMBERS).unwrap();
+        let cur_page = resource.get(urls::COLLECTION_CURRENT_PAGE).unwrap().to_int().unwrap();
+        assert_eq!(cur_page, 2)
     }
 
     #[test]
