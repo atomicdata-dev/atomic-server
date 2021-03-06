@@ -1,6 +1,6 @@
 //! Describe changes / mutations to data
 
-use serde::{Serialize};
+use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
@@ -40,55 +40,65 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Apply a single signed Commit to the store
+    /// Apply a single signed Commit to the store.
     /// Creates, edits or destroys a resource.
     /// Checks if the signature is created by the Agent.
-    /// TODO: Should check if the Agent has the correct rights.
-    fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, true, true)
+    pub fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
+        self.apply_opts(store, true, true, true)
     }
 
-    fn apply_opts(&self, store: &impl Storelike, validate_schema: bool, validate_signature: bool) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
-        let signature = match self.signature.as_ref() {
-            Some(sig) => sig,
-            None => return Err("No signature set".into()),
-        };
-        // TODO: Check if commit.agent has the rights to update the resource
-        let pubkey_b64 = store
-            .get_resource(&self.signer)?
-            .get(urls::PUBLIC_KEY)?
-            .to_string();
-        let agent_pubkey = base64::decode(pubkey_b64)?;
-        let stringified_commit = self.serialize_deterministically_json_ad(store)?;
-        let peer_public_key =
-            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
-        let signature_bytes = base64::decode(signature.clone())?;
-        peer_public_key
-            .verify(stringified_commit.as_bytes(), &signature_bytes)
-            .map_err(|_e| {
-                format!(
-                    "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Stringified commit: {}. Public key",
-                    stringified_commit,
-                )
-            })?;
-        // Check if the created_at lies in the past
-        let now = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .expect("Time went backwards")
-            .as_millis() as i64;
-        let commit_resource: Resource = self.clone().into_resource(store)?;
-        let acceptable_ms_difference = 10000;
-        if self.created_at > now + acceptable_ms_difference {
-            return Err(format!(
-                "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
-                now, self.created_at
-            )
-            .into());
-            // TODO: also check that no younger commits exist
+    /// Apply a single signed Commit to the store.
+    /// Creates, edits or destroys a resource.
+    /// Allows for control over which validations should be performed.
+    /// TODO: Should check if the Agent has the correct rights.
+    pub fn apply_opts(
+        &self,
+        store: &impl Storelike,
+        validate_schema: bool,
+        validate_signature: bool,
+        validate_timestamp: bool,
+    ) -> AtomicResult<Resource> {
+        if validate_signature {
+            let signature = match self.signature.as_ref() {
+                Some(sig) => sig,
+                None => return Err("No signature set".into()),
+            };
+            // TODO: Check if commit.agent has the rights to update the resource
+            let pubkey_b64 = store
+                .get_resource(&self.signer)?
+                .get(urls::PUBLIC_KEY)?
+                .to_string();
+            let agent_pubkey = base64::decode(pubkey_b64)?;
+            let stringified_commit = self.serialize_deterministically_json_ad(store)?;
+            let peer_public_key =
+                ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
+            let signature_bytes = base64::decode(signature.clone())?;
+            peer_public_key
+                .verify(stringified_commit.as_bytes(), &signature_bytes)
+                .map_err(|_e| {
+                    format!(
+                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Stringified commit: {}. Public key",
+                        stringified_commit,
+                    )
+                })?;
         }
+        // Check if the created_at lies in the past
+        if validate_timestamp {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_millis() as i64;
+            let acceptable_ms_difference = 10000;
+            if self.created_at > now + acceptable_ms_difference {
+                return Err(format!(
+                    "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
+                    now, self.created_at
+                )
+                .into());
+                // TODO: also check that no younger commits exist
+            }
+        }
+        let commit_resource: Resource = self.clone().into_resource(store)?;
         if let Some(destroy) = self.destroy {
             if destroy {
                 store.remove_resource(&self.subject)?;
@@ -105,24 +115,23 @@ impl Commit {
             }
             store.add_resource(&resource)?;
         }
-        if let Some(remove) = self.remove {
+        if let Some(remove) = self.remove.clone() {
             for prop in remove.iter() {
                 resource.remove_propval(&prop);
             }
             store.add_resource(&resource)?;
         }
-        resource.check_required_props(store)?;
+        if validate_schema {
+            resource.check_required_props(store)?;
+        }
         // Save the Commit to the Store
         store.add_resource(&commit_resource)?;
         Ok(commit_resource)
     }
 
-    /// Applies a commit without performing the necessary authorization / signature / schema checks.
-    pub fn apply_unsafe(&self, commit: crate::Commit) -> AtomicResult<Resource>
-    where
-        Self: std::marker::Sized,
-    {
-        self.apply_opts(commit, false, false, false)
+    /// Applies a commit without performing authorization / signature / schema checks.
+    pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<Resource> {
+        self.apply_opts(store, false, false, false)
     }
 
     /// Converts a Resource of a Commit into a Commit
@@ -230,7 +239,6 @@ impl Commit {
         let mut commit_resource = self.clone().into_resource(store)?;
         // A deterministic serialization should not contain the hash (signature), since that would influence the hash.
         commit_resource.remove_propval(urls::SIGNATURE);
-
         let json_obj = crate::serialize::propvals_to_json_map(
             commit_resource.get_propvals(),
             None,
@@ -312,7 +320,6 @@ fn sign_at(
         signature: None,
         url: None,
     };
-    println!("Agent: {:?}", agent);
     let stringified = commit
         .serialize_deterministically_json_ad(store)
         .map_err(|e| format!("Failed serializing commit: {}", e))?;

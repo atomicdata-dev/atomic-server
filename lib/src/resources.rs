@@ -196,7 +196,7 @@ impl Resource {
             crate::client::post_commit(&commit)?;
         }
         // If that succeeds, save it locally;
-        store.commit(commit.clone())?;
+        commit.apply(store)?;
         // then, reset the internal CommitBuiler.
         self.reset_commit_builder();
         Ok(commit)
@@ -210,7 +210,7 @@ impl Resource {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
         let commit = commitbuilder.sign(&agent, store)?;
-        store.commit(commit.clone())?;
+        commit.apply(store)?;
         self.reset_commit_builder();
         let resource = commit.into_resource(store)?;
         Ok(resource)
@@ -431,7 +431,7 @@ mod test {
             .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
         let commit = new_resource.get_commit_builder().clone().sign(&agent, &store).unwrap();
-        store.commit(commit).unwrap();
+        commit.apply(&store).unwrap();
         assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
