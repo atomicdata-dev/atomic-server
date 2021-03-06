@@ -30,16 +30,15 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
     let mut commits = get_commits_for_resource(subject, store)?;
     // Sort all commits by date
     commits.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-
     // We create a backup of the current resource.
     let backup = store.get_resource(subject)?;
     // Warning: if the below code returns an error while stuck mid-commit, we currently fail to put our backup back!
     // try {
-    store.remove_resource(subject);
+    store.remove_resource(subject)?;
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
             // We skip unnecassary checks
-            store.commit_unsafe(commit.clone())?;
+            commit.apply_unsafe(store)?;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {
                 break;
@@ -47,7 +46,7 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
         }
     }
     let version = store.get_resource(&subject.to_string())?;
-    // }
+// }
     // Put back the backup
     store.add_resource(&backup)?;
     Ok(version)
