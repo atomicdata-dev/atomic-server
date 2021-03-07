@@ -1,12 +1,17 @@
 use crate::{Commit, Resource, Storelike, endpoints::Endpoint, errors::AtomicResult, urls};
 
-fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+pub fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
     let params = url.query_pairs();
 
     let mut commit_url = None;
 
     for (k, v) in params {
         if let "commit" = k.as_ref() { commit_url = Some(v.to_string()) };
+    }
+
+    if commit_url.is_none() {
+        // return Err("No commit query param has been passed".into())
+        return versioning_endpoint().to_resource(store)
     }
 
     construct_version(&commit_url.unwrap(), store)
@@ -18,7 +23,7 @@ pub fn versioning_endpoint() -> Endpoint {
     // params.push();
 
     Endpoint {
-        path: "versioning".to_string(),
+        path: "/versioning".to_string(),
         params,
         description: "Constructs a version of a resource from a commit".to_string(),
         shortname: "versioning".to_string(),
