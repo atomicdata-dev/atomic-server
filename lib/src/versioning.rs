@@ -1,4 +1,30 @@
-use crate::{errors::AtomicResult, urls, Commit, Resource, Storelike};
+use crate::{Commit, Resource, Storelike, endpoints::Endpoint, errors::AtomicResult, urls};
+
+fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+    let params = url.query_pairs();
+
+    let mut commit_url = None;
+
+    for (k, v) in params {
+        if let "commit" = k.as_ref() { commit_url = Some(v.to_string()) };
+    }
+
+    construct_version(&commit_url.unwrap(), store)
+}
+
+pub fn versioning_endpoint() -> Endpoint {
+
+    let params = Vec::new();
+    // params.push();
+
+    Endpoint {
+        path: "versioning".to_string(),
+        params,
+        description: "Constructs a version of a resource from a commit".to_string(),
+        shortname: "versioning".to_string(),
+        // handler: handle_version_request,
+    }
+}
 
 /// Searches the local store for all commits with this subject
 pub fn get_commits_for_resource(
@@ -38,6 +64,7 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
             // We skip unnecassary checks
+            // TODO: maybe do some caching here? Seems more logical than caching the get_version. Maybe this function will become recursive.
             commit.apply_unsafe(store)?;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {

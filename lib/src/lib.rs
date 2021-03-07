@@ -71,6 +71,7 @@ pub mod db;
 pub mod config;
 pub mod datatype;
 pub mod errors;
+pub mod endpoints;
 pub mod mapping;
 pub mod parse;
 pub mod populate;
