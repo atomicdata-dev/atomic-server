@@ -7,6 +7,7 @@ pub const DATATYPE_CLASS: &str = "https://atomicdata.dev/classes/Datatype";
 pub const COMMIT: &str = "https://atomicdata.dev/classes/Commit";
 pub const AGENT: &str = "https://atomicdata.dev/classes/Agent";
 pub const COLLECTION: &str = "https://atomicdata.dev/classes/Collection";
+pub const ENDPOINT: &str = "https://atomicdata.dev/classes/Endpoint";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -37,6 +38,8 @@ pub const COLLECTION_TOTAL_PAGES: &str = "https://atomicdata.dev/properties/coll
 pub const COLLECTION_CURRENT_PAGE: &str = "https://atomicdata.dev/properties/collection/currentPage";
 pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collection/members";
 pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collection/pageSize";
+// ... for Endpoints
+pub const ENDPOINT_PARAMETERS: &str = "https://atomicdata.dev/properties/endpoint/parameters";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
