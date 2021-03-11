@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.22.3"
+version = "0.23.0"
 dependencies = [
  "acme-lib",
  "actix-cors",
@@ -466,6 +466,7 @@ dependencies = [
  "base64 0.13.0",
  "bincode",
  "dirs",
+ "lazy_static",
  "ntest",
  "rand 0.8.0",
  "regex",
