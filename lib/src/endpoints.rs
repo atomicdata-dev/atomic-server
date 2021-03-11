@@ -8,15 +8,16 @@ use crate::{Db, Resource, Storelike, Value, errors::AtomicResult, urls, versioni
 pub struct Endpoint {
   /// The part behind the server domain, e.g. '/versions' or '/collections'. Include the slash.
   pub path: String,
-  /// A list of arguments that can be passed to the Endpoint
+  /// The function that is called when the request matches the path
+  pub handle: fn(subject: url::Url, store: &Db) -> AtomicResult<Resource>,
+  /// The list of properties that can be passed to the Endpoint as Query parameters
   pub params: Vec<String>,
   pub description: String,
   pub shortname: String,
-  // This requires using dyn, which is not possible with the :Sized Storelike trait
-  pub handle: fn(subject: url::Url, store: &Db) -> AtomicResult<Resource>,
 }
 
 impl Endpoint {
+  /// Converts Endpoint to resource. Does not save it.
   pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
     let subject = format!("{}{}", store.get_base_url(), self.path);
     let mut resource = Resource::new(subject);

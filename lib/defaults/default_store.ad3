@@ -134,6 +134,10 @@
 ["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/collection/property\",\"https://atomicdata.dev/properties/collection/value\",\"https://atomicdata.dev/properties/collection/pageSize\",\"https://atomicdata.dev/properties/collection/members\",\"https://atomicdata.dev/properties/collection/totalPages\",\"https://atomicdata.dev/properties/collection/totalMembers\",\"https://atomicdata.dev/properties/collection/currentPage\"]"]
 ["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/description","A paginated set of resources that can be sorted. Accepts query parameters for setting the current page number, page size, sort attribute, sort direction"]
 ["https://atomicdata.dev/classes/Collection","https://atomicdata.dev/properties/shortname","collection"]
+["https://atomicdata.dev/classes/Endpoint","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
+["https://atomicdata.dev/classes/Endpoint","https://atomicdata.dev/properties/requires","[\"https://atomicdata.dev/properties/endpoint/parameters\",\"https://atomicdata.dev/properties/description\"]"]
+["https://atomicdata.dev/classes/Endpoint","https://atomicdata.dev/properties/description","An API endpoint at some path which accepts requests and returns some Resource."]
+["https://atomicdata.dev/classes/Endpoint","https://atomicdata.dev/properties/shortname","endpoint"]
 # Datatypes
 ["https://atomicdata.dev/datatypes/string","https://atomicdata.dev/properties/shortname","string"]
 ["https://atomicdata.dev/datatypes/string","https://atomicdata.dev/properties/description","A UTF-8 string. Allows newlines with `\n`. This is a generic string datatype - don't use this for things like [markdown](https://atomicdata.dev/datatypes/markdown) or html."]

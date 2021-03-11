@@ -48,6 +48,7 @@ impl Db {
             index_props,
             base_url,
         };
+        crate::populate::populate_base_models(&store)?;
         Ok(store)
     }
 
@@ -208,6 +209,13 @@ impl Storelike for Db {
         resources
     }
 
+    fn populate(&self) -> AtomicResult<()> {
+        // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
+        crate::populate::populate_default_store(self)?;
+        crate::populate::populate_collections(self)?;
+        crate::populate::populate_endpoints(self)
+    }
+
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
         // This errors when the resource is not present.
         // https://github.com/joepio/atomic/issues/46
@@ -340,7 +348,7 @@ mod test {
     #[test]
     fn populate_collections() {
         let store = DB.lock().unwrap().clone();
-        let collections_collection_url = format!("{}/collections", store.get_base_url());
+        let collections_collection_url = format!("{}/collection", store.get_base_url());
         let my_resource = store
             .get_resource_extended(&collections_collection_url)
             .unwrap();
@@ -348,6 +356,6 @@ mod test {
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert!(my_value.to_string() == "6");
+        assert!(my_value.to_string() == "7");
     }
 }

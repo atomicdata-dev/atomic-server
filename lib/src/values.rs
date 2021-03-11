@@ -215,7 +215,7 @@ impl fmt::Display for Value {
             Value::Float(float) => write!(f, "{}", float),
             Value::Markdown(i) => write!(f, "{}", i),
             Value::ResourceArray(v) => {
-                let s = crate::serialize::serialize_json_array_owned(v)
+                let s = crate::serialize::serialize_json_array(v)
                     .unwrap_or_else(|_e| format!("[Could not serialize resource array: {:?}", v));
                 write!(f, "{}", s)
             }
