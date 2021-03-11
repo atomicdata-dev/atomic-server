@@ -156,6 +156,45 @@ impl Storelike for Db {
         }
     }
 
+    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
+        let mut url = url::Url::parse(subject)?;
+        let clone = url.clone();
+        let query_params = clone.query_pairs();
+        url.set_query(None);
+        let removed_query_params = url.to_string();
+
+        // Check if the subject matches one of the endpoints
+        let endpoints = crate::endpoints::default_endpoints();
+        let mut endpoint_resource = None;
+        endpoints.into_iter().for_each(|endpoint| {
+            if url.path().starts_with(&endpoint.path) {
+                endpoint_resource = Some((endpoint.handle)(clone.clone(), self))
+            }
+        });
+
+        if let Some(resource) = endpoint_resource {
+            let mut resource_updated = resource?;
+            // Extended resources must always return the requested subject as their own subject
+            resource_updated.set_subject(subject.into());
+            return Ok(resource_updated);
+        }
+
+        let mut resource = self.get_resource(&removed_query_params)?;
+        // make sure the actual subject matches the one requested
+        resource.set_subject(subject.into());
+        // If a certain class needs to be extended, add it to this match statement
+        for class in resource.get_classes(self)? {
+            match class.subject.as_ref() {
+                crate::urls::COLLECTION => {
+                    return crate::collections::construct_collection(self, query_params, resource)
+                }
+                "example" => todo!(),
+                _ => {}
+            }
+        }
+        Ok(resource)
+    }
+
     fn all_resources(&self) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         for item in self.resources.into_iter() {
@@ -167,10 +206,6 @@ impl Storelike for Db {
             resources.push(resource);
         }
         resources
-    }
-
-    fn set_default_agent(&self, agent: crate::agents::Agent) {
-        self.default_agent.lock().unwrap().replace(agent);
     }
 
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
@@ -186,6 +221,10 @@ impl Storelike for Db {
             .into());
         }
         Ok(())
+    }
+
+    fn set_default_agent(&self, agent: crate::agents::Agent) {
+        self.default_agent.lock().unwrap().replace(agent);
     }
 }
 
@@ -225,10 +264,18 @@ mod test {
         store
     }
 
+
+    /// Share the Db instance between tests. Otherwise, all tests try to init the same location on disk an throw errors.
+    use lazy_static::lazy_static; // 1.4.0
+    use std::sync::Mutex;
+    lazy_static! {
+        static ref DB: Mutex<Db> = Mutex::new(init());
+    }
+
     #[test]
     #[timeout(30000)]
     fn basic() {
-        let store = init();
+        let store = DB.lock().unwrap().clone();
         // Let's parse this AD3 string.
         let ad3 =
             r#"["https://localhost/test","https://atomicdata.dev/properties/description","Test"]"#;
@@ -288,5 +335,19 @@ mod test {
         store.remove_resource(crate::urls::CLASS).unwrap_err();
         // Should throw an error, because resource is deleted
         store.get_propvals(crate::urls::CLASS).unwrap_err();
+    }
+
+    #[test]
+    fn populate_collections() {
+        let store = DB.lock().unwrap().clone();
+        let collections_collection_url = format!("{}/collections", store.get_base_url());
+        let my_resource = store
+            .get_resource_extended(&collections_collection_url)
+            .unwrap();
+        let my_value = my_resource
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap();
+        println!("My value: {}", my_value);
+        assert!(my_value.to_string() == "6");
     }
 }

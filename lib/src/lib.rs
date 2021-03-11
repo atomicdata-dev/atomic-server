@@ -71,6 +71,7 @@ pub mod db;
 pub mod config;
 pub mod datatype;
 pub mod errors;
+#[cfg(feature = "db")]
 pub mod endpoints;
 pub mod mapping;
 pub mod parse;
@@ -84,6 +85,7 @@ mod url_helpers;
 pub mod urls;
 pub mod validate;
 pub mod values;
+#[cfg(feature = "db")]
 pub mod versioning;
 
 pub use atoms::Atom;

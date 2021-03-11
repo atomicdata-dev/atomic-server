@@ -1,34 +1,34 @@
-use crate::{Commit, Resource, Storelike, endpoints::Endpoint, errors::AtomicResult, urls};
+use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Commit, Resource, Storelike};
 
-pub fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
-    let params = url.query_pairs();
-
-    let mut commit_url = None;
-
-    for (k, v) in params {
-        if let "commit" = k.as_ref() { commit_url = Some(v.to_string()) };
-    }
-
-    if commit_url.is_none() {
-        // return Err("No commit query param has been passed".into())
-        return versioning_endpoint().to_resource(store)
-    }
-
-    construct_version(&commit_url.unwrap(), store)
-}
-
+/// Construct the Endpoint for Versioning
 pub fn versioning_endpoint() -> Endpoint {
-
-    let params = Vec::new();
-    // params.push();
+    let mut params = Vec::new();
+    let commit_id_param = urls::SUBJECT.to_string();
+    params.push(commit_id_param);
 
     Endpoint {
         path: "/versioning".to_string(),
         params,
         description: "Constructs a version of a resource from a commit".to_string(),
         shortname: "versioning".to_string(),
-        // handler: handle_version_request,
+        handle: handle_version_request,
     }
+}
+
+pub fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+    let params = url.query_pairs();
+    let mut commit_url = None;
+    for (k, v) in params {
+        if let "commit" = k.as_ref() {
+            commit_url = Some(v.to_string())
+        };
+    }
+    if commit_url.is_none() {
+        return versioning_endpoint().to_resource(store);
+    }
+    let mut resource = construct_version(&commit_url.unwrap(), store)?;
+    resource.set_subject(url.to_string());
+    Ok(resource)
 }
 
 /// Searches the local store for all commits with this subject
@@ -78,7 +78,7 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
         }
     }
     let version = store.get_resource(&subject.to_string())?;
-// }
+    // }
     // Put back the backup
     store.add_resource(&backup)?;
     Ok(version)
@@ -101,8 +101,8 @@ pub fn get_version(commit_url: &str, store: &impl Storelike) -> AtomicResult<Res
 
 #[cfg(test)]
 mod test {
-    use crate::{Resource, Store};
     use super::*;
+    use crate::{Resource, Store};
 
     #[test]
     fn gets_all_versions() {

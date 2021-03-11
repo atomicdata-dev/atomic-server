@@ -1,10 +1,9 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
-use crate::{endpoints::default_endpoints, errors::AtomicResult};
+use crate::{errors::AtomicResult};
 use crate::{
     agents::Agent,
     schema::{Class, Property},
-    urls,
 };
 use crate::{mapping::Mapping, values::Value, Atom, Resource, RichAtom};
 
@@ -102,43 +101,9 @@ pub trait Storelike: Sized {
     }
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
-    /// Currently only used for constructing Collections.
+    /// Defaults to get_resource if store doesn't support extended resources
     fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
-        let mut url = url::Url::parse(subject)?;
-        let clone = url.clone();
-        let query_params = clone.query_pairs();
-        url.set_query(None);
-        let removed_query_params = url.to_string();
-
-        // Check if it matches one of the endpoints
-        let endpoints = default_endpoints();
-        let mut found  = None;
-        endpoints.into_iter().for_each(|endpoint| {
-            println!("path: {}", url.path());
-            println!("endpoint path: {}", &endpoint.path);
-            if url.path().starts_with(&endpoint.path) {
-                println!("MATCH!");
-                found = Some(crate::versioning::handle_version_request(url.clone(), self))
-            }
-        });
-        if found.is_some() {
-            return found.unwrap()
-        }
-
-        let mut resource = self.get_resource(&removed_query_params)?;
-        // make sure the actual subject matches the one requested
-        resource.set_subject(subject.into());
-        // If a certain class needs to be extended, add it to this match statement
-        for class in resource.get_classes(self)? {
-            match class.subject.as_ref() {
-                urls::COLLECTION => {
-                    return crate::collections::construct_collection(self, query_params, resource)
-                }
-                "example" => todo!(),
-                _ => {}
-            }
-        }
-        Ok(resource)
+        self.get_resource(subject)
     }
 
     fn handle_not_found(

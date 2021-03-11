@@ -320,16 +320,4 @@ mod test {
             )
             .unwrap();
     }
-
-    #[test]
-    fn populate_collections() {
-        let store = init_store();
-        let collections_collection_url = format!("{}/collections", store.get_base_url());
-        let my_resource = store
-            .get_resource_extended(&collections_collection_url)
-            .unwrap();
-        let my_value = my_resource.get(urls::COLLECTION_MEMBER_COUNT).unwrap();
-        println!("My value: {}", my_value);
-        assert!(my_value.to_string() == "6");
-    }
 }
