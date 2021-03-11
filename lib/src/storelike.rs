@@ -148,7 +148,7 @@ pub trait Storelike: Sized {
     ///     Some("[\"https://atomicdata.dev/classes/Class\"]")
     /// ).unwrap();
     /// println!("Count: {}", atoms.len());
-    /// assert!(atoms.len() == 6)
+    /// assert!(atoms.len() == 7)
     /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.
@@ -314,11 +314,10 @@ pub trait Storelike: Sized {
         Ok(current)
     }
 
-    /// Loads the default store and constructs various default collections.
+    /// Loads the default store. For DBs it also adds default Collections and Endpoints.
     fn populate(&self) -> AtomicResult<()> {
         crate::populate::populate_base_models(self)?;
-        crate::populate::populate_default(self)?;
-        crate::populate::populate_collections(self)
+        crate::populate::populate_default_store(self)
     }
 
     /// Sets the default Agent for applying commits.

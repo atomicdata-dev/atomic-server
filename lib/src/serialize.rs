@@ -123,11 +123,6 @@ pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
     Ok(string)
 }
 
-pub fn serialize_json_array_owned(items: &[String]) -> AtomicResult<String> {
-    let string = serde_json::to_string(items)?;
-    Ok(string)
-}
-
 /// Serializes Atoms to .ad3.
 /// It is a newline-delimited JSON file (ndjson), where each line is a JSON Array with three string values.
 pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {

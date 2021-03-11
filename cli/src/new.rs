@@ -236,7 +236,7 @@ fn prompt_field(
                     }
                     if length == urls.len() {
                         input =
-                            Some(atomic_lib::serialize::serialize_json_array_owned(&urls).unwrap());
+                            Some(atomic_lib::serialize::serialize_json_array(&urls).unwrap());
                         break;
                     }
                 }

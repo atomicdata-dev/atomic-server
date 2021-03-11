@@ -66,9 +66,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
         class_type: Some(urls::PROPERTY.into()),
         data_type: DataType::ResourceArray,
         shortname: "recommends".into(),
-        description:
-            "The Properties that are not required, but recommended for this Class."
-                .into(),
+        description: "The Properties that are not required, but recommended for this Class.".into(),
         subject: urls::RECOMMENDS.into(),
     }
     .to_resource()?;
@@ -78,9 +76,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
         class_type: Some(urls::PROPERTY.into()),
         data_type: DataType::ResourceArray,
         shortname: "requires".into(),
-        description:
-            "The Properties that are required for this Class."
-                .into(),
+        description: "The Properties that are required for this Class.".into(),
         subject: urls::REQUIRES.into(),
     }
     .to_resource()?;
@@ -110,7 +106,8 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
         requires: vec![urls::SHORTNAME.into(), urls::DESCRIPTION.into()],
         recommends: vec![],
         shortname: "datatype".into(),
-        description: "A Datatype describes a possible type of value, such as 'string' or 'integer'.".into(),
+        description:
+            "A Datatype describes a possible type of value, such as 'string' or 'integer'.".into(),
         subject: urls::DATATYPE_CLASS.into(),
     }
     .to_resource()?;
@@ -120,36 +117,40 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 }
 
 /// Imports items from default_store.ad3
-/// Might get stuck in infinite loop if populate_base_models is not yet run.
-pub fn populate_default(store: &impl Storelike) -> AtomicResult<()> {
+pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
     let ad3 = include_str!("../defaults/default_store.ad3");
     let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
     store.add_atoms(atoms)?;
     Ok(())
 }
 
-/// Generates some nice collections for a store, such as `/agents` and `/collections`
-/// Might get stuck in infinite loop if populate_base_models is not yet run.
+/// Generates some nice collections for classes, such as `/agent` and `/collection`
 pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     use crate::collections::CollectionBuilder;
 
-    let classes = CollectionBuilder::class_collection(urls::CLASS, "classes", store);
-    store.add_resource_unsafe(&classes.to_resource(store)?)?;
+    let classes_atoms = store.tpf(
+        None,
+        Some("https://atomicdata.dev/properties/isA"),
+        Some("[\"https://atomicdata.dev/classes/Class\"]"),
+    )?;
 
-    let properties = CollectionBuilder::class_collection(urls::PROPERTY, "properties", store);
-    store.add_resource_unsafe(&properties.to_resource(store)?)?;
+    for atom in classes_atoms {
+        let class = store.get_class(&atom.subject)?;
+        let collection = CollectionBuilder::class_collection(&class.subject, &class.shortname, store);
+        store.add_resource_unsafe(&collection.to_resource(store)?)?;
+    }
 
-    let commits = CollectionBuilder::class_collection(urls::COMMIT, "commits", store);
-    store.add_resource_unsafe(&commits.to_resource(store)?)?;
+    Ok(())
+}
 
-    let agents = CollectionBuilder::class_collection(urls::AGENT, "agents", store);
-    store.add_resource_unsafe(&agents.to_resource(store)?)?;
-
-    let datatypes = CollectionBuilder::class_collection(urls::DATATYPE_CLASS, "datatypes", store);
-    store.add_resource_unsafe(&datatypes.to_resource(store)?)?;
-
-    let collections = CollectionBuilder::class_collection(urls::COLLECTION, "collections", store);
-    store.add_resource_unsafe(&collections.to_resource(store)?)?;
-
+#[cfg(feature = "db")]
+/// Adds default Endpoints (versioning) to the Db.
+/// Makes sure they are fetchable
+pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
+    let endpoints = crate::endpoints::default_endpoints();
+    for endpoint in endpoints {
+        let resource = endpoint.to_resource(store)?;
+        store.add_resource(&resource)?;
+    }
     Ok(())
 }
