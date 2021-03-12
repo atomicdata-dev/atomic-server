@@ -136,7 +136,11 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
     for atom in classes_atoms {
         let class = store.get_class(&atom.subject)?;
-        let collection = CollectionBuilder::class_collection(&class.subject, &class.shortname, store);
+        let collection = CollectionBuilder::class_collection(
+            &class.subject,
+            &format!("{}s", &class.shortname),
+            store,
+        );
         store.add_resource_unsafe(&collection.to_resource(store)?)?;
     }
 
