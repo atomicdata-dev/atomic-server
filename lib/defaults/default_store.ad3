@@ -105,6 +105,10 @@
 ["https://atomicdata.dev/properties/endpoint/parameters","https://atomicdata.dev/properties/classtype","https://atomicdata.dev/classes/Property"]
 ["https://atomicdata.dev/properties/endpoint/parameters","https://atomicdata.dev/properties/shortname","parameters"]
 ["https://atomicdata.dev/properties/endpoint/parameters","https://atomicdata.dev/properties/description","The query parameters of the endpoint"]
+["https://atomicdata.dev/properties/path","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Property\"]"]
+["https://atomicdata.dev/properties/path","https://atomicdata.dev/properties/datatype","https://atomicdata.dev/datatypes/string"]
+["https://atomicdata.dev/properties/path","https://atomicdata.dev/properties/shortname","path"]
+["https://atomicdata.dev/properties/path","https://atomicdata.dev/properties/description","An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value."]
 # Classes
 ["https://atomicdata.dev/classes/Class","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
 ["https://atomicdata.dev/classes/Class","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/recommends\",\"https://atomicdata.dev/properties/requires\"]"]

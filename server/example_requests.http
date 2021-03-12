@@ -22,6 +22,10 @@ Accept: text/turtle
 GET https://atomicdata.dev/tpf?property=https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: application/ad3-ndjson
 
+### Use Path endpoint to retrieve a resource or a path
+GET https://atomicdata.dev/path?path=https://atomicdata.dev/properties/isA HTTP/1.1
+Accept: application/ad3-ndjson
+
 ### Send a Commit
 POST http://localhost/commit HTTP/1.1
 Accept: application/json

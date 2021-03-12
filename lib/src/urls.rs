@@ -40,6 +40,7 @@ pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collecti
 pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collection/pageSize";
 // ... for Endpoints
 pub const ENDPOINT_PARAMETERS: &str = "https://atomicdata.dev/properties/endpoint/parameters";
+pub const PATH: &str = "https://atomicdata.dev/properties/path";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

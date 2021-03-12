@@ -1,21 +1,30 @@
 use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Commit, Resource, Storelike};
 
-/// Construct the Endpoint for Versioning
-pub fn versioning_endpoint() -> Endpoint {
-    let mut params = Vec::new();
-    let commit_id_param = urls::SUBJECT.to_string();
-    params.push(commit_id_param);
-
+pub fn version_endpoint() -> Endpoint {
     Endpoint {
-        path: "/versioning".to_string(),
-        params,
-        description: "Constructs a version of a resource from a commit".to_string(),
+        path: "/version".to_string(),
+        params: [urls::SUBJECT.to_string()].into(),
+        description: "Constructs a version of a resource from a Commit URL.".to_string(),
         shortname: "versioning".to_string(),
         handle: handle_version_request,
     }
 }
 
-pub fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+// pub fn list_versions_endpoint() -> Endpoint {
+//     let mut params = Vec::new();
+//     let commit_id_param = urls::SUBJECT.to_string();
+//     params.push(commit_id_param);
+
+//     Endpoint {
+//         path: "/listVersions".to_string(),
+//         params,
+//         description: "Lists all versions for one resource".to_string(),
+//         shortname: "versioning".to_string(),
+//         handle: handle_version_request,
+//     }
+// }
+
+fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
     let params = url.query_pairs();
     let mut commit_url = None;
     for (k, v) in params {
@@ -24,7 +33,7 @@ pub fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicRe
         };
     }
     if commit_url.is_none() {
-        return versioning_endpoint().to_resource(store);
+        return version_endpoint().to_resource(store);
     }
     let mut resource = construct_version(&commit_url.unwrap(), store)?;
     resource.set_subject(url.to_string());
@@ -32,7 +41,7 @@ pub fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicRe
 }
 
 /// Searches the local store for all commits with this subject
-pub fn get_commits_for_resource(
+fn get_commits_for_resource(
     subject: &str,
     store: &impl Storelike,
 ) -> AtomicResult<Vec<Commit>> {
