@@ -24,6 +24,26 @@
   <script src="https://joepio.github.io/atomic-data-browser/webpack-runtime.js"></script>
   <script src="https://joepio.github.io/atomic-data-browser/styles.js"></script>
   <script src="https://joepio.github.io/atomic-data-browser/index.js"></script>
+  <script>var _paq = (window._paq = window._paq || []);
+    _paq.push(['trackPageView']);
+    _paq.push(['enableLinkTracking']);
+    (function () {
+      var u = 'https://analytics.argu.co/';
+      _paq.push(['setTrackerUrl', u + 'matomo.php']);
+      _paq.push(['setSiteId', '18']);
+      var d = document,
+        g = d.createElement('script'),
+        s = d.getElementsByTagName('script')[0];
+      g.type = 'text/javascript';
+      g.async = true;
+      g.src = u + 'matomo.js';
+      s.parentNode.insertBefore(g, s);
+    })();
+    window.addEventListener('hashchange', function () {
+      _paq.push(['setCustomUrl', '/' + window.location.hash.substr(1)]);
+      _paq.push(['setDocumentTitle', 'My New Title']);
+      _paq.push(['trackPageView']);
+    });</script>
 </body>
 
 </html>

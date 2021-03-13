@@ -5,8 +5,12 @@ List of changes for this repo, including `atomic-cli`,
 
 ## v0.23.0
 
-- Added versioning #
+- Added versioning #42
+- Added endpoints #110 #73
+- Moved `/path` logic to `atomic-lib` as endpoint #110
+- `get_extended_resource` is now DB only #110
 - Correct response codes (404) #105
+- Improved .html page (+PWA support and matomo tracking)
 
 ## v0.22.4
 

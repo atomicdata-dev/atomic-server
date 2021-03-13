@@ -30,7 +30,7 @@ pub async fn tpf(
     let property = empty_to_nothing(query.property.clone());
     let value = empty_to_nothing(query.value.clone());
     let atoms = store
-        .tpf(subject.as_deref(), property.as_deref(), value.as_deref())?;
+        .tpf(subject.as_deref(), property.as_deref(), value.as_deref(), true)?;
     log::info!("{:?}", query);
     match content_type {
         ContentType::JSON | ContentType::JSONLD | ContentType::JSONAD => {

@@ -45,7 +45,7 @@ impl Store {
     /// Serializes the current store and saves to path
     pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
         let mut file_string: String = String::new();
-        for resource in self.all_resources() {
+        for resource in self.all_resources(true) {
             file_string.push_str(&*resource.to_ad3()?);
         }
         fs::create_dir_all(path.parent().expect("Could not find parent folder"))
@@ -96,7 +96,7 @@ impl Storelike for Store {
         Ok(())
     }
 
-    fn all_resources(&self) -> ResourceCollection {
+    fn all_resources(&self, _include_external: bool) -> ResourceCollection {
         let mut all = Vec::new();
         for (_subject, resource) in self.hashmap.lock().unwrap().clone().into_iter() {
             all.push(resource)
@@ -226,24 +226,24 @@ mod test {
     fn tpf() {
         let store = init_store();
         // All atoms
-        let atoms = store.tpf(None, None, None).unwrap();
+        let atoms = store.tpf(None, None, None, true).unwrap();
         assert!(atoms.len() > 10);
         // Find by subject
-        let atoms = store.tpf(Some(urls::CLASS), None, None).unwrap();
+        let atoms = store.tpf(Some(urls::CLASS), None, None, true).unwrap();
         assert!(atoms.len() == 5);
         // Find by value
-        let atoms = store.tpf(None, None, Some("class")).unwrap();
+        let atoms = store.tpf(None, None, Some("class"), true).unwrap();
         assert!(atoms[0].subject == urls::CLASS);
         assert!(atoms.len() == 1);
         // Find by property and value
         let atoms = store
-            .tpf(None, Some(urls::SHORTNAME), Some("class"))
+            .tpf(None, Some(urls::SHORTNAME), Some("class"), true)
             .unwrap();
         assert!(atoms[0].subject == urls::CLASS);
         assert!(atoms.len() == 1);
         // Find item in array
         let atoms = store
-            .tpf(None, Some(urls::IS_A), Some(urls::CLASS))
+            .tpf(None, Some(urls::IS_A), Some(urls::CLASS), true)
             .unwrap();
         assert!(atoms.len() > 3);
     }
@@ -283,12 +283,12 @@ mod test {
     fn get_extended_resource() {
         let store = Store::init().unwrap();
         store.populate().unwrap();
-        let subject = "https://atomicdata.dev/classes?current_page=2";
+        let subject = "https://atomicdata.dev/collections/class?current_page=2";
         // Should throw, because page 2 is out of bounds for default page size
         let _wrong_resource = store
             .get_resource_extended(subject)
             .unwrap_err();
-        let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
+        let subject = "https://atomicdata.dev/collections/class?current_page=2&page_size=1";
         let resource = store
             .get_resource_extended(subject)
             .unwrap();

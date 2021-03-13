@@ -123,9 +123,9 @@ pub trait Storelike: Sized {
         self.fetch_resource(subject)
     }
 
-    /// Returns a collection with all resources in the store.
+    /// Returns a collection with all resources in the store.\
     /// WARNING: This could be very expensive!
-    fn all_resources(&self) -> ResourceCollection;
+    fn all_resources(&self, include_external: bool) -> ResourceCollection;
 
     /// Removes a resource from the store. Errors if not present.
     fn remove_resource(&self, subject: &str) -> AtomicResult<()>;
@@ -145,7 +145,8 @@ pub trait Storelike: Sized {
     /// let atoms = store.tpf(
     ///     None,
     ///     Some("https://atomicdata.dev/properties/isA"),
-    ///     Some("[\"https://atomicdata.dev/classes/Class\"]")
+    ///     Some("[\"https://atomicdata.dev/classes/Class\"]"),
+    ///     true
     /// ).unwrap();
     /// println!("Count: {}", atoms.len());
     /// assert!(atoms.len() == 7)
@@ -157,6 +158,8 @@ pub trait Storelike: Sized {
         q_subject: Option<&str>,
         q_property: Option<&str>,
         q_value: Option<&str>,
+        // Whether resources from outside the store should be searched through
+        include_external: bool,
     ) -> AtomicResult<Vec<Atom>> {
         let mut vec: Vec<Atom> = Vec::new();
 
@@ -166,7 +169,7 @@ pub trait Storelike: Sized {
 
         // Simply return all the atoms
         if !hassub && !hasprop && !hasval {
-            for resource in self.all_resources() {
+            for resource in self.all_resources(include_external) {
                 for (property, value) in resource.get_propvals() {
                     vec.push(Atom::new(
                         resource.get_subject().clone(),
@@ -225,7 +228,7 @@ pub trait Storelike: Sized {
                 Err(_) => Ok(vec),
             },
             None => {
-                for resource in self.all_resources() {
+                for resource in self.all_resources(include_external) {
                     find_in_resource(&resource);
                 }
                 Ok(vec)

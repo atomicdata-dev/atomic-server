@@ -140,6 +140,8 @@ impl Collection {
             None,
             collection_builder.property.as_deref(),
             collection_builder.value.as_deref(),
+            // Collections only show items from inside this store. Maybe later add this as an option to collections
+            false
         )?;
         let mut subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
         // Default to no sorting
@@ -336,7 +338,7 @@ mod test {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let collection = store
-            .get_resource_extended("https://atomicdata.dev/classes")
+            .get_resource_extended("https://atomicdata.dev/collections/class")
             .unwrap();
         assert!(
             collection
@@ -357,7 +359,7 @@ mod test {
                 .get(urls::COLLECTION_MEMBER_COUNT)
                 .unwrap()
                 .to_string()
-                == "6"
+                == "7"
         );
     }
 
@@ -367,7 +369,7 @@ mod test {
         store.populate().unwrap();
 
         let collection_page_size = store
-            .get_resource_extended("https://atomicdata.dev/classes?page_size=1")
+            .get_resource_extended("https://atomicdata.dev/collections/class?page_size=1")
             .unwrap();
         assert!(
             collection_page_size
@@ -377,7 +379,7 @@ mod test {
                 == "1"
         );
         let collection_page_nr = store
-            .get_resource_extended("https://atomicdata.dev/classes?current_page=2&page_size=1")
+            .get_resource_extended("https://atomicdata.dev/collections/class?current_page=2&page_size=1")
             .unwrap();
         assert!(
             collection_page_nr

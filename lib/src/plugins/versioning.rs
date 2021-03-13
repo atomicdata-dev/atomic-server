@@ -45,7 +45,7 @@ fn get_commits_for_resource(
     subject: &str,
     store: &impl Storelike,
 ) -> AtomicResult<Vec<Commit>> {
-    let commit_atoms = store.tpf(None, Some(urls::SUBJECT), Some(subject))?;
+    let commit_atoms = store.tpf(None, Some(urls::SUBJECT), Some(subject), false)?;
     let mut commit_resources = Vec::new();
     for atom in commit_atoms {
         let commit = crate::Commit::from_resource(store.get_resource(&atom.subject)?)?;
