@@ -30,7 +30,7 @@ assert!(my_value.to_string() == "Test");
 let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
 assert!(my_value_from_shortname.to_string() == "Test");
 // We can find any Atoms matching some value using Triple Pattern Fragments:
-let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
+let found_atoms = store.tpf(None, None, Some("Test"), false).unwrap();
 assert!(found_atoms.len() == 1);
 // We can also create a new Resource, linked to the store.
 // Note that since this store only exists in memory, it's data cannot be accessed from the internet.

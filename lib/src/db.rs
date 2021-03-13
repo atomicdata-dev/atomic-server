@@ -196,11 +196,15 @@ impl Storelike for Db {
         Ok(resource)
     }
 
-    fn all_resources(&self) -> ResourceCollection {
+    fn all_resources(&self, include_external: bool) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
+        let self_url = self.get_self_url().expect("No self URL set, is required in DB");
         for item in self.resources.into_iter() {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
             let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
+            if !include_external && !subject.starts_with(&self_url) {
+                continue;
+            }
             let propvals: PropVals = bincode::deserialize(&resource_bin)
                 .unwrap_or_else(|e| panic!(format!("{}. {}", corrupt_db_message(&subject), e)));
             let resource = Resource::from_propvals(propvals, subject);
@@ -252,7 +256,7 @@ mod test {
     fn init() -> Db {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
-        let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
+        let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
         store.populate().unwrap();
         let agent = store.create_agent("name").unwrap();
         store.set_default_agent(agent);
@@ -265,7 +269,7 @@ mod test {
     fn _init_faulty() -> Db {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
-        let store = Db::init(tmp_dir_path, "https://localhost/".into()).unwrap();
+        let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
         let agent = store.create_agent("name").unwrap();
         store.populate().unwrap();
         store.set_default_agent(agent);
@@ -302,7 +306,7 @@ mod test {
         let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
         assert!(my_value_from_shortname.to_string() == "Test");
         // We can find any Atoms matching some value using Triple Pattern Fragments:
-        let found_atoms = store.tpf(None, None, Some("Test")).unwrap();
+        let found_atoms = store.tpf(None, None, Some("Test"), true).unwrap();
         assert!(found_atoms.len() == 1);
         assert!(found_atoms[0].value == "Test");
 
@@ -343,12 +347,15 @@ mod test {
         store.remove_resource(crate::urls::CLASS).unwrap_err();
         // Should throw an error, because resource is deleted
         store.get_propvals(crate::urls::CLASS).unwrap_err();
+
+        assert!(store.all_resources(false).len() < store.all_resources(true).len());
     }
 
     #[test]
     fn populate_collections() {
         let store = DB.lock().unwrap().clone();
-        let collections_collection_url = format!("{}/collection", store.get_base_url());
+        println!("{:?}", store.all_resources(false));
+        let collections_collection_url = format!("{}/collections/collection", store.get_base_url());
         let my_resource = store
             .get_resource_extended(&collections_collection_url)
             .unwrap();

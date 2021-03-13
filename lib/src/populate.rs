@@ -132,6 +132,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
         None,
         Some("https://atomicdata.dev/properties/isA"),
         Some("[\"https://atomicdata.dev/classes/Class\"]"),
+        true
     )?;
 
     for atom in classes_atoms {

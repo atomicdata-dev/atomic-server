@@ -22,7 +22,7 @@ pub fn validate_store(
     let mut unfetchable_classes: Vec<(String, Error)> = Vec::new();
     // subject, property, class
     let mut missing_props: Vec<(String, String, String)> = Vec::new();
-    for resource in store.all_resources() {
+    for resource in store.all_resources(true) {
         let subject = resource.get_subject();
         let propvals = resource.get_propvals();
         println!("Subject: {:?}", subject);

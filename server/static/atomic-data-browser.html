@@ -5,12 +5,12 @@
   <meta charset="utf-8">
   <meta content="width=device-width,initial-scale=1" name="viewport">
   <meta content="The easiest way to create, share and model Linked Atomic Data." name="description">
-  <link href="icon.png" rel="icon" type="image/png">
-  <link href="apple-touch-icon.png" rel="apple-touch-icon" sizes="180x180">
-  <link href="favicon-32x32.png" rel="icon" sizes="32x32" type="image/png">
-  <link href="favicon-16x16.png" rel="icon" sizes="16x16" type="image/png">
-  <link href="site.webmanifest" rel="manifest">
-  <link color="#1e43a3" href="/safari-pinned-tab.svg" rel="mask-icon">
+  <link href="https://joepio.github.io/atomic-data-browser/icon.png" rel="icon" type="image/png">
+  <link href="https://joepio.github.io/atomic-data-browser/apple-touch-icon.png" rel="apple-touch-icon" sizes="180x180">
+  <link href="https://joepio.github.io/atomic-data-browser/favicon-32x32.png" rel="icon" sizes="32x32" type="image/png">
+  <link href="https://joepio.github.io/atomic-data-browser/favicon-16x16.png" rel="icon" sizes="16x16" type="image/png">
+  <link href="https://joepio.github.io/atomic-data-browser/site.webmanifest" rel="manifest">
+  <link color="#1e43a3" href="https://joepio.github.io/atomic-data-browser/safari-pinned-tab.svg" rel="mask-icon">
   <meta content="#ffffff" name="msapplication-TileColor">
   <meta content="#ffffff" name="theme-color">
   <meta content="yes" name="apple-mobile-web-app-capable">
@@ -24,6 +24,26 @@
   <script src="https://joepio.github.io/atomic-data-browser/webpack-runtime.js"></script>
   <script src="https://joepio.github.io/atomic-data-browser/styles.js"></script>
   <script src="https://joepio.github.io/atomic-data-browser/index.js"></script>
+  <script>var _paq = (window._paq = window._paq || []);
+    _paq.push(['trackPageView']);
+    _paq.push(['enableLinkTracking']);
+    (function () {
+      var u = 'https://analytics.argu.co/';
+      _paq.push(['setTrackerUrl', u + 'matomo.php']);
+      _paq.push(['setSiteId', '18']);
+      var d = document,
+        g = d.createElement('script'),
+        s = d.getElementsByTagName('script')[0];
+      g.type = 'text/javascript';
+      g.async = true;
+      g.src = u + 'matomo.js';
+      s.parentNode.insertBefore(g, s);
+    })();
+    window.addEventListener('hashchange', function () {
+      _paq.push(['setCustomUrl', '/' + window.location.hash.substr(1)]);
+      _paq.push(['setDocumentTitle', 'My New Title']);
+      _paq.push(['trackPageView']);
+    });</script>
 </body>
 
 </html>
