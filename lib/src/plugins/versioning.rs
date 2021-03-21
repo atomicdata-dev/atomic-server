@@ -1,28 +1,24 @@
-use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Commit, Resource, Storelike};
+use crate::{Commit, Resource, Storelike, collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls};
 
 pub fn version_endpoint() -> Endpoint {
     Endpoint {
         path: "/version".to_string(),
         params: [urls::SUBJECT.to_string()].into(),
         description: "Constructs a version of a resource from a Commit URL.".to_string(),
-        shortname: "versioning".to_string(),
+        shortname: "versions".to_string(),
         handle: handle_version_request,
     }
 }
 
-// pub fn list_versions_endpoint() -> Endpoint {
-//     let mut params = Vec::new();
-//     let commit_id_param = urls::SUBJECT.to_string();
-//     params.push(commit_id_param);
-
-//     Endpoint {
-//         path: "/listVersions".to_string(),
-//         params,
-//         description: "Lists all versions for one resource".to_string(),
-//         shortname: "versioning".to_string(),
-//         handle: handle_version_request,
-//     }
-// }
+pub fn all_versions_endpoint() -> Endpoint {
+    Endpoint {
+        path: "/all-versions".to_string(),
+        params: [urls::SUBJECT.to_string()].into(),
+        description: "Shows all versions for some resource. Constructs these using Commits.".to_string(),
+        shortname: "all-versions".to_string(),
+        handle: handle_all_versions_request,
+    }
+}
 
 fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
     let params = url.query_pairs();
@@ -40,6 +36,34 @@ fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult
     Ok(resource)
 }
 
+fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+    let params = url.query_pairs();
+    let mut target_subject = None;
+    for (k, v) in params {
+        if let "subject" = k.as_ref() {
+            target_subject = Some(v.to_string())
+        };
+    }
+    if target_subject.is_none() {
+        return all_versions_endpoint().to_resource(store);
+    }
+    let collection_builder = CollectionBuilder {
+        subject: url.to_string(),
+        property: Some(urls::SUBJECT.into()),
+        value: Some(target_subject.unwrap()),
+        sort_by: None,
+        sort_desc: false,
+        current_page: 0,
+        page_size: 20,
+    };
+    let mut collection = collection_builder.into_collection(store)?;
+    let new_members = collection.members.iter_mut().map(|commit_url| {
+        construct_version_endpoint_url(store, commit_url)
+    }).collect();
+    collection.members = new_members;
+    collection.to_resource(store)
+}
+
 /// Searches the local store for all commits with this subject
 fn get_commits_for_resource(
     subject: &str,
@@ -53,13 +77,6 @@ fn get_commits_for_resource(
     }
     Ok(commit_resources)
 }
-
-// /// Returns a list of all version_urls for a resource. Uses the `/versioning` api
-// pub fn get_version_list(store: &impl Storelike, subject: &str) -> AtomicResult<Vec<String>> {
-//   let commits = get_commits_for_resource(store, subject)?;
-//   for com
-//   Ok(subjects)
-// }
 
 /// Constructs a Resource version for a specific Commit
 /// Only works if the current store has the required Commits
@@ -93,10 +110,15 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
     Ok(version)
 }
 
+/// Creates the versioning URL for some specific Commit
+fn construct_version_endpoint_url(store: &impl Storelike, commit_url: &str) -> String {
+    format!("{}/versioning?commit={}", store.get_base_url(), commit_url)
+}
+
 /// Gets a version of a Resource by Commit.
 /// Tries cached version, constructs one if there is no cached version.
 pub fn get_version(commit_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
-    let version_url = format!("{}/versioning?commit={}", store.get_base_url(), commit_url);
+    let version_url = construct_version_endpoint_url(store, commit_url);
     match store.get_resource(&version_url) {
         Ok(cached) => Ok(cached),
         Err(_not_cached) => {
@@ -114,7 +136,7 @@ mod test {
     use crate::{Resource, Store};
 
     #[test]
-    fn gets_all_versions() {
+    fn constructs_versions() {
         let store = Store::init().unwrap();
         store.populate().unwrap();
         let agent = store.create_agent("my_agent").unwrap();

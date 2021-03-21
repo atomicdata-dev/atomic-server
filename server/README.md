@@ -79,21 +79,14 @@ It makes it easy to query and edit Atomic Data from the command line.
 You can fetch individual items by sending a GET request to their URL.
 
 ```sh
-# Fetch as AD3 triples
-curl -i -H "Accept: application/ad3-ndjson" https://atomicdata.dev/properties/shortname
+# Fetch as JSON-AD (de facto standard for Atomic Data)
+curl -i -H "Accept: application/ad-json" https://atomicdata.dev/properties/shortname
 # Fetch as JSON-LD
 curl -i -H "Accept: application/ld+json" https://atomicdata.dev/properties/shortname
 # Fetch as JSON
 curl -i -H "Accept: application/json" https://atomicdata.dev/properties/shortname
 # Fetch as Turtle / N3
 curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
-```
-
-### Query the store with Triple Pattern Fragments
-
-```sh
-# Fetch as AD3 triples
-curl -i -H "Accept: application/ad3-ndjson" "https://atomicdata.dev/tpf?subject=&property=&value=description"
 ```
 
 ### HTTPS Setup

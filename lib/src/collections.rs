@@ -69,6 +69,11 @@ impl CollectionBuilder {
             current_page: 0,
         }
     }
+
+    /// Converts the CollectionBuilder into a collection, with Members
+    pub fn into_collection(self, store: &impl Storelike) -> AtomicResult<Collection> {
+        Collection::new_with_members(store, self)
+    }
 }
 
 /// Dynamic resource used for ordering, filtering and querying content.

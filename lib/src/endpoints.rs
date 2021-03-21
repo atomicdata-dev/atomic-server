@@ -4,7 +4,10 @@
 
 use crate::{
     errors::AtomicResult,
-    plugins::{path::path_endpoint, versioning::version_endpoint},
+    plugins::{
+        path::path_endpoint,
+        versioning::{all_versions_endpoint, version_endpoint},
+    },
     urls, Db, Resource, Storelike, Value,
 };
 
@@ -42,6 +45,7 @@ impl Endpoint {
 pub fn default_endpoints() -> Vec<Endpoint> {
     let mut vec = Vec::new();
     vec.push(version_endpoint());
+    vec.push(all_versions_endpoint());
     vec.push(path_endpoint());
     vec
 }
