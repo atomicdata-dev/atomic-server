@@ -43,7 +43,7 @@ Powers both `atomic-cli` and `atomic-server`.
 
 I've been working with Linked Data for a couple of years, and I believe it has some incredible merits.
 URLs are great identifiers, and using them for keys makes sense as well.
-It has the potential to help a more democratic and decentralized web, where people control their own data.
+Linked data has the potential to help a more interoperable and decentralized web, where people control their own data.
 However, the RDF data model has [some characteristics](https://docs.atomicdata.dev/interoperability/rdf.html) that make it difficult for many developers, and I think that limits adoption.
 That's why I've been working on a new way to think about linked data: [Atomic Data](https://docs.atomicdata.dev/).
 Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a strict subset), but introduces some new concepts that aim to make it easier to use for developers.

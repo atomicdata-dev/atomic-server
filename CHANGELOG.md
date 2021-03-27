@@ -10,7 +10,8 @@ List of changes for this repo, including `atomic-cli`,
 - Moved `/path` logic to `atomic-lib` as endpoint #110
 - `get_extended_resource` is now DB only #110
 - Correct response codes (404) #105
-- Improved .html page (+PWA support and matomo tracking)
+- Improved .html page (+PWA support and Matomo tracking)
+- Upgraded various dependencies
 
 ## v0.22.4
 
