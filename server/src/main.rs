@@ -53,7 +53,7 @@ async fn main() -> io::Result<()> {
     });
 
     #[cfg(feature = "desktop")]
-    tray_icon::tray_icon_process();
+    tray_icon::tray_icon_process(config.clone());
 
     if config.https {
         // If there is no certificate file, or the certs are too old, start HTTPS initialization
