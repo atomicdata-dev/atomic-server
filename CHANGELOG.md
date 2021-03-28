@@ -3,8 +3,9 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
-## v0.23.1
+## v0.23.2
 
+- Removed all HTML rendering from `atomic-server` (since we're using `atomic-data-browser`).
 - Changed how config paths are calculated and shared.
 - Remove the need for having the `./static` folder #118 when running `atomic-server`, moved to config dir.
 
