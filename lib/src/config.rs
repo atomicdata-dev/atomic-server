@@ -14,11 +14,18 @@ pub struct Config {
     pub private_key: String,
 }
 
-/// Returns the default path for the config file: `~/.config/atomic/config.toml`
-pub fn default_path() -> AtomicResult<PathBuf> {
+/// Returns the default path for the config file: `~/.config/atomic`
+pub fn default_config_dir_path() -> AtomicResult<PathBuf> {
     Ok(dirs::home_dir()
         .ok_or("Could not open home dir")?
-        .join(".config/atomic/config.toml"))
+        .join(".config/atomic"))
+}
+
+/// Returns the default path for the config file: `~/.config/atomic/config.toml`
+pub fn default_config_file_path() -> AtomicResult<PathBuf> {
+    let mut default_dir = default_config_dir_path()?;
+    default_dir.push("config.toml");
+    Ok(default_dir)
 }
 
 /// Reads config file from a specified path
@@ -35,6 +42,7 @@ pub fn read_config(path: &PathBuf) -> AtomicResult<Config> {
 pub fn write_config(path: &PathBuf, config: Config) -> AtomicResult<String> {
     let out =
         toml::to_string_pretty(&config).map_err(|e| format!("Error serializing config. {}", e))?;
-    std::fs::write(path, out.clone()).map_err(|e| format!("Error writing config to {:?}. {}", path, e))?;
+    std::fs::write(path, out.clone())
+        .map_err(|e| format!("Error writing config to {:?}. {}", path, e))?;
     Ok(out)
 }
