@@ -13,8 +13,8 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
                 }))
                 .to(handlers::single_page_app::single_page),
         )
-        .service(actix_files::Files::new("/static", "static/").show_files_listing())
-        .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
+        // .service(actix_files::Files::new("/static", "static/").show_files_listing())
+        // .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
         .service(
             web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))),
         )

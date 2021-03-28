@@ -1,9 +1,9 @@
 //! Everything required for setting up HTTPS.
 
-use actix_web::{HttpServer, App};
 use acme_lib::create_p384_key;
 use acme_lib::persist::FilePersist;
 use acme_lib::{Directory, DirectoryUrl, Error};
+use actix_web::{App, HttpServer};
 
 use std::{
     fs::{self, File},
@@ -18,12 +18,17 @@ const CERTS_CREATED_AT: &str = "./.https/certs_created_at";
 pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
     log::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
     let http_endpoint = format!("{}:{}", config.ip, config.port);
+    let mut well_known_folder = config.static_path.clone();
+    well_known_folder.push("well-known");
+    fs::create_dir_all(&well_known_folder)?;
     let init_server = HttpServer::new(move || {
-        App::new()
-            .service(actix_files::Files::new("/.well-known", "static/well-known/").show_files_listing())
+        App::new().service(
+            actix_files::Files::new("/.well-known", well_known_folder.clone()).show_files_listing(),
+        )
     });
     let running_server = init_server
-        .bind(&http_endpoint).expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
+        .bind(&http_endpoint)
+        .expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
         .run();
     crate::https::request_cert(&config).expect("Certification init failed.");
     log::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
@@ -40,12 +45,10 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
         DirectoryUrl::LetsEncrypt
     };
 
-    let https_path = ".https";
-
-    fs::create_dir_all(PathBuf::from(&https_path))?;
+    fs::create_dir_all(PathBuf::from(&config.https_path))?;
 
     // Save/load keys and certificates to current dir.
-    let persist = FilePersist::new(https_path);
+    let persist = FilePersist::new(&config.https_path);
 
     // Create a directory entrypoint.
     let dir = Directory::from_url(persist, url)?;
@@ -90,21 +93,24 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
         // The token is the filename.
         let token = chall.http_token();
-        let path = format!("static/well-known/acme-challenge/{}", token);
+
+        let formatted_path = format!("well-known/acme-challenge/{}", token);
+        let mut challenge_path = config.static_path.clone();
+        challenge_path.push(formatted_path);
 
         // The proof is the contents of the file
         let proof = chall.http_proof();
 
-        log::info!("Writing ACME challange to {}", path);
+        log::info!("Writing ACME challange to {:?}", challenge_path);
 
         fs::create_dir_all(
-            PathBuf::from(&path)
+            PathBuf::from(&challenge_path)
                 .parent()
                 .expect("Could not find parent folder"),
         )
         .expect("Unable to create dirs");
 
-        fs::write(path, proof).expect("Unable to write file");
+        fs::write(challenge_path, proof).expect("Unable to write file");
 
         // Here you must do "something" to place
         // the file/contents in the correct place.
@@ -140,8 +146,8 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     log::info!("Downloading certificate...");
     let cert = ord_cert.download_and_save_cert()?;
 
-    fs::write(config.cert_path.clone(), cert.certificate()).expect("Unable to write file");
-    fs::write(config.key_path.clone(), cert.private_key()).expect("Unable to write file");
+    fs::write(&config.cert_path, cert.certificate()).expect("Unable to write file");
+    fs::write(&config.key_path, cert.private_key()).expect("Unable to write file");
     add_certs_created_at();
     log::info!("HTTPS init Success!");
     Ok(())
@@ -151,11 +157,9 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
     use rustls::internal::pemfile::{certs, pkcs8_private_keys};
     let mut https_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
-    let cert_file = &mut BufReader::new(
-        File::open(config.cert_path.clone())
-            .expect("No HTTPS TLS key found."),
-    );
-    let key_file = &mut BufReader::new(File::open(config.key_path.clone()).unwrap());
+    let cert_file =
+        &mut BufReader::new(File::open(config.cert_path.clone()).expect("No HTTPS TLS key found."));
+    let key_file = &mut BufReader::new(File::open(&config.key_path).unwrap());
     let cert_chain = certs(cert_file).unwrap();
     let mut keys = pkcs8_private_keys(key_file).unwrap();
     if keys.is_empty() {

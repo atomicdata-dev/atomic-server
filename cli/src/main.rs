@@ -42,7 +42,7 @@ impl Context<'_> {
 }
 
 fn set_agent_config() -> AtomicResult<Config> {
-    let agent_config_path = atomic_lib::config::default_path()?;
+    let agent_config_path = atomic_lib::config::default_config_file_path()?;
     match atomic_lib::config::read_config(&agent_config_path) {
         Ok(found) => Ok(found),
         Err(_e) => {

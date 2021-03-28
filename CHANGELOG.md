@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.23.1
+
+- Changed how config paths are calculated and shared.
+- Remove the need for having the `./static` folder #118 when running `atomic-server`, moved to config dir.
+
 ## v0.23.0
 
 - Added versioning #42

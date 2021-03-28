@@ -24,7 +24,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     let mapping = Mapping::init();
     let tera = Tera::new("templates/*.html")?;
     // Create a new agent if it does not yet exist.
-    match atomic_lib::config::read_config(&config.config_path) {
+    match atomic_lib::config::read_config(&config.config_file_path) {
         Ok(agent_config) => {
             match store.get_resource(&agent_config.agent) {
                 Ok(_) => {}
@@ -43,7 +43,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                     } else {
                         return Err(format!(
                             "An agent is present in {:?}, but this agent cannot be retrieved. Either make sure the agent is retrievable, or remove it from your config. {}",
-                            config.config_path, e,
+                            config.config_file_path, e,
                         ).into());
                     }
                 }
@@ -56,8 +56,8 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                 server: config.local_base_url.clone(),
                 private_key: agent.private_key,
             };
-            let config_string = atomic_lib::config::write_config(&config.config_path, cfg)?;
-            log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli) to log in with these credentials. \n{}", &config.config_path, config_string);
+            let config_string = atomic_lib::config::write_config(&config.config_file_path, cfg)?;
+            log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli) to log in with these credentials. \n{}", &config.config_file_path, config_string);
         }
     }
 
