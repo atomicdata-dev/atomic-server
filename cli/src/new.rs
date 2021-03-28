@@ -221,9 +221,8 @@ fn prompt_field(
                                 urls.push(url);
                             }
                             None => {
-                                println!("Define the Property named {}", item.bold().green(),);
-                                let class = &context.store.get_class(urls::PROPERTY)?.clone();
-                                // TODO: This currently creates Property instances, but this should depend on the class!
+                                let class = &context.store.get_class(&property.class_type.clone().expect("At this moment, this CLI only supports Properties that have a class-type."))?.clone();
+                                println!("Define the {} named {}", class.shortname, item.bold().green(),);
                                 let (resource, _shortname) = prompt_instance(
                                     context,
                                     class,

@@ -102,9 +102,8 @@ mod test {
     #[test]
     #[ignore]
     fn post_commit_basic() {
-
         // let store = Store::init().unwrap();
-        // TODO actually make this work
+        // // TODO actually make this work
         // let commit = crate::commit::CommitBuilder::new("subject".into())
         //     .sign(&agent)
         //     .unwrap();

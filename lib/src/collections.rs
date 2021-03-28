@@ -33,8 +33,6 @@ pub struct CollectionBuilder {
 
 impl CollectionBuilder {
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
-        // TODO: Should not persist, because now it is spammimg the store!
-        // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
         let mut resource = crate::Resource::new_instance(urls::COLLECTION, store)?;
         resource.set_subject(self.subject.clone());
         if let Some(prop) = &self.property {

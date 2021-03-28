@@ -23,6 +23,7 @@ pub struct Context<'a> {
 }
 
 impl Context<'_> {
+    /// Sets an agent
     pub fn get_write_context(&self) -> Config {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
             return write_ctx.clone();
@@ -32,9 +33,8 @@ impl Context<'_> {
         self.store.set_default_agent(Agent {
             subject: write_ctx.agent.clone(),
             private_key: write_ctx.private_key.clone(),
-            // TODO: use actual data
             created_at: atomic_lib::datetime_helpers::now(),
-            name: "Random name".into(),
+            name: format!("Temporary name for {}", write_ctx.agent),
             public_key: generate_public_key(&write_ctx.private_key).public,
         });
         write_ctx
@@ -327,52 +327,52 @@ fn validate(context: &mut Context) -> AtomicResult<()> {
 mod test {
     use assert_cmd::Command;
 
-    // #[test]
-    // fn get_fail() {
-    //     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd.args(&["get","random-non-existent-shortname"]).assert().failure();
-    // }
+    #[test]
+    fn get_fail() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","random-non-existent-shortname"]).assert().failure();
+    }
 
-    // #[test]
-    // fn get_shortname() {
-    //     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd.args(&["get","shortname"]).assert().success();
-    // }
+    #[test]
+    fn get_shortname() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","shortname"]).assert().success();
+    }
 
-    // #[test]
-    // fn get_url() {
-    //     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd.args(&["get","https://atomicdata.dev/collections/class"]).assert().success();
-    // }
+    #[test]
+    fn get_url() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections/class"]).assert().success();
+    }
 
-    // #[test]
-    // fn get_path() {
-    //     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd.args(&["get","https://atomicdata.dev/collections/class members"]).assert().success();
-    // }
+    #[test]
+    fn get_path() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections/class members"]).assert().success();
+    }
 
-    // #[test]
-    // fn get_path_array() {
-    //     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd.args(&["get","https://atomicdata.dev/collections/class is-a 0"]).assert().success();
-    // }
+    #[test]
+    fn get_path_array() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections/class is-a 0"]).assert().success();
+    }
 
-    // #[test]
-    // fn get_path_array_non_existent() {
-    //     let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd.args(&["get","https://atomicdata.dev/collections/class is-a 1"]).assert().failure();
-    // }
+    #[test]
+    fn get_path_array_non_existent() {
+        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd.args(&["get","https://atomicdata.dev/collections/class is-a 1"]).assert().failure();
+    }
 
-    // #[ignore]
-    // #[test]
-    // fn set_and_get() {
-    //     use std::time::SystemTime;
-    //     let value: String = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string();
-    //     let mut cmd_set = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     cmd_set.args(&["set","https://atomicdata.dev/test",atomic_lib::urls::SHORTNAME,&value]).assert().success();
+    #[ignore]
+    #[test]
+    fn set_and_get() {
+        use std::time::SystemTime;
+        let value: String = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string();
+        let mut cmd_set = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        cmd_set.args(&["set","https://atomicdata.dev/test",atomic_lib::urls::SHORTNAME,&value]).assert().success();
 
-    //     let mut cmd_get = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-    //     let result = cmd_get.args(&["get","https://atomicdata.dev/test shortname"]).assert().success().to_string();
-    //     assert!(result.contains(&value));
-    // }
+        let mut cmd_get = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let result = cmd_get.args(&["get","https://atomicdata.dev/test shortname"]).assert().success().to_string();
+        assert!(result.contains(&value));
+    }
 }

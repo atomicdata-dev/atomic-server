@@ -98,6 +98,7 @@ impl Resource {
 
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
+    /// Does not save the resource to the store.
     pub fn new_instance(class_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
         let class=  store.get_class(class_url)?;
