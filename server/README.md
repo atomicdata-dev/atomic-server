@@ -25,21 +25,21 @@ Powered by Rust, atomic-lib, actix-web, Sled and [more](Cargo.toml).
 - You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
 - You like living on the edge (this application is not production ready)
 
-## Getting started
+## Installation & getting started
+
+You can run `atomic-server` in four ways:
+
+- Install using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html): `cargo install atomic-server`
+- Using docker
+- From a published [binary](https://github.com/joepio/atomic/releases)
+- From source
 
 ### Run using docker
 
 The `dockerfile` is located in the project root, above this `server` folder.
 
 - Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
-- Take note of the Agent Subject and Private key, you should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
-
-### Running from cargo
-
-Make sure you have [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
-
-`cargo install atomic-server`.
 
 ### Install from source
 
@@ -56,35 +56,12 @@ cargo run --features desktop
 # Visit http://localhost
 ```
 
-## Usage
+## Initial setup and configuration
 
-Check out [./example_requests.http](/example_requests.http) for various HTTP requests to the server.
-
-### Set up on own domain
-
-If you want to run Atomic Server on your own VPS + domain, make sure to correctly set the `.env`.
-See `default.env` for a template and explanation of variables.
-
-### Use `atomic-cli` as client
-
-`atomic-cli` is a useful terminal tool for interacting with `atomic-server`.
-It makes it easy to query and edit Atomic Data from the command line.
-[Check it out](https://github.com/joepio/atomic/tree/master/cli).
-
-### Get individual resources
-
-You can fetch individual items by sending a GET request to their URL.
-
-```sh
-# Fetch as JSON-AD (de facto standard for Atomic Data)
-curl -i -H "Accept: application/ad-json" https://atomicdata.dev/properties/shortname
-# Fetch as JSON-LD
-curl -i -H "Accept: application/ld+json" https://atomicdata.dev/properties/shortname
-# Fetch as JSON
-curl -i -H "Accept: application/json" https://atomicdata.dev/properties/shortname
-# Fetch as Turtle / N3
-curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
-```
+- The binary loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
+- If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` (see HTTPS setup below)
+- After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
+- A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
 
 ### HTTPS Setup
 
@@ -96,14 +73,46 @@ Open `.env` and set:
 ```env
 ATOMIC_EMAIL=youremail@example.com
 ATOMIC_DOMAIN=example.com
+ATOMIC_HTTPS=true
 ```
 
-Run the server `cargo run`.
+Run the server: `cargo run`.
 Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's Encrypt will send an HTTP request to this server's `/.well-known` directory to check the keys.
 It will now initialize the certificate.
 Read the logs, watch for errors.
 
 HTTPS certificates are automatically renewed when the server is restarted, and the certs are 4 weeks or older.
+
+## Usage
+
+There are three ways to interact with this server:
+
+- **GUI**: Use the `atomic-data-browser` JS frontend by visiting `localhost`.
+- **API**: Check out [./example_requests.http](/example_requests.http) for various HTTP requests to the server. Also, [read the docs](https://docs.atomicdata.dev/)!
+- **CLI**: The `atomic-cli` terminal app
+
+### Use `atomic-cli` as client
+
+`atomic-cli` is a useful terminal tool for interacting with `atomic-server`.
+It makes it easy to query and edit Atomic Data from the command line.
+[Check it out](https://github.com/joepio/atomic/tree/master/cli).
+
+### API
+
+You can fetch individual items by sending a GET request to their URL.
+
+```sh
+# Fetch as JSON-AD (de facto standard for Atomic Data)
+curl -i -H "Accept: application/ad+json" https://atomicdata.dev/properties/shortname
+# Fetch as JSON-LD
+curl -i -H "Accept: application/ld+json" https://atomicdata.dev/properties/shortname
+# Fetch as JSON
+curl -i -H "Accept: application/json" https://atomicdata.dev/properties/shortname
+# Fetch as Turtle / N3
+curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
+```
+
+Check out [./example_requests.http](/example_requests.http) for more things that you can do.
 
 ## Testing
 
