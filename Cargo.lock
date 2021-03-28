@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.23.1"
+version = "0.23.2"
 dependencies = [
  "acme-lib",
  "actix-cors",
