@@ -11,19 +11,14 @@ pub fn tray_icon_process(config: crate::config::Config) {
           Ok(item) => item,
           Err(_e) => return,
       };
-      let _ = tray.add_menu_item("Open in browser", move || {
-          if webbrowser::open(&server_url.clone()).is_ok() {
-              log::info!("Opening browser url...")
-          } else {
-              log::info!("Opening browser url failed.")
-          }
+      let _ = tray.add_menu_item("Open", move || {
+        open::that(&server_url);
+      });
+      let _ = tray.add_menu_item("Config folder", move || {
+        open::that(&config.config_dir);
       });
       let _ = tray.add_menu_item("About", move || {
-          if webbrowser::open("https://github.com/joepio/atomic").is_ok() {
-              log::info!("Opening about url...")
-          } else {
-              log::info!("Opening about url failed.")
-          }
+        open::that("https://github.com/joepio/atomic");
       });
       let inner = tray.inner_mut();
       inner.add_quit_item("Quit");
