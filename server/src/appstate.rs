@@ -1,15 +1,12 @@
 //! App state, which is accessible from handlers
 use crate::{config::Config, errors::BetterResult};
 use atomic_lib::{agents::Agent, mapping::Mapping, Storelike};
-use tera::Tera;
 
 /// Context for the server (not an individual request)
 #[derive(Clone)]
 pub struct AppState {
     /// Contains all the data
     pub store: atomic_lib::Db,
-    /// For rendering templates
-    pub tera: Tera,
     /// For bookmarks (map URLs to Shortnames)
     pub mapping: Mapping,
     /// App Configuration
@@ -22,7 +19,6 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     store.populate()?;
     let mapping = Mapping::init();
-    let tera = Tera::new("templates/*.html")?;
     // Create a new agent if it does not yet exist.
     match atomic_lib::config::read_config(&config.config_file_path) {
         Ok(agent_config) => {
@@ -65,6 +61,5 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         store,
         config,
         mapping,
-        tera,
     })
 }

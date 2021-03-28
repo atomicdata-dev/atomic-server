@@ -1,11 +1,9 @@
-use crate::render::atom::RenderAtom;
 use crate::{appstate::AppState, content_types::get_accept};
 use crate::{content_types::ContentType, errors::BetterResult, helpers::empty_to_nothing};
-use actix_web::{http, web, HttpResponse};
+use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
 use serde::Deserialize;
 use std::sync::Mutex;
-use tera::Context as TeraCtx;
 
 #[derive(Deserialize, Debug)]
 pub struct TPFQuery {
@@ -33,27 +31,11 @@ pub async fn tpf(
         .tpf(subject.as_deref(), property.as_deref(), value.as_deref(), true)?;
     log::info!("{:?}", query);
     match content_type {
-        ContentType::JSON | ContentType::JSONLD | ContentType::JSONAD => {
+        ContentType::JSON | ContentType::HTML | ContentType::JSONLD | ContentType::JSONAD => {
             builder.header("Content-Type", content_type.to_mime());
             // TODO
             log::error!("Not implemented");
             Ok(builder.body("Not implemented"))
-        }
-        ContentType::HTML => {
-            let mut renderedatoms: Vec<RenderAtom> = Vec::new();
-
-            for atom in atoms {
-                renderedatoms.push(RenderAtom::from_atom(atom, store)?);
-            }
-
-            builder.set(http::header::ContentType::html());
-            let mut tera_context = TeraCtx::new();
-            tera_context.insert("atoms", &renderedatoms);
-            tera_context.insert("subject", &subject);
-            tera_context.insert("property", &property);
-            tera_context.insert("value", &value);
-            let body = context.tera.render("tpf.html", &tera_context)?;
-            Ok(builder.body(body))
         }
         ContentType::AD3 => {
             builder.header("Content-Type", content_type.to_mime());

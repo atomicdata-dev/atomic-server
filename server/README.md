@@ -35,9 +35,13 @@ The `dockerfile` is located in the project root, above this `server` folder.
 - Take note of the Agent Subject and Private key, you should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
 
-### Install from source
+### Running from cargo
 
-Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
+Make sure you have [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+
+`cargo install atomic-server`.
+
+### Install from source
 
 ```sh
 # Clone this repoo
@@ -51,13 +55,6 @@ cargo run
 cargo run --features desktop
 # Visit http://localhost
 ```
-
-### Running from cargo
-
-You can also install with `cargo install atomic-server`, but this binary will also require:
-
-- the `/templates` directory
-- the `/static` directory
 
 ## Usage
 
