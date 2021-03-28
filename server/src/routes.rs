@@ -23,10 +23,6 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
                 .service(web::resource("").route(web::post().to(handlers::commit::post_commit))),
         )
         .service(
-            web::scope("/validate")
-                .service(web::resource("").route(web::get().to(handlers::validate::validate))),
-        )
-        .service(
             web::scope("/{path:[^{}]+}")
                 .service(web::resource("").route(web::get().to(handlers::resource::get_resource))),
         );

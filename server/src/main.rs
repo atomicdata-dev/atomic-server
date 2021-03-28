@@ -9,11 +9,9 @@ mod handlers;
 mod helpers;
 mod https;
 mod jsonerrors;
-mod render;
 mod routes;
 #[cfg(feature = "desktop")]
 mod tray_icon;
-mod views;
 
 #[actix_rt::main]
 async fn main() -> io::Result<()> {

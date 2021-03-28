@@ -85,15 +85,6 @@ impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
     }
 }
 
-impl From<tera::Error> for AppError {
-    fn from(error: tera::Error) -> Self {
-        AppError {
-          message: error.to_string(),
-          error_type: AppErrorType::OtherError,
-        }
-    }
-}
-
 impl<T> From<std::sync::PoisonError<T>> for AppError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         AppError {
