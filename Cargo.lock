@@ -446,6 +446,7 @@ dependencies = [
  "env_logger 0.8.2",
  "futures",
  "log",
+ "open",
  "promptly",
  "regex",
  "rustls 0.18.1",
@@ -455,7 +456,6 @@ dependencies = [
  "tray-item",
  "use",
  "uuid",
- "webbrowser",
 ]
 
 [[package]]
@@ -585,7 +585,7 @@ dependencies = [
  "regex",
  "rustc-hash",
  "shlex",
- "which",
+ "which 3.1.1",
 ]
 
 [[package]]
@@ -1059,7 +1059,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "323032447eba6f5aca88b46d6e7815151c16c53e4128569420c09d7840db3bfc"
 dependencies = [
  "tempfile",
- "which",
+ "which 3.1.1",
 ]
 
 [[package]]
@@ -2060,6 +2060,16 @@ name = "opaque-debug"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "624a8340c38c1b80fd549087862da4ba43e08858af025b236e509b6649fc13d5"
+
+[[package]]
+name = "open"
+version = "1.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7e9f1bdf15cd1f5a00cc9002a733a6ee6d0ff562491852d59652471c4a389f7"
+dependencies = [
+ "which 4.1.0",
+ "winapi 0.3.9",
+]
 
 [[package]]
 name = "openssl"
@@ -3451,17 +3461,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "webbrowser"
-version = "0.5.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecad156490d6b620308ed411cfee90d280b3cbd13e189ea0d3fada8acc89158a"
-dependencies = [
- "web-sys",
- "widestring",
- "winapi 0.3.9",
-]
-
-[[package]]
 name = "webpki"
 version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3495,6 +3494,16 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d011071ae14a2f6671d0b74080ae0cd8ebf3a6f8c9589a2cd45f23126fe29724"
 dependencies = [
+ "libc",
+]
+
+[[package]]
+name = "which"
+version = "4.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b55551e42cbdf2ce2bedd2203d0cc08dba002c27510f86dab6d0ce304cba3dfe"
+dependencies = [
+ "either",
  "libc",
 ]
 
