@@ -7,8 +7,8 @@
 
 _Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
-The easiest way to share Atomic Data on the web.
-It's a database and a server for storing and sharing typed linked data.
+The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
+`atomic-server` is a web-first database for storing and sharing typed linked data.
 Demo on [atomicdata.dev](https://atomicdata.dev)
 
 - No runtime dependencies, fast, runs on all platforms
@@ -58,7 +58,7 @@ cargo run --features desktop
 
 ## Initial setup and configuration
 
-- The binary loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
+- The server loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
 - If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` (see HTTPS setup below)
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.

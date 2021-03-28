@@ -112,7 +112,7 @@ pub fn init() -> BetterResult<Config> {
     }
 
     if https & email.is_none() {
-        email = Some(promptly::prompt("What is your e-mail?").unwrap());
+        email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
     }
 
     let schema = if https { "https" } else { "http" };

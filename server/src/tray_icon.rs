@@ -12,13 +12,28 @@ pub fn tray_icon_process(config: crate::config::Config) {
           Err(_e) => return,
       };
       let _ = tray.add_menu_item("Open", move || {
-        open::that(&server_url);
+        match open::that(&server_url) {
+          Ok(_) => (),
+          Err(err) => (
+            log::error!("Can't open app. {}", err)
+          ),
+        }
       });
       let _ = tray.add_menu_item("Config folder", move || {
-        open::that(&config.config_dir);
+        match open::that(&config.config_dir) {
+          Ok(_) => (),
+          Err(err) => (
+            log::error!("Can't open config folder. {}", err)
+          ),
+        }
       });
       let _ = tray.add_menu_item("About", move || {
-        open::that("https://github.com/joepio/atomic");
+        match open::that("https://github.com/joepio/atomic") {
+          Ok(_) => (),
+          Err(err) => (
+            log::error!("Can't open about page. {}", err)
+          ),
+        }
       });
       let inner = tray.inner_mut();
       inner.add_quit_item("Quit");
