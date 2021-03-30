@@ -116,7 +116,7 @@
 ["https://atomicdata.dev/classes/Class","https://atomicdata.dev/properties/description","A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data and explains what the thing represents. It is convention to use Uppercase in its URL. Note that in Atomic Data, a Resource can have several Classes - not just a single one."]
 ["https://atomicdata.dev/classes/Class","https://atomicdata.dev/properties/shortname","class"]
 ["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/isA","[\"https://atomicdata.dev/classes/Class\"]"]
-["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/recommends",\"https://atomicdata.dev/properties/classtype\"]"]
+["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/recommends","[\"https://atomicdata.dev/properties/classtype\"]"]
 ["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/requires","[\"https://atomicdata.dev/properties/shortname\",\"https://atomicdata.dev/properties/description\",\"https://atomicdata.dev/properties/datatype\"]"]
 ["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/description","A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`."]
 ["https://atomicdata.dev/classes/Property","https://atomicdata.dev/properties/shortname","property"]
