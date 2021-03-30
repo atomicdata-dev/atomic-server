@@ -1,7 +1,6 @@
 //! Creating a new resource. Provides prompting logic
 use crate::Context;
 use atomic_lib::mapping;
-use atomic_lib::urls;
 use atomic_lib::{
     datatype::DataType,
     errors::AtomicResult,

@@ -8,9 +8,11 @@ pub const SERIALIZE_OPTIONS: [&str; 8] = ["pretty", "json", "jsonld", "jsonad", 
 /// Resolves an Atomic Path query
 pub fn get_path(context: &mut Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
-    let path_string = subcommand_matches
-        .value_of("path")
-        .expect("Add a URL, shortname or path");
+    let path_vec: Vec<&str> = subcommand_matches
+        .values_of("path")
+        .expect("Add a URL, shortname or path")
+        .collect();
+    let path_string: String = path_vec.join(" ");
     let serialization: Format = match subcommand_matches.value_of("as").unwrap() {
         "pretty" => (Format::PRETTY),
         "json" => (Format::JSON),
@@ -28,7 +30,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
     // Returns a URL or Value
     let store = &mut context.store;
     let path = store
-        .get_path(path_string, Some(&context.mapping.lock().unwrap()))?;
+        .get_path(&path_string, Some(&context.mapping.lock().unwrap()))?;
     let out = match path {
         storelike::PathReturn::Subject(subject) => match serialization {
             Format::JSON => store

@@ -1,4 +1,4 @@
-# `atomic` (CLI)
+# `atomic-cli` (CLI)
 
 [![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
 [![Discord chat][discord-badge]][discord-url]
@@ -10,9 +10,9 @@ _Status: Alpha. Probe to breaking changes. [Changelog](https://github.com/joepio
 A command-line application to create, read and interact with Atomic Data.
 
 ```
-atomic 0.20.0
+atomic-cli 0.23.2
 Joep Meindertsma <joep@ontola.io>
-Create, share, fetch and model linked atomic data!
+Create, share, fetch and model Atomic Data!
 
 USAGE:
     atomic-cli [SUBCOMMAND]
@@ -22,17 +22,17 @@ FLAGS:
     -V, --version    Prints version information
 
 SUBCOMMANDS:
-    destroy    Permanently removes a Resource. Uses Commits.
-    edit       Edit a single Atom from a Resource using your text editor. Uses Commits.
-    get        Traverses a Path and prints the resulting Resource or Value.
+    destroy    Permanently removes a Resource.
+    edit       Edit a single Atom from a Resource using your text editor.
+    get        Get a Resource or Value by using Atomic Paths.
     help       Prints this message or the help of the given subcommand(s)
     list       List all bookmarks
     new        Create a Resource
-    remove     Remove a single Atom from a Resource. Uses Commits.
-    set        Update an Atom's value. Uses Commits.
+    remove     Remove a single Atom from a Resource.
+    set        Update a single Atom. Creates both the Resource if they don't exist. Overwrites existing.
     tpf        Finds Atoms using Triple Pattern Fragments.
 
-Visit https://github.com/joepio/atomic for more info
+Visit https://atomicdata.dev for more info
 ```
 
 ## Installation

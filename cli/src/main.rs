@@ -66,11 +66,11 @@ fn set_agent_config() -> AtomicResult<Config> {
 }
 
 fn main() -> AtomicResult<()> {
-    let matches = App::new("atomic")
+    let matches = App::new("atomic-cli")
         .version(crate_version!())
         .author("Joep Meindertsma <joep@ontola.io>")
-        .about("Create, share, fetch and model linked atomic data!")
-        .after_help("Visit https://github.com/joepio/atomic for more info")
+        .about("Create, share, fetch and model Atomic Data!")
+        .after_help("Visit https://atomicdata.dev for more info")
         .setting(AppSettings::ArgRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("new").about("Create a Resource")
@@ -82,11 +82,14 @@ fn main() -> AtomicResult<()> {
         )
         .subcommand(
             SubCommand::with_name("get")
-                    .about("Traverses a Path and prints the resulting Resource or Value.",
+                    .about("Get a Resource or Value by using Atomic Paths.",
                     )
                     .after_help("\
-                    Traverses a Path and prints the resulting Resource or Value. \
-                    Examples: \natomic get \"class description\"\natomic get \"https://example.com\"\n\
+                    Traverses a Path and prints the resulting Resource or Value. \n\n\
+                    Examples: \n\n\
+                    $ atomic get class https://atomicdata.dev/properties/description\n\
+                    $ atomic get class description\n\
+                    $ atomic get https://example.com \n\n\
                     Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
                     ")
                 .arg(Arg::with_name("path")
@@ -97,12 +100,13 @@ fn main() -> AtomicResult<()> {
                     ",
                     )
                     .required(true)
+                    .min_values(1)
                 )
                 .arg(Arg::with_name("as")
                     .long("as")
                     .possible_values(&SERIALIZE_OPTIONS)
                     .default_value("pretty")
-                    .help(&*format!("Serialization option ({:#?})", SERIALIZE_OPTIONS))
+                    .help(&"Serialization format")
                     .takes_value(true)
                 )
         )
