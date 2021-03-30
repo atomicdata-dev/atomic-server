@@ -194,7 +194,7 @@ impl Resource {
         let should_post = store.get_self_url().is_none();
         if should_post {
             // First, post it to the store where the data must reside
-            crate::client::post_commit(&commit)?;
+            crate::client::post_commit(&commit, store)?;
         }
         // If that succeeds, save it locally;
         commit.apply(store)?;

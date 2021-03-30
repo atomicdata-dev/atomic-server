@@ -29,7 +29,7 @@ pub fn edit(context: &Context) -> AtomicResult<()> {
     // If the prop is not found, create it
     let current_val = match resource.get_shortname(&prop, &context.store) {
         Ok(val) => val.to_string(),
-        Err(_) => "".to_string()
+        Err(_) => "".to_string(),
     };
     let edited = edit::edit(current_val)?;
     // Remove newline - or else I can's save shortnames or numbers using vim;
@@ -66,7 +66,7 @@ fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) ->
         .get_default_agent()
         .expect("No default agent set");
     let commit = commit_builder.sign(&agent, &context.store)?;
-    atomic_lib::client::post_commit(&commit)?;
+    atomic_lib::client::post_commit(&commit, &context.store)?;
     Ok(())
 }
 

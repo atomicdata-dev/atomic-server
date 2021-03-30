@@ -245,7 +245,8 @@ impl Commit {
             store,
             &JsonType::JSONAD,
         )?;
-        serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into())
+        let string = serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into());
+        string
     }
 }
 

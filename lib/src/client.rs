@@ -1,11 +1,11 @@
 //! Functions for interacting with an Atomic Server
 use url::Url;
 
-use crate::{Resource, Storelike, errors::AtomicResult, parse::parse_ad3};
+use crate::{errors::AtomicResult, parse::parse_ad3, Resource, Storelike};
 
 fn fetch_basic(url: &str) -> AtomicResult<Vec<crate::Atom>> {
     if !url.starts_with("http") {
-        return Err(format!("Could not fetch url '{}', must start with http.", url).into())
+        return Err(format!("Could not fetch url '{}', must start with http.", url).into());
     }
     let resp = ureq::get(&url)
         .set("Accept", crate::parse::AD3_MIME)
@@ -56,17 +56,21 @@ pub fn fetch_tpf(
 }
 
 /// Posts a Commit to the endpoint of the Subject from the Commit
-pub fn post_commit(commit: &crate::Commit) -> AtomicResult<()> {
+pub fn post_commit(commit: &crate::Commit, store: &impl Storelike) -> AtomicResult<()> {
     let base_url = crate::url_helpers::base_url(commit.get_subject())?;
     // Default Commit endpoint is `https://example.com/commit`
     let endpoint = format!("{}commit", base_url);
-    post_commit_custom_endpoint(&endpoint, commit)
+    post_commit_custom_endpoint(&endpoint, commit, store)
 }
 
 /// Posts a Commit to an endpoint
 /// Default commit endpoint is `https://example.com/commit`
-pub fn post_commit_custom_endpoint(endpoint: &str, commit: &crate::Commit) -> AtomicResult<()> {
-    let json = serde_json::to_string(commit)?;
+pub fn post_commit_custom_endpoint(
+    endpoint: &str,
+    commit: &crate::Commit,
+    store: &impl Storelike,
+) -> AtomicResult<()> {
+    let json = commit.clone().into_resource(store)?.to_json_ad(store)?;
 
     let resp = ureq::post(&endpoint)
         .set("Content-Type", "application/json")
