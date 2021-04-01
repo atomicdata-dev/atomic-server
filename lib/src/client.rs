@@ -70,7 +70,7 @@ pub fn post_commit_custom_endpoint(
     commit: &crate::Commit,
     store: &impl Storelike,
 ) -> AtomicResult<()> {
-    let json = commit.clone().into_resource(store)?.to_json_ad(store)?;
+    let json = commit.clone().into_resource(store)?.to_json_ad()?;
 
     let resp = ureq::post(&endpoint)
         .set("Content-Type", "application/json")

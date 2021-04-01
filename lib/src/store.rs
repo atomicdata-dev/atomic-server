@@ -219,7 +219,7 @@ mod test {
         let store = init_store();
         let subject = urls::CLASS;
         let resource = store.get_resource(subject).unwrap();
-        resource.to_json_ad(&store).unwrap();
+        resource.to_json_ad().unwrap();
     }
 
     #[test]

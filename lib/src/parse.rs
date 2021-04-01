@@ -165,7 +165,7 @@ mod test {
             "https://atomicdata.dev/properties/shortname": "agent"
           }"#;
         let resource = parse_json_ad_resource(json_input, &store).unwrap();
-        let json_output = resource.to_json_ad(&store).unwrap();
+        let json_output = resource.to_json_ad().unwrap();
         let in_value: serde_json::Value = serde_json::from_str(json_input).unwrap();
         let out_value: serde_json::Value = serde_json::from_str(&json_output).unwrap();
         assert_eq!(in_value, out_value);

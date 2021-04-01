@@ -50,11 +50,11 @@ pub async fn get_resource(
             Ok(builder.body(body))
         }
         ContentType::JSONAD => {
-            let body = resource.to_json_ad(store)?;
+            let body = resource.to_json_ad()?;
             Ok(builder.body(body))
         }
         ContentType::HTML => {
-            let body = resource.to_json_ad(store)?;
+            let body = resource.to_json_ad()?;
             Ok(builder.body(body))
         }
         ContentType::AD3 => {

@@ -1,12 +1,12 @@
 //! A resource is a set of Atoms that share a URL
 
-use crate::{serialize::JsonType, values::Value};
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     mapping::is_url,
     schema::{Class, Property},
     Atom, Storelike,
 };
+use crate::{serialize::JsonType, values::Value};
 use std::collections::HashMap;
 
 /// A Resource is a set of Atoms that shares a single Subject.
@@ -30,8 +30,12 @@ impl Resource {
         let classvec = self.get_classes(store)?;
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
-                self.get(&required_prop)
-                    .map_err(|e| format!("Property {} missing in class {}. {} ", &required_prop, class.subject, e))?;
+                self.get(&required_prop).map_err(|e| {
+                    format!(
+                        "Property {} missing in class {}. {} ",
+                        &required_prop, class.subject, e
+                    )
+                })?;
             }
         }
         Ok(())
@@ -101,7 +105,7 @@ impl Resource {
     /// Does not save the resource to the store.
     pub fn new_instance(class_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
-        let class=  store.get_class(class_url)?;
+        let class = store.get_class(class_url)?;
         use rand::Rng;
         let random_string: String = rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
@@ -132,7 +136,11 @@ impl Resource {
 
     /// Remove a propval from a resource by property URL or shortname.
     /// Returns error if propval does not exist in this resource or its class.
-    pub fn remove_propval_shortname(&mut self, property_shortname: &str, store: &impl Storelike) -> AtomicResult<()> {
+    pub fn remove_propval_shortname(
+        &mut self,
+        property_shortname: &str,
+        store: &impl Storelike,
+    ) -> AtomicResult<()> {
         let property_url = self.resolve_shortname_to_property(property_shortname, store)?;
         self.remove_propval(&property_url.subject);
         Ok(())
@@ -149,7 +157,7 @@ impl Resource {
     ) -> AtomicResult<Property> {
         // If it's a URL, were done quickly!
         if is_url(shortname) {
-            return store.get_property(shortname)
+            return store.get_property(shortname);
         }
         // First, iterate over all existing properties, see if any of these work.
         for (url, _val) in self.propvals.iter() {
@@ -220,9 +228,20 @@ impl Resource {
     /// Insert a Property/Value combination.
     /// Overwrites existing Property/Value.
     /// Validates the datatype.
-    pub fn set_propval_string(&mut self, property_url: String, value: &str, store: &impl Storelike) -> AtomicResult<()> {
-        let fullprop = store.get_property(&property_url)
-            .map_err(|e| format!("Failed setting propval for '{}' because property '{}' could not be found. {}", self.get_subject(), property_url, e))?;
+    pub fn set_propval_string(
+        &mut self,
+        property_url: String,
+        value: &str,
+        store: &impl Storelike,
+    ) -> AtomicResult<()> {
+        let fullprop = store.get_property(&property_url).map_err(|e| {
+            format!(
+                "Failed setting propval for '{}' because property '{}' could not be found. {}",
+                self.get_subject(),
+                property_url,
+                e
+            )
+        })?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.set_propval_unsafe(property_url, val)?;
         Ok(())
@@ -231,7 +250,12 @@ impl Resource {
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
     /// Adds it to the commit builder.
-    pub fn set_propval(&mut self, property: String, value: Value, store: &impl Storelike) -> AtomicResult<()> {
+    pub fn set_propval(
+        &mut self,
+        property: String,
+        value: Value,
+        store: &impl Storelike,
+    ) -> AtomicResult<()> {
         let required_datatype = store.get_property(&property)?.data_type;
         if required_datatype == value.datatype() {
             self.set_propval_unsafe(property, value)
@@ -259,7 +283,12 @@ impl Resource {
     /// Sets a property / value combination.
     /// Property can be a shortname (e.g. 'description' instead of the full URL).
     /// Returns error if propval does not exist in this resource or its class.
-    pub fn set_propval_shortname(&mut self, property: &str, value: &str, store: &impl Storelike) -> AtomicResult<()> {
+    pub fn set_propval_shortname(
+        &mut self,
+        property: &str,
+        value: &str,
+        store: &impl Storelike,
+    ) -> AtomicResult<()> {
         let fullprop = self.resolve_shortname_to_property(property, store)?;
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.set_propval_unsafe(fullprop.subject, fullval)?;
@@ -279,7 +308,8 @@ impl Resource {
         let resource = self.get_propvals();
 
         for (property, value) in resource {
-            let mut ad3_atom = serde_json::to_string(&vec![self.get_subject(), &property, &value.to_string()])?;
+            let mut ad3_atom =
+                serde_json::to_string(&vec![self.get_subject(), &property, &value.to_string()])?;
             ad3_atom.push('\n');
             string.push_str(&*ad3_atom);
         }
@@ -287,34 +317,32 @@ impl Resource {
     }
 
     /// Converts Resource to JSON-AD string.
-    pub fn to_json_ad(&self, store: &impl Storelike) -> AtomicResult<String> {
+    pub fn to_json_ad(&self) -> AtomicResult<String> {
         let obj = crate::serialize::propvals_to_json_map(
             self.get_propvals(),
             Some(self.get_subject().clone()),
-            store,
-            &JsonType::JSONAD
         )?;
         serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON-AD".into())
     }
 
     /// Converts Resource to plain JSON string.
     pub fn to_json(&self, store: &impl Storelike) -> AtomicResult<String> {
-        let obj = crate::serialize::propvals_to_json_map(
+        let obj = crate::serialize::propvals_to_json_ld(
             self.get_propvals(),
             Some(self.get_subject().clone()),
             store,
-            &JsonType::JSON
+            false,
         )?;
         serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON".into())
     }
 
     /// Converts Resource to JSON-LD string, with @context object and RDF compatibility.
     pub fn to_json_ld(&self, store: &impl Storelike) -> AtomicResult<String> {
-        let obj = crate::serialize::propvals_to_json_map(
+        let obj = crate::serialize::propvals_to_json_ld(
             self.get_propvals(),
             Some(self.get_subject().clone()),
             store,
-            &JsonType::JSONLD
+            true,
         )?;
         serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON-LD".into())
     }
@@ -323,7 +351,11 @@ impl Resource {
     pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
         let mut atoms: Vec<Atom> = Vec::new();
         for (property, value) in self.propvals.iter() {
-            let atom = Atom::new(self.subject.to_string(), property.clone(), value.to_string());
+            let atom = Atom::new(
+                self.subject.to_string(),
+                property.clone(),
+                value.to_string(),
+            );
             atoms.push(atom);
         }
         Ok(atoms)
@@ -351,11 +383,23 @@ mod test {
     fn get_and_set_resource_props() {
         let store = init_store();
         let mut resource = store.get_resource(urls::CLASS).unwrap();
-        assert!(resource.get_shortname("shortname", &store).unwrap().to_string() == "class");
+        assert!(
+            resource
+                .get_shortname("shortname", &store)
+                .unwrap()
+                .to_string()
+                == "class"
+        );
         resource
             .set_propval_shortname("shortname", "something-valid", &store)
             .unwrap();
-        assert!(resource.get_shortname("shortname", &store).unwrap().to_string() == "something-valid");
+        assert!(
+            resource
+                .get_shortname("shortname", &store)
+                .unwrap()
+                .to_string()
+                == "something-valid"
+        );
         resource
             .set_propval_shortname("shortname", "should not contain spaces", &store)
             .unwrap_err();
@@ -372,7 +416,7 @@ mod test {
         new_resource
             .set_propval_shortname("description", "Should succeed!", &store)
             .unwrap();
-        new_resource.check_required_props(&store).unwrap ();
+        new_resource.check_required_props(&store).unwrap();
     }
 
     #[test]
@@ -382,7 +426,13 @@ mod test {
         new_resource
             .set_propval_shortname("shortname", "person", &store)
             .unwrap();
-        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "person");
+        assert!(
+            new_resource
+                .get_shortname("shortname", &store)
+                .unwrap()
+                .to_string()
+                == "person"
+        );
         new_resource
             .set_propval_shortname("shortname", "human", &store)
             .unwrap();
@@ -390,7 +440,13 @@ mod test {
             .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
         new_resource.save_locally(&store).unwrap();
-        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
+        assert!(
+            new_resource
+                .get_shortname("shortname", &store)
+                .unwrap()
+                .to_string()
+                == "human"
+        );
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
             resource_from_store
@@ -424,16 +480,32 @@ mod test {
         new_resource
             .set_propval_shortname("shortname", "person", &store)
             .unwrap();
-        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "person");
+        assert!(
+            new_resource
+                .get_shortname("shortname", &store)
+                .unwrap()
+                .to_string()
+                == "person"
+        );
         new_resource
             .set_propval_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
             .set_propval_shortname("description", "A real human being", &store)
             .unwrap();
-        let commit = new_resource.get_commit_builder().clone().sign(&agent, &store).unwrap();
+        let commit = new_resource
+            .get_commit_builder()
+            .clone()
+            .sign(&agent, &store)
+            .unwrap();
         commit.apply(&store).unwrap();
-        assert!(new_resource.get_shortname("shortname", &store).unwrap().to_string() == "human");
+        assert!(
+            new_resource
+                .get_shortname("shortname", &store)
+                .unwrap()
+                .to_string()
+                == "human"
+        );
         let resource_from_store = store.get_resource(new_resource.get_subject()).unwrap();
         assert!(
             resource_from_store
@@ -479,14 +551,18 @@ mod test {
         let property: String = urls::DESCRIPTION.into();
         let value = Value::Markdown("joe".into());
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
-        new_resource.set_propval(property.clone(), value.clone(), &store).unwrap();
+        new_resource
+            .set_propval(property.clone(), value.clone(), &store)
+            .unwrap();
         // Should fail, because a propval is missing
         assert!(new_resource.save_locally(&store).is_err());
-        new_resource.set_propval(urls::SHORTNAME.into(), Value::Slug("joe".into()), &store).unwrap();
+        new_resource
+            .set_propval(urls::SHORTNAME.into(), Value::Slug("joe".into()), &store)
+            .unwrap();
         let subject = new_resource.get_subject().clone();
         println!("subject new {}", new_resource.get_subject());
         new_resource.save_locally(&store).unwrap();
-        let found_resource  = store.get_resource(&subject).unwrap();
+        let found_resource = store.get_resource(&subject).unwrap();
         println!("subject found {}", found_resource.get_subject());
         println!("subject all {:?}", found_resource.get_propvals());
 

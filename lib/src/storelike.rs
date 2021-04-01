@@ -64,6 +64,11 @@ pub trait Storelike: Sized {
         Ok(agent)
     }
 
+    /// Exports the store to a big JSON-AD file
+    fn export(&self) -> AtomicResult<String> {
+        crate::serialize::resources_to_json_ad(self.all_resources(true))
+    }
+
     /// Fetches a resource, makes sure its subject matches.
     /// Save to the store.
     fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {

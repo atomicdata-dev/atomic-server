@@ -41,7 +41,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
                 .to_json_ld(store)?,
             Format::JSONAD => store
                 .get_resource_extended(&subject)?
-                .to_json_ad(store)?,
+                .to_json_ad()?,
             Format::AD3 => store.get_resource_extended(&subject)?.to_ad3()?,
             Format::NT => {
                 let resource = store.get_resource_extended(&subject)?;

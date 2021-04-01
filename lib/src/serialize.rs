@@ -1,8 +1,26 @@
 //! Serialization / formatting / encoding (JSON, RDF, N-Triples, AD3)
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, Atom, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, resources::PropVals, Atom, Resource, Storelike, Value,
 };
+
+/// Serializes a vector or Resources to a JSON-AD string
+pub fn resources_to_json_ad(resources: Vec<Resource>) -> AtomicResult<String> {
+    let array: Vec<String> = resources
+        .into_iter()
+        .map(|r: Resource| r.to_json_ad().expect("could not serialize to json-ad "))
+        .collect();
+    let serde_array = Value::from(array);
+    serde_json::to_string_pretty(&serde_array).map_err(|_| "Could not serialize to JSON-AD".into())
+}
+
+/// Parses JSON-AD strings to resources
+pub fn parse_json_ad(string: &str, store: &impl Storelike) -> Vec<Resource> {
+    let parsed: Value = serde_json::from_str(data)?;
+    let vec = Vec::new();
+
+
+}
 
 /// Possible JSON-like serializations
 #[derive(PartialEq)]
@@ -15,12 +33,56 @@ pub enum JsonType {
     JSONAD,
 }
 
+/// Converts an Atomic Value to a Serde Value.
+fn val_to_serde(value: Value) -> AtomicResult<serde_json::Value> {
+    use serde_json::Value as SerdeValue;
+
+    let json_val = match value {
+        Value::AtomicUrl(val) => SerdeValue::String(val),
+        Value::Date(val) => SerdeValue::String(val),
+        // TODO: Handle big numbers
+        Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
+        Value::Float(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
+        Value::Markdown(val) => SerdeValue::String(val),
+        Value::ResourceArray(val) => SerdeValue::Array(
+            val.iter()
+                .map(|item| SerdeValue::String(item.clone()))
+                .collect(),
+        ),
+        Value::Slug(val) => SerdeValue::String(val),
+        Value::String(val) => SerdeValue::String(val),
+        Value::Timestamp(val) => SerdeValue::Number(val.into()),
+        Value::Unsupported(val) => SerdeValue::String(val.value),
+        Value::Boolean(val) => SerdeValue::Bool(val),
+        // TODO: fix this for nested resources in json and json-ld serialization, because this will cause them to fall back to json-ad
+        Value::NestedResource(res) => propvals_to_json_map(&res, None)?,
+    };
+    Ok(json_val)
+}
+
 /// Serializes a Resource to a Serde JSON Map
 pub fn propvals_to_json_map(
     propvals: &PropVals,
     subject: Option<String>,
+) -> AtomicResult<serde_json::Value> {
+    use serde_json::{Map, Value as SerdeValue};
+    let mut root = Map::new();
+    for (prop_url, value) in propvals.iter() {
+        root.insert(prop_url.clone(), val_to_serde(value.clone())?);
+    }
+    if let Some(sub) = subject {
+        root.insert("@id".into(), SerdeValue::String(sub));
+    }
+    let obj = SerdeValue::Object(root);
+    Ok(obj)
+}
+
+/// Serializes a Resource to a Serde JSON Map
+pub fn propvals_to_json_ld(
+    propvals: &PropVals,
+    subject: Option<String>,
     store: &impl Storelike,
-    json_type: &JsonType,
+    json_ld: bool,
 ) -> AtomicResult<serde_json::Value> {
     use serde_json::{Map, Value as SerdeValue};
     // Initiate JSON object
@@ -30,12 +92,8 @@ pub fn propvals_to_json_map(
     // For every atom, find the key, datatype and add it to the @context
     for (prop_url, value) in propvals.iter() {
         // The property is only needed in JSON-LD and JSON for shortnames
-        let property = if json_type == &JsonType::JSONAD {
-            None
-        } else {
-            Some(store.get_property(prop_url)?)
-        };
-        if json_type == &JsonType::JSONLD {
+        let property = store.get_property(prop_url)?;
+        if json_ld {
             // In JSON-LD, the value of a Context Item can be a string or an object.
             // This object can contain information about the translation or datatype of the value
             let ctx_value: SerdeValue = match value.datatype() {
@@ -75,42 +133,20 @@ pub fn propvals_to_json_map(
                 _other => prop_url.as_str().into(),
             };
             context.insert(
-                property.clone().unwrap().shortname.as_str().into(),
+                property.shortname.as_str().into(),
                 ctx_value,
             );
         }
-        let key = if json_type == &JsonType::JSONAD {
-            prop_url.clone()
-        } else {
-            property.clone().unwrap().shortname
-        };
-        let json_val = match value.to_owned() {
-            Value::AtomicUrl(val) => SerdeValue::String(val),
-            Value::Date(val) => SerdeValue::String(val),
-            // TODO: Handle big numbers
-            Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
-            Value::Float(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
-            Value::Markdown(val) => SerdeValue::String(val),
-            Value::ResourceArray(val) => SerdeValue::Array(
-                val.iter()
-                    .map(|item| SerdeValue::String(item.clone()))
-                    .collect(),
-            ),
-            Value::Slug(val) => SerdeValue::String(val),
-            Value::String(val) => SerdeValue::String(val),
-            Value::Timestamp(val) => SerdeValue::Number(val.into()),
-            Value::Unsupported(val) => SerdeValue::String(val.value),
-            Value::Boolean(val) => SerdeValue::Bool(val),
-            Value::NestedResource(res) => propvals_to_json_map(&res, None, store, &json_type)?,
-        };
-        root.insert(key, json_val);
+        let key = property.shortname;
+
+        root.insert(key, val_to_serde(value.clone())?);
     }
 
     if let Some(sub) = subject {
         root.insert("@id".into(), SerdeValue::String(sub));
     }
 
-    if json_type == &JsonType::JSONLD {
+    if json_ld {
         root.insert("@context".into(), context.into());
     }
     let obj = SerdeValue::Object(root);
@@ -197,7 +233,7 @@ mod test {
         let json = store
             .get_resource(crate::urls::AGENT)
             .unwrap()
-            .to_json_ad(&store)
+            .to_json_ad()
             .unwrap();
         println!("json: {}", json);
         let correct_json = r#"{
@@ -326,5 +362,13 @@ mod test {
         assert!(serialized.contains(r#""description"^^<https://atomicdata.dev/datatypes/slug>"#));
         // This could fail when the `description` resource changes
         assert!(serialized.lines().count() == 4);
+    }
+
+    #[test]
+    fn serialize_vec_json_ld() {
+        use crate::Storelike;
+        let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
+        let serialized = resources_to_json_ad(store.all_resources(true));
     }
 }
