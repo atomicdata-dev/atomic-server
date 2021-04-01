@@ -242,11 +242,8 @@ impl Commit {
         let json_obj = crate::serialize::propvals_to_json_map(
             commit_resource.get_propvals(),
             None,
-            store,
-            &JsonType::JSONAD,
         )?;
-        let string = serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into());
-        string
+        serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into())
     }
 }
 
