@@ -440,6 +440,7 @@ dependencies = [
  "actix-web",
  "atomic_lib",
  "chrono",
+ "clap",
  "dirs",
  "dotenv",
  "env_logger 0.8.2",
@@ -457,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.23.2"
+version = "0.23.3"
 dependencies = [
  "base64 0.13.0",
  "bincode",
