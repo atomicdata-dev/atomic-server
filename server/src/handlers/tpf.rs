@@ -29,7 +29,7 @@ pub async fn tpf(
     let value = empty_to_nothing(query.value.clone());
     let atoms = store
         .tpf(subject.as_deref(), property.as_deref(), value.as_deref(), true)?;
-    log::info!("{:?}", query);
+    log::info!("TPF query: {:?}", query);
     match content_type {
         ContentType::JSON | ContentType::HTML | ContentType::JSONLD | ContentType::JSONAD => {
             builder.header("Content-Type", content_type.to_mime());

@@ -9,7 +9,6 @@ pub type BetterResult<T> = std::result::Result<T, AppError>;
 pub enum AppErrorType {
     NotFoundError,
     OtherError,
-    // NotImplementedError,
 }
 
 // More strict error type, supports HTTP responses
@@ -41,7 +40,6 @@ impl ResponseError for AppError {
         match self.error_type {
             AppErrorType::NotFoundError => StatusCode::NOT_FOUND,
             AppErrorType::OtherError => StatusCode::INTERNAL_SERVER_ERROR,
-            // AppErrorType::NotImplementedError => StatusCode::NOT_IMPLEMENTED
         }
     }
     fn error_response(&self) -> HttpResponse {

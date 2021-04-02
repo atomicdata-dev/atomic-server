@@ -6,13 +6,9 @@ use std::sync::Mutex;
 /// Send and process a Commit.
 /// Currently only accepts JSON-AD
 pub async fn post_commit(
-    // commit: web::Json<atomic_lib::Commit>,
     data: web::Data<Mutex<AppState>>,
-    // req: actix_web::HttpRequest,
-    // payload: &mut web::Payload,
     body: String,
 ) -> BetterResult<HttpResponse> {
-    // log::info!("commit: {:?}", commit);
     let mut context = data.lock().unwrap();
     let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
