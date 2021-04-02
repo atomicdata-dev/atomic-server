@@ -1,6 +1,6 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
-use crate::{errors::AtomicResult};
+use crate::{errors::AtomicResult, parse::parse_json_ad_array};
 use crate::{
     agents::Agent,
     schema::{Class, Property},
@@ -35,6 +35,11 @@ pub trait Storelike: Sized {
     /// Does not do any validations.
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()>;
 
+    /// Returns a collection with all resources in the store.
+    /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
+    /// WARNING: This could be very expensive!
+    fn all_resources(&self, include_external: bool) -> ResourceCollection;
+
     /// Returns the root URL where the default store is.
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
@@ -65,8 +70,8 @@ pub trait Storelike: Sized {
     }
 
     /// Exports the store to a big JSON-AD file
-    fn export(&self) -> AtomicResult<String> {
-        crate::serialize::resources_to_json_ad(self.all_resources(true))
+    fn export(&self, include_external: bool) -> AtomicResult<String> {
+        crate::serialize::resources_to_json_ad(self.all_resources(include_external))
     }
 
     /// Fetches a resource, makes sure its subject matches.
@@ -128,9 +133,15 @@ pub trait Storelike: Sized {
         self.fetch_resource(subject)
     }
 
-    /// Returns a collection with all resources in the store.\
-    /// WARNING: This could be very expensive!
-    fn all_resources(&self, include_external: bool) -> ResourceCollection;
+    /// Imports a JSON-AD string, returns the amount of imported resources
+    fn import(&self, string: &str) -> AtomicResult<usize> {
+        let vec = parse_json_ad_array(string, self)?;
+        let len = vec.len();
+        for r in vec {
+            self.add_resource(&r)?
+        }
+        Ok(len)
+    }
 
     /// Removes a resource from the store. Errors if not present.
     fn remove_resource(&self, subject: &str) -> AtomicResult<()>;
