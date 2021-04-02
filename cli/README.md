@@ -1,7 +1,7 @@
 # `atomic-cli` (CLI)
 
 [![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
-[![Discord chat][discord-badge]][discord-url]
+[![Discord chat][https://img.shields.io/discord/723588174747533393.svg?logo=discord]][https://discord.gg/a72Rv2P]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/aget_basetomic)
 
@@ -61,26 +61,17 @@ Run `atomic-cli command --help` for mor information about specific commands.
 The write commands (`set`, `remove`, `edit`, `destroy`) require some authentication config, which needs to match with the target [atomic-server](https://crates.io/crates/atomic-server).
 It will read the `~/.config/atomic/config.toml` file, and create one using some prompts if it is not yet present.
 
-## Progress
+## Features
 
-- [x] Stores & reads stuff from and to .ad3 user files on disk
-- [x] A `new` command for instantiating [Atomic Classes](https://docs.atomicdata.dev/schema/classes.html)
-- [x] A `list` command for showing local bookmarks (mappings)
-- [x] A `get` command for finding resources and parts of data using Atomic Paths with...
-  - [x] AD3 Serialization
-  - [x] Basic JSON Serialization
-  - [x] RDF (Turtle / N-Triples / RDF/XML) Serialization
-- [x] Works with [`atomic-server`](../server) [#6](https://github.com/joepio/atomic/issues/6)
-  - [x] fetches data using `get`, handles `paths` client side
-  - [x] `set`, `remove`, `edit` and `destroy` commands for commits
-  - [x] `new` creates commits
-- [x] A `delta` command for manipulating existing local resources
-- [x] Tests for the cli
-- [ ] A `map` command for creating a bookmark and storing a copy
+- A `list` command for showing local bookmarks (mappings)
+- A `get` command for finding resources and parts of data using Atomic Paths with various serialization options (JSON, JSON-AD, JSON-LD, Turtle, N-Triples, Pretty). Also supports [path traversal](https://docs.atomicdata.dev/core/paths.html).
+- `set`, `remove`, `destroy` and `edit` commands that send commits.
+- A `new` command for instantiating [Atomic Classes](https://docs.atomicdata.dev/schema/classes.html)
 
 ## Config
 
 Atomic creates a `~/.config/atomic` folder, which contains a `mapping.amp` and a `store.ad3`.
+This folder is also used by `atomic-server`.
 
 ## Mapping
 
@@ -117,6 +108,3 @@ $ atomic install https://atomicdata.dev/ontologies/meetings
 # when no URL is given, use the Ontola repo's ontologies
 $ atomic install meetings
 ```
-
-[discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
-[discord-url]: https://discord.gg/a72Rv2P
