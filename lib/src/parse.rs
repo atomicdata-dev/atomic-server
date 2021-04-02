@@ -1,6 +1,6 @@
 //! Parsing / deserialization / decoding
 
-use crate::{Atom, Resource, Value, errors::AtomicResult, resources::PropVals, urls};
+use crate::{errors::AtomicResult, resources::PropVals, urls, Atom, Resource, Storelike, Value};
 
 pub const AD3_MIME: &str = "application/ad3-ndjson";
 
@@ -58,17 +58,51 @@ pub fn parse_json_ad_resource(
     store: &impl crate::Storelike,
 ) -> AtomicResult<Resource> {
     let json: Map<String, serde_json::Value> = serde_json::from_str(string)?;
-    let subject = json
-        .get("@id")
-        .ok_or("Missing `@id` value in top level JSON. Could not determine Subject of Resource.")?
-        .as_str()
-        .ok_or("`@id` is not a string - should be the Subject of the Resource (a URL)")?;
-    let mut resource = Resource::new(subject.to_string());
+    json_ad_object_to_resource(json, store)
+}
+
+/// Parses a JSON-AD object, converts it to an Atomic Resource
+fn json_ad_object_to_resource(
+    json: Map<String, serde_json::Value>,
+    store: &impl crate::Storelike,
+) -> AtomicResult<Resource>{
+    let mut resource = Resource::new(get_id(json.clone())?);
     let propvals = parse_json_ad_map_to_propvals(json, store)?;
     for (prop, val) in propvals {
         resource.set_propval(prop, val, store)?
     }
     Ok(resource)
+}
+
+/// Returns the @id in a JSON object
+fn get_id(object: serde_json::Map<String, serde_json::Value>) -> AtomicResult<String> {
+    Ok(object
+        .get("@id")
+        .ok_or("Missing `@id` value in top level JSON. Could not determine Subject of Resource.")?
+        .as_str()
+        .ok_or("`@id` is not a string - should be the Subject of the Resource (a URL)")?
+        .to_string())
+}
+
+/// Parses JSON-AD strings to resources
+pub fn parse_json_ad_array(string: &str, store: &impl Storelike) -> AtomicResult<Vec<Resource>> {
+    let parsed: serde_json::Value = serde_json::from_str(string)?;
+    let mut vec = Vec::new();
+    match parsed {
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                match item {
+                    serde_json::Value::Object(obj) => {
+                        vec.push(json_ad_object_to_resource(obj, store)?)
+                    },
+                    wrong => return Err(format!("Wrong datatype, expected object, got: {:?}", wrong).into()),
+                }
+            }
+        }
+        serde_json::Value::Object(obj) => vec.push(json_ad_object_to_resource(obj, store)?),
+        _other => return Err("Root JSON element must be an object or array.".into()),
+    }
+    Ok(vec)
 }
 
 /// Parse a single Json AD string, convert to Atoms
@@ -78,7 +112,10 @@ pub fn parse_json_ad_commit_resource(
     store: &impl crate::Storelike,
 ) -> AtomicResult<Resource> {
     let json: Map<String, serde_json::Value> = serde_json::from_str(string)?;
-    let signature = json.get(urls::SUBJECT).ok_or("No subject field in Commit.")?.to_string();
+    let signature = json
+        .get(urls::SUBJECT)
+        .ok_or("No subject field in Commit.")?
+        .to_string();
     let subject = format!("{}/commits/{}", store.get_base_url(), signature);
     let mut resource = Resource::new(subject);
     let propvals = parse_json_ad_map_to_propvals(json, store)?;
@@ -172,7 +209,9 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "`@id` is not a string - should be the Subject of the Resource (a URL)")]
+    #[should_panic(
+        expected = "`@id` is not a string - should be the Subject of the Resource (a URL)"
+    )]
     fn parse_and_serialize_json_ad_wrong_id() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
@@ -205,16 +244,19 @@ mod test {
         parse_json_ad_resource(json_input, &store).unwrap();
     }
 
-    // #[test]
-    // fn parse_and_serialize_round_trip() {
-    //     let store = crate::Store::init().unwrap();
-    //     // Populate the store
-    //     store.populate().unwrap();
-    //     // Get all the atoms
-    //     // Serialize all as JSON-AD
-    //     // Parse JSON-AD in a new store, without populating it. (only the base models)
-    //     // Get all the atoms from this new store
-    //     // Check if they are the same!
-    //     parse_json_ad_resource(json_input, &store).unwrap();
-    // }
+    #[test]
+    fn serialize_parse_roundtrip() {
+        use crate::Storelike;
+        let store1 = crate::Store::init().unwrap();
+        store1.populate().unwrap();
+        let serialized =
+            crate::serialize::resources_to_json_ad(store1.all_resources(true)).unwrap();
+        let store2 = crate::Store::init().unwrap();
+        println!("{}", serialized);
+        store2.import(&serialized).unwrap();
+        let all1 = store1.all_resources(true);
+        let all2 = store2.all_resources(true);
+        assert_eq!(all1.len(), all2.len());
+        assert_eq!(all1[2].get("shortname").unwrap().to_string(), all2[2].get("shortname").unwrap().to_string());
+    }
 }

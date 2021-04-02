@@ -1,43 +1,28 @@
 //! Serialization / formatting / encoding (JSON, RDF, N-Triples, AD3)
 
+use serde_json::Map;
+use serde_json::Value as SerdeValue;
+
 use crate::{
     datatype::DataType, errors::AtomicResult, resources::PropVals, Atom, Resource, Storelike, Value,
 };
 
 /// Serializes a vector or Resources to a JSON-AD string
 pub fn resources_to_json_ad(resources: Vec<Resource>) -> AtomicResult<String> {
-    let array: Vec<String> = resources
+    let array: Vec<serde_json::Value> = resources
         .into_iter()
-        .map(|r: Resource| r.to_json_ad().expect("could not serialize to json-ad "))
+        .map(|r: Resource| {
+            crate::serialize::propvals_to_json_map(r.get_propvals(), Some(r.get_subject().clone()))
+                .expect("could not serialize to json-ad ")
+        })
         .collect();
-    let serde_array = Value::from(array);
+    let serde_array = serde_json::Value::from(array);
     serde_json::to_string_pretty(&serde_array).map_err(|_| "Could not serialize to JSON-AD".into())
 }
 
-/// Parses JSON-AD strings to resources
-pub fn parse_json_ad(string: &str, store: &impl Storelike) -> Vec<Resource> {
-    let parsed: Value = serde_json::from_str(data)?;
-    let vec = Vec::new();
-
-
-}
-
-/// Possible JSON-like serializations
-#[derive(PartialEq)]
-pub enum JsonType {
-    /// Plain JSON with human readable keys
-    JSON,
-    /// RDF / Linked Data compatible JSON-LD with an @context
-    JSONLD,
-    /// Atomic Data JSON, most performant
-    JSONAD,
-}
-
 /// Converts an Atomic Value to a Serde Value.
-fn val_to_serde(value: Value) -> AtomicResult<serde_json::Value> {
-    use serde_json::Value as SerdeValue;
-
-    let json_val = match value {
+fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
+    let json_val: SerdeValue = match value {
         Value::AtomicUrl(val) => SerdeValue::String(val),
         Value::Date(val) => SerdeValue::String(val),
         // TODO: Handle big numbers
@@ -65,7 +50,6 @@ pub fn propvals_to_json_map(
     propvals: &PropVals,
     subject: Option<String>,
 ) -> AtomicResult<serde_json::Value> {
-    use serde_json::{Map, Value as SerdeValue};
     let mut root = Map::new();
     for (prop_url, value) in propvals.iter() {
         root.insert(prop_url.clone(), val_to_serde(value.clone())?);
@@ -84,7 +68,6 @@ pub fn propvals_to_json_ld(
     store: &impl Storelike,
     json_ld: bool,
 ) -> AtomicResult<serde_json::Value> {
-    use serde_json::{Map, Value as SerdeValue};
     // Initiate JSON object
     let mut root = Map::new();
     // For JSON-LD serialization
@@ -132,10 +115,7 @@ pub fn propvals_to_json_ld(
                 }
                 _other => prop_url.as_str().into(),
             };
-            context.insert(
-                property.shortname.as_str().into(),
-                ctx_value,
-            );
+            context.insert(property.shortname.as_str().into(), ctx_value);
         }
         let key = property.shortname;
 
@@ -261,6 +241,20 @@ mod test {
     }
 
     #[test]
+    fn serialize_json_ad_multiple() {
+        // let store = crate::Store::init().unwrap();
+        let mut vec = Vec::new();
+        vec.push(Resource::new("subjet".into()));
+        let serialized = resources_to_json_ad(vec).unwrap();
+        let correct_json = r#"[
+  {
+    "@id": "subjet"
+  }
+]"#;
+        assert_eq!(serialized, correct_json);
+    }
+
+    #[test]
     fn serialize_json() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
@@ -362,13 +356,5 @@ mod test {
         assert!(serialized.contains(r#""description"^^<https://atomicdata.dev/datatypes/slug>"#));
         // This could fail when the `description` resource changes
         assert!(serialized.lines().count() == 4);
-    }
-
-    #[test]
-    fn serialize_vec_json_ld() {
-        use crate::Storelike;
-        let store = crate::Store::init().unwrap();
-        store.populate().unwrap();
-        let serialized = resources_to_json_ad(store.all_resources(true));
     }
 }

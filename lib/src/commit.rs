@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, serialize::JsonType, urls,
+    datatype::DataType, errors::AtomicResult, resources::PropVals, urls,
     Resource, Storelike, Value,
 };
 

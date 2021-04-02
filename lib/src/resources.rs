@@ -6,7 +6,7 @@ use crate::{
     schema::{Class, Property},
     Atom, Storelike,
 };
-use crate::{serialize::JsonType, values::Value};
+use crate::{values::Value};
 use std::collections::HashMap;
 
 /// A Resource is a set of Atoms that shares a single Subject.
