@@ -362,7 +362,7 @@ mod test {
                 .get(urls::COLLECTION_MEMBER_COUNT)
                 .unwrap()
                 .to_string()
-                == "7"
+                == "8"
         );
     }
 

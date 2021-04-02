@@ -65,7 +65,7 @@ pub fn parse_json_ad_resource(
 fn json_ad_object_to_resource(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,
-) -> AtomicResult<Resource>{
+) -> AtomicResult<Resource> {
     let mut resource = Resource::new(get_id(json.clone())?);
     let propvals = parse_json_ad_map_to_propvals(json, store)?;
     for (prop, val) in propvals {
@@ -94,8 +94,12 @@ pub fn parse_json_ad_array(string: &str, store: &impl Storelike) -> AtomicResult
                 match item {
                     serde_json::Value::Object(obj) => {
                         vec.push(json_ad_object_to_resource(obj, store)?)
-                    },
-                    wrong => return Err(format!("Wrong datatype, expected object, got: {:?}", wrong).into()),
+                    }
+                    wrong => {
+                        return Err(
+                            format!("Wrong datatype, expected object, got: {:?}", wrong).into()
+                        )
+                    }
                 }
             }
         }
@@ -252,11 +256,16 @@ mod test {
         let serialized =
             crate::serialize::resources_to_json_ad(store1.all_resources(true)).unwrap();
         let store2 = crate::Store::init().unwrap();
-        println!("{}", serialized);
         store2.import(&serialized).unwrap();
         let all1 = store1.all_resources(true);
         let all2 = store2.all_resources(true);
         assert_eq!(all1.len(), all2.len());
-        assert_eq!(all1[2].get("shortname").unwrap().to_string(), all2[2].get("shortname").unwrap().to_string());
+        let found_shortname = store2
+            .get_resource(urls::CLASS)
+            .unwrap()
+            .get(urls::SHORTNAME)
+            .unwrap()
+            .clone();
+        assert_eq!(found_shortname.to_string(), "class");
     }
 }

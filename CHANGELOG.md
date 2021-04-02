@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.23.3
+
+- Added import / export to server and lib and basic #125
+- Added multi-resource JSON-AD array parsing
+
 ## v0.23.2
 
 - Removed all HTML rendering from `atomic-server` (since we're using `atomic-data-browser`).

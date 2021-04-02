@@ -1,6 +1,3 @@
-use actix_cors::Cors;
-use actix_web::{middleware, web, App, HttpServer};
-use std::{io, sync::Mutex};
 mod appstate;
 mod config;
 mod content_types;
@@ -13,8 +10,42 @@ mod routes;
 #[cfg(feature = "desktop")]
 mod tray_icon;
 
+use actix_cors::Cors;
+use actix_web::{middleware, web, App, HttpServer};
+use atomic_lib::{errors::AtomicResult, Storelike};
+use clap::{crate_version, AppSettings, Arg, SubCommand};
+use std::{fs::File, sync::Mutex};
+
 #[actix_rt::main]
-async fn main() -> io::Result<()> {
+async fn main() -> AtomicResult<()> {
+    let matches = clap::App::new("atomic-server")
+        .version(crate_version!())
+        .author("Joep Meindertsma <joep@ontola.io>")
+        .about("Store and share Atomic Data!")
+        .after_help("Visit https://atomicdata.dev for more info")
+        .setting(AppSettings::ArgRequiredElseHelp)
+        .subcommand(
+            SubCommand::with_name("run")
+                .about("Starts the server")
+        )
+        .subcommand(
+            SubCommand::with_name("export")
+                .about("Create a JSON-AD backup of the store.")
+                .arg(Arg::with_name("path")
+                    .help("Where the file should be saved. Defaults to `~/.config/atomic/backups/{current_date}.json`.")
+                    .required(false)
+                )
+        )
+        .subcommand(
+            SubCommand::with_name("import")
+                .about("Import a JSON-AD backup to the store. Overwrites Resources with same @id.")
+                .arg(Arg::with_name("path")
+                    .help("where the file should be imported from")
+                    .required(true)
+                )
+        )
+        .get_matches();
+
     // Enable all logging
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
@@ -30,6 +61,46 @@ async fn main() -> io::Result<()> {
         Err(e) => {
             panic!("Error during appstate setup. {}", e)
         }
+    };
+
+    match matches.subcommand_name() {
+        Some("export") => {
+            let path = match matches.subcommand_matches("export").unwrap().value_of("path") {
+                Some(p) => std::path::Path::new(p).to_path_buf(),
+                None => {
+                    let date = chrono::Local::now().to_rfc3339();
+                    let pathstr = format!("backups/{}.json", date);
+                    let mut pt = config.config_dir;
+                    pt.push(&pathstr);
+                    pt
+                },
+            };
+            let outstr = appstate.store.export(true)?;
+            std::fs::create_dir_all(path.parent().unwrap())
+                .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
+            let mut file = File::create(&path).map_err(|e| format!("Failed to write file to {:?}. {}", path, e))?;
+            use std::io::Write;
+            write!(file, "{}", outstr)?;
+            println!("Succesfully exported data to {}", path.to_str().unwrap());
+            std::process::exit(0);
+        }
+        Some("import") => {
+            let pathstr = matches.subcommand_matches("import").unwrap().value_of("path").unwrap();
+            let path = std::path::Path::new(pathstr);
+            let readstring = std::fs::read_to_string(path)?;
+
+            appstate.store.import(&readstring)?;
+
+            println!("Sucesfully imported {} to store.", pathstr);
+            std::process::exit(0);
+        }
+        Some("run") => {
+            // todo!();
+        }
+        Some(unkown) => {
+            panic!(format!("Unkown command: {}", unkown));
+        }
+        None => println!("Run atomic-server --help for available commands"),
     };
 
     let server = HttpServer::new(move || {
