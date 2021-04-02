@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.23.2"
+version = "0.23.3"
 dependencies = [
  "assert_cmd",
  "atomic_lib",
@@ -431,7 +431,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.23.2"
+version = "0.23.3"
 dependencies = [
  "acme-lib",
  "actix-cors",
