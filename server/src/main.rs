@@ -32,7 +32,7 @@ async fn main() -> AtomicResult<()> {
             SubCommand::with_name("export")
                 .about("Create a JSON-AD backup of the store.")
                 .arg(Arg::with_name("path")
-                    .help("Where the file should be saved. Defaults to `~/.config/atomic/backups/{current_date}.json`.")
+                    .help("Where the file should be saved. Defaults to `~/.config/atomic/backups/{current_date}.jsonld`.")
                     .required(false)
                 )
         )
@@ -69,7 +69,7 @@ async fn main() -> AtomicResult<()> {
                 Some(p) => std::path::Path::new(p).to_path_buf(),
                 None => {
                     let date = chrono::Local::now().to_rfc3339();
-                    let pathstr = format!("backups/{}.json", date);
+                    let pathstr = format!("backups/{}.jsonld", date);
                     let mut pt = config.config_dir;
                     pt.push(&pathstr);
                     pt

@@ -118,9 +118,8 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 
 /// Imports items from default_store.ad3
 pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
-    let ad3 = include_str!("../defaults/default_store.ad3");
-    let atoms = crate::parse::parse_ad3(&String::from(ad3))?;
-    store.add_atoms(atoms)?;
+    let json = include_str!("../defaults/default_store.jsonld");
+    store.import(json)?;
     Ok(())
 }
 
