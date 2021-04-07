@@ -37,7 +37,7 @@ I've got to automate this process some day...
 DockerHub has been setup to track the `master` branch, but it does not tag builds other than `latest`.
 
 1. build: `docker build . -t joepmeneer/atomic-server:v0.20.4 -t joepmeneer/atomic-server:latest`
-1. publish: `docker push joepmeneer/atomic-server`
+1. publish: `docker push -a joepmeneer/atomic-server`
 
 or:
 
