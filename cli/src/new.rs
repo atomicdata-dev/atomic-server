@@ -20,7 +20,12 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
         .unwrap()
         .value_of("class")
         .expect("Add a class value");
-    let class_url = context.mapping.lock().unwrap().try_mapping_or_url(class_input).unwrap();
+    let class_url = context
+        .mapping
+        .lock()
+        .unwrap()
+        .try_mapping_or_url(class_input)
+        .unwrap();
     let class = context.store.get_class(&class_url)?;
     println!("Enter a new {}: {}", class.shortname, class.description);
     let (resource, _bookmark) = prompt_instance(context, &class, None)?;
@@ -58,7 +63,7 @@ fn prompt_instance<'a>(
     new_resource.set_propval(
         "https://atomicdata.dev/properties/isA".into(),
         Value::ResourceArray(Vec::from([class.subject.clone()])),
-        &context.store
+        &context.store,
     )?;
 
     for prop_subject in &class.requires {
@@ -106,7 +111,9 @@ fn prompt_instance<'a>(
     let map = prompt_bookmark(&mut context.mapping.lock().unwrap(), &subject);
 
     context
-        .mapping.lock().unwrap()
+        .mapping
+        .lock()
+        .unwrap()
         .write_mapping_to_disk(&context.user_mapping_path);
     Ok((new_resource, map))
 }
@@ -182,15 +189,18 @@ fn prompt_field(
         }
         DataType::AtomicUrl => loop {
             let msg = format!("URL{}", msg_appendix);
-            let url: Option<String> = prompt_opt(msg).unwrap();
-            // If a classtype is present, the given URL must be an instance of that Class
             let classtype = &property.class_type;
             if classtype.is_some() {
                 let class = context
                     .store
                     .get_class(&String::from(classtype.as_ref().unwrap()))?;
-                println!("Enter the URL or shortname of a {}", class.description)
+                println!(
+                    "Enter the URL of a {} (an instance of a {})",
+                    class.shortname, class.subject
+                )
             }
+            let url: Option<String> = prompt_opt(msg).unwrap();
+            // If a classtype is present, the given URL must be an instance of that Class
             if let Some(u) = url {
                 // TODO: Check if string or if map
                 input = context.mapping.lock().unwrap().try_mapping_or_url(&u);
@@ -215,26 +225,32 @@ fn prompt_field(
                     let mut urls: Vec<String> = Vec::new();
                     let length = string_items.clone().count();
                     for item in string_items.into_iter() {
-                        match context.mapping.lock().unwrap().try_mapping_or_url(item) {
+                        let mapping_match = context
+                            .mapping
+                            .lock()
+                            .unwrap()
+                            .try_mapping_or_url(item)
+                            .clone();
+                        match mapping_match {
                             Some(url) => {
                                 urls.push(url);
                             }
                             None => {
                                 let class = &context.store.get_class(&property.class_type.clone().expect("At this moment, this CLI only supports Properties that have a class-type."))?.clone();
-                                println!("Define the {} named {}", class.shortname, item.bold().green(),);
-                                let (resource, _shortname) = prompt_instance(
-                                    context,
-                                    class,
-                                    Some(item.into()),
-                                )?;
+                                println!(
+                                    "Define the {} named {}",
+                                    class.shortname,
+                                    item.bold().green(),
+                                );
+                                let (resource, _shortname) =
+                                    prompt_instance(context, class, Some(item.into()))?;
                                 urls.push(resource.get_subject().clone());
                                 continue;
                             }
                         }
                     }
                     if length == urls.len() {
-                        input =
-                            Some(atomic_lib::serialize::serialize_json_array(&urls).unwrap());
+                        input = Some(atomic_lib::serialize::serialize_json_array(&urls).unwrap());
                         break;
                     }
                 }

@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.24.0
+
+- Fix deadlock in `cli new` command #124
+
 ## v0.23.3
 
 - Added import / export to server and lib and + basic cli functionality #125
