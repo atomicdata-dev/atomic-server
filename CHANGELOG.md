@@ -10,7 +10,8 @@ List of changes for this repo, including `atomic-cli`,
 
 ## v0.23.3
 
-- Added import / export to server and lib and + basic cli functionality #125
+- Added import / export to server and lib  #121
+- Added basic cli functionality with Clap to server #125
 - Added multi-resource JSON-AD array parsing #123
 - Use JSON-LD as default store #79
 
