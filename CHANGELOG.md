@@ -6,6 +6,7 @@ List of changes for this repo, including `atomic-cli`,
 ## v0.24.0
 
 - Fix deadlock in `cli new` command #124
+- Added boolean, timestamp and unsupported fallback to `cli new` command #30
 
 ## v0.23.3
 

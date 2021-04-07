@@ -257,9 +257,39 @@ fn prompt_field(
                 None => break,
             }
         },
-        DataType::Timestamp => todo!(),
-        DataType::Unsupported(unsup) => panic!("Unsupported datatype: {:?}", unsup),
-        DataType::Boolean => todo!(),
+        DataType::Timestamp => {
+            let msg = format!("timestamp{}", msg_appendix);
+            let number: Option<u64> = prompt_opt(&msg)?;
+            match number {
+                Some(nr) => {
+                    input = Some(nr.to_string());
+                }
+                None => (return Ok(None)),
+            }
+        }
+        DataType::Unsupported(unsup) => {
+            let msg = format!("unsupported datatype {}, defaulting to string{}", unsup, msg_appendix);
+            let string: Option<String> = prompt_opt(&msg)?;
+            match string {
+                Some(nr) => {
+                    input = Some(nr);
+                }
+                None => (return Ok(None)),
+            }
+        }
+        DataType::Boolean => {
+            let msg = format!("boolean{}", msg_appendix);
+            let number: Option<bool> = prompt_opt(&msg)?;
+            match number {
+                Some(nr) => {
+                    if nr {
+                        return Ok(Some("true".to_string()));
+                    }
+                    return Ok(Some("false".to_string()))
+                }
+                None => (return Ok(None)),
+            }
+        }
     };
     Ok(input)
 }

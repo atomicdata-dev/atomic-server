@@ -12,6 +12,7 @@ mod new;
 mod path;
 
 #[allow(dead_code)]
+/// The Context contains all the data for executing a single CLI command, such as the passed arguments and the in memory store.
 pub struct Context<'a> {
     store: atomic_lib::Store,
     mapping: Mutex<Mapping>,
@@ -28,7 +29,7 @@ impl Context<'_> {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
             return write_ctx.clone();
         };
-        let write_ctx = set_agent_config().expect("Issue while generating Context");
+        let write_ctx = set_agent_config().expect("Issue while generating write context / agent configuration");
         self.write.borrow_mut().replace(write_ctx.clone());
         self.store.set_default_agent(Agent {
             subject: write_ctx.agent.clone(),
@@ -41,6 +42,7 @@ impl Context<'_> {
     }
 }
 
+/// Reads config files for writing data, or promps the user if they don't yet exist
 fn set_agent_config() -> AtomicResult<Config> {
     let agent_config_path = atomic_lib::config::default_config_file_path()?;
     match atomic_lib::config::read_config(&agent_config_path) {
@@ -185,7 +187,7 @@ fn main() -> AtomicResult<()> {
         .get_matches();
 
     let config_folder = home_dir()
-        .expect("Home dir could not be opened. We need this to store data.")
+        .expect("Home dir could not be opened. We need this to store some configuration files.")
         .join(".config/atomic/");
 
     // The mapping holds shortnames and URLs for quick CLI usage
@@ -197,20 +199,12 @@ fn main() -> AtomicResult<()> {
         mapping.read_mapping_from_file(&user_mapping_path)?;
     }
 
-    let _use_db = false;
-
-    if _use_db {
-        // Currenlty uses the Sled store, just like the server.
-        // Unfortunately, these can't be used at the same time!
-        // let user_store_path = config_folder.join("db");
-        // let store_path = &user_store_path;
-        // let store = atomic_lib::Db::init(store_path).expect("Failed opening store. Is another program using it?");
-    }
+    // Initialize an in-memory store
     let store = atomic_lib::Store::init()?;
+    // Add some default data / common properties to speed things up
     store.populate()?;
 
     let mut context = Context {
-        // TODO: This should be configurable
         mapping: Mutex::new(mapping),
         store,
         matches,
@@ -312,6 +306,7 @@ fn tpf(context: &mut Context) -> AtomicResult<()> {
     Ok(())
 }
 
+/// Converts dots to 'None'
 fn tpf_value(string: &str) -> Option<&str> {
     if string == "." {
         None
