@@ -436,7 +436,6 @@ dependencies = [
  "acme-lib",
  "actix-cors",
  "actix-files",
- "actix-rt",
  "actix-web",
  "atomic_lib",
  "chrono",

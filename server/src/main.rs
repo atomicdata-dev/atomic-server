@@ -16,7 +16,7 @@ use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, AppSettings, Arg, SubCommand};
 use std::{fs::File, sync::Mutex};
 
-#[actix_rt::main]
+#[actix_web::main]
 async fn main() -> AtomicResult<()> {
     let matches = clap::App::new("atomic-server")
         .version(crate_version!())
