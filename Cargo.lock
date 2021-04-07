@@ -417,7 +417,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.23.3"
+version = "0.23.4"
 dependencies = [
  "assert_cmd",
  "atomic_lib",
