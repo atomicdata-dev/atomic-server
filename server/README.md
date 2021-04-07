@@ -25,6 +25,13 @@ Powered by Rust, atomic-lib, actix-web, Sled and [more](Cargo.toml).
 - You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
 - You like living on the edge (this application is not production ready)
 
+```
+SUBCOMMANDS:
+    export    Create a JSON-AD backup of the store.
+    import    Import a JSON-AD backup to the store. Overwrites Resources with same @id.
+    run       Starts the server
+```
+
 ## Installation & getting started
 
 You can run `atomic-server` in four ways:
@@ -113,6 +120,11 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
+
+## Extra commands
+
+The `atomic-server` binary has some extra CLI commands: `import` and `export`.
+Run `atomic-server --help` to read more.
 
 ## Testing
 

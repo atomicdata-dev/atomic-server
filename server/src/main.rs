@@ -13,7 +13,7 @@ mod tray_icon;
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use atomic_lib::{errors::AtomicResult, Storelike};
-use clap::{crate_version, AppSettings, Arg, SubCommand};
+use clap::{crate_version, Arg, SubCommand};
 use std::{fs::File, sync::Mutex};
 
 #[actix_web::main]
@@ -21,12 +21,10 @@ async fn main() -> AtomicResult<()> {
     let matches = clap::App::new("atomic-server")
         .version(crate_version!())
         .author("Joep Meindertsma <joep@ontola.io>")
-        .about("Store and share Atomic Data!")
-        .after_help("Visit https://atomicdata.dev for more info")
-        .setting(AppSettings::ArgRequiredElseHelp)
+        .about("Store and share Atomic Data! Visit https://atomicdata.dev for more info")
         .subcommand(
             SubCommand::with_name("run")
-                .about("Starts the server")
+                .about("Starts the server (also runs without any arguments)")
         )
         .subcommand(
             SubCommand::with_name("export")
@@ -95,12 +93,14 @@ async fn main() -> AtomicResult<()> {
             std::process::exit(0);
         }
         Some("run") => {
-            // todo!();
+            // continue, start server
         }
         Some(unkown) => {
             panic!(format!("Unkown command: {}", unkown));
         }
-        None => println!("Run atomic-server --help for available commands"),
+        None => {
+            // Start server if no command is found
+        },
     };
 
     let server = HttpServer::new(move || {
