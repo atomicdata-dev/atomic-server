@@ -1,7 +1,7 @@
 # `atomic-cli` (CLI)
 
 [![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
-[![Discord chat][https://img.shields.io/discord/723588174747533393.svg?logo=discord]][https://discord.gg/a72Rv2P]
+[![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/aget_basetomic)
 
