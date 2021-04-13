@@ -10,6 +10,7 @@ use crate::{
         path::path_endpoint,
         search::search_endpoint,
         versioning::{all_versions_endpoint, version_endpoint},
+        wasm_demo::wasm_demo_endpoint,
     },
     urls, Db, Resource, Storelike, Value,
 };
@@ -58,5 +59,6 @@ pub fn default_endpoints() -> Vec<Endpoint> {
         path_endpoint(),
         search_endpoint(),
         upload_endpoint(),
+        wasm_demo_endpoint(),
     ]
 }

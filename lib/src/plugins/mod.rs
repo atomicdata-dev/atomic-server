@@ -7,3 +7,4 @@ pub mod files;
 pub mod path;
 pub mod search;
 pub mod versioning;
+pub mod wasm_demo;

@@ -31,6 +31,7 @@ tracing = "0.1.29"
 ureq = "1.5.4"
 url = "2.2.1"
 urlencoding = "2.1.0"
+wasmer = {version="1.0.2", optional = true}
 
 [dev-dependencies]
 criterion = "0.3"
@@ -40,5 +41,5 @@ ntest = "0.7.3"
 
 [features]
 config = ["dirs", "toml"]
-db = ["sled", "bincode"]
+db = ["sled", "bincode", "wasmer"]
 rdf = ["rio_api", "rio_turtle"]
