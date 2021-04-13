@@ -41,5 +41,5 @@ ntest = "0.7"
 
 [features]
 config = ["dirs", "toml"]
-db = ["sled", "bincode"]
+db = ["sled", "bincode", "wasmer"]
 rdf = ["rio_api", "rio_turtle"]
