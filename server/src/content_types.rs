@@ -4,12 +4,23 @@ use actix_web::{http::HeaderMap};
 
 #[derive(PartialEq)]
 pub enum ContentType {
+    /// Plain JSON, using shortnames as keys instead of URLs
+    /// https://docs.atomicdata.dev/interoperability/json.html#atomic-data-as-plain-json
     JSON,
+    /// JSON-AD, default Atomic Data serialization
+    /// https://docs.atomicdata.dev/core/json-ad.html
     JSONAD,
+    /// JSON-LD, RDF compatible JSON with @context mapping
+    /// https://docs.atomicdata.dev/interoperability/json.html#from-json-to-json-ad
     JSONLD,
     HTML,
+    /// RDF Turtle format
+    /// https://www.w3.org/TR/turtle/
     TURTLE,
+    /// RDF N-Triples format
+    /// https://www.w3.org/TR/n-triples/
     NT,
+    /// Atomic Data Triples (deprecated)
     AD3,
 }
 
