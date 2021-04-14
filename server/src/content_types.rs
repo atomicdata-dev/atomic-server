@@ -77,6 +77,9 @@ pub fn parse_accept_header(header: &str) -> ContentType {
         if mimepart.contains(MIME_TURTLE) {
             return ContentType::TURTLE
         }
+        if mimepart.contains(MIME_NT) {
+            return ContentType::NT
+        }
     }
     log::info!("Unknown Accept header, defaut to HTML: {}", header);
     ContentType::HTML
