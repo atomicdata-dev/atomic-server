@@ -1,7 +1,9 @@
 //! Configuration logic which can be used in both CLI and Server contexts
+//! For serializaing, storing, and parsing the `~/.config/atomic/config.toml` file
+
 use crate::errors::AtomicResult;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A set of options that are shared between CLI and Server contexts
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -29,7 +31,7 @@ pub fn default_config_file_path() -> AtomicResult<PathBuf> {
 }
 
 /// Reads config file from a specified path
-pub fn read_config(path: &PathBuf) -> AtomicResult<Config> {
+pub fn read_config(path: &Path) -> AtomicResult<Config> {
     let config_string = std::fs::read_to_string(path)
         .map_err(|e| format!("Error reading config from {:?}. {}", path, e))?;
     let config: Config = toml::from_str(&config_string)
@@ -39,7 +41,7 @@ pub fn read_config(path: &PathBuf) -> AtomicResult<Config> {
 
 /// Writes config file from a specified path
 /// Overwrites any existing config
-pub fn write_config(path: &PathBuf, config: Config) -> AtomicResult<String> {
+pub fn write_config(path: &Path, config: Config) -> AtomicResult<String> {
     let out =
         toml::to_string_pretty(&config).map_err(|e| format!("Error serializing config. {}", e))?;
     std::fs::write(path, out.clone())

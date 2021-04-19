@@ -1,4 +1,6 @@
-//! Logic for Agents - which are like Users
+//! Logic for Agents
+//! Agents are actors (such as users) that can edit content.
+//! https://docs.atomicdata.dev/commits/concepts.html
 
 use crate::{Resource, Storelike, datetime_helpers, errors::AtomicResult, urls};
 

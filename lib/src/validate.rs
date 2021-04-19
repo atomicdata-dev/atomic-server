@@ -1,3 +1,6 @@
+//! Validate the Store and create a ValidationReport.
+//! Might be deprecated soon, as Validation hasn't been necessary since parsing has built-in data validation.
+
 /// Checks Atomic Data in the store for validity.
 /// Returns an Error if it is not valid.
 ///

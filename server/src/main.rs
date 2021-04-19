@@ -96,7 +96,7 @@ async fn main() -> AtomicResult<()> {
             // continue, start server
         }
         Some(unkown) => {
-            panic!(format!("Unkown command: {}", unkown));
+            panic!("Unkown command: {}", unkown);
         }
         None => {
             // Start server if no command is found
