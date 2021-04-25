@@ -3,6 +3,13 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.23.5
+
+- Build using esbuild instead of webpack #31
+- Some documentation improvements
+- Remove `createdAt` from Agent model required fields
+- Fix `n-triples` content type negotiation
+
 ## v0.23.4
 
 - Fix deadlock in `cli new` command #124
