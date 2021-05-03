@@ -106,7 +106,7 @@ async fn main() -> AtomicResult<()> {
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
         // Allow requests from other domains
-        let cors = Cors::permissive();
+        let cors = Cors::default().allow_any_origin();
 
         App::new()
             .app_data(data)

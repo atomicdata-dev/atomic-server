@@ -4,7 +4,7 @@ pub fn path_endpoint() -> Endpoint {
     Endpoint {
         path: "/path".to_string(),
         params: [urls::PATH.to_string()].into(),
-        description: "An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value.".to_string(),
+        description: "An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value. At this moment, Values are not yet supported.".to_string(),
         shortname: "path".to_string(),
         handle: handle_path_request,
     }
@@ -28,6 +28,7 @@ fn handle_path_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Re
           store.get_resource(&subject)
         }
         crate::storelike::PathReturn::Atom(_) => {
+          // TODO: Create Atom resource, which contains a Subject, a Property and a Value.
           Err("Path resulted in a value - not a resource. ".into())
         }
     }
