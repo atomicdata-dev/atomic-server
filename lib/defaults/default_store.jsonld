@@ -198,6 +198,26 @@
       "https://atomicdata.dev/properties/shortname": "timestamp"
   },
   {
+      "@id": "https://atomicdata.dev/properties/canEdit",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "The Agents (users) who are allowed to edit this Resource and all those that have this resource as its.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "can-edit"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/canRead",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "The Agents (users) who are allowed to read this Resource and all those that have this resource as its.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "can-read"
+  },
+  {
       "@id": "https://atomicdata.dev/properties/classtype",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
