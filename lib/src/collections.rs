@@ -208,9 +208,13 @@ impl Collection {
     }
 
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
-        // TODO: Should not persist, because now it is spammimg the store!
-        // let mut resource = crate::Resource::new_instance(crate::urls::COLLECTION, store)?;
         let mut resource = crate::Resource::new(self.subject.clone());
+        self.add_to_resource(&mut resource, store)?;
+        Ok(resource)
+    }
+
+    /// Adds the Collection props to an existing Resource.
+    pub fn add_to_resource(&self, resource: &mut Resource, store: &impl Storelike) -> AtomicResult<crate::Resource> {
         resource.set_propval(
             crate::urls::COLLECTION_MEMBERS.into(),
             self.members.clone().into(),
@@ -246,7 +250,7 @@ impl Collection {
             store,
         )?;
         // Maybe include items directly
-        Ok(resource)
+        Ok(resource.to_owned())
     }
 }
 
@@ -254,7 +258,7 @@ impl Collection {
 pub fn construct_collection(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
-    resource: Resource,
+    resource: &mut Resource,
 ) -> AtomicResult<Resource> {
     let mut sort_by = None;
     let mut sort_desc = false;
@@ -291,7 +295,7 @@ pub fn construct_collection(
         page_size,
     };
     let collection = Collection::new_with_members(store, collection_builder)?;
-    Ok(collection.to_resource(store)?)
+    collection.add_to_resource(resource, store)
 }
 
 #[cfg(test)]

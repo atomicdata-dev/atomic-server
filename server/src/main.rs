@@ -114,6 +114,9 @@ async fn main() -> AtomicResult<()> {
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
             .configure(routes::config_routes)
+            .default_service(
+                web::to(|| {log::info!("404..."); actix_web::HttpResponse::NotFound()})
+            )
             .app_data(
                 web::JsonConfig::default()
                     // register error_handler for JSON extractors.

@@ -8,33 +8,41 @@ use std::{
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
 pub async fn get_resource(
-    subject_end: web::Path<String>,
+    subject_end: Option<web::Path<String>>,
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
     let context = data.lock().unwrap();
-    let mut subj_end_string = subject_end.as_str();
+
     let mut content_type = get_accept(req.headers());
-    // Check extensions and set datatype. Harder than it looks to get right...
-    if content_type == ContentType::HTML {
-        if let Some((ext, path)) = try_extension(subj_end_string) {
-            content_type = ext;
-            subj_end_string = path;
+    let base_url = &context.config.local_base_url;
+    // Get the subject from the path, or return the home URL
+    let subject = if let Some(subj_end) = subject_end {
+        let mut subj_end_string = subj_end.as_str();
+        if content_type == ContentType::HTML {
+            if let Some((ext, path)) = try_extension(subj_end_string) {
+                content_type = ext;
+                subj_end_string = path;
+            }
         }
-    }
-    // This might not be the best way of creating the subject. But I can't access the full URL from any actix stuff!
-    let querystring = if req.query_string().is_empty() {
-        "".to_string()
+        // Check extensions and set datatype. Harder than it looks to get right...
+        // This might not be the best way of creating the subject. But I can't access the full URL from any actix stuff!
+        let querystring = if req.query_string().is_empty() {
+            "".to_string()
+        } else {
+            format!("?{}", req.query_string())
+        };
+        let subject = format!(
+            "{}/{}{}",
+            base_url, subj_end_string, querystring
+        );
+        subject
     } else {
-        format!("?{}", req.query_string())
+        String::from(base_url)
     };
-    let subject = format!(
-        "{}/{}{}",
-        &context.config.local_base_url, subj_end_string, querystring
-    );
     let store = &context.store;
     let mut builder = HttpResponse::Ok();
-    log::info!("get_resource: {} - {}", subject, content_type.to_mime());
+    log::info!("get_resource: {} as {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
     let resource = store
         .get_resource_extended(&subject)
