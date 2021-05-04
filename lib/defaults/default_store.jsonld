@@ -80,12 +80,13 @@
   },
   {
       "@id": "https://atomicdata.dev/classes/Drive",
-      "https://atomicdata.dev/properties/description": "The Drive node is at the top of the hierarchy. It can be thought of as a hard drive, at the top of a filesystem. It can be used as a starting point to navigate to any Resource. ",
+      "https://atomicdata.dev/properties/description": "The Drive node is at the top of the hierarchy in an Atomic Server. It can be thought of as a hard drive at the top of a filesystem. It can be used as a starting point to navigate to any Resource. A Drive needs to provide read and write access at least to one node.",
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Class"
       ],
       "https://atomicdata.dev/properties/recommends": [
-          "https://atomicdata.dev/properties/description"
+          "https://atomicdata.dev/properties/read",
+          "https://atomicdata.dev/properties/write"
       ],
       "https://atomicdata.dev/properties/shortname": "agent"
   },
@@ -201,7 +202,7 @@
       "@id": "https://atomicdata.dev/properties/edit",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-      "https://atomicdata.dev/properties/description": "The Agents (users) who are allowed to edit this Resource and all those that have this resource as its.",
+      "https://atomicdata.dev/properties/description": "The Agents (users) who are allowed to edit this Resource and all children (those that have the current Resource as their parent).",
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Property"
       ],
@@ -211,7 +212,7 @@
       "@id": "https://atomicdata.dev/properties/read",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-      "https://atomicdata.dev/properties/description": "The Agents (users) who are allowed to read this Resource and all those that have this resource as its.",
+      "https://atomicdata.dev/properties/description": "The Agents (users) who are allowed to read this Resource and all children (those that have the current Resource as their parent).",
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Property"
       ],

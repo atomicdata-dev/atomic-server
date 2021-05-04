@@ -8,6 +8,7 @@ pub const COMMIT: &str = "https://atomicdata.dev/classes/Commit";
 pub const AGENT: &str = "https://atomicdata.dev/classes/Agent";
 pub const COLLECTION: &str = "https://atomicdata.dev/classes/Collection";
 pub const ENDPOINT: &str = "https://atomicdata.dev/classes/Endpoint";
+pub const DRIVE: &str = "https://atomicdata.dev/classes/Drive";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -41,6 +42,10 @@ pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collec
 // ... for Endpoints
 pub const ENDPOINT_PARAMETERS: &str = "https://atomicdata.dev/properties/endpoint/parameters";
 pub const PATH: &str = "https://atomicdata.dev/properties/path";
+// ... for Hierarchy / Drive
+pub const PARENT: &str = "https://atomicdata.dev/properties/parent";
+pub const READ: &str = "https://atomicdata.dev/properties/read";
+pub const WRITE: &str = "https://atomicdata.dev/properties/write";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

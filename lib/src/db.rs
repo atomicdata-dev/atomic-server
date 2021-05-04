@@ -32,7 +32,7 @@ pub struct Db {
 }
 
 impl Db {
-    /// Creates a new store at the specified path.
+    /// Creates a new store at the specified path, or opens the store if it already exists.
     /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init<P: AsRef<std::path::Path>>(path: P, base_url: String) -> AtomicResult<Db> {
@@ -158,11 +158,15 @@ impl Storelike for Db {
     }
 
     fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
+        // This might add a trailing slash
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
         let query_params = clone.query_pairs();
         url.set_query(None);
-        let removed_query_params = url.to_string();
+        let mut removed_query_params = url.to_string();
+
+        // Remove trailing slash
+        if removed_query_params.ends_with('/') { removed_query_params.pop(); }
 
         // Check if the subject matches one of the endpoints
         let endpoints = crate::endpoints::default_endpoints();
@@ -187,7 +191,7 @@ impl Storelike for Db {
         for class in resource.get_classes(self)? {
             match class.subject.as_ref() {
                 crate::urls::COLLECTION => {
-                    return crate::collections::construct_collection(self, query_params, resource)
+                    return crate::collections::construct_collection(self, query_params, &mut resource)
                 }
                 "example" => todo!(),
                 _ => {}
@@ -206,7 +210,7 @@ impl Storelike for Db {
                 continue;
             }
             let propvals: PropVals = bincode::deserialize(&resource_bin)
-                .unwrap_or_else(|e| panic!(format!("{}. {}", corrupt_db_message(&subject), e)));
+                .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
             let resource = Resource::from_propvals(propvals, subject);
             resources.push(resource);
         }
@@ -216,6 +220,7 @@ impl Storelike for Db {
     fn populate(&self) -> AtomicResult<()> {
         // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
         crate::populate::populate_default_store(self)?;
+        crate::populate::populate_hierarchy(self)?;
         crate::populate::populate_collections(self)?;
         crate::populate::populate_endpoints(self)
     }

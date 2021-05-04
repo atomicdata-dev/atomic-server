@@ -16,8 +16,11 @@ pub struct AppState {
 /// Creates the server context.
 /// Initializes a store.
 pub fn init(config: Config) -> BetterResult<AppState> {
+    // Opens or creates the database
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
+    // Maybe running populate every time is too much
     store.populate()?;
+    // This may no longer be needed
     let mapping = Mapping::init();
     // Create a new agent if it does not yet exist.
     match atomic_lib::config::read_config(&config.config_file_path) {
@@ -36,6 +39,9 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                             &agent_config.private_key,
                         );
                         store.add_resource(&recreated_agent.to_resource(&store)?)?;
+                        // Now let's add the agent as the Root user and provide write access
+                        let mut drive = store.get_resource(store.get_base_url())?;
+                        drive.set_propval(atomic_lib::urls::WRITE.into(), atomic_lib::Value::AtomicUrl(agent_config.agent), &store)?;
                     } else {
                         return Err(format!(
                             "An agent is present in {:?}, but this agent cannot be retrieved. Either make sure the agent is retrievable, or remove it from your config. {}",

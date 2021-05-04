@@ -1,3 +1,8 @@
+//! Populating a Store means adding resources to it.
+//! Some of these are the core Atomic Data resources, such as the Property class.
+//! These base models are required for having a functioning store.
+//! Other populate methods help to set up an Atomic Server, by creating a basic file hierarcy and creating default collections.
+
 use crate::{
     datatype::DataType,
     errors::AtomicResult,
@@ -116,7 +121,25 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Imports items from default_store.ad3
+/// Adds the hierarchy related items (Drive, default Folder) to the Store. Sets the home page as the top level node
+pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
+    let self_url = store
+        .get_self_url()
+        .ok_or("No self_url set, cannot populate store with Drive")?;
+    let mut drive = crate::Resource::new_instance(urls::DRIVE, store)?;
+    drive.set_subject(self_url);
+    let base_url = url::Url::parse(store.get_base_url())?;
+    drive.set_propval_string(
+        urls::NAME.into(),
+        base_url.host_str().ok_or("Can't use current base URL")?,
+        store,
+    )?;
+    // drive.set_propval(urls::WRITE.into(), crate::Value::AtomicUrl(store.get_default_agent()?.subject), store)?;
+    // drive.set_propval(urls::READ.into(), crate::Value::AtomicUrl(store.get_default_agent()?.subject), store)?;
+    store.add_resource(&drive)
+}
+
+/// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary) from default_store.jsonld
 pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
     let json = include_str!("../defaults/default_store.jsonld");
     store.import(json)?;
@@ -131,7 +154,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
         None,
         Some("https://atomicdata.dev/properties/isA"),
         Some("[\"https://atomicdata.dev/classes/Class\"]"),
-        true
+        true,
     )?;
 
     for atom in classes_atoms {
@@ -141,7 +164,20 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
             &format!("collections/{}", &class.shortname),
             store,
         );
-        store.add_resource_unsafe(&collection.to_resource(store)?)?;
+        let mut collection_resource = collection.to_resource(store)?;
+        collection_resource.set_propval_string(
+            urls::PARENT.into(),
+            &store
+                .get_self_url()
+                .ok_or("No self_url present in store, can't populate collections")?,
+            store,
+        )?;
+        collection_resource.set_propval_string(
+            urls::SHORTNAME.into(),
+            "test",
+            store
+        )?;
+        store.add_resource_unsafe(&collection_resource)?;
     }
 
     Ok(())
