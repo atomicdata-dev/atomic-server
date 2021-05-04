@@ -159,6 +159,8 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
     for atom in classes_atoms {
         let class = store.get_class(&atom.subject)?;
+        // Can't import this for some reason - even if it's there in cargo.toml
+        // let plural_name = pluralize_rs::to_plural(class.shortname);
         let collection = CollectionBuilder::class_collection(
             &class.subject,
             &format!("collections/{}", &class.shortname),
@@ -172,9 +174,10 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
                 .ok_or("No self_url present in store, can't populate collections")?,
             store,
         )?;
+
         collection_resource.set_propval_string(
-            urls::SHORTNAME.into(),
-            "test",
+            urls::NAME.into(),
+            &format!("{} collection", class.shortname),
             store
         )?;
         store.add_resource_unsafe(&collection_resource)?;

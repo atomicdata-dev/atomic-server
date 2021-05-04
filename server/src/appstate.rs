@@ -41,7 +41,11 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                         store.add_resource(&recreated_agent.to_resource(&store)?)?;
                         // Now let's add the agent as the Root user and provide write access
                         let mut drive = store.get_resource(store.get_base_url())?;
-                        drive.set_propval(atomic_lib::urls::WRITE.into(), atomic_lib::Value::AtomicUrl(agent_config.agent), &store)?;
+                        let agents = vec![agent_config.agent.clone()];
+                        // TODO: add read rights to public, maybe
+                        drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), &store)?;
+                        drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), &store)?;
+                        store.add_resource(&drive)?;
                     } else {
                         return Err(format!(
                             "An agent is present in {:?}, but this agent cannot be retrieved. Either make sure the agent is retrievable, or remove it from your config. {}",
