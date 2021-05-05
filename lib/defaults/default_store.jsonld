@@ -219,6 +219,15 @@
       "https://atomicdata.dev/properties/shortname": "read"
   },
   {
+      "@id": "https://atomicdata.dev/properties/children",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+      "https://atomicdata.dev/properties/description": "The children of a Resource are the items that have this Resource set as Parent. Children are 'below' their Parents, hierarchically. Parents are the boss of children, which means that parents influents things like read and write rights.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "children"
+  },
+  {
       "@id": "https://atomicdata.dev/properties/classtype",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",

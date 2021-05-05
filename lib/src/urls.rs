@@ -46,6 +46,7 @@ pub const PATH: &str = "https://atomicdata.dev/properties/path";
 pub const PARENT: &str = "https://atomicdata.dev/properties/parent";
 pub const READ: &str = "https://atomicdata.dev/properties/read";
 pub const WRITE: &str = "https://atomicdata.dev/properties/write";
+pub const CHILDREN: &str = "https://atomicdata.dev/properties/children";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
