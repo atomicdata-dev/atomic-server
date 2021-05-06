@@ -223,12 +223,9 @@ mod test {
      "https://atomicdata.dev/classes/Class"
   ],
   "https://atomicdata.dev/properties/recommends": [
-    "https://atomicdata.dev/properties/description",
-    "https://atomicdata.dev/properties/remove",
-    "https://atomicdata.dev/properties/destroy"
+    "https://atomicdata.dev/properties/description"
   ],
     "https://atomicdata.dev/properties/requires": [
-    "https://atomicdata.dev/properties/createdAt",
     "https://atomicdata.dev/properties/name",
     "https://atomicdata.dev/properties/publicKey"
   ],
@@ -242,9 +239,7 @@ mod test {
 
     #[test]
     fn serialize_json_ad_multiple() {
-        // let store = crate::Store::init().unwrap();
-        let mut vec = Vec::new();
-        vec.push(Resource::new("subjet".into()));
+        let vec = vec![Resource::new("subjet".into())];
         let serialized = resources_to_json_ad(vec).unwrap();
         let correct_json = r#"[
   {
@@ -271,12 +266,9 @@ mod test {
               "https://atomicdata.dev/classes/Class"
             ],
             "recommends": [
-              "https://atomicdata.dev/properties/description",
-              "https://atomicdata.dev/properties/remove",
-              "https://atomicdata.dev/properties/destroy"
+              "https://atomicdata.dev/properties/description"
             ],
             "requires": [
-              "https://atomicdata.dev/properties/createdAt",
               "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/publicKey"
             ],
@@ -321,12 +313,9 @@ mod test {
               "https://atomicdata.dev/classes/Class"
             ],
             "recommends": [
-              "https://atomicdata.dev/properties/description",
-              "https://atomicdata.dev/properties/remove",
-              "https://atomicdata.dev/properties/destroy"
+              "https://atomicdata.dev/properties/description"
             ],
             "requires": [
-              "https://atomicdata.dev/properties/createdAt",
               "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/publicKey"
             ],
