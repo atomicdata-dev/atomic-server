@@ -1,6 +1,6 @@
 //! App state, which is accessible from handlers
 use crate::{config::Config, errors::BetterResult};
-use atomic_lib::{agents::Agent, mapping::Mapping, Storelike};
+use atomic_lib::{Storelike, agents::Agent, mapping::Mapping};
 
 /// Context for the server (not an individual request)
 #[derive(Clone)]
@@ -23,10 +23,12 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     // This may no longer be needed
     let mapping = Mapping::init();
     // Create a new agent if it does not yet exist.
-    match atomic_lib::config::read_config(&config.config_file_path) {
+    let ag_cfg: atomic_lib::config::Config = match atomic_lib::config::read_config(&config.config_file_path) {
         Ok(agent_config) => {
             match store.get_resource(&agent_config.agent) {
-                Ok(_) => {}
+                Ok(_) => {
+                    agent_config
+                }
                 Err(e) => {
                     if agent_config.agent.contains(&config.local_base_url) {
                         // If there is an agent in the config, but not in the store,
@@ -39,13 +41,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                             &agent_config.private_key,
                         );
                         store.add_resource(&recreated_agent.to_resource(&store)?)?;
-                        // Now let's add the agent as the Root user and provide write access
-                        let mut drive = store.get_resource(store.get_base_url())?;
-                        let agents = vec![agent_config.agent.clone()];
-                        // TODO: add read rights to public, maybe
-                        drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), &store)?;
-                        drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), &store)?;
-                        store.add_resource(&drive)?;
+                        agent_config
                     } else {
                         return Err(format!(
                             "An agent is present in {:?}, but this agent cannot be retrieved. Either make sure the agent is retrievable, or remove it from your config. {}",
@@ -53,7 +49,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                         ).into());
                     }
                 }
-            };
+            }
         }
         Err(_) => {
             let agent = store.create_agent("root")?;
@@ -62,10 +58,20 @@ pub fn init(config: Config) -> BetterResult<AppState> {
                 server: config.local_base_url.clone(),
                 private_key: agent.private_key,
             };
-            let config_string = atomic_lib::config::write_config(&config.config_file_path, cfg)?;
+            let config_string = atomic_lib::config::write_config(&config.config_file_path, cfg.clone())?;
             log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli) to log in with these credentials. \n{}", &config.config_file_path, config_string);
+            cfg
         }
-    }
+    };
+
+    log::info!("Setting rights to Drive...");
+    // Now let's add the agent as the Root user and provide write access
+    let mut drive = store.get_resource(store.get_base_url())?;
+    let agents = vec![ag_cfg.agent.clone()];
+    // TODO: add read rights to public, maybe
+    drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), &store)?;
+    drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), &store)?;
+    store.add_resource(&drive)?;
 
     Ok(AppState {
         store,

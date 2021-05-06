@@ -403,6 +403,16 @@
       "https://atomicdata.dev/properties/shortname": "public-key"
   },
   {
+      "@id": "https://atomicdata.dev/properties/read",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+      "https://atomicdata.dev/properties/description": "The agents that can read this resource and its children.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "read"
+  },
+  {
       "@id": "https://atomicdata.dev/properties/recommends",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
@@ -476,5 +486,15 @@
           "https://atomicdata.dev/classes/Property"
       ],
       "https://atomicdata.dev/properties/shortname": "subject"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/write",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The agents that can edit this resource and its children.",
+    "https://atomicdata.dev/properties/isA": [
+        "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "read"
   }
 ]
