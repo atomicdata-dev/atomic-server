@@ -361,12 +361,12 @@ mod test {
                 .unwrap()
                 .to_string()
         );
-        assert!(
+        assert_eq!(
             collection
                 .get(urls::COLLECTION_MEMBER_COUNT)
                 .unwrap()
                 .to_string()
-                == "8"
+                , "7"
         );
     }
 
