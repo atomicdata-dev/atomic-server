@@ -32,6 +32,10 @@ I've got to automate this process some day...
 1. Update the versions in cargo.toml files using Semantic Versioning.
 1. run `cargo publish` in `lib`, than you can run the same in `cli` and `server`
 
+OR
+
+1. Install `cargo install cargo-release` and run `cargo release patch`
+
 ## Publishing server to Docker
 
 DockerHub has been setup to track the `master` branch, but it does not tag builds other than `latest`.

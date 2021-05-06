@@ -32,7 +32,7 @@ pub async fn post_commit(
     ) {
         return Err("Subject of commit should be sent to other domain - this store can not own this resource.".into());
     }
-    let saved_commit_resource = incoming_commit.apply(store)?;
+    let saved_commit_resource = incoming_commit.apply_opts(store, true, true, true, true)?;
     // TODO: better response
     let message = format!(
         "Commit succesfully applied. Can be seen at {}",

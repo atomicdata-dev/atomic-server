@@ -73,6 +73,7 @@ pub mod datatype;
 pub mod errors;
 #[cfg(feature = "db")]
 pub mod endpoints;
+pub mod hierarchy;
 pub mod mapping;
 pub mod parse;
 #[cfg(feature = "db")]

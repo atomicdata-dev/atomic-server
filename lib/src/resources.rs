@@ -214,6 +214,7 @@ impl Resource {
     /// Saves the resource (with all the changes) to the store by creating a Commit.
     /// Uses default Agent to sign the Commit.
     /// Returns the generated Commit.
+    /// Does not validate rights / hierarchy.
     /// Does not store these changes on the server of the Subject - the Commit will be lost, unless you handle it manually.
     pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
         let agent = store.get_default_agent()?;

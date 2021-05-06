@@ -5,8 +5,7 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, urls,
-    Resource, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, Resource, Storelike, Value,
 };
 
 /// A Commit is a set of changes to a Resource.
@@ -42,9 +41,11 @@ pub struct Commit {
 impl Commit {
     /// Apply a single signed Commit to the store.
     /// Creates, edits or destroys a resource.
-    /// Checks if the signature is created by the Agent.
+    /// Checks if the signature is created by the Agent, and validates the data shape.
+    /// Does not check if the correct rights are present.
+    /// If you need more control over which checks to perform, use apply_opts
     pub fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, true, true, true)
+        self.apply_opts(store, true, true, false, false)
     }
 
     /// Apply a single signed Commit to the store.
@@ -57,6 +58,7 @@ impl Commit {
         validate_schema: bool,
         validate_signature: bool,
         validate_timestamp: bool,
+        validate_rights: bool,
     ) -> AtomicResult<Resource> {
         if validate_signature {
             let signature = match self.signature.as_ref() {
@@ -99,16 +101,19 @@ impl Commit {
             }
         }
         let commit_resource: Resource = self.clone().into_resource(store)?;
+        // Create a new resource if it doens't exist yet
+        let mut resource = match store.get_resource(&self.subject) {
+            Ok(rs) => rs,
+            Err(_) => Resource::new(self.subject.clone()),
+        };
+        // If a Destroy field is found, remove the resource and return early
+        // TODO: Should we remove the existing commits too? Probably.
         if let Some(destroy) = self.destroy {
             if destroy {
                 store.remove_resource(&self.subject)?;
                 return Ok(commit_resource);
             }
         }
-        let mut resource = match store.get_resource(&self.subject) {
-            Ok(rs) => rs,
-            Err(_) => Resource::new(self.subject.clone()),
-        };
         if let Some(set) = self.set.clone() {
             for (prop, val) in set.iter() {
                 resource.set_propval(prop.into(), val.to_owned(), store)?;
@@ -121,9 +126,23 @@ impl Commit {
             }
             store.add_resource(&resource)?;
         }
+        // Check if all required props are there
         if validate_schema {
             resource.check_required_props(store)?;
         }
+        // Set a parent only if the rights checks are to be validated
+        if validate_rights {
+            // If there is no explicit parent set, revert to a default
+            if resource.get(urls::PARENT).is_err() {
+                let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
+                resource.set_propval(urls::PARENT.into(), Value::AtomicUrl(default_parent), store)?;
+            }
+            if !crate::hierarchy::check_write(store, &resource, self.signer.clone())?
+            {
+                return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                &self.signer, self.subject).into());
+            }
+        };
         // Save the Commit to the Store
         store.add_resource(&commit_resource)?;
         Ok(commit_resource)
@@ -131,7 +150,7 @@ impl Commit {
 
     /// Applies a commit without performing authorization / signature / schema checks.
     pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, false, false, false)
+        self.apply_opts(store, false, false, false, false)
     }
 
     /// Converts a Resource of a Commit into a Commit
@@ -184,8 +203,7 @@ impl Commit {
             Value::new(&self.subject, &DataType::AtomicUrl).unwrap(),
             store,
         )?;
-        let mut classes: Vec<String> = Vec::new();
-        classes.push(urls::COMMIT.into());
+        let classes = vec![urls::COMMIT.to_string()];
         resource.set_propval(urls::IS_A.into(), classes.into(), store)?;
         resource.set_propval(
             urls::CREATED_AT.into(),
@@ -239,10 +257,8 @@ impl Commit {
         let mut commit_resource = self.clone().into_resource(store)?;
         // A deterministic serialization should not contain the hash (signature), since that would influence the hash.
         commit_resource.remove_propval(urls::SIGNATURE);
-        let json_obj = crate::serialize::propvals_to_json_map(
-            commit_resource.get_propvals(),
-            None,
-        )?;
+        let json_obj =
+            crate::serialize::propvals_to_json_map(commit_resource.get_propvals(), None)?;
         serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into())
     }
 }
@@ -405,8 +421,7 @@ mod test {
         let description = Value::new("Some description", &DataType::String).unwrap();
         set.insert(urls::SHORTNAME.into(), shortname);
         set.insert(urls::DESCRIPTION.into(), description);
-        let mut remove = Vec::new();
-        remove.push(String::from(urls::IS_A));
+        let remove = vec![String::from(urls::IS_A)];
         let destroy = false;
         let commit = Commit {
             subject: String::from("https://localhost/test"),

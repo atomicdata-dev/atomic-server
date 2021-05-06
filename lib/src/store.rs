@@ -257,7 +257,7 @@ mod test {
         match res {
             crate::storelike::PathReturn::Subject(_) => panic!("Should be an Atom"),
             crate::storelike::PathReturn::Atom(atom) => {
-                assert!(atom.value == "class");
+                assert_eq!(atom.value, "class");
             }
         }
         let res = store
@@ -265,7 +265,7 @@ mod test {
             .unwrap();
         match res {
             crate::storelike::PathReturn::Subject(sub) => {
-                assert!(sub == urls::SHORTNAME);
+                assert_eq!(sub, urls::DESCRIPTION);
             }
             crate::storelike::PathReturn::Atom(_) => panic!("Should be an Subject"),
         }
