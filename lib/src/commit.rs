@@ -106,25 +106,15 @@ impl Commit {
             Ok(rs) => rs,
             Err(_) => Resource::new(self.subject.clone()),
         };
-        // If a Destroy field is found, remove the resource and return early
-        // TODO: Should we remove the existing commits too? Probably.
-        if let Some(destroy) = self.destroy {
-            if destroy {
-                store.remove_resource(&self.subject)?;
-                return Ok(commit_resource);
-            }
-        }
         if let Some(set) = self.set.clone() {
             for (prop, val) in set.iter() {
                 resource.set_propval(prop.into(), val.to_owned(), store)?;
             }
-            store.add_resource(&resource)?;
         }
         if let Some(remove) = self.remove.clone() {
             for prop in remove.iter() {
                 resource.remove_propval(&prop);
             }
-            store.add_resource(&resource)?;
         }
         // Check if all required props are there
         if validate_schema {
@@ -132,7 +122,7 @@ impl Commit {
         }
         // Set a parent only if the rights checks are to be validated
         if validate_rights {
-            // If there is no explicit parent set, revert to a default
+        // If there is no explicit parent set, revert to a default
             if resource.get(urls::PARENT).is_err() {
                 let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
                 resource.set_propval(urls::PARENT.into(), Value::AtomicUrl(default_parent), store)?;
@@ -142,9 +132,19 @@ impl Commit {
                 return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
                 &self.signer, self.subject).into());
             }
+            println!("This should not happen!")
         };
+        // If a Destroy field is found, remove the resource and return early
+        // TODO: Should we remove the existing commits too? Probably.
+        if let Some(destroy) = self.destroy {
+            if destroy {
+                store.remove_resource(&self.subject)?;
+                return Ok(commit_resource);
+            }
+        }
         // Save the Commit to the Store
         store.add_resource(&commit_resource)?;
+        store.add_resource(&resource)?;
         Ok(commit_resource)
     }
 

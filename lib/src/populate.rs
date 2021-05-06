@@ -3,12 +3,7 @@
 //! These base models are required for having a functioning store.
 //! Other populate methods help to set up an Atomic Server, by creating a basic file hierarcy and creating default collections.
 
-use crate::{
-    datatype::DataType,
-    errors::AtomicResult,
-    schema::{Class, Property},
-    urls, Storelike,
-};
+use crate::{Storelike, datatype::DataType, errors::AtomicResult, schema::{Class, Property}, urls};
 
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.
 /// This is necessary to prevent a loop where Property X (like the `shortname` Property)
@@ -121,7 +116,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Adds the hierarchy related items (Drive, default Folder) to the Store. Sets the home page as the top level node
+/// Adds the hierarchy related items (Drive, default Folder) to the Store. Sets the home page as the top level node, and gives write rights to the default agent.
 pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
     let self_url = store
         .get_self_url()
@@ -134,8 +129,18 @@ pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
         base_url.host_str().ok_or("Can't use current base URL")?,
         store,
     )?;
-    // drive.set_propval(urls::WRITE.into(), crate::Value::AtomicUrl(store.get_default_agent()?.subject), store)?;
-    // drive.set_propval(urls::READ.into(), crate::Value::AtomicUrl(store.get_default_agent()?.subject), store)?;
+    // The root agent does not yet exist
+    // let root_agent = store.get_default_agent()?.subject;
+    // drive.set_propval(
+    //     urls::READ.into(),
+    //     Value::ResourceArray(vec![root_agent.clone()]),
+    //     store,
+    // )?;
+    // drive.set_propval(
+    //     urls::WRITE.into(),
+    //     Value::ResourceArray(vec![root_agent]),
+    //     store,
+    // )?;
     store.add_resource(&drive)
 }
 
