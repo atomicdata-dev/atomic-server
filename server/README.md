@@ -63,6 +63,13 @@ cargo run --features desktop
 # Visit http://localhost
 ```
 
+### Troubleshooting
+
+```sh
+# If pkg-config or libssl-dev is not installed, make sure to install them
+sudo apt-get install -y pkg-config libssl-dev --fix-missing                                                                                                                                                                       10:52:39
+```
+
 ## Initial setup and configuration
 
 - The server loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
