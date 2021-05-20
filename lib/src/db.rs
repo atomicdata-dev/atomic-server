@@ -196,7 +196,6 @@ impl Storelike for Db {
                 crate::urls::DRIVE => {
                     return crate::hierarchy::add_children(self, &mut resource)
                 }
-                "example" => todo!(),
                 _ => {}
             }
         }

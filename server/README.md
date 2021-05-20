@@ -13,10 +13,13 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 
 - No runtime dependencies, fast, runs on all platforms
 - Embedded HTTP / HTTPS / HTTP2.0 server
-- Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad)
-- Uses [atomic-data-abrowser](https://github.com/joepio/atomic-data-browser) as front-end.
+- Supports dynamic schema validation using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- Supports event-sourced versioning powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- Supports querying, sorting and filtering using [Atomic Collections]()
+- Serialization to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
+- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as front-end.
 
-Powered by Rust, atomic-lib, actix-web, Sled and [more](Cargo.toml).
+Powered by Rust, atomic-lib, [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
 
 ## When should you use this
 

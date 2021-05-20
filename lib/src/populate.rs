@@ -166,9 +166,17 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
         let class = store.get_class(&atom.subject)?;
         // Can't import this for some reason - even if it's there in cargo.toml
         // let plural_name = pluralize_rs::to_plural(class.shortname);
+
+        // Pluralize the shortname
+        let pluralized = match class.shortname.as_ref() {
+            "class" => "classes".to_string(),
+            "property" => "properties".to_string(),
+            other => format!("{}s", other).to_string(),
+        };
+
         let collection = CollectionBuilder::class_collection(
             &class.subject,
-            &format!("collections/{}", &class.shortname),
+            &pluralized,
             store,
         );
         let mut collection_resource = collection.to_resource(store)?;
@@ -182,7 +190,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
         collection_resource.set_propval_string(
             urls::NAME.into(),
-            &format!("{} collection", class.shortname),
+            &pluralized,
             store
         )?;
         store.add_resource_unsafe(&collection_resource)?;
