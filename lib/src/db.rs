@@ -362,7 +362,7 @@ mod test {
     fn populate_collections() {
         let store = DB.lock().unwrap().clone();
         println!("{:?}", store.all_resources(false));
-        let collections_collection_url = format!("{}/collections/collection", store.get_base_url());
+        let collections_collection_url = format!("{}/collections", store.get_base_url());
         let my_resource = store
             .get_resource_extended(&collections_collection_url)
             .unwrap();
@@ -370,6 +370,6 @@ mod test {
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert!(my_value.to_string() == "7");
+        assert_eq!(my_value.to_string(), "9");
     }
 }
