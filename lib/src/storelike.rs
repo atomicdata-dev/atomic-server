@@ -164,7 +164,7 @@ pub trait Storelike: Sized {
     ///     Some("[\"https://atomicdata.dev/classes/Class\"]"),
     ///     true
     /// ).unwrap();
-    /// assert_eq!(atoms.len(), 8)
+    /// assert_eq!(atoms.len(), 9)
     /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.
