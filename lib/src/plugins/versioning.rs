@@ -1,4 +1,7 @@
-use crate::{Commit, Resource, Storelike, collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls};
+use crate::{
+    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, Commit,
+    Resource, Storelike,
+};
 
 pub fn version_endpoint() -> Endpoint {
     Endpoint {
@@ -14,7 +17,8 @@ pub fn all_versions_endpoint() -> Endpoint {
     Endpoint {
         path: "/all-versions".to_string(),
         params: [urls::SUBJECT.to_string()].into(),
-        description: "Shows all versions for some resource. Constructs these using Commits.".to_string(),
+        description: "Shows all versions for some resource. Constructs these using Commits."
+            .to_string(),
         shortname: "all-versions".to_string(),
         handle: handle_all_versions_request,
     }
@@ -57,18 +61,17 @@ fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicR
         page_size: 20,
     };
     let mut collection = collection_builder.into_collection(store)?;
-    let new_members = collection.members.iter_mut().map(|commit_url| {
-        construct_version_endpoint_url(store, commit_url)
-    }).collect();
+    let new_members = collection
+        .members
+        .iter_mut()
+        .map(|commit_url| construct_version_endpoint_url(store, commit_url))
+        .collect();
     collection.members = new_members;
     collection.to_resource(store)
 }
 
 /// Searches the local store for all commits with this subject
-fn get_commits_for_resource(
-    subject: &str,
-    store: &impl Storelike,
-) -> AtomicResult<Vec<Commit>> {
+fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Vec<Commit>> {
     let commit_atoms = store.tpf(None, Some(urls::SUBJECT), Some(subject), false)?;
     let mut commit_resources = Vec::new();
     for atom in commit_atoms {
@@ -112,7 +115,11 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
 
 /// Creates the versioning URL for some specific Commit
 fn construct_version_endpoint_url(store: &impl Storelike, commit_url: &str) -> String {
-    format!("{}/versioning?commit={}", store.get_base_url(), commit_url)
+    format!(
+        "{}/versioning?commit={}",
+        store.get_base_url(),
+        urlencoding::encode(commit_url)
+    )
 }
 
 /// Gets a version of a Resource by Commit.
