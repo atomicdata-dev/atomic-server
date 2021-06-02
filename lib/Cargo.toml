@@ -23,6 +23,7 @@ sled = {version = "0.34.6", optional = true}
 toml = {version = "0.5.8", optional = true}
 ureq = "1.5.4"
 url = "2.2.1"
+urlencoding = "1.3.3"
 
 [dev-dependencies]
 ntest = "0.7.3"
