@@ -9,6 +9,8 @@ pub const AGENT: &str = "https://atomicdata.dev/classes/Agent";
 pub const COLLECTION: &str = "https://atomicdata.dev/classes/Collection";
 pub const ENDPOINT: &str = "https://atomicdata.dev/classes/Endpoint";
 pub const DRIVE: &str = "https://atomicdata.dev/classes/Drive";
+pub const INVITE: &str = "https://atomicdata.dev/classes/Invite";
+pub const REDIRECT: &str = "https://atomicdata.dev/classes/Redirect";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -47,6 +49,16 @@ pub const PARENT: &str = "https://atomicdata.dev/properties/parent";
 pub const READ: &str = "https://atomicdata.dev/properties/read";
 pub const WRITE: &str = "https://atomicdata.dev/properties/write";
 pub const CHILDREN: &str = "https://atomicdata.dev/properties/children";
+// ... for Inivtations
+pub const DESTINATION: &str = "https://atomicdata.dev/properties/destination";
+pub const TARGET: &str = "https://atomicdata.dev/properties/invite/target";
+pub const USAGES_LEFT: &str = "https://atomicdata.dev/properties/invite/usagesLeft";
+pub const USED_BY: &str = "https://atomicdata.dev/properties/invite/usedBy";
+pub const WRITE_BOOL: &str = "https://atomicdata.dev/properties/invite/write";
+pub const INVITE_PUBKEY: &str = "https://atomicdata.dev/properties/invite/publicKey";
+pub const INVITE_AGENT: &str = "https://atomicdata.dev/properties/invite/agent";
+pub const REDIRECT_AGENT: &str = "https://atomicdata.dev/properties/invite/redirectAgent";
+
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

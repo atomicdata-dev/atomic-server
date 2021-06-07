@@ -122,13 +122,16 @@ impl Commit {
         }
         // Set a parent only if the rights checks are to be validated
         if validate_rights {
-        // If there is no explicit parent set, revert to a default
+            // If there is no explicit parent set, revert to a default
             if resource.get(urls::PARENT).is_err() {
                 let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
-                resource.set_propval(urls::PARENT.into(), Value::AtomicUrl(default_parent), store)?;
+                resource.set_propval(
+                    urls::PARENT.into(),
+                    Value::AtomicUrl(default_parent),
+                    store,
+                )?;
             }
-            if !crate::hierarchy::check_write(store, &resource, self.signer.clone())?
-            {
+            if !crate::hierarchy::check_write(store, &resource, self.signer.clone())? {
                 return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
                 &self.signer, self.subject).into());
             }
@@ -337,13 +340,18 @@ fn sign_at(
     let stringified = commit
         .serialize_deterministically_json_ad(store)
         .map_err(|e| format!("Failed serializing commit: {}", e))?;
-    let signature =
-        sign_message(&stringified, &agent.private_key, &agent.public_key).map_err(|e| {
-            format!(
-                "Failed to sign message for resource {} with agent {}: {}",
-                commit.subject, agent.subject, e
-            )
-        })?;
+    let private_key = agent.private_key.clone().ok_or("No private key in agent")?;
+    let signature = sign_message(
+        &stringified,
+        &private_key,
+        &agent.public_key,
+    )
+    .map_err(|e| {
+        format!(
+            "Failed to sign message for resource {} with agent {}: {}",
+            commit.subject, agent.subject, e
+        )
+    })?;
     commit.signature = Some(signature);
     Ok(commit)
 }

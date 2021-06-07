@@ -111,7 +111,14 @@
       "https://atomicdata.dev/properties/requires": [
           "https://atomicdata.dev/properties/invite/target",
           "https://atomicdata.dev/properties/invite/usagesLeft",
-          "https://atomicdata.dev/properties/invite/usedBy"
+          "https://atomicdata.dev/properties/invite/users"
+      ],
+      "https://atomicdata.dev/properties/recommends": [
+        "https://atomicdata.dev/properties/invite/write"
+      ],
+      "https://atomicdata.dev/properties/endpoint/parameters": [
+        "https://atomicdata.dev/properties/invite/publicKey",
+        "https://atomicdata.dev/properties/invite/agent"
       ],
       "https://atomicdata.dev/properties/shortname": "invite"
   },
@@ -130,6 +137,20 @@
           "https://atomicdata.dev/properties/shortname"
       ],
       "https://atomicdata.dev/properties/shortname": "property"
+  },
+  {
+      "@id": "https://atomicdata.dev/classes/Redirect",
+      "https://atomicdata.dev/properties/description": "A Resource that should redirect the browser to a new location.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Class"
+      ],
+      "https://atomicdata.dev/properties/requires": [
+          "https://atomicdata.dev/properties/destination"
+      ],
+      "https://atomicdata.dev/properties/recommends": [
+          "https://atomicdata.dev/properties/invite/redirectAgent"
+      ],
+      "https://atomicdata.dev/properties/shortname": "redirect"
   },
   {
       "@id": "https://atomicdata.dev/datatypes/atomicURL",
@@ -351,6 +372,15 @@
       "https://atomicdata.dev/properties/shortname": "description"
   },
   {
+      "@id": "https://atomicdata.dev/properties/destination",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "Where a redirect should point to.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "destination"
+  },
+  {
       "@id": "https://atomicdata.dev/properties/destroy",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
       "https://atomicdata.dev/properties/description": "If set to true, the entire Subject resource will be removed in this commit. This will be executed _before_ other commands, such as set.",
@@ -388,7 +418,7 @@
       "https://atomicdata.dev/properties/shortname": "usages-left"
   },
   {
-      "@id": "https://atomicdata.dev/properties/invite/usedBy",
+      "@id": "https://atomicdata.dev/properties/invite/users",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
       "https://atomicdata.dev/properties/description": "The list of Agents that have used this Invite.",
@@ -396,6 +426,44 @@
           "https://atomicdata.dev/classes/Property"
       ],
       "https://atomicdata.dev/properties/shortname": "used-by"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/invite/write",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+      "https://atomicdata.dev/properties/description": "If true, provides the one who is invited with Write rights, which means allowing to edit the resource, its properties and its children.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "write"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/invite/publicKey",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+      "https://atomicdata.dev/properties/description": "The public key of the Agent that wants to use an Invite. This will create an Agent on the Store using this private key.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "public-key"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/invite/agent",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "The Agent that should be given the rights for this Invite.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "agent"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/invite/redirectAgent",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "The Agent that is created in a Redirect action.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "redirect-agent"
   },
   {
       "@id": "https://atomicdata.dev/properties/isA",

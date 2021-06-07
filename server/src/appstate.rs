@@ -56,7 +56,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
             let cfg = atomic_lib::config::Config {
                 agent: agent.subject.clone(),
                 server: config.local_base_url.clone(),
-                private_key: agent.private_key,
+                private_key: agent.private_key.expect("No private key for agent. Check the config file."),
             };
             let config_string = atomic_lib::config::write_config(&config.config_file_path, cfg.clone())?;
             log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli) to log in with these credentials. \n{}", &config.config_file_path, config_string);

@@ -193,6 +193,9 @@ impl Storelike for Db {
                 crate::urls::COLLECTION => {
                     return crate::collections::construct_collection(self, query_params, &mut resource)
                 }
+                crate::urls::INVITE => {
+                    return crate::plugins::invite::construct_invite_redirect(self, query_params, &mut resource)
+                }
                 crate::urls::DRIVE => {
                     return crate::hierarchy::add_children(self, &mut resource)
                 }
@@ -370,6 +373,6 @@ mod test {
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert_eq!(my_value.to_string(), "9");
+        assert_eq!(my_value.to_string(), "10");
     }
 }
