@@ -33,7 +33,7 @@ impl Context<'_> {
         self.write.borrow_mut().replace(write_ctx.clone());
         self.store.set_default_agent(Agent {
             subject: write_ctx.agent.clone(),
-            private_key: write_ctx.private_key.clone(),
+            private_key: Some(write_ctx.private_key.clone()),
             created_at: atomic_lib::datetime_helpers::now(),
             name: format!("Temporary name for {}", write_ctx.agent),
             public_key: generate_public_key(&write_ctx.private_key).public,

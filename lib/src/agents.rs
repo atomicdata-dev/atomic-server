@@ -7,7 +7,7 @@ use crate::{Resource, Storelike, datetime_helpers, errors::AtomicResult, urls};
 #[derive(Clone, Debug)]
 pub struct Agent {
   /// Private key for signing commits
-  pub private_key: String,
+  pub private_key: Option<String>,
   /// Private key for signing commits
   pub public_key: String,
   /// URL of the Agent
@@ -39,10 +39,21 @@ impl Agent {
     let keypair = generate_public_key(private_key);
 
     Agent {
-      private_key: keypair.private,
+      private_key: Some(keypair.private),
       public_key: keypair.public.clone(),
       subject: format!("{}/agents/{}", store.get_base_url(), keypair.public),
       name,
+      created_at: datetime_helpers::now(),
+    }
+  }
+
+  pub fn new_from_public_key(store: &impl Storelike, public_key: &str) -> Agent {
+
+    Agent {
+      private_key: None,
+      public_key: public_key.into(),
+      subject: format!("{}/agents/{}", store.get_base_url(), public_key),
+      name: public_key.into(),
       created_at: datetime_helpers::now(),
     }
   }
