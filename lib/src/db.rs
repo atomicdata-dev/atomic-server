@@ -169,6 +169,7 @@ impl Storelike for Db {
         if removed_query_params.ends_with('/') { removed_query_params.pop(); }
 
         // Check if the subject matches one of the endpoints
+        // TODO: do this on initialize, not on request!
         let endpoints = crate::endpoints::default_endpoints();
         let mut endpoint_resource = None;
         endpoints.into_iter().for_each(|endpoint| {
@@ -194,7 +195,7 @@ impl Storelike for Db {
                     return crate::collections::construct_collection(self, query_params, &mut resource)
                 }
                 crate::urls::INVITE => {
-                    return crate::plugins::invite::construct_invite_redirect(self, query_params, &mut resource)
+                    return crate::plugins::invite::construct_invite_redirect(self, query_params, &mut resource, subject)
                 }
                 crate::urls::DRIVE => {
                     return crate::hierarchy::add_children(self, &mut resource)

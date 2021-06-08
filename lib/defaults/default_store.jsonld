@@ -109,12 +109,13 @@
           "https://atomicdata.dev/classes/Class"
       ],
       "https://atomicdata.dev/properties/requires": [
-          "https://atomicdata.dev/properties/invite/target",
-          "https://atomicdata.dev/properties/invite/usagesLeft",
-          "https://atomicdata.dev/properties/invite/users"
+          "https://atomicdata.dev/properties/invite/target"
       ],
       "https://atomicdata.dev/properties/recommends": [
-        "https://atomicdata.dev/properties/invite/write"
+        "https://atomicdata.dev/properties/invite/write",
+        "https://atomicdata.dev/properties/createdBy",
+        "https://atomicdata.dev/properties/invite/users",
+        "https://atomicdata.dev/properties/invite/usagesLeft"
       ],
       "https://atomicdata.dev/properties/endpoint/parameters": [
         "https://atomicdata.dev/properties/invite/publicKey",
@@ -353,6 +354,16 @@
       "https://atomicdata.dev/properties/shortname": "created-at"
   },
   {
+      "@id": "https://atomicdata.dev/properties/createdBy",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "Who created this resource.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "created-by"
+  },
+  {
       "@id": "https://atomicdata.dev/properties/datatype",
       "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Datatype",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
@@ -425,7 +436,7 @@
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Property"
       ],
-      "https://atomicdata.dev/properties/shortname": "used-by"
+      "https://atomicdata.dev/properties/shortname": "users"
   },
   {
       "@id": "https://atomicdata.dev/properties/invite/write",
@@ -604,6 +615,6 @@
     "https://atomicdata.dev/properties/isA": [
         "https://atomicdata.dev/classes/Property"
     ],
-    "https://atomicdata.dev/properties/shortname": "read"
+    "https://atomicdata.dev/properties/shortname": "write"
   }
 ]
