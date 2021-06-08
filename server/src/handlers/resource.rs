@@ -47,7 +47,7 @@ pub async fn get_resource(
     let resource = store
         .get_resource_extended(&subject)
         // TODO: Don't always return 404 - only when it's actually not found!
-        .map_err(|e| AppError::not_found(e.to_string()))?;
+        .map_err(|e| AppError::other_error(e.to_string()))?;
     match content_type {
         ContentType::JSON => {
             let body = resource.to_json(store)?;

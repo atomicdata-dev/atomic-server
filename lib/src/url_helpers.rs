@@ -19,3 +19,11 @@ pub fn base_url(url: &str) -> AtomicResult<String> {
 
     Ok(parsed.to_string())
 }
+
+/// Throws an error if the URL is not a valid URL
+pub fn check_valid_url(url: &str) -> AtomicResult<()> {
+     if !url.starts_with("http") {
+         return Err(format!("Url does not start with http: {}", url).into())
+     }
+     Ok(())
+}

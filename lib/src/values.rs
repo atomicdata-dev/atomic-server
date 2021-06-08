@@ -1,8 +1,6 @@
 //! A value is the part of an Atom that contains the actual information.
 
-use crate::{
-    datatype::match_datatype, datatype::DataType, errors::AtomicResult, resources::PropVals,
-};
+use crate::{datatype::DataType, datatype::match_datatype, errors::AtomicResult, resources::PropVals, url_helpers::check_valid_url};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
@@ -82,7 +80,10 @@ impl Value {
                 )
                 .into())
             }
-            DataType::AtomicUrl => Ok(Value::AtomicUrl(value.into())),
+            DataType::AtomicUrl => {
+                check_valid_url(value)?;
+                Ok(Value::AtomicUrl(value.into()))
+            },
             DataType::ResourceArray => {
                 let vector: Vec<String> = crate::parse::parse_json_array(&value).map_err(|e| {
                     return format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e);

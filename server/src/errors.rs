@@ -26,6 +26,13 @@ impl AppError {
             error_type: AppErrorType::NotFoundError
         }
     }
+
+    pub fn other_error(message: String) -> AppError {
+        AppError {
+            message,
+            error_type: AppErrorType::OtherError
+        }
+    }
 }
 
 #[derive(Serialize)]
