@@ -6,7 +6,7 @@ license = "MIT"
 name = "atomic_lib"
 readme = "README.md"
 repository = "https://github.com/joepio/atomic"
-version = "0.23.3"
+version = "0.24.0"
 
 [dependencies]
 base64 = "0.13.0"

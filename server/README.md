@@ -13,8 +13,10 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 
 - No runtime dependencies, fast, runs on all platforms
 - Embedded HTTP / HTTPS / HTTP2.0 server
-- Supports dynamic schema validation using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- Supports dynamic schema validation / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
 - Supports event-sourced versioning powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- Supports hierarchical structures and authorization (read / write permissions) powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
+- Supports an easy invite / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 - Supports querying, sorting and filtering using [Atomic Collections]()
 - Serialization to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as front-end.
