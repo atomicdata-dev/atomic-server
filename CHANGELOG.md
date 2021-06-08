@@ -3,6 +3,12 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.24
+
+- [Hierarchy](https://docs.atomicdata.dev/hierarchy.html) with breadcrumbs and easy to use navigation #134
+- Authorization using Hierarchy, which means you can add write & read permissions anywhere in a hierarchy.
+- Invites to invite new and existing users to read / edit a bunch of resources. Test it [here](https://atomicdata.dev/invites/1).
+
 ## v0.23.5
 
 - Build using esbuild instead of webpack #31
