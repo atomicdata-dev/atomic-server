@@ -13,21 +13,22 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 
 - No runtime dependencies, fast, runs on all platforms
 - Embedded HTTP / HTTPS / HTTP2.0 server
-- Supports dynamic schema validation / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
-- Supports event-sourced versioning powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
-- Supports hierarchical structures and authorization (read / write permissions) powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
-- Supports an easy invite / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
-- Supports querying, sorting and filtering using [Atomic Collections]()
 - Serialization to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
-- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as front-end.
+- Dynamic schema validation / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- Event-sourced versioning powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- Authorization (read / write permissions) and Hierarchical structures  powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
+- Invite / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
+- Supports querying, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
+- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as a GUI / front-end.
 
 Powered by Rust, atomic-lib, [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
 
 ## When should you use this
 
 - You want to make (high-value) datasets as easily accessible as possible
-- You can afford to create or find an Atomic Schema for your dataset (use `atomic-cli new class` for this). Example classes [here](https://atomicdata.dev/classes).
+- You want to specify and share a common vocabulary / ontology / schema for some specific domain or dataset. Example classes [here](https://atomicdata.dev/classes).
 - You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
+- You are interested in re-decentralizing the web or want want to work with tech that improves data ownership and interoperability.
 - You like living on the edge (this application is not production ready)
 
 ```
@@ -68,7 +69,7 @@ cargo run --features desktop
 # Visit http://localhost
 ```
 
-### Troubleshooting
+### Troubleshooting during installation
 
 ```sh
 # If pkg-config or libssl-dev is not installed, make sure to install them
@@ -78,7 +79,7 @@ sudo apt-get install -y pkg-config libssl-dev --fix-missing                     
 ## Initial setup and configuration
 
 - The server loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
-- If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` (see HTTPS setup below)
+- If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` in the `.env` (see HTTPS setup below)
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
 
