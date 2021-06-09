@@ -219,7 +219,7 @@
   },
   {
       "@id": "https://atomicdata.dev/datatypes/string",
-      "https://atomicdata.dev/properties/description": "A UTF-8 string. Allows newlines with `\n`. This is a generic string datatype - don't use this for things like [markdown](https://atomicdata.dev/datatypes/markdown) or html.",
+      "https://atomicdata.dev/properties/description": "A UTF-8 string. Allows newlines with `\\n`. This is a generic string datatype - don't use this for things like [markdown](https://atomicdata.dev/datatypes/markdown) or html.",
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Datatype"
       ],
