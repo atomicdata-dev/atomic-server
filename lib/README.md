@@ -17,18 +17,22 @@ Also, the [`atomic-cli`](../cli/readme.md) and [`atomic-server`](../server/readm
 
 ## Features
 
-- In-memory store for getting / setting data (`Store`). Useful for clients.
-- On disk database (`Db`, uses Sled), which powers `atomic-server`.
-- Parsing (JSON-AD) and serialization (RDF, Turtle, N-Triples, JSON, JSON-LD) of atomic data.
+- Two stores for Atomic Data:
+  - In-memory store for getting / setting data (`Store`). Useful for clients.
+  - On disk database (`Db`, uses Sled), which powers `atomic-server`.
+- [JSON-AD Parser](https://docs.atomicdata.dev/core/json-ad.html)
+- Serialization of atomic data  to JSON-AD, plain JSON, RDF, Turtle, N-Triples and JSON-LD.
 - [Path](https://docs.atomicdata.dev/core/paths.html) traversal
 - Convert Atomic Data to Rust native types
 - Resolve / parse mappings (bookmarks)
-- Validate Atomic Schema
-- Atomic Commits (transactions / delta's / changes / updates / versioning / history)
-- Plugins (currently only Endpoints which enable dynamic resources)
-- Collections (pagination, sorting, filtering)
+- Validate [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html) (transactions / delta's / changes / updates / versioning / history)
+- Plugin system (although not very mature)
+- [Collections](https://docs.atomicdata.dev/schema/collections.html) (pagination, sorting, filtering)
 - Querying (using triple pattern fragments)
-
+- [Invites](https://docs.atomicdata.dev/invitations.html)
+- [Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
+- Saving Atomic Config files.
 
 ## Optional features
 
