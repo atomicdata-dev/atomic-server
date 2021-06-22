@@ -1,4 +1,4 @@
-# Atomic
+# atomic-data-rust
 
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
