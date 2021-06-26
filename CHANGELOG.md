@@ -3,7 +3,13 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
-## v0.24
+## v0.24.1
+
+- Add write rights to Agent itself on accepting Invite
+- Fix RDF serialization for dynamic resources #141
+- Update and check Usages for Invites #134
+
+## v0.24.0
 
 - [Hierarchy](https://docs.atomicdata.dev/hierarchy.html) with breadcrumbs and easy to use navigation #134
 - Authorization using Hierarchy, which means you can add write & read permissions anywhere in a hierarchy.

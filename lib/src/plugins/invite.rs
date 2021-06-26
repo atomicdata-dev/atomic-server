@@ -1,4 +1,4 @@
-use crate::{Resource, Storelike, agents::Agent, errors::AtomicResult, url_helpers::check_valid_url, urls};
+use crate::{Resource, Storelike, Value, agents::Agent, errors::AtomicResult, url_helpers::check_valid_url, urls};
 
 /// If there is a valid Agent in the correct query param, and the invite is valid, update the rights and respond with a redirect to the target resource
 pub fn construct_invite_redirect(
@@ -24,6 +24,12 @@ pub fn construct_invite_redirect(
         (Some(public_key), None) => {
             let new_agent = Agent::new_from_public_key(store, &public_key)?;
             store.add_resource(&new_agent.to_resource(store)?)?;
+            // I'd rather do this, but this errors:
+            // new_agent.to_resource(store)?.save_locally(store)?;
+
+            // Always add write rights to the agent itself
+            // A bit inefficient, since it re-fetches the agent from the store, but it's not that big of a cost
+            add_rights(&new_agent.subject, &new_agent.subject, true, store)?;
             new_agent.subject
         },
         (Some(_), Some(_)) => return Err("Either publicKey or agent can be set - not both at the same time.".into()),
@@ -36,7 +42,15 @@ pub fn construct_invite_redirect(
         |e| format!("Invite {} does not have a target. {}", invite_resource.get_subject(), e)
     )?.to_string();
 
-    // TODO: inplement usagesLeft check
+    if let Ok(usages_left) = invite_resource.get(urls::USAGES_LEFT) {
+        let num  = usages_left.to_int()?;
+        if num == 0 {
+            return Err("No usages left for this invite".into())
+        }
+        invite_resource.set_propval(urls::USAGES_LEFT.into(), Value::Integer(num - 1), store)?;
+        invite_resource.save_locally(store).map_err(|e| format!("Unable to save updated Invite. {}", e))?;
+    }
+
     // TODO: implement rights check
     // check_if_invite_is_valid(invite_resource)?;
     add_rights(&agent, target, write, store)?;
