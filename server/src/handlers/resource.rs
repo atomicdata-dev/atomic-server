@@ -70,7 +70,7 @@ pub async fn get_resource(
             Ok(builder.body(body))
         }
         ContentType::TURTLE | ContentType::NT => {
-            let atoms = store.get_resource(&subject)?.to_atoms()?;
+            let atoms = resource.to_atoms()?;
             let body = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(body))
         }
