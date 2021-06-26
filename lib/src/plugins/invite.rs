@@ -36,7 +36,11 @@ pub fn construct_invite_redirect(
     };
 
     // If there are write or read rights
-    let write = invite_resource.get(urls::WRITE_BOOL)?.to_bool()?;
+    let write = if let Ok(bool) = invite_resource.get(urls::WRITE_BOOL){
+        bool.to_bool()?
+    } else {
+        false
+    };
 
     let target=  &invite_resource.get(urls::TARGET).map_err(
         |e| format!("Invite {} does not have a target. {}", invite_resource.get_subject(), e)
