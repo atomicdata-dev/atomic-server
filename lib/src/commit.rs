@@ -106,21 +106,8 @@ impl Commit {
             Ok(rs) => rs,
             Err(_) => Resource::new(self.subject.clone()),
         };
-        if let Some(set) = self.set.clone() {
-            for (prop, val) in set.iter() {
-                resource.set_propval(prop.into(), val.to_owned(), store)?;
-            }
-        }
-        if let Some(remove) = self.remove.clone() {
-            for prop in remove.iter() {
-                resource.remove_propval(&prop);
-            }
-        }
-        // Check if all required props are there
-        if validate_schema {
-            resource.check_required_props(store)?;
-        }
-        // Set a parent only if the rights checks are to be validated
+        // Set a parent only if the rights checks are to be validated.
+        // This should happen _before_ setting any values, to prevent malicious users from giving themselves write rights in a commit!
         if validate_rights {
             // If there is no explicit parent set, revert to a default
             if resource.get(urls::PARENT).is_err() {
@@ -137,6 +124,20 @@ impl Commit {
             }
             println!("This should not happen!")
         };
+        if let Some(set) = self.set.clone() {
+            for (prop, val) in set.iter() {
+                resource.set_propval(prop.into(), val.to_owned(), store)?;
+            }
+        }
+        if let Some(remove) = self.remove.clone() {
+            for prop in remove.iter() {
+                resource.remove_propval(&prop);
+            }
+        }
+        // Check if all required props are there
+        if validate_schema {
+            resource.check_required_props(store)?;
+        }
         // If a Destroy field is found, remove the resource and return early
         // TODO: Should we remove the existing commits too? Probably.
         if let Some(destroy) = self.destroy {
