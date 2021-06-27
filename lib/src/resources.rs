@@ -366,19 +366,7 @@ impl Resource {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{parse::parse_ad3, urls, Store};
-
-    fn init_store() -> Store {
-        let string =
-            String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
-        let store = Store::init().unwrap();
-        store.populate().unwrap();
-        let atoms = parse_ad3(&string).unwrap();
-        let agent = store.create_agent("testman").unwrap();
-        store.set_default_agent(agent);
-        store.add_atoms(atoms).unwrap();
-        store
-    }
+    use crate::{test_utils::init_store, urls};
 
     #[test]
     fn get_and_set_resource_props() {

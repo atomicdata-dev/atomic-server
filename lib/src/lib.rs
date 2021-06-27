@@ -84,6 +84,7 @@ pub mod schema;
 pub mod serialize;
 pub mod store;
 pub mod storelike;
+mod test_utils;
 mod url_helpers;
 pub mod urls;
 pub mod validate;
