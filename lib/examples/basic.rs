@@ -39,7 +39,7 @@ fn main() {
     // In order to change things in the store, we should use Commits,
     // which are signed pieces of data that contain state changes.
     // Because these are signed, we need an Agent, which has a private key to sign Commits.
-    let agent = store.create_agent("my_agent").unwrap();
+    let agent = store.create_agent(Some("my_agent")).unwrap();
     store.set_default_agent(agent);
     let _fails   = new_property.save_locally(&store);
     // But.. when we commit, we get an error!

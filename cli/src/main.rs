@@ -35,7 +35,7 @@ impl Context<'_> {
             subject: write_ctx.agent.clone(),
             private_key: Some(write_ctx.private_key.clone()),
             created_at: atomic_lib::datetime_helpers::now(),
-            name: format!("Temporary name for {}", write_ctx.agent),
+            name: None,
             public_key: generate_public_key(&write_ctx.private_key).public,
         });
         write_ctx
@@ -256,7 +256,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
             tpf(context)?;
         }
         Some("validate") => {
-            validate(context)?;
+            validate(context);
         }
         Some(cmd) => return Err(format!("{} is not a valid command. Run atomic --help", cmd).into()),
         None => println!("Run atomic --help for available commands"),
@@ -316,10 +316,9 @@ fn tpf_value(string: &str) -> Option<&str> {
 }
 
 /// Validates the store
-fn validate(context: &mut Context) -> AtomicResult<()> {
+fn validate(context: &mut Context) {
     let reportstring = context.store.validate().to_string();
     println!("{}", reportstring);
-    Ok(())
 }
 
 #[cfg(test)]

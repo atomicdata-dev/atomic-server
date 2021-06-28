@@ -13,7 +13,7 @@ pub struct Agent {
     /// URL of the Agent
     pub subject: String,
     pub created_at: i64,
-    pub name: String,
+    pub name: Option<String>,
 }
 
 impl Agent {
@@ -22,7 +22,9 @@ impl Agent {
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
         let mut agent = Resource::new_instance(urls::AGENT, store)?;
         agent.set_subject(self.subject.clone());
-        agent.set_propval_string(crate::urls::NAME.into(), &self.name, store)?;
+        if let Some(name) = &self.name {
+            agent.set_propval_string(crate::urls::NAME.into(), name, store)?;
+        }
         agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &self.public_key, store)?;
         agent.set_propval_string(
             crate::urls::CREATED_AT.into(),
@@ -33,20 +35,20 @@ impl Agent {
     }
 
     /// Creates a new Agent, generates a new Keypair.
-    pub fn new(name: String, store: &impl Storelike) -> AtomicResult<Agent> {
+    pub fn new(name: Option<&str>, store: &impl Storelike) -> AtomicResult<Agent> {
         let keypair = generate_keypair()?;
 
         Ok(Agent::new_from_private_key(name, store, &keypair.private))
     }
 
-    pub fn new_from_private_key(name: String, store: &impl Storelike, private_key: &str) -> Agent {
+    pub fn new_from_private_key(name: Option<&str>, store: &impl Storelike, private_key: &str) -> Agent {
         let keypair = generate_public_key(private_key);
 
         Agent {
             private_key: Some(keypair.private),
             public_key: keypair.public.clone(),
             subject: format!("{}/agents/{}", store.get_base_url(), keypair.public),
-            name,
+            name: name.map(|x| x.to_owned()),
             created_at: datetime_helpers::now(),
         }
     }
@@ -58,7 +60,7 @@ impl Agent {
             private_key: None,
             public_key: public_key.into(),
             subject: format!("{}/agents/{}", store.get_base_url(), public_key),
-            name: public_key.into(),
+            name: None,
             created_at: datetime_helpers::now(),
         })
     }

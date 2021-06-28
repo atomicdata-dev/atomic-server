@@ -38,3 +38,36 @@ pub fn check_write(
     Ok(false)
   }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{Storelike, Value, datatype::DataType};
+
+
+    // TODO: Add tests for:
+    // - basic check_write (should be false for newly created agent)
+    // - Malicious Commit (which grants itself write rights)
+
+    #[test]
+    fn authorization() {
+        let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
+        let agent = store.create_agent(Some("test_actor")).unwrap();
+        let subject = "https://localhost/new_thing";
+        let mut commitbuilder_1 = crate::commit::CommitBuilder::new(subject.into());
+        let property = crate::urls::DESCRIPTION;
+        let value = Value::new("Some value", &DataType::Markdown).unwrap();
+        commitbuilder_1.set(property.into(), value.clone());
+        let mut commitbuilder_2 = commitbuilder_1.clone();
+        let commit_1 = commitbuilder_1.sign(&agent, &store).unwrap();
+        // Should fail if there is no self_url set in the store, and no parent in the commit
+        // TODO: FINISH THIS
+        // commit_1.apply_opts(&store, true, true, true, true).unwrap_err();
+        // commitbuilder_2.set(crate::urls::PARENT.into(), Value::AtomicUrl(crate::urls::AGENT.into()));
+        // let commit_2 = commitbuilder_2.sign(&agent, &store).unwrap();
+
+        // let resource = store.get_resource(&subject).unwrap();
+        // assert!(resource.get(property).unwrap().to_string() == value.to_string());
+    }
+}

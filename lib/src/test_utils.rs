@@ -7,7 +7,7 @@ pub fn init_store() -> Store {
   let store = Store::init().unwrap();
   store.populate().unwrap();
   let atoms = parse_ad3(&string).unwrap();
-  let agent = store.create_agent("testman").unwrap();
+  let agent = store.create_agent(None).unwrap();
   store.set_default_agent(agent);
   store.add_atoms(atoms).unwrap();
   store

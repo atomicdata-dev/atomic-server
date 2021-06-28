@@ -269,7 +269,7 @@ mod test {
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
         store.populate().unwrap();
-        let agent = store.create_agent("name").unwrap();
+        let agent = store.create_agent(None).unwrap();
         store.set_default_agent(agent);
         store
     }
@@ -281,7 +281,7 @@ mod test {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
-        let agent = store.create_agent("name").unwrap();
+        let agent = store.create_agent(None).unwrap();
         store.populate().unwrap();
         store.set_default_agent(agent);
         store

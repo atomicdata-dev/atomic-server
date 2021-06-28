@@ -63,8 +63,8 @@ pub trait Storelike: Sized {
     /// Returns a tuple of (subject, private_key).
     /// Make sure to store the private_key somewhere safe!
     /// Does not create a Commit.
-    fn create_agent(&self, name: &str) -> AtomicResult<crate::agents::Agent> {
-        let agent = Agent::new(name.to_string(), self)?;
+    fn create_agent(&self, name: Option<&str>) -> AtomicResult<crate::agents::Agent> {
+        let agent = Agent::new(name, self)?;
         self.add_resource(&agent.to_resource(self)?)?;
         Ok(agent)
     }

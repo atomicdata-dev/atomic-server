@@ -185,12 +185,6 @@ mod test {
     }
 
     #[test]
-    fn validate() {
-        let store = init_store();
-        assert!(store.validate().is_valid())
-    }
-
-    #[test]
     fn validate_invalid() {
         let store = init_store();
         let invalid_ad3 =

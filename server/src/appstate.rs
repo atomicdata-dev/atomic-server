@@ -52,7 +52,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
             }
         }
         Err(_) => {
-            let agent = store.create_agent("root")?;
+            let agent = store.create_agent(Some("root"))?;
             let cfg = atomic_lib::config::Config {
                 agent: agent.subject.clone(),
                 server: config.local_base_url.clone(),
@@ -73,7 +73,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         private_key: Some(ag_cfg.private_key.clone()),
         public_key: generate_public_key(&ag_cfg.private_key).public,
         created_at: 0,
-        name: "generated Agent - full name not generatoed".to_string(),
+        name: None,
     };
     log::info!("Setting default Agent {}...", &agent.subject);
     store.set_default_agent(agent);

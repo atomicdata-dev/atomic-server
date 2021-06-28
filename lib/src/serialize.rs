@@ -223,10 +223,10 @@ mod test {
      "https://atomicdata.dev/classes/Class"
   ],
   "https://atomicdata.dev/properties/recommends": [
+    "https://atomicdata.dev/properties/name",
     "https://atomicdata.dev/properties/description"
   ],
     "https://atomicdata.dev/properties/requires": [
-    "https://atomicdata.dev/properties/name",
     "https://atomicdata.dev/properties/publicKey"
   ],
   "https://atomicdata.dev/properties/shortname": "agent"
@@ -266,10 +266,10 @@ mod test {
               "https://atomicdata.dev/classes/Class"
             ],
             "recommends": [
+              "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/description"
             ],
             "requires": [
-              "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/publicKey"
             ],
             "shortname": "agent"
@@ -313,10 +313,10 @@ mod test {
               "https://atomicdata.dev/classes/Class"
             ],
             "recommends": [
+              "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/description"
             ],
             "requires": [
-              "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/publicKey"
             ],
             "shortname": "agent"

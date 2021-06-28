@@ -394,7 +394,7 @@ mod test {
     fn agent_and_commit() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        let agent = store.create_agent("test_actor").unwrap();
+        let agent = store.create_agent(Some("test_actor")).unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
@@ -452,7 +452,7 @@ mod test {
         let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        let agent = Agent::new_from_private_key("name".into(), &store, private_key);
+        let agent = Agent::new_from_private_key(None, &store, private_key);
         assert_eq!(
             &agent.subject,
             "http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="

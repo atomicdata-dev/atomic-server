@@ -57,8 +57,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
                 atom.value
             }
             Format::NT => {
-                let mut atoms: Vec<Atom> = Vec::new();
-                atoms.push(Atom::from(*atom));
+                let atoms: Vec<Atom> = vec![Atom::from(*atom)];
                 serialize::atoms_to_ntriples(atoms, store)?
             }
             Format::PRETTY => atom.native_value.to_string(),
