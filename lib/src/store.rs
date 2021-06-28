@@ -259,7 +259,7 @@ mod test {
             .unwrap();
         match res {
             crate::storelike::PathReturn::Subject(sub) => {
-                assert_eq!(sub, urls::DESCRIPTION);
+                assert_eq!(sub, urls::SHORTNAME);
             }
             crate::storelike::PathReturn::Atom(_) => panic!("Should be an Subject"),
         }

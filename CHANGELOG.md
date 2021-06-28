@@ -8,6 +8,8 @@ List of changes for this repo, including `atomic-cli`,
 - Add write rights to Agent itself on accepting Invite
 - Fix RDF serialization for dynamic resources #141
 - Update and check Usages for Invites #134
+- Make names for agents optional
+- Move shortname property always to first one
 
 ## v0.24.0
 

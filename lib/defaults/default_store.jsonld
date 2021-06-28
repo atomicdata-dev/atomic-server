@@ -25,8 +25,8 @@
           "https://atomicdata.dev/properties/requires"
       ],
       "https://atomicdata.dev/properties/requires": [
-          "https://atomicdata.dev/properties/description",
-          "https://atomicdata.dev/properties/shortname"
+          "https://atomicdata.dev/properties/shortname",
+          "https://atomicdata.dev/properties/description"
       ],
       "https://atomicdata.dev/properties/shortname": "class"
   },
@@ -73,8 +73,8 @@
           "https://atomicdata.dev/classes/Class"
       ],
       "https://atomicdata.dev/properties/requires": [
-          "https://atomicdata.dev/properties/description",
-          "https://atomicdata.dev/properties/shortname"
+          "https://atomicdata.dev/properties/shortname",
+          "https://atomicdata.dev/properties/description"
       ],
       "https://atomicdata.dev/properties/shortname": "datatype"
   },
@@ -133,9 +133,9 @@
           "https://atomicdata.dev/properties/classtype"
       ],
       "https://atomicdata.dev/properties/requires": [
-          "https://atomicdata.dev/properties/datatype",
+          "https://atomicdata.dev/properties/shortname",
           "https://atomicdata.dev/properties/description",
-          "https://atomicdata.dev/properties/shortname"
+          "https://atomicdata.dev/properties/datatype"
       ],
       "https://atomicdata.dev/properties/shortname": "property"
   },
