@@ -137,6 +137,7 @@ async fn main() -> AtomicResult<()> {
         let https_config = crate::https::get_https_config(&config)
             .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
         let endpoint = format!("{}:{}", config.ip, config.port_https);
+        println!("{}\n\nvisit https://{}\n\n", BANNER, &endpoint);
         server
             .bind_rustls(&endpoint, https_config)
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
@@ -145,6 +146,7 @@ async fn main() -> AtomicResult<()> {
         Ok(())
     } else {
         let endpoint = format!("{}:{}", config.ip, config.port);
+        println!("{}\n\n Visit http://{}\n\n", BANNER, &endpoint);
         server
             .bind(&format!("{}:{}", config.ip, config.port))
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
@@ -153,3 +155,11 @@ async fn main() -> AtomicResult<()> {
         Ok(())
     }
 }
+
+const BANNER: &str = r#"
+         __                  _
+  ____ _/ /_____  ____ ___  (_)____      ________  ______   _____  _____
+ / __ `/ __/ __ \/ __ `__ \/ / ___/_____/ ___/ _ \/ ___/ | / / _ \/ ___/
+/ /_/ / /_/ /_/ / / / / / / / /__/_____(__  )  __/ /   | |/ /  __/ /
+\__,_/\__/\____/_/ /_/ /_/_/\___/     /____/\___/_/    |___/\___/_/
+"#;
