@@ -374,6 +374,6 @@ mod test {
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert_eq!(my_value.to_string(), "10");
+        assert_eq!(my_value.to_string(), "11");
     }
 }

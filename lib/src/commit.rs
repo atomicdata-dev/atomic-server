@@ -124,19 +124,10 @@ impl Commit {
             }
             println!("This should not happen!")
         };
-        if let Some(set) = self.set.clone() {
-            for (prop, val) in set.iter() {
-                resource.set_propval(prop.into(), val.to_owned(), store)?;
-            }
-        }
-        if let Some(remove) = self.remove.clone() {
-            for prop in remove.iter() {
-                resource.remove_propval(&prop);
-            }
-        }
+        let resource_changed = self.apply_changes(resource, store)?;
         // Check if all required props are there
         if validate_schema {
-            resource.check_required_props(store)?;
+            resource_changed.check_required_props(store)?;
         }
         // If a Destroy field is found, remove the resource and return early
         // TODO: Should we remove the existing commits too? Probably.
@@ -148,8 +139,23 @@ impl Commit {
         }
         // Save the Commit to the Store
         store.add_resource(&commit_resource)?;
-        store.add_resource(&resource)?;
+        store.add_resource(&resource_changed)?;
         Ok(commit_resource)
+    }
+
+    /// Updates the values in the Resource according to the `set` and `remove` attributes in the Commit
+    pub fn apply_changes(&self, mut resource: Resource, store: &impl Storelike) -> AtomicResult<Resource> {
+        if let Some(set) = self.set.clone() {
+            for (prop, val) in set.iter() {
+                resource.set_propval(prop.into(), val.to_owned(), store)?;
+            }
+        }
+        if let Some(remove) = self.remove.clone() {
+            for prop in remove.iter() {
+                resource.remove_propval(&prop);
+            }
+        }
+        Ok(resource)
     }
 
     /// Applies a commit without performing authorization / signature / schema checks.

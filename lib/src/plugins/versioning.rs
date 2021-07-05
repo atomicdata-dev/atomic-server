@@ -1,7 +1,4 @@
-use crate::{
-    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, Commit,
-    Resource, Storelike,
-};
+use crate::{Commit, Resource, Store, Storelike, Value, collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls};
 
 pub fn version_endpoint() -> Endpoint {
     Endpoint {
@@ -92,26 +89,17 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
     let mut commits = get_commits_for_resource(subject, store)?;
     // Sort all commits by date
     commits.sort_by(|a, b| a.created_at.cmp(&b.created_at));
-    // We create a backup of the current resource.
-    let backup = store.get_resource(subject)?;
-    // Warning: if the below code returns an error while stuck mid-commit, we currently fail to put our backup back!
-    // try {
-    store.remove_resource(subject)?;
+    let mut version = Resource::new(subject.into());
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
-            // We skip unnecassary checks
-            // TODO: maybe do some caching here? Seems more logical than caching the get_version. Maybe this function will become recursive.
-            commit.apply_unsafe(store)?;
+            let updated = commit.apply_changes(version, store)?;
+            version = updated;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {
                 break;
             }
         }
     }
-    let version = store.get_resource(&subject.to_string())?;
-    // }
-    // Put back the backup
-    store.add_resource(&backup)?;
     Ok(version)
 }
 
