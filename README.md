@@ -1,3 +1,4 @@
+![atomic data rust logo](./logo.svg)
 # atomic-data-rust
 
 [![Discord chat][discord-badge]][discord-url]
