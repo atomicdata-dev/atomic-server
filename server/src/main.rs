@@ -116,7 +116,7 @@ async fn main() -> AtomicResult<()> {
             .wrap(middleware::Compress::default())
             .configure(routes::config_routes)
             .default_service(
-                web::to(|| {log::info!("404..."); actix_web::HttpResponse::NotFound()})
+                web::to(|| {log::error!("Wrong route, should not happen with normal requests"); actix_web::HttpResponse::NotFound()})
             )
             .app_data(
                 web::JsonConfig::default()

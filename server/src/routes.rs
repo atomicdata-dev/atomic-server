@@ -17,8 +17,9 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))),
         )
         .service(
-            web::scope("/commit")
-                .service(web::resource("").route(web::post().to(handlers::commit::post_commit))),
+            web::resource("/commit")
+                .guard(actix_web::guard::Method(Method::POST))
+                .to(handlers::commit::post_commit),
         )
         .service(
             web::scope("/{path:[^{}]+}")
