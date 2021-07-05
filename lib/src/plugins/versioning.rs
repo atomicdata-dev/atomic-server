@@ -51,14 +51,16 @@ fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicR
     if target_subject.is_none() {
         return all_versions_endpoint().to_resource(store);
     }
+    let target =  target_subject.unwrap();
     let collection_builder = CollectionBuilder {
         subject: url.to_string(),
         property: Some(urls::SUBJECT.into()),
-        value: Some(target_subject.unwrap()),
+        value: Some(target.clone()),
         sort_by: None,
         sort_desc: false,
         current_page: 0,
         page_size: 20,
+        name: Some(format!("Versions of {}", target)),
     };
     let mut collection = collection_builder.into_collection(store)?;
     let new_members = collection

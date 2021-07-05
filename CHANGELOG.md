@@ -8,6 +8,8 @@ List of changes for this repo, including `atomic-cli`,
 - Fix `/path` endpoint return values #143
 - Add ASCI logo in terminal on boot
 - Fix getting resources from server's `/commit` path #144
+- Fix cache-control header issue when opening a closed tab #137
+- Add collection properties `name`, `sortBy` and `sortDesc` #145
 
 ## v0.24.1
 

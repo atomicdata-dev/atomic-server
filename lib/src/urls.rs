@@ -42,6 +42,8 @@ pub const COLLECTION_TOTAL_PAGES: &str = "https://atomicdata.dev/properties/coll
 pub const COLLECTION_CURRENT_PAGE: &str = "https://atomicdata.dev/properties/collection/currentPage";
 pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collection/members";
 pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collection/pageSize";
+pub const COLLECTION_SORT_BY: &str = "https://atomicdata.dev/properties/collection/sortBy";
+pub const COLLECTION_SORT_DESC: &str = "https://atomicdata.dev/properties/collection/sortDesc";
 // ... for Endpoints
 pub const ENDPOINT_PARAMETERS: &str = "https://atomicdata.dev/properties/endpoint/parameters";
 pub const PATH: &str = "https://atomicdata.dev/properties/path";

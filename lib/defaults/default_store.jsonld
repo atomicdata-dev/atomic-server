@@ -54,6 +54,8 @@
           "https://atomicdata.dev/properties/collection/members",
           "https://atomicdata.dev/properties/collection/pageSize",
           "https://atomicdata.dev/properties/collection/property",
+          "https://atomicdata.dev/properties/collection/sortBy",
+          "https://atomicdata.dev/properties/collection/sortDesc",
           "https://atomicdata.dev/properties/collection/totalMembers",
           "https://atomicdata.dev/properties/collection/totalPages",
           "https://atomicdata.dev/properties/collection/value"
@@ -356,6 +358,25 @@
           "https://atomicdata.dev/classes/Property"
       ],
       "https://atomicdata.dev/properties/shortname": "subject"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/collection/sortBy",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "Sort collection by this property. Sorts ascending by default.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "sort-by"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/collection/sortDesc",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+      "https://atomicdata.dev/properties/description": "Sort collection descendingly. Sorts ascending by default.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "sort-desc"
   },
   {
       "@id": "https://atomicdata.dev/properties/collection/totalMembers",

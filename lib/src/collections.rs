@@ -29,17 +29,31 @@ pub struct CollectionBuilder {
     pub current_page: usize,
     /// How many items per page
     pub page_size: usize,
+    /// A human readable name
+    pub name: Option<String>,
 }
 
 impl CollectionBuilder {
+    /// Converts a CollectionBuilder into a Resource.
+    /// Note that this does not calculate any members, and it does not generate any pages.
+    /// If that is what you need, use `.into_resource`
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
         let mut resource = crate::Resource::new_instance(urls::COLLECTION, store)?;
         resource.set_subject(self.subject.clone());
-        if let Some(prop) = &self.property {
-            resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), prop, store)?;
+        if let Some(val) = &self.property {
+            resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), val, store)?;
         }
         if let Some(val) = &self.value {
             resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
+        }
+        if let Some(val) = &self.name {
+            resource.set_propval_string(crate::urls::NAME.into(), val, store)?;
+        }
+        if let Some(val) = &self.sort_by {
+            resource.set_propval_string(crate::urls::COLLECTION_SORT_BY.into(), val, store)?;
+        }
+        if self.sort_desc {
+            resource.set_propval_string(crate::urls::COLLECTION_SORT_DESC.into(), "true", store)?;
         }
         resource.set_propval_string(
             crate::urls::COLLECTION_CURRENT_PAGE.into(),
@@ -65,6 +79,7 @@ impl CollectionBuilder {
             sort_desc: false,
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
+            name: Some(format!("{} collection", path)),
         }
     }
 
@@ -99,6 +114,8 @@ pub struct Collection {
     pub total_items: usize,
     /// Total number of pages
     pub total_pages: usize,
+    /// Human readable name of a resource
+    pub name: Option<String>,
 }
 
 /// Sorts a vector or resources by some property.
@@ -203,6 +220,7 @@ impl Collection {
             sort_desc: collection_builder.sort_desc,
             current_page: collection_builder.current_page,
             page_size: collection_builder.page_size,
+            name: collection_builder.name,
         };
         Ok(collection)
     }
@@ -225,6 +243,9 @@ impl Collection {
         }
         if let Some(val) = &self.value {
             resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
+        }
+        if let Some(val) = &self.name {
+            resource.set_propval_string(crate::urls::NAME.into(), val, store)?;
         }
         resource.set_propval(
             crate::urls::COLLECTION_MEMBER_COUNT.into(),
@@ -265,12 +286,16 @@ pub fn construct_collection(
     let mut page_size = DEFAULT_PAGE_SIZE;
     let mut value = None;
     let mut property = None;
+    let mut name = None;
 
     if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
         property = Some(val.to_string());
     }
     if let Ok(val) = resource.get(urls::COLLECTION_VALUE) {
         value = Some(val.to_string());
+    }
+    if let Ok(val) = resource.get(urls::NAME) {
+        name = Some(val.to_string());
     }
     for (k, v) in query_params {
         match k.as_ref() {
@@ -292,6 +317,7 @@ pub fn construct_collection(
         sort_desc,
         current_page,
         page_size,
+        name,
     };
     let collection = Collection::new_with_members(store, collection_builder)?;
     collection.add_to_resource(resource, store)
@@ -316,6 +342,7 @@ mod test {
             sort_desc: false,
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
+            name: Some("Test collection".into())
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
@@ -334,6 +361,7 @@ mod test {
             sort_desc: false,
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
+            name: None,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
