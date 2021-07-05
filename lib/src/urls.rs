@@ -11,6 +11,7 @@ pub const ENDPOINT: &str = "https://atomicdata.dev/classes/Endpoint";
 pub const DRIVE: &str = "https://atomicdata.dev/classes/Drive";
 pub const INVITE: &str = "https://atomicdata.dev/classes/Invite";
 pub const REDIRECT: &str = "https://atomicdata.dev/classes/Redirect";
+pub const ATOM: &str = "https://atomicdata.dev/classes/Atom";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -58,7 +59,10 @@ pub const WRITE_BOOL: &str = "https://atomicdata.dev/properties/invite/write";
 pub const INVITE_PUBKEY: &str = "https://atomicdata.dev/properties/invite/publicKey";
 pub const INVITE_AGENT: &str = "https://atomicdata.dev/properties/invite/agent";
 pub const REDIRECT_AGENT: &str = "https://atomicdata.dev/properties/invite/redirectAgent";
-
+// ... for Atoms
+pub const ATOM_SUBJECT: &str = "https://atomicdata.dev/properties/atom/subject";
+pub const ATOM_PROPERTY: &str = "https://atomicdata.dev/properties/atom/property";
+pub const ATOM_VALUE: &str = "https://atomicdata.dev/properties/atom/value";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

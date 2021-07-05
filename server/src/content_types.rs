@@ -67,6 +67,9 @@ pub fn get_accept(map: &HeaderMap) -> ContentType {
 /// Defaults to HTML
 pub fn parse_accept_header(header: &str) -> ContentType {
     for mimepart in header.split(',') {
+        if mimepart.contains(MIME_JSONAD) {
+            return ContentType::JSONAD
+        }
         if mimepart.contains(MIME_AD3) {
             return ContentType::AD3
         }
@@ -81,9 +84,6 @@ pub fn parse_accept_header(header: &str) -> ContentType {
         }
         if mimepart.contains(MIME_JSONLD) {
             return ContentType::JSONLD
-        }
-        if mimepart.contains(MIME_JSONAD) {
-            return ContentType::JSONAD
         }
         if mimepart.contains(MIME_TURTLE) {
             return ContentType::TURTLE

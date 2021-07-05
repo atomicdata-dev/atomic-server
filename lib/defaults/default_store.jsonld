@@ -15,6 +15,19 @@
       "https://atomicdata.dev/properties/shortname": "agent"
   },
   {
+    "@id": "https://atomicdata.dev/classes/Atom",
+    "https://atomicdata.dev/properties/description": "An Atom is the smallest piece of meaningful data in Atomic Data. It consists of a Subject, a Property and a Value.",
+    "https://atomicdata.dev/properties/isA": [
+        "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+        "https://atomicdata.dev/properties/atom/subject",
+        "https://atomicdata.dev/properties/atom/property",
+        "https://atomicdata.dev/properties/atom/value"
+    ],
+    "https://atomicdata.dev/properties/shortname": "atom"
+},
+  {
       "@id": "https://atomicdata.dev/classes/Class",
       "https://atomicdata.dev/properties/description": "A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data and explains what the thing represents. It is convention to use Uppercase in its URL. Note that in Atomic Data, a Resource can have several Classes - not just a single one. A Resource describes which Classes it has using the [`is-a` Property](https://atomicdata.dev/properties/isA).",
       "https://atomicdata.dev/properties/isA": [
@@ -232,6 +245,33 @@
           "https://atomicdata.dev/classes/Datatype"
       ],
       "https://atomicdata.dev/properties/shortname": "timestamp"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/atom/property",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "The property of an Atom is the relationship between the resource (subject) and the value. For example, in the sentence `john is born in 1991`, the property is `is born in`.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "property"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/atom/subject",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "https://atomicdata.dev/properties/description": "The subject of an Atom is the (URL of the) Resource that is being described. For example, in the sentence `john is born in 1991`, the subject is `john`.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "subject"
+  },
+  {
+      "@id": "https://atomicdata.dev/properties/atom/value",
+      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+      "https://atomicdata.dev/properties/description": "The value of an Atom is the actual content of the information that is being described. For example, in the sentence `john is born in 1991`, the value is `1991`. When you use this property, the datatype is always a String, even if the actual property would set something different.",
+      "https://atomicdata.dev/properties/isA": [
+          "https://atomicdata.dev/classes/Property"
+      ],
+      "https://atomicdata.dev/properties/shortname": "value"
   },
   {
       "@id": "https://atomicdata.dev/properties/edit",

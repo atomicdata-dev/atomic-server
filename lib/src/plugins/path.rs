@@ -21,15 +21,19 @@ fn handle_path_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Re
     if path.is_none() {
         return path_endpoint().to_resource(store);
     }
-    println!("path is some {:?}", path);
     let result = store.get_path(&path.unwrap(), None)?;
     match result {
-        crate::storelike::PathReturn::Subject(subject) => {
-          store.get_resource(&subject)
-        }
-        crate::storelike::PathReturn::Atom(_) => {
-          // TODO: Create Atom resource, which contains a Subject, a Property and a Value.
-          Err("Path resulted in a value - not a resource. ".into())
+        crate::storelike::PathReturn::Subject(subject) => store.get_resource(&subject),
+        crate::storelike::PathReturn::Atom(atom) => {
+            let mut resource = Resource::new(url.into_string());
+            resource.set_propval_string(urls::ATOM_SUBJECT.into(), &atom.subject, store)?;
+            resource.set_propval_string(
+                urls::ATOM_PROPERTY.into(),
+                &atom.property.subject,
+                store,
+            )?;
+            resource.set_propval_string(urls::ATOM_VALUE.into(), &atom.value, store)?;
+            Ok(resource)
         }
     }
 }
