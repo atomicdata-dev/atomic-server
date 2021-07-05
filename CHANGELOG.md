@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.24.2 (unpublished)
+
+- Fix `/path` endpoint return values #143
+- Add asci logo in terminal on boot
+
 ## v0.24.1
 
 - Add write rights to Agent itself on accepting Invite
