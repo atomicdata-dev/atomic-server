@@ -1,13 +1,15 @@
-# `atomic-cli` (CLI)
+# `atomic-cli`
 
-[![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
+[![crates.io](https://img.shields.io/crates/v/atomic-cli)](https://crates.io/crates/atomic-cli)
 [![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/aget_basetomic)
 
 _Status: Alpha. Prone to breaking changes. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
-A command-line application to create, read and interact with Atomic Data.
+**A command-line application to create, read and interact with Atomic Data.**
+
+Designed and tested to work with [atomic-server](https://crates.io/crates/atomic-server/).
 
 ```
 atomic-cli 0.23.2

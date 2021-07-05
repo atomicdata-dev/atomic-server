@@ -1,6 +1,6 @@
 # atomic-lib
 
-[![crates.io](https://meritbadge.herokuapp.com/atomic_lib)](https://crates.io/crates/atomic_lib)
+[![crates.io](https://img.shields.io/crates/v/atomic_lib)](https://crates.io/crates/atomic_lib)
 [![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
 [![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -8,12 +8,11 @@
 
 _Status: Alpha. Prone to breaking changes. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
-Rust library for using [Atomic Data](https://docs.atomicdata.dev).
+**Rust library for using [Atomic Data](https://docs.atomicdata.dev).
+Powers [`atomic-cli`](../cli/readme.md) and [`atomic-server`](../server/readme.md).**
 
-[Docs](https://docs.rs/atomic_lib/latest/atomic_lib/).
-
+[Check out the docs on docs.rs](https://docs.rs/atomic_lib/latest/atomic_lib/).
 For code examples, see [`examples/basic.rs`](examples/basic.rs) and the many tests in the code.
-Also, the [`atomic-cli`](../cli/readme.md) and [`atomic-server`](../server/readme.md) applications both use this `atomic-lib` library.
 
 ## Features
 
