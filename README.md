@@ -1,16 +1,15 @@
 ![atomic data rust logo](./logo.svg)
-# atomic-data-rust
 
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
-Create, share, fetch and model linked [Atomic Data](https://docs.atomicdata.dev)!
-This repo consists of three components: A library, a server and a CLI.
+**Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
+This repo consists of three components: A library, a server and a CLI.**
 
 ## `atomic-server`
 
-[![crates.io](https://meritbadge.herokuapp.com/atomic-server)](https://crates.io/crates/atomic-server)
+[![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
 
 The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
 
@@ -23,7 +22,7 @@ The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https:
 
 ## `atomic-cli`
 
-[![crates.io](https://meritbadge.herokuapp.com/atomic-cli)](https://crates.io/crates/atomic-cli)
+[![crates.io](https://img.shields.io/crates/v/atomic-cli)](https://crates.io/crates/atomic-cli)
 
 A simple Command Line Interface tool to fetch, create and query Atomic Data.
 Especially useful for interacting with an `atomic-server`.
@@ -32,7 +31,7 @@ Especially useful for interacting with an `atomic-server`.
 
 ## `atomic-lib`
 
-[![crates.io](https://meritbadge.herokuapp.com/atomic_lib)](https://crates.io/crates/atomic_lib)
+[![crates.io](https://img.shields.io/crates/v/atomic_lib)](https://crates.io/crates/atomic_lib)
 [![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
 
 A Rust library to serialize, parse, store, convert, validate, edit, fetch and store Atomic Data.
@@ -52,7 +51,7 @@ Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a
 This repository serves the following purposes:
 
 - Test and experiment with some of the core ideas of Atomic Data, such as [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html) (share models and data types), [Paths](https://docs.atomicdata.dev/core/paths.html) (traversing data), [AD3 Serialization](https://docs.atomicdata.dev/core/serialization.html) and [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html) (storing signed state changes).
-- Serve the first Atomic Data, including the core schema (now available on [atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [docs](https://docs.atomicdata.dev/)
+- Serve the first Atomic Data, including the core schema (now available on [https://atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [docs](https://docs.atomicdata.dev/)
 - Provide developers with tools and inspiration to use Atomic Data in their own projects.
 
 ## Also check out
