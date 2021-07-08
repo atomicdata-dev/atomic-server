@@ -614,6 +614,7 @@
   },
   {
       "@id": "https://atomicdata.dev/properties/remove",
+      "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
       "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
       "https://atomicdata.dev/properties/description": "A list of property URLs that should be removed from the resource. ",
       "https://atomicdata.dev/properties/isA": [
