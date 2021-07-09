@@ -68,10 +68,6 @@ pub async fn get_resource(
             let body = resource.to_json_ad()?;
             Ok(builder.body(body))
         }
-        ContentType::AD3 => {
-            let body = resource.to_ad3()?;
-            Ok(builder.body(body))
-        }
         ContentType::TURTLE | ContentType::NT => {
             let atoms = resource.to_atoms()?;
             let body = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
@@ -86,7 +82,6 @@ fn try_extension(path: &str) -> Option<(ContentType, &str)> {
     if items.len() == 2 {
         let path = items[0];
         let content_type = match items[1] {
-            "ad3" => ContentType::AD3,
             "json" => ContentType::JSON,
             "jsonld" => ContentType::JSONLD,
             "jsonad" => ContentType::JSONAD,

@@ -303,20 +303,6 @@ impl Resource {
         self.subject = url;
     }
 
-    /// Serializes Resource to Atomic Data Triples (ad3), and NDJSON serialized representation.
-    pub fn to_ad3(&self) -> AtomicResult<String> {
-        let mut string = String::new();
-        let resource = self.get_propvals();
-
-        for (property, value) in resource {
-            let mut ad3_atom =
-                serde_json::to_string(&vec![self.get_subject(), &property, &value.to_string()])?;
-            ad3_atom.push('\n');
-            string.push_str(&*ad3_atom);
-        }
-        Ok(string)
-    }
-
     /// Converts Resource to JSON-AD string.
     pub fn to_json_ad(&self) -> AtomicResult<String> {
         let obj = crate::serialize::propvals_to_json_map(

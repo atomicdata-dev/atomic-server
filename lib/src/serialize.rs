@@ -1,10 +1,10 @@
-//! Serialization / formatting / encoding (JSON, RDF, N-Triples, AD3)
+//! Serialization / formatting / encoding (JSON, RDF, N-Triples)
 
 use serde_json::Map;
 use serde_json::Value as SerdeValue;
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, Atom, Resource, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, resources::PropVals, Resource, Storelike, Value, Atom
 };
 
 /// Serializes a vector or Resources to a JSON-AD string
@@ -139,19 +139,6 @@ pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
     Ok(string)
 }
 
-/// Serializes Atoms to .ad3.
-/// It is a newline-delimited JSON file (ndjson), where each line is a JSON Array with three string values.
-pub fn serialize_atoms_to_ad3(atoms: Vec<Atom>) -> AtomicResult<String> {
-    let mut string = String::new();
-    for atom in atoms {
-        let mut ad3_atom =
-            serde_json::to_string(&vec![&atom.subject, &atom.property, &atom.value.to_string()])?;
-        ad3_atom.push('\n');
-        string.push_str(&*ad3_atom);
-    }
-    Ok(string)
-}
-
 #[cfg(feature = "rdf")]
 /// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
 pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult<String> {
@@ -196,7 +183,6 @@ pub fn atoms_to_turtle(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult
     use rio_api::formatter::TriplesFormatter;
     use rio_api::model::{Literal, NamedNode, Term, Triple};
     use rio_turtle::TurtleFormatter;
-
     let mut formatter = TurtleFormatter::new(Vec::default());
 
     for atom in atoms {
@@ -234,7 +220,6 @@ pub enum Format {
     JSON,
     JSONAD,
     JSONLD,
-    AD3,
     NT,
     PRETTY,
 }

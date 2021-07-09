@@ -1,4 +1,4 @@
-use crate::{Commit, Resource, Store, Storelike, Value, collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls};
+use crate::{Commit, Resource, Storelike, collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls};
 
 pub fn version_endpoint() -> Endpoint {
     Endpoint {

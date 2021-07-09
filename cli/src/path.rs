@@ -3,7 +3,7 @@ use atomic_lib::{errors::AtomicResult, serialize, storelike, Atom, Storelike};
 use serialize::Format;
 
 /// List of serialization options. Should match /path.rs/get
-pub const SERIALIZE_OPTIONS: [&str; 8] = ["pretty", "json", "jsonld", "jsonad", "ad3", "nt", "turtle", "n3"];
+pub const SERIALIZE_OPTIONS: [&str; 7] = ["pretty", "json", "jsonld", "jsonad", "nt", "turtle", "n3"];
 
 /// Resolves an Atomic Path query
 pub fn get_path(context: &mut Context) -> AtomicResult<()> {
@@ -18,12 +18,11 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
         "json" => (Format::JSON),
         "jsonld" => (Format::JSONLD),
         "jsonad" => (Format::JSONAD),
-        "ad3" => (Format::AD3),
         "nt" => (Format::NT),
         "turtle" => (Format::NT),
         "n3" => (Format::NT),
         format => {
-            return Err(format!("As {} not supported. Try 'json' or 'ad3'.", format).into());
+            return Err(format!("As {} not supported. Try {:?}", format, SERIALIZE_OPTIONS).into());
         }
     };
 
@@ -42,7 +41,6 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
             Format::JSONAD => store
                 .get_resource_extended(&subject)?
                 .to_json_ad()?,
-            Format::AD3 => store.get_resource_extended(&subject)?.to_ad3()?,
             Format::NT => {
                 let resource = store.get_resource_extended(&subject)?;
                 serialize::atoms_to_ntriples(resource.to_atoms()?, store)?
@@ -50,17 +48,13 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
             Format::PRETTY => pretty_print_resource(&subject, store)?,
         },
         storelike::PathReturn::Atom(atom) => match serialization {
-            Format::JSONLD | Format::JSON | Format::JSONAD => {
-                atom.value
-            }
-            Format::AD3 => {
-                atom.value
+            Format::JSONLD | Format::JSON | Format::JSONAD | Format::PRETTY => {
+                atom.value.to_string()
             }
             Format::NT => {
-                let atoms: Vec<Atom> = vec![Atom::from(*atom)];
+                let atoms: Vec<Atom> = vec![*atom];
                 serialize::atoms_to_ntriples(atoms, store)?
             }
-            Format::PRETTY => atom.native_value.to_string(),
         },
     };
     println!("{}", out);

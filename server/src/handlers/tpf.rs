@@ -37,11 +37,6 @@ pub async fn tpf(
             log::error!("Not implemented");
             Ok(builder.body("Not implemented"))
         }
-        ContentType::AD3 => {
-            builder.header("Content-Type", content_type.to_mime());
-            let ad3_string = atomic_lib::serialize::serialize_atoms_to_ad3(atoms)?;
-            Ok(builder.body(ad3_string))
-        }
         ContentType::TURTLE | ContentType::NT => {
             builder.header("Content-Type", content_type.to_mime());
             let bod_string = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;

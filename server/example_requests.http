@@ -10,21 +10,9 @@ Accept: application/ad+json
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: application/ld+json
 
-### Get a thing as AD3
-GET https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: application/ad3-ndjson
-
 ### Get a thing as turtle
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: text/turtle
-
-### Use TPF endpoint to get all atoms with an 'isA' property
-GET https://atomicdata.dev/tpf?property=https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: application/ad3-ndjson
-
-### Use Path endpoint to retrieve a resource or a path
-GET https://atomicdata.dev/path?path=https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: application/ad3-ndjson
 
 ### Send a Commit
 POST http://localhost/commit HTTP/1.1
@@ -42,7 +30,3 @@ Content-Type: application/json
   "destroy": false,
   "signature": "correct_signature"
 }
-
-### Check if above commit has been applied correctly
-GET http://localhost/somresource HTTP/1.1
-Accept: application/ad3-ndjson

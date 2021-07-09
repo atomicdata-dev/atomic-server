@@ -1,51 +1,8 @@
 //! Parsing / deserialization / decoding
 
-use crate::{errors::AtomicResult, resources::PropVals, urls, Atom, Resource, Storelike, Value};
+use crate::{errors::AtomicResult, resources::PropVals, urls, Resource, Storelike, Value};
 
-pub const AD3_MIME: &str = "application/ad3-ndjson";
-
-/// Parses an Atomic Data Triples (.ad3) string.
-/// Does not add the Atoms to the store - use store.add_atoms() for that.
-/// Allows comments and empty lines.
-pub fn parse_ad3(string: &str, store: &impl Storelike) -> AtomicResult<Vec<Atom>> {
-    let mut atoms: Vec<Atom> = Vec::new();
-    for line in string.lines() {
-        match line.chars().next() {
-            // These are comments
-            Some('#') => {}
-            Some(' ') => {}
-            // That's an array, awesome
-            Some('[') => {
-                let string_vec: Vec<String> = match parse_json_array(line) {
-                    Ok(vec) => vec,
-                    Err(e) => {return Err(format!("Parsing error in {:?}. Needs to be a JSON array of three strings. {}", line, e).into())}
-                };
-                if string_vec.len() != 3 {
-                    return Err(format!(
-                        "Wrong length of array at line {:?}: wrong length of array, should be 3",
-                        line
-                    )
-                    .into());
-                }
-                let subject = string_vec[0].clone();
-                let property = string_vec[1].clone();
-                let value_string = string_vec[2].clone();
-                let datatype = store.get_property(&property)?.data_type;
-                let value = Value::new(&value_string, &datatype)?;
-                atoms.push(Atom::new(subject, property, value));
-            }
-            Some(char) => {
-                return Err(format!(
-                    "AD3 Parsing error at '{}', line cannot start with {}. Should start with JSON Array '['",
-                    line, char
-                )
-                .into())
-            }
-            None => {}
-        };
-    }
-    Ok(atoms)
-}
+pub const JSON_AD_MIME: &str = "application/ad+json";
 
 pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
     let vector: Vec<String> = serde_json::from_str(string)?;

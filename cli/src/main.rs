@@ -300,8 +300,7 @@ fn tpf(context: &mut Context) -> AtomicResult<()> {
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());
     let value = tpf_value(subcommand_matches.value_of("value").unwrap());
     let endpoint = format!("{}/tpf", &context.get_write_context().server);
-    let atoms = atomic_lib::client::fetch_tpf(&endpoint, subject, property, value)?;
-    let serialized = atomic_lib::serialize::serialize_atoms_to_ad3(atoms)?;
+    let serialized = atomic_lib::client::fetch_tpf(&endpoint, subject, property, value)?;
     println!("{}", serialized);
     Ok(())
 }

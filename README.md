@@ -50,7 +50,7 @@ Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a
 
 This repository serves the following purposes:
 
-- Test and experiment with some of the core ideas of Atomic Data, such as [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html) (share models and data types), [Paths](https://docs.atomicdata.dev/core/paths.html) (traversing data), [AD3 Serialization](https://docs.atomicdata.dev/core/serialization.html) and [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html) (storing signed state changes).
+- Test and experiment with some of the core ideas of Atomic Data, such as [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html) (share models and data types), [Paths](https://docs.atomicdata.dev/core/paths.html) (traversing data), [JSON-AD Serialization](https://docs.atomicdata.dev/core/json-ad.html) and [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html) (storing signed state changes).
 - Serve the first Atomic Data, including the core schema (now available on [https://atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [docs](https://docs.atomicdata.dev/)
 - Provide developers with tools and inspiration to use Atomic Data in their own projects.
 

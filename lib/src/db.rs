@@ -299,29 +299,7 @@ mod test {
     #[timeout(30000)]
     fn basic() {
         let store = DB.lock().unwrap().clone();
-        // Let's parse this AD3 string.
-        let ad3 =
-            r#"["https://localhost/test","https://atomicdata.dev/properties/description","Test"]"#;
-        // The parser returns a Vector of Atoms
-        let atoms = crate::parse::parse_ad3(&ad3, &store).unwrap();
-        // Add the Atoms to the Store
-        store.add_atoms(atoms).unwrap();
-        // Get our resource...
-        let my_resource = store.get_resource("https://localhost/test").unwrap();
-        // Get our value by filtering on our property...
-        let my_value = my_resource
-            .get("https://atomicdata.dev/properties/description")
-            .unwrap();
-        assert!(my_value.to_string() == "Test");
-        // We can also use the shortname of description
-        let my_value_from_shortname = my_resource.get_shortname("description", &store).unwrap();
-        assert!(my_value_from_shortname.to_string() == "Test");
-        // We can find any Atoms matching some value using Triple Pattern Fragments:
-        let found_atoms = store.tpf(None, None, Some("Test"), true).unwrap();
-        assert!(found_atoms.len() == 1);
-        assert!(found_atoms[0].value.to_string() == "Test");
-
-        // We can also create a new Resource, linked to the store.
+        // We can create a new Resource, linked to the store.
         // Note that since this store only exists in memory, it's data cannot be accessed from the internet.
         // Let's make a new Property instance!
         let mut new_property =

@@ -20,11 +20,8 @@ pub enum ContentType {
     /// RDF N-Triples format
     /// https://www.w3.org/TR/n-triples/
     NT,
-    /// Atomic Data Triples (deprecated)
-    AD3,
 }
 
-const MIME_AD3: &str = "application/ad3-ndjson";
 const MIME_HTML: &str = "text/html";
 const MIME_XML: &str = "application/xml";
 const MIME_JSON: &str = "application/json";
@@ -41,7 +38,6 @@ impl ContentType {
             ContentType::JSONLD => MIME_JSONLD,
             ContentType::HTML => MIME_HTML,
             ContentType::TURTLE => MIME_TURTLE,
-            ContentType::AD3 => MIME_AD3,
             ContentType::NT => MIME_NT
         }
     }
@@ -69,9 +65,6 @@ pub fn parse_accept_header(header: &str) -> ContentType {
     for mimepart in header.split(',') {
         if mimepart.contains(MIME_JSONAD) {
             return ContentType::JSONAD
-        }
-        if mimepart.contains(MIME_AD3) {
-            return ContentType::AD3
         }
         if mimepart.contains(MIME_HTML) {
             return ContentType::HTML
@@ -103,14 +96,13 @@ mod test {
     #[test]
     fn parse_types() {
         assert!(parse_accept_header("text/html,application/xml") == ContentType::HTML);
-        assert!(parse_accept_header("application/ad3-ndjson") == ContentType::AD3);
         assert!(parse_accept_header("application/ad+json") == ContentType::JSONAD);
         assert!(parse_accept_header("application/ld+json") == ContentType::JSONLD);
     }
 
     #[test]
     fn parse_types_with_blank_chars() {
-        assert!(parse_accept_header("application/ad3-ndjson ; ") == ContentType::AD3);
-        assert!(parse_accept_header(" application/ad3-ndjson ; ") == ContentType::AD3);
+        assert!(parse_accept_header("application/ad+json ; ") == ContentType::JSONAD);
+        assert!(parse_accept_header(" application/ad+json ; ") == ContentType::JSONAD);
     }
 }

@@ -11,6 +11,7 @@ List of changes for this repo, including `atomic-cli`,
 - Fix cache-control header issue when opening a closed tab #137
 - Add collection properties `name`, `sortBy` and `sortDesc` #145
 - Extract `apply_changes` from `apply_commit`, make versioning safer and more reliable #146
+- Remove AD3 remnants, clean up code #148
 
 ## v0.24.1
 

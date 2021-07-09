@@ -72,7 +72,7 @@ It will read the `~/.config/atomic/config.toml` file, and create one using some 
 
 ## Config
 
-Atomic creates a `~/.config/atomic` folder, which contains a `mapping.amp` and a `store.ad3`.
+Atomic creates a `~/.config/atomic` folder, which contains a `mapping.amp` and a `db`.
 This folder is also used by `atomic-server`.
 
 ## Mapping

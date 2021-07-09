@@ -1,14 +1,12 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
-//! Currently, it can only persist its data as .ad3 (Atomic Data Triples) to disk.
-//! A more robust persistent storage option will be used later, such as: https://github.com/TheNeikos/rustbreak
 
 use crate::{
     atoms::Atom,
     storelike::{ResourceCollection, Storelike},
 };
 use crate::{errors::AtomicResult, Resource};
-use std::{collections::HashMap, fs, path::PathBuf, sync::Arc, sync::Mutex};
+use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
 #[derive(Clone)]
@@ -28,30 +26,6 @@ impl Store {
         };
         crate::populate::populate_base_models(&store)?;
         Ok(store)
-    }
-
-    /// Reads an .ad3 (Atomic Data Triples) graph and adds it to the store
-    pub fn read_store_from_file(&self, path: &PathBuf) -> AtomicResult<()> {
-        match std::fs::read_to_string(path) {
-            Ok(contents) => {
-                let atoms = crate::parse::parse_ad3(&contents, self)?;
-                self.add_atoms(atoms)?;
-                Ok(())
-            }
-            Err(err) => Err(format!("Parsing error: {}", err).into()),
-        }
-    }
-
-    /// Serializes the current store and saves to path
-    pub fn write_store_to_disk(&self, path: &PathBuf) -> AtomicResult<()> {
-        let mut file_string: String = String::new();
-        for resource in self.all_resources(true) {
-            file_string.push_str(&*resource.to_ad3()?);
-        }
-        fs::create_dir_all(path.parent().expect("Could not find parent folder"))
-            .expect("Unable to create dirs");
-        fs::write(path, file_string).expect("Unable to write file");
-        Ok(())
     }
 }
 
@@ -144,15 +118,11 @@ impl Storelike for Store {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{parse::parse_ad3, urls};
+    use crate::{urls};
 
     fn init_store() -> Store {
-        let string =
-            String::from("[\"_:test\",\"https://atomicdata.dev/properties/shortname\",\"hi\"]");
         let store = Store::init().unwrap();
         store.populate().unwrap();
-        let atoms = parse_ad3(&string, &store).unwrap();
-        store.add_atoms(atoms).unwrap();
         store
     }
 
@@ -171,30 +141,6 @@ mod test {
         // Should fetch the agent class, since it's not in the store
         let agent = store.get_class(urls::AGENT).unwrap();
         assert_eq!(agent.shortname, "agent")
-    }
-
-    #[test]
-    fn get() {
-        let store = init_store();
-        let my_resource = store.get_resource("_:test").unwrap();
-        let my_value = my_resource
-            .get("https://atomicdata.dev/properties/shortname")
-            .unwrap();
-        println!("My value: {}", my_value);
-        assert!(my_value.to_string() == "hi");
-    }
-
-    #[test]
-    fn validate_invalid() {
-        let store = init_store();
-        let invalid_ad3 =
-            // 'requires' should be an array, but is a string
-            String::from("[\"_:test\",\"https://atomicdata.dev/properties/requires\",\"Test\"]");
-        let atoms = parse_ad3(&invalid_ad3, &store).unwrap();
-        store.add_atoms(atoms).unwrap_err();
-        // Throws an error before we even need to validate. Which is good. Maybe the validate function should accept something different.
-        // let report = store.validate();
-        // assert!(!report.is_valid());
     }
 
     #[test]
