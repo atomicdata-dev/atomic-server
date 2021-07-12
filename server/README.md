@@ -108,7 +108,7 @@ HTTPS certificates are automatically renewed when the server is restarted, and t
 There are three ways to interact with this server:
 
 - **GUI**: Use the `atomic-data-browser` JS frontend by visiting `localhost`.
-- **API**: Check out [./example_requests.http](/example_requests.http) for various HTTP requests to the server. Also, [read the docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
+- **API**: Check out [./example_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
 - **CLI**: The `atomic-cli` terminal app
 
 ### Use `atomic-cli` as client
