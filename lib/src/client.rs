@@ -31,13 +31,14 @@ pub fn fetch_body(url: &str, content_type: &str) -> AtomicResult<String> {
     Ok(body)
 }
 
-/// Uses a TPF endpoint, fetches the atoms.
+/// Uses a TPF endpoint, returns a Vector of matching resources
 pub fn fetch_tpf(
     endpoint: &str,
     q_subject: Option<&str>,
     q_property: Option<&str>,
     q_value: Option<&str>,
-) -> AtomicResult<String> {
+    store: &impl Storelike,
+) -> AtomicResult<Vec<Resource>> {
     let mut url = Url::parse(endpoint)?;
     if let Some(val) = q_subject {
         url.query_pairs_mut().append_pair("subject", val);
@@ -48,7 +49,8 @@ pub fn fetch_tpf(
     if let Some(val) = q_value {
         url.query_pairs_mut().append_pair("value", val);
     }
-    fetch_body(url.as_str(), "application/n-triples")
+    let body = fetch_body(url.as_str(), "application/ad+json")?;
+    crate::parse::parse_json_ad_array(&body, store)
 }
 
 /// Posts a Commit to the endpoint of the Subject from the Commit

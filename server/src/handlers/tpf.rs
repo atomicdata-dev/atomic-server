@@ -30,15 +30,21 @@ pub async fn tpf(
     let atoms = store
         .tpf(subject.as_deref(), property.as_deref(), value.as_deref(), true)?;
     log::info!("TPF query: {:?}", query);
+    builder.header("Content-Type", content_type.to_mime());
     match content_type {
-        ContentType::JSON | ContentType::HTML | ContentType::JSONLD | ContentType::JSONAD => {
-            builder.header("Content-Type", content_type.to_mime());
+        ContentType::JSONAD => {
+            let mut resources = vec![];
+            for atom in atoms {
+                resources.push(store.get_resource(&atom.subject)?);
+            }
+            Ok(builder.body(atomic_lib::serialize::resources_to_json_ad(resources)?))
+        }
+        ContentType::JSON | ContentType::HTML | ContentType::JSONLD => {
             // TODO
-            log::error!("Not implemented");
-            Ok(builder.body("Not implemented"))
+            log::error!("This Content-Type is not implemented");
+            Ok(builder.body("This Content-Type is not implemented"))
         }
         ContentType::TURTLE | ContentType::NT => {
-            builder.header("Content-Type", content_type.to_mime());
             let bod_string = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(bod_string))
         }
