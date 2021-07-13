@@ -12,7 +12,8 @@ List of changes for this repo, including `atomic-cli`,
 - Add collection properties `name`, `sortBy` and `sortDesc` #145
 - Extract `apply_changes` from `apply_commit`, make versioning safer and more reliable #146
 - Remove AD3 remnants, clean up code #148
-- TPF support JSON-AD #150
+- TPF endpoint supports JSON-AD #150
+- Custom serializations in `atomic-cli tpf`
 
 ## v0.24.1
 

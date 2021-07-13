@@ -4,12 +4,14 @@ use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
 use colored::*;
 use dirs::home_dir;
-use path::SERIALIZE_OPTIONS;
 use std::{cell::RefCell, path::PathBuf, sync::Mutex};
+
+use crate::print::{SERIALIZE_OPTIONS, print_resource};
 
 mod commit;
 mod new;
 mod path;
+mod print;
 
 #[allow(dead_code)]
 /// The Context contains all the data for executing a single CLI command, such as the passed arguments and the in memory store.
@@ -132,6 +134,13 @@ fn main() -> AtomicResult<()> {
                 .arg(Arg::with_name("value")
                     .help("The value URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
                     .required(true)
+                )
+                .arg(Arg::with_name("as")
+                    .long("as")
+                    .possible_values(&SERIALIZE_OPTIONS)
+                    .default_value("pretty")
+                    .help(&"Serialization format")
+                    .takes_value(true)
                 )
         )
         .subcommand(
@@ -277,31 +286,17 @@ fn list(context: &mut Context) {
     println!("{}", string)
 }
 
-/// Returns a resource for the terminal with readble formatting and colors
-fn pretty_print_resource(url: &str, store: &impl Storelike) -> AtomicResult<String> {
-    let mut output = String::new();
-    let resource = store.get_resource(url)?;
-    for (prop_url, val) in resource.get_propvals() {
-        let prop_shortname = store.get_property(&prop_url)?.shortname;
-        output.push_str(&*format!(
-            "{0: <15}{1: <10} \n",
-            prop_shortname.blue().bold(),
-            val.to_string()
-        ));
-    }
-    output.push_str(&*format!("{0: <15}{1: <10} \n", "subject".blue().bold(), url));
-    Ok(output)
-}
-
 /// Triple Pattern Fragment Query
-fn tpf(context: &mut Context) -> AtomicResult<()> {
+fn tpf(context: &Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
     let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());
     let value = tpf_value(subcommand_matches.value_of("value").unwrap());
     let endpoint = format!("{}/tpf", &context.get_write_context().server);
-    let serialized = atomic_lib::client::fetch_tpf(&endpoint, subject, property, value)?;
-    println!("{}", serialized);
+    let resources = atomic_lib::client::fetch_tpf(&endpoint, subject, property, value, &context.store)?;
+    for r in resources {
+        print_resource(context, &r, subcommand_matches)?;
+    }
     Ok(())
 }
 

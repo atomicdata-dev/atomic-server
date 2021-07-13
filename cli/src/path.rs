@@ -1,9 +1,6 @@
-use crate::{pretty_print_resource, Context};
+use crate::{Context, print::{get_serialization, print_resource}};
 use atomic_lib::{errors::AtomicResult, serialize, storelike, Atom, Storelike};
 use serialize::Format;
-
-/// List of serialization options. Should match /path.rs/get
-pub const SERIALIZE_OPTIONS: [&str; 7] = ["pretty", "json", "jsonld", "jsonad", "nt", "turtle", "n3"];
 
 /// Resolves an Atomic Path query
 pub fn get_path(context: &mut Context) -> AtomicResult<()> {
@@ -13,39 +10,17 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
         .expect("Add a URL, shortname or path")
         .collect();
     let path_string: String = path_vec.join(" ");
-    let serialization: Format = match subcommand_matches.value_of("as").unwrap() {
-        "pretty" => (Format::PRETTY),
-        "json" => (Format::JSON),
-        "jsonld" => (Format::JSONLD),
-        "jsonad" => (Format::JSONAD),
-        "nt" => (Format::NT),
-        "turtle" => (Format::NT),
-        "n3" => (Format::NT),
-        format => {
-            return Err(format!("As {} not supported. Try {:?}", format, SERIALIZE_OPTIONS).into());
-        }
-    };
+    let serialization: Format = get_serialization(subcommand_matches)?;
 
     // Returns a URL or Value
     let store = &mut context.store;
     let path = store
         .get_path(&path_string, Some(&context.mapping.lock().unwrap()))?;
     let out = match path {
-        storelike::PathReturn::Subject(subject) => match serialization {
-            Format::JSON => store
-                .get_resource_extended(&subject)?
-                .to_json(store)?,
-            Format::JSONLD => store
-                .get_resource_extended(&subject)?
-                .to_json_ld(store)?,
-            Format::JSONAD => store
-                .get_resource_extended(&subject)?
-                .to_json_ad()?,
-            Format::NT => {
-                let resource = store.get_resource_extended(&subject)?;
-                serialize::atoms_to_ntriples(resource.to_atoms()?, store)?
-            }
-            Format::PRETTY => pretty_print_resource(&subject, store)?,
+        storelike::PathReturn::Subject(subject) => {
+            let resource = store.get_resource_extended(&subject)?;
+            print_resource(context, &resource, subcommand_matches)?;
+            return Ok(())
         },
         storelike::PathReturn::Atom(atom) => match serialization {
             Format::JSONLD | Format::JSON | Format::JSONAD | Format::PRETTY => {

@@ -3,6 +3,7 @@ use crate::{content_types::ContentType, errors::BetterResult, helpers::empty_to_
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
 use serde::Deserialize;
+use std::collections::HashSet;
 use std::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
@@ -34,8 +35,13 @@ pub async fn tpf(
     match content_type {
         ContentType::JSONAD => {
             let mut resources = vec![];
+            // Only search each subject once, to avoid duplicate entries
+            let mut subjects = HashSet::new();
             for atom in atoms {
-                resources.push(store.get_resource(&atom.subject)?);
+                subjects.insert(atom.subject.clone());
+            }
+            for subject in subjects {
+                resources.push(store.get_resource(&subject)?);
             }
             Ok(builder.body(atomic_lib::serialize::resources_to_json_ad(resources)?))
         }
