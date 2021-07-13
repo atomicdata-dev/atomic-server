@@ -3,7 +3,7 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
-## v0.24.2 (unpublished)
+## v0.24.2
 
 - Fix `/path` endpoint return values #143
 - Add ASCI logo in terminal on boot
