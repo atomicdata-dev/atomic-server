@@ -4,7 +4,7 @@ use serde_json::Map;
 use serde_json::Value as SerdeValue;
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, Resource, Storelike, Value
+    datatype::DataType, errors::AtomicResult, resources::PropVals, Resource, Storelike, Value, Atom
 };
 
 /// Serializes a vector or Resources to a JSON-AD string

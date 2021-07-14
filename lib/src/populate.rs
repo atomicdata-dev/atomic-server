@@ -146,7 +146,7 @@ pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
 
 /// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary) from default_store.jsonld
 pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
-    let json = include_str!("../defaults/default_store.jsonld");
+    let json = include_str!("../defaults/default_store.json");
     store.import(json)?;
     Ok(())
 }
