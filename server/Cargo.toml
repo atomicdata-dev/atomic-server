@@ -5,7 +5,7 @@ version = "0.24.2"
 authors = ["Joep Meindertsma <joep@ontola.io>"]
 edition = "2018"
 license = "MIT"
-repository = "https://github.com/joepio/atomic-cli"
+repository = "https://github.com/joepio/atomic-data-rust"
 
 [dependencies]
 atomic_lib = { version = "0.24.2", path = "../lib", features = ["config", "db", "rdf"] }
