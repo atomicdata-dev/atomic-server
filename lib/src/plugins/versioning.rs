@@ -92,7 +92,7 @@ pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResu
     let mut version = Resource::new(subject.into());
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
-            let updated = commit.apply_changes(version, store)?;
+            let updated = commit.apply_changes(version, store, false)?;
             version = updated;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {

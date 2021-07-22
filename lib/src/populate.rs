@@ -161,7 +161,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     let classes_atoms = store.tpf(
         None,
         Some("https://atomicdata.dev/properties/isA"),
-        Some("[\"https://atomicdata.dev/classes/Class\"]"),
+        Some("https://atomicdata.dev/classes/Class"),
         true,
     )?;
 

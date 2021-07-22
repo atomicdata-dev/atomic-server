@@ -25,6 +25,11 @@ pub trait Storelike: Sized {
     /// Validates datatypes and required props presence.
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
 
+    /// Adds an Atom to the PropSubjectMap. Overwrites if already present.
+    fn add_atom_to_index(&self, _atom: &Atom) -> AtomicResult<()> {
+        Ok(())
+    }
+
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
     /// In most cases, you should use `resource.save()` instead.
@@ -39,6 +44,17 @@ pub trait Storelike: Sized {
     /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
     /// WARNING: This could be very expensive!
     fn all_resources(&self, include_external: bool) -> ResourceCollection;
+
+    /// Constructs the value index from all resources in the store. Could take a while.
+    fn build_index(&self, include_external: bool) -> AtomicResult<()> {
+        for r in self.all_resources(include_external) {
+            let atoms = r.to_atoms()?;
+            for atom in atoms {
+                self.add_atom_to_index(&atom)?;
+            }
+        }
+        Ok(())
+    }
 
     /// Returns the root URL where the default store is.
     /// E.g. `https://example.com`
@@ -336,6 +352,11 @@ pub trait Storelike: Sized {
     fn populate(&self) -> AtomicResult<()> {
         crate::populate::populate_base_models(self)?;
         crate::populate::populate_default_store(self)
+    }
+
+    /// Removes an Atom from the PropSubjectMap.
+    fn remove_atom_from_index(&self, _atom: &Atom) -> AtomicResult<()> {
+        Ok(())
     }
 
     /// Sets the default Agent for applying commits.
