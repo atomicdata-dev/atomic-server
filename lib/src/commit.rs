@@ -4,9 +4,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
-use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, Resource, Storelike, Value,
-};
+use crate::{Atom, Resource, Storelike, Value, datatype::DataType, errors::AtomicResult, resources::PropVals, urls};
 
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
@@ -45,7 +43,7 @@ impl Commit {
     /// Does not check if the correct rights are present.
     /// If you need more control over which checks to perform, use apply_opts
     pub fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, true, true, false, false)
+        self.apply_opts(store, true, true, false, false, false)
     }
 
     /// Apply a single signed Commit to the store.
@@ -59,6 +57,7 @@ impl Commit {
         validate_signature: bool,
         validate_timestamp: bool,
         validate_rights: bool,
+        update_index: bool,
     ) -> AtomicResult<Resource> {
         if validate_signature {
             let signature = match self.signature.as_ref() {
@@ -112,7 +111,7 @@ impl Commit {
         };
         // We apply the Commit, but don't save the resource just yet.
         // This _must_ be a clone, because otherwise we could have malicious agents granting themselves rights
-        let resource_changed = self.apply_changes(resource_old.clone(), store)?;
+        let resource_changed = self.apply_changes(resource_old.clone(), store, update_index)?;
 
         if validate_rights {
             if is_new {
@@ -156,15 +155,29 @@ impl Commit {
         Ok(commit_resource)
     }
 
-    /// Updates the values in the Resource according to the `set` and `remove` attributes in the Commit
-    pub fn apply_changes(&self, mut resource: Resource, store: &impl Storelike) -> AtomicResult<Resource> {
+    /// Updates the values in the Resource according to the `set` and `remove` attributes in the Commit.
+    /// Optionally also updates the index in the Store.
+    pub fn apply_changes(&self, mut resource: Resource, store: &impl Storelike, update_index: bool) -> AtomicResult<Resource> {
         if let Some(set) = self.set.clone() {
             for (prop, val) in set.iter() {
+                if update_index {
+                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                    if let Ok(_v) = resource.get(prop) {
+                        store.remove_atom_from_index(&atom)?;
+                    }
+                    store.add_atom_to_index(&atom)?;
+                }
                 resource.set_propval(prop.into(), val.to_owned(), store)?;
             }
         }
         if let Some(remove) = self.remove.clone() {
             for prop in remove.iter() {
+                if update_index {
+                    let val = resource.get(prop)?;
+                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                    store.remove_atom_from_index(&atom)?;
+                    store.add_atom_to_index(&atom)?;
+                }
                 resource.remove_propval(&prop);
             }
         }
@@ -173,7 +186,7 @@ impl Commit {
 
     /// Applies a commit without performing authorization / signature / schema checks.
     pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, false, false, false, false)
+        self.apply_opts(store, false, false, false, false, false)
     }
 
     /// Converts a Resource of a Commit into a Commit

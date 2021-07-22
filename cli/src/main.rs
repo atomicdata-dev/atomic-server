@@ -54,11 +54,7 @@ fn set_agent_config() -> AtomicResult<Config> {
             let server = promptly::prompt("What's the base url of your Atomic Server?")?;
             let agent = promptly::prompt("What's the URL of your Agent?")?;
             let private_key = promptly::prompt("What's the private key of this Agent?")?;
-            let config = atomic_lib::config::Config {
-                server,
-                private_key,
-                agent,
-            };
+            let config = atomic_lib::config::Config { server, agent, private_key };
             atomic_lib::config::write_config(&agent_config_path, config.clone())?;
             println!(
                 "New config file created at {:?}",

@@ -15,7 +15,7 @@ pub struct Config {
     /// Where the app is hosted (defaults to localhost).
     /// Without the port and schema values.
     pub domain: String,
-    /// E.g. https://example.com
+    /// The full URL at which the Server will be available. E.g. https://example.com
     pub local_base_url: String,
     /// The contact mail address for Let's Encrypt HTTPS setup
     pub email: Option<String>,
@@ -116,26 +116,15 @@ pub fn init() -> BetterResult<Config> {
     }
 
     let schema = if https { "https" } else { "http" };
-    let local_base_url = format!("{}://{}", schema, domain);
+    // I'm not convinced that this is the best way to do this.
+    let local_base_url = if https && port == 80 || !https && port == 443 {
+        format!("{}://{}", schema, domain)
+    } else {
+        format!("{}://{}:{}", schema, domain, port)
+    };
 
     let mut static_path = config_dir.clone();
     static_path.push("public");
 
-    Ok(Config {
-        cert_path,
-        config_dir,
-        config_file_path,
-        email,
-        development,
-        domain,
-        https,
-        https_path,
-        ip,
-        key_path,
-        port,
-        port_https,
-        local_base_url,
-        store_path,
-        static_path,
-    })
+    Ok(Config { development, domain, local_base_url, email, port, port_https, ip, https, config_dir, key_path, cert_path, https_path, config_file_path, static_path, store_path })
 }

@@ -262,12 +262,12 @@ impl Resource {
             self.set_propval_unsafe(property, value)
         } else {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
-            self.get_subject(),
-            property,
-            value.to_string(),
-            required_datatype,
-            value.datatype()
-        ).into())
+                self.get_subject(),
+                property,
+                value.to_string(),
+                required_datatype,
+                value.datatype()
+            ).into())
         }
     }
 

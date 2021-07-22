@@ -1,17 +1,13 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
+use std::{collections::{HashMap, HashSet}, sync::{Arc, Mutex}};
 
-use crate::{
-    errors::AtomicResult,
-    resources::PropVals,
-    storelike::{ResourceCollection, Storelike},
-    Atom, Resource,
-};
+use crate::{Atom, Resource, Value, datatype::DataType, errors::AtomicResult, resources::PropVals, storelike::{ResourceCollection, Storelike}};
+
+/// Inside the value_index, each value is mapped to this type.
+/// The String on the left represents a Property URL, and the second one is the set of subjects.
+pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 
 /// The Db is a persistent on-disk Atomic Data store.
 /// It's an implementation of Storelike.
@@ -80,11 +76,37 @@ impl Db {
         match propval_maybe.as_ref() {
             Some(binpropval) => {
                 let propval: PropVals = bincode::deserialize(binpropval)
-                    .map_err(|e| format!("{} {}", corrupt_db_message(subject), e))?;
+                    .map_err(|e| format!("Deserialize propval error: {} {}", corrupt_db_message(subject), e))?;
                 Ok(propval)
             }
             None => Err(format!("Resource {} not found", subject).into()),
         }
+    }
+
+    /// Search for a value, get a PropSubjectMap. If it does not exist, create a new one.
+    fn get_prop_subject_map(&self, string_val: &str) -> AtomicResult<PropSubjectMap> {
+        let prop_sub_map = self
+            .index_vals
+            .get(string_val)
+            .map_err(|e| format!("Can't open {} from value index: {}", string_val, e))?;
+        match prop_sub_map.as_ref() {
+            Some(binpropval) => {
+                let psm: PropSubjectMap = bincode::deserialize(binpropval)
+                .map_err(|e| format!("Deserialize PropSubjectMap error: {} {}", corrupt_db_message(&string_val), e))?;
+                Ok(psm)
+            }
+            None => {
+                let psm: PropSubjectMap = PropSubjectMap::new();
+                Ok(psm)
+            },
+        }
+    }
+
+    fn set_prop_subject_map(&self, string_val: &str, psm: &PropSubjectMap) -> AtomicResult<()> {
+        let psm_binary = bincode::serialize(psm)
+        .map_err(|e| format!("Can't serialize value {}: {}", string_val, e))?;
+        self.index_vals.insert(string_val, psm_binary)?;
+        Ok(())
     }
 }
 
@@ -117,6 +139,28 @@ impl Storelike for Db {
         Ok(())
     }
 
+    fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
+        let vec = match atom.value.clone() {
+            Value::ResourceArray(v) => v,
+            other=>  vec![other.to_string()],
+        };
+
+        for val in vec {
+            let mut map = self.get_prop_subject_map(&val)?;
+
+            let mut set = match map.get_mut(&atom.property){
+                Some(vals) => vals.to_owned(),
+                None => HashSet::new(),
+            };
+
+            set.insert(atom.subject.clone());
+            map.insert(atom.property.clone(), set);
+
+            self.set_prop_subject_map(&val, &map)?;
+        }
+        Ok(())
+    }
+
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
@@ -126,6 +170,28 @@ impl Storelike for Db {
 
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()> {
         self.set_propvals(resource.get_subject(), &resource.get_propvals())
+    }
+
+    fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
+        let vec = match atom.value.clone() {
+            Value::ResourceArray(v) => v,
+            other=>  vec![other.to_string()],
+        };
+
+        for val in vec {
+            let mut map = self.get_prop_subject_map(&val)?;
+
+            let mut set = match map.get_mut(&atom.property){
+                Some(vals) => vals.to_owned(),
+                None => HashSet::new(),
+            };
+
+            set.remove(&atom.subject);
+            map.insert(atom.property.clone(), set);
+
+            self.set_prop_subject_map(&val, &map)?;
+        }
+        Ok(())
     }
 
     fn get_base_url(&self) -> &str {
@@ -248,6 +314,119 @@ impl Storelike for Db {
 
     fn set_default_agent(&self, agent: crate::agents::Agent) {
         self.default_agent.lock().unwrap().replace(agent);
+    }
+
+    // TPF implementation that used the index_value cache, far more performant than the StoreLike implementation
+    fn tpf(
+        &self,
+        q_subject: Option<&str>,
+        q_property: Option<&str>,
+        q_value: Option<&str>,
+        // Whether resources from outside the store should be searched through
+        include_external: bool,
+    ) -> AtomicResult<Vec<Atom>> {
+        let mut vec: Vec<Atom> = Vec::new();
+
+        let hassub = q_subject.is_some();
+        let hasprop = q_property.is_some();
+        let hasval = q_value.is_some();
+
+        // Simply return all the atoms
+        if !hassub && !hasprop && !hasval {
+            for resource in self.all_resources(include_external) {
+                for (property, value) in resource.get_propvals() {
+                    vec.push(Atom::new(
+                        resource.get_subject().clone(),
+                        property.clone(),
+                        value.clone()
+                    ))
+                }
+            }
+            return Ok(vec);
+        }
+
+        // If the value is a resourcearray, check if it is inside
+        let val_equals = |val: &str| {
+            let q = q_value.unwrap();
+            val == q || {
+                if val.starts_with('[') {
+                    match crate::parse::parse_json_array(val) {
+                        Ok(vec) => return vec.contains(&q.into()),
+                        Err(_) => return val == q,
+                    }
+                }
+                false
+            }
+        };
+
+        // Find atoms matching the TPF query in a single resource
+        let mut find_in_resource = |resource: &Resource| {
+            let subj = resource.get_subject();
+            for (prop, val) in resource.get_propvals().iter() {
+                if hasprop && q_property.as_ref().unwrap() == prop {
+                    if hasval {
+                        if val_equals(&val.to_string()) {
+                            vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
+                        }
+                        break;
+                    } else {
+                        vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
+                    }
+                    break;
+                } else if hasval && !hasprop && val_equals(&val.to_string()) {
+                    vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
+                }
+            }
+        };
+
+        match q_subject {
+            Some(sub) => match self.get_resource(&sub) {
+                Ok(resource) => {
+                    if hasprop | hasval {
+                        find_in_resource(&resource);
+                        Ok(vec)
+                    } else {
+                        resource.to_atoms()
+                    }
+                }
+                Err(_) => Ok(vec),
+            },
+            None => {
+                if hasval {
+                    let spm = self.get_prop_subject_map(q_value.unwrap())?;
+                    if hasprop {
+                        if let Some(set) = spm.get(q_property.unwrap())  {
+                            for subj in set {
+                                let property_full = self.get_property(q_property.unwrap())?;
+                                let mut datatype = property_full.data_type;
+                                // The value index stores only single subjects, not arrays.
+                                // However, this also means that it is not possible to find the actual _value_ of a thing
+                                // So for arrays, we simply return AtomicURLs.
+                                if datatype == DataType::ResourceArray {
+                                    datatype = DataType::AtomicUrl
+                                }
+                                let atom = Atom::new(subj.into(), q_property.unwrap().into(), Value::new(q_value.unwrap(), &datatype)?);
+                                vec.push(atom);
+                            }
+                        }
+                    } else {
+                        for (prop, set) in spm.iter() {
+                            for subj in set {
+                                let property_full = self.get_property(prop)?;
+                                let atom = Atom::new(subj.into(), prop.into(), Value::new(q_value.unwrap(), &property_full.data_type)?);
+                                vec.push(atom);
+                            }
+                        }
+                    }
+                    return Ok(vec)
+                }
+                // TODO: Add an index for searching only by property
+                for resource in self.all_resources(include_external) {
+                    find_in_resource(&resource);
+                }
+                Ok(vec)
+            }
+        }
     }
 }
 

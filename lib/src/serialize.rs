@@ -183,6 +183,7 @@ pub fn atoms_to_turtle(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult
     use rio_api::formatter::TriplesFormatter;
     use rio_api::model::{Literal, NamedNode, Term, Triple};
     use rio_turtle::TurtleFormatter;
+
     let mut formatter = TurtleFormatter::new(Vec::default());
 
     for atom in atoms {

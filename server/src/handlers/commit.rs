@@ -14,17 +14,6 @@ pub async fn post_commit(
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
     let incoming_commit = Commit::from_resource(incoming_commit_resource)?;
-    let now = atomic_lib::datetime_helpers::now();
-    // 86,400,000 is 24 hrs
-    let acceptable_milliseconds = 86_400_000;
-    let time_ago = now - incoming_commit.created_at;
-    if time_ago > acceptable_milliseconds {
-        return Err(format!(
-            "Commit was was createdAt {}ms ago, which is more than the maximum of {}ms.",
-            time_ago, acceptable_milliseconds
-        )
-        .into());
-    }
     if !incoming_commit.subject.contains(
         &store
             .get_self_url()
@@ -32,7 +21,7 @@ pub async fn post_commit(
     ) {
         return Err("Subject of commit should be sent to other domain - this store can not own this resource.".into());
     }
-    let saved_commit_resource = incoming_commit.apply_opts(store, true, true, true, true)?;
+    let saved_commit_resource = incoming_commit.apply_opts(store, true, true, true, true, true)?;
     // TODO: better response
     let message = format!(
         "Commit succesfully applied. Can be seen at {}",
