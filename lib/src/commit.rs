@@ -79,7 +79,7 @@ impl Commit {
                 .verify(stringified_commit.as_bytes(), &signature_bytes)
                 .map_err(|_e| {
                     format!(
-                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Stringified commit: {}. Public key",
+                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: {}",
                         stringified_commit,
                     )
                 })?;
@@ -101,30 +101,43 @@ impl Commit {
             }
         }
         let commit_resource: Resource = self.clone().into_resource(store)?;
+        let mut is_new = false;
         // Create a new resource if it doens't exist yet
-        let mut resource = match store.get_resource(&self.subject) {
+        let mut resource_old = match store.get_resource(&self.subject) {
             Ok(rs) => rs,
-            Err(_) => Resource::new(self.subject.clone()),
+            Err(_) => {
+                is_new = true;
+                Resource::new(self.subject.clone())
+            },
         };
-        // Set a parent only if the rights checks are to be validated.
-        // This should happen _before_ setting any values, to prevent malicious users from giving themselves write rights in a commit!
+        // We apply the Commit, but don't save the resource just yet.
+        // This _must_ be a clone, because otherwise we could have malicious agents granting themselves rights
+        let resource_changed = self.apply_changes(resource_old.clone(), store)?;
+
         if validate_rights {
-            // If there is no explicit parent set, revert to a default
-            if resource.get(urls::PARENT).is_err() {
-                let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
-                resource.set_propval(
-                    urls::PARENT.into(),
-                    Value::AtomicUrl(default_parent),
-                    store,
-                )?;
+            if is_new {
+                if !crate::hierarchy::check_write(store, &resource_changed, self.signer.clone())? {
+                    return Err(format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                    &self.signer, self.subject).into());
+                }
+            } else {
+                // Set a parent only if the rights checks are to be validated.
+                // If there is no explicit parent set on the previous resource, use a default
+                if resource_old.get(urls::PARENT).is_err() {
+                    let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
+                    resource_old.set_propval(
+                        urls::PARENT.into(),
+                        Value::AtomicUrl(default_parent),
+                        store,
+                    )?;
+                }
+                // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
+                if !crate::hierarchy::check_write(store, &resource_old, self.signer.clone())? {
+                    return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                    &self.signer, self.subject).into());
+                }
             }
-            if !crate::hierarchy::check_write(store, &resource, self.signer.clone())? {
-                return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                &self.signer, self.subject).into());
-            }
-            println!("This should not happen!")
         };
-        let resource_changed = self.apply_changes(resource, store)?;
         // Check if all required props are there
         if validate_schema {
             resource_changed.check_required_props(store)?;

@@ -116,7 +116,9 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Adds the hierarchy related items (Drive, default Folder) to the Store. Sets the home page as the top level node, and gives write rights to the default agent.
+/// Adds the hierarchy related items (Drive, default Folder) to the Store.
+/// Sets the home page as the top level node, and gives write rights to the default agent.
+/// Requires a `self_url` to be set in the store.
 pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
     let self_url = store
         .get_self_url()
@@ -151,7 +153,8 @@ pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Generates some nice collections for classes, such as `/agent` and `/collection`
+/// Generates some nice collections for classes, such as `/agent` and `/collection`.
+/// Requires a `self_url` to be set in the store.
 pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     use crate::collections::CollectionBuilder;
 

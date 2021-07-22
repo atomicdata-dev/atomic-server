@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.25.0 [unpublished]
+
+- Add models for Document editor
+- Improve commit authorization checks - allow new resources with existing parents
+
 ## v0.24.2
 
 - Fix `/path` endpoint return values #143
