@@ -101,6 +101,8 @@
       ],
       "https://atomicdata.dev/properties/recommends": [
           "https://atomicdata.dev/properties/read",
+          "https://atomicdata.dev/properties/children",
+          "https://atomicdata.dev/properties/description",
           "https://atomicdata.dev/properties/write"
       ],
       "https://atomicdata.dev/properties/shortname": "drive"
@@ -296,13 +298,15 @@
       "https://atomicdata.dev/properties/shortname": "read"
   },
   {
-      "@id": "https://atomicdata.dev/properties/children",
-      "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
-      "https://atomicdata.dev/properties/description": "The children of a Resource are the items that have this Resource set as Parent. Children are 'below' their Parents, hierarchically. Parents are the boss of children, which means that parents influents things like read and write rights.",
-      "https://atomicdata.dev/properties/isA": [
-          "https://atomicdata.dev/classes/Property"
-      ],
-      "https://atomicdata.dev/properties/shortname": "children"
+    "@id": "https://atomicdata.dev/properties/children",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The children of a Resource are the items that have this Resource set as Parent. Children are 'below' their Parents, hierarchically. Parents are the boss of children, which means that parents influents things like read and write rights.",
+    "https://atomicdata.dev/properties/isA": [
+        "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/isDynamic": true,
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev",
+    "https://atomicdata.dev/properties/shortname": "children"
   },
   {
       "@id": "https://atomicdata.dev/properties/classtype",
@@ -330,6 +334,7 @@
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Property"
       ],
+      "https://atomicdata.dev/properties/isDynamic": true,
       "https://atomicdata.dev/properties/shortname": "members"
   },
   {
@@ -385,6 +390,7 @@
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Property"
       ],
+      "https://atomicdata.dev/properties/isDynamic": true,
       "https://atomicdata.dev/properties/shortname": "total-members"
   },
   {
@@ -394,6 +400,7 @@
       "https://atomicdata.dev/properties/isA": [
           "https://atomicdata.dev/classes/Property"
       ],
+      "https://atomicdata.dev/properties/isDynamic": true,
       "https://atomicdata.dev/properties/shortname": "total-pages"
   },
   {
@@ -546,6 +553,16 @@
           "https://atomicdata.dev/classes/Property"
       ],
       "https://atomicdata.dev/properties/shortname": "is-a"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/isDynamic",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "If this is true, a Property is calculated server side and should therefore not appear in forms.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/8S2U/viqkaAQVzUisaolrpX6hx/G/L3e2MTjWA83Rxk=",
+    "https://atomicdata.dev/properties/shortname": "is-dynamic"
   },
   {
       "@id": "https://atomicdata.dev/properties/name",

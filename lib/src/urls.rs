@@ -18,6 +18,7 @@ pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
 pub const DESCRIPTION: &str = "https://atomicdata.dev/properties/description";
 // ... for Properties
 pub const IS_A: &str = "https://atomicdata.dev/properties/isA";
+pub const IS_DYNAMIC: &str = "https://atomicdata.dev/properties/isDynamic";
 pub const DATATYPE_PROP: &str = "https://atomicdata.dev/properties/datatype";
 pub const CLASSTYPE_PROP: &str = "https://atomicdata.dev/properties/classtype";
 // ... for Classes
