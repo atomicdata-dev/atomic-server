@@ -103,6 +103,13 @@ async fn main() -> AtomicResult<()> {
         },
     };
 
+    let appstate_clone = appstate.clone();
+    actix_web::rt::spawn(async move {
+        log::info!("Building index...");
+        appstate_clone.store.build_index(true).expect("Failed to build index");
+        log::info!("Index finished!");
+    });
+
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
         // Allow requests from other domains

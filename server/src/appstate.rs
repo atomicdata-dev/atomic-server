@@ -78,9 +78,6 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     log::info!("Setting default Agent {}...", &agent.subject);
     store.set_default_agent(agent);
 
-    log::info!("Building index...");
-    store.build_index(true).expect("Failed to build index");
-
     Ok(AppState { store, mapping, config })
 }
 
