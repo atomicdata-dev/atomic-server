@@ -8,20 +8,21 @@
 _Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
 The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
-`atomic-server` is a web-first database for storing and sharing typed linked data.
+`atomic-server` is a graph database server for storing and sharing typed linked data.
 Demo on [atomicdata.dev](https://atomicdata.dev)
 
 - No runtime dependencies, fast, runs on all platforms
-- Embedded HTTP / HTTPS / HTTP2.0 server
+- Embedded HTTP / HTTPS / HTTP2.0 server. Built-in LetsEncrypt handshake.
 - Serialization to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - Dynamic schema validation / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
-- Event-sourced versioning powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
-- Authorization (read / write permissions) and Hierarchical structures  powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
+- Event-sourced versioning / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- Pagination, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
+- Authorization (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
 - Invite / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 - Supports querying, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
-- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as a GUI / front-end.
+- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as a GUI / front-end, which offers dynamic forms, tables, authentication and more.
 
-Powered by Rust, atomic-lib, [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
+Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
 
 ## When should you use this
 
@@ -37,6 +38,12 @@ SUBCOMMANDS:
     import    Import a JSON-AD backup to the store. Overwrites Resources with same @id.
     run       Starts the server
 ```
+
+## When _not_ to use this
+
+- If you need stability or reliability, look further (for now).
+- You're dealing with non-public / private data. As of now, this server does not have methods to prevent access to content.
+- Complex query requirements. Check out NEO4j, Apache Jena or maybe TerminusDB.
 
 ## Installation & getting started
 
