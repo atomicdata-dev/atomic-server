@@ -83,7 +83,7 @@ pub fn init() -> BetterResult<Config> {
                     )
                 })?;
             }
-            "ATOMIC_DOMAIN" => {
+            "ATOMIC_BASE_URL" => {
                 // Perhaps this should have some regex check
                 domain = value;
             }

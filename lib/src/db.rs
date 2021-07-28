@@ -90,9 +90,9 @@ impl Db {
             .get(string_val)
             .map_err(|e| format!("Can't open {} from value index: {}", string_val, e))?;
         match prop_sub_map.as_ref() {
-            Some(binpropval) => {
-                let psm: PropSubjectMap = bincode::deserialize(binpropval)
-                .map_err(|e| format!("Deserialize PropSubjectMap error: {} {}", corrupt_db_message(&string_val), e))?;
+                Some(binpropval) => {
+                    let psm: PropSubjectMap = bincode::deserialize(binpropval)
+                        .map_err(|e| format!("Deserialize PropSubjectMap error: {} {}", corrupt_db_message(&string_val), e))?;
                 Ok(psm)
             }
             None => {
@@ -139,10 +139,15 @@ impl Storelike for Db {
         Ok(())
     }
 
+    // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
+
         let vec = match atom.value.clone() {
             Value::ResourceArray(v) => v,
-            other=>  vec![other.to_string()],
+            Value::AtomicUrl(v) => vec![v],
+            _other=>  {
+                return Ok(())
+            },
         };
 
         for val in vec {
@@ -438,6 +443,8 @@ const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is po
 
 #[cfg(test)]
 mod test {
+    use crate::urls;
+
     use super::*;
     use ntest::timeout;
 
@@ -453,21 +460,7 @@ mod test {
         store
     }
 
-    /// TODO: find bug!
-    /// For some reason, this one keeps going on forever.
-    /// It calles create_agent before populating, and keeps requesting stuff.
-    fn _init_faulty() -> Db {
-        let tmp_dir_path = "tmp/db";
-        let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
-        let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
-        let agent = store.create_agent(None).unwrap();
-        store.populate().unwrap();
-        store.set_default_agent(agent);
-        store
-    }
-
-
-    /// Share the Db instance between tests. Otherwise, all tests try to init the same location on disk an throw errors.
+    /// Share the Db instance between tests. Otherwise, all tests try to init the same location on disk and throw errors.
     use lazy_static::lazy_static; // 1.4.0
     use std::sync::Mutex;
     lazy_static! {
@@ -532,5 +525,21 @@ mod test {
             .unwrap();
         println!("My value: {}", my_value);
         assert_eq!(my_value.to_string(), "11");
+    }
+
+    #[test]
+    /// Check if the cache is working
+    fn add_atom_to_index() {
+        let store = DB.lock().unwrap().clone();
+        let subject = urls::CLASS.into();
+        let property: String = urls::PARENT.into();
+        let val_string= urls::AGENT;
+        let value = Value::new(val_string, &DataType::AtomicUrl).unwrap();
+        // This atom should normally not exist - Agent is not the parent of Class.
+        let atom = Atom::new(subject, property.clone(), value);
+        store.add_atom_to_index(&atom).unwrap();
+        let found = store.tpf(None, Some(&property), Some(val_string), false).unwrap();
+        // If we see the atom, it's in the index.
+        assert_eq!(found.len(), 1);
     }
 }

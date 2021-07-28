@@ -103,6 +103,10 @@ async fn main() -> AtomicResult<()> {
         },
     };
 
+    // Start other async processes
+    #[cfg(feature = "desktop")]
+    tray_icon::tray_icon_process(config.clone());
+
     let appstate_clone = appstate.clone();
     actix_web::rt::spawn(async move {
         log::info!("Building index...");
@@ -132,8 +136,6 @@ async fn main() -> AtomicResult<()> {
             )
     });
 
-    #[cfg(feature = "desktop")]
-    tray_icon::tray_icon_process(config.clone());
 
     if config.https {
         // If there is no certificate file, or the certs are too old, start HTTPS initialization
