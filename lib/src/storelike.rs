@@ -26,6 +26,7 @@ pub trait Storelike: Sized {
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
 
     /// Adds an Atom to the PropSubjectMap. Overwrites if already present.
+    /// The default implementation for this does not do anything, so overwrite it if your store needs indexing.
     fn add_atom_to_index(&self, _atom: &Atom) -> AtomicResult<()> {
         Ok(())
     }
