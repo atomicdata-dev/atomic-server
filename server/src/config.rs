@@ -117,7 +117,7 @@ pub fn init() -> BetterResult<Config> {
 
     let schema = if https { "https" } else { "http" };
     // I'm not convinced that this is the best way to do this.
-    let local_base_url = if https && port == 80 || !https && port == 443 {
+    let local_base_url = if https && port == 443 || !https && port == 80 {
         format!("{}://{}", schema, domain)
     } else {
         format!("{}://{}:{}", schema, domain, port)
