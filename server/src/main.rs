@@ -136,6 +136,7 @@ async fn main() -> AtomicResult<()> {
             )
     });
 
+    let message = format!("{}\n\nVisit {}\n\n", BANNER, config.local_base_url);
 
     if config.https {
         // If there is no certificate file, or the certs are too old, start HTTPS initialization
@@ -146,7 +147,7 @@ async fn main() -> AtomicResult<()> {
         let https_config = crate::https::get_https_config(&config)
             .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
         let endpoint = format!("{}:{}", config.ip, config.port_https);
-        println!("{}\n\nvisit https://{}\n\n", BANNER, &endpoint);
+        println!("{}", message);
         server
             .bind_rustls(&endpoint, https_config)
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
@@ -155,7 +156,7 @@ async fn main() -> AtomicResult<()> {
         Ok(())
     } else {
         let endpoint = format!("{}:{}", config.ip, config.port);
-        println!("{}\n\n Visit http://{}\n\n", BANNER, &endpoint);
+        println!("{}", message);
         server
             .bind(&format!("{}:{}", config.ip, config.port))
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
