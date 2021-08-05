@@ -176,7 +176,6 @@ impl Commit {
                     let val = resource.get(prop)?;
                     let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
                     store.remove_atom_from_index(&atom)?;
-                    store.add_atom_to_index(&atom)?;
                 }
                 resource.remove_propval(&prop);
             }
