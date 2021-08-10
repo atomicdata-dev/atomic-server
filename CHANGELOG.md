@@ -3,8 +3,9 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
-## v0.25.0 [unpublished]
+## v0.25.1
 
+- Add Value indexing, which speeds up TPF queries / collections tremendously #14
 - Add models for Document editor
 - Improve commit authorization checks - allow new resources with existing parents
 
