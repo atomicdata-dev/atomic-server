@@ -5,7 +5,7 @@ use std::{collections::{HashMap, HashSet}, sync::{Arc, Mutex}};
 
 use crate::{Atom, Resource, Value, datatype::DataType, errors::AtomicResult, resources::PropVals, storelike::{ResourceCollection, Storelike}};
 
-/// Inside the value_index, each value is mapped to this type.
+/// Inside the index_vals, each value is mapped to this type.
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
 pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 
@@ -22,7 +22,6 @@ pub struct Db {
     resources: sled::Tree,
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
     index_vals: sled::Tree,
-    index_props: sled::Tree,
     /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
     base_url: String,
 }
@@ -34,27 +33,17 @@ impl Db {
     pub fn init<P: AsRef<std::path::Path>>(path: P, base_url: String) -> AtomicResult<Db> {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location. Is another instance of Atomic Server running? {}", e))?;
         let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
-        let index_props = db.open_tree("index_props")?;
         let index_vals = db.open_tree("index_vals")?;
         let store = Db {
             db,
             default_agent: Arc::new(Mutex::new(None)),
             resources,
             index_vals,
-            index_props,
             base_url,
         };
         crate::populate::populate_base_models(&store)?;
         Ok(store)
     }
-
-    // fn index_value_add(&mut self, atom: Atom) -> AtomicResult<()> {
-    //     todo!();
-    // }
-
-    // fn index_value_remove(&mut self, atom: Atom) -> AtomicResult<()> {
-    //     todo!();
-    // }
 
     /// Internal method for fetching Resource data.
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
