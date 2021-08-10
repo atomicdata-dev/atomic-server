@@ -91,10 +91,21 @@ impl Db {
         }
     }
 
+    /// Returns true if the index has been built.
+    pub fn has_index(&self) -> bool {
+        !self.index_vals.is_empty()
+    }
+
     fn set_prop_subject_map(&self, string_val: &str, psm: &PropSubjectMap) -> AtomicResult<()> {
         let psm_binary = bincode::serialize(psm)
         .map_err(|e| format!("Can't serialize value {}: {}", string_val, e))?;
         self.index_vals.insert(string_val, psm_binary)?;
+        Ok(())
+    }
+
+    /// Removes all values from the index.
+    pub fn clear_index(&self) -> AtomicResult<()> {
+        self.index_vals.clear()?;
         Ok(())
     }
 }

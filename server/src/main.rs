@@ -42,6 +42,10 @@ async fn main() -> AtomicResult<()> {
                     .required(true)
                 )
         )
+        .subcommand(
+            SubCommand::with_name("index")
+                .about("Rebuilds the index, and starts the server.")
+        )
         .get_matches();
 
     // Enable all logging
@@ -60,6 +64,8 @@ async fn main() -> AtomicResult<()> {
             panic!("Error during appstate setup. {}", e)
         }
     };
+    let appstate_clone = appstate.clone();
+    let mut build_index = !appstate_clone.store.has_index();
 
     match matches.subcommand_name() {
         Some("export") => {
@@ -95,6 +101,9 @@ async fn main() -> AtomicResult<()> {
         Some("run") => {
             // continue, start server
         }
+        Some("index") => {
+            build_index = true;
+        }
         Some(unkown) => {
             panic!("Unkown command: {}", unkown);
         }
@@ -107,11 +116,13 @@ async fn main() -> AtomicResult<()> {
     #[cfg(feature = "desktop")]
     tray_icon::tray_icon_process(config.clone());
 
-    let appstate_clone = appstate.clone();
     actix_web::rt::spawn(async move {
-        log::info!("Building index...");
-        appstate_clone.store.build_index(true).expect("Failed to build index");
-        log::info!("Index finished!");
+        if build_index {
+            log::warn!("Building index... This could take a while, expect worse performance until 'Building index finished'");
+            appstate_clone.store.clear_index().expect("Failed to clear index");
+            appstate_clone.store.build_index(true).expect("Failed to build index");
+            log::info!("Building index finished!");
+        }
     });
 
     let server = HttpServer::new(move || {
