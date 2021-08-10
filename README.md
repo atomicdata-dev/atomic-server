@@ -28,7 +28,6 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
 
-## When should you use t
 [→ Read more](server/README.md)
 
 ## `atomic-cli`
