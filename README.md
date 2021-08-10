@@ -11,13 +11,24 @@ This repo consists of three components: A library, a server and a CLI.**
 
 [![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
 
-The easiest way to share Atomic Data on the web. Demo on [atomicdata.dev](https://atomicdata.dev)
+The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
+`atomic-server` is a graph database server for storing and sharing typed linked data.
+Demo on [atomicdata.dev](https://atomicdata.dev)
 
-- A (personal) server for storing and sharing Atomic Data. Provides abstractions for querying, versioning, authorization, and more.
-- Serialization to HTML, JSON, Linked Data (RDF/XML, N-Triples / Turtle / JSON-LD) and [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad)
-- Embedded HTTP / HTTPS / HTTP2.0 server
-- Virtually no runtime dependencies, fast, runs on most platforms (including on your Raspberry Pi)
+- No runtime dependencies, fast, runs on all platforms
+- Embedded HTTP / HTTPS / HTTP2.0 server. Built-in LetsEncrypt handshake.
+- Serialization to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
+- Dynamic schema validation / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- Event-sourced versioning / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- Pagination, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
+- Authorization (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
+- Invite / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
+- Supports querying, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
+- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as a GUI / front-end, which offers dynamic forms, tables, authentication and more.
 
+Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
+
+## When should you use t
 [→ Read more](server/README.md)
 
 ## `atomic-cli`
