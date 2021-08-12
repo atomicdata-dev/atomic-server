@@ -32,11 +32,20 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
 - You are interested in re-decentralizing the web or want want to work with tech that improves data ownership and interoperability.
 - You like living on the edge (this application is not production ready)
 
+## CLI commands
+
 ```
+FLAGS:
+    -h, --help       Prints help information
+    -i, --init       Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands,
+                     and re-builds the index.
+    -r, --reindex    Rebuilds the index (can take a while for large stores).
+    -V, --version    Prints version information
+
 SUBCOMMANDS:
     export    Create a JSON-AD backup of the store.
+    help      Prints this message or the help of the given subcommand(s)
     import    Import a JSON-AD backup to the store. Overwrites Resources with same @id.
-    run       Starts the server
 ```
 
 ## When _not_ to use this
@@ -140,11 +149,6 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
-
-## Extra commands
-
-The `atomic-server` binary has some extra CLI commands: `import` and `export`.
-Run `atomic-server --help` to read more.
 
 ## Testing
 

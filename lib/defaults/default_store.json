@@ -94,6 +94,19 @@
       "https://atomicdata.dev/properties/shortname": "datatype"
   },
   {
+    "@id": "https://atomicdata.dev/classes/Document",
+    "https://atomicdata.dev/properties/description": "A nice documnet",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/8S2U/viqkaAQVzUisaolrpX6hx/G/L3e2MTjWA83Rxk=",
+    "https://atomicdata.dev/properties/recommends": [
+        "https://atomicdata.dev/properties/documents/elements",
+        "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "document"
+  },
+  {
       "@id": "https://atomicdata.dev/classes/Drive",
       "https://atomicdata.dev/properties/description": "The Drive node is at the top of the hierarchy in an Atomic Server. It can be thought of as a hard drive at the top of a filesystem. It can be used as a starting point to navigate to any Resource. A Drive needs to provide read and write access at least to one node.",
       "https://atomicdata.dev/properties/isA": [
@@ -467,6 +480,16 @@
           "https://atomicdata.dev/classes/Property"
       ],
       "https://atomicdata.dev/properties/shortname": "destroy"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/documents/elements",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Set of sections in a document",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/PhpdE3DbDJScLL2enGFx6Sisyx8Afxs6q/6DRvHgjuw=",
+    "https://atomicdata.dev/properties/shortname": "elements"
   },
   {
       "@id": "https://atomicdata.dev/properties/endpoint/parameters",

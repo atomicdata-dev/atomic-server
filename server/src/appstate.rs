@@ -18,16 +18,15 @@ pub struct AppState {
 /// Initializes a store on disk.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> BetterResult<AppState> {
-    let first_time = !std::path::Path::exists(&config.store_path);
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
-    if first_time {
-        log::info!("This is your first time, creating and populating new Database...");
+    if config.initialize {
+        log::info!("Initialize: creating and populating new Database...");
         atomic_lib::populate::populate_default_store(&store)?;
         // Building the index here is needed to perform TPF queries on imported resources
         store.build_index(true)?;
     }
     set_default_agent(&config, &store)?;
-    if first_time {
+    if config.initialize {
         atomic_lib::populate::populate_hierarchy(&store)?;
         atomic_lib::populate::populate_collections(&store)?;
         atomic_lib::populate::populate_endpoints(&store)?;

@@ -10,6 +10,10 @@ use std::path::PathBuf;
 /// These values are set when the server initializes, and do not change while running.
 #[derive(Clone)]
 pub struct Config {
+    /// If you're starting the server for the first time, or have passed an `--initialize` flag
+    pub initialize: bool,
+    /// If the index has to be rebuilt
+    pub rebuild_index: bool,
     /// If you're running in Development mode.
     pub development: bool,
     /// Where the app is hosted (defaults to localhost).
@@ -46,7 +50,7 @@ pub struct Config {
 }
 
 /// Creates the server config, reads .env values and sets defaults
-pub fn init() -> BetterResult<Config> {
+pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
     dotenv().ok();
     let mut development = false;
     let mut domain = String::from("localhost");
@@ -65,6 +69,7 @@ pub fn init() -> BetterResult<Config> {
     let mut key_path = config_dir.clone();
     key_path.push("https/key.pem");
     let mut email = None;
+
     for (key, value) in env::vars() {
         match &*key {
             "ATOMIC_CONFIG_PATH" => {
@@ -111,6 +116,9 @@ pub fn init() -> BetterResult<Config> {
         }
     }
 
+    let initialize = !std::path::Path::exists(&store_path) || matches.is_present("init");
+    let rebuild_index = matches.is_present("reindex");
+
     if https & email.is_none() {
         email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
     }
@@ -126,5 +134,23 @@ pub fn init() -> BetterResult<Config> {
     let mut static_path = config_dir.clone();
     static_path.push("public");
 
-    Ok(Config { development, domain, local_base_url, email, port, port_https, ip, https, config_dir, key_path, cert_path, https_path, config_file_path, static_path, store_path })
+    Ok(Config {
+        rebuild_index,
+        cert_path,
+        config_dir,
+        config_file_path,
+        development,
+        domain,
+        email,
+        https_path,
+        https,
+        initialize,
+        ip,
+        key_path,
+        local_base_url,
+        port_https,
+        port,
+        static_path,
+        store_path,
+    })
 }

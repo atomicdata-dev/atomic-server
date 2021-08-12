@@ -21,11 +21,7 @@ async fn main() -> AtomicResult<()> {
     let matches = clap::App::new("atomic-server")
         .version(crate_version!())
         .author("Joep Meindertsma <joep@ontola.io>")
-        .about("Store and share Atomic Data! Visit https://atomicdata.dev for more info")
-        .subcommand(
-            SubCommand::with_name("run")
-                .about("Starts the server (also runs without any arguments)")
-        )
+        .about("Store and share Atomic Data! Visit https://atomicdata.dev for more info. Pass no subcommands to launch the server.")
         .subcommand(
             SubCommand::with_name("export")
                 .about("Create a JSON-AD backup of the store.")
@@ -42,9 +38,17 @@ async fn main() -> AtomicResult<()> {
                     .required(true)
                 )
         )
-        .subcommand(
-            SubCommand::with_name("index")
-                .about("Rebuilds the index, and starts the server.")
+        .arg(
+            Arg::with_name("reindex")
+            .long("reindex")
+            .short("r")
+            .help("Rebuilds the index (can take a while for large stores).")
+        )
+        .arg(
+            Arg::with_name("init")
+            .long("init")
+            .help("Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index.")
+            .short("i")
         )
         .get_matches();
 
@@ -56,7 +60,7 @@ async fn main() -> AtomicResult<()> {
     log::info!("Atomic-server {}. Visit https://atomicdata.dev and https://github.com/joepio/atomic for more information.", VERSION);
 
     // Read .env vars, https certs
-    let config = config::init().expect("Error setting config");
+    let config = config::init(&matches).expect("Error setting config");
     // Initialize DB and HTML templating engine
     let appstate = match appstate::init(config.clone()) {
         Ok(state) => state,
@@ -65,7 +69,6 @@ async fn main() -> AtomicResult<()> {
         }
     };
     let appstate_clone = appstate.clone();
-    let mut build_index = !appstate_clone.store.has_index();
 
     match matches.subcommand_name() {
         Some("export") => {
@@ -101,9 +104,6 @@ async fn main() -> AtomicResult<()> {
         Some("run") => {
             // continue, start server
         }
-        Some("index") => {
-            build_index = true;
-        }
         Some(unkown) => {
             panic!("Unkown command: {}", unkown);
         }
@@ -116,14 +116,14 @@ async fn main() -> AtomicResult<()> {
     #[cfg(feature = "desktop")]
     tray_icon::tray_icon_process(config.clone());
 
-    actix_web::rt::spawn(async move {
-        if build_index {
+    if config.rebuild_index {
+        actix_web::rt::spawn(async move {
             log::warn!("Building index... This could take a while, expect worse performance until 'Building index finished'");
             appstate_clone.store.clear_index().expect("Failed to clear index");
             appstate_clone.store.build_index(true).expect("Failed to build index");
             log::info!("Building index finished!");
-        }
-    });
+        });
+    }
 
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
