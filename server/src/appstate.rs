@@ -18,15 +18,23 @@ pub struct AppState {
 /// Initializes a store on disk.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> BetterResult<AppState> {
+    let first_time = !std::path::Path::exists(&config.store_path);
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
-    set_default_agent(&config, &store)?;
-    // TODO: implement logic that checks if this is the first time that the server is started.
-    let initial = true;
-    if initial {
-        store.populate()?;
-        set_up_initial_invite(&store)?;
+    if first_time {
+        log::info!("This is your first time, creating and populating new Database...");
+        atomic_lib::populate::populate_default_store(&store)?;
+        // Building the index here is needed to perform TPF queries on imported resources
+        store.build_index(true)?;
     }
-    set_up_drive(&store)?;
+    set_default_agent(&config, &store)?;
+    if first_time {
+        atomic_lib::populate::populate_hierarchy(&store)?;
+        atomic_lib::populate::populate_collections(&store)?;
+        atomic_lib::populate::populate_endpoints(&store)?;
+        set_up_initial_invite(&store)?;
+        // This means that editing the .env does _not_ grant you the rights to edit the Drive.
+        set_up_drive(&store)?;
+    }
 
     Ok(AppState { store, config })
 }
@@ -38,7 +46,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
     ) {
         Ok(agent_config) => {
             match store.get_resource(&agent_config.agent) {
-                Ok(_) => agent_config,
+                Ok(_) => {agent_config},
                 Err(e) => {
                     if agent_config.agent.contains(&config.local_base_url) {
                         // If there is an agent in the config, but not in the store,
@@ -111,6 +119,11 @@ fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
         atomic_lib::Value::AtomicUrl(store.get_base_url().into()),
         store,
     )?;
+    invite.set_propval_string(
+        atomic_lib::urls::DESCRIPTION.into(),
+        "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once.",
+        store,
+    )?;
     invite.save_locally(store)?;
     Ok(())
 }
@@ -124,6 +137,7 @@ fn set_up_drive(store: &impl Storelike) -> BetterResult<()> {
     // TODO: add read rights to public, maybe
     drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), store)?;
     drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), store)?;
+    drive.set_propval_string(atomic_lib::urls::DESCRIPTION.into(), "Welcome to your Atomic-Server! Register your User by visiting [`/setup`](http://localhost/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store)?;
     drive.save_locally(store)?;
     Ok(())
 }

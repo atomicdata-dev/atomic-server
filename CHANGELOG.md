@@ -3,6 +3,9 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+## v0.25.3
+
+- Improve ease of initial setup with initial invite on `/setup` #159 and welcoming descriptions for first Drive and Invite.
 
 ## v0.25.2
 

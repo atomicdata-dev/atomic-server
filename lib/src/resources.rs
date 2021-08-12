@@ -297,8 +297,8 @@ impl Resource {
     }
 
     /// Changes the subject of the Resource.
-    /// TODO: Handle these changes in Commits
-    /// introduce 'move' command? https://github.com/joepio/atomic/issues/44
+    /// Does not 'move' the Resource
+    /// See https://github.com/joepio/atomic/issues/44
     pub fn set_subject(&mut self, url: String) {
         self.commit.set_subject(url.clone());
         self.subject = url;

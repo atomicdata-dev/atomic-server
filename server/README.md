@@ -73,7 +73,6 @@ cp default.env .env
 cargo run
 # Or tun the extra-cool desktop version with a presence in your app tray
 cargo run --features desktop
-# Visit http://localhost
 ```
 
 ### Troubleshooting during installation
@@ -85,6 +84,7 @@ sudo apt-get install -y pkg-config libssl-dev --fix-missing                     
 
 ## Initial setup and configuration
 
+- Visit `http://localhost/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
 - The server loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
 - If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` in the `.env` (see HTTPS setup below)
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.

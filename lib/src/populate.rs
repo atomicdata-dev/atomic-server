@@ -214,8 +214,8 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
     let endpoints = crate::endpoints::default_endpoints();
     for endpoint in endpoints {
-        let resource = endpoint.to_resource(store)?;
-        store.add_resource(&resource)?;
+        let mut resource = endpoint.to_resource(store)?;
+        resource.save_locally(store)?;
     }
     Ok(())
 }

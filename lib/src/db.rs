@@ -302,9 +302,6 @@ impl Storelike for Db {
         crate::populate::populate_hierarchy(self)?;
         crate::populate::populate_collections(self)?;
         crate::populate::populate_endpoints(self)?;
-        // We need to build the index again, because the the endpoints and collections might not be indexed.
-        // Ideally, the populate methods themselves make sure they are indexed.
-        // self.build_index(true)?;
         Ok(())
     }
 

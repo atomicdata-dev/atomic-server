@@ -23,9 +23,7 @@ pub fn construct_invite_redirect(
         (None, Some(agent_url)) => agent_url,
         (Some(public_key), None) => {
             let new_agent = Agent::new_from_public_key(store, &public_key)?;
-            store.add_resource(&new_agent.to_resource(store)?)?;
-            // I'd rather do this, but this errors:
-            // new_agent.to_resource(store)?.save_locally(store)?;
+            new_agent.to_resource(store)?.save_locally(store)?;
 
             // Always add write rights to the agent itself
             // A bit inefficient, since it re-fetches the agent from the store, but it's not that big of a cost
@@ -46,14 +44,22 @@ pub fn construct_invite_redirect(
         |e| format!("Invite {} does not have a target. {}", invite_resource.get_subject(), e)
     )?.to_string();
 
+    println!("Invite resource before: {:?}", invite_resource);
+
     if let Ok(usages_left) = invite_resource.get(urls::USAGES_LEFT) {
         let num  = usages_left.to_int()?;
         if num == 0 {
             return Err("No usages left for this invite".into())
         }
+        // Since the requested subject might have query params, we don't want to overwrite that one - we want to overwrite the clean resource.
+        let mut url = url::Url::parse(subject)?;
+        url.set_query(None);
+        invite_resource.set_subject(url.to_string());
         invite_resource.set_propval(urls::USAGES_LEFT.into(), Value::Integer(num - 1), store)?;
         invite_resource.save_locally(store).map_err(|e| format!("Unable to save updated Invite. {}", e))?;
     }
+
+    println!("Invite resource after: {:?}", invite_resource);
 
     // TODO: implement rights check
     // check_if_invite_is_valid(invite_resource)?;

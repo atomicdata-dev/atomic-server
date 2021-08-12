@@ -80,7 +80,7 @@ pub trait Storelike: Sized {
     /// An Agent is required for signing Commits.
     /// Returns a tuple of (subject, private_key).
     /// Make sure to store the private_key somewhere safe!
-    /// Does not create a Commit.
+    /// Does not create a Commit - the recommended way is to use `agent.to_resource().save_locally()`.
     fn create_agent(&self, name: Option<&str>) -> AtomicResult<crate::agents::Agent> {
         let agent = Agent::new(name, self)?;
         self.add_resource(&agent.to_resource(self)?)?;
