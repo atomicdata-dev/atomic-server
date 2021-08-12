@@ -223,12 +223,12 @@ mod test {
     fn get_extended_resource() {
         let store = Store::init().unwrap();
         store.populate().unwrap();
-        let subject = "https://atomicdata.dev/collections/class?current_page=2";
+        let subject = "https://atomicdata.dev/classes?current_page=2";
         // Should throw, because page 2 is out of bounds for default page size
         let _wrong_resource = store
             .get_resource_extended(subject)
             .unwrap_err();
-        let subject = "https://atomicdata.dev/collections/class?current_page=2&page_size=1";
+        let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
         let resource = store
             .get_resource_extended(subject)
             .unwrap();

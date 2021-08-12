@@ -43,7 +43,7 @@ impl Commit {
     /// Does not check if the correct rights are present.
     /// If you need more control over which checks to perform, use apply_opts
     pub fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, true, true, false, false, false)
+        self.apply_opts(store, true, true, false, false, true)
     }
 
     /// Apply a single signed Commit to the store.
@@ -339,6 +339,11 @@ impl CommitBuilder {
     /// Set Property / Value combinations that will either be created or overwritten.
     pub fn set(&mut self, prop: String, val: Value) {
         self.set.insert(prop, val);
+    }
+
+    /// Set a new subject for this Commit
+    pub fn set_subject(&mut self, subject: String) {
+        self.subject = subject;
     }
 
     /// Set Property URLs which values to be removed

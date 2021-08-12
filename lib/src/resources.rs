@@ -300,6 +300,7 @@ impl Resource {
     /// TODO: Handle these changes in Commits
     /// introduce 'move' command? https://github.com/joepio/atomic/issues/44
     pub fn set_subject(&mut self, url: String) {
+        self.commit.set_subject(url.clone());
         self.subject = url;
     }
 

@@ -33,7 +33,8 @@ pub trait Storelike: Sized {
 
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
-    /// In most cases, you should use `resource.save()` instead.
+    /// Does not build indexes or save versions.
+    /// In most cases, you should use `resource.save()` instead, which uses Commits.
     fn add_resource(&self, resource: &Resource) -> AtomicResult<()>;
 
     /// Adds a Resource to the store.

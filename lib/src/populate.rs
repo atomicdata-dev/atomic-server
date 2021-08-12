@@ -143,7 +143,8 @@ pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
     //     Value::ResourceArray(vec![root_agent]),
     //     store,
     // )?;
-    store.add_resource(&drive)
+    drive.save_locally(store)?;
+    Ok(())
 }
 
 /// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary) from default_store.jsonld
@@ -182,7 +183,9 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
             &pluralized,
             store,
         );
+
         let mut collection_resource = collection.to_resource(store)?;
+
         collection_resource.set_propval_string(
             urls::PARENT.into(),
             &store
@@ -196,7 +199,10 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
             &pluralized,
             store
         )?;
-        store.add_resource_unsafe(&collection_resource)?;
+
+        // Should we use save_locally, which creates commits, or add_resource_unsafe, which is faster?
+        collection_resource.save_locally(store)?;
+        // store.add_resource_unsafe(&collection_resource)?;
     }
 
     Ok(())

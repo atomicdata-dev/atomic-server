@@ -330,25 +330,25 @@ mod test {
     #[test]
     fn get_url() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/collections/class"]).assert().success();
+        cmd.args(&["get","https://atomicdata.dev/classes"]).assert().success();
     }
 
     #[test]
     fn get_path() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/collections/class members"]).assert().success();
+        cmd.args(&["get","https://atomicdata.dev/classes members"]).assert().success();
     }
 
     #[test]
     fn get_path_array() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/collections/class is-a 0"]).assert().success();
+        cmd.args(&["get","https://atomicdata.dev/classes is-a 0"]).assert().success();
     }
 
     #[test]
     fn get_path_array_non_existent() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/collections/class is-a 1"]).assert().failure();
+        cmd.args(&["get","https://atomicdata.dev/classes is-a 1"]).assert().failure();
     }
 
     #[ignore]

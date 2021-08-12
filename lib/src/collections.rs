@@ -1,6 +1,6 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a TPF query
-use crate::{Resource, Storelike, errors::AtomicResult, storelike::ResourceCollection, urls};
+use crate::{errors::AtomicResult, storelike::ResourceCollection, urls, Resource, Storelike};
 
 #[derive(Debug)]
 pub struct TPFQuery {
@@ -70,7 +70,11 @@ impl CollectionBuilder {
     }
 
     /// Default CollectionBuilder for Classes. Finds all resources by class URL. Has sensible defaults.
-    pub fn class_collection(class_url: &str, path: &str, store: &impl Storelike) -> CollectionBuilder {
+    pub fn class_collection(
+        class_url: &str,
+        path: &str,
+        store: &impl Storelike,
+    ) -> CollectionBuilder {
         CollectionBuilder {
             subject: format!("{}/{}", store.get_base_url(), path),
             property: Some(urls::IS_A.into()),
@@ -119,28 +123,29 @@ pub struct Collection {
 }
 
 /// Sorts a vector or resources by some property.
-fn sort_resources(mut resources: ResourceCollection, sort_by: &str, sort_desc: bool) -> ResourceCollection {
-    resources.sort_by(
-        |a, b|
-        {
-            let val_a = a.get(sort_by);
-            let val_b = b.get(sort_by);
-            if val_a.is_err() || val_b.is_err() {
-                return std::cmp::Ordering::Equal
-            }
-            if val_b.unwrap().to_string() > val_a.unwrap().to_string() {
-                if sort_desc {
-                    std::cmp::Ordering::Greater
-                } else {
-                    std::cmp::Ordering::Less
-                }
-            } else if sort_desc {
-                std::cmp::Ordering::Less
-            } else {
-                std::cmp::Ordering::Greater
-            }
+fn sort_resources(
+    mut resources: ResourceCollection,
+    sort_by: &str,
+    sort_desc: bool,
+) -> ResourceCollection {
+    resources.sort_by(|a, b| {
+        let val_a = a.get(sort_by);
+        let val_b = b.get(sort_by);
+        if val_a.is_err() || val_b.is_err() {
+            return std::cmp::Ordering::Equal;
         }
-    );
+        if val_b.unwrap().to_string() > val_a.unwrap().to_string() {
+            if sort_desc {
+                std::cmp::Ordering::Greater
+            } else {
+                std::cmp::Ordering::Less
+            }
+        } else if sort_desc {
+            std::cmp::Ordering::Less
+        } else {
+            std::cmp::Ordering::Greater
+        }
+    });
     resources
 }
 
@@ -161,7 +166,7 @@ impl Collection {
             collection_builder.property.as_deref(),
             collection_builder.value.as_deref(),
             // Collections only show items from inside this store. Maybe later add this as an option to collections
-            false
+            false,
         )?;
         let mut subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
         // Default to no sorting
@@ -169,10 +174,14 @@ impl Collection {
             let mut resources = Vec::new();
             for subject in subjects.clone() {
                 resources.push(store.get_resource(&subject)?)
-            };
+            }
             // TODO: Include these resources in the response! They're already fetched. Should speed things up.
             // https://github.com/joepio/atomic/issues/62
-            resources = sort_resources(resources, &collection_builder.sort_by.clone().unwrap(), collection_builder.sort_desc);
+            resources = sort_resources(
+                resources,
+                &collection_builder.sort_by.clone().unwrap(),
+                collection_builder.sort_desc,
+            );
             subjects.clear();
             for resource in resources {
                 subjects.push(resource.get_subject().clone())
@@ -232,7 +241,11 @@ impl Collection {
     }
 
     /// Adds the Collection props to an existing Resource.
-    pub fn add_to_resource(&self, resource: &mut Resource, store: &impl Storelike) -> AtomicResult<crate::Resource> {
+    pub fn add_to_resource(
+        &self,
+        resource: &mut Resource,
+        store: &impl Storelike,
+    ) -> AtomicResult<crate::Resource> {
         resource.set_propval(
             crate::urls::COLLECTION_MEMBERS.into(),
             self.members.clone().into(),
@@ -342,7 +355,7 @@ mod test {
             sort_desc: false,
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
-            name: Some("Test collection".into())
+            name: Some("Test collection".into()),
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
@@ -367,34 +380,29 @@ mod test {
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 
+    #[cfg(feature = "db")]
     #[test]
     fn get_collection() {
-        let store = crate::Store::init().unwrap();
-        store.populate().unwrap();
-        let collection = store
-            .get_resource_extended("https://atomicdata.dev/collections/class")
+        let store = crate::db::test::DB.lock().unwrap().clone();
+        let subjects: Vec<String> = store
+            .all_resources(false)
+            .into_iter()
+            .map(|r| r.get_subject().into())
+            .collect();
+        println!("{:?}", subjects);
+        let collections_collection = store
+            .get_resource_extended(&format!("{}/collections", store.get_base_url()))
             .unwrap();
         assert!(
-            collection
+            collections_collection
                 .get(urls::COLLECTION_PROPERTY)
                 .unwrap()
                 .to_string()
                 == urls::IS_A
         );
-        println!(
-            "Count is {}",
-            collection
-                .get(urls::COLLECTION_MEMBER_COUNT)
-                .unwrap()
-                .to_string()
-        );
-        assert_eq!(
-            collection
-                .get(urls::COLLECTION_MEMBER_COUNT)
-                .unwrap()
-                .to_string()
-                , "12"
-        );
+        let member_count = collections_collection.get(urls::COLLECTION_MEMBER_COUNT).unwrap();
+        println!("Member Count is {}", member_count.to_string());
+        assert!(member_count.to_int().unwrap() > 10, "Member count is too small");
     }
 
     #[test]
@@ -403,7 +411,7 @@ mod test {
         store.populate().unwrap();
 
         let collection_page_size = store
-            .get_resource_extended("https://atomicdata.dev/collections/class?page_size=1")
+            .get_resource_extended("https://atomicdata.dev/classes?page_size=1")
             .unwrap();
         assert!(
             collection_page_size
@@ -413,7 +421,7 @@ mod test {
                 == "1"
         );
         let collection_page_nr = store
-            .get_resource_extended("https://atomicdata.dev/collections/class?current_page=2&page_size=1")
+            .get_resource_extended("https://atomicdata.dev/classes?current_page=2&page_size=1")
             .unwrap();
         assert!(
             collection_page_nr

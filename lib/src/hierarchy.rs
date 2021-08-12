@@ -9,6 +9,7 @@ pub fn add_children(
   resource: &mut Resource,
 ) -> AtomicResult<Resource> {
   let atoms = store.tpf(None, Some(urls::PARENT), Some(resource.get_subject()), false)?;
+  println!("atoms {:?}", atoms);
   let mut children: Vec<String> = Vec::new();
   for atom in atoms {
     children.push(atom.subject)

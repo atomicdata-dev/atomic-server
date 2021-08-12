@@ -49,24 +49,10 @@ Powers both `atomic-cli` and `atomic-server`.
 
 [→ Read more](lib/README.md)
 
-## Motivation
-
-I've been working with Linked Data for a couple of years, and I believe it has some incredible merits.
-URLs are great identifiers, and using them for keys makes sense as well.
-Linked data has the potential to help a more interoperable and decentralized web, where people control their own data.
-However, the RDF data model has [some characteristics](https://docs.atomicdata.dev/interoperability/rdf.html) that make it difficult for many developers, and I think that limits adoption.
-That's why I've been working on a new way to think about linked data: [Atomic Data](https://docs.atomicdata.dev/).
-Atomic Data is heavily inspired by RDF (and converts nicely into RDF, as it is a strict subset), but introduces some new concepts that aim to make it easier to use for developers.
-
-This repository serves the following purposes:
-
-- Test and experiment with some of the core ideas of Atomic Data, such as [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html) (share models and data types), [Paths](https://docs.atomicdata.dev/core/paths.html) (traversing data), [JSON-AD Serialization](https://docs.atomicdata.dev/core/json-ad.html) and [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html) (storing signed state changes).
-- Serve the first Atomic Data, including the core schema (now available on [https://atomicdata.dev](https://atomicdata.dev)), which is referred to by the constantly evolving [docs](https://docs.atomicdata.dev/)
-- Provide developers with tools and inspiration to use Atomic Data in their own projects.
-
 ## Also check out
 
 - [Atomic-Data-Browser](https://github.com/joepio/atomic-data-browser), an in-browser app for viewing and editing atomic data. Also contains a typescript / react front-end library. Will replace most of the html templating in this project.
+- [Atomic-Data-Docs](https://github.com/ontola/atomic-data-docs), a book containing detailed documentation of Atomic Data.
 
 ## Contribute
 

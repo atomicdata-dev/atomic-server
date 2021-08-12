@@ -297,9 +297,15 @@ impl Storelike for Db {
     fn populate(&self) -> AtomicResult<()> {
         // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
         crate::populate::populate_default_store(self)?;
+        // This is a potentially expensive operation, but is needed to make TPF queries work with the models created in here
+        self.build_index(true)?;
         crate::populate::populate_hierarchy(self)?;
         crate::populate::populate_collections(self)?;
-        crate::populate::populate_endpoints(self)
+        crate::populate::populate_endpoints(self)?;
+        // We need to build the index again, because the the endpoints and collections might not be indexed.
+        // Ideally, the populate methods themselves make sure they are indexed.
+        // self.build_index(true)?;
+        Ok(())
     }
 
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
@@ -401,7 +407,11 @@ impl Storelike for Db {
                     let spm = self.get_prop_subject_map(q_value.unwrap())?;
                     if hasprop {
                         if let Some(set) = spm.get(q_property.unwrap())  {
+                            let base = self.get_base_url();
                             for subj in set {
+                                if !include_external && !subj.starts_with(base) {
+                                    continue;
+                                }
                                 let property_full = self.get_property(q_property.unwrap())?;
                                 let mut datatype = property_full.data_type;
                                 // The value index stores only single subjects, not arrays.
@@ -442,7 +452,7 @@ fn corrupt_db_message(subject: &str) -> String {
 const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.";
 
 #[cfg(test)]
-mod test {
+pub mod test {
     use crate::urls;
 
     use super::*;
@@ -454,9 +464,9 @@ mod test {
         let tmp_dir_path = "tmp/db";
         let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
         let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
-        store.populate().unwrap();
         let agent = store.create_agent(None).unwrap();
         store.set_default_agent(agent);
+        store.populate().unwrap();
         store
     }
 
@@ -464,7 +474,7 @@ mod test {
     use lazy_static::lazy_static; // 1.4.0
     use std::sync::Mutex;
     lazy_static! {
-        static ref DB: Mutex<Db> = Mutex::new(init());
+        pub static ref DB: Mutex<Db> = Mutex::new(init());
     }
 
     #[test]
@@ -515,7 +525,8 @@ mod test {
     #[test]
     fn populate_collections() {
         let store = DB.lock().unwrap().clone();
-        println!("{:?}", store.all_resources(false));
+        let subjects: Vec<String> = store.all_resources(false).into_iter().map(|r| r.get_subject().into()).collect();
+        println!("{:?}", subjects);
         let collections_collection_url = format!("{}/collections", store.get_base_url());
         let my_resource = store
             .get_resource_extended(&collections_collection_url)
@@ -524,7 +535,7 @@ mod test {
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert_eq!(my_value.to_string(), "11");
+        assert_eq!(my_value.to_int().unwrap(), 11);
     }
 
     #[test]
@@ -538,8 +549,11 @@ mod test {
         // This atom should normally not exist - Agent is not the parent of Class.
         let atom = Atom::new(subject, property.clone(), value);
         store.add_atom_to_index(&atom).unwrap();
-        let found = store.tpf(None, Some(&property), Some(val_string), false).unwrap();
+        let found_no_external = store.tpf(None, Some(&property), Some(val_string), false).unwrap();
+        // Don't find the atom if no_external is true.
+        assert_eq!(found_no_external.len(), 0);
+        let found_external = store.tpf(None, Some(&property), Some(val_string), true).unwrap();
         // If we see the atom, it's in the index.
-        assert_eq!(found.len(), 1);
+        assert_eq!(found_external.len(), 1);
     }
 }

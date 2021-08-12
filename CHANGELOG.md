@@ -3,6 +3,12 @@
 List of changes for this repo, including `atomic-cli`,
 `atomic-server` and `atomic-lib`.
 
+
+## v0.25.2
+
+- Fixes caching bugs for collections introduced by #14
+- Fix external resources in Collections #161
+
 ## v0.25.1
 
 - Add Value indexing, which speeds up TPF queries / collections tremendously #14
