@@ -6,7 +6,7 @@ pub fn tray_icon_process(config: crate::config::Config) {
   } else {
       format!("http://{}:{}", config.ip.to_string(), config.port)
   };
-  actix_rt::spawn(async move {
+  actix_web::rt::spawn(async move {
       let mut tray = match tray_item::TrayItem::new("Atomic", "") {
           Ok(item) => item,
           Err(_e) => return,
