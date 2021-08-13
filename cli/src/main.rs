@@ -327,7 +327,7 @@ mod test {
 
     #[test]
     fn get_fail() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd.args(&["get", "random-non-existent-shortname"])
             .assert()
             .failure();
@@ -335,13 +335,13 @@ mod test {
 
     #[test]
     fn get_shortname() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd.args(&["get", "shortname"]).assert().success();
     }
 
     #[test]
     fn get_url() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd.args(&["get", "https://atomicdata.dev/classes"])
             .assert()
             .success();
@@ -349,7 +349,7 @@ mod test {
 
     #[test]
     fn get_path() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd.args(&["get", "https://atomicdata.dev/classes members"])
             .assert()
             .success();
@@ -357,7 +357,7 @@ mod test {
 
     #[test]
     fn get_path_array() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd.args(&["get", "https://atomicdata.dev/classes is-a 0"])
             .assert()
             .success();
@@ -365,7 +365,7 @@ mod test {
 
     #[test]
     fn get_path_array_non_existent() {
-        let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd.args(&["get", "https://atomicdata.dev/classes is-a 1"])
             .assert()
             .failure();
@@ -380,7 +380,7 @@ mod test {
             .unwrap()
             .as_secs()
             .to_string();
-        let mut cmd_set = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd_set = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         cmd_set
             .args(&[
                 "set",
@@ -391,7 +391,7 @@ mod test {
             .assert()
             .success();
 
-        let mut cmd_get = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
+        let mut cmd_get = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
         let result = cmd_get
             .args(&["get", "https://atomicdata.dev/test shortname"])
             .assert()
