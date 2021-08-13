@@ -6,20 +6,20 @@ use actix_web::http::HeaderMap;
 pub enum ContentType {
     /// Plain JSON, using shortnames as keys instead of URLs
     /// https://docs.atomicdata.dev/interoperability/json.html#atomic-data-as-plain-json
-    JSON,
+    Json,
     /// JSON-AD, default Atomic Data serialization
     /// https://docs.atomicdata.dev/core/json-ad.html
-    JSONAD,
+    JsonAd,
     /// JSON-LD, RDF compatible JSON with @context mapping
     /// https://docs.atomicdata.dev/interoperability/json.html#from-json-to-json-ad
-    JSONLD,
-    HTML,
+    JsonLd,
+    Html,
     /// RDF Turtle format
     /// https://www.w3.org/TR/turtle/
-    TURTLE,
+    Turtle,
     /// RDF N-Triples format
     /// https://www.w3.org/TR/n-triples/
-    NT,
+    NTriples,
 }
 
 const MIME_HTML: &str = "text/html";
@@ -33,12 +33,12 @@ const MIME_NT: &str = "application/n-triples";
 impl ContentType {
     pub fn to_mime(&self) -> &str {
         match self {
-            ContentType::JSON => MIME_JSON,
-            ContentType::JSONAD => MIME_JSONAD,
-            ContentType::JSONLD => MIME_JSONLD,
-            ContentType::HTML => MIME_HTML,
-            ContentType::TURTLE => MIME_TURTLE,
-            ContentType::NT => MIME_NT,
+            ContentType::Json => MIME_JSON,
+            ContentType::JsonAd => MIME_JSONAD,
+            ContentType::JsonLd => MIME_JSONLD,
+            ContentType::Html => MIME_HTML,
+            ContentType::Turtle => MIME_TURTLE,
+            ContentType::NTriples => MIME_NT,
         }
     }
 }
@@ -48,7 +48,7 @@ impl ContentType {
 pub fn get_accept(map: &HeaderMap) -> ContentType {
     let accept_header = match map.get("Accept") {
         Some(header) => header.to_str().unwrap_or(""),
-        None => return ContentType::HTML,
+        None => return ContentType::Html,
     };
     parse_accept_header(accept_header)
 }
@@ -60,29 +60,29 @@ pub fn get_accept(map: &HeaderMap) -> ContentType {
 pub fn parse_accept_header(header: &str) -> ContentType {
     for mimepart in header.split(',') {
         if mimepart.contains(MIME_JSONAD) {
-            return ContentType::JSONAD;
+            return ContentType::JsonAd;
         }
         if mimepart.contains(MIME_HTML) {
-            return ContentType::HTML;
+            return ContentType::Html;
         }
         if mimepart.contains(MIME_XML) {
-            return ContentType::HTML;
+            return ContentType::Html;
         }
         if mimepart.contains(MIME_JSON) {
-            return ContentType::JSON;
+            return ContentType::Json;
         }
         if mimepart.contains(MIME_JSONLD) {
-            return ContentType::JSONLD;
+            return ContentType::JsonLd;
         }
         if mimepart.contains(MIME_TURTLE) {
-            return ContentType::TURTLE;
+            return ContentType::Turtle;
         }
         if mimepart.contains(MIME_NT) {
-            return ContentType::NT;
+            return ContentType::NTriples;
         }
     }
     log::info!("Unknown Accept header, defaut to HTML: {}", header);
-    ContentType::HTML
+    ContentType::Html
 }
 
 #[cfg(test)]
@@ -91,14 +91,14 @@ mod test {
 
     #[test]
     fn parse_types() {
-        assert!(parse_accept_header("text/html,application/xml") == ContentType::HTML);
-        assert!(parse_accept_header("application/ad+json") == ContentType::JSONAD);
-        assert!(parse_accept_header("application/ld+json") == ContentType::JSONLD);
+        assert!(parse_accept_header("text/html,application/xml") == ContentType::Html);
+        assert!(parse_accept_header("application/ad+json") == ContentType::JsonAd);
+        assert!(parse_accept_header("application/ld+json") == ContentType::JsonLd);
     }
 
     #[test]
     fn parse_types_with_blank_chars() {
-        assert!(parse_accept_header("application/ad+json ; ") == ContentType::JSONAD);
-        assert!(parse_accept_header(" application/ad+json ; ") == ContentType::JSONAD);
+        assert!(parse_accept_header("application/ad+json ; ") == ContentType::JsonAd);
+        assert!(parse_accept_header(" application/ad+json ; ") == ContentType::JsonAd);
     }
 }

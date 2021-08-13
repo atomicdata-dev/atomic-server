@@ -4,7 +4,7 @@
 
 use crate::errors::AtomicResult;
 use std::collections::hash_map::IntoIter;
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::Path};
 /// Maps shortanmes (bookmarks) to URLs
 #[derive(Clone)]
 pub struct Mapping {
@@ -45,7 +45,7 @@ impl Mapping {
     }
 
     /// Reads an .amp (atomic mapping) file from your disk.
-    pub fn read_mapping_from_file(&mut self, path: &PathBuf) -> AtomicResult<()> {
+    pub fn read_mapping_from_file(&mut self, path: &Path) -> AtomicResult<()> {
         let mapping_string = std::fs::read_to_string(path)?;
         self.parse_mapping(&mapping_string)?;
         Ok(())
@@ -82,7 +82,7 @@ impl Mapping {
     }
 
     /// Serializes the mapping and stores it to the path
-    pub fn write_mapping_to_disk(&self, path: &PathBuf) {
+    pub fn write_mapping_to_disk(&self, path: &Path) {
         let mut file_string: String = String::new();
         for (key, url) in self.hashmap.clone().iter() {
             let map = format!("{}={}\n", key, url);

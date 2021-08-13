@@ -3,7 +3,7 @@
 use crate::{errors::AtomicResult, storelike::ResourceCollection, urls, Resource, Storelike};
 
 #[derive(Debug)]
-pub struct TPFQuery {
+pub struct TpfQuery {
     pub subject: Option<String>,
     pub property: Option<String>,
     pub value: Option<String>,

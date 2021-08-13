@@ -9,7 +9,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             web::resource("/*")
                 .guard(actix_web::guard::Method(Method::GET))
                 .guard(actix_web::guard::fn_guard(|head| {
-                    content_types::get_accept(&head.headers()) == content_types::ContentType::HTML
+                    content_types::get_accept(&head.headers()) == content_types::ContentType::Html
                 }))
                 .to(handlers::single_page_app::single_page),
         )

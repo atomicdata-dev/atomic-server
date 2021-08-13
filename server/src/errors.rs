@@ -7,6 +7,7 @@ pub type BetterResult<T> = std::result::Result<T, AppError>;
 
 #[derive(Debug)]
 pub enum AppErrorType {
+    #[allow(dead_code)]
     NotFoundError,
     OtherError,
 }
@@ -20,6 +21,7 @@ pub struct AppError {
 }
 
 impl AppError {
+    #[allow(dead_code)]
     pub fn not_found(message: String) -> AppError {
         AppError {
             message: format!("Resource not found. {}", message),

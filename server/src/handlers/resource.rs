@@ -22,7 +22,7 @@ pub async fn get_resource(
     // Get the subject from the path, or return the home URL
     let subject = if let Some(subj_end) = subject_end {
         let mut subj_end_string = subj_end.as_str();
-        if content_type == ContentType::HTML {
+        if content_type == ContentType::Html {
             if let Some((ext, path)) = try_extension(subj_end_string) {
                 content_type = ext;
                 subj_end_string = path;
@@ -55,23 +55,23 @@ pub async fn get_resource(
         // TODO: Don't always return 404 - only when it's actually not found!
         .map_err(|e| AppError::other_error(e.to_string()))?;
     match content_type {
-        ContentType::JSON => {
+        ContentType::Json => {
             let body = resource.to_json(store)?;
             Ok(builder.body(body))
         }
-        ContentType::JSONLD => {
+        ContentType::JsonLd => {
             let body = resource.to_json_ld(store)?;
             Ok(builder.body(body))
         }
-        ContentType::JSONAD => {
+        ContentType::JsonAd => {
             let body = resource.to_json_ad()?;
             Ok(builder.body(body))
         }
-        ContentType::HTML => {
+        ContentType::Html => {
             let body = resource.to_json_ad()?;
             Ok(builder.body(body))
         }
-        ContentType::TURTLE | ContentType::NT => {
+        ContentType::Turtle | ContentType::NTriples => {
             let atoms = resource.to_atoms()?;
             let body = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(body))
@@ -85,11 +85,11 @@ fn try_extension(path: &str) -> Option<(ContentType, &str)> {
     if items.len() == 2 {
         let path = items[0];
         let content_type = match items[1] {
-            "json" => ContentType::JSON,
-            "jsonld" => ContentType::JSONLD,
-            "jsonad" => ContentType::JSONAD,
-            "html" => ContentType::HTML,
-            "ttl" => ContentType::TURTLE,
+            "json" => ContentType::Json,
+            "jsonld" => ContentType::JsonLd,
+            "jsonad" => ContentType::JsonAd,
+            "html" => ContentType::Html,
+            "ttl" => ContentType::Turtle,
             _ => return None,
         };
         return Some((content_type, path));

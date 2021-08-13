@@ -218,11 +218,11 @@ pub fn atoms_to_turtle(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult
 
 /// Should list all the supported serialization formats
 pub enum Format {
-    JSON,
-    JSONAD,
-    JSONLD,
-    NT,
-    PRETTY,
+    Json,
+    JsonAd,
+    JsonLd,
+    NTriples,
+    Pretty,
 }
 
 #[cfg(test)]

@@ -16,13 +16,13 @@ pub const SERIALIZE_OPTIONS: [&str; 7] =
 pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
     let format = if let Some(preffered_format) = argmatches.value_of("as") {
         match preffered_format {
-            "pretty" => (Format::PRETTY),
-            "json" => (Format::JSON),
-            "jsonld" => (Format::JSONLD),
-            "jsonad" => (Format::JSONAD),
-            "nt" => (Format::NT),
-            "turtle" => (Format::NT),
-            "n3" => (Format::NT),
+            "pretty" => (Format::Pretty),
+            "json" => (Format::Json),
+            "jsonld" => (Format::JsonLd),
+            "jsonad" => (Format::JsonAd),
+            "nt" => (Format::NTriples),
+            "turtle" => (Format::NTriples),
+            "n3" => (Format::NTriples),
             format => {
                 return Err(
                     format!("As {} not supported. Try {:?}", format, SERIALIZE_OPTIONS).into(),
@@ -30,7 +30,7 @@ pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
             }
         }
     } else {
-        Format::PRETTY
+        Format::Pretty
     };
     Ok(format)
 }
@@ -61,11 +61,11 @@ pub fn print_resource(
     argmatches: &ArgMatches,
 ) -> AtomicResult<()> {
     let out = match get_serialization(argmatches)? {
-        Format::JSON => resource.to_json(&context.store)?,
-        Format::JSONLD => resource.to_json_ld(&context.store)?,
-        Format::JSONAD => resource.to_json_ad()?,
-        Format::NT => serialize::atoms_to_ntriples(resource.to_atoms()?, &context.store)?,
-        Format::PRETTY => pretty_print_resource(&resource, &context.store)?,
+        Format::Json => resource.to_json(&context.store)?,
+        Format::JsonLd => resource.to_json_ld(&context.store)?,
+        Format::JsonAd => resource.to_json_ad()?,
+        Format::NTriples => serialize::atoms_to_ntriples(resource.to_atoms()?, &context.store)?,
+        Format::Pretty => pretty_print_resource(&resource, &context.store)?,
     };
     println!("{}", out);
     Ok(())

@@ -25,10 +25,10 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
             return Ok(());
         }
         storelike::PathReturn::Atom(atom) => match serialization {
-            Format::JSONLD | Format::JSON | Format::JSONAD | Format::PRETTY => {
+            Format::JsonLd | Format::Json | Format::JsonAd | Format::Pretty => {
                 atom.value.to_string()
             }
-            Format::NT => {
+            Format::NTriples => {
                 let atoms: Vec<Atom> = vec![*atom];
                 serialize::atoms_to_ntriples(atoms, store)?
             }

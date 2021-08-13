@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
-pub struct TPFQuery {
+pub struct TpfQuery {
     pub subject: Option<String>,
     pub property: Option<String>,
     pub value: Option<String>,
@@ -18,7 +18,7 @@ pub struct TPFQuery {
 pub async fn tpf(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
-    query: web::Query<TPFQuery>,
+    query: web::Query<TpfQuery>,
 ) -> BetterResult<HttpResponse> {
     let mut context = data.lock().unwrap();
     let store = &mut context.store;
@@ -37,7 +37,7 @@ pub async fn tpf(
     log::info!("TPF query: {:?}", query);
     builder.header("Content-Type", content_type.to_mime());
     match content_type {
-        ContentType::JSONAD => {
+        ContentType::JsonAd => {
             let mut resources = vec![];
             // Only search each subject once, to avoid duplicate entries
             let mut subjects = HashSet::new();
@@ -49,12 +49,12 @@ pub async fn tpf(
             }
             Ok(builder.body(atomic_lib::serialize::resources_to_json_ad(resources)?))
         }
-        ContentType::JSON | ContentType::HTML | ContentType::JSONLD => {
+        ContentType::Json | ContentType::Html | ContentType::JsonLd => {
             // TODO
             log::error!("This Content-Type is not implemented");
             Ok(builder.body("This Content-Type is not implemented"))
         }
-        ContentType::TURTLE | ContentType::NT => {
+        ContentType::Turtle | ContentType::NTriples => {
             let bod_string = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
             Ok(builder.body(bod_string))
         }
