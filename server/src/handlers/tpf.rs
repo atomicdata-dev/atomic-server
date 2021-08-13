@@ -28,8 +28,12 @@ pub async fn tpf(
     let subject = empty_to_nothing(query.subject.clone());
     let property = empty_to_nothing(query.property.clone());
     let value = empty_to_nothing(query.value.clone());
-    let atoms = store
-        .tpf(subject.as_deref(), property.as_deref(), value.as_deref(), true)?;
+    let atoms = store.tpf(
+        subject.as_deref(),
+        property.as_deref(),
+        value.as_deref(),
+        true,
+    )?;
     log::info!("TPF query: {:?}", query);
     builder.header("Content-Type", content_type.to_mime());
     match content_type {

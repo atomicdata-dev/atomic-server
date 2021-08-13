@@ -1,4 +1,7 @@
-use crate::{Commit, Resource, Storelike, collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls};
+use crate::{
+    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, Commit,
+    Resource, Storelike,
+};
 
 pub fn version_endpoint() -> Endpoint {
     Endpoint {
@@ -48,7 +51,7 @@ fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicR
     if target_subject.is_none() {
         return all_versions_endpoint().to_resource(store);
     }
-    let target =  target_subject.unwrap();
+    let target = target_subject.unwrap();
     let collection_builder = CollectionBuilder {
         subject: url.to_string(),
         property: Some(urls::SUBJECT.into()),

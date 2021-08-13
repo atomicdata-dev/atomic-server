@@ -3,7 +3,12 @@
 //! These base models are required for having a functioning store.
 //! Other populate methods help to set up an Atomic Server, by creating a basic file hierarcy and creating default collections.
 
-use crate::{Storelike, datatype::DataType, errors::AtomicResult, schema::{Class, Property}, urls};
+use crate::{
+    datatype::DataType,
+    errors::AtomicResult,
+    schema::{Class, Property},
+    urls, Storelike,
+};
 
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.
 /// This is necessary to prevent a loop where Property X (like the `shortname` Property)
@@ -178,11 +183,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
             other => format!("{}s", other).to_string(),
         };
 
-        let collection = CollectionBuilder::class_collection(
-            &class.subject,
-            &pluralized,
-            store,
-        );
+        let collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
 
         let mut collection_resource = collection.to_resource(store)?;
 
@@ -194,11 +195,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
             store,
         )?;
 
-        collection_resource.set_propval_string(
-            urls::NAME.into(),
-            &pluralized,
-            store
-        )?;
+        collection_resource.set_propval_string(urls::NAME.into(), &pluralized, store)?;
 
         // Should we use save_locally, which creates commits, or add_resource_unsafe, which is faster?
         collection_resource.save_locally(store)?;

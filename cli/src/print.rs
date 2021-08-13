@@ -1,11 +1,16 @@
-use atomic_lib::{Resource, Storelike, errors::AtomicResult, serialize::{self, Format}};
+use atomic_lib::{
+    errors::AtomicResult,
+    serialize::{self, Format},
+    Resource, Storelike,
+};
 use clap::ArgMatches;
 use colored::*;
 
 use crate::Context;
 
 /// List of serialization options. Should match /path.rs/get
-pub const SERIALIZE_OPTIONS: [&str; 7] = ["pretty", "json", "jsonld", "jsonad", "nt", "turtle", "n3"];
+pub const SERIALIZE_OPTIONS: [&str; 7] =
+    ["pretty", "json", "jsonld", "jsonad", "nt", "turtle", "n3"];
 
 /// Returns preffered serialization format. Defaults to pretty.
 pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
@@ -19,7 +24,9 @@ pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
             "turtle" => (Format::NT),
             "n3" => (Format::NT),
             format => {
-                return Err(format!("As {} not supported. Try {:?}", format, SERIALIZE_OPTIONS).into());
+                return Err(
+                    format!("As {} not supported. Try {:?}", format, SERIALIZE_OPTIONS).into(),
+                );
             }
         }
     } else {
@@ -30,34 +37,35 @@ pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
 
 /// Prints a resource for the terminal with readble formatting and colors
 pub fn pretty_print_resource(resource: &Resource, store: &impl Storelike) -> AtomicResult<String> {
-  let mut output = String::new();
-  output.push_str(&*format!("{0: <15}{1: <10} \n", "subject".blue().bold(), resource.get_subject()));
-  for (prop_url, val) in resource.get_propvals() {
-      let prop_shortname = store.get_property(&prop_url)?.shortname;
-      output.push_str(&*format!(
-          "{0: <15}{1: <10} \n",
-          prop_shortname.blue().bold(),
-          val.to_string()
-      ));
-  }
-  Ok(output)
+    let mut output = String::new();
+    output.push_str(&*format!(
+        "{0: <15}{1: <10} \n",
+        "subject".blue().bold(),
+        resource.get_subject()
+    ));
+    for (prop_url, val) in resource.get_propvals() {
+        let prop_shortname = store.get_property(&prop_url)?.shortname;
+        output.push_str(&*format!(
+            "{0: <15}{1: <10} \n",
+            prop_shortname.blue().bold(),
+            val.to_string()
+        ));
+    }
+    Ok(output)
 }
 
 /// Prints a resource to the command line
-pub fn print_resource(context: &Context, resource: &Resource, argmatches: &ArgMatches) -> AtomicResult<()> {
+pub fn print_resource(
+    context: &Context,
+    resource: &Resource,
+    argmatches: &ArgMatches,
+) -> AtomicResult<()> {
     let out = match get_serialization(argmatches)? {
-      Format::JSON => resource
-          .to_json(&context.store)?,
-      Format::JSONLD => resource
-          .to_json_ld(&context.store)?,
-      Format::JSONAD => resource
-          .to_json_ad()?,
-      Format::NT => {
-          serialize::atoms_to_ntriples(resource.to_atoms()?, &context.store)?
-      }
-      Format::PRETTY => {
-          pretty_print_resource(&resource, &context.store)?
-      }
+        Format::JSON => resource.to_json(&context.store)?,
+        Format::JSONLD => resource.to_json_ld(&context.store)?,
+        Format::JSONAD => resource.to_json_ad()?,
+        Format::NT => serialize::atoms_to_ntriples(resource.to_atoms()?, &context.store)?,
+        Format::PRETTY => pretty_print_resource(&resource, &context.store)?,
     };
     println!("{}", out);
     Ok(())

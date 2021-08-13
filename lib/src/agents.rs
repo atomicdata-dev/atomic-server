@@ -41,7 +41,11 @@ impl Agent {
         Ok(Agent::new_from_private_key(name, store, &keypair.private))
     }
 
-    pub fn new_from_private_key(name: Option<&str>, store: &impl Storelike, private_key: &str) -> Agent {
+    pub fn new_from_private_key(
+        name: Option<&str>,
+        store: &impl Storelike,
+        private_key: &str,
+    ) -> Agent {
         let keypair = generate_public_key(private_key);
 
         Agent {

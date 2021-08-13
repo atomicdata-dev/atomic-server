@@ -268,7 +268,10 @@ fn prompt_field(
             }
         }
         DataType::Unsupported(unsup) => {
-            let msg = format!("unsupported datatype {}, defaulting to string{}", unsup, msg_appendix);
+            let msg = format!(
+                "unsupported datatype {}, defaulting to string{}",
+                unsup, msg_appendix
+            );
             let string: Option<String> = prompt_opt(&msg)?;
             match string {
                 Some(nr) => {
@@ -285,7 +288,7 @@ fn prompt_field(
                     if nr {
                         return Ok(Some("true".to_string()));
                     }
-                    return Ok(Some("false".to_string()))
+                    return Ok(Some("false".to_string()));
                 }
                 None => (return Ok(None)),
             }

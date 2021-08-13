@@ -400,9 +400,14 @@ mod test {
                 .to_string()
                 == urls::IS_A
         );
-        let member_count = collections_collection.get(urls::COLLECTION_MEMBER_COUNT).unwrap();
+        let member_count = collections_collection
+            .get(urls::COLLECTION_MEMBER_COUNT)
+            .unwrap();
         println!("Member Count is {}", member_count.to_string());
-        assert!(member_count.to_int().unwrap() > 10, "Member count is too small");
+        assert!(
+            member_count.to_int().unwrap() > 10,
+            "Member count is too small"
+        );
     }
 
     #[test]

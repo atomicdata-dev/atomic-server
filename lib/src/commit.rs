@@ -4,7 +4,10 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
-use crate::{Atom, Resource, Storelike, Value, datatype::DataType, errors::AtomicResult, resources::PropVals, urls};
+use crate::{
+    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, Atom, Resource, Storelike,
+    Value,
+};
 
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
@@ -107,7 +110,7 @@ impl Commit {
             Err(_) => {
                 is_new = true;
                 Resource::new(self.subject.clone())
-            },
+            }
         };
         // We apply the Commit, but don't save the resource just yet.
         // This _must_ be a clone, because otherwise we could have malicious agents granting themselves rights
@@ -157,7 +160,12 @@ impl Commit {
 
     /// Updates the values in the Resource according to the `set` and `remove` attributes in the Commit.
     /// Optionally also updates the index in the Store.
-    pub fn apply_changes(&self, mut resource: Resource, store: &impl Storelike, update_index: bool) -> AtomicResult<Resource> {
+    pub fn apply_changes(
+        &self,
+        mut resource: Resource,
+        store: &impl Storelike,
+        update_index: bool,
+    ) -> AtomicResult<Resource> {
         if let Some(set) = self.set.clone() {
             for (prop, val) in set.iter() {
                 if update_index {
@@ -378,12 +386,7 @@ fn sign_at(
         .serialize_deterministically_json_ad(store)
         .map_err(|e| format!("Failed serializing commit: {}", e))?;
     let private_key = agent.private_key.clone().ok_or("No private key in agent")?;
-    let signature = sign_message(
-        &stringified,
-        &private_key,
-        &agent.public_key,
-    )
-    .map_err(|e| {
+    let signature = sign_message(&stringified, &private_key, &agent.public_key).map_err(|e| {
         format!(
             "Failed to sign message for resource {} with agent {}: {}",
             commit.subject, agent.subject, e

@@ -1,4 +1,7 @@
-use crate::{Context, print::{get_serialization, print_resource}};
+use crate::{
+    print::{get_serialization, print_resource},
+    Context,
+};
 use atomic_lib::{errors::AtomicResult, serialize, storelike, Atom, Storelike};
 use serialize::Format;
 
@@ -14,14 +17,13 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
 
     // Returns a URL or Value
     let store = &mut context.store;
-    let path = store
-        .get_path(&path_string, Some(&context.mapping.lock().unwrap()))?;
+    let path = store.get_path(&path_string, Some(&context.mapping.lock().unwrap()))?;
     let out = match path {
         storelike::PathReturn::Subject(subject) => {
             let resource = store.get_resource_extended(&subject)?;
             print_resource(context, &resource, subcommand_matches)?;
-            return Ok(())
-        },
+            return Ok(());
+        }
         storelike::PathReturn::Atom(atom) => match serialization {
             Format::JSONLD | Format::JSON | Format::JSONAD | Format::PRETTY => {
                 atom.value.to_string()

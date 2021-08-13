@@ -1,4 +1,4 @@
-use actix_web::{HttpResponse, error::ResponseError, http::StatusCode};
+use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
 use serde::Serialize;
 use std::error::Error;
 
@@ -23,14 +23,14 @@ impl AppError {
     pub fn not_found(message: String) -> AppError {
         AppError {
             message: format!("Resource not found. {}", message),
-            error_type: AppErrorType::NotFoundError
+            error_type: AppErrorType::NotFoundError,
         }
     }
 
     pub fn other_error(message: String) -> AppError {
         AppError {
             message,
-            error_type: AppErrorType::OtherError
+            error_type: AppErrorType::OtherError,
         }
     }
 }
@@ -66,8 +66,8 @@ impl std::fmt::Display for AppError {
 impl From<&str> for AppError {
     fn from(message: &str) -> Self {
         AppError {
-          message: message.into(),
-          error_type: AppErrorType::OtherError,
+            message: message.into(),
+            error_type: AppErrorType::OtherError,
         }
     }
 }
@@ -75,8 +75,8 @@ impl From<&str> for AppError {
 impl From<String> for AppError {
     fn from(message: String) -> Self {
         AppError {
-          message,
-          error_type: AppErrorType::OtherError,
+            message,
+            error_type: AppErrorType::OtherError,
         }
     }
 }
@@ -84,8 +84,8 @@ impl From<String> for AppError {
 impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         AppError {
-          message: error.to_string(),
-          error_type: AppErrorType::OtherError,
+            message: error.to_string(),
+            error_type: AppErrorType::OtherError,
         }
     }
 }
@@ -93,8 +93,8 @@ impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
 impl<T> From<std::sync::PoisonError<T>> for AppError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         AppError {
-          message: error.to_string(),
-          error_type: AppErrorType::OtherError,
+            message: error.to_string(),
+            error_type: AppErrorType::OtherError,
         }
     }
 }

@@ -118,7 +118,7 @@ impl Storelike for Store {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{urls};
+    use crate::urls;
 
     fn init_store() -> Store {
         let store = Store::init().unwrap();
@@ -225,14 +225,14 @@ mod test {
         store.populate().unwrap();
         let subject = "https://atomicdata.dev/classes?current_page=2";
         // Should throw, because page 2 is out of bounds for default page size
-        let _wrong_resource = store
-            .get_resource_extended(subject)
-            .unwrap_err();
+        let _wrong_resource = store.get_resource_extended(subject).unwrap_err();
         let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
-        let resource = store
-            .get_resource_extended(subject)
+        let resource = store.get_resource_extended(subject).unwrap();
+        let cur_page = resource
+            .get(urls::COLLECTION_CURRENT_PAGE)
+            .unwrap()
+            .to_int()
             .unwrap();
-        let cur_page = resource.get(urls::COLLECTION_CURRENT_PAGE).unwrap().to_int().unwrap();
         assert_eq!(cur_page, 2);
         assert_eq!(resource.get_subject(), subject);
     }

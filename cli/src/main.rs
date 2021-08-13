@@ -6,7 +6,7 @@ use colored::*;
 use dirs::home_dir;
 use std::{cell::RefCell, path::PathBuf, sync::Mutex};
 
-use crate::print::{SERIALIZE_OPTIONS, print_resource};
+use crate::print::{print_resource, SERIALIZE_OPTIONS};
 
 mod commit;
 mod new;
@@ -31,7 +31,8 @@ impl Context<'_> {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
             return write_ctx.clone();
         };
-        let write_ctx = set_agent_config().expect("Issue while generating write context / agent configuration");
+        let write_ctx =
+            set_agent_config().expect("Issue while generating write context / agent configuration");
         self.write.borrow_mut().replace(write_ctx.clone());
         self.store.set_default_agent(Agent {
             subject: write_ctx.agent.clone(),
@@ -54,7 +55,11 @@ fn set_agent_config() -> AtomicResult<Config> {
             let server = promptly::prompt("What's the base url of your Atomic Server?")?;
             let agent = promptly::prompt("What's the URL of your Agent?")?;
             let private_key = promptly::prompt("What's the private key of this Agent?")?;
-            let config = atomic_lib::config::Config { server, agent, private_key };
+            let config = atomic_lib::config::Config {
+                server,
+                agent,
+                private_key,
+            };
             atomic_lib::config::write_config(&agent_config_path, config.clone())?;
             println!(
                 "New config file created at {:?}",
@@ -219,7 +224,7 @@ fn main() -> AtomicResult<()> {
     };
 
     match exec_command(&mut context) {
-        Ok(r) => {r}
+        Ok(r) => r,
         Err(e) => {
             eprint!("{}", e);
             std::process::exit(1);
@@ -235,11 +240,13 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
             commit::destroy(context)?;
         }
         Some("edit") => {
-            #[cfg(feature = "native")] {
+            #[cfg(feature = "native")]
+            {
                 commit::edit(context)?;
             }
-            #[cfg(not(feature = "native"))] {
-                return Err("Feature not available. Compile with `native` feature.".into())
+            #[cfg(not(feature = "native"))]
+            {
+                return Err("Feature not available. Compile with `native` feature.".into());
             }
         }
         Some("get") => {
@@ -263,7 +270,9 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
         Some("validate") => {
             validate(context);
         }
-        Some(cmd) => return Err(format!("{} is not a valid command. Run atomic --help", cmd).into()),
+        Some(cmd) => {
+            return Err(format!("{} is not a valid command. Run atomic --help", cmd).into())
+        }
         None => println!("Run atomic --help for available commands"),
     };
     Ok(())
@@ -289,7 +298,8 @@ fn tpf(context: &Context) -> AtomicResult<()> {
     let property = tpf_value(subcommand_matches.value_of("property").unwrap());
     let value = tpf_value(subcommand_matches.value_of("value").unwrap());
     let endpoint = format!("{}/tpf", &context.get_write_context().server);
-    let resources = atomic_lib::client::fetch_tpf(&endpoint, subject, property, value, &context.store)?;
+    let resources =
+        atomic_lib::client::fetch_tpf(&endpoint, subject, property, value, &context.store)?;
     for r in resources {
         print_resource(context, &r, subcommand_matches)?;
     }
@@ -318,49 +328,75 @@ mod test {
     #[test]
     fn get_fail() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","random-non-existent-shortname"]).assert().failure();
+        cmd.args(&["get", "random-non-existent-shortname"])
+            .assert()
+            .failure();
     }
 
     #[test]
     fn get_shortname() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","shortname"]).assert().success();
+        cmd.args(&["get", "shortname"]).assert().success();
     }
 
     #[test]
     fn get_url() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/classes"]).assert().success();
+        cmd.args(&["get", "https://atomicdata.dev/classes"])
+            .assert()
+            .success();
     }
 
     #[test]
     fn get_path() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/classes members"]).assert().success();
+        cmd.args(&["get", "https://atomicdata.dev/classes members"])
+            .assert()
+            .success();
     }
 
     #[test]
     fn get_path_array() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/classes is-a 0"]).assert().success();
+        cmd.args(&["get", "https://atomicdata.dev/classes is-a 0"])
+            .assert()
+            .success();
     }
 
     #[test]
     fn get_path_array_non_existent() {
         let mut cmd = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd.args(&["get","https://atomicdata.dev/classes is-a 1"]).assert().failure();
+        cmd.args(&["get", "https://atomicdata.dev/classes is-a 1"])
+            .assert()
+            .failure();
     }
 
     #[ignore]
     #[test]
     fn set_and_get() {
         use std::time::SystemTime;
-        let value: String = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap().as_secs().to_string();
+        let value: String = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            .to_string();
         let mut cmd_set = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        cmd_set.args(&["set","https://atomicdata.dev/test",atomic_lib::urls::SHORTNAME,&value]).assert().success();
+        cmd_set
+            .args(&[
+                "set",
+                "https://atomicdata.dev/test",
+                atomic_lib::urls::SHORTNAME,
+                &value,
+            ])
+            .assert()
+            .success();
 
         let mut cmd_get = Command::cargo_bin(env!("CARGO_PKG_NAME")).unwrap();
-        let result = cmd_get.args(&["get","https://atomicdata.dev/test shortname"]).assert().success().to_string();
+        let result = cmd_get
+            .args(&["get", "https://atomicdata.dev/test shortname"])
+            .assert()
+            .success()
+            .to_string();
         assert!(result.contains(&value));
     }
 }

@@ -1,10 +1,10 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
-use crate::{errors::AtomicResult, parse::parse_json_ad_array};
 use crate::{
     agents::Agent,
     schema::{Class, Property},
 };
+use crate::{errors::AtomicResult, parse::parse_json_ad_array};
 use crate::{mapping::Mapping, values::Value, Atom, Resource};
 
 // A path can return one of many things
@@ -153,7 +153,8 @@ pub trait Storelike: Sized {
 
     /// Imports a JSON-AD string, returns the amount of imported resources
     fn import(&self, string: &str) -> AtomicResult<usize> {
-        let vec = parse_json_ad_array(string, self).map_err(|e| format!("Unable to parse JSON-AD string: {}", e))?;
+        let vec = parse_json_ad_array(string, self)
+            .map_err(|e| format!("Unable to parse JSON-AD string: {}", e))?;
         let len = vec.len();
         for r in vec {
             self.add_resource(&r)?
@@ -207,7 +208,7 @@ pub trait Storelike: Sized {
                     vec.push(Atom::new(
                         resource.get_subject().clone(),
                         property.clone(),
-                        value.clone()
+                        value.clone(),
                     ))
                 }
             }

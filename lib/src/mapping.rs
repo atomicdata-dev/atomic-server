@@ -3,8 +3,8 @@
 //! This section provides tools to store, share and resolve these Mappings.
 
 use crate::errors::AtomicResult;
-use std::{collections::HashMap, fs, path::PathBuf};
 use std::collections::hash_map::IntoIter;
+use std::{collections::HashMap, fs, path::PathBuf};
 /// Maps shortanmes (bookmarks) to URLs
 #[derive(Clone)]
 pub struct Mapping {
@@ -15,9 +15,7 @@ impl Mapping {
     pub fn init() -> Mapping {
         let hashmap: HashMap<String, String> = HashMap::new();
 
-        Mapping {
-            hashmap
-        }
+        Mapping { hashmap }
     }
 
     /// Checks if the input string is a Mapping or a valid URL.
@@ -37,7 +35,7 @@ impl Mapping {
     }
 
     /// Add a new bookmark to the store
-    pub fn insert(&mut self, shortname: String, url: String){
+    pub fn insert(&mut self, shortname: String, url: String) {
         self.hashmap.insert(shortname, url);
     }
 
@@ -48,7 +46,7 @@ impl Mapping {
 
     /// Reads an .amp (atomic mapping) file from your disk.
     pub fn read_mapping_from_file(&mut self, path: &PathBuf) -> AtomicResult<()> {
-        let mapping_string  =std::fs::read_to_string(path)?;
+        let mapping_string = std::fs::read_to_string(path)?;
         self.parse_mapping(&mapping_string)?;
         Ok(())
     }
@@ -66,7 +64,8 @@ impl Mapping {
                 Some(_) => {
                     let split: Vec<&str> = line.split('=').collect();
                     if split.len() == 2 {
-                        self.hashmap.insert(String::from(split[0]), String::from(split[1]));
+                        self.hashmap
+                            .insert(String::from(split[0]), String::from(split[1]));
                     } else {
                         return Err(format!("Error reading line {:?}", line).into());
                     };

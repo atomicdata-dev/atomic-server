@@ -1,52 +1,53 @@
 //! The Hierarchy model describes how Resources are structed in a tree-like shape.
 //! It dealt with authorization (read / write grants)
 
-use crate::{Resource, Storelike, errors::AtomicResult, urls};
+use crate::{errors::AtomicResult, urls, Resource, Storelike};
 
 /// Looks for children relations, adds to the resource. Performs a TPF query, might be expensive.
-pub fn add_children(
-  store: &impl Storelike,
-  resource: &mut Resource,
-) -> AtomicResult<Resource> {
-  let atoms = store.tpf(None, Some(urls::PARENT), Some(resource.get_subject()), false)?;
-  let mut children: Vec<String> = Vec::new();
-  for atom in atoms {
-    children.push(atom.subject)
-  }
-  resource.set_propval(urls::CHILDREN.into(), children.into(), store)?;
-  Ok(resource.to_owned())
+pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicResult<Resource> {
+    let atoms = store.tpf(
+        None,
+        Some(urls::PARENT),
+        Some(resource.get_subject()),
+        false,
+    )?;
+    let mut children: Vec<String> = Vec::new();
+    for atom in atoms {
+        children.push(atom.subject)
+    }
+    resource.set_propval(urls::CHILDREN.into(), children.into(), store)?;
+    Ok(resource.to_owned())
 }
 
 /// Recursively checks a Resource and its Parents for write.
 pub fn check_write(
-  store: &impl Storelike,
-  resource: &Resource,
-  agent: String,
+    store: &impl Storelike,
+    resource: &Resource,
+    agent: String,
 ) -> AtomicResult<bool> {
-  // Check if the resource's write rights explicitly refers to the agent
-  if let Ok(arr_val) = resource.get(urls::WRITE) {
-    if arr_val.to_vec()?.contains(&agent) {
-      return Ok(true)
-    };
-  }
-  // Try the parents recursively
-  if let Ok(val) = resource.get(urls::PARENT) {
-    let parent = store.get_resource(&val.to_string())?;
-    if resource.get_subject() == parent.get_subject() {
-      return Err("Parent is the same as the current resource".into())
+    // Check if the resource's write rights explicitly refers to the agent
+    if let Ok(arr_val) = resource.get(urls::WRITE) {
+        if arr_val.to_vec()?.contains(&agent) {
+            return Ok(true);
+        };
     }
-    check_write(store, &parent, agent)
-  } else {
-    // resource has no parent and agent is not in Write array - check fails
-    Ok(false)
-  }
+    // Try the parents recursively
+    if let Ok(val) = resource.get(urls::PARENT) {
+        let parent = store.get_resource(&val.to_string())?;
+        if resource.get_subject() == parent.get_subject() {
+            return Err("Parent is the same as the current resource".into());
+        }
+        check_write(store, &parent, agent)
+    } else {
+        // resource has no parent and agent is not in Write array - check fails
+        Ok(false)
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{Storelike, Value, datatype::DataType};
-
+    use crate::{datatype::DataType, Storelike, Value};
 
     // TODO: Add tests for:
     // - basic check_write (should be false for newly created agent)

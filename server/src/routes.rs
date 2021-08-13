@@ -26,7 +26,5 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
                 .service(web::resource("").route(web::get().to(handlers::resource::get_resource))),
         )
         // Also allow the home resource
-        .service(
-            web::resource("/").to(handlers::resource::get_resource),
-        );
+        .service(web::resource("/").to(handlers::resource::get_resource));
 }

@@ -1,9 +1,18 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
-use std::{collections::{HashMap, HashSet}, sync::{Arc, Mutex}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
-use crate::{Atom, Resource, Value, datatype::DataType, errors::AtomicResult, resources::PropVals, storelike::{ResourceCollection, Storelike}};
+use crate::{
+    datatype::DataType,
+    errors::AtomicResult,
+    resources::PropVals,
+    storelike::{ResourceCollection, Storelike},
+    Atom, Resource, Value,
+};
 
 /// Inside the index_vals, each value is mapped to this type.
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
@@ -64,8 +73,13 @@ impl Db {
             .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
         match propval_maybe.as_ref() {
             Some(binpropval) => {
-                let propval: PropVals = bincode::deserialize(binpropval)
-                    .map_err(|e| format!("Deserialize propval error: {} {}", corrupt_db_message(subject), e))?;
+                let propval: PropVals = bincode::deserialize(binpropval).map_err(|e| {
+                    format!(
+                        "Deserialize propval error: {} {}",
+                        corrupt_db_message(subject),
+                        e
+                    )
+                })?;
                 Ok(propval)
             }
             None => Err(format!("Resource {} not found", subject).into()),
@@ -79,15 +93,20 @@ impl Db {
             .get(string_val)
             .map_err(|e| format!("Can't open {} from value index: {}", string_val, e))?;
         match prop_sub_map.as_ref() {
-                Some(binpropval) => {
-                    let psm: PropSubjectMap = bincode::deserialize(binpropval)
-                        .map_err(|e| format!("Deserialize PropSubjectMap error: {} {}", corrupt_db_message(&string_val), e))?;
+            Some(binpropval) => {
+                let psm: PropSubjectMap = bincode::deserialize(binpropval).map_err(|e| {
+                    format!(
+                        "Deserialize PropSubjectMap error: {} {}",
+                        corrupt_db_message(&string_val),
+                        e
+                    )
+                })?;
                 Ok(psm)
             }
             None => {
                 let psm: PropSubjectMap = PropSubjectMap::new();
                 Ok(psm)
-            },
+            }
         }
     }
 
@@ -98,7 +117,7 @@ impl Db {
 
     fn set_prop_subject_map(&self, string_val: &str, psm: &PropSubjectMap) -> AtomicResult<()> {
         let psm_binary = bincode::serialize(psm)
-        .map_err(|e| format!("Can't serialize value {}: {}", string_val, e))?;
+            .map_err(|e| format!("Can't serialize value {}: {}", string_val, e))?;
         self.index_vals.insert(string_val, psm_binary)?;
         Ok(())
     }
@@ -141,19 +160,16 @@ impl Storelike for Db {
 
     // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
-
         let vec = match atom.value.clone() {
             Value::ResourceArray(v) => v,
             Value::AtomicUrl(v) => vec![v],
-            _other=>  {
-                return Ok(())
-            },
+            _other => return Ok(()),
         };
 
         for val in vec {
             let mut map = self.get_prop_subject_map(&val)?;
 
-            let mut set = match map.get_mut(&atom.property){
+            let mut set = match map.get_mut(&atom.property) {
                 Some(vals) => vals.to_owned(),
                 None => HashSet::new(),
             };
@@ -180,13 +196,13 @@ impl Storelike for Db {
     fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
         let vec = match atom.value.clone() {
             Value::ResourceArray(v) => v,
-            other=>  vec![other.to_string()],
+            other => vec![other.to_string()],
         };
 
         for val in vec {
             let mut map = self.get_prop_subject_map(&val)?;
 
-            let mut set = match map.get_mut(&atom.property){
+            let mut set = match map.get_mut(&atom.property) {
                 Some(vals) => vals.to_owned(),
                 None => HashSet::new(),
             };
@@ -237,7 +253,9 @@ impl Storelike for Db {
         let mut removed_query_params = url.to_string();
 
         // Remove trailing slash
-        if removed_query_params.ends_with('/') { removed_query_params.pop(); }
+        if removed_query_params.ends_with('/') {
+            removed_query_params.pop();
+        }
 
         // Check if the subject matches one of the endpoints
         // TODO: do this on initialize, not on request!
@@ -263,14 +281,21 @@ impl Storelike for Db {
         for class in resource.get_classes(self)? {
             match class.subject.as_ref() {
                 crate::urls::COLLECTION => {
-                    return crate::collections::construct_collection(self, query_params, &mut resource)
+                    return crate::collections::construct_collection(
+                        self,
+                        query_params,
+                        &mut resource,
+                    )
                 }
                 crate::urls::INVITE => {
-                    return crate::plugins::invite::construct_invite_redirect(self, query_params, &mut resource, subject)
+                    return crate::plugins::invite::construct_invite_redirect(
+                        self,
+                        query_params,
+                        &mut resource,
+                        subject,
+                    )
                 }
-                crate::urls::DRIVE => {
-                    return crate::hierarchy::add_children(self, &mut resource)
-                }
+                crate::urls::DRIVE => return crate::hierarchy::add_children(self, &mut resource),
                 _ => {}
             }
         }
@@ -279,7 +304,9 @@ impl Storelike for Db {
 
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
-        let self_url = self.get_self_url().expect("No self URL set, is required in DB");
+        let self_url = self
+            .get_self_url()
+            .expect("No self URL set, is required in DB");
         for item in self.resources.into_iter() {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
             let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
@@ -346,7 +373,7 @@ impl Storelike for Db {
                     vec.push(Atom::new(
                         resource.get_subject().clone(),
                         property.clone(),
-                        value.clone()
+                        value.clone(),
                     ))
                 }
             }
@@ -403,7 +430,7 @@ impl Storelike for Db {
                 if hasval {
                     let spm = self.get_prop_subject_map(q_value.unwrap())?;
                     if hasprop {
-                        if let Some(set) = spm.get(q_property.unwrap())  {
+                        if let Some(set) = spm.get(q_property.unwrap()) {
                             let base = self.get_base_url();
                             for subj in set {
                                 if !include_external && !subj.starts_with(base) {
@@ -417,7 +444,11 @@ impl Storelike for Db {
                                 if datatype == DataType::ResourceArray {
                                     datatype = DataType::AtomicUrl
                                 }
-                                let atom = Atom::new(subj.into(), q_property.unwrap().into(), Value::new(q_value.unwrap(), &datatype)?);
+                                let atom = Atom::new(
+                                    subj.into(),
+                                    q_property.unwrap().into(),
+                                    Value::new(q_value.unwrap(), &datatype)?,
+                                );
                                 vec.push(atom);
                             }
                         }
@@ -425,12 +456,16 @@ impl Storelike for Db {
                         for (prop, set) in spm.iter() {
                             for subj in set {
                                 let property_full = self.get_property(prop)?;
-                                let atom = Atom::new(subj.into(), prop.into(), Value::new(q_value.unwrap(), &property_full.data_type)?);
+                                let atom = Atom::new(
+                                    subj.into(),
+                                    prop.into(),
+                                    Value::new(q_value.unwrap(), &property_full.data_type)?,
+                                );
                                 vec.push(atom);
                             }
                         }
                     }
-                    return Ok(vec)
+                    return Ok(vec);
                 }
                 // TODO: Add an index for searching only by property
                 for resource in self.all_resources(include_external) {
@@ -522,7 +557,11 @@ pub mod test {
     #[test]
     fn populate_collections() {
         let store = DB.lock().unwrap().clone();
-        let subjects: Vec<String> = store.all_resources(false).into_iter().map(|r| r.get_subject().into()).collect();
+        let subjects: Vec<String> = store
+            .all_resources(false)
+            .into_iter()
+            .map(|r| r.get_subject().into())
+            .collect();
         println!("{:?}", subjects);
         let collections_collection_url = format!("{}/collections", store.get_base_url());
         let my_resource = store
@@ -541,15 +580,19 @@ pub mod test {
         let store = DB.lock().unwrap().clone();
         let subject = urls::CLASS.into();
         let property: String = urls::PARENT.into();
-        let val_string= urls::AGENT;
+        let val_string = urls::AGENT;
         let value = Value::new(val_string, &DataType::AtomicUrl).unwrap();
         // This atom should normally not exist - Agent is not the parent of Class.
         let atom = Atom::new(subject, property.clone(), value);
         store.add_atom_to_index(&atom).unwrap();
-        let found_no_external = store.tpf(None, Some(&property), Some(val_string), false).unwrap();
+        let found_no_external = store
+            .tpf(None, Some(&property), Some(val_string), false)
+            .unwrap();
         // Don't find the atom if no_external is true.
         assert_eq!(found_no_external.len(), 0);
-        let found_external = store.tpf(None, Some(&property), Some(val_string), true).unwrap();
+        let found_external = store
+            .tpf(None, Some(&property), Some(val_string), true)
+            .unwrap();
         // If we see the atom, it's in the index.
         assert_eq!(found_external.len(), 1);
     }

@@ -1,7 +1,7 @@
 //! Functions for interacting with an Atomic Server
 use url::Url;
 
-use crate::{Resource, Storelike, errors::AtomicResult, parse::parse_json_ad_resource};
+use crate::{errors::AtomicResult, parse::parse_json_ad_resource, Resource, Storelike};
 
 /// Fetches a resource, makes sure its subject matches.
 /// Checks the datatypes for the Values.
@@ -9,7 +9,8 @@ use crate::{Resource, Storelike, errors::AtomicResult, parse::parse_json_ad_reso
 /// WARNING: Calls store methods, and is called by store methods, might get stuck in a loop!
 pub fn fetch_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Resource> {
     let body = fetch_body(subject, crate::parse::JSON_AD_MIME)?;
-    let resource = parse_json_ad_resource(&body, store).map_err(|e| format!("Error parsing body of {}: {}", subject, e))?;
+    let resource = parse_json_ad_resource(&body, store)
+        .map_err(|e| format!("Error parsing body of {}: {}", subject, e))?;
     Ok(resource)
 }
 

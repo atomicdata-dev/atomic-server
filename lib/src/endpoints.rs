@@ -43,9 +43,5 @@ impl Endpoint {
 }
 
 pub fn default_endpoints() -> Vec<Endpoint> {
-    vec![
-        version_endpoint(),
-        all_versions_endpoint(),
-        path_endpoint()
-    ]
+    vec![version_endpoint(), all_versions_endpoint(), path_endpoint()]
 }

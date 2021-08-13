@@ -38,9 +38,11 @@ pub const NAME: &str = "https://atomicdata.dev/properties/name";
 // ... for Collections
 pub const COLLECTION_PROPERTY: &str = "https://atomicdata.dev/properties/collection/property";
 pub const COLLECTION_VALUE: &str = "https://atomicdata.dev/properties/collection/value";
-pub const COLLECTION_MEMBER_COUNT: &str = "https://atomicdata.dev/properties/collection/totalMembers";
+pub const COLLECTION_MEMBER_COUNT: &str =
+    "https://atomicdata.dev/properties/collection/totalMembers";
 pub const COLLECTION_TOTAL_PAGES: &str = "https://atomicdata.dev/properties/collection/totalPages";
-pub const COLLECTION_CURRENT_PAGE: &str = "https://atomicdata.dev/properties/collection/currentPage";
+pub const COLLECTION_CURRENT_PAGE: &str =
+    "https://atomicdata.dev/properties/collection/currentPage";
 pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collection/members";
 pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collection/pageSize";
 pub const COLLECTION_SORT_BY: &str = "https://atomicdata.dev/properties/collection/sortBy";

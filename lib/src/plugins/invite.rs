@@ -1,18 +1,21 @@
-use crate::{Resource, Storelike, Value, agents::Agent, errors::AtomicResult, url_helpers::check_valid_url, urls};
+use crate::{
+    agents::Agent, errors::AtomicResult, url_helpers::check_valid_url, urls, Resource, Storelike,
+    Value,
+};
 
 /// If there is a valid Agent in the correct query param, and the invite is valid, update the rights and respond with a redirect to the target resource
 pub fn construct_invite_redirect(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
     invite_resource: &mut Resource,
-    subject: &str
+    subject: &str,
 ) -> AtomicResult<Resource> {
     let mut pub_key = None;
     let mut invite_agent = None;
     for (k, v) in query_params {
         match k.as_ref() {
-            "public-key" | urls::INVITE_PUBKEY=> { pub_key = Some(v.to_string()) },
-            "agent" | urls::AGENT=> { invite_agent = Some(v.to_string()) },
+            "public-key" | urls::INVITE_PUBKEY => pub_key = Some(v.to_string()),
+            "agent" | urls::AGENT => invite_agent = Some(v.to_string()),
             _ => {}
         }
     }
@@ -29,34 +32,45 @@ pub fn construct_invite_redirect(
             // A bit inefficient, since it re-fetches the agent from the store, but it's not that big of a cost
             add_rights(&new_agent.subject, &new_agent.subject, true, store)?;
             new_agent.subject
-        },
-        (Some(_), Some(_)) => return Err("Either publicKey or agent can be set - not both at the same time.".into()),
+        }
+        (Some(_), Some(_)) => {
+            return Err("Either publicKey or agent can be set - not both at the same time.".into())
+        }
     };
 
     // If there are write or read rights
-    let write = if let Ok(bool) = invite_resource.get(urls::WRITE_BOOL){
+    let write = if let Ok(bool) = invite_resource.get(urls::WRITE_BOOL) {
         bool.to_bool()?
     } else {
         false
     };
 
-    let target=  &invite_resource.get(urls::TARGET).map_err(
-        |e| format!("Invite {} does not have a target. {}", invite_resource.get_subject(), e)
-    )?.to_string();
+    let target = &invite_resource
+        .get(urls::TARGET)
+        .map_err(|e| {
+            format!(
+                "Invite {} does not have a target. {}",
+                invite_resource.get_subject(),
+                e
+            )
+        })?
+        .to_string();
 
     println!("Invite resource before: {:?}", invite_resource);
 
     if let Ok(usages_left) = invite_resource.get(urls::USAGES_LEFT) {
-        let num  = usages_left.to_int()?;
+        let num = usages_left.to_int()?;
         if num == 0 {
-            return Err("No usages left for this invite".into())
+            return Err("No usages left for this invite".into());
         }
         // Since the requested subject might have query params, we don't want to overwrite that one - we want to overwrite the clean resource.
         let mut url = url::Url::parse(subject)?;
         url.set_query(None);
         invite_resource.set_subject(url.to_string());
         invite_resource.set_propval(urls::USAGES_LEFT.into(), Value::Integer(num - 1), store)?;
-        invite_resource.save_locally(store).map_err(|e| format!("Unable to save updated Invite. {}", e))?;
+        invite_resource
+            .save_locally(store)
+            .map_err(|e| format!("Unable to save updated Invite. {}", e))?;
     }
 
     println!("Invite resource after: {:?}", invite_resource);
@@ -66,8 +80,16 @@ pub fn construct_invite_redirect(
     add_rights(&agent, target, write, store)?;
 
     let mut redirect = Resource::new_instance(urls::REDIRECT, store)?;
-    redirect.set_propval(urls::DESTINATION.into(), invite_resource.get(urls::TARGET)?.to_owned(), store)?;
-    redirect.set_propval(urls::REDIRECT_AGENT.into(), crate::Value::AtomicUrl(agent), store)?;
+    redirect.set_propval(
+        urls::DESTINATION.into(),
+        invite_resource.get(urls::TARGET)?.to_owned(),
+        store,
+    )?;
+    redirect.set_propval(
+        urls::REDIRECT_AGENT.into(),
+        crate::Value::AtomicUrl(agent),
+        store,
+    )?;
     // The front-end requires the @id to be the same as requested
     redirect.set_subject(subject.into());
     Ok(redirect)
@@ -77,23 +99,28 @@ pub fn construct_invite_redirect(
 /// Overwrites the target resource to include the new rights.
 /// Checks if the Agent has a valid URL.
 /// Will not throw an error if the Agent already has the rights.
-pub fn add_rights(agent: &str, target: &str, write: bool, store: &impl Storelike) -> AtomicResult<()> {
+pub fn add_rights(
+    agent: &str,
+    target: &str,
+    write: bool,
+    store: &impl Storelike,
+) -> AtomicResult<()> {
     check_valid_url(agent)?;
     // Get the Resource that the user is being invited to
     let mut target = store.get_resource(target)?;
-    let right = if write {urls::WRITE} else {urls::READ};
+    let right = if write { urls::WRITE } else { urls::READ };
     let mut rights_vector: Vec<String> = match target.get(right) {
         // Rights have been set, add to the list
         Ok(val) => {
             let vec = val.to_vec().map_err(|_| "Invalid value for rights")?;
             // If the vector already contains the agent, throw an error;
             for a in vec {
-               if a == agent {
-                   return Ok(())
-               }
+                if a == agent {
+                    return Ok(());
+                }
             }
             vec.to_owned()
-        },
+        }
         // No rights have been set, create a new vector
         Err(_) => Vec::new(),
     };
@@ -101,7 +128,9 @@ pub fn add_rights(agent: &str, target: &str, write: bool, store: &impl Storelike
     rights_vector.push(agent.to_string());
 
     target.set_propval(right.into(), rights_vector.into(), store)?;
-    target.save_locally(store).map_err(|e| format!("Unable to save updated target resource. {}", e))?;
+    target
+        .save_locally(store)
+        .map_err(|e| format!("Unable to save updated target resource. {}", e))?;
 
     Ok(())
 }

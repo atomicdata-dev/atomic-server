@@ -24,7 +24,10 @@ impl Atom {
 
 impl std::fmt::Display for Atom {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        fmt.write_str(&format!("<{}> <{}> '{}'", self.subject, self.property, self.value))?;
+        fmt.write_str(&format!(
+            "<{}> <{}> '{}'",
+            self.subject, self.property, self.value
+        ))?;
         Ok(())
     }
 }

@@ -45,7 +45,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
     ) {
         Ok(agent_config) => {
             match store.get_resource(&agent_config.agent) {
-                Ok(_) => {agent_config},
+                Ok(_) => agent_config,
                 Err(e) => {
                     if agent_config.agent.contains(&config.local_base_url) {
                         // If there is an agent in the config, but not in the store,

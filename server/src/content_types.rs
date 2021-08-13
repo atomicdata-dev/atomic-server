@@ -1,6 +1,6 @@
 //! Content-type / Accept header negotiation, MIME types
 
-use actix_web::{http::HeaderMap};
+use actix_web::http::HeaderMap;
 
 #[derive(PartialEq)]
 pub enum ContentType {
@@ -38,7 +38,7 @@ impl ContentType {
             ContentType::JSONLD => MIME_JSONLD,
             ContentType::HTML => MIME_HTML,
             ContentType::TURTLE => MIME_TURTLE,
-            ContentType::NT => MIME_NT
+            ContentType::NT => MIME_NT,
         }
     }
 }
@@ -47,12 +47,8 @@ impl ContentType {
 /// Defaults to HTML if none is found.
 pub fn get_accept(map: &HeaderMap) -> ContentType {
     let accept_header = match map.get("Accept") {
-        Some(header) => {
-            header.to_str().unwrap_or("")
-        }
-        None => {
-            return ContentType::HTML
-        }
+        Some(header) => header.to_str().unwrap_or(""),
+        None => return ContentType::HTML,
     };
     parse_accept_header(accept_header)
 }
@@ -64,25 +60,25 @@ pub fn get_accept(map: &HeaderMap) -> ContentType {
 pub fn parse_accept_header(header: &str) -> ContentType {
     for mimepart in header.split(',') {
         if mimepart.contains(MIME_JSONAD) {
-            return ContentType::JSONAD
+            return ContentType::JSONAD;
         }
         if mimepart.contains(MIME_HTML) {
-            return ContentType::HTML
+            return ContentType::HTML;
         }
         if mimepart.contains(MIME_XML) {
-            return ContentType::HTML
+            return ContentType::HTML;
         }
         if mimepart.contains(MIME_JSON) {
-            return ContentType::JSON
+            return ContentType::JSON;
         }
         if mimepart.contains(MIME_JSONLD) {
-            return ContentType::JSONLD
+            return ContentType::JSONLD;
         }
         if mimepart.contains(MIME_TURTLE) {
-            return ContentType::TURTLE
+            return ContentType::TURTLE;
         }
         if mimepart.contains(MIME_NT) {
-            return ContentType::NT
+            return ContentType::NT;
         }
     }
     log::info!("Unknown Accept header, defaut to HTML: {}", header);

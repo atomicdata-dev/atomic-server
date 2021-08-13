@@ -24,7 +24,11 @@ fn sign_message(message: &str, private_key: &str, public_key: &str) -> String {
     // I'm using PKCS8 in my actual Rust implementation, but I think this might make things more complicated in this example.
     // I can't get it to match signatures with either.
     // let key_pair = ring::signature::Ed25519KeyPair::from_pkcs8(&private_key_vec).unwrap();
-    let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(&private_key_vec, &public_key_vec).unwrap();
+    let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(
+        &private_key_vec,
+        &public_key_vec,
+    )
+    .unwrap();
     let signature = key_pair.sign(&message.as_bytes());
     let signature_bytes = signature.as_ref();
     encode_hex(signature_bytes)

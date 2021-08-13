@@ -1,9 +1,12 @@
-use crate::{appstate::AppState, content_types::ContentType, content_types::get_accept, errors::{AppError, BetterResult}};
-use actix_web::{web, HttpResponse};
-use atomic_lib::{Storelike};
-use std::{
-    sync::{Mutex},
+use crate::{
+    appstate::AppState,
+    content_types::get_accept,
+    content_types::ContentType,
+    errors::{AppError, BetterResult},
 };
+use actix_web::{web, HttpResponse};
+use atomic_lib::Storelike;
+use std::sync::Mutex;
 
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
@@ -32,10 +35,7 @@ pub async fn get_resource(
         } else {
             format!("?{}", req.query_string())
         };
-        let subject = format!(
-            "{}/{}{}",
-            base_url, subj_end_string, querystring
-        );
+        let subject = format!("{}/{}{}", base_url, subj_end_string, querystring);
         subject
     } else {
         String::from(base_url)
@@ -46,7 +46,10 @@ pub async fn get_resource(
     builder.header("Content-Type", content_type.to_mime());
     // This prevents the browser from displaying the JSON response upon re-opening a closed tab
     // https://github.com/joepio/atomic-data-rust/issues/137
-    builder.header("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    builder.header(
+        "Cache-Control",
+        "no-store, no-cache, must-revalidate, private",
+    );
     let resource = store
         .get_resource_extended(&subject)
         // TODO: Don't always return 404 - only when it's actually not found!

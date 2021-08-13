@@ -84,9 +84,7 @@ pub fn validate_store(
                             ));
                         }
                     }
-                    Err(e) => {
-                        unfetchable.push((required_prop_subject, e.to_string()))
-                    }
+                    Err(e) => unfetchable.push((required_prop_subject, e.to_string())),
                 }
             }
         }

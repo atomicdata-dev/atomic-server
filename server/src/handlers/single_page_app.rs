@@ -1,5 +1,5 @@
-use actix_web::HttpResponse;
 use crate::errors::BetterResult;
+use actix_web::HttpResponse;
 
 /// Returns the atomic-data-browser single page application
 pub async fn single_page() -> BetterResult<HttpResponse> {
@@ -8,7 +8,10 @@ pub async fn single_page() -> BetterResult<HttpResponse> {
         .content_type("text/html")
         // This prevents the browser from displaying the JSON response upon re-opening a closed tab
         // https://github.com/joepio/atomic-data-rust/issues/137
-        .header("Cache-Control", "no-store, no-cache, must-revalidate, private")
+        .header(
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate, private",
+        )
         .body(body);
 
     Ok(resp)

@@ -72,7 +72,11 @@ async fn main() -> AtomicResult<()> {
 
     match matches.subcommand_name() {
         Some("export") => {
-            let path = match matches.subcommand_matches("export").unwrap().value_of("path") {
+            let path = match matches
+                .subcommand_matches("export")
+                .unwrap()
+                .value_of("path")
+            {
                 Some(p) => std::path::Path::new(p).to_path_buf(),
                 None => {
                     let date = chrono::Local::now().to_rfc3339();
@@ -80,19 +84,24 @@ async fn main() -> AtomicResult<()> {
                     let mut pt = config.config_dir;
                     pt.push(&pathstr);
                     pt
-                },
+                }
             };
             let outstr = appstate.store.export(true)?;
             std::fs::create_dir_all(path.parent().unwrap())
                 .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
-            let mut file = File::create(&path).map_err(|e| format!("Failed to write file to {:?}. {}", path, e))?;
+            let mut file = File::create(&path)
+                .map_err(|e| format!("Failed to write file to {:?}. {}", path, e))?;
             use std::io::Write;
             write!(file, "{}", outstr)?;
             println!("Succesfully exported data to {}", path.to_str().unwrap());
             std::process::exit(0);
         }
         Some("import") => {
-            let pathstr = matches.subcommand_matches("import").unwrap().value_of("path").unwrap();
+            let pathstr = matches
+                .subcommand_matches("import")
+                .unwrap()
+                .value_of("path")
+                .unwrap();
             let path = std::path::Path::new(pathstr);
             let readstring = std::fs::read_to_string(path)?;
 
@@ -109,7 +118,7 @@ async fn main() -> AtomicResult<()> {
         }
         None => {
             // Start server if no command is found
-        },
+        }
     };
 
     // Start other async processes
@@ -119,8 +128,14 @@ async fn main() -> AtomicResult<()> {
     if config.rebuild_index {
         actix_web::rt::spawn(async move {
             log::warn!("Building index... This could take a while, expect worse performance until 'Building index finished'");
-            appstate_clone.store.clear_index().expect("Failed to clear index");
-            appstate_clone.store.build_index(true).expect("Failed to build index");
+            appstate_clone
+                .store
+                .clear_index()
+                .expect("Failed to clear index");
+            appstate_clone
+                .store
+                .build_index(true)
+                .expect("Failed to build index");
             log::info!("Building index finished!");
         });
     }
@@ -137,9 +152,10 @@ async fn main() -> AtomicResult<()> {
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
             .configure(routes::config_routes)
-            .default_service(
-                web::to(|| {log::error!("Wrong route, should not happen with normal requests"); actix_web::HttpResponse::NotFound()})
-            )
+            .default_service(web::to(|| {
+                log::error!("Wrong route, should not happen with normal requests");
+                actix_web::HttpResponse::NotFound()
+            }))
             .app_data(
                 web::JsonConfig::default()
                     // register error_handler for JSON extractors.

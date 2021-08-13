@@ -1,12 +1,12 @@
 //! A resource is a set of Atoms that share a URL
 
+use crate::values::Value;
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     mapping::is_url,
     schema::{Class, Property},
     Atom, Storelike,
 };
-use crate::{values::Value};
 use std::collections::HashMap;
 
 /// A Resource is a set of Atoms that shares a single Subject.
@@ -339,11 +339,7 @@ impl Resource {
     pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
         let mut atoms: Vec<Atom> = Vec::new();
         for (property, value) in self.propvals.iter() {
-            let atom = Atom::new(
-                self.subject.to_string(),
-                property.clone(),
-                value.clone(),
-            );
+            let atom = Atom::new(self.subject.to_string(), property.clone(), value.clone());
             atoms.push(atom);
         }
         Ok(atoms)

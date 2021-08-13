@@ -1,8 +1,8 @@
 //! Datatypes constrain values of Atoms
 
-use std::{fmt, string::ParseError};
-use serde::{Deserialize, Serialize};
 use crate::urls;
+use serde::{Deserialize, Serialize};
+use std::{fmt, string::ParseError};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum DataType {

@@ -1,6 +1,6 @@
 //! Structs and models at the core of Atomic Schema (Class, Property, Datatype).
 
-use crate::{Resource, Value, datatype::DataType, errors::AtomicResult, urls};
+use crate::{datatype::DataType, errors::AtomicResult, urls, Resource, Value};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -43,12 +43,24 @@ impl Property {
     /// Convert to resource
     pub fn to_resource(&self) -> AtomicResult<Resource> {
         let mut resource = Resource::new(self.subject.clone());
-        resource.set_propval_unsafe(urls::IS_A.into(), Value::ResourceArray(vec![urls::PROPERTY.into()]))?;
+        resource.set_propval_unsafe(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::PROPERTY.into()]),
+        )?;
         resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()))?;
-        resource.set_propval_unsafe(urls::DESCRIPTION.into(), Value::String(self.description.clone()))?;
-        resource.set_propval_unsafe(urls::DATATYPE_PROP.into(), Value::AtomicUrl(self.data_type.to_string()))?;
+        resource.set_propval_unsafe(
+            urls::DESCRIPTION.into(),
+            Value::String(self.description.clone()),
+        )?;
+        resource.set_propval_unsafe(
+            urls::DATATYPE_PROP.into(),
+            Value::AtomicUrl(self.data_type.to_string()),
+        )?;
         if let Some(classtype) = &self.class_type {
-            resource.set_propval_unsafe(urls::CLASSTYPE_PROP.into(), Value::AtomicUrl(classtype.clone()))?;
+            resource.set_propval_unsafe(
+                urls::CLASSTYPE_PROP.into(),
+                Value::AtomicUrl(classtype.clone()),
+            )?;
         }
 
         Ok(resource)
@@ -97,14 +109,26 @@ impl Class {
     /// Converts Class to a Resource
     pub fn to_resource(&self) -> AtomicResult<Resource> {
         let mut resource = Resource::new(self.subject.clone());
-        resource.set_propval_unsafe(urls::IS_A.into(), Value::ResourceArray(vec![urls::CLASS.into()]))?;
+        resource.set_propval_unsafe(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::CLASS.into()]),
+        )?;
         resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()))?;
-        resource.set_propval_unsafe(urls::DESCRIPTION.into(), Value::String(self.description.clone()))?;
+        resource.set_propval_unsafe(
+            urls::DESCRIPTION.into(),
+            Value::String(self.description.clone()),
+        )?;
         if !self.requires.is_empty() {
-            resource.set_propval_unsafe(urls::REQUIRES.into(), Value::ResourceArray(self.requires.clone()))?;
+            resource.set_propval_unsafe(
+                urls::REQUIRES.into(),
+                Value::ResourceArray(self.requires.clone()),
+            )?;
         }
         if !self.requires.is_empty() {
-            resource.set_propval_unsafe(urls::RECOMMENDS.into(), Value::ResourceArray(self.recommends.clone()))?;
+            resource.set_propval_unsafe(
+                urls::RECOMMENDS.into(),
+                Value::ResourceArray(self.recommends.clone()),
+            )?;
         }
         Ok(resource)
     }
