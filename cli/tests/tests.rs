@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod test {
     use assert_cmd::Command;
