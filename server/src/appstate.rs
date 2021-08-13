@@ -120,7 +120,7 @@ fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
     )?;
     invite.set_propval_string(
         atomic_lib::urls::DESCRIPTION.into(),
-        "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once.",
+        "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once. If you, for whatever reason, need a new `/setup` invite, you can pass the `--init` flag to `atomic-server`.",
         store,
     )?;
     invite.save_locally(store)?;
