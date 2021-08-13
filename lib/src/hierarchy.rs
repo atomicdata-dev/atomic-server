@@ -46,7 +46,7 @@ pub fn check_write(
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    // use super::*;
     use crate::{datatype::DataType, Storelike, Value};
 
     // TODO: Add tests for:
@@ -57,14 +57,14 @@ mod test {
     fn authorization() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        let agent = store.create_agent(Some("test_actor")).unwrap();
+        // let agent = store.create_agent(Some("test_actor")).unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuilder_1 = crate::commit::CommitBuilder::new(subject.into());
         let property = crate::urls::DESCRIPTION;
         let value = Value::new("Some value", &DataType::Markdown).unwrap();
         commitbuilder_1.set(property.into(), value.clone());
-        let mut commitbuilder_2 = commitbuilder_1.clone();
-        let commit_1 = commitbuilder_1.sign(&agent, &store).unwrap();
+        // let mut commitbuilder_2 = commitbuilder_1.clone();
+        // let commit_1 = commitbuilder_1.sign(&agent, &store).unwrap();
         // Should fail if there is no self_url set in the store, and no parent in the commit
         // TODO: FINISH THIS
         // commit_1.apply_opts(&store, true, true, true, true).unwrap_err();
