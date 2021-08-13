@@ -12,6 +12,8 @@ jobs:
         target: [x86_64-pc-windows-gnu, x86_64-unknown-linux-musl, x86_64-apple-darwin]
     steps:
       - uses: actions/checkout@master
+      - name: publish crates
+        uses: katyo/publish-crates@v1
       - name: Compile and release
         uses: rust-build/rust-build.action@latest
         env:
