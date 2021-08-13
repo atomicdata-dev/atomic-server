@@ -65,6 +65,7 @@ pub mod schema;
 pub mod serialize;
 pub mod store;
 pub mod storelike;
+#[cfg(test)]
 mod test_utils;
 mod url_helpers;
 pub mod urls;

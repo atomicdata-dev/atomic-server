@@ -19,7 +19,7 @@ pub fn fetch_body(url: &str, content_type: &str) -> AtomicResult<String> {
     if !url.starts_with("http") {
         return Err(format!("Could not fetch url '{}', must start with http.", url).into());
     }
-    let resp = ureq::get(&url)
+    let resp = ureq::get(url)
         .set("Accept", content_type)
         .timeout_read(2000)
         .call();
