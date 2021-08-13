@@ -571,7 +571,7 @@ pub mod test {
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
         println!("My value: {}", my_value);
-        assert_eq!(my_value.to_int().unwrap(), 11);
+        assert!(my_value.to_int().unwrap() > 11);
     }
 
     #[test]
