@@ -99,7 +99,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
 /// Creates the first Invitation that is opened by the user on the Home page.
 fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
     let subject = format!("{}/setup", store.get_base_url());
-    log::info!("Creating initial Invite at {}...", subject);
+    log::info!("Creating initial Invite at {} ...", subject);
     let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;
     invite.set_subject(subject);
     // This invite can be used only once
