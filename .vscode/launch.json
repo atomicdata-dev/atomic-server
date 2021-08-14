@@ -1,0 +1,212 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'atomic-server'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=atomic-server",
+          "--package=atomic-server"
+        ],
+        "filter": {
+          "name": "atomic-server",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'atomic-server'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=atomic-server",
+          "--package=atomic-server"
+        ],
+        "filter": {
+          "name": "atomic-server",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in library 'atomic_lib'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--lib",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "atomic_lib",
+          "kind": "lib"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'signing'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=signing",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "signing",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'signing'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=signing",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "signing",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'compare_ring'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=compare_ring",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "compare_ring",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'compare_ring'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=compare_ring",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "compare_ring",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug example 'basic'",
+      "cargo": {
+        "args": [
+          "build",
+          "--example=basic",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "basic",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in example 'basic'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--example=basic",
+          "--package=atomic_lib"
+        ],
+        "filter": {
+          "name": "basic",
+          "kind": "example"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug executable 'atomic-cli'",
+      "cargo": {
+        "args": [
+          "build",
+          "--bin=atomic-cli",
+          "--package=atomic-cli"
+        ],
+        "filter": {
+          "name": "atomic-cli",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug unit tests in executable 'atomic-cli'",
+      "cargo": {
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=atomic-cli",
+          "--package=atomic-cli"
+        ],
+        "filter": {
+          "name": "atomic-cli",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}
