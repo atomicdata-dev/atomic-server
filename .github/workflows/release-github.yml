@@ -6,6 +6,12 @@ on:
       - v*
 
 jobs:
+  crates:
+    runs-on: ubuntu-latest
+    steps:
+    - name: publish crates
+      uses: katyo/publish-crates@v1
+
   create-release:
     runs-on: ubuntu-latest
     steps:
