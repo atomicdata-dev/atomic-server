@@ -164,3 +164,21 @@ cargo test --all
 cargo install drill
 drill -b benchmark.yml --stats
 ```
+
+## FAQ
+
+### I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?
+
+You can run `atomic-server --init` to recreate the `/setup` invite. It will be reset to `1` usage.
+
+### How do I migrate my data to a new domain?
+
+There are no helper functions for this, but you could `atomic-server export` your JSON-AD, and find + replace your old domain with the new one.
+
+### How do I reset my database?
+
+Remove the `db` folder in your `atomic` config: `rm -rf ~/.config/atomic/db`.
+
+### How do I make my data private, yet available online?
+
+This is not yet possible. See [#13](https://github.com/joepio/atomic-data-rust/issues/13).

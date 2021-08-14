@@ -25,6 +25,7 @@ pub fn check_write(
     resource: &Resource,
     agent: String,
 ) -> AtomicResult<bool> {
+
     // Check if the resource's write rights explicitly refers to the agent
     if let Ok(arr_val) = resource.get(urls::WRITE) {
         if arr_val.to_vec()?.contains(&agent) {

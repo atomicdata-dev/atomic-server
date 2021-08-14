@@ -17,6 +17,7 @@ Make sure to `cargo test --all` before opening a PR!
 
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
+- On pushing a version `v*` tag, a Release will be created
 - Use `cargo workspaces version patch` (and maybe replace patch with the right version) to make your life easier. You'll need to `cargo install cargo-workspaces`.
 - Whenever you upgrade the version, you should create a release on Github. This will also build the binaries.
 
