@@ -1,7 +1,7 @@
 [package]
 name = "atomic-server"
 description = "Create, share and model Atomic Data with this graph database server."
-version = "0.25.3"
+version = "0.25.4"
 authors = ["Joep Meindertsma <joep@ontola.io>"]
 edition = "2018"
 license = "MIT"
