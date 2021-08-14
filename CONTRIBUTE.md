@@ -5,13 +5,21 @@ If you encounter issues, add them to the Github issue tracker.
 Same goes for feature requests.
 PR's are welcome, too!
 And join our [Discord](https://discord.gg/a72Rv2P)!
+I'd love to help you out to understand this codebase.
 
 If you want to share some thoughts on Atomic Data as a standard, please [drop an issue in the Atomic Data docs repo](https://github.com/ontola/atomic-data/issues).
 
 ## Local development
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
-Make sure to `cargo test --all` before opening a PR!
+If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-data-browser), run it with `SNOWPACK_PUBLIC_BASE_URL` set to your `atomic-server` (by default `localhost`).
+
+## Making a perfect pull-request
+
+- Clear explanation in the PR itself of what is changed and why
+- Reference to relevant issues in commit messages (e.g. `#123 my commit message`)
+- Tests are passing `cargo test --all`
+- Linters are happy `cargo fmt` & `cargo clippy`
 
 # Versioning and Tagging
 
