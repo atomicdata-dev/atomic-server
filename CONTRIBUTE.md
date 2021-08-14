@@ -13,20 +13,12 @@ If you want to share some thoughts on Atomic Data as a standard, please [drop an
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 Make sure to `cargo test --all` before opening a PR!
 
-## Tagging and versioning
+# Versioning and Tagging
 
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
-- On pushing a version `v*` tag, a Release will be created
-- Use `cargo workspaces version patch` (and maybe replace patch with the right version) to make your life easier. You'll need to `cargo install cargo-workspaces`.
-- Whenever you upgrade the version, you should create a release on Github. This will also build the binaries.
-
-## CI vs manual
-
-1. The CI on Github (Actions) should deal with testing and publishing the version
-1. Bump your version using `cargo install cargo-workspaces`
-1. `cargo workspaces version patch` to increment version in all `cargo.toml` files
-1. Push to master, let the CI take care of the rest
+- On pushing a version `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there. So tag the releases!
+- Use `cargo workspaces version patch` (and maybe replace `patch` with the `minor`) to update the `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces`.
 
 ## Building and publishing binaries
 
