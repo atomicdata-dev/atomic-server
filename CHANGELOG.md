@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.25.7
+
+- Improve process ID functionality #167
+- Improve invite URL
+
 ## v0.25.6
 
 - Fix domain .env #169
@@ -10,7 +15,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## v0.25.5
 
-- Check and terminate running instances of `atomic-server` when running instance
+- Check and terminate running instances of `atomic-server` when running instance #167
 
 ## v0.25.4
 

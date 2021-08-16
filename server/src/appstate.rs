@@ -136,7 +136,7 @@ fn set_up_drive(store: &impl Storelike) -> BetterResult<()> {
     // TODO: add read rights to public, maybe
     drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), store)?;
     drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), store)?;
-    drive.set_propval_string(atomic_lib::urls::DESCRIPTION.into(), "Welcome to your Atomic-Server! Register your User by visiting [`/setup`](http://localhost/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store)?;
+    drive.set_propval_string(atomic_lib::urls::DESCRIPTION.into(), &format!("Welcome to your Atomic-Server! Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
     drive.save_locally(store)?;
     Ok(())
 }
