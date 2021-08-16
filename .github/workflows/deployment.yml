@@ -15,6 +15,8 @@ jobs:
       #   with:
       #     command: build
       #     args: --release
+      - name: Set env
+        run: echo ::set-env name=RELEASE_VERSION::$(echo ${GITHUB_REF:10})
       - name: Deploy to atomicdata.dev
         uses: easingthemes/ssh-deploy@main
         env:
@@ -25,4 +27,4 @@ jobs:
           SOURCE: "README.md"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: ${{ secrets.REMOTE_TARGET }}
+          TARGET: atomic-server${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}}
