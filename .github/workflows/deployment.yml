@@ -29,4 +29,4 @@ jobs:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
       - name: Run new server
-        run: ~/atomic-server &> log-${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}}
+        run: ~/atomic-server &> ./log
