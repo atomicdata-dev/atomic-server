@@ -1,34 +1,34 @@
 [package]
-name = "atomic-server"
-description = "Create, share and model Atomic Data with this graph database server."
-version = "0.25.5"
 authors = ["Joep Meindertsma <joep@ontola.io>"]
+description = "Create, share and model Atomic Data with this graph database server."
 edition = "2018"
 license = "MIT"
+name = "atomic-server"
 repository = "https://github.com/joepio/atomic-data-rust"
+version = "0.25.6"
 
 [dependencies]
-atomic_lib = { version = "0.25.3", path = "../lib", features = ["config", "db", "rdf"] }
 acme-lib = "0.8.1"
+actix-cors = "0.5.4"
 actix-files = "0.5.0"
-actix-web = { version = "3.3.2", features = ["rustls"] }
+actix-web = {version = "3.3.2", features = ["rustls"]}
+atomic_lib = {version = "0.25.6", path = "../lib", features = ["config", "db", "rdf"]}
 chrono = "0.4.19"
+clap = "2.33.3"
 dirs = "3.0.1"
 dotenv = "0.15.0"
 env_logger = "0.8.2"
+futures = "0.3.16"
+heim = "0.0.11"
 log = "0.4.11"
+open = {version = "1.6.0", optional = true}
 promptly = "0.3.0"
 regex = "1.4.2"
 rustls = "0.18.1"
-serde = { version = "1.0.118", features = ["derive"] }
+serde = {version = "1.0.118", features = ["derive"]}
 serde_json = "1.0.60"
 tokio = "1.4.0"
-tray-item = { version = "0.4.0-alpha", optional = true }
-open = {version = "1.6.0", optional = true }
-actix-cors = "0.5.4"
-futures = "0.3.16"
-clap = "2.33.3"
-heim = "0.0.11"
+tray-item = {version = "0.4.0-alpha", optional = true}
 
 [features]
 desktop = ["tray-item", "open"]

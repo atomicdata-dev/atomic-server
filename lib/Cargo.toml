@@ -6,7 +6,7 @@ license = "MIT"
 name = "atomic_lib"
 readme = "README.md"
 repository = "https://github.com/joepio/atomic-data-rust"
-version = "0.25.5"
+version = "0.25.6"
 
 [dependencies]
 base64 = "0.13.0"
@@ -26,8 +26,8 @@ url = "2.2.1"
 urlencoding = "1.3.3"
 
 [dev-dependencies]
-ntest = "0.7.3"
 lazy_static = "1.4.0"
+ntest = "0.7.3"
 
 [features]
 config = ["dirs", "toml"]
