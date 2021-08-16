@@ -19,6 +19,7 @@ use std::{fs::File, sync::Mutex};
 
 #[actix_web::main]
 async fn main() -> AtomicResult<()> {
+    // We start off by checking the command line arguments and commands
     let matches = clap::App::new("atomic-server")
         .version(crate_version!())
         .author("Joep Meindertsma <joep@ontola.io>")
@@ -62,16 +63,20 @@ async fn main() -> AtomicResult<()> {
 
     // Read .env vars, https certs
     let config = config::init(&matches).expect("Error setting config");
-    process::check_and_stop_running(&config)?;
-    // Initialize DB and HTML templating engine
+
+    // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
+    let _ = process::terminate_existing_processes(&config)
+        .map_err(|e| log::error!("Could not check for running instance: {}", e));
+
+    // The Appstate contains the actual database
     let appstate = match appstate::init(config.clone()) {
         Ok(state) => state,
         Err(e) => {
             panic!("Error during appstate setup. {}", e)
         }
     };
-    let appstate_clone = appstate.clone();
 
+    // All subcommands (as of now) also require appstate, which is why we have this logic below initial CLI logic.
     match matches.subcommand_name() {
         Some("export") => {
             let path = match matches
@@ -128,6 +133,8 @@ async fn main() -> AtomicResult<()> {
     tray_icon::tray_icon_process(config.clone());
 
     if config.rebuild_index {
+        let appstate_clone = appstate.clone();
+
         actix_web::rt::spawn(async move {
             log::warn!("Building index... This could take a while, expect worse performance until 'Building index finished'");
             appstate_clone

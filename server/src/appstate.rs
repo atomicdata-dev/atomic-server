@@ -91,7 +91,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
         created_at: 0,
         name: None,
     };
-    log::info!("Setting default Agent {}...", &agent.subject);
+    log::info!("Setting default Agent {}", &agent.subject);
     store.set_default_agent(agent);
     Ok(())
 }
@@ -99,7 +99,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
 /// Creates the first Invitation that is opened by the user on the Home page.
 fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
     let subject = format!("{}/setup", store.get_base_url());
-    log::info!("Creating initial Invite at {} ...", subject);
+    log::info!("Creating initial Invite at {}", subject);
     let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;
     invite.set_subject(subject);
     // This invite can be used only once
@@ -129,7 +129,7 @@ fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
 
 /// Get the Drive resource (base URL), set agent as the Root user, provide write access
 fn set_up_drive(store: &impl Storelike) -> BetterResult<()> {
-    log::info!("Setting rights to Drive...");
+    log::info!("Setting rights to Drive {}", store.get_base_url());
     // Now let's add the agent as the Root user and provide write access
     let mut drive = store.get_resource(store.get_base_url())?;
     let agents = vec![store.get_default_agent()?.subject];

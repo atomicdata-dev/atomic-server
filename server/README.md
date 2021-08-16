@@ -58,10 +58,12 @@ SUBCOMMANDS:
 
 You can run `atomic-server` in four ways:
 
-- Install using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html): `cargo install atomic-server`
+- From a published [binary](https://github.com/joepio/atomic/releases) (probably the quickest)
 - Using docker
-- From a published [binary](https://github.com/joepio/atomic/releases)
-- From source
+- Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
+- Manually from source
+
+When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration)
 
 ### Run using docker
 
@@ -74,8 +76,8 @@ The `dockerfile` is located in the project root, above this `server` folder.
 
 ```sh
 # Clone this repoo
-git clone git@github.com:joepio/atomic.git
-cd atomic/server
+git clone git@github.com:joepio/atomic-data-rust.git
+cd atomic-data-rust/server
 # Optional, but recommended: Create a new .env using the template.
 cp default.env .env
 # Run the server. It creates a store in ~/.config/atomic/db by default
@@ -84,20 +86,20 @@ cargo run
 cargo run --features desktop
 ```
 
-### Troubleshooting during installation
+Troubleshooting compiling from source:
 
 ```sh
 # If pkg-config or libssl-dev is not installed, make sure to install them
-sudo apt-get install -y pkg-config libssl-dev --fix-missing                                                                                                                                                                       10:52:39
+sudo apt-get install -y pkg-config libssl-dev --fix-missing
 ```
 
 ## Initial setup and configuration
 
-- Visit `http://localhost/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
 - The server loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
-- If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` in the `.env` (see HTTPS setup below)
+- If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` in the `.env` (see HTTPS setup below).
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
+- Visit `http://localhost/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
 
 ### HTTPS Setup
 
@@ -123,9 +125,9 @@ HTTPS certificates are automatically renewed when the server is restarted, and t
 
 There are three ways to interact with this server:
 
-- **GUI**: Use the `atomic-data-browser` JS frontend by visiting `localhost`.
+- **GUI**: Use the [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) JS frontend by visiting `localhost`.
 - **API**: Check out [./example_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
-- **CLI**: The `atomic-cli` terminal app
+- **CLI**: The [`atomic-cli`](https://crates.io/crates/atomic-cli/0.24.2) terminal app
 
 ### Use `atomic-cli` as client
 
@@ -174,6 +176,7 @@ You can run `atomic-server --init` to recreate the `/setup` invite. It will be r
 ### How do I migrate my data to a new domain?
 
 There are no helper functions for this, but you could `atomic-server export` your JSON-AD, and find + replace your old domain with the new one.
+This could especially be helpful if you're running at `localhost` and want to move to a live server.
 
 ### How do I reset my database?
 
@@ -182,3 +185,7 @@ Remove the `db` folder in your `atomic` config: `rm -rf ~/.config/atomic/db`.
 ### How do I make my data private, yet available online?
 
 This is not yet possible. See [#13](https://github.com/joepio/atomic-data-rust/issues/13).
+
+### Collections are empty / TPF is not working
+
+You might have a problem with your index. Try reindexing using `atomic-server --reindex`.
