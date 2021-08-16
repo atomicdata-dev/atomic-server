@@ -88,7 +88,7 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
                     )
                 })?;
             }
-            "ATOMIC_BASE_URL" => {
+            "ATOMIC_DOMAIN" => {
                 // Perhaps this should have some regex check
                 domain = value;
             }
