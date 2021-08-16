@@ -1,3 +1,5 @@
+name: Deployment
+
 on:
   workflow_dispatch:
 
@@ -16,7 +18,7 @@ jobs:
       - name: Deploy to atomicdata.dev
         uses: easingthemes/ssh-deploy@main
         env:
-          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
           SOURCE: "target/release/atomic-server"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
