@@ -30,5 +30,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUSTTARGET: ${{ matrix.target }}
-          # Rather have a plain binary if possible
-          # EXTRA_FILES: "README.md LICENSE"
+          EXTRA_FILES: "README.md LICENSE"
