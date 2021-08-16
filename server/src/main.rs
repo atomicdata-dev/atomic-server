@@ -6,6 +6,7 @@ mod handlers;
 mod helpers;
 mod https;
 mod jsonerrors;
+mod process;
 mod routes;
 #[cfg(feature = "desktop")]
 mod tray_icon;
@@ -61,6 +62,7 @@ async fn main() -> AtomicResult<()> {
 
     // Read .env vars, https certs
     let config = config::init(&matches).expect("Error setting config");
+    process::check_and_stop_running(&config)?;
     // Initialize DB and HTML templating engine
     let appstate = match appstate::init(config.clone()) {
         Ok(state) => state,
@@ -180,7 +182,6 @@ async fn main() -> AtomicResult<()> {
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
             .run()
             .await?;
-        Ok(())
     } else {
         let endpoint = format!("{}:{}", config.ip, config.port);
         println!("{}", message);
@@ -189,8 +190,10 @@ async fn main() -> AtomicResult<()> {
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
             .run()
             .await?;
-        Ok(())
     }
+    process::remove_pid(&config)?;
+
+    Ok(())
 }
 
 const BANNER: &str = r#"
