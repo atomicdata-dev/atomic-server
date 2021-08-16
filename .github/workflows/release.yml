@@ -5,13 +5,13 @@ on:
     types: [created]
   workflow_dispatch:
 
-
 jobs:
   crates:
     runs-on: ubuntu-latest
     steps:
-    - name: publish crates
-      uses: katyo/publish-crates@v1
+      - uses: actions/checkout@master
+      - name: publish crates
+        uses: katyo/publish-crates@v1
 
   release:
     name: release ${{ matrix.target }}
@@ -19,13 +19,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [
-          x86_64-pc-windows-gnu,
-          x86_64-unknown-linux-musl,
-          # Not working:
-          # https://github.com/rust-build/rust-build.action/issues/11
-          # x86_64-apple-darwin,
-        ]
+        target: [x86_64-pc-windows-gnu, x86_64-unknown-linux-musl]
+    # Not working:
+    # https://github.com/rust-build/rust-build.action/issues/11
+    # x86_64-apple-darwin,
     steps:
       - uses: actions/checkout@master
       - name: Compile and release
