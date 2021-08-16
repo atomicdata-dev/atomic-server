@@ -8,23 +8,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      # - uses: actions-rs/toolchain@v1
-      #   with:
-      #     toolchain: stable
-      # - uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --release
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF:10})" >> $GITHUB_ENV
-      - name: Deploy to atomicdata.dev
+      - name: Transfer binary rsync
         uses: easingthemes/ssh-deploy@main
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
-          # SOURCE: "target/release/atomic-server"
-          # Temp to speed up CI setup
-          SOURCE: "README.md"
+          SOURCE: "target/release/atomic-server"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
