@@ -27,6 +27,6 @@ jobs:
           SOURCE: "README.md"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: ~/atomic-server${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}}
+          TARGET: ~/
       - name: Run new server
-        run: ~/atomic-server${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}} &> log-${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}}
+        run: ~/atomic-server &> log-${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}}

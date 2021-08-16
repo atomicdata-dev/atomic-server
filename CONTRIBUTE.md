@@ -21,8 +21,10 @@ If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-d
 - Tests are passing `cargo test --all`
 - Linters are happy `cargo fmt` & `cargo clippy`
 
-# Versioning and Tagging
+# CI, Versioning and Tagging
 
+- We use Github Actions for building, testing and creating releases. See #165 for progress.
+- The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 - On pushing a version `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there. So tag the releases!
