@@ -3,7 +3,7 @@ use actix_web::{http::Method, web};
 use crate::{content_types, handlers};
 
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
-    app.service(web::resource("/ws").to(handlers::ws::web_socket_handler))
+    app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         // Catch all HTML requests and send them to the single page app
         .service(
             web::resource("/*")

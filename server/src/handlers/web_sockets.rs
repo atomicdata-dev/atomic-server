@@ -1,7 +1,10 @@
 use actix::{fut, Actor, ActorContext, Addr, AsyncContext, Running, StreamHandler};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws::{self, WebsocketContext};
-use std::time::{Duration, Instant};
+use std::{
+    borrow::Borrow,
+    time::{Duration, Instant},
+};
 
 /// Get an HTTP request, upgrade it to a Websocket connection
 pub async fn web_socket_handler(
@@ -22,6 +25,8 @@ struct WebSocketConnection {
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise we drop connection.
     hb: Instant,
+    /// The Subjects that the client is subscribed to
+    subscribed: std::collections::HashSet<String>,
 }
 
 impl Actor for WebSocketConnection {
@@ -45,7 +50,30 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                 self.hb = Instant::now();
             }
             // TODO: Check if it's a subscribe / unsubscribe / commit message
-            Ok(ws::Message::Text(text)) => ctx.text(text),
+            Ok(ws::Message::Text(text)) => {
+                match text.as_str() {
+                    s if s.starts_with("SUBSCRIBE ") => {
+                        let mut parts = s.split("SUBSCRIBE ");
+                        if let Some(subject) = parts.nth(1) {
+                            self.subscribed.insert(subject.into());
+                        } else {
+                            ctx.text("ERROR: SUBSCRIBE without subject")
+                        }
+                    }
+                    s if s.starts_with("UNSUBSCRIBE ") => {
+                        let mut parts = s.split("UNSUBSCRIBE ");
+                        if let Some(subject) = parts.nth(1) {
+                            self.subscribed.remove(subject);
+                        } else {
+                            ctx.text("ERROR: UNSUBSCRIBE without subject")
+                        }
+                    }
+                    other => {
+                        log::warn!("Unmatched message: {}", other);
+                        ctx.text(format!("Server receieved unknown message: {}", other));
+                    }
+                };
+            }
             Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
             Ok(ws::Message::Close(reason)) => {
                 ctx.close(reason);
@@ -59,7 +87,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 impl WebSocketConnection {
     fn new() -> Self {
         // TODO: Maybe store who the user is? And a list of subscribtions?
-        Self { hb: Instant::now() }
+        Self {
+            hb: Instant::now(),
+            subscribed: std::collections::HashSet::new(),
+        }
     }
 
     /// helper method that sends ping to client every second.
@@ -79,8 +110,10 @@ impl WebSocketConnection {
                 return;
             }
 
+            let subscribedstring = act.subscribed.clone();
+
             // TODO: Try sending a Commit!
-            ctx.text("COMMIT demo from server");
+            ctx.text(format!("You're subscribed to {:?}", subscribedstring));
             ctx.ping(b"");
         });
     }
