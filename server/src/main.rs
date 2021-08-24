@@ -1,4 +1,6 @@
+mod actor_messages;
 mod appstate;
+mod commit_monitor;
 mod config;
 mod content_types;
 mod errors;
@@ -11,6 +13,7 @@ mod routes;
 #[cfg(feature = "desktop")]
 mod tray_icon;
 
+use actix::Actor;
 use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use atomic_lib::{errors::AtomicResult, Storelike};
@@ -149,6 +152,41 @@ async fn main() -> AtomicResult<()> {
         });
     }
 
+    // We start the process responsible for keeping track of changes to Resources and notifying subscribers
+    let commit_monitor = commit_monitor::CommitMonitor::default().start();
+    // TODO: Remove this mock loop!
+    {
+        let appstate_clone = appstate.clone();
+        let config_clone = config.clone();
+
+        actix_web::rt::spawn(async move {
+            let mut interval = actix_web::rt::time::interval(std::time::Duration::from_secs(1));
+            loop {
+                interval.tick().await;
+                let mut demo_resource_drive = appstate_clone
+                    .store
+                    .get_resource(&config_clone.local_base_url)
+                    .unwrap();
+                demo_resource_drive
+                    .set_propval(
+                        atomic_lib::urls::NAME.to_string(),
+                        atomic_lib::Value::String("NEW NAME".into()),
+                        &appstate_clone.store,
+                    )
+                    .unwrap();
+                let commit = demo_resource_drive
+                    .get_commit_builder()
+                    .clone()
+                    .sign(
+                        &appstate_clone.store.get_default_agent().unwrap(),
+                        &appstate_clone.store,
+                    )
+                    .unwrap();
+
+                commit_monitor.do_send(crate::actor_messages::CommitMessage { commit });
+            }
+        });
+    }
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
         // Allow requests from other domains

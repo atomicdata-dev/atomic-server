@@ -29,8 +29,9 @@ regex = "1.4.2"
 rustls = "0.18.1"
 serde = {version = "1.0.118", features = ["derive"]}
 serde_json = "1.0.60"
-tokio = "1.4.0"
+tokio = {version = "1.4.0", features = ["time"]}
 tray-item = {version = "0.4.0-alpha", optional = true}
+uuid = "0.8.2"
 
 [features]
 desktop = ["tray-item", "open"]

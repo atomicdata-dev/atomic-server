@@ -30,10 +30,10 @@ impl Resource {
         let classvec = self.get_classes(store)?;
         for class in classvec.iter() {
             for required_prop in class.requires.clone() {
-                self.get(&required_prop).map_err(|e| {
+                self.get(&required_prop).map_err(|_e| {
                     format!(
-                        "Property {} missing in class {}. {} ",
-                        &required_prop, class.subject, e
+                        "Property {} missing. Is required in class {} ",
+                        &required_prop, class.subject
                     )
                 })?;
             }
