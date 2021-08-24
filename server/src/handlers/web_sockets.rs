@@ -27,6 +27,8 @@ struct WebSocketConnection {
     hb: Instant,
     /// The Subjects that the client is subscribed to
     subscribed: std::collections::HashSet<String>,
+    /// The Agent that opened the websocket, if provided
+    agent: Option<String>,
 }
 
 impl Actor for WebSocketConnection {
@@ -86,22 +88,24 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 
 impl WebSocketConnection {
     fn new() -> Self {
-        // TODO: Maybe store who the user is? And a list of subscribtions?
         Self {
+            agent: None,
             hb: Instant::now(),
+            // Maybe this should be stored only in the CommitMonitor, and not here.
             subscribed: std::collections::HashSet::new(),
         }
     }
 
-    /// helper method that sends ping to client every second.
-    ///
-    /// also this method checks heartbeats from client
+    /// Sends ping to client every second. If there is no response, the Actor is stopped.
     fn hb(&self, ctx: &mut <Self as Actor>::Context) {
         ctx.run_interval(HEARTBEAT_INTERVAL, |act, ctx| {
             // check client heartbeats
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 // heartbeat timed out
-                println!("Websocket Client heartbeat failed, disconnecting!");
+                log::info!("Websocket Client heartbeat failed, disconnecting!");
+
+                // We need to kill the Actor responsible for Commit monitoring, too
+                // act.lobby_addr.do_send(Disconnect { id: act.id, room_id: act.room });
 
                 // stop actor
                 ctx.stop();
