@@ -157,7 +157,8 @@ async fn main() -> AtomicResult<()> {
     // TODO: Remove this mock loop!
     {
         let appstate_clone = appstate.clone();
-        let config_clone = config.clone();
+        // let config_clone = config.clone();
+        let commit_monitor_clone = commit_monitor.clone();
 
         actix_web::rt::spawn(async move {
             let mut interval = actix_web::rt::time::interval(std::time::Duration::from_secs(1));
@@ -165,7 +166,7 @@ async fn main() -> AtomicResult<()> {
                 interval.tick().await;
                 let mut demo_resource_drive = appstate_clone
                     .store
-                    .get_resource(&config_clone.local_base_url)
+                    .get_resource("http://localhost/element/7bobfdfoxi6".into())
                     .unwrap();
                 demo_resource_drive
                     .set_propval(
@@ -183,17 +184,22 @@ async fn main() -> AtomicResult<()> {
                     )
                     .unwrap();
 
-                commit_monitor.do_send(crate::actor_messages::CommitMessage { commit });
+                commit_monitor_clone.do_send(crate::actor_messages::CommitMessage {
+                    subject: commit.subject.clone(),
+                    resource: commit.into_resource(&appstate_clone.store).unwrap(),
+                });
             }
         });
     }
     let server = HttpServer::new(move || {
         let data = web::Data::new(Mutex::new(appstate.clone()));
+        let commit_monitor_mutex = web::Data::new(Mutex::new(commit_monitor.clone()));
         // Allow requests from other domains
         // let cors = Cors::default().allow_any_origin();
         let cors = Cors::permissive();
 
         App::new()
+            .app_data(commit_monitor_mutex)
             .app_data(data)
             .wrap(cors)
             .wrap(middleware::Logger::default())
