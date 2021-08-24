@@ -1,7 +1,10 @@
 //! The actor messages are used for communication between Actix Actors.
 //! In this case it's for communication between the CommitMonitor and the WebSocketConnection.
 
-use actix::prelude::{Message, Recipient};
+use actix::{
+    prelude::{Message, Recipient},
+    Addr,
+};
 use uuid::Uuid;
 
 //WebSocketConnection responds to this to pipe it through to the actual client
@@ -30,13 +33,17 @@ pub struct Disconnect {
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct Subscribe {
-    // pub room_id: Uuid,
+    pub addr: Addr<crate::handlers::web_sockets::WebSocketConnection>,
+    // pub websocket_id: Uuid,
     pub subject: String,
 }
 
-/// A message containing a Commit, which should be sent to subscribers
-#[derive(Message)]
+/// A message containing a Resource, which should be sent to subscribers
+#[derive(Message, Clone)]
 #[rtype(result = "()")]
 pub struct CommitMessage {
-    pub commit: atomic_lib::Commit,
+    /// Target subject of the commit
+    pub subject: String,
+    /// Full resource of the Commit itself
+    pub resource: atomic_lib::Resource,
 }

@@ -2,17 +2,24 @@
 //! It is mostly used by WebSockets to notify front-end clients of changes Resources.
 
 // TODO: define messages between CommitMonitor and WebSocketConnection
-use crate::actor_messages::{CommitMessage, Connect, Disconnect, WsMessage};
-use actix::prelude::{Actor, Context, Handler, Recipient};
+use crate::{
+    actor_messages::{CommitMessage, Connect, Disconnect, Subscribe, WsMessage},
+    handlers::web_sockets::WebSocketConnection,
+};
+use actix::{
+    prelude::{Actor, Context, Handler, Recipient},
+    Addr,
+};
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
-type Socket = Recipient<WsMessage>;
+// We might need this instead of Addr, but I don't understand it
+// type Socket = Recipient<WsMessage>;
 
 /// The Commit Monitor is an Actor that checks for new commits and notifies listeners.
 pub struct CommitMonitor {
     /// Maintains a list of all the resources that are being subscribed to, and maps these to websocket connections.
-    subscriptions: HashMap<String, HashSet<Socket>>,
+    subscriptions: HashMap<String, HashSet<Addr<WebSocketConnection>>>,
 }
 
 impl CommitMonitor {}
@@ -40,22 +47,38 @@ impl Handler<Disconnect> for CommitMonitor {
 }
 
 /// Handler for Disconnect message.
+impl Handler<Subscribe> for CommitMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: Subscribe, _: &mut Context<Self>) {
+        let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
+            set.clone()
+        } else {
+            HashSet::new()
+        };
+        set.insert(msg.addr);
+        log::info!("handle subscribe {} ", msg.subject);
+        self.subscriptions.insert(msg.subject, set);
+    }
+}
+
+/// Handler for Disconnect message.
 impl Handler<CommitMessage> for CommitMonitor {
     type Result = ();
 
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
-        log::info!("handle commit");
-        let commit = msg.commit;
-        if let Some(set) = self.subscriptions.get(&commit.subject) {
-            for socket in set {
-                log::info!(
-                    "Updating socket {:?} with commit for {}",
-                    socket,
-                    commit.subject
-                );
+        log::info!(
+            "handle commit for {} with id {}",
+            msg.subject,
+            msg.resource.get_subject()
+        );
+        if let Some(set) = self.subscriptions.get(&msg.subject) {
+            log::info!("Updating commit {} for {} sockets", msg.subject, set.len());
+            for connection in set {
+                connection.do_send(msg.clone());
             }
         } else {
-            log::info!("No subscribers for {}", commit.subject);
+            log::info!("No subscribers for {}", msg.subject);
         }
     }
 }

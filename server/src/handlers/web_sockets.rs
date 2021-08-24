@@ -1,18 +1,25 @@
-use actix::{fut, Actor, ActorContext, Addr, AsyncContext, Running, StreamHandler};
+use actix::{
+    fut, Actor, ActorContext, Addr, AsyncContext, Context, Handler, Running, StreamHandler,
+};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws::{self, WebsocketContext};
 use std::{
     borrow::Borrow,
+    sync::Mutex,
     time::{Duration, Instant},
 };
+
+use crate::{actor_messages::CommitMessage, commit_monitor::CommitMonitor};
 
 /// Get an HTTP request, upgrade it to a Websocket connection
 pub async fn web_socket_handler(
     req: HttpRequest,
     stream: web::Payload,
+    commit_monitor_mutx: web::Data<Mutex<Addr<CommitMonitor>>>,
 ) -> Result<HttpResponse, Error> {
     log::info!("Starting websocket");
-    let resp = ws::start(WebSocketConnection::new(), &req, stream);
+    let commit_monitor = commit_monitor_mutx.lock().unwrap().to_owned();
+    let resp = ws::start(WebSocketConnection::new(commit_monitor), &req, stream);
     resp
 }
 
@@ -21,7 +28,7 @@ const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
 // websocket connection is long running connection, it easier
 /// to handle with an actor
-struct WebSocketConnection {
+pub struct WebSocketConnection {
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise we drop connection.
     hb: Instant,
@@ -29,6 +36,8 @@ struct WebSocketConnection {
     subscribed: std::collections::HashSet<String>,
     /// The Agent that opened the websocket, if provided
     agent: Option<String>,
+    /// The CommitMonitor Actor that receives and sends messages for Commits
+    commit_monitor_addr: Addr<CommitMonitor>,
 }
 
 impl Actor for WebSocketConnection {
@@ -39,7 +48,6 @@ impl Actor for WebSocketConnection {
     }
 }
 
-/// Handler for `ws::Message`
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         log::info!("Incoming websocket mssage: {:?}", msg);
@@ -57,6 +65,11 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                     s if s.starts_with("SUBSCRIBE ") => {
                         let mut parts = s.split("SUBSCRIBE ");
                         if let Some(subject) = parts.nth(1) {
+                            self.commit_monitor_addr
+                                .do_send(crate::actor_messages::Subscribe {
+                                    addr: ctx.address(),
+                                    subject: subject.to_string(),
+                                });
                             self.subscribed.insert(subject.into());
                         } else {
                             ctx.text("ERROR: SUBSCRIBE without subject")
@@ -87,12 +100,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 }
 
 impl WebSocketConnection {
-    fn new() -> Self {
+    fn new(commit_monitor_addr: Addr<CommitMonitor>) -> Self {
         Self {
             agent: None,
             hb: Instant::now(),
             // Maybe this should be stored only in the CommitMonitor, and not here.
             subscribed: std::collections::HashSet::new(),
+            commit_monitor_addr,
         }
     }
 
@@ -120,5 +134,19 @@ impl WebSocketConnection {
             ctx.text(format!("You're subscribed to {:?}", subscribedstring));
             ctx.ping(b"");
         });
+    }
+}
+
+impl Handler<CommitMessage> for WebSocketConnection {
+    type Result = ();
+
+    fn handle(&mut self, msg: CommitMessage, ctx: &mut ws::WebsocketContext<Self>) {
+        let resource = msg.resource;
+        log::info!(
+            "handle commit in web socket connection {}",
+            resource.get_subject()
+        );
+        let formatted_commit = format!("COMMIT {}", resource.to_json_ad().unwrap());
+        ctx.text(formatted_commit);
     }
 }
