@@ -99,7 +99,7 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Class"
         ],
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/8S2U/viqkaAQVzUisaolrpX6hx/G/L3e2MTjWA83Rxk=",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/recommends": [
             "https://atomicdata.dev/properties/documents/elements",
             "https://atomicdata.dev/properties/name"
@@ -298,7 +298,7 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/8S2U/viqkaAQVzUisaolrpX6hx/G/L3e2MTjWA83Rxk=",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "drives"
     },
     {
@@ -595,8 +595,18 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/8S2U/viqkaAQVzUisaolrpX6hx/G/L3e2MTjWA83Rxk=",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "is-dynamic"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/isLocked",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+        "https://atomicdata.dev/properties/description": "If this is true, the Property should probably not be edited, because doing so could lead to serious errors.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "is-locked"
     },
     {
         "@id": "https://atomicdata.dev/properties/name",
