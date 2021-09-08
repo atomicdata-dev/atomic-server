@@ -1,41 +1,41 @@
-use actix::{
-    fut, Actor, ActorContext, Addr, AsyncContext, Context, Handler, Running, StreamHandler,
-};
+use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, Error, HttpRequest, HttpResponse};
-use actix_web_actors::ws::{self, WebsocketContext};
+use actix_web_actors::ws::{self};
 use std::{
-    borrow::Borrow,
     sync::Mutex,
     time::{Duration, Instant},
 };
 
-use crate::{actor_messages::CommitMessage, commit_monitor::CommitMonitor};
+use crate::{actor_messages::CommitMessage, appstate::AppState, commit_monitor::CommitMonitor};
 
 /// Get an HTTP request, upgrade it to a Websocket connection
 pub async fn web_socket_handler(
     req: HttpRequest,
     stream: web::Payload,
-    commit_monitor_mutx: web::Data<Mutex<Addr<CommitMonitor>>>,
+    data: web::Data<Mutex<AppState>>,
 ) -> Result<HttpResponse, Error> {
     log::info!("Starting websocket");
-    let commit_monitor = commit_monitor_mutx.lock().unwrap().to_owned();
-    let resp = ws::start(WebSocketConnection::new(commit_monitor), &req, stream);
+    let context = data.lock().unwrap();
+    let resp = ws::start(
+        WebSocketConnection::new(context.commit_monitor.clone()),
+        &req,
+        stream,
+    );
     resp
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
-// websocket connection is long running connection, it easier
-/// to handle with an actor
+/// This connection is used for relaying relevant Commits to the client.
+/// The client sends SUBSCRIBE messages to the server to indicate which Resources it is interested in
+// TODO: Add the Agent that opened the websocket, if provided
 pub struct WebSocketConnection {
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise we drop connection.
     hb: Instant,
     /// The Subjects that the client is subscribed to
     subscribed: std::collections::HashSet<String>,
-    /// The Agent that opened the websocket, if provided
-    agent: Option<String>,
     /// The CommitMonitor Actor that receives and sends messages for Commits
     commit_monitor_addr: Addr<CommitMonitor>,
 }
@@ -102,7 +102,6 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 impl WebSocketConnection {
     fn new(commit_monitor_addr: Addr<CommitMonitor>) -> Self {
         Self {
-            agent: None,
             hb: Instant::now(),
             // Maybe this should be stored only in the CommitMonitor, and not here.
             subscribed: std::collections::HashSet::new(),
