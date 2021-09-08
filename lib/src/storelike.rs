@@ -134,6 +134,11 @@ pub trait Storelike: Sized {
         self.get_resource(subject)
     }
 
+    /// Calls any set on_commit functions
+    fn handle_commit(&self, commit: &crate::Commit) -> AtomicResult<()> {
+        Ok(())
+    }
+
     fn handle_not_found(
         &self,
         subject: &str,

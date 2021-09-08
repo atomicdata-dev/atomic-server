@@ -9,7 +9,9 @@ pub async fn post_commit(
     data: web::Data<Mutex<AppState>>,
     body: String,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data.lock().unwrap();
+    let mut context = data
+        .lock()
+        .expect("Failed to lock mutexguard in post_commit");
     let store = &mut context.store;
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
@@ -27,6 +29,15 @@ pub async fn post_commit(
         "Commit succesfully applied. Can be seen at {}",
         saved_commit_resource.get_subject()
     );
+
+    // When a commit is applied, notify all webhook subscribers
+    context
+        .commit_monitor
+        .do_send(crate::actor_messages::CommitMessage {
+            subject: incoming_commit.subject,
+            resource: saved_commit_resource,
+        });
+
     log::info!("{}", &message);
     Ok(builder.body(message))
 }

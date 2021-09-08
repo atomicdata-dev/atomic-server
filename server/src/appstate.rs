@@ -1,17 +1,21 @@
 //! App state, which is accessible from handlers
-use crate::{config::Config, errors::BetterResult};
+use crate::{commit_monitor::CommitMonitor, config::Config, errors::BetterResult};
 use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
 };
 
-/// Context for the server (not an individual request)
+/// Context for the server (not an individual request).
+// This struct is cloned accross all threads, so make sure the fields are thread safe.
+// A good option here is to use Actors for things that can change (e.g. commit_monitor)
 #[derive(Clone)]
 pub struct AppState {
     /// Contains all the data
     pub store: atomic_lib::Db,
     /// App Configuration
     pub config: Config,
+    /// The Actix Address of the CommitMonitor, which should receive updates when a commit is applied
+    pub commit_monitor: actix::Addr<CommitMonitor>,
 }
 
 /// Creates the server context.
@@ -35,7 +39,13 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         set_up_drive(&store)?;
     }
 
-    Ok(AppState { store, config })
+    use actix::Actor;
+
+    Ok(AppState {
+        store,
+        config,
+        commit_monitor: crate::commit_monitor::CommitMonitor::default().start(),
+    })
 }
 
 /// Create a new agent if it does not yet exist.

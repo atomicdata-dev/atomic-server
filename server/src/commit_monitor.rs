@@ -3,15 +3,14 @@
 
 // TODO: define messages between CommitMonitor and WebSocketConnection
 use crate::{
-    actor_messages::{CommitMessage, Connect, Disconnect, Subscribe, WsMessage},
+    actor_messages::{CommitMessage, Subscribe},
     handlers::web_sockets::WebSocketConnection,
 };
 use actix::{
-    prelude::{Actor, Context, Handler, Recipient},
+    prelude::{Actor, Context, Handler},
     Addr,
 };
 use std::collections::{HashMap, HashSet};
-use uuid::Uuid;
 
 // We might need this instead of Addr, but I don't understand it
 // type Socket = Recipient<WsMessage>;
@@ -37,16 +36,6 @@ impl Default for CommitMonitor {
     }
 }
 
-/// Handler for Disconnect message.
-impl Handler<Disconnect> for CommitMonitor {
-    type Result = ();
-
-    fn handle(&mut self, msg: Disconnect, _: &mut Context<Self>) {
-        log::info!("handle disconnect");
-    }
-}
-
-/// Handler for Disconnect message.
 impl Handler<Subscribe> for CommitMonitor {
     type Result = ();
 
@@ -62,19 +51,20 @@ impl Handler<Subscribe> for CommitMonitor {
     }
 }
 
-/// Handler for Disconnect message.
 impl Handler<CommitMessage> for CommitMonitor {
     type Result = ();
 
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
         log::info!(
-            "handle commit for {} with id {}",
+            "handle commit for {} with id {}. Current connections: {}",
             msg.subject,
-            msg.resource.get_subject()
+            msg.resource.get_subject(),
+            self.subscriptions.len()
         );
         if let Some(set) = self.subscriptions.get(&msg.subject) {
             log::info!("Updating commit {} for {} sockets", msg.subject, set.len());
             for connection in set {
+                log::info!("Sending commit for connection");
                 connection.do_send(msg.clone());
             }
         } else {
