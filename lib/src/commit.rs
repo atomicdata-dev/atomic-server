@@ -188,6 +188,13 @@ impl Commit {
                 resource.remove_propval(&prop);
             }
         }
+        if let Some(destroy) = self.destroy {
+            if destroy {
+                for atom in resource.to_atoms()?.iter() {
+                    store.remove_atom_from_index(&atom)?;
+                }
+            }
+        }
         Ok(resource)
     }
 
