@@ -148,6 +148,7 @@ impl Commit {
         // TODO: Should we remove the existing commits too? Probably.
         if let Some(destroy) = self.destroy {
             if destroy {
+                // Note: the value index is updated before this action, in resource.apply_changes()
                 store.remove_resource(&self.subject)?;
                 return Ok(commit_resource);
             }
@@ -158,7 +159,7 @@ impl Commit {
         Ok(commit_resource)
     }
 
-    /// Updates the values in the Resource according to the `set` and `remove` attributes in the Commit.
+    /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
     /// Optionally also updates the index in the Store.
     pub fn apply_changes(
         &self,
