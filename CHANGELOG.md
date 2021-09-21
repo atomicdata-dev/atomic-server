@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.26.0
+
+- Added WebSockets support for live synchronization / real-time updates with the front-end #171
+- Update index after `destroy`ing a resource #173
+
 ## v0.25.7
 
 - Improve process ID functionality #167

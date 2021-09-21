@@ -306,7 +306,7 @@ impl Resource {
 
     /// Converts Resource to JSON-AD string.
     pub fn to_json_ad(&self) -> AtomicResult<String> {
-        let obj = crate::serialize::propvals_to_json_map(
+        let obj = crate::serialize::propvals_to_json_ad_map(
             self.get_propvals(),
             Some(self.get_subject().clone()),
         )?;

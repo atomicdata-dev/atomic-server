@@ -1,40 +1,40 @@
 ---
-  base: 'http://localhost'
-  iterations: 500
-  concurrency: 50
-  rampup: 2
+base: "http://localhost"
+iterations: 1000
+concurrency: 4
+rampup: 2
 
-  plan:
-    - name: Empty Triple Pattern Fragments endpoint
-      request:
-        url: /tpf
-        headers:
-          Accept: 'application/ad+json'
-    - name: JSON-LD resource
-      request:
-        url: /tpf
-        headers:
-          Accept: 'application/ld+json'
-    - name: TTL resource
-      request:
-        url: /tpf
-        headers:
-          Accept: 'text/turtle'
-    - name: "404"
-      request:
-        url: /gsgsesge
-        headers:
-          Accept: 'application/ad+json'
-    - name: Collections Collection
-      request:
-        url: /collections/collection
-        headers:
-          Accept: 'application/ad+json'
-    - name: Path traversal
-      request:
-        url: /path?path=https%3A%2F%2Fatomicdata.dev%2Fproperties%2Fdescription+is-a+0
-        headers:
-          Accept: 'application/ad+json'
-    - name: Home HTML
-      request:
-        url: /
+plan:
+  - name: JSON-AD resource
+    request:
+      url: /document/6fr6s0hyhm
+      headers:
+        Accept: "application/ad+json"
+  - name: JSON-LD resource
+    request:
+      url: /document/6fr6s0hyhm
+      headers:
+        Accept: "application/ld+json"
+  - name: TTL resource
+    request:
+      url: /document/6fr6s0hyhm
+      headers:
+        Accept: "text/turtle"
+  - name: "404"
+    request:
+      url: /gsgsesge
+      headers:
+        Accept: "application/ad+json"
+  - name: Collections Collection
+    request:
+      url: /collections
+      headers:
+        Accept: "application/ad+json"
+  - name: Path traversal
+    request:
+      url: /path?path=https%3A%2F%2Fatomicdata.dev%2Fproperties%2Fdescription+is-a+0
+      headers:
+        Accept: "application/ad+json"
+  - name: Home HTML
+    request:
+      url: /
