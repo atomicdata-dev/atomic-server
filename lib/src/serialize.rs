@@ -12,8 +12,11 @@ pub fn resources_to_json_ad(resources: Vec<Resource>) -> AtomicResult<String> {
     let array: Vec<serde_json::Value> = resources
         .into_iter()
         .map(|r: Resource| {
-            crate::serialize::propvals_to_json_map(r.get_propvals(), Some(r.get_subject().clone()))
-                .expect("could not serialize to json-ad ")
+            crate::serialize::propvals_to_json_ad_map(
+                r.get_propvals(),
+                Some(r.get_subject().clone()),
+            )
+            .expect("could not serialize to json-ad ")
         })
         .collect();
     let serde_array = serde_json::Value::from(array);
@@ -40,13 +43,13 @@ fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
         Value::Unsupported(val) => SerdeValue::String(val.value),
         Value::Boolean(val) => SerdeValue::Bool(val),
         // TODO: fix this for nested resources in json and json-ld serialization, because this will cause them to fall back to json-ad
-        Value::NestedResource(res) => propvals_to_json_map(&res, None)?,
+        Value::NestedResource(res) => propvals_to_json_ad_map(&res, None)?,
     };
     Ok(json_val)
 }
 
 /// Serializes a Resource to a Serde JSON Map
-pub fn propvals_to_json_map(
+pub fn propvals_to_json_ad_map(
     propvals: &PropVals,
     subject: Option<String>,
 ) -> AtomicResult<serde_json::Value> {

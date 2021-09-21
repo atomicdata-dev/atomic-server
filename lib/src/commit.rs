@@ -300,7 +300,7 @@ impl Commit {
     }
 
     /// Generates a deterministic serialized JSON-AD representation of the Commit.
-    /// Does not contain the signature, since this function is used to check if the signature is correct.
+    /// Removes the signature from the object before serializing, since this function is used to check if the signature is correct.
     pub fn serialize_deterministically_json_ad(
         &self,
         store: &impl Storelike,
@@ -309,7 +309,7 @@ impl Commit {
         // A deterministic serialization should not contain the hash (signature), since that would influence the hash.
         commit_resource.remove_propval(urls::SIGNATURE);
         let json_obj =
-            crate::serialize::propvals_to_json_map(commit_resource.get_propvals(), None)?;
+            crate::serialize::propvals_to_json_ad_map(commit_resource.get_propvals(), None)?;
         serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into())
     }
 }

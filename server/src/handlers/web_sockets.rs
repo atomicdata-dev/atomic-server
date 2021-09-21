@@ -126,11 +126,6 @@ impl WebSocketConnection {
                 // don't try to send a ping
                 return;
             }
-
-            let subscribedstring = act.subscribed.clone();
-
-            // TODO: Try sending a Commit!
-            ctx.text(format!("You're subscribed to {:?}", subscribedstring));
             ctx.ping(b"");
         });
     }
@@ -142,7 +137,7 @@ impl Handler<CommitMessage> for WebSocketConnection {
     fn handle(&mut self, msg: CommitMessage, ctx: &mut ws::WebsocketContext<Self>) {
         let resource = msg.resource;
         log::info!(
-            "handle commit in web socket connection {}",
+            "handle commit in web socket connection for resource {}",
             resource.get_subject()
         );
         let formatted_commit = format!("COMMIT {}", resource.to_json_ad().unwrap());
