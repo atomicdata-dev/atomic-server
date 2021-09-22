@@ -596,4 +596,49 @@ pub mod test {
         // If we see the atom, it's in the index.
         assert_eq!(found_external.len(), 1);
     }
+
+    #[test]
+    /// Check if a resource is properly removed from the DB after a delete command
+    fn destroy_resource_and_check_collection() {
+        let store = DB.lock().unwrap().clone();
+        let agents_url = format!("{}/agents", store.get_base_url());
+        let agents_collection_1 = store.get_resource_extended(&agents_url).unwrap();
+        let agents_collection_count_1 = agents_collection_1
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        assert_eq!(
+            agents_collection_count_1, 1,
+            "The Agents collection is not one (we assume there is one agent already present from init)"
+        );
+
+        let mut resource = crate::agents::Agent::new(None, &store)
+            .unwrap()
+            .to_resource(&store)
+            .unwrap();
+        resource.save_locally(&store).unwrap();
+        let agents_collection_2 = store.get_resource_extended(&agents_url).unwrap();
+        let agents_collection_count_2 = agents_collection_2
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        assert_eq!(
+            agents_collection_count_2, 2,
+            "The Resource was not found in the collection."
+        );
+
+        resource.destroy(&store).unwrap();
+        let agents_collection_3 = store.get_resource_extended(&agents_url).unwrap();
+        let agents_collection_count_3 = agents_collection_3
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        assert_eq!(
+            agents_collection_count_3, 1,
+            "The collection count did not decrease after destroying the resource."
+        );
+    }
 }

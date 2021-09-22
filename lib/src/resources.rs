@@ -41,6 +41,12 @@ impl Resource {
         Ok(())
     }
 
+    /// Removes / deletes the resource from the store by performing a Commit.
+    pub fn destroy(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
+        self.commit.destroy(true);
+        self.save(store)
+    }
+
     pub fn from_propvals(propvals: PropVals, subject: String) -> Resource {
         Resource {
             propvals,
