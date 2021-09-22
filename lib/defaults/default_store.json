@@ -28,22 +28,6 @@
         "https://atomicdata.dev/properties/shortname": "atom"
     },
     {
-        "@id": "https://atomicdata.dev/classes/Class",
-        "https://atomicdata.dev/properties/description": "A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data and explains what the thing represents. It is convention to use Uppercase in its URL. Note that in Atomic Data, a Resource can have several Classes - not just a single one. A Resource describes which Classes it has using the [`is-a` Property](https://atomicdata.dev/properties/isA).",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Class"
-        ],
-        "https://atomicdata.dev/properties/recommends": [
-            "https://atomicdata.dev/properties/recommends",
-            "https://atomicdata.dev/properties/requires"
-        ],
-        "https://atomicdata.dev/properties/requires": [
-            "https://atomicdata.dev/properties/shortname",
-            "https://atomicdata.dev/properties/description"
-        ],
-        "https://atomicdata.dev/properties/shortname": "class"
-    },
-    {
         "@id": "https://atomicdata.dev/classes/Collection",
         "https://atomicdata.dev/properties/description": "A paginated set of resources that can be sorted. Accepts query parameters for setting the current page number, page size, sort attribute, sort direction",
         "https://atomicdata.dev/properties/isA": [
@@ -80,18 +64,6 @@
             "https://atomicdata.dev/properties/subject"
         ],
         "https://atomicdata.dev/properties/shortname": "commit"
-    },
-    {
-        "@id": "https://atomicdata.dev/classes/Datatype",
-        "https://atomicdata.dev/properties/description": "A Datatype describes a possible type of value, such as 'string' or 'integer'. In the JSON-AD serialization format, Datatypes by default use strings, unless noted otherwise.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Class"
-        ],
-        "https://atomicdata.dev/properties/requires": [
-            "https://atomicdata.dev/properties/shortname",
-            "https://atomicdata.dev/properties/description"
-        ],
-        "https://atomicdata.dev/properties/shortname": "datatype"
     },
     {
         "@id": "https://atomicdata.dev/classes/Document",
@@ -152,22 +124,6 @@
             "https://atomicdata.dev/properties/invite/agent"
         ],
         "https://atomicdata.dev/properties/shortname": "invite"
-    },
-    {
-        "@id": "https://atomicdata.dev/classes/Property",
-        "https://atomicdata.dev/properties/description": "A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Class"
-        ],
-        "https://atomicdata.dev/properties/recommends": [
-            "https://atomicdata.dev/properties/classtype"
-        ],
-        "https://atomicdata.dev/properties/requires": [
-            "https://atomicdata.dev/properties/shortname",
-            "https://atomicdata.dev/properties/description",
-            "https://atomicdata.dev/properties/datatype"
-        ],
-        "https://atomicdata.dev/properties/shortname": "property"
     },
     {
         "@id": "https://atomicdata.dev/classes/Redirect",
@@ -333,16 +289,6 @@
         "https://atomicdata.dev/properties/shortname": "children"
     },
     {
-        "@id": "https://atomicdata.dev/properties/classtype",
-        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-        "https://atomicdata.dev/properties/description": "The class-type indicates that the Atomic URL should be an instance of this class.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "classtype"
-    },
-    {
         "@id": "https://atomicdata.dev/properties/collection/currentPage",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
         "https://atomicdata.dev/properties/description": "The current page number of the collection. Defaults to 0.",
@@ -456,25 +402,6 @@
         "https://atomicdata.dev/properties/shortname": "created-by"
     },
     {
-        "@id": "https://atomicdata.dev/properties/datatype",
-        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Datatype",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-        "https://atomicdata.dev/properties/description": "The Datatype of a property, such as String or Timestamp.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "datatype"
-    },
-    {
-        "@id": "https://atomicdata.dev/properties/description",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/markdown",
-        "https://atomicdata.dev/properties/description": "A textual description of something. When making a description, make sure that the first few words tell the most important part. Give examples. Since the text supports markdown, you're free to use links and more.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "description"
-    },
-    {
         "@id": "https://atomicdata.dev/properties/destination",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
         "https://atomicdata.dev/properties/description": "Where a redirect should point to.",
@@ -579,16 +506,6 @@
         "https://atomicdata.dev/properties/shortname": "redirect-agent"
     },
     {
-        "@id": "https://atomicdata.dev/properties/isA",
-        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
-        "https://atomicdata.dev/properties/description": "A list of Classes of which the thing is an instance of. The Classes of a Resource determine which Properties are recommended and required.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "is-a"
-    },
-    {
         "@id": "https://atomicdata.dev/properties/isDynamic",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
         "https://atomicdata.dev/properties/description": "If this is true, a Property is calculated server side and should therefore not appear in forms.",
@@ -664,16 +581,6 @@
         "https://atomicdata.dev/properties/shortname": "read"
     },
     {
-        "@id": "https://atomicdata.dev/properties/recommends",
-        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
-        "https://atomicdata.dev/properties/description": "The Properties that are not required, but recommended for this Class.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "recommends"
-    },
-    {
         "@id": "https://atomicdata.dev/properties/remove",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
@@ -682,16 +589,6 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/shortname": "remove"
-    },
-    {
-        "@id": "https://atomicdata.dev/properties/requires",
-        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
-        "https://atomicdata.dev/properties/description": "The Properties that are required for each instance of this Class.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "requires"
     },
     {
         "@id": "https://atomicdata.dev/properties/set",
@@ -710,15 +607,6 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/shortname": "secret"
-    },
-    {
-        "@id": "https://atomicdata.dev/properties/shortname",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/slug",
-        "https://atomicdata.dev/properties/description": "A short name of something. It can only contain letters, numbers and dashes `-`. Use dashes to denote spaces between words. Not case sensitive - lowercase only. Useful in programming contexts where the user should be able to type something short to identify a specific thing.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "shortname"
     },
     {
         "@id": "https://atomicdata.dev/properties/signature",
