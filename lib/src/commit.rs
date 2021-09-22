@@ -62,6 +62,12 @@ impl Commit {
         validate_rights: bool,
         update_index: bool,
     ) -> AtomicResult<Resource> {
+        let subject_url =
+            url::Url::parse(&self.subject).map_err(|e| format!("Subject is not a URL. {}", e))?;
+        if subject_url.query().is_some() {
+            return Err("Subject URL cannot have query parameters".into());
+        }
+
         if validate_signature {
             let signature = match self.signature.as_ref() {
                 Some(sig) => sig,
@@ -252,46 +258,45 @@ impl Commit {
         resource.set_subject(commit_subject);
         resource.set_propval(
             urls::SUBJECT.into(),
-            Value::new(&self.subject, &DataType::AtomicUrl).unwrap(),
+            Value::new(&self.subject, &DataType::AtomicUrl)?,
             store,
         )?;
         let classes = vec![urls::COMMIT.to_string()];
         resource.set_propval(urls::IS_A.into(), classes.into(), store)?;
         resource.set_propval(
             urls::CREATED_AT.into(),
-            Value::new(&self.created_at.to_string(), &DataType::Timestamp).unwrap(),
+            Value::new(&self.created_at.to_string(), &DataType::Timestamp)?,
             store,
         )?;
         resource.set_propval(
             SIGNER.into(),
-            Value::new(&self.signer, &DataType::AtomicUrl).unwrap(),
+            Value::new(&self.signer, &DataType::AtomicUrl)?,
             store,
         )?;
-        if self.set.is_some() {
+        if let Some(set) = self.set {
             let mut newset = PropVals::new();
-            for (prop, val) in self.set.clone().unwrap() {
+            for (prop, val) in set.clone() {
                 newset.insert(prop, val);
             }
             resource.set_propval(urls::SET.into(), newset.into(), store)?;
         };
-        if self.remove.is_some() && !self.remove.clone().unwrap().is_empty() {
-            let remove_vec: Vec<String> = self.remove.clone().unwrap();
-            resource.set_propval(urls::REMOVE.into(), remove_vec.into(), store)?;
+        if let Some(remove) = self.remove {
+            if !remove.is_empty() {
+                resource.set_propval(urls::REMOVE.into(), remove.into(), store)?;
+            }
         };
-        if self.destroy.is_some() && self.destroy.unwrap() {
-            resource.set_propval(urls::DESTROY.into(), true.into(), store)?;
+        if let Some(destroy) = self.destroy {
+            if destroy {
+                resource.set_propval(urls::DESTROY.into(), true.into(), store)?;
+            }
         }
         resource.set_propval(
             SIGNER.into(),
-            Value::new(&self.signer, &DataType::AtomicUrl).unwrap(),
+            Value::new(&self.signer, &DataType::AtomicUrl)?,
             store,
         )?;
-        if self.signature.is_some() {
-            resource.set_propval(
-                urls::SIGNATURE.into(),
-                self.signature.unwrap().into(),
-                store,
-            )?;
+        if let Some(signature) = self.signature {
+            resource.set_propval(urls::SIGNATURE.into(), signature.into(), store)?;
         }
         Ok(resource)
     }
@@ -532,5 +537,30 @@ mod test {
         let message = "val";
         let signature = sign_message(message, private_key, public_key).unwrap();
         assert_eq!(signature, signature_expected);
+    }
+
+    #[test]
+
+    fn invalid_subjects() {
+        let store = crate::Store::init().unwrap();
+        let agent = store.create_agent(Some("test_actor")).unwrap();
+
+        {
+            let subject = "invalid URL";
+            let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
+            let _ = commitbuiler.sign(&agent, &store).unwrap_err();
+        }
+        {
+            let subject = "https://invalid.com?q=invalid";
+            let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
+            let commit = commitbuiler.sign(&agent, &store).unwrap();
+            commit.apply(&store).unwrap_err();
+        }
+        {
+            let subject = "https://valid.com/valid";
+            let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
+            let commit = commitbuiler.sign(&agent, &store).unwrap();
+            commit.apply(&store).unwrap();
+        }
     }
 }

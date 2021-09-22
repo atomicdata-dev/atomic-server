@@ -7,6 +7,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 - Improved error message for hierarchy authorization check #178
 - Fix Property `recommends` #177
+- Refuse commits with query parameters in their subjects #179
 
 ## v0.26.0
 
