@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.26.1
+
+- Improved error message for hierarchy authorization check #178
+- Fix Property `recommends` #177
+
 ## v0.26.0
 
 - Added WebSockets support for live synchronization / real-time updates with the front-end #171
