@@ -630,7 +630,7 @@
     {
         "@id": "https://atomicdata.dev/properties/subject",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-        "https://atomicdata.dev/properties/description": "The subject of a Delta - the resource ID that is being changed.",
+        "https://atomicdata.dev/properties/description": "The thing that the Commit is changing - the resource ID that is being targeted. It must not contain any query parameters.",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
