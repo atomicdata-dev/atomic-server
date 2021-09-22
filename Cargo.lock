@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.25.4"
+version = "0.26.0"
 dependencies = [
  "assert_cmd",
  "atomic_lib",
@@ -483,7 +483,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.25.6"
+version = "0.26.0"
 dependencies = [
  "acme-lib",
  "actix",
@@ -512,7 +512,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.25.6"
+version = "0.26.0"
 dependencies = [
  "base64 0.13.0",
  "bincode",
