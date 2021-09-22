@@ -35,7 +35,8 @@ pub fn check_write(
     if let Ok(val) = resource.get(urls::PARENT) {
         let parent = store.get_resource(&val.to_string())?;
         if resource.get_subject() == parent.get_subject() {
-            return Err(format!("Parent ({}) is the same as the current resource", val).into());
+            // return Err(format!("Parent ({}) is the same as the current resource - there is a circular parent relationship.", val).into());
+            return Ok(false);
         }
         check_write(store, &parent, agent)
     } else {

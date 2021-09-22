@@ -124,7 +124,8 @@ impl Commit {
                 }
             } else {
                 // Set a parent only if the rights checks are to be validated.
-                // If there is no explicit parent set on the previous resource, use a default
+                // If there is no explicit parent set on the previous resource, use a default.
+                // Unless it's a Drive!
                 if resource_old.get(urls::PARENT).is_err() {
                     let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
                     resource_old.set_propval(
