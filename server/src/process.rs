@@ -11,10 +11,20 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
     if let Some(pid) = pid_maybe {
         match futures::executor::block_on(heim::process::get(pid)) {
             Ok(process) => {
-                log::warn!("Terminating existing running instance of atomic-server (process ID: {}) and waiting two seconds...", process.pid());
+                log::warn!(
+                    "Terminating existing running instance of atomic-server (process ID: {})...",
+                    process.pid()
+                );
                 futures::executor::block_on(process.terminate())
-                    .expect("Found running Atomic Server, but could not terminate it.");
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                    .expect("Found running atomic-server, but could not terminate it.");
+                loop {
+                    log::info!("Checking if other server has succesfully terminated...",);
+                    if let Err(_e) = futures::executor::block_on(heim::process::get(pid)) {
+                        log::info!("No other atomic-server is running, continuing",);
+                        break;
+                    };
+                    std::thread::sleep(std::time::Duration::from_secs(2));
+                }
             }
             Err(_e) => (),
         }

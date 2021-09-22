@@ -8,6 +8,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Improved error message for hierarchy authorization check #178
 - Fix Property `recommends` #177
 - Refuse commits with query parameters in their subjects #179
+- Add `resource.destroy()` method, which uses commits
+- Improve killing existing processes - wait until other process has stopped #167
 
 ## v0.26.0
 
