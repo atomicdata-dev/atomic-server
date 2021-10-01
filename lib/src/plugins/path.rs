@@ -25,7 +25,7 @@ fn handle_path_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Re
     match result {
         crate::storelike::PathReturn::Subject(subject) => store.get_resource(&subject),
         crate::storelike::PathReturn::Atom(atom) => {
-            let mut resource = Resource::new(url.into_string());
+            let mut resource = Resource::new(url.to_string());
             resource.set_propval_string(urls::ATOM_SUBJECT.into(), &atom.subject, store)?;
             resource.set_propval_string(urls::ATOM_PROPERTY.into(), &atom.property, store)?;
             resource.set_propval_string(urls::ATOM_VALUE.into(), &atom.value.to_string(), store)?;
