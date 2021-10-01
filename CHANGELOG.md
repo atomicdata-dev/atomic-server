@@ -10,6 +10,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Refuse commits with query parameters in their subjects #179
 - Add `resource.destroy()` method, which uses commits
 - Improve killing existing processes - wait until other process has stopped #167
+- Make `atomic-cli` smaller (don't use `db` feature from `atomic-lib`)
 
 ## v0.26.0
 
