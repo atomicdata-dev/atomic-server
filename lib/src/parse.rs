@@ -126,7 +126,7 @@ pub fn parse_json_ad_map_to_propvals(
                         _err => return Err("Found non-string item in resource array.".into()),
                     }
                 }
-                Value::ResourceArray(newvec)
+                Value::ResourceArraySubjects(newvec)
             }
             serde_json::Value::Object(map) => {
                 Value::NestedResource(parse_json_ad_map_to_propvals(map, store)?)
@@ -214,7 +214,7 @@ mod test {
         let store1 = crate::Store::init().unwrap();
         store1.populate().unwrap();
         let serialized =
-            crate::serialize::resources_to_json_ad(store1.all_resources(true)).unwrap();
+            crate::serialize::resources_to_json_ad(&store1.all_resources(true)).unwrap();
         let store2 = crate::Store::init().unwrap();
         store2.import(&serialized).unwrap();
         let all1 = store1.all_resources(true);

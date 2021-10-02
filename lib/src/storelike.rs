@@ -89,7 +89,7 @@ pub trait Storelike: Sized {
 
     /// Exports the store to a big JSON-AD file
     fn export(&self, include_external: bool) -> AtomicResult<String> {
-        crate::serialize::resources_to_json_ad(self.all_resources(include_external))
+        crate::serialize::resources_to_json_ad(&self.all_resources(include_external))
     }
 
     /// Fetches a resource, makes sure its subject matches.
@@ -309,7 +309,7 @@ pub trait Storelike: Sized {
                 match current {
                     PathReturn::Atom(atom) => {
                         let vector = match resource.get(&atom.property)? {
-                            Value::ResourceArray(vec) => vec,
+                            Value::ResourceArraySubjects(vec) => vec,
                             _ => return Err("Should be Vector!".into()),
                         };
                         let url: String = vector

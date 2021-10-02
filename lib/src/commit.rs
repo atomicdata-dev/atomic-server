@@ -1,6 +1,6 @@
 //! Describe changes / mutations to data
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
@@ -321,7 +321,7 @@ impl Commit {
 }
 
 /// Use this for creating Commits.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitBuilder {
     /// The subject URL that is to be modified by this Delta
     subject: String,

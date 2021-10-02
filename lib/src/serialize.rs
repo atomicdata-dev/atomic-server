@@ -8,18 +8,15 @@ use crate::{
 };
 
 /// Serializes a vector or Resources to a JSON-AD string
-pub fn resources_to_json_ad(resources: Vec<Resource>) -> AtomicResult<String> {
-    let array: Vec<serde_json::Value> = resources
-        .into_iter()
-        .map(|r: Resource| {
-            crate::serialize::propvals_to_json_ad_map(
-                r.get_propvals(),
-                Some(r.get_subject().clone()),
-            )
-            .expect("could not serialize to json-ad ")
-        })
-        .collect();
-    let serde_array = serde_json::Value::from(array);
+pub fn resources_to_json_ad(resources: &Vec<Resource>) -> AtomicResult<String> {
+    let mut vec: Vec<serde_json::Value> = Vec::new();
+    for r in resources {
+        vec.push(crate::serialize::propvals_to_json_ad_map(
+            r.get_propvals(),
+            Some(r.get_subject().clone()),
+        )?)
+    }
+    let serde_array = serde_json::Value::from(vec);
     serde_json::to_string_pretty(&serde_array).map_err(|_| "Could not serialize to JSON-AD".into())
 }
 
@@ -32,11 +29,21 @@ fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
         Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
         Value::Float(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
         Value::Markdown(val) => SerdeValue::String(val),
-        Value::ResourceArray(val) => SerdeValue::Array(
+        Value::ResourceArraySubjects(val) => SerdeValue::Array(
             val.iter()
                 .map(|item| SerdeValue::String(item.clone()))
                 .collect(),
         ),
+        Value::ResourceArrayNested(val) => {
+            let mut vec: Vec<SerdeValue> = Vec::new();
+            for resource in val {
+                vec.push(crate::serialize::propvals_to_json_ad_map(
+                    resource.get_propvals(),
+                    Some(resource.get_subject().clone()),
+                )?);
+            }
+            SerdeValue::Array(vec)
+        }
         Value::Slug(val) => SerdeValue::String(val),
         Value::String(val) => SerdeValue::String(val),
         Value::Timestamp(val) => SerdeValue::Number(val.into()),
@@ -44,6 +51,7 @@ fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
         Value::Boolean(val) => SerdeValue::Bool(val),
         // TODO: fix this for nested resources in json and json-ld serialization, because this will cause them to fall back to json-ad
         Value::NestedResource(res) => propvals_to_json_ad_map(&res, None)?,
+        Value::Resource(_) => todo!(),
     };
     Ok(json_val)
 }
@@ -267,7 +275,7 @@ mod test {
     #[test]
     fn serialize_json_ad_multiple() {
         let vec = vec![Resource::new("subjet".into())];
-        let serialized = resources_to_json_ad(vec).unwrap();
+        let serialized = resources_to_json_ad(&vec).unwrap();
         let correct_json = r#"[
   {
     "@id": "subjet"

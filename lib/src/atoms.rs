@@ -1,11 +1,10 @@
 //! The smallest units of data, consiting of a Subject, a Property and a Value
 
 use crate::values::Value;
-use serde::Serialize;
 
 /// The Atom is the (non-validated) string representation of a piece of data.
 /// It's RichAtom sibling provides some extra methods.
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug)]
 pub struct Atom {
     pub subject: String,
     pub property: String,

@@ -2,7 +2,7 @@
 
 use crate::{
     datatype::match_datatype, datatype::DataType, errors::AtomicResult, resources::PropVals,
-    url_helpers::check_valid_url,
+    url_helpers::check_valid_url, Resource,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -15,12 +15,14 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     Markdown(String),
-    ResourceArray(Vec<String>),
+    ResourceArraySubjects(Vec<String>),
+    ResourceArrayNested(Vec<Resource>),
     Slug(String),
     String(String),
     /// Unix Epoch datetime in milliseconds
     Timestamp(i64),
     NestedResource(PropVals),
+    Resource(Resource),
     Boolean(bool),
     Unsupported(UnsupportedValue),
 }
@@ -47,12 +49,14 @@ impl Value {
             Value::Integer(_) => DataType::Integer,
             Value::Float(_) => DataType::Float,
             Value::Markdown(_) => DataType::Markdown,
-            Value::ResourceArray(_) => DataType::ResourceArray,
+            Value::ResourceArraySubjects(_) => DataType::ResourceArray,
+            Value::ResourceArrayNested(_) => DataType::ResourceArray,
             Value::Slug(_) => DataType::Slug,
             Value::String(_) => DataType::String,
             Value::Timestamp(_) => DataType::Timestamp,
             // TODO: these datatypes are not the same
             Value::NestedResource(_) => DataType::AtomicUrl,
+            Value::Resource(_) => DataType::AtomicUrl,
             Value::Boolean(_) => DataType::Boolean,
             Value::Unsupported(s) => DataType::Unsupported(s.datatype.clone()),
         }
@@ -91,7 +95,7 @@ impl Value {
                 let vector: Vec<String> = crate::parse::parse_json_array(&value).map_err(|e| {
                     return format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e);
                 })?;
-                Ok(Value::ResourceArray(vector))
+                Ok(Value::ResourceArraySubjects(vector))
             }
             DataType::Date => {
                 let re = Regex::new(DATE_REGEX).unwrap();
@@ -134,7 +138,7 @@ impl Value {
 
     /// Returns a Vector, if the Value is one
     pub fn to_vec(&self) -> AtomicResult<&Vec<String>> {
-        if let Value::ResourceArray(arr) = self {
+        if let Value::ResourceArraySubjects(arr) = self {
             return Ok(arr);
         }
         Err(format!("Value {} is not a Resource Array", self).into())
@@ -193,7 +197,7 @@ impl From<usize> for Value {
 
 impl From<Vec<String>> for Value {
     fn from(val: Vec<String>) -> Self {
-        Value::ResourceArray(val)
+        Value::ResourceArraySubjects(val)
     }
 }
 
@@ -209,6 +213,18 @@ impl From<bool> for Value {
     }
 }
 
+impl From<Resource> for Value {
+    fn from(val: Resource) -> Self {
+        Value::Resource(val)
+    }
+}
+
+impl From<Vec<Resource>> for Value {
+    fn from(val: Vec<Resource>) -> Self {
+        Value::ResourceArrayNested(val)
+    }
+}
+
 use std::fmt;
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -218,14 +234,26 @@ impl fmt::Display for Value {
             Value::Integer(i) => write!(f, "{}", i),
             Value::Float(float) => write!(f, "{}", float),
             Value::Markdown(i) => write!(f, "{}", i),
-            Value::ResourceArray(v) => {
+            Value::ResourceArraySubjects(v) => {
                 let s = crate::serialize::serialize_json_array(v)
-                    .unwrap_or_else(|_e| format!("[Could not serialize resource array: {:?}", v));
+                    .unwrap_or_else(|_e| format!("Could not serialize resource array: {:?}", v));
+                write!(f, "{}", s)
+            }
+            Value::ResourceArrayNested(v) => {
+                let s = crate::serialize::resources_to_json_ad(v).unwrap_or_else(|_e| {
+                    format!("Could not serialize nested resource array: {:?}", v)
+                });
                 write!(f, "{}", s)
             }
             Value::Slug(s) => write!(f, "{}", s),
             Value::String(s) => write!(f, "{}", s),
             Value::Timestamp(i) => write!(f, "{}", i),
+            Value::Resource(r) => write!(
+                f,
+                "{}",
+                r.to_json_ad()
+                    .unwrap_or_else(|_e| format!("Could not serialize resource: {:?}", r))
+            ),
             Value::NestedResource(n) => write!(f, "{:?}", n),
             Value::Boolean(b) => write!(f, "{}", b),
             Value::Unsupported(u) => write!(f, "{}", u.value),

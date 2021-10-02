@@ -45,7 +45,7 @@ impl Property {
         let mut resource = Resource::new(self.subject.clone());
         resource.set_propval_unsafe(
             urls::IS_A.into(),
-            Value::ResourceArray(vec![urls::PROPERTY.into()]),
+            Value::ResourceArraySubjects(vec![urls::PROPERTY.into()]),
         )?;
         resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()))?;
         resource.set_propval_unsafe(
@@ -111,7 +111,7 @@ impl Class {
         let mut resource = Resource::new(self.subject.clone());
         resource.set_propval_unsafe(
             urls::IS_A.into(),
-            Value::ResourceArray(vec![urls::CLASS.into()]),
+            Value::ResourceArraySubjects(vec![urls::CLASS.into()]),
         )?;
         resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()))?;
         resource.set_propval_unsafe(
@@ -121,13 +121,13 @@ impl Class {
         if !self.requires.is_empty() {
             resource.set_propval_unsafe(
                 urls::REQUIRES.into(),
-                Value::ResourceArray(self.requires.clone()),
+                Value::ResourceArraySubjects(self.requires.clone()),
             )?;
         }
         if !self.requires.is_empty() {
             resource.set_propval_unsafe(
                 urls::RECOMMENDS.into(),
-                Value::ResourceArray(self.recommends.clone()),
+                Value::ResourceArraySubjects(self.recommends.clone()),
             )?;
         }
         Ok(resource)
