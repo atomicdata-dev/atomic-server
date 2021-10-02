@@ -31,6 +31,8 @@ pub struct CollectionBuilder {
     pub page_size: usize,
     /// A human readable name
     pub name: Option<String>,
+    /// Whether it's children should be included as nested resources in the response
+    pub nested: bool,
 }
 
 impl CollectionBuilder {
@@ -62,7 +64,7 @@ impl CollectionBuilder {
         )?;
         resource.set_propval(
             crate::urls::COLLECTION_PAGE_SIZE.into(),
-            self.page_size.clone().into(),
+            self.page_size.into(),
             store,
         )?;
         // Maybe include items directly
@@ -84,6 +86,7 @@ impl CollectionBuilder {
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
             name: Some(format!("{} collection", path)),
+            nested: false,
         }
     }
 
@@ -106,6 +109,8 @@ pub struct Collection {
     pub value: Option<String>,
     /// The actual items that you're interested in. List the member subjects of the current page.
     pub members: Vec<String>,
+    /// The members as full resources, instead of a list of subjects. Is only populated if `nested` is true.
+    pub members_nested: Option<Vec<Resource>>,
     /// URL of the value to sort by
     pub sort_by: Option<String>,
     // Sorts ascending by default
@@ -120,6 +125,8 @@ pub struct Collection {
     pub total_pages: usize,
     /// Human readable name of a resource
     pub name: Option<String>,
+    /// Whether it's children should be included as nested resources in the response
+    pub nested: bool,
 }
 
 /// Sorts a vector or resources by some property.
@@ -168,33 +175,43 @@ impl Collection {
             // Collections only show items from inside this store. Maybe later add this as an option to collections
             false,
         )?;
-        let mut subjects: Vec<String> = atoms.iter().map(|atom| atom.subject.clone()).collect();
-        // Default to no sorting
-        if collection_builder.sort_by.is_some() {
-            let mut resources = Vec::new();
-            for subject in subjects.clone() {
+        // Remove duplicate subjects
+        let mut subjects: Vec<String> = atoms
+            .iter()
+            .map(|atom| atom.subject.clone())
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect();
+
+        let mut resources = Vec::new();
+        // If sorting is required or the nested resoureces are asked, we need to fetch all resources from the store.
+        if collection_builder.sort_by.is_some() || collection_builder.nested {
+            for subject in subjects.iter() {
                 resources.push(store.get_resource(&subject)?)
             }
-            // TODO: Include these resources in the response! They're already fetched. Should speed things up.
-            // https://github.com/joepio/atomic/issues/62
-            resources = sort_resources(
-                resources,
-                &collection_builder.sort_by.clone().unwrap(),
-                collection_builder.sort_desc,
-            );
-            subjects.clear();
-            for resource in resources {
-                subjects.push(resource.get_subject().clone())
+            if let Some(sort) = &collection_builder.sort_by {
+                resources = sort_resources(resources, sort, collection_builder.sort_desc);
+                subjects.clear();
+                for r in resources.iter() {
+                    subjects.push(r.get_subject().clone())
+                }
             }
         }
         let mut all_pages: Vec<Vec<String>> = Vec::new();
+        let mut all_pages_nested: Vec<Vec<Resource>> = Vec::new();
         let mut page: Vec<String> = Vec::new();
+        let mut page_nested: Vec<Resource> = Vec::new();
         let current_page = collection_builder.current_page;
         for (i, subject) in subjects.iter().enumerate() {
             page.push(subject.into());
+            if collection_builder.nested {
+                page_nested.push(resources[i].clone());
+            }
             if page.len() >= collection_builder.page_size {
                 all_pages.push(page);
+                all_pages_nested.push(page_nested);
                 page = Vec::new();
+                page_nested = Vec::new();
                 // No need to calculte more than necessary
                 if all_pages.len() > current_page {
                     break;
@@ -203,6 +220,7 @@ impl Collection {
             // Add the last page when handling the last subject
             if i == subjects.len() - 1 {
                 all_pages.push(page);
+                all_pages_nested.push(page_nested);
                 break;
             }
         }
@@ -218,9 +236,20 @@ impl Collection {
         // Construct the pages (TODO), use pageSize
         let total_pages =
             (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
+        let members_nested = if collection_builder.nested {
+            Some(
+                all_pages_nested
+                    .get(current_page)
+                    .ok_or("Page number is too high")?
+                    .clone(),
+            )
+        } else {
+            None
+        };
         let collection = Collection {
             total_pages,
             members,
+            members_nested,
             total_items,
             subject: collection_builder.subject,
             property: collection_builder.property,
@@ -230,6 +259,7 @@ impl Collection {
             current_page: collection_builder.current_page,
             page_size: collection_builder.page_size,
             name: collection_builder.name,
+            nested: collection_builder.nested,
         };
         Ok(collection)
     }
@@ -248,7 +278,11 @@ impl Collection {
     ) -> AtomicResult<crate::Resource> {
         resource.set_propval(
             crate::urls::COLLECTION_MEMBERS.into(),
-            self.members.clone().into(),
+            if let Some(nested_members) = &self.members_nested {
+                nested_members.clone().into()
+            } else {
+                self.members.clone().into()
+            },
             store,
         )?;
         if let Some(prop) = &self.property {
@@ -262,24 +296,24 @@ impl Collection {
         }
         resource.set_propval(
             crate::urls::COLLECTION_MEMBER_COUNT.into(),
-            self.total_items.clone().into(),
+            self.total_items.into(),
             store,
         )?;
         let classes: Vec<String> = vec![crate::urls::COLLECTION.into()];
         resource.set_propval(crate::urls::IS_A.into(), classes.into(), store)?;
         resource.set_propval(
             crate::urls::COLLECTION_TOTAL_PAGES.into(),
-            self.total_pages.clone().into(),
+            self.total_pages.into(),
             store,
         )?;
         resource.set_propval(
             crate::urls::COLLECTION_CURRENT_PAGE.into(),
-            self.current_page.clone().into(),
+            self.current_page.into(),
             store,
         )?;
         resource.set_propval(
             crate::urls::COLLECTION_PAGE_SIZE.into(),
-            self.page_size.clone().into(),
+            self.page_size.into(),
             store,
         )?;
         // Maybe include items directly
@@ -300,6 +334,7 @@ pub fn construct_collection(
     let mut value = None;
     let mut property = None;
     let mut name = None;
+    let mut include = false;
 
     if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
         property = Some(val.to_string());
@@ -319,6 +354,7 @@ pub fn construct_collection(
             "sort_desc" => sort_desc = true,
             "current_page" => current_page = v.parse::<usize>()?,
             "page_size" => page_size = v.parse::<usize>()?,
+            "include" => include = v.parse::<bool>()?,
             _ => {}
         };
     }
@@ -331,6 +367,7 @@ pub fn construct_collection(
         current_page,
         page_size,
         name,
+        nested: include,
     };
     let collection = Collection::new_with_members(store, collection_builder)?;
     collection.add_to_resource(resource, store)
@@ -346,7 +383,6 @@ mod test {
     fn create_collection() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        // Get all Classes, sorted by shortname
         let collection_builder = CollectionBuilder {
             subject: "test_subject".into(),
             property: Some(urls::IS_A.into()),
@@ -356,6 +392,7 @@ mod test {
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
             name: Some("Test collection".into()),
+            nested: false,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
@@ -365,7 +402,6 @@ mod test {
     fn create_collection_2() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        // Get all Classes, sorted by shortname
         let collection_builder = CollectionBuilder {
             subject: "test_subject".into(),
             property: Some(urls::IS_A.into()),
@@ -375,9 +411,34 @@ mod test {
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
             name: None,
+            nested: false,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
+    }
+
+    #[test]
+    fn create_collection_nested_members_and_sorting() {
+        let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
+        let collection_builder = CollectionBuilder {
+            subject: "test_subject".into(),
+            property: Some(urls::IS_A.into()),
+            value: Some(urls::CLASS.into()),
+            sort_by: Some(urls::SHORTNAME.into()),
+            sort_desc: false,
+            page_size: DEFAULT_PAGE_SIZE,
+            current_page: 0,
+            name: None,
+            // The important bit here
+            nested: true,
+        };
+        let collection = Collection::new_with_members(&store, collection_builder).unwrap();
+
+        let first_resource = &collection.members_nested.unwrap()[0];
+
+        println!("{}", first_resource.get_subject());
+        assert!(first_resource.get_subject().contains("Agent"));
     }
 
     #[cfg(feature = "db")]
@@ -436,7 +497,7 @@ mod test {
                 == "1"
         );
         let members_vec = match collection_page_nr.get(urls::COLLECTION_MEMBERS).unwrap() {
-            crate::Value::ResourceArray(vec) => vec,
+            crate::Value::ResourceArraySubjects(vec) => vec,
             _ => panic!(),
         };
         assert!(members_vec.len() == 1);

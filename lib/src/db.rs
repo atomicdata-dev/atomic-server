@@ -161,7 +161,7 @@ impl Storelike for Db {
     // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
         let vec = match atom.value.clone() {
-            Value::ResourceArray(v) => v,
+            Value::ResourceArraySubjects(v) => v,
             Value::AtomicUrl(v) => vec![v],
             _other => return Ok(()),
         };
@@ -195,7 +195,7 @@ impl Storelike for Db {
 
     fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
         let vec = match atom.value.clone() {
-            Value::ResourceArray(v) => v,
+            Value::ResourceArraySubjects(v) => v,
             other => vec![other.to_string()],
         };
 

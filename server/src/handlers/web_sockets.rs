@@ -16,12 +16,11 @@ pub async fn web_socket_handler(
 ) -> Result<HttpResponse, Error> {
     log::info!("Starting websocket");
     let context = data.lock().unwrap();
-    let resp = ws::start(
+    ws::start(
         WebSocketConnection::new(context.commit_monitor.clone()),
         &req,
         stream,
-    );
-    resp
+    )
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);

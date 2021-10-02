@@ -61,6 +61,7 @@ fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicR
         current_page: 0,
         page_size: 20,
         name: Some(format!("Versions of {}", target)),
+        nested: false,
     };
     let mut collection = collection_builder.into_collection(store)?;
     let new_members = collection

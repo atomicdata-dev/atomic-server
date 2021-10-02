@@ -47,7 +47,7 @@ pub async fn tpf(
             for subject in subjects {
                 resources.push(store.get_resource(&subject)?);
             }
-            Ok(builder.body(atomic_lib::serialize::resources_to_json_ad(resources)?))
+            Ok(builder.body(atomic_lib::serialize::resources_to_json_ad(&resources)?))
         }
         ContentType::Json | ContentType::Html | ContentType::JsonLd => {
             // TODO

@@ -62,7 +62,7 @@ fn prompt_instance<'a>(
 
     new_resource.set_propval(
         "https://atomicdata.dev/properties/isA".into(),
-        Value::ResourceArray(Vec::from([class.subject.clone()])),
+        Value::ResourceArraySubjects(Vec::from([class.subject.clone()])),
         &context.store,
     )?;
 
