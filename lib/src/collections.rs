@@ -32,7 +32,9 @@ pub struct CollectionBuilder {
     /// A human readable name
     pub name: Option<String>,
     /// Whether it's children should be included as nested resources in the response
-    pub nested: bool,
+    pub include_nested: bool,
+    /// Whether to include resources from other servers
+    pub include_external: bool,
 }
 
 impl CollectionBuilder {
@@ -54,6 +56,20 @@ impl CollectionBuilder {
         if let Some(val) = &self.sort_by {
             resource.set_propval_string(crate::urls::COLLECTION_SORT_BY.into(), val, store)?;
         }
+        if self.include_nested {
+            resource.set_propval_string(
+                crate::urls::COLLECTION_INCLUDE_NESTED.into(),
+                "true",
+                store,
+            )?;
+        }
+        if self.include_external {
+            resource.set_propval_string(
+                crate::urls::COLLECTION_INCLUDE_EXTERNAL.into(),
+                "true",
+                store,
+            )?;
+        }
         if self.sort_desc {
             resource.set_propval_string(crate::urls::COLLECTION_SORT_DESC.into(), "true", store)?;
         }
@@ -65,6 +81,12 @@ impl CollectionBuilder {
         resource.set_propval(
             crate::urls::COLLECTION_PAGE_SIZE.into(),
             self.page_size.into(),
+            store,
+        )?;
+        // CollectionBuilders by definition do not have any members, so we should communicate that to clients
+        resource.set_propval(
+            crate::urls::INCOMPLETE.into(),
+            crate::Value::Boolean(true),
             store,
         )?;
         // Maybe include items directly
@@ -86,7 +108,8 @@ impl CollectionBuilder {
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
             name: Some(format!("{} collection", path)),
-            nested: false,
+            include_nested: true,
+            include_external: false,
         }
     }
 
@@ -126,7 +149,9 @@ pub struct Collection {
     /// Human readable name of a resource
     pub name: Option<String>,
     /// Whether it's children should be included as nested resources in the response
-    pub nested: bool,
+    pub include_nested: bool,
+    /// Include resources from other servers
+    pub include_external: bool,
 }
 
 /// Sorts a vector or resources by some property.
@@ -172,8 +197,7 @@ impl Collection {
             None,
             collection_builder.property.as_deref(),
             collection_builder.value.as_deref(),
-            // Collections only show items from inside this store. Maybe later add this as an option to collections
-            false,
+            collection_builder.include_external,
         )?;
         // Remove duplicate subjects
         let mut subjects: Vec<String> = atoms
@@ -185,9 +209,13 @@ impl Collection {
 
         let mut resources = Vec::new();
         // If sorting is required or the nested resoureces are asked, we need to fetch all resources from the store.
-        if collection_builder.sort_by.is_some() || collection_builder.nested {
+        if collection_builder.sort_by.is_some() || collection_builder.include_nested {
             for subject in subjects.iter() {
-                resources.push(store.get_resource(&subject)?)
+                // WARNING: This does not get extended resources, which means that they could be incomplete and lack the dynamic properties
+                // For example, Collections will not have Members.
+                // The client has to know about this and possibly handle it
+                let resource = store.get_resource(&subject)?;
+                resources.push(resource)
             }
             if let Some(sort) = &collection_builder.sort_by {
                 resources = sort_resources(resources, sort, collection_builder.sort_desc);
@@ -204,7 +232,7 @@ impl Collection {
         let current_page = collection_builder.current_page;
         for (i, subject) in subjects.iter().enumerate() {
             page.push(subject.into());
-            if collection_builder.nested {
+            if collection_builder.include_nested {
                 page_nested.push(resources[i].clone());
             }
             if page.len() >= collection_builder.page_size {
@@ -225,22 +253,23 @@ impl Collection {
             }
         }
         if all_pages.is_empty() {
-            all_pages.push(Vec::new())
+            all_pages.push(Vec::new());
+            all_pages_nested.push(Vec::new());
         }
         // Maybe I should default to last page, if current_page is too high?
         let members = all_pages
             .get(current_page)
-            .ok_or("Page number is too high")?
+            .ok_or(format!("Page number {} is too high", current_page))?
             .clone();
         let total_items = subjects.len();
         // Construct the pages (TODO), use pageSize
         let total_pages =
             (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
-        let members_nested = if collection_builder.nested {
+        let members_nested = if collection_builder.include_nested {
             Some(
                 all_pages_nested
                     .get(current_page)
-                    .ok_or("Page number is too high")?
+                    .ok_or(format!("Page number {} is too high", current_page))?
                     .clone(),
             )
         } else {
@@ -259,7 +288,8 @@ impl Collection {
             current_page: collection_builder.current_page,
             page_size: collection_builder.page_size,
             name: collection_builder.name,
-            nested: collection_builder.nested,
+            include_nested: collection_builder.include_nested,
+            include_external: collection_builder.include_external,
         };
         Ok(collection)
     }
@@ -287,6 +317,20 @@ impl Collection {
         )?;
         if let Some(prop) = &self.property {
             resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), prop, store)?;
+        }
+        if self.include_nested {
+            resource.set_propval_string(
+                crate::urls::COLLECTION_INCLUDE_NESTED.into(),
+                "true",
+                store,
+            )?;
+        }
+        if self.include_external {
+            resource.set_propval_string(
+                crate::urls::COLLECTION_INCLUDE_EXTERNAL.into(),
+                "true",
+                store,
+            )?;
         }
         if let Some(val) = &self.value {
             resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
@@ -316,12 +360,21 @@ impl Collection {
             self.page_size.into(),
             store,
         )?;
-        // Maybe include items directly
+
+        // CollectionBuilders by definition do not have any members, so they set Incomplete to true.
+        // We should set this to false in full Collections
+        resource.set_propval(
+            crate::urls::INCOMPLETE.into(),
+            crate::Value::Boolean(false),
+            store,
+        )?;
         Ok(resource.to_owned())
     }
 }
 
-/// Builds a collection from query params
+/// Builds a collection from query params and the passed Collection resource.
+/// The query params are used to override the stored Collection resource properties.
+/// This also sets defaults for Collection properties when fields are missing
 pub fn construct_collection(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
@@ -334,7 +387,8 @@ pub fn construct_collection(
     let mut value = None;
     let mut property = None;
     let mut name = None;
-    let mut include = false;
+    let mut include_nested = false;
+    let mut include_external = false;
 
     if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
         property = Some(val.to_string());
@@ -345,16 +399,22 @@ pub fn construct_collection(
     if let Ok(val) = resource.get(urls::NAME) {
         name = Some(val.to_string());
     }
+    if let Ok(val) = resource.get(urls::COLLECTION_INCLUDE_NESTED) {
+        include_nested = val.to_bool()?;
+    }
+    if let Ok(val) = resource.get(urls::COLLECTION_INCLUDE_EXTERNAL) {
+        include_external = val.to_bool()?;
+    }
     for (k, v) in query_params {
         match k.as_ref() {
             "property" => property = Some(v.to_string()),
             "value" => value = Some(v.to_string()),
             "sort_by" => sort_by = Some(v.to_string()),
-            // TODO: parse bool
-            "sort_desc" => sort_desc = true,
+            "sort_desc" => sort_desc = v.parse::<bool>()?,
             "current_page" => current_page = v.parse::<usize>()?,
             "page_size" => page_size = v.parse::<usize>()?,
-            "include" => include = v.parse::<bool>()?,
+            "include_nested" => include_nested = v.parse::<bool>()?,
+            "include_external" => include_external = v.parse::<bool>()?,
             _ => {}
         };
     }
@@ -367,7 +427,8 @@ pub fn construct_collection(
         current_page,
         page_size,
         name,
-        nested: include,
+        include_nested,
+        include_external,
     };
     let collection = Collection::new_with_members(store, collection_builder)?;
     collection.add_to_resource(resource, store)
@@ -392,7 +453,8 @@ mod test {
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
             name: Some("Test collection".into()),
-            nested: false,
+            include_nested: false,
+            include_external: false,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
@@ -411,10 +473,16 @@ mod test {
             page_size: DEFAULT_PAGE_SIZE,
             current_page: 0,
             name: None,
-            nested: false,
+            include_nested: false,
+            include_external: false,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
+
+        let resource_collection = &collection.to_resource(&store).unwrap();
+        resource_collection
+            .get(urls::COLLECTION_INCLUDE_NESTED)
+            .unwrap_err();
     }
 
     #[test]
@@ -431,14 +499,20 @@ mod test {
             current_page: 0,
             name: None,
             // The important bit here
-            nested: true,
+            include_nested: true,
+            include_external: false,
         };
         let collection = Collection::new_with_members(&store, collection_builder).unwrap();
-
-        let first_resource = &collection.members_nested.unwrap()[0];
-
-        println!("{}", first_resource.get_subject());
+        let first_resource = &collection.members_nested.clone().unwrap()[0];
         assert!(first_resource.get_subject().contains("Agent"));
+
+        let resource_collection = &collection.to_resource(&store).unwrap();
+        let val = resource_collection
+            .get(urls::COLLECTION_INCLUDE_NESTED)
+            .unwrap()
+            .to_bool()
+            .unwrap();
+        assert!(val, "Include nested must be true");
     }
 
     #[cfg(feature = "db")]

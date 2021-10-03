@@ -42,7 +42,8 @@
             "https://atomicdata.dev/properties/collection/sortDesc",
             "https://atomicdata.dev/properties/collection/totalMembers",
             "https://atomicdata.dev/properties/collection/totalPages",
-            "https://atomicdata.dev/properties/collection/value"
+            "https://atomicdata.dev/properties/collection/value",
+            "https://atomicdata.dev/properties/incomplete"
         ],
         "https://atomicdata.dev/properties/shortname": "collection"
     },
@@ -298,6 +299,24 @@
         "https://atomicdata.dev/properties/shortname": "current-page"
     },
     {
+        "@id": "https://atomicdata.dev/properties/collection/includeExternal",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+        "https://atomicdata.dev/properties/description": "If true, resources will be included in this collection that are not present in the Server.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "include-external"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/collection/includeNested",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+        "https://atomicdata.dev/properties/description": "If true, full resources will be included in the response, which is often faster for clients.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "include-nested"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/collection/members",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
         "https://atomicdata.dev/properties/description": "The members are the list of resources in a collection.",
@@ -438,6 +457,16 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/shortname": "parameters"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/incomplete",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+        "https://atomicdata.dev/properties/description": "If this is true, this Resource does not contain all the values that it should. This is probably done because it was included as part of a larger Resource, such as a Collection, Fetch this resource directly (send a GET request to its Subject URL) to get all the properties.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "incomplete"
     },
     {
         "@id": "https://atomicdata.dev/properties/invite/target",

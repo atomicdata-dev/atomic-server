@@ -13,7 +13,7 @@ use std::collections::HashMap;
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
 /// All changes to the Resource are applied after committing them (e.g. by using).
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Resource {
     /// A hashMap of all the Property Value combinations
     propvals: PropVals,

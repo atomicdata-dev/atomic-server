@@ -564,14 +564,21 @@ pub mod test {
             .collect();
         println!("{:?}", subjects);
         let collections_collection_url = format!("{}/collections", store.get_base_url());
-        let my_resource = store
+        let collections_resource = store
             .get_resource_extended(&collections_collection_url)
             .unwrap();
-        let my_value = my_resource
+        let member_count = collections_resource
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
             .unwrap();
-        println!("My value: {}", my_value);
-        assert!(my_value.to_int().unwrap() > 11);
+        assert!(member_count > 11);
+        let nested = collections_resource
+            .get(crate::urls::COLLECTION_INCLUDE_NESTED)
+            .unwrap()
+            .to_bool()
+            .unwrap();
+        assert!(nested);
     }
 
     #[test]
