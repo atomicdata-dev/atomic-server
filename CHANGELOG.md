@@ -6,7 +6,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## v0.27.0
 
 - **IMPORANT**: before upgrading to this version, export your database using your previous version: `atomic-server export`. The database could become corrupted when running the new version.
-- Include Resources in Collection responses, improving performance dramatically for collections#62
+- Include Resources in Collection responses, improving performance dramatically for collections #62
+- Introduce `incomplete` resources
 
 ## v0.26.3
 

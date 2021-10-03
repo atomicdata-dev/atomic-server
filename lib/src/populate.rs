@@ -199,7 +199,6 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
         // Should we use save_locally, which creates commits, or add_resource_unsafe, which is faster?
         collection_resource.save_locally(store)?;
-        // store.add_resource_unsafe(&collection_resource)?;
     }
 
     Ok(())

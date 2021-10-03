@@ -70,6 +70,7 @@ impl Storelike for Store {
         Ok(())
     }
 
+    // TODO: Fix this for local stores, include external does not make sense here
     fn all_resources(&self, _include_external: bool) -> ResourceCollection {
         let mut all = Vec::new();
         for (_subject, resource) in self.hashmap.lock().unwrap().clone().into_iter() {

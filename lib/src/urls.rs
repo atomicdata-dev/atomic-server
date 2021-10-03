@@ -16,6 +16,7 @@ pub const ATOM: &str = "https://atomicdata.dev/classes/Atom";
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
 pub const DESCRIPTION: &str = "https://atomicdata.dev/properties/description";
+pub const INCOMPLETE: &str = "https://atomicdata.dev/properties/incomplete";
 // ... for Properties
 pub const IS_A: &str = "https://atomicdata.dev/properties/isA";
 pub const IS_DYNAMIC: &str = "https://atomicdata.dev/properties/isDynamic";
@@ -45,6 +46,10 @@ pub const COLLECTION_TOTAL_PAGES: &str = "https://atomicdata.dev/properties/coll
 pub const COLLECTION_CURRENT_PAGE: &str =
     "https://atomicdata.dev/properties/collection/currentPage";
 pub const COLLECTION_MEMBERS: &str = "https://atomicdata.dev/properties/collection/members";
+pub const COLLECTION_INCLUDE_NESTED: &str =
+    "https://atomicdata.dev/properties/collection/includeNested";
+pub const COLLECTION_INCLUDE_EXTERNAL: &str =
+    "https://atomicdata.dev/properties/collection/includeExternal";
 pub const COLLECTION_PAGE_SIZE: &str = "https://atomicdata.dev/properties/collection/pageSize";
 pub const COLLECTION_SORT_BY: &str = "https://atomicdata.dev/properties/collection/sortBy";
 pub const COLLECTION_SORT_DESC: &str = "https://atomicdata.dev/properties/collection/sortDesc";
