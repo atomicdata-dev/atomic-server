@@ -1,4 +1,4 @@
-name: Release (github + crates.io + docker) and deploy to AtomicData.dev
+name: Release (github + crates.io + docker)
 
 on:
   push:
