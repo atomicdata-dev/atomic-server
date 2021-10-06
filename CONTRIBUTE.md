@@ -59,7 +59,11 @@ or:
 
 1. build and publish various builds (warning: building to ARM takes long!): `docker buildx build --platform linux/amd64,linux/arm64 . -t joepmeneer/atomic-server:v0.20.4 -t joepmeneer/atomic-server:latest --push`. Note that including the armv7 platform `linux/arm/v7` currently fails.
 
-## Deploy to atomicdata.dev
+## Deploying to atomicdata.dev
+
+1. Run the [`deploy` Github action](https://github.com/joepio/atomic-data-rust/actions/workflows/deployment.yml)
+
+or do it manually:
 
 1. `cd server`
 1. `cargo build --release --target x86_64-unknown-linux-gnu`
