@@ -25,6 +25,7 @@ If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-d
 
 - We use Github Actions for building, testing and creating releases. See #165 for progress.
 - Use `cargo workspaces version patch` (and maybe replace `patch` with the `minor`) to update the `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces`.
+- Manually update the `atomic_lib` dependencies in the `cargo.toml` files for `lib` and `server` - this is not done automatically.
 - On pushing a version `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there. So tag the releases, and push the tag!
 - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
