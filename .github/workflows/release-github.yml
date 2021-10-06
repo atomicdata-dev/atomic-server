@@ -1,4 +1,4 @@
-name: Release (github)
+name: Release (github + crates.io + docker) and deploy to AtomicData.dev
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
           registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   create-release:
-    name: Greate Release on GitHub
+    name: Create Release on GitHub
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
