@@ -5,7 +5,7 @@ edition = "2018"
 license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/joepio/atomic-data-rust"
-version = "0.26.0"
+version = "0.26.1"
 
 [dependencies]
 acme-lib = "0.8.1"
