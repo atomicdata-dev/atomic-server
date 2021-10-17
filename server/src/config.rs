@@ -47,6 +47,10 @@ pub struct Config {
     pub static_path: PathBuf,
     /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
     pub store_path: PathBuf,
+    /// Endpoint where the front-end assets are hosted. (defaults to `~/.config/atomic/db`)
+    pub asset_url: String,
+    /// Custom JS script to include in the body of the HTML template
+    pub script: String,
 }
 
 /// Creates the server config, reads .env values and sets defaults
@@ -69,6 +73,8 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
     let mut key_path = config_dir.clone();
     key_path.push("https/key.pem");
     let mut email = None;
+    let mut asset_url = "https://joepio.github.io/atomic-data-browser".to_string();
+    let mut script = "";
 
     // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
@@ -113,6 +119,12 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
             "ATOMIC_HTTPS" => {
                 https = value.parse().expect("ATOMIC_HTTPS is not a boolean");
             }
+            "ATOMIC_SCRIPT" => {
+                script = value;
+            }
+            "ATOMIC_ASSET_URL" => {
+                asset_url = value;
+            }
             _ => {}
         }
     }
@@ -153,5 +165,7 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
         port,
         static_path,
         store_path,
+        asset_url,
+        script,
     })
 }

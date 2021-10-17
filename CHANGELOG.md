@@ -6,6 +6,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## v0.26.1
 
 - Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #87
+- Remove analytics in server
+= Make `asset-url` and `script` in HTML template customizable.
 
 ## v0.26.1
 
