@@ -19,7 +19,8 @@ COPY --from=cacher /app/target target
 COPY --from=cacher $CARGO_HOME $CARGO_HOME
 RUN cargo build --release --bin atomic-server
 
-FROM gcr.io/distroless/cc-debian10 as runtime
+# Not ideal
+FROM frolvlad/alpine-glibc as runtime
 
 COPY ./server/ /server
 WORKDIR /server
