@@ -9,6 +9,8 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
         Err(_e) => None,
     };
     if let Some(pid) = pid_maybe {
+        let retry_secs = 1;
+        let mut tries_left = 15;
         match futures::executor::block_on(heim::process::get(pid)) {
             Ok(process) => {
                 log::warn!(
@@ -17,13 +19,24 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
                 );
                 futures::executor::block_on(process.terminate())
                     .expect("Found running atomic-server, but could not terminate it.");
+                log::info!("Checking if other server has succesfully terminated...",);
                 loop {
-                    log::info!("Checking if other server has succesfully terminated...",);
                     if let Err(_e) = futures::executor::block_on(heim::process::get(pid)) {
-                        log::info!("No other atomic-server is running, continuing",);
+                        log::info!("No other atomic-server is running, continuing start-up",);
                         break;
                     };
-                    std::thread::sleep(std::time::Duration::from_secs(2));
+                    if tries_left > 1 {
+                        tries_left = tries_left - 1;
+                        log::info!(
+                            "Other instance is still running, checking again in {} seconds, for {} more times ",
+                            retry_secs,
+                            tries_left
+                        );
+                        std::thread::sleep(std::time::Duration::from_secs(retry_secs));
+                    } else {
+                        log::error!("Could not terminate other atomic-server, exiting...");
+                        std::process::exit(1);
+                    }
                 }
             }
             Err(_e) => (),
