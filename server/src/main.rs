@@ -17,7 +17,7 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use atomic_lib::{errors::AtomicResult, Storelike};
 use clap::{crate_version, Arg, SubCommand};
-use std::{fs::File, sync::Mutex};
+use std::{fs::File, io::Write, sync::Mutex};
 
 #[actix_web::main]
 async fn main() -> AtomicResult<()> {
@@ -41,6 +41,10 @@ async fn main() -> AtomicResult<()> {
                     .help("where the file should be imported from")
                     .required(true)
                 )
+        )
+        .subcommand(
+            SubCommand::with_name("setup-env")
+                .about("Creates a `.env` file in your current directory that shows various options that you can set.")
         )
         .arg(
             Arg::with_name("reindex")
@@ -70,14 +74,6 @@ async fn main() -> AtomicResult<()> {
     let _ = process::terminate_existing_processes(&config)
         .map_err(|e| log::error!("Could not check for running instance: {}", e));
 
-    // The Appstate contains the actual database
-    let appstate = match appstate::init(config.clone()) {
-        Ok(state) => state,
-        Err(e) => {
-            panic!("Error during appstate setup. {}", e)
-        }
-    };
-
     // All subcommands (as of now) also require appstate, which is why we have this logic below initial CLI logic.
     match matches.subcommand_name() {
         Some("export") => {
@@ -90,11 +86,12 @@ async fn main() -> AtomicResult<()> {
                 None => {
                     let date = chrono::Local::now().to_rfc3339();
                     let pathstr = format!("backups/{}.json", date);
-                    let mut pt = config.config_dir;
+                    let mut pt = config.config_dir.clone();
                     pt.push(&pathstr);
                     pt
                 }
             };
+            let appstate = appstate::init(config.clone())?;
             let outstr = appstate.store.export(true)?;
             std::fs::create_dir_all(path.parent().unwrap())
                 .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
@@ -113,10 +110,28 @@ async fn main() -> AtomicResult<()> {
                 .unwrap();
             let path = std::path::Path::new(pathstr);
             let readstring = std::fs::read_to_string(path)?;
-
+            let appstate = appstate::init(config.clone())?;
             appstate.store.import(&readstring)?;
 
             println!("Sucesfully imported {} to store.", pathstr);
+            std::process::exit(0);
+        }
+        Some("setup-env") => {
+            let current_path = std::env::current_dir()?;
+            let pathstr = format!(
+                "{}/.env",
+                current_path.to_str().expect("Cannot render path")
+            );
+            if std::path::Path::new(&pathstr).exists() {
+                log::error!(".env already exists at {}", pathstr);
+                panic!("{} already exists", pathstr);
+            }
+            let mut file = File::create(&pathstr)
+                .map_err(|e| format!("Failed to write file to {:?}. {}", current_path, e))?;
+            let default_env = include_str!("../default.env");
+            file.write_all(default_env.as_bytes())?;
+
+            println!("Sucesfully created {}", pathstr);
             std::process::exit(0);
         }
         Some("run") => {
@@ -129,6 +144,9 @@ async fn main() -> AtomicResult<()> {
             // Start server if no command is found
         }
     };
+
+    // Setup the database and more
+    let appstate = appstate::init(config.clone())?;
 
     // Start other async processes
     #[cfg(feature = "desktop")]

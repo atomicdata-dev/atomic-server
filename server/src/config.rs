@@ -70,6 +70,7 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
     key_path.push("https/key.pem");
     let mut email = None;
 
+    // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
         match &*key {
             "ATOMIC_CONFIG_PATH" => {

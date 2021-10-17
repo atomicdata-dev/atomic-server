@@ -5,6 +5,10 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## v0.26.1
 
+- Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #87
+
+## v0.26.1
+
 - Improved error message for hierarchy authorization check #178
 - Fix Property `recommends` #177
 - Refuse commits with query parameters in their subjects #179
