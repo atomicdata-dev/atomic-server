@@ -74,7 +74,7 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
     key_path.push("https/key.pem");
     let mut email = None;
     let mut asset_url = "https://joepio.github.io/atomic-data-browser".to_string();
-    let mut script = "";
+    let mut script = "".to_string();
 
     // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
