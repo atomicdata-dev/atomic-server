@@ -13,8 +13,8 @@ pub async fn single_page(
 
     let template = include_str!("../../static/atomic-data-browser.html");
     let body = template
-        .replace("{script}", &context.config.script)
-        .replace("{asset_url}", &context.config.asset_url);
+        .replace("{ script }", &context.config.opts.script)
+        .replace("{ asset_url }", &context.config.opts.asset_url);
 
     let resp = HttpResponse::Ok()
         .content_type("text/html")
