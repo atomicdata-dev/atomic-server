@@ -17,7 +17,7 @@ const CERTS_CREATED_AT: &str = "./.https/certs_created_at";
 /// Starts an HTTP Actix server for HTTPS certificate initialization
 pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
     log::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
-    let http_endpoint = format!("{}:{}", config.ip, config.port);
+    let http_endpoint = format!("{}:{}", config.opts.ip, config.opts.port);
     let mut well_known_folder = config.static_path.clone();
     well_known_folder.push("well-known");
     fs::create_dir_all(&well_known_folder)?;
@@ -30,7 +30,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
         .bind(&http_endpoint)
         .expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
         .run();
-    crate::https::request_cert(&config).expect("Certification init failed.");
+    crate::https::request_cert(config).map_err(|e| format!("Certification init failed: {}", e))?;
     log::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
     running_server.stop(true).await;
     Ok(())
@@ -39,7 +39,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
 /// Writes keys to disk using LetsEncrypt
 pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     // Use DirectoryUrl::LetsEncrypStaging for dev/testing.
-    let url = if config.development {
+    let url = if config.opts.development {
         DirectoryUrl::LetsEncryptStaging
     } else {
         DirectoryUrl::LetsEncrypt
@@ -57,6 +57,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     // creates a new one before accessing the API to establish
     // that it's there.
     let email = config
+        .opts
         .email
         .clone()
         .expect("ATOMIC_EMAIL must be set for HTTPS init");
@@ -64,7 +65,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     let acc = dir.account(&email)?;
 
     // Order a new TLS certificate for a domain.
-    let mut ord_new = acc.new_order(&*config.domain, &[])?;
+    let mut ord_new = acc.new_order(&*config.opts.domain, &[])?;
 
     // If the ownership of the domain(s) have already been
     // authorized in a previous order, you might be able to
