@@ -31,7 +31,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     env_logger::init();
 
     const VERSION: &str = env!("CARGO_PKG_VERSION");
-    log::info!("Atomic-server {}. Visit https://atomicdata.dev and https://github.com/joepio/atomic for more information.", VERSION);
+    log::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", VERSION);
 
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {

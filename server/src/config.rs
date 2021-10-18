@@ -1,4 +1,4 @@
-//! Setup on boot, reads .env values
+//! Parse CLI options, setup on boot, read .env values
 
 use crate::errors::BetterResult;
 use clap::Parser;
@@ -7,7 +7,7 @@ use std::env;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
-/// Store and share Atomic Data! Visit https://atomicdata.dev for more info. Pass no subcommands to launch the server.
+/// Store and share Atomic Data! Visit https://atomicdata.dev for more info. Pass no subcommands to launch the server. The `.env` of your current directory will be read.
 #[derive(Clone, Parser, Debug)]
 #[clap(author = "Joep Meindertsma (joep@ontola.io)")]
 pub struct Opts {
@@ -52,14 +52,17 @@ pub struct Opts {
     /// Custom JS script to include in the body of the HTML template
     #[clap(long, default_value = "", env = "ATOMIC_SCRIPT")]
     pub script: String,
+    /// Path for atomic data config directory. Defaults to "~/.config/atomic/""
+    #[clap(long, env = "ATOMIC_CONFIG_DIR")]
+    pub config_dir: Option<PathBuf>,
 }
 
 #[derive(Parser, Clone, Debug)]
 pub enum Command {
-    /// Create a JSON-AD backup of the store.
+    /// Create and save a JSON-AD backup of the store.
     #[clap(name = "export")]
     Export(ExportOpts),
-    /// Import a JSON-AD backup to the store. Overwrites Resources with same @id.
+    /// Import a JSON-AD backup to the store. Overwrites existing Resources with same @id.
     #[clap(name = "import")]
     Import(ImportOpts),
     /// Creates a `.env` file in your current directory that shows various options that you can set.
@@ -69,14 +72,14 @@ pub enum Command {
 
 #[derive(Parser, Clone, Debug)]
 pub struct ExportOpts {
-    /// Where the exported file should be saved
+    /// Where the exported file should be saved  "~/.config/atomic/backups/{date}.json"
     #[clap(short)]
     pub path: Option<PathBuf>,
 }
 
 #[derive(Parser, Clone, Debug)]
 pub struct ImportOpts {
-    /// Where the file that must be imported is saved
+    /// Where the file that should be imported is.
     #[clap(short)]
     pub path: PathBuf,
 }
@@ -113,9 +116,16 @@ pub struct Config {
 }
 
 /// Creates the server config, reads .env values and sets defaults
-pub fn init(opts: Opts) -> BetterResult<Config> {
+pub fn init() -> BetterResult<Config> {
+    // Parse CLI options, .env values, set defaults
+    let opts: Opts = Opts::parse();
+
     dotenv().ok();
-    let config_dir = atomic_lib::config::default_config_dir_path()?;
+    let config_dir = if let Some(dir) = &opts.config_dir {
+        dir.clone()
+    } else {
+        atomic_lib::config::default_config_dir_path()?
+    };
     let mut config_file_path = atomic_lib::config::default_config_file_path()?;
     let mut store_path = config_dir.clone();
     store_path.push("db");

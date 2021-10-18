@@ -15,15 +15,12 @@ mod serve;
 mod tray_icon;
 
 use atomic_lib::{errors::AtomicResult, Storelike};
-use clap::Parser;
 use std::{fs::File, io::Write};
 
 #[actix_web::main]
 async fn main() -> AtomicResult<()> {
-    // Parse CLI options, .env values, set defaults
-    let opts: config::Opts = config::Opts::parse();
-    // Create additional configurations, derived from opts
-    let config = config::init(opts).map_err(|e| format!("Initialization failed: {}", e))?;
+    // Parse CLI commands, env vars
+    let config = config::init().map_err(|e| format!("Initialization failed: {}", e))?;
 
     // All subcommands (as of now) also require appstate, which is why we have this logic below initial CLI logic.
     match &config.opts.command {
