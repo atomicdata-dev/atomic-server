@@ -3,7 +3,7 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## v0.26.2
+## v0.26.2-b
 
 - Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #87
 - Remove analytics in server

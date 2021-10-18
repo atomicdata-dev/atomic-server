@@ -19,7 +19,7 @@ COPY --from=cacher /app/target target
 COPY --from=cacher $CARGO_HOME $CARGO_HOME
 RUN cargo build --release --bin atomic-server
 
-# Not ideal
+# We only need a small runtime for this step, but make sure glibc is installed
 FROM frolvlad/alpine-glibc as runtime
 
 COPY ./server/ /server
