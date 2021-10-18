@@ -47,7 +47,7 @@ pub struct Config {
     pub static_path: PathBuf,
     /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
     pub store_path: PathBuf,
-    /// Endpoint where the front-end assets are hosted. (defaults to `~/.config/atomic/db`)
+    /// Endpoint where the front-end assets are hosted. (defaults to `https://joepio.github.io/atomic-data-browser`)
     pub asset_url: String,
     /// Custom JS script to include in the body of the HTML template
     pub script: String,
