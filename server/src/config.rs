@@ -20,7 +20,7 @@ pub struct Opts {
     /// Re-creates the value index. Parses all the resources. Do this if your collections have issues.
     #[clap(long)]
     pub rebuild_index: bool,
-    /// If you're running in Development mode.
+    /// Use staging environments for services like LetsEncrypt
     #[clap(long, env = "ATOMIC_DEVELOPMENT")]
     pub development: bool,
     /// The origin domain where the app is hosted, without the port and schema values.
@@ -30,7 +30,7 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_EMAIL")]
     pub email: Option<String>,
     /// The port where the HTTP app is available
-    #[clap(long, default_value = "80", env = "ATOMIC_PORT")]
+    #[clap(short, long, default_value = "80", env = "ATOMIC_PORT")]
     pub port: u32,
     /// The port where the HTTPS app is available
     #[clap(long, default_value = "443", env = "ATOMIC_PORT")]
@@ -42,6 +42,16 @@ pub struct Opts {
     /// Is disabled when using cert_init
     #[clap(long, env = "ATOMIC_HTTPS")]
     pub https: bool,
+    /// Endpoint where the front-end assets are hosted
+    #[clap(
+        long,
+        default_value = "https://joepio.github.io/atomic-data-browser",
+        env = "ATOMIC_ASSET_URL"
+    )]
+    pub asset_url: String,
+    /// Custom JS script to include in the body of the HTML template
+    #[clap(long, default_value = "", env = "ATOMIC_SCRIPT")]
+    pub script: String,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -171,7 +181,5 @@ pub fn init(opts: Opts) -> BetterResult<Config> {
         local_base_url,
         static_path,
         store_path,
-        asset_url,
-        script,
     })
 }
