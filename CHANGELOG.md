@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.26.3
+
+- Many `atomic-server` CLI improvements. Add options as flags, without needing environment variables.
+
 ## v0.26.2
 
 - Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #187
