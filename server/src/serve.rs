@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_web::{middleware, web, HttpServer};
 use atomic_lib::{errors::AtomicResult, Storelike};
-use std::{sync::Mutex};
+use std::sync::Mutex;
 
 /// Start the server
 pub async fn serve(config: crate::config::Config) -> AtomicResult<()> {
