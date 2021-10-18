@@ -3,11 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## v0.26.2-b
+## v0.26.2
 
-- Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #87
+- Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #187
 - Remove analytics in server
-- Make `asset-url` and `script` in HTML template customizable.
+- Make `asset-url` and `script` in HTML template customizable. #189
 
 ## v0.26.1
 
