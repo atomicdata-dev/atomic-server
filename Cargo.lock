@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.26.2"
+version = "0.26.3"
 dependencies = [
  "acme-lib",
  "actix",
