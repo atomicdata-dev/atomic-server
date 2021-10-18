@@ -22,6 +22,17 @@ pub struct AppState {
 /// Initializes a store on disk.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> BetterResult<AppState> {
+    // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
+    let _ = crate::process::terminate_existing_processes(&config)
+        .map_err(|e| log::error!("Could not check for running instance: {}", e));
+
+    // Enable all logging
+    std::env::set_var("RUST_LOG", "info");
+    env_logger::init();
+
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    log::info!("Atomic-server {}. Visit https://atomicdata.dev and https://github.com/joepio/atomic for more information.", VERSION);
+
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {
         log::info!("Initialize: creating and populating new Database...");

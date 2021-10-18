@@ -1,37 +1,88 @@
 //! Setup on boot, reads .env values
 
 use crate::errors::BetterResult;
+use clap::Parser;
 use dotenv::dotenv;
 use std::env;
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 use std::path::PathBuf;
+
+/// Store and share Atomic Data! Visit https://atomicdata.dev for more info. Pass no subcommands to launch the server.
+#[derive(Clone, Parser, Debug)]
+#[clap(author = "Joep Meindertsma (joep@ontola.io)")]
+pub struct Opts {
+    /// The subcommand being run
+    #[clap(subcommand)]
+    pub command: Option<Command>,
+    /// Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
+    #[clap(long)]
+    pub initialize: bool,
+    /// Re-creates the value index. Parses all the resources. Do this if your collections have issues.
+    #[clap(long)]
+    pub rebuild_index: bool,
+    /// If you're running in Development mode.
+    #[clap(long, env = "ATOMIC_DEVELOPMENT")]
+    pub development: bool,
+    /// The origin domain where the app is hosted, without the port and schema values.
+    #[clap(long, default_value = "localhost", env = "ATOMIC_DOMAIN")]
+    pub domain: String,
+    /// The contact mail address for Let's Encrypt HTTPS setup
+    #[clap(long, env = "ATOMIC_EMAIL")]
+    pub email: Option<String>,
+    /// The port where the HTTP app is available
+    #[clap(long, default_value = "80", env = "ATOMIC_PORT")]
+    pub port: u32,
+    /// The port where the HTTPS app is available
+    #[clap(long, default_value = "443", env = "ATOMIC_PORT")]
+    pub port_https: u32,
+    /// The IP address of the server
+    #[clap(long, default_value = "0.0.0.0", env = "ATOMIC_IP")]
+    pub ip: IpAddr,
+    /// If we're using HTTPS or plaintext HTTP.
+    /// Is disabled when using cert_init
+    #[clap(long, env = "ATOMIC_HTTPS")]
+    pub https: bool,
+}
+
+#[derive(Parser, Clone, Debug)]
+pub enum Command {
+    /// Create a JSON-AD backup of the store.
+    #[clap(name = "export")]
+    Export(ExportOpts),
+    /// Import a JSON-AD backup to the store. Overwrites Resources with same @id.
+    #[clap(name = "import")]
+    Import(ImportOpts),
+    /// Creates a `.env` file in your current directory that shows various options that you can set.
+    #[clap(name = "setup-env")]
+    SetupEnv,
+}
+
+#[derive(Parser, Clone, Debug)]
+pub struct ExportOpts {
+    /// Where the exported file should be saved
+    #[clap(short)]
+    pub path: Option<PathBuf>,
+}
+
+#[derive(Parser, Clone, Debug)]
+pub struct ImportOpts {
+    /// Where the file that must be imported is saved
+    #[clap(short)]
+    pub path: PathBuf,
+}
+
+/// Start atomic-server, oi mate
+#[derive(Parser, Clone, Debug)]
+pub struct ServerOpts {}
 
 /// Configuration for the server.
 /// These values are set when the server initializes, and do not change while running.
 #[derive(Clone)]
 pub struct Config {
-    /// If you're starting the server for the first time, or have passed an `--initialize` flag
-    pub initialize: bool,
-    /// If the index has to be rebuilt
-    pub rebuild_index: bool,
-    /// If you're running in Development mode.
-    pub development: bool,
-    /// Where the app is hosted (defaults to localhost).
-    /// Without the port and schema values.
-    pub domain: String,
-    /// The full URL at which the Server will be available. E.g. https://example.com
+    /// Full domain + schema
     pub local_base_url: String,
-    /// The contact mail address for Let's Encrypt HTTPS setup
-    pub email: Option<String>,
-    /// The port where the HTTP app is available (defaults to 80)
-    pub port: u32,
-    /// The port where the HTTPS app is available (defaults to 443)
-    pub port_https: u32,
-    /// The IP address of the serer. (defaults to 0.0.0.0)
-    pub ip: IpAddr,
-    /// If we're using HTTPS or plaintext HTTP.
-    /// Is disabled when using cert_init
-    pub https: bool,
+    /// CLI + ENV options
+    pub opts: Opts,
     // ===  PATHS  ===
     /// Path for atomic data config `~/.config/atomic/`. Used to construct most other paths.
     pub config_dir: PathBuf,
@@ -47,21 +98,13 @@ pub struct Config {
     pub static_path: PathBuf,
     /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
     pub store_path: PathBuf,
-    /// Endpoint where the front-end assets are hosted. (defaults to `https://joepio.github.io/atomic-data-browser`)
-    pub asset_url: String,
-    /// Custom JS script to include in the body of the HTML template
-    pub script: String,
+    /// init app
+    pub initialize: bool,
 }
 
 /// Creates the server config, reads .env values and sets defaults
-pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
+pub fn init(opts: Opts) -> BetterResult<Config> {
     dotenv().ok();
-    let mut development = false;
-    let mut domain = String::from("localhost");
-    let mut https = false;
-    let mut ip = IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0));
-    let mut port = 80;
-    let mut port_https = 443;
     let config_dir = atomic_lib::config::default_config_dir_path()?;
     let mut config_file_path = atomic_lib::config::default_config_file_path()?;
     let mut store_path = config_dir.clone();
@@ -72,9 +115,6 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
     cert_path.push("https/cert.pem");
     let mut key_path = config_dir.clone();
     key_path.push("https/key.pem");
-    let mut email = None;
-    let mut asset_url = "https://joepio.github.io/atomic-data-browser".to_string();
-    let mut script = "".to_string();
 
     // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
@@ -95,74 +135,40 @@ pub fn init(matches: &clap::ArgMatches) -> BetterResult<Config> {
                     )
                 })?;
             }
-            "ATOMIC_DOMAIN" => {
-                // Perhaps this should have some regex check
-                domain = value;
-            }
-            "ATOMIC_DEVELOPMENT" => {
-                development = value.parse().expect("ATOMIC_DEVELOPMENT is not a boolean");
-            }
-            "ATOMIC_PORT" => {
-                port = value.parse().expect("ATOMIC_PORT is not a number");
-            }
-            "ATOMIC_PORT_HTTPS" => {
-                port_https = value.parse().expect("ATOMIC_PORT_HTTPS is not a number");
-            }
-            "ATOMIC_IP" => {
-                ip = value
-                    .parse()
-                    .expect("Could not parse ATOMIC_IP. Is it a valid IP address?");
-            }
-            "ATOMIC_EMAIL" => {
-                email = Some(value);
-            }
-            "ATOMIC_HTTPS" => {
-                https = value.parse().expect("ATOMIC_HTTPS is not a boolean");
-            }
-            "ATOMIC_SCRIPT" => {
-                script = value;
-            }
-            "ATOMIC_ASSET_URL" => {
-                asset_url = value;
-            }
             _ => {}
         }
     }
 
-    let initialize = !std::path::Path::exists(&store_path) || matches.is_present("init");
-    let rebuild_index = matches.is_present("reindex");
+    let initialize = !std::path::Path::exists(&store_path) || opts.initialize;
 
-    if https & email.is_none() {
-        email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
+    if opts.https & opts.email.is_none() {
+        return Err(
+            "The email parameter is required for getting an HTTPS certificate from Let'sEncrypt."
+                .into(),
+        );
+        // email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
     }
 
-    let schema = if https { "https" } else { "http" };
+    let schema = if opts.https { "https" } else { "http" };
     // I'm not convinced that this is the best way to do this.
-    let local_base_url = if https && port_https == 443 || !https && port == 80 {
-        format!("{}://{}", schema, domain)
+    let local_base_url = if opts.https && opts.port_https == 443 || !opts.https && opts.port == 80 {
+        format!("{}://{}", schema, opts.domain)
     } else {
-        format!("{}://{}:{}", schema, domain, port)
+        format!("{}://{}:{}", schema, opts.domain, opts.port)
     };
 
     let mut static_path = config_dir.clone();
     static_path.push("public");
 
     Ok(Config {
-        rebuild_index,
+        initialize,
+        opts,
         cert_path,
         config_dir,
         config_file_path,
-        development,
-        domain,
-        email,
         https_path,
-        https,
-        initialize,
-        ip,
         key_path,
         local_base_url,
-        port_https,
-        port,
         static_path,
         store_path,
         asset_url,
