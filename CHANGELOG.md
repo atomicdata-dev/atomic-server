@@ -5,7 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## v0.26.3
 
-- Many `atomic-server` CLI improvements. Add options as flags, without needing environment variables.
+- Many `atomic-server` CLI improvements. Add options as flags, without needing environment variables. #154
 
 ## v0.26.2
 
