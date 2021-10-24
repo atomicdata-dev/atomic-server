@@ -10,6 +10,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Introduce `incomplete` resources
 - Update `get_resource_extended`, allow specify whether to calculate nested resources.
 - Sort `children` in hierarchies.
+- Sort `export` output - first export Properties, fixing #163
+- Add `only-internal` to `export` CLI command in `atomic-server`.
 
 ## v0.26.3
 
