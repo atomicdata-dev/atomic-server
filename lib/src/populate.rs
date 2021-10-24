@@ -128,6 +128,17 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     .to_resource()?;
     store.add_resource_unsafe(&datatype)?;
 
+    let agent = Class {
+        requires: vec![urls::PUBLIC_KEY.into()],
+        recommends: vec![urls::NAME.into(), urls::DESCRIPTION.into()],
+        shortname: "agent".into(),
+        description:
+            "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The public key is used to verify signatures (on [Commits](https://atomicdata.dev/classes/Commit)) set by the of the Agent.".into(),
+        subject: urls::AGENT.into(),
+    }
+    .to_resource()?;
+    store.add_resource_unsafe(&agent)?;
+
     Ok(())
 }
 

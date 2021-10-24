@@ -169,12 +169,9 @@ pub trait Storelike: Sized {
 
     /// Imports a JSON-AD string, returns the amount of imported resources
     fn import(&self, string: &str) -> AtomicResult<usize> {
-        let vec = parse_json_ad_array(string, self)
-            .map_err(|e| format!("Unable to parse JSON-AD string: {}", e))?;
+        let vec = parse_json_ad_array(string, self, true)
+            .map_err(|e| format!("Unable to parse JSON-AD: {}", e))?;
         let len = vec.len();
-        for r in vec {
-            self.add_resource(&r)?
-        }
         Ok(len)
     }
 

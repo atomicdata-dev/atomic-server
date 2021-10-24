@@ -26,10 +26,20 @@ fn json_ad_object_to_resource(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,
 ) -> AtomicResult<Resource> {
-    let mut resource = Resource::new(get_id(json.clone())?);
-    let propvals = parse_json_ad_map_to_propvals(json, store)?;
+    let subject = get_id(json.clone()).map_err(|e| format!("Unable to get @id. {}", e))?;
+    let mut resource = Resource::new(subject.clone());
+    let propvals = parse_json_ad_map_to_propvals(json, store)
+        .map_err(|e| format!("Unable to parse JSON-AD for {}. {}", &subject, e))?;
     for (prop, val) in propvals {
-        resource.set_propval(prop, val, store)?
+        // I'd like to get rid of these clones! But I want to use them in the error, too...
+        resource
+            .set_propval(prop.clone(), val.clone(), store)
+            .map_err(|e| {
+                format!(
+                    "Unable to set prop: {}, val: {} for subject {}. {}",
+                    prop, val, subject, e
+                )
+            })?
     }
     Ok(resource)
 }
@@ -44,8 +54,12 @@ fn get_id(object: serde_json::Map<String, serde_json::Value>) -> AtomicResult<St
         .to_string())
 }
 
-/// Parses JSON-AD strings to resources
-pub fn parse_json_ad_array(string: &str, store: &impl Storelike) -> AtomicResult<Vec<Resource>> {
+/// Parses JSON-AD strings to resources, adds them to the store
+pub fn parse_json_ad_array(
+    string: &str,
+    store: &impl Storelike,
+    add: bool,
+) -> AtomicResult<Vec<Resource>> {
     let parsed: serde_json::Value = serde_json::from_str(string)?;
     let mut vec = Vec::new();
     match parsed {
@@ -53,7 +67,12 @@ pub fn parse_json_ad_array(string: &str, store: &impl Storelike) -> AtomicResult
             for item in arr {
                 match item {
                     serde_json::Value::Object(obj) => {
-                        vec.push(json_ad_object_to_resource(obj, store)?)
+                        let resource = json_ad_object_to_resource(obj, store)
+                            .map_err(|e| format!("Unable to parse resource. {}", e))?;
+                        if add {
+                            store.add_resource(&resource)?
+                        };
+                        vec.push(resource);
                     }
                     wrong => {
                         return Err(
@@ -63,7 +82,10 @@ pub fn parse_json_ad_array(string: &str, store: &impl Storelike) -> AtomicResult
                 }
             }
         }
-        serde_json::Value::Object(obj) => vec.push(json_ad_object_to_resource(obj, store)?),
+        serde_json::Value::Object(obj) => vec.push(
+            json_ad_object_to_resource(obj, store)
+                .map_err(|e| format!("Unable to parse resource {}", e))?,
+        ),
         _other => return Err("Root JSON element must be an object or array.".into()),
     }
     Ok(vec)

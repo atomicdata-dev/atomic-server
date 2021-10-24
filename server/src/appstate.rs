@@ -36,15 +36,19 @@ pub fn init(config: Config) -> BetterResult<AppState> {
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {
         log::info!("Initialize: creating and populating new Database...");
-        atomic_lib::populate::populate_default_store(&store)?;
+        atomic_lib::populate::populate_default_store(&store)
+            .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // Building the index here is needed to perform TPF queries on imported resources
         store.build_index(true)?;
     }
     set_default_agent(&config, &store)?;
     if config.initialize {
-        atomic_lib::populate::populate_hierarchy(&store)?;
-        atomic_lib::populate::populate_collections(&store)?;
-        atomic_lib::populate::populate_endpoints(&store)?;
+        atomic_lib::populate::populate_hierarchy(&store)
+            .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
+        atomic_lib::populate::populate_collections(&store)
+            .map_err(|e| format!("Failed to populate collections. {}", e))?;
+        atomic_lib::populate::populate_endpoints(&store)
+            .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         set_up_initial_invite(&store)?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
         set_up_drive(&store)?;

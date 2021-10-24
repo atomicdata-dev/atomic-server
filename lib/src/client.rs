@@ -51,7 +51,7 @@ pub fn fetch_tpf(
         url.query_pairs_mut().append_pair("value", val);
     }
     let body = fetch_body(url.as_str(), "application/ad+json")?;
-    crate::parse::parse_json_ad_array(&body, store)
+    crate::parse::parse_json_ad_array(&body, store, false)
 }
 
 /// Posts a Commit to the endpoint of the Subject from the Commit
