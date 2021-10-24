@@ -50,7 +50,8 @@ impl Db {
             index_vals,
             base_url,
         };
-        crate::populate::populate_base_models(&store)?;
+        crate::populate::populate_base_models(&store)
+            .map_err(|e| format!("Failed to populate base models. {}", e))?;
         Ok(store)
     }
 
@@ -347,12 +348,16 @@ impl Storelike for Db {
 
     fn populate(&self) -> AtomicResult<()> {
         // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
-        crate::populate::populate_default_store(self)?;
+        crate::populate::populate_default_store(self)
+            .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // This is a potentially expensive operation, but is needed to make TPF queries work with the models created in here
         self.build_index(true)?;
-        crate::populate::populate_hierarchy(self)?;
-        crate::populate::populate_collections(self)?;
-        crate::populate::populate_endpoints(self)?;
+        crate::populate::populate_hierarchy(self)
+            .map_err(|e| format!("Failed to populate hierarcy. {}", e))?;
+        crate::populate::populate_collections(self)
+            .map_err(|e| format!("Failed to populate collections. {}", e))?;
+        crate::populate::populate_endpoints(self)
+            .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         Ok(())
     }
 
