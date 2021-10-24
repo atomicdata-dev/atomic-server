@@ -36,4 +36,4 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: ~/atomic-server --export && ~/atomic-server &> log-${{ GITHUB_REF#refs/*/ }}
+          script: ~/atomic-server --export && ~/atomic-server &> log
