@@ -8,6 +8,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - **IMPORANT**: before upgrading to this version, export your database using your previous version: `atomic-server export`. The database could become corrupted when running the new version.
 - Include Resources in Collection responses, improving performance dramatically for collections #62
 - Introduce `incomplete` resources
+- Update `get_resource_extended`, allow specify whether to calculate nested resources.
+- Sort `children` in hierarchies.
 
 ## v0.26.3
 

@@ -226,9 +226,9 @@ mod test {
         store.populate().unwrap();
         let subject = "https://atomicdata.dev/classes?current_page=2";
         // Should throw, because page 2 is out of bounds for default page size
-        let _wrong_resource = store.get_resource_extended(subject).unwrap_err();
+        let _wrong_resource = store.get_resource_extended(subject, false).unwrap_err();
         let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
-        let resource = store.get_resource_extended(subject).unwrap();
+        let resource = store.get_resource_extended(subject, false).unwrap();
         let cur_page = resource
             .get(urls::COLLECTION_CURRENT_PAGE)
             .unwrap()

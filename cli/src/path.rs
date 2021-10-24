@@ -20,7 +20,7 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
     let path = store.get_path(&path_string, Some(&context.mapping.lock().unwrap()))?;
     let out = match path {
         storelike::PathReturn::Subject(subject) => {
-            let resource = store.get_resource_extended(&subject)?;
+            let resource = store.get_resource_extended(&subject, false)?;
             print_resource(context, &resource, subcommand_matches)?;
             return Ok(());
         }

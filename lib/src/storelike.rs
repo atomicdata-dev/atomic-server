@@ -130,7 +130,9 @@ pub trait Storelike: Sized {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Defaults to get_resource if store doesn't support extended resources
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
+    /// - *skip_dynamic* Does not calculte dynamic properties. Adds an `incomplete=true` property if the resource should have been dynamic.
+    fn get_resource_extended(&self, subject: &str, skip_dynamic: bool) -> AtomicResult<Resource> {
+        let _ignore = skip_dynamic;
         self.get_resource(subject)
     }
 
@@ -292,7 +294,7 @@ pub trait Storelike: Sized {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource = self.get_resource_extended(&subject)?;
+        let mut resource = self.get_resource_extended(&subject, false)?;
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -322,7 +324,7 @@ pub trait Storelike: Sized {
                             ))?
                             .into();
                         subject = url;
-                        resource = self.get_resource_extended(&subject)?;
+                        resource = self.get_resource_extended(&subject, false)?;
                         current = PathReturn::Subject(subject.clone());
                         continue;
                     }

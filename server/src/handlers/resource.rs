@@ -51,7 +51,7 @@ pub async fn get_resource(
         "no-store, no-cache, must-revalidate, private",
     );
     let resource = store
-        .get_resource_extended(&subject)
+        .get_resource_extended(&subject, false)
         // TODO: Don't always return 404 - only when it's actually not found!
         .map_err(|e| AppError::other_error(e.to_string()))?;
     match content_type {
