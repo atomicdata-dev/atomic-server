@@ -15,6 +15,7 @@ pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicRe
     for atom in atoms {
         children.push(atom.subject)
     }
+    children.sort();
     resource.set_propval(urls::CHILDREN.into(), children.into(), store)?;
     Ok(resource.to_owned())
 }

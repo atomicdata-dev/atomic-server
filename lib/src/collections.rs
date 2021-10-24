@@ -83,12 +83,6 @@ impl CollectionBuilder {
             self.page_size.into(),
             store,
         )?;
-        // CollectionBuilders by definition do not have any members, so we should communicate that to clients
-        resource.set_propval(
-            crate::urls::INCOMPLETE.into(),
-            crate::Value::Boolean(true),
-            store,
-        )?;
         // Maybe include items directly
         Ok(resource)
     }
@@ -211,10 +205,8 @@ impl Collection {
         // If sorting is required or the nested resoureces are asked, we need to fetch all resources from the store.
         if collection_builder.sort_by.is_some() || collection_builder.include_nested {
             for subject in subjects.iter() {
-                // WARNING: This does not get extended resources, which means that they could be incomplete and lack the dynamic properties
-                // For example, Collections will not have Members.
-                // The client has to know about this and possibly handle it
-                let resource = store.get_resource(&subject)?;
+                // These nested resources are not fully calculated - they will be presented as -is
+                let resource = store.get_resource_extended(subject, true)?;
                 resources.push(resource)
             }
             if let Some(sort) = &collection_builder.sort_by {
@@ -361,13 +353,6 @@ impl Collection {
             store,
         )?;
 
-        // CollectionBuilders by definition do not have any members, so they set Incomplete to true.
-        // We should set this to false in full Collections
-        resource.set_propval(
-            crate::urls::INCOMPLETE.into(),
-            crate::Value::Boolean(false),
-            store,
-        )?;
         Ok(resource.to_owned())
     }
 }
@@ -526,7 +511,7 @@ mod test {
             .collect();
         println!("{:?}", subjects);
         let collections_collection = store
-            .get_resource_extended(&format!("{}/collections", store.get_base_url()))
+            .get_resource_extended(&format!("{}/collections", store.get_base_url()), false)
             .unwrap();
         assert!(
             collections_collection
@@ -551,7 +536,7 @@ mod test {
         store.populate().unwrap();
 
         let collection_page_size = store
-            .get_resource_extended("https://atomicdata.dev/classes?page_size=1")
+            .get_resource_extended("https://atomicdata.dev/classes?page_size=1", false)
             .unwrap();
         assert!(
             collection_page_size
@@ -561,7 +546,10 @@ mod test {
                 == "1"
         );
         let collection_page_nr = store
-            .get_resource_extended("https://atomicdata.dev/classes?current_page=2&page_size=1")
+            .get_resource_extended(
+                "https://atomicdata.dev/classes?current_page=2&page_size=1",
+                false,
+            )
             .unwrap();
         assert!(
             collection_page_nr

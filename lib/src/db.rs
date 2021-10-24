@@ -244,7 +244,7 @@ impl Storelike for Db {
         }
     }
 
-    fn get_resource_extended(&self, subject: &str) -> AtomicResult<Resource> {
+    fn get_resource_extended(&self, subject: &str, skip_dynamic: bool) -> AtomicResult<Resource> {
         // This might add a trailing slash
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
@@ -275,29 +275,53 @@ impl Storelike for Db {
         }
 
         let mut resource = self.get_resource(&removed_query_params)?;
+
         // make sure the actual subject matches the one requested
         resource.set_subject(subject.into());
+
+        // Whether the resource has dynamic properties
+        let mut has_dynamic = false;
         // If a certain class needs to be extended, add it to this match statement
         for class in resource.get_classes(self)? {
             match class.subject.as_ref() {
                 crate::urls::COLLECTION => {
-                    return crate::collections::construct_collection(
-                        self,
-                        query_params,
-                        &mut resource,
-                    )
+                    has_dynamic = true;
+                    if !skip_dynamic {
+                        return crate::collections::construct_collection(
+                            self,
+                            query_params,
+                            &mut resource,
+                        );
+                    }
                 }
                 crate::urls::INVITE => {
-                    return crate::plugins::invite::construct_invite_redirect(
-                        self,
-                        query_params,
-                        &mut resource,
-                        subject,
-                    )
+                    has_dynamic = true;
+                    if !skip_dynamic {
+                        return crate::plugins::invite::construct_invite_redirect(
+                            self,
+                            query_params,
+                            &mut resource,
+                            subject,
+                        );
+                    }
                 }
-                crate::urls::DRIVE => return crate::hierarchy::add_children(self, &mut resource),
+                crate::urls::DRIVE => {
+                    has_dynamic = true;
+                    if !skip_dynamic {
+                        return crate::hierarchy::add_children(self, &mut resource);
+                    }
+                }
                 _ => {}
             }
+        }
+
+        // This lets clients know that the resource may have dynamic properties that are currently not included
+        if has_dynamic && skip_dynamic {
+            resource.set_propval(
+                crate::urls::INCOMPLETE.into(),
+                crate::Value::Boolean(true),
+                self,
+            )?;
         }
         Ok(resource)
     }
@@ -565,7 +589,7 @@ pub mod test {
         println!("{:?}", subjects);
         let collections_collection_url = format!("{}/collections", store.get_base_url());
         let collections_resource = store
-            .get_resource_extended(&collections_collection_url)
+            .get_resource_extended(&collections_collection_url, false)
             .unwrap();
         let member_count = collections_resource
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -609,7 +633,7 @@ pub mod test {
     fn destroy_resource_and_check_collection() {
         let store = DB.lock().unwrap().clone();
         let agents_url = format!("{}/agents", store.get_base_url());
-        let agents_collection_1 = store.get_resource_extended(&agents_url).unwrap();
+        let agents_collection_1 = store.get_resource_extended(&agents_url, false).unwrap();
         let agents_collection_count_1 = agents_collection_1
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -625,7 +649,7 @@ pub mod test {
             .to_resource(&store)
             .unwrap();
         resource.save_locally(&store).unwrap();
-        let agents_collection_2 = store.get_resource_extended(&agents_url).unwrap();
+        let agents_collection_2 = store.get_resource_extended(&agents_url, false).unwrap();
         let agents_collection_count_2 = agents_collection_2
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -637,7 +661,7 @@ pub mod test {
         );
 
         resource.destroy(&store).unwrap();
-        let agents_collection_3 = store.get_resource_extended(&agents_url).unwrap();
+        let agents_collection_3 = store.get_resource_extended(&agents_url, false).unwrap();
         let agents_collection_count_3 = agents_collection_3
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
