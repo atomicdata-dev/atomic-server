@@ -92,7 +92,7 @@ impl Value {
                 Ok(Value::AtomicUrl(value.into()))
             }
             DataType::ResourceArray => {
-                let vector: Vec<String> = crate::parse::parse_json_array(&value).map_err(|e| {
+                let vector: Vec<String> = crate::parse::parse_json_array(value).map_err(|e| {
                     return format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e);
                 })?;
                 Ok(Value::ResourceArraySubjects(vector))

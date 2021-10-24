@@ -67,7 +67,7 @@ fn prompt_instance<'a>(
     )?;
 
     for prop_subject in &class.requires {
-        let field = context.store.get_property(&prop_subject)?;
+        let field = context.store.get_property(prop_subject)?;
         if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
             new_resource.set_propval_string(
                 field.subject.clone(),
@@ -96,7 +96,7 @@ fn prompt_instance<'a>(
     }
 
     for prop_subject in &class.recommends {
-        let field = context.store.get_property(&prop_subject)?;
+        let field = context.store.get_property(prop_subject)?;
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         let input = prompt_field(&field, true, context)?;
         if let Some(i) = input {
@@ -310,7 +310,7 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &str) -> Option<Stri
                         mapping.get(sn).unwrap()
                     );
                     shortname = prompt_opt(msg).unwrap();
-                } else if re.is_match(&sn.as_str()) {
+                } else if re.is_match(sn.as_str()) {
                     mapping.insert(sn.into(), subject.into());
                     return Some(String::from(sn));
                 } else {

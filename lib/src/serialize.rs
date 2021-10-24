@@ -8,7 +8,7 @@ use crate::{
 };
 
 /// Serializes a vector or Resources to a JSON-AD string
-pub fn resources_to_json_ad(resources: &Vec<Resource>) -> AtomicResult<String> {
+pub fn resources_to_json_ad(resources: &[Resource]) -> AtomicResult<String> {
     let mut vec: Vec<serde_json::Value> = Vec::new();
     for r in resources {
         vec.push(crate::serialize::propvals_to_json_ad_map(

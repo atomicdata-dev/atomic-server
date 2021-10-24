@@ -44,7 +44,7 @@ pub fn pretty_print_resource(resource: &Resource, store: &impl Storelike) -> Ato
         resource.get_subject()
     ));
     for (prop_url, val) in resource.get_propvals() {
-        let prop_shortname = store.get_property(&prop_url)?.shortname;
+        let prop_shortname = store.get_property(prop_url)?.shortname;
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),
@@ -65,7 +65,7 @@ pub fn print_resource(
         Format::JsonLd => resource.to_json_ld(&context.store)?,
         Format::JsonAd => resource.to_json_ad()?,
         Format::NTriples => serialize::atoms_to_ntriples(resource.to_atoms()?, &context.store)?,
-        Format::Pretty => pretty_print_resource(&resource, &context.store)?,
+        Format::Pretty => pretty_print_resource(resource, &context.store)?,
     };
     println!("{}", out);
     Ok(())

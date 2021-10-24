@@ -193,13 +193,13 @@ impl Commit {
                     let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
                     store.remove_atom_from_index(&atom)?;
                 }
-                resource.remove_propval(&prop);
+                resource.remove_propval(prop);
             }
         }
         if let Some(destroy) = self.destroy {
             if destroy {
                 for atom in resource.to_atoms()?.iter() {
-                    store.remove_atom_from_index(&atom)?;
+                    store.remove_atom_from_index(atom)?;
                 }
             }
         }
@@ -460,7 +460,7 @@ mod test {
         let commit_subject = commit.get_subject().to_string();
         let _created_resource = commit.apply(&store).unwrap();
 
-        let resource = store.get_resource(&subject).unwrap();
+        let resource = store.get_resource(subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
         let found_commit = store.get_resource(&commit_subject).unwrap();
         println!("{}", found_commit.get_subject());
