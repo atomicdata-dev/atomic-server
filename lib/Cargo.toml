@@ -1,7 +1,7 @@
 [package]
 authors = ["Joep Meindertsma <joep@argu.co>"]
 description = "Library for creating, storing, querying, validating and converting Atomic Data."
-edition = "2018"
+edition = "2021"
 license = "MIT"
 name = "atomic_lib"
 readme = "README.md"
