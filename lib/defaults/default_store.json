@@ -565,15 +565,6 @@
         "https://atomicdata.dev/properties/shortname": "name"
     },
     {
-        "@id": "https://atomicdata.dev/properties/parent",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-        "https://atomicdata.dev/properties/description": "The parent of a Resource sets the hierarchical structure of the Resource, and therefore also the rights / grants. It is used for both navigation, structure and authorization. Parents are the inverse of [children](https://atomicdata.dev/properties/children).",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "parent"
-    },
-    {
         "@id": "https://atomicdata.dev/properties/path",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value.",

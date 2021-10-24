@@ -108,5 +108,14 @@
       "https://atomicdata.dev/properties/description"
     ],
     "https://atomicdata.dev/properties/shortname": "datatype"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/parent",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The parent of a Resource sets the hierarchical structure of the Resource, and therefore also the rights / grants. It is used for both navigation, structure and authorization. Parents are the inverse of [children](https://atomicdata.dev/properties/children).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "parent"
   }
 ]

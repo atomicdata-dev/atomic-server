@@ -87,6 +87,16 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     .to_resource()?;
     store.add_resource_unsafe(&requires)?;
 
+    let parent = Property {
+        class_type: Some(urls::PROPERTY.into()),
+        data_type: DataType::AtomicUrl,
+        shortname: "parent".into(),
+        description: "The parent of a Resource sets the hierarchical structure of the Resource, and therefore also the rights / grants. It is used for both navigation, structure and authorization. Parents are the inverse of [children](https://atomicdata.dev/properties/children).".into(),
+        subject: urls::PARENT.into(),
+    }
+    .to_resource()?;
+    store.add_resource_unsafe(&parent)?;
+
     let property = Class {
         requires: vec![urls::SHORTNAME.into(), urls::DATATYPE_PROP.into()],
         recommends: vec![urls::DESCRIPTION.into(), urls::CLASSTYPE_PROP.into(), urls::IS_DYNAMIC.into(), urls::IS_LOCKED.into()],

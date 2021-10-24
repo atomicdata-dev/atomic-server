@@ -16,7 +16,7 @@ jobs:
           command: build
           args: --release
       - name: Set env
-        run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF:10})" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
       - name: Transfer binary rsync
         uses: easingthemes/ssh-deploy@main
         env:
@@ -26,5 +26,14 @@ jobs:
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
-      - name: Run new server
-        run: ~/atomic-server &> ~/log-${{ env.RELEASE_VERSION }}-${{ env.GITHUB_RUN_NUMBER}}
+      # - name: Export data
+      #   run: ~/atomic-server --export
+      # - name: Run new server
+      #   run: ~/atomic-server &> log-${{ GITHUB_REF#refs/*/ }}
+      - name: executing remote ssh commands using ssh key
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: ~/atomic-server --export && ~/atomic-server &> log-${{ GITHUB_REF#refs/*/ }}
