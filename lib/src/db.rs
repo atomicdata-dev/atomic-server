@@ -97,7 +97,7 @@ impl Db {
                 let psm: PropSubjectMap = bincode::deserialize(binpropval).map_err(|e| {
                     format!(
                         "Deserialize PropSubjectMap error: {} {}",
-                        corrupt_db_message(&string_val),
+                        corrupt_db_message(string_val),
                         e
                     )
                 })?;
@@ -186,11 +186,11 @@ impl Storelike for Db {
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
         resource.check_required_props(self)?;
-        self.set_propvals(resource.get_subject(), &resource.get_propvals())
+        self.set_propvals(resource.get_subject(), resource.get_propvals())
     }
 
     fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()> {
-        self.set_propvals(resource.get_subject(), &resource.get_propvals())
+        self.set_propvals(resource.get_subject(), resource.get_propvals())
     }
 
     fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
@@ -439,7 +439,7 @@ impl Storelike for Db {
         };
 
         match q_subject {
-            Some(sub) => match self.get_resource(&sub) {
+            Some(sub) => match self.get_resource(sub) {
                 Ok(resource) => {
                     if hasprop | hasval {
                         find_in_resource(&resource);

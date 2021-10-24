@@ -73,7 +73,7 @@ impl Resource {
         let mut classes: Vec<Class> = Vec::new();
         if let Ok(val) = self.get(crate::urls::IS_A) {
             for class in val.to_vec()? {
-                classes.push(store.get_class(&class)?)
+                classes.push(store.get_class(class)?)
             }
         }
         Ok(classes)

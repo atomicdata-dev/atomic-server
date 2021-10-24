@@ -266,7 +266,7 @@ pub trait Storelike: Sized {
         };
 
         match q_subject {
-            Some(sub) => match self.get_resource(&sub) {
+            Some(sub) => match self.get_resource(sub) {
                 Ok(resource) => {
                     if hasprop | hasval {
                         find_in_resource(&resource);
@@ -356,7 +356,7 @@ pub trait Storelike: Sized {
             }
             // Set the parent for the next loop equal to the next node.
             // TODO: skip this step if the current iteration is the last one
-            let value = resource.get_shortname(&item, self)?.clone();
+            let value = resource.get_shortname(item, self)?.clone();
             let property = resource.resolve_shortname_to_property(item, self)?;
             current = PathReturn::Atom(Box::new(Atom::new(
                 subject.clone(),

@@ -71,7 +71,7 @@ pub fn post_commit_custom_endpoint(
 ) -> AtomicResult<()> {
     let json = commit.clone().into_resource(store)?.to_json_ad()?;
 
-    let resp = ureq::post(&endpoint)
+    let resp = ureq::post(endpoint)
         .set("Content-Type", "application/json")
         .timeout_read(2000)
         .send_string(&json);

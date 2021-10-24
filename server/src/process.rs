@@ -26,7 +26,7 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
                         break;
                     };
                     if tries_left > 1 {
-                        tries_left = tries_left - 1;
+                        tries_left -= 1;
                         log::info!(
                             "Other instance is still running, checking again in {} seconds, for {} more times ",
                             retry_secs,
