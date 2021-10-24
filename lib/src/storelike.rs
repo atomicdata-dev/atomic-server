@@ -87,9 +87,23 @@ pub trait Storelike: Sized {
         Ok(agent)
     }
 
-    /// Exports the store to a big JSON-AD file
+    /// Exports the store to a big JSON-AD file.
+    /// Sorts the export by first exporting Property Resources, which makes importing faster and more dependent.
     fn export(&self, include_external: bool) -> AtomicResult<String> {
-        crate::serialize::resources_to_json_ad(&self.all_resources(include_external))
+        let resources = self.all_resources(include_external);
+        let mut properties: Vec<Resource> = Vec::new();
+        let mut other_resources: Vec<Resource> = Vec::new();
+        for r in resources {
+            if let Ok(class) = r.get_main_class() {
+                if class == crate::urls::PROPERTY {
+                    properties.push(r);
+                    continue;
+                }
+            }
+            other_resources.push(r);
+        }
+        properties.append(&mut other_resources);
+        crate::serialize::resources_to_json_ad(&properties)
     }
 
     /// Fetches a resource, makes sure its subject matches.

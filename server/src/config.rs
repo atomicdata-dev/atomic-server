@@ -75,6 +75,9 @@ pub struct ExportOpts {
     /// Where the exported file should be saved  "~/.config/atomic/backups/{date}.json"
     #[clap(short)]
     pub path: Option<PathBuf>,
+    /// Do not export resources that are externally defined, which are cached by this Server.
+    #[clap(long)]
+    pub only_internal: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

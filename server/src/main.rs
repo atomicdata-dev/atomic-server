@@ -36,7 +36,7 @@ async fn main() -> AtomicResult<()> {
                 }
             };
             let appstate = appstate::init(config.clone())?;
-            let outstr = appstate.store.export(true)?;
+            let outstr = appstate.store.export(!e.only_internal)?;
             std::fs::create_dir_all(path.parent().unwrap())
                 .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
             let mut file = File::create(&path)

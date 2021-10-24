@@ -79,6 +79,15 @@ impl Resource {
         Ok(classes)
     }
 
+    /// Returns the first item of the is_ array
+    pub fn get_main_class(&self) -> AtomicResult<String> {
+        if let Ok(val) = self.get(crate::urls::IS_A) {
+            Ok(val.to_vec()?[0].clone())
+        } else {
+            Err(format!("Resource {} has no class", self.subject).into())
+        }
+    }
+
     /// Returns all PropVals.
     /// Useful if you want to iterate over all Atoms / Properties.
     pub fn get_propvals(&self) -> &PropVals {
