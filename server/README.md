@@ -11,16 +11,15 @@ The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
 `atomic-server` is a graph database server for storing and sharing typed linked data.
 Demo on [atomicdata.dev](https://atomicdata.dev)
 
-- No runtime dependencies, fast, runs on all platforms
-- Embedded HTTP / HTTPS / HTTP2.0 server. Built-in LetsEncrypt handshake.
+- **Lightweight** (13MB binary, no runtime dependencies), **fast** (1ms responses), runs on **all platforms** (linux, windows, mac, arm)
+- **Easy to use admin interface** powered by [atomic-data-browser](https://github.com/joepio/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
+- **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
+- **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- Event-sourced **versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
 - Serialization to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
-- Dynamic schema validation / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
-- Event-sourced versioning / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
-- Pagination, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
-- Authorization (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
-- Invite / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
-- Supports querying, sorting and filtering using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
-- Uses [atomic-data-browser](https://github.com/joepio/atomic-data-browser) as a GUI / front-end, which offers dynamic forms, tables, authentication and more.
+- **Querying, pagination, sorting and filtering** using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
+- **Authorization** (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
+- **Invite** / sharing system with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled) and [more](Cargo.toml).
 
