@@ -120,10 +120,12 @@ pub struct Config {
 
 /// Creates the server config, reads .env values and sets defaults
 pub fn init() -> BetterResult<Config> {
+    // Parse .env file (do this before parsing the CLI opts)
+    dotenv().ok();
+
     // Parse CLI options, .env values, set defaults
     let opts: Opts = Opts::parse();
 
-    dotenv().ok();
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
     } else {
