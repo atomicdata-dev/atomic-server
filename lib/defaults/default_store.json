@@ -48,7 +48,7 @@
         "https://atomicdata.dev/properties/shortname": "value"
     },
     {
-        "@id": "https://atomicdata.dev/property/drives",
+        "@id": "https://atomicdata.dev/properties/drives",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Drive",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
         "https://atomicdata.dev/properties/description": "The set of Drives that the user often will want to access.",
