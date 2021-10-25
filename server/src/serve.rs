@@ -58,20 +58,28 @@ pub async fn serve(config: crate::config::Config) -> AtomicResult<()> {
     let message = format!("{}\n\nVisit {}\n\n", BANNER, config.local_base_url);
 
     if config.opts.https {
-        // If there is no certificate file, or the certs are too old, start HTTPS initialization
-        if std::fs::File::open(&config.cert_path).is_err() || crate::https::check_expiration_certs()
-        {
-            crate::https::cert_init_server(&config).await?;
+        if cfg!(feature = "https") {
+            #[cfg(feature = "https")]
+            {
+                // If there is no certificate file, or the certs are too old, start HTTPS initialization
+                if std::fs::File::open(&config.cert_path).is_err()
+                    || crate::https::check_expiration_certs()
+                {
+                    crate::https::cert_init_server(&config).await?;
+                }
+                let https_config = crate::https::get_https_config(&config)
+                    .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
+                let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
+                println!("{}", message);
+                server
+                    .bind_rustls(&endpoint, https_config)
+                    .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
+                    .run()
+                    .await?;
+            }
+        } else {
+            return Err("The HTTPS feature has been disabled for this build. Please compile atomic-server with the HTTP feature. `cargo install atomic-server`".into());
         }
-        let https_config = crate::https::get_https_config(&config)
-            .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
-        let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
-        println!("{}", message);
-        server
-            .bind_rustls(&endpoint, https_config)
-            .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
-            .run()
-            .await?;
     } else {
         let endpoint = format!("{}:{}", config.opts.ip, config.opts.port);
         println!("{}", message);

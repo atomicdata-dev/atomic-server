@@ -8,7 +8,7 @@ repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.27.1"
 
 [dependencies]
-acme-lib = "0.8.1"
+acme-lib = {version = "0.8.1", optional = true}
 actix = "0.10.0"
 actix-cors = "0.5.4"
 actix-files = "0.5.0"
@@ -26,11 +26,13 @@ log = "0.4.11"
 open = {version = "2.0.1", optional = true}
 promptly = "0.3.0"
 regex = "1.4.2"
-rustls = "0.18.1"
+rustls = {version = "0.18.1", optional = true}
 serde = {version = "1.0.118", features = ["derive"]}
 serde_json = "1.0.60"
 tokio = {version = "1.4.0", features = ["time"]}
 tray-item = {version = "0.4.0-alpha", optional = true}
 
 [features]
+default = ["https"]
 desktop = ["tray-item", "open"]
+https = ["acme-lib", "rustls"]

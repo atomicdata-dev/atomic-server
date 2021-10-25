@@ -83,6 +83,8 @@ cp default.env .env
 cargo run
 # Or tun the extra-cool desktop version with a presence in your app tray
 cargo run --features desktop
+# If you don't need HTTPS (or don't have OpenSSL available on your device)
+cargo run --no-default-features
 ```
 
 Troubleshooting compiling from source:

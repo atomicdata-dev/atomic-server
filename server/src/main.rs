@@ -6,6 +6,7 @@ mod content_types;
 mod errors;
 mod handlers;
 mod helpers;
+#[cfg(feature = "https")]
 mod https;
 mod jsonerrors;
 mod process;

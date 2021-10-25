@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.27.2
+
+- Make HTTPS optional #192
+
 ## v0.27.1
 
 - Fix bootstrapping issue #193
