@@ -49,7 +49,6 @@ impl Actor for WebSocketConnection {
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        log::info!("Incoming websocket mssage: {:?}", msg);
         match msg {
             Ok(ws::Message::Ping(msg)) => {
                 self.hb = Instant::now();
@@ -60,6 +59,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
             }
             // TODO: Check if it's a subscribe / unsubscribe / commit message
             Ok(ws::Message::Text(text)) => {
+                log::info!("Incoming websocket text message: {:?}", msg);
                 match text.as_str() {
                     s if s.starts_with("SUBSCRIBE ") => {
                         let mut parts = s.split("SUBSCRIBE ");
