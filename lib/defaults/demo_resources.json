@@ -1,0 +1,30 @@
+[
+  {
+    "@id": "https://atomicdata.dev/invites/1",
+    "https://atomicdata.dev/properties/createdBy": "https://atomicdata.dev/agents/QmfpRIBn2JYEatT0MjSkMNoBJzstz19orwnT5oT2rcQ=",
+    "https://atomicdata.dev/properties/description": "This is an invite to edit a Document!",
+    "https://atomicdata.dev/properties/invite/target": "https://atomicdata.dev/document/pnf5jlv3r2f",
+    "https://atomicdata.dev/properties/invite/write": true,
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Invite"
+    ],
+    "https://atomicdata.dev/properties/name": "demo invite (document)",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev"
+  },
+  {
+    "@id": "https://atomicdata.dev/documents/demodoc",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Document"
+    ],
+    "https://atomicdata.dev/properties/name": "Demo Document",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/documents"
+  },
+  {
+    "@id": "https://atomicdata.dev",
+    "https://atomicdata.dev/properties/description": "Welcome to your Atomic-Server! Register your User by visiting [`/setup`](https://atomicdata.dev/setup). After that, edit this page by pressing `edit` in the navigation bar menu.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Drive"
+    ],
+    "https://atomicdata.dev/properties/name": "atomicdata.dev",
+  }
+]
