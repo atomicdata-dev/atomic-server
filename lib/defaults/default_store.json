@@ -394,7 +394,7 @@
     {
         "@id": "https://atomicdata.dev/properties/set",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-        "https://atomicdata.dev/properties/description": "Every single Atom from this resource will be added to the Subject resource. If the Property existed before, it will be overwritten.",
+        "https://atomicdata.dev/properties/description": "The `set` Property describes the fields that are changed in the Commit. It is a Nested Resource, and each of its Property-Value combinations will be added to the Subject resource. If the Property existed before, it will be overwritten.",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],

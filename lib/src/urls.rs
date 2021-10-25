@@ -37,6 +37,7 @@ pub const SIGNATURE: &str = "https://atomicdata.dev/properties/signature";
 // ... for Agents
 pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
 pub const NAME: &str = "https://atomicdata.dev/properties/name";
+pub const DRIVES: &str = "https://atomicdata.dev/properties/drives";
 // ... for Collections
 pub const COLLECTION_PROPERTY: &str = "https://atomicdata.dev/properties/collection/property";
 pub const COLLECTION_VALUE: &str = "https://atomicdata.dev/properties/collection/value";
