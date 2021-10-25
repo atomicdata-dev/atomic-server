@@ -138,6 +138,7 @@
     {
         "@id": "https://atomicdata.dev/properties/collection/property",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
         "https://atomicdata.dev/properties/description": "Filter collection by the Property of Atoms. The property is the second field of an atom. Similar to `predicate` in RDF.",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
