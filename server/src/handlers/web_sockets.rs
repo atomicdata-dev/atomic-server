@@ -59,7 +59,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
             }
             // TODO: Check if it's a subscribe / unsubscribe / commit message
             Ok(ws::Message::Text(text)) => {
-                log::info!("Incoming websocket text message: {:?}", msg);
+                log::info!("Incoming websocket text message: {:?}", text);
                 match text.as_str() {
                     s if s.starts_with("SUBSCRIBE ") => {
                         let mut parts = s.split("SUBSCRIBE ");
