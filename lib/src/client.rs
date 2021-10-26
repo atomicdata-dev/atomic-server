@@ -10,7 +10,7 @@ use crate::{errors::AtomicResult, parse::parse_json_ad_resource, Resource, Store
 pub fn fetch_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Resource> {
     let body = fetch_body(subject, crate::parse::JSON_AD_MIME)?;
     let resource = parse_json_ad_resource(&body, store)
-        .map_err(|e| format!("Error parsing body of {}: {}", subject, e))?;
+        .map_err(|e| format!("Error parsing body of {}. {}", subject, e))?;
     Ok(resource)
 }
 
