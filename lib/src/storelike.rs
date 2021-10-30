@@ -23,6 +23,10 @@ pub trait Storelike: Sized {
     /// Adds Atoms to the store.
     /// Will replace existing Atoms that share Subject / Property combination.
     /// Validates datatypes and required props presence.
+    #[deprecated(
+        since = "0.28.0",
+        note = "The atoms abstraction has been deprecated in favor of Resources"
+    )]
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
 
     /// Adds an Atom to the PropSubjectMap. Overwrites if already present.
@@ -33,14 +37,23 @@ pub trait Storelike: Sized {
 
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
-    /// Does not build indexes or save versions.
+    /// Updates the index.
+    /// Validates the fields (checks required props).
     /// In most cases, you should use `resource.save()` instead, which uses Commits.
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()>;
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        self.add_resource_opts(resource, true, true, true)
+    }
 
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
     /// Does not do any validations.
-    fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()>;
+    fn add_resource_opts(
+        &self,
+        resource: &Resource,
+        check_required_props: bool,
+        update_index: bool,
+        overwrite_existing: bool,
+    ) -> AtomicResult<()>;
 
     /// Returns a collection with all resources in the store.
     /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
@@ -110,7 +123,7 @@ pub trait Storelike: Sized {
     /// Save to the store.
     fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {
         let resource: Resource = crate::client::fetch_resource(subject, self)?;
-        self.add_resource_unsafe(&resource)?;
+        self.add_resource_opts(&resource, true, true, true)?;
         Ok(resource)
     }
 
@@ -157,11 +170,7 @@ pub trait Storelike: Sized {
     ) -> AtomicResult<Resource> {
         if let Some(self_url) = self.get_self_url() {
             if subject.starts_with(&self_url) {
-                return Err(format!(
-                    "Failed to retrieve '{}', does not exist locally. {}",
-                    subject, error
-                )
-                .into());
+                return Err(format!("Failed to retrieve locally: '{}'. {}", subject, error).into());
             }
         }
         self.fetch_resource(subject)
@@ -170,7 +179,7 @@ pub trait Storelike: Sized {
     /// Imports a JSON-AD string, returns the amount of imported resources
     fn import(&self, string: &str) -> AtomicResult<usize> {
         let vec = parse_json_ad_array(string, self, true)
-            .map_err(|e| format!("Unable to parse JSON-AD: {}", e))?;
+            .map_err(|e| format!("Unable to import JSON-AD. {}", e))?;
         let len = vec.len();
         Ok(len)
     }

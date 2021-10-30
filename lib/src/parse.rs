@@ -52,7 +52,7 @@ pub fn parse_json_ad_array(
                         let resource = json_ad_object_to_resource(obj, store)
                             .map_err(|e| format!("Unable to parse resource. {}", e))?;
                         if add {
-                            store.add_resource(&resource)?
+                            store.add_resource_opts(&resource, true, true, true)?
                         };
                         vec.push(resource);
                     }
@@ -73,7 +73,7 @@ pub fn parse_json_ad_array(
     Ok(vec)
 }
 
-/// Parse a single Json AD string, convert to Atoms
+/// Parse a single Json AD string that represents an incoming Commit.
 /// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
 pub fn parse_json_ad_commit_resource(
     string: &str,
@@ -88,8 +88,10 @@ pub fn parse_json_ad_commit_resource(
     let mut resource = Resource::new(subject);
     let propvals = match parse_json_ad_map_to_propvals(json, store)? {
         SubResource::Resource(r) => r.into_propvals(),
-        SubResource::Nested(_) => return Err("Commit resource has no @id".into()),
-        SubResource::Subject(_) => return Err("Commit resource is a string".into()),
+        SubResource::Nested(pv) => pv,
+        SubResource::Subject(_) => {
+            return Err("Commit resource is a string, should be a resource.".into())
+        }
     };
     for (prop, val) in propvals {
         resource.set_propval(prop, val, store)?

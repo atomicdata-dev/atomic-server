@@ -25,7 +25,7 @@ pub struct Resource {
 pub type PropVals = HashMap<String, Value>;
 
 impl Resource {
-    /// Fetches all 'required' properties. Fails is any are missing in this Resource.
+    /// Fetches all 'required' properties. Returns an error if any are missing in this Resource.
     pub fn check_required_props(&self, store: &impl Storelike) -> AtomicResult<()> {
         let classvec = self.get_classes(store)?;
         for class in classvec.iter() {

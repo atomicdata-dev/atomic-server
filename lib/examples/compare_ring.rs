@@ -29,7 +29,7 @@ fn sign_message(message: &str, private_key: &str, public_key: &str) -> String {
         &public_key_vec,
     )
     .unwrap();
-    let signature = key_pair.sign(&message.as_bytes());
+    let signature = key_pair.sign(message.as_bytes());
     let signature_bytes = signature.as_ref();
     encode_hex(signature_bytes)
 }

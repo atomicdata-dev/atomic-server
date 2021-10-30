@@ -157,7 +157,7 @@ mod test {
             .set_propval_string(crate::urls::DESCRIPTION.into(), second_val, &store)
             .unwrap();
         let second_commit = resource.save_locally(&store).unwrap();
-        let commits = get_commits_for_resource(&subject, &store).unwrap();
+        let commits = get_commits_for_resource(subject, &store).unwrap();
         assert_eq!(commits.len(), 2);
 
         let first_version = construct_version(first_commit.get_subject(), &store).unwrap();

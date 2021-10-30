@@ -18,7 +18,7 @@ If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-d
 
 - Clear explanation in the PR itself of what is changed and why
 - Reference to relevant issues in commit messages (e.g. `#123 my commit message`)
-- Tests are passing `cargo test --all`
+- Tests are passing `cargo test --all`. Run specific tests with `cargo test --all-features --package atomic_lib --lib -- db::test::testname`.
 - Linters are happy `cargo fmt` & `cargo clippy`
 
 # CI, Versioning and Tagging

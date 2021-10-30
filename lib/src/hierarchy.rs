@@ -64,7 +64,7 @@ mod test {
         let mut commitbuilder_1 = crate::commit::CommitBuilder::new(subject.into());
         let property = crate::urls::DESCRIPTION;
         let value = Value::new("Some value", &DataType::Markdown).unwrap();
-        commitbuilder_1.set(property.into(), value.clone());
+        commitbuilder_1.set(property.into(), value);
         // let mut commitbuilder_2 = commitbuilder_1.clone();
         // let commit_1 = commitbuilder_1.sign(&agent, &store).unwrap();
         // Should fail if there is no self_url set in the store, and no parent in the commit
