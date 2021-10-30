@@ -45,7 +45,7 @@ impl Property {
         let mut resource = Resource::new(self.subject.clone());
         resource.set_propval_unsafe(
             urls::IS_A.into(),
-            Value::ResourceArraySubjects(vec![urls::PROPERTY.into()]),
+            Value::ResourceArray(vec![urls::PROPERTY.into()]),
         )?;
         resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()))?;
         resource.set_propval_unsafe(
@@ -82,14 +82,14 @@ impl Class {
     pub fn from_resource(resource: Resource) -> AtomicResult<Class> {
         let mut requires = Vec::new();
         if let Ok(reqs) = resource.get(urls::REQUIRES) {
-            for prop_sub in reqs.to_vec()? {
+            for prop_sub in reqs.to_subjects(None)? {
                 requires.push(prop_sub.clone())
             }
         }
 
         let mut recommends = Vec::new();
         if let Ok(recs) = resource.get(urls::RECOMMENDS) {
-            for rec_subject in recs.to_vec()? {
+            for rec_subject in recs.to_subjects(None)? {
                 recommends.push(rec_subject.clone())
             }
         }
@@ -111,7 +111,7 @@ impl Class {
         let mut resource = Resource::new(self.subject.clone());
         resource.set_propval_unsafe(
             urls::IS_A.into(),
-            Value::ResourceArraySubjects(vec![urls::CLASS.into()]),
+            Value::ResourceArray(vec![urls::CLASS.into()]),
         )?;
         resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()))?;
         resource.set_propval_unsafe(
@@ -119,15 +119,13 @@ impl Class {
             Value::String(self.description.clone()),
         )?;
         if !self.requires.is_empty() {
-            resource.set_propval_unsafe(
-                urls::REQUIRES.into(),
-                Value::ResourceArraySubjects(self.requires.clone()),
-            )?;
+            resource
+                .set_propval_unsafe(urls::REQUIRES.into(), Value::from(self.requires.clone()))?;
         }
         if !self.requires.is_empty() {
             resource.set_propval_unsafe(
                 urls::RECOMMENDS.into(),
-                Value::ResourceArraySubjects(self.recommends.clone()),
+                Value::from(self.recommends.clone()),
             )?;
         }
         Ok(resource)

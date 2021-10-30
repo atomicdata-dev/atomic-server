@@ -4,7 +4,7 @@ use serde_json::Map;
 use serde_json::Value as SerdeValue;
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, Atom, Resource, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, resources::PropVals, Resource, Storelike, Value,
 };
 
 /// Serializes a vector or Resources to a JSON-AD string
@@ -29,18 +29,23 @@ fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
         Value::Integer(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
         Value::Float(val) => serde_json::from_str(&val.to_string()).unwrap_or_default(),
         Value::Markdown(val) => SerdeValue::String(val),
-        Value::ResourceArraySubjects(val) => SerdeValue::Array(
-            val.iter()
-                .map(|item| SerdeValue::String(item.clone()))
-                .collect(),
-        ),
-        Value::ResourceArrayNested(val) => {
+        Value::ResourceArray(val) => {
             let mut vec: Vec<SerdeValue> = Vec::new();
             for resource in val {
-                vec.push(crate::serialize::propvals_to_json_ad_map(
-                    resource.get_propvals(),
-                    Some(resource.get_subject().clone()),
-                )?);
+                match resource {
+                    crate::values::SubResource::Resource(r) => {
+                        vec.push(crate::serialize::propvals_to_json_ad_map(
+                            r.get_propvals(),
+                            Some(r.get_subject().clone()),
+                        )?);
+                    }
+                    crate::values::SubResource::Nested(pv) => {
+                        vec.push(crate::serialize::propvals_to_json_ad_map(&pv, None)?);
+                    }
+                    crate::values::SubResource::Subject(s) => {
+                        vec.push(SerdeValue::String(s.clone()))
+                    }
+                }
             }
             SerdeValue::Array(vec)
         }
@@ -50,7 +55,16 @@ fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
         Value::Unsupported(val) => SerdeValue::String(val.value),
         Value::Boolean(val) => SerdeValue::Bool(val),
         // TODO: fix this for nested resources in json and json-ld serialization, because this will cause them to fall back to json-ad
-        Value::NestedResource(res) => propvals_to_json_ad_map(&res, None)?,
+        Value::NestedResource(res) => match res {
+            crate::values::SubResource::Resource(r) => crate::serialize::propvals_to_json_ad_map(
+                r.get_propvals(),
+                Some(r.get_subject().clone()),
+            )?,
+            crate::values::SubResource::Nested(propvals) => {
+                propvals_to_json_ad_map(&propvals, None)?
+            }
+            crate::values::SubResource::Subject(s) => SerdeValue::String(s),
+        },
         Value::Resource(_) => todo!(),
     };
     Ok(json_val)
@@ -152,7 +166,7 @@ pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
 
 #[cfg(feature = "rdf")]
 /// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
-pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult<String> {
+pub fn atoms_to_ntriples(atoms: Vec<crate::Atom>, store: &impl Storelike) -> AtomicResult<String> {
     use rio_api::formatter::TriplesFormatter;
     use rio_api::model::{Literal, NamedNode, Term, Triple};
     use rio_turtle::NTriplesFormatter;
@@ -190,7 +204,7 @@ pub fn atoms_to_ntriples(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResu
 
 #[cfg(feature = "rdf")]
 /// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
-pub fn atoms_to_turtle(atoms: Vec<Atom>, store: &impl Storelike) -> AtomicResult<String> {
+pub fn atoms_to_turtle(atoms: Vec<crate::Atom>, store: &impl Storelike) -> AtomicResult<String> {
     use rio_api::formatter::TriplesFormatter;
     use rio_api::model::{Literal, NamedNode, Term, Triple};
     use rio_turtle::TurtleFormatter;
@@ -259,7 +273,8 @@ mod test {
   ],
   "https://atomicdata.dev/properties/recommends": [
     "https://atomicdata.dev/properties/name",
-    "https://atomicdata.dev/properties/description"
+    "https://atomicdata.dev/properties/description",
+    "https://atomicdata.dev/properties/drives"
   ],
     "https://atomicdata.dev/properties/requires": [
     "https://atomicdata.dev/properties/publicKey"
@@ -302,7 +317,8 @@ mod test {
             ],
             "recommends": [
               "https://atomicdata.dev/properties/name",
-              "https://atomicdata.dev/properties/description"
+              "https://atomicdata.dev/properties/description",
+              "https://atomicdata.dev/properties/drives"
             ],
             "requires": [
               "https://atomicdata.dev/properties/publicKey"
@@ -349,7 +365,8 @@ mod test {
             ],
             "recommends": [
               "https://atomicdata.dev/properties/name",
-              "https://atomicdata.dev/properties/description"
+              "https://atomicdata.dev/properties/description",
+              "https://atomicdata.dev/properties/drives"
             ],
             "requires": [
               "https://atomicdata.dev/properties/publicKey"

@@ -7,7 +7,9 @@ use crate::{
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-/// An individual Value in an Atom, represented as a native Rust enum.
+/// An individual Value in an Atom.
+/// Note that creating values using `Value::from` might result in the wrong Datatype, as the from conversion makes assumptions (e.g. integers are Integers, not Timestamps).
+/// Use `Value::SomeDataType()` for explicit creation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum Value {
     AtomicUrl(String),
@@ -15,16 +17,26 @@ pub enum Value {
     Integer(i64),
     Float(f64),
     Markdown(String),
-    ResourceArraySubjects(Vec<String>),
-    ResourceArrayNested(Vec<Resource>),
+    ResourceArray(Vec<SubResource>),
     Slug(String),
     String(String),
     /// Unix Epoch datetime in milliseconds
     Timestamp(i64),
-    NestedResource(PropVals),
+    NestedResource(SubResource),
     Resource(Resource),
     Boolean(bool),
     Unsupported(UnsupportedValue),
+}
+
+/// A resource in a JSON-AD body can be any of these
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum SubResource {
+    Resource(Resource),
+    // I was considering using Resources for these, but that would involve
+    // storing the paths in both the NestedResource as well as its parent
+    // context, which could produce inconsistencies.
+    Nested(PropVals),
+    Subject(String),
 }
 
 /// When the Datatype of a Value is not handled by this library
@@ -49,8 +61,7 @@ impl Value {
             Value::Integer(_) => DataType::Integer,
             Value::Float(_) => DataType::Float,
             Value::Markdown(_) => DataType::Markdown,
-            Value::ResourceArraySubjects(_) => DataType::ResourceArray,
-            Value::ResourceArrayNested(_) => DataType::ResourceArray,
+            Value::ResourceArray(_) => DataType::ResourceArray,
             Value::Slug(_) => DataType::Slug,
             Value::String(_) => DataType::String,
             Value::Timestamp(_) => DataType::Timestamp,
@@ -95,7 +106,11 @@ impl Value {
                 let vector: Vec<String> = crate::parse::parse_json_array(value).map_err(|e| {
                     return format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e);
                 })?;
-                Ok(Value::ResourceArraySubjects(vector))
+                let mut new_vec = Vec::new();
+                for i in vector {
+                    new_vec.push(SubResource::Subject(i));
+                }
+                Ok(Value::ResourceArray(new_vec))
             }
             DataType::Date => {
                 let re = Regex::new(DATE_REGEX).unwrap();
@@ -136,12 +151,44 @@ impl Value {
         Value::new(value, &match_datatype(datatype))
     }
 
-    /// Returns a Vector, if the Value is one
-    pub fn to_vec(&self) -> AtomicResult<&Vec<String>> {
-        if let Value::ResourceArraySubjects(arr) = self {
-            return Ok(arr);
+    /// Turns the value into a Vector of subject strings.
+    /// Works for resource arrays with nested resources, full resources, single resources.
+    /// Returns a path for for Anonymous Nested Resources, which is why you need to pass a parent_path e.g. `http://example.com/foo/bar https://atomicdata.dev/properties/children`.
+    pub fn to_subjects(&self, parent_path: Option<String>) -> AtomicResult<Vec<String>> {
+        let mut vec: Vec<String> = Vec::new();
+        match self {
+            Value::ResourceArray(arr) => {
+                arr.iter()
+                    .enumerate()
+                    .for_each(|(i, r)| match r.to_owned() {
+                        SubResource::Resource(e) => vec.push(e.get_subject().into()),
+                        SubResource::Nested(_e) => {
+                            println!("hopw");
+                            let path_base = if let Some(p) = &parent_path {
+                                p.to_string()
+                            } else {
+                                "nested_resource_without_parent_path".into()
+                            };
+                            vec.push(format!("{} {}", path_base, i))
+                        }
+                        SubResource::Subject(s) => vec.push(s),
+                    });
+                Ok(vec)
+            }
+            Value::AtomicUrl(s) => {
+                vec.push(s.into());
+                Ok(vec)
+            }
+            Value::NestedResource(_nr) => {
+                // TODO: change the data model of nested resources to store the subject of the parent, so we can construct a path
+                Err("Can't convert nested resources to subjects.".into())
+            }
+            Value::Resource(r) => {
+                vec.push(r.get_subject().into());
+                Ok(vec)
+            }
+            other => Err(format!("Value {} is not a Resource Array, but {}", self, other).into()),
         }
-        Err(format!("Value {} is not a Resource Array", self).into())
     }
 
     pub fn to_bool(&self) -> AtomicResult<bool> {
@@ -163,7 +210,7 @@ impl Value {
 
     /// Returns a PropVals Hashmap, if the Atom is a NestedResource
     pub fn to_nested(&self) -> AtomicResult<&PropVals> {
-        if let Value::NestedResource(nested) = self {
+        if let Value::NestedResource(SubResource::Nested(nested)) = self {
             return Ok(nested);
         }
         Err(format!("Value {} is not a Nested Resource", self).into())
@@ -182,34 +229,47 @@ impl From<i32> for Value {
     }
 }
 
-// impl From<u64> for Value {
-//     fn from(val: u64) -> Self {
-//         // This might panic. Perhaps this is not a good idea
-//         Value::Integer(val as i64)
-//     }
-// }
-
 impl From<usize> for Value {
     fn from(val: usize) -> Self {
         Value::Integer(val as i64)
     }
 }
 
+impl From<Vec<&str>> for Value {
+    fn from(val: Vec<&str>) -> Self {
+        let mut vec = Vec::new();
+        for i in val {
+            vec.push(SubResource::Subject(i.into()));
+        }
+        Value::ResourceArray(vec)
+    }
+}
+
 impl From<Vec<String>> for Value {
     fn from(val: Vec<String>) -> Self {
-        Value::ResourceArraySubjects(val)
+        let mut vec = Vec::new();
+        for i in val {
+            vec.push(SubResource::Subject(i));
+        }
+        Value::ResourceArray(vec)
     }
 }
 
 impl From<PropVals> for Value {
     fn from(val: PropVals) -> Self {
-        Value::NestedResource(val)
+        Value::NestedResource(SubResource::Nested(val))
     }
 }
 
 impl From<bool> for Value {
     fn from(val: bool) -> Self {
         Value::Boolean(val)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(val: f64) -> Self {
+        Value::Float(val)
     }
 }
 
@@ -221,7 +281,11 @@ impl From<Resource> for Value {
 
 impl From<Vec<Resource>> for Value {
     fn from(val: Vec<Resource>) -> Self {
-        Value::ResourceArrayNested(val)
+        let mut vec = Vec::new();
+        for i in val {
+            vec.push(SubResource::Resource(i));
+        }
+        Value::ResourceArray(vec)
     }
 }
 
@@ -234,15 +298,11 @@ impl fmt::Display for Value {
             Value::Integer(i) => write!(f, "{}", i),
             Value::Float(float) => write!(f, "{}", float),
             Value::Markdown(i) => write!(f, "{}", i),
-            Value::ResourceArraySubjects(v) => {
-                let s = crate::serialize::serialize_json_array(v)
-                    .unwrap_or_else(|_e| format!("Could not serialize resource array: {:?}", v));
-                write!(f, "{}", s)
-            }
-            Value::ResourceArrayNested(v) => {
-                let s = crate::serialize::resources_to_json_ad(v).unwrap_or_else(|_e| {
-                    format!("Could not serialize nested resource array: {:?}", v)
-                });
+            Value::ResourceArray(v) => {
+                let mut s: String = String::new();
+                for i in v {
+                    s.push_str(&i.to_string());
+                }
                 write!(f, "{}", s)
             }
             Value::Slug(s) => write!(f, "{}", s),
@@ -261,6 +321,57 @@ impl fmt::Display for Value {
     }
 }
 
+impl fmt::Display for SubResource {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s: String = String::new();
+
+        match self {
+            SubResource::Resource(r) => {
+                s.push_str(
+                    &r.to_json_ad()
+                        .unwrap_or_else(|_e| format!("Could not serialize resource: {:?}", r)),
+                );
+            }
+            SubResource::Nested(pv) => {
+                let serialized = crate::serialize::propvals_to_json_ad_map(pv, None)
+                    .unwrap_or_else(|_e| {
+                        return serde_json::Value::String(format!(
+                            "Could not serialize {:?} : {}",
+                            pv, _e
+                        ));
+                    });
+                s.push_str(&serialized.to_string());
+            }
+            SubResource::Subject(sub) => s.push_str(sub),
+        }
+        write!(f, "{}", s)
+    }
+}
+
+impl From<&str> for SubResource {
+    fn from(val: &str) -> Self {
+        SubResource::Subject(val.to_owned())
+    }
+}
+
+impl From<String> for SubResource {
+    fn from(val: String) -> Self {
+        SubResource::Subject(val)
+    }
+}
+
+impl From<PropVals> for SubResource {
+    fn from(val: PropVals) -> Self {
+        SubResource::Nested(val)
+    }
+}
+
+impl From<Resource> for SubResource {
+    fn from(val: Resource) -> Self {
+        SubResource::Resource(val)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -273,8 +384,8 @@ mod test {
         assert!(string.to_string() == "string");
         let date = Value::new("1200-02-02", &DataType::Date).unwrap();
         assert!(date.to_string() == "1200-02-02");
-        let date = Value::new("1.123123", &DataType::Float).unwrap();
-        assert!(date.to_string() == "1.123123");
+        let float = Value::new("1.123123", &DataType::Float).unwrap();
+        assert!(float.to_string() == "1.123123");
         let converted = Value::from(8);
         assert!(converted.to_string() == "8");
     }
@@ -287,5 +398,59 @@ mod test {
         Value::new("120-02-02", &DataType::Date).unwrap_err();
         Value::new("12000-02-02", &DataType::Date).unwrap_err();
         Value::new("a", &DataType::Float).unwrap_err();
+    }
+
+    #[test]
+    fn value_conversions_from_and_datatypes() {
+        let int = Value::from(8);
+        assert_eq!(int.datatype(), DataType::Integer);
+        assert_eq!(int.to_string(), "8");
+        let resource_rray = Value::from(vec!["https://atomicdata.dev/properties/description"]);
+        assert_eq!(resource_rray.datatype(), DataType::ResourceArray);
+        assert_eq!(
+            resource_rray.to_string(),
+            "https://atomicdata.dev/properties/description"
+        );
+        let float = Value::from(1.123123);
+        assert_eq!(float.datatype(), DataType::Float);
+        assert_eq!(float.to_string(), "1.123123");
+        let converted = Value::from(8);
+        assert_eq!(converted.datatype(), DataType::Integer);
+        assert_eq!(converted.to_string(), "8");
+    }
+
+    #[test]
+    fn value_to_subjects() {
+        let subject_string = String::from("https://example.com/subject_string");
+        let mut nested = PropVals::new();
+        nested.insert(
+            crate::urls::DESCRIPTION.into(),
+            Value::Markdown("test".into()),
+        );
+        let full_resource = Resource::new("https://example.com/full_resource".into());
+        let array_no_nested = Value::ResourceArray(vec![
+            subject_string.clone().into(),
+            full_resource.clone().into(),
+        ]);
+        assert_eq!(array_no_nested.to_subjects(None).unwrap().len(), 2);
+        let array_nested = Value::ResourceArray(vec![
+            subject_string.into(),
+            full_resource.clone().into(),
+            nested.into(),
+        ]);
+        let atom = crate::Atom::new(
+            "https://example.com/parent_resource".into(),
+            crate::urls::PARENT.into(),
+            array_nested,
+        );
+        assert_eq!(
+            atom.values_to_subjects().unwrap(),
+            vec![
+                "https://example.com/subject_string".to_string(),
+                full_resource.get_subject().into(),
+                "https://example.com/parent_resource https://atomicdata.dev/properties/parent 2"
+                    .into(),
+            ]
+        );
     }
 }

@@ -51,7 +51,10 @@ fn set_agent_config() -> AtomicResult<Config> {
     match atomic_lib::config::read_config(&agent_config_path) {
         Ok(found) => Ok(found),
         Err(_e) => {
-            println!("No config found. Let's create one!");
+            println!(
+                "No config found at {:?}. Let's create one!",
+                &agent_config_path
+            );
             let server = promptly::prompt("What's the base url of your Atomic Server?")?;
             let agent = promptly::prompt("What's the URL of your Agent?")?;
             let private_key = promptly::prompt("What's the private key of this Agent?")?;
@@ -61,10 +64,7 @@ fn set_agent_config() -> AtomicResult<Config> {
                 private_key,
             };
             atomic_lib::config::write_config(&agent_config_path, config.clone())?;
-            println!(
-                "New config file created at {:?}",
-                agent_config_path.to_str()
-            );
+            println!("New config file created at {:?}", agent_config_path);
             Ok(config)
         }
     }
@@ -187,6 +187,14 @@ fn main() -> AtomicResult<()> {
         .subcommand(
             SubCommand::with_name("destroy")
                 .about("Permanently removes a Resource.")
+                .arg(Arg::with_name("subject")
+                    .help("Subject URL or bookmark of the resource to be destroyed")
+                    .required(true)
+                )
+        )
+        .subcommand(
+            SubCommand::with_name("config")
+                .about("Returns the path of the config file")
                 .arg(Arg::with_name("subject")
                     .help("Subject URL or bookmark of the resource to be destroyed")
                     .required(true)

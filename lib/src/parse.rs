@@ -1,6 +1,9 @@
 //! Parsing / deserialization / decoding
 
-use crate::{errors::AtomicResult, resources::PropVals, urls, Resource, Storelike, Value};
+use crate::{
+    errors::AtomicResult, resources::PropVals, urls, values::SubResource, Resource, Storelike,
+    Value,
+};
 
 pub const JSON_AD_MIME: &str = "application/ad+json";
 
@@ -26,32 +29,11 @@ fn json_ad_object_to_resource(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,
 ) -> AtomicResult<Resource> {
-    let subject = get_id(json.clone()).map_err(|e| format!("Unable to get @id. {}", e))?;
-    let mut resource = Resource::new(subject.clone());
-    let propvals = parse_json_ad_map_to_propvals(json, store)
-        .map_err(|e| format!("Unable to parse JSON-AD for {}. {}", &subject, e))?;
-    for (prop, val) in propvals {
-        // I'd like to get rid of these clones! But I want to use them in the error, too...
-        resource
-            .set_propval(prop.clone(), val.clone(), store)
-            .map_err(|e| {
-                format!(
-                    "Unable to set prop: {}, val: {} for subject {}. {}",
-                    prop, val, subject, e
-                )
-            })?
+    match parse_json_ad_map_to_propvals(json, store)? {
+        SubResource::Resource(r) => Ok(r),
+        SubResource::Nested(_) => Err("It's a nested Resource, no @id found".into()),
+        SubResource::Subject(_) => Err("It's a string, not a nested resource".into()),
     }
-    Ok(resource)
-}
-
-/// Returns the @id in a JSON object
-fn get_id(object: serde_json::Map<String, serde_json::Value>) -> AtomicResult<String> {
-    Ok(object
-        .get("@id")
-        .ok_or("Missing `@id` value in top level JSON. Could not determine Subject of Resource.")?
-        .as_str()
-        .ok_or("`@id` is not a string - should be the Subject of the Resource (a URL)")?
-        .to_string())
 }
 
 /// Parses JSON-AD strings to resources, adds them to the store
@@ -104,7 +86,11 @@ pub fn parse_json_ad_commit_resource(
         .to_string();
     let subject = format!("{}/commits/{}", store.get_base_url(), signature);
     let mut resource = Resource::new(subject);
-    let propvals = parse_json_ad_map_to_propvals(json, store)?;
+    let propvals = match parse_json_ad_map_to_propvals(json, store)? {
+        SubResource::Resource(r) => r.into_propvals(),
+        SubResource::Nested(_) => return Err("Commit resource has no @id".into()),
+        SubResource::Subject(_) => return Err("Commit resource is a string".into()),
+    };
     for (prop, val) in propvals {
         resource.set_propval(prop, val, store)?
     }
@@ -116,13 +102,16 @@ pub fn parse_json_ad_commit_resource(
 pub fn parse_json_ad_map_to_propvals(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,
-) -> AtomicResult<PropVals> {
+) -> AtomicResult<SubResource> {
     let mut propvals = PropVals::new();
+    let mut subject = None;
     for (prop, val) in json {
         if prop == "@id" {
-            // Not sure if this is the correct behavior.
-            // This will turn named resources into nested ones!
-            // To fix this, we need to use an Enum for Value::ResourceArray(enum)
+            subject = if let serde_json::Value::String(s) = val {
+                Some(s.to_string())
+            } else {
+                return Err("@id must be a string".into());
+            };
             continue;
         }
         let atomic_val = match val {
@@ -141,14 +130,19 @@ pub fn parse_json_ad_map_to_propvals(
             // In Atomic Data, all arrays are Resource Arrays which are serialized JSON things.
             // Maybe this step could be simplified? Just serialize to string?
             serde_json::Value::Array(arr) => {
-                let mut newvec: Vec<String> = Vec::new();
+                let mut newvec: Vec<SubResource> = Vec::new();
                 for v in arr {
                     match v {
-                        serde_json::Value::String(str) => newvec.push(str),
+                        serde_json::Value::String(str) => newvec.push(SubResource::Subject(str)),
+                        // If it's an Object, it can be either an anonymous or a full resource.
+                        serde_json::Value::Object(map) => {
+                            let propvals = parse_json_ad_map_to_propvals(map, store)?;
+                            newvec.push(propvals)
+                        }
                         _err => return Err("Found non-string item in resource array.".into()),
                     }
                 }
-                Value::ResourceArraySubjects(newvec)
+                Value::ResourceArray(newvec)
             }
             serde_json::Value::Object(map) => {
                 Value::NestedResource(parse_json_ad_map_to_propvals(map, store)?)
@@ -157,7 +151,13 @@ pub fn parse_json_ad_map_to_propvals(
         // Some of these values are _not correctly matched_ to the datatype.
         propvals.insert(prop, atomic_val);
     }
-    Ok(propvals)
+    if let Some(subj) = { subject } {
+        let mut r = Resource::new(subj);
+        r.set_propvals_unsafe(propvals);
+        Ok(SubResource::Resource(r))
+    } else {
+        Ok(SubResource::Nested(propvals))
+    }
 }
 
 #[cfg(test)]
@@ -195,9 +195,7 @@ mod test {
     }
 
     #[test]
-    #[should_panic(
-        expected = "`@id` is not a string - should be the Subject of the Resource (a URL)"
-    )]
+    #[should_panic(expected = "@id must be a strin")]
     fn parse_and_serialize_json_ad_wrong_id() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
@@ -249,5 +247,57 @@ mod test {
             .unwrap()
             .clone();
         assert_eq!(found_shortname.to_string(), "class");
+    }
+
+    #[test]
+    fn parse_nested_resource_map_roundtrip() {
+        let store = crate::Store::init().unwrap();
+
+        let json = r#"{
+            "@id": "https://atomicdata.dev/thingWithNestedMaps",
+            "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/linkedThing",
+            "https://atomicdata.dev/properties/datatype": {
+                "https://atomicdata.dev/properties/name": "Anonymous nested resource"
+            },
+            "https://atomicdata.dev/properties/parent": {
+                "@id": "https://atomicdata.dev/nestedThing",
+                "https://atomicdata.dev/properties/name": "Named Nested Resource"
+            }
+          }"#;
+        let parsed = parse_json_ad_resource(json, &store).unwrap();
+        let serialized = parsed.to_json_ad().unwrap();
+        println!("{}", serialized);
+        assert_eq!(json.replace(" ", ""), serialized.replace(" ", ""));
+    }
+
+    #[test]
+    fn parse_nested_resource_array() {
+        let store = crate::Store::init().unwrap();
+
+        let json = r#"{
+            "@id": "https://atomicdata.dev/classes",
+            "https://atomicdata.dev/properties/collection/members": [
+              {
+                "@id": "https://atomicdata.dev/classes/FirstThing",
+                "https://atomicdata.dev/properties/description": "Named nested resource"
+              },
+              {
+                "https://atomicdata.dev/properties/description": "Anonymous nested resource"
+              },
+              "https://atomicdata.dev/classes/ThirdThing"
+            ]
+          }"#;
+        let parsed = parse_json_ad_resource(json, &store).unwrap();
+        let members = parsed
+            .get(urls::COLLECTION_MEMBERS)
+            .unwrap()
+            .to_subjects(Some("https://atomicdata.dev/classes https://atomicdata.dev/properties/collection/members".into()))
+            .unwrap();
+        let should_be = vec![
+            "https://atomicdata.dev/classes/FirstThing",
+            "https://atomicdata.dev/classes https://atomicdata.dev/properties/collection/members 1",
+            "https://atomicdata.dev/classes/ThirdThing",
+        ];
+        assert_eq!(members, should_be);
     }
 }

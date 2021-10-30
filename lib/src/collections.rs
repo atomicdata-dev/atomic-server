@@ -559,7 +559,7 @@ mod test {
                 == "1"
         );
         let members_vec = match collection_page_nr.get(urls::COLLECTION_MEMBERS).unwrap() {
-            crate::Value::ResourceArraySubjects(vec) => vec,
+            crate::Value::ResourceArray(vec) => vec,
             _ => panic!(),
         };
         assert!(members_vec.len() == 1);
