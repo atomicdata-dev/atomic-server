@@ -184,14 +184,39 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+    fn add_resource_opts(
+        &self,
+        resource: &Resource,
+        check_required_props: bool,
+        update_index: bool,
+        overwrite_existing: bool,
+    ) -> AtomicResult<()> {
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
-        resource.check_required_props(self)?;
-        self.set_propvals(resource.get_subject(), resource.get_propvals())
-    }
-
-    fn add_resource_unsafe(&self, resource: &Resource) -> AtomicResult<()> {
+        let existing = self.get_propvals(resource.get_subject()).ok();
+        if !overwrite_existing && existing.is_some() {
+            return Err(format!(
+                "Failed to add: '{}', already exists, should not be overwritten.",
+                resource.get_subject()
+            )
+            .into());
+        }
+        if check_required_props {
+            resource.check_required_props(self)?;
+        }
+        if update_index {
+            if let Some(pv) = existing {
+                let subject = resource.get_subject();
+                for (prop, val) in pv.iter() {
+                    // Possible performance hit - these clones can be replaced by modifying remove_atom_from_index
+                    let remove_atom = crate::Atom::new(subject.into(), prop.into(), val.clone());
+                    self.remove_atom_from_index(&remove_atom)?;
+                }
+            }
+            for a in resource.to_atoms()? {
+                self.add_atom_to_index(&a)?;
+            }
+        }
         self.set_propvals(resource.get_subject(), resource.get_propvals())
     }
 
@@ -364,11 +389,14 @@ impl Storelike for Db {
     }
 
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
-        // This errors when the resource is not present.
-        // https://github.com/joepio/atomic/issues/46
-        let binary_subject = bincode::serialize(subject).unwrap();
-        let found = self.resources.remove(&binary_subject)?;
-        if found.is_none() {
+        if let Ok(found) = self.get_propvals(subject) {
+            for (prop, val) in found {
+                let remove_atom = crate::Atom::new(subject.into(), prop, val);
+                self.remove_atom_from_index(&remove_atom)?;
+            }
+            let binary_subject = bincode::serialize(subject).unwrap();
+            let _found = self.resources.remove(&binary_subject)?;
+        } else {
             return Err(format!(
                 "Resource {} could not be deleted, because it was not found in the store.",
                 subject
@@ -523,10 +551,10 @@ pub mod test {
 
     /// Creates new temporary database, populates it, removes previous one.
     /// Can only be run one thread at a time, because it requires a lock on the DB file.
-    fn init() -> Db {
-        let tmp_dir_path = "tmp/db";
-        let _try_remove_existing = std::fs::remove_dir_all(tmp_dir_path);
-        let store = Db::init(tmp_dir_path, "https://localhost".into()).unwrap();
+    fn init(id: &str) -> Db {
+        let tmp_dir_path = format!("tmp/db/{}", id);
+        let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
+        let store = Db::init(&tmp_dir_path, "https://localhost".into()).unwrap();
         let agent = store.create_agent(None).unwrap();
         store.set_default_agent(agent);
         store.populate().unwrap();
@@ -534,10 +562,12 @@ pub mod test {
     }
 
     /// Share the Db instance between tests. Otherwise, all tests try to init the same location on disk and throw errors.
+    /// Note that not all behavior can be properly tested with a shared database.
+    /// If you need a clean one, juts call init("someId").
     use lazy_static::lazy_static; // 1.4.0
     use std::sync::Mutex;
     lazy_static! {
-        pub static ref DB: Mutex<Db> = Mutex::new(init());
+        pub static ref DB: Mutex<Db> = Mutex::new(init("shared"));
     }
 
     #[test]
@@ -547,31 +577,30 @@ pub mod test {
         // We can create a new Resource, linked to the store.
         // Note that since this store only exists in memory, it's data cannot be accessed from the internet.
         // Let's make a new Property instance!
-        let mut new_property =
+        let mut new_resource =
             crate::Resource::new_instance("https://atomicdata.dev/classes/Property", &store)
                 .unwrap();
         // And add a description for that Property
-        new_property
+        new_resource
             .set_propval_shortname("description", "the age of a person", &store)
             .unwrap();
-        new_property
+        new_resource
             .set_propval_shortname("shortname", "age", &store)
             .unwrap();
-        new_property
+        new_resource
             .set_propval_shortname("datatype", crate::urls::INTEGER, &store)
             .unwrap();
         // Changes are only applied to the store after saving them explicitly.
-        new_property.save_locally(&store).unwrap();
+        new_resource.save_locally(&store).unwrap();
         // The modified resource is saved to the store after this
 
         // A subject URL has been created automatically.
-        let subject = new_property.get_subject();
+        let subject = new_resource.get_subject();
         let fetched_new_resource = store.get_resource(subject).unwrap();
         let description_val = fetched_new_resource
             .get_shortname("description", &store)
             .unwrap()
             .to_string();
-        println!("desc {}", description_val);
         assert!(description_val == "the age of a person");
 
         // Try removing something
@@ -636,9 +665,10 @@ pub mod test {
     }
 
     #[test]
-    /// Check if a resource is properly removed from the DB after a delete command
-    fn destroy_resource_and_check_collection() {
-        let store = DB.lock().unwrap().clone();
+    /// Check if a resource is properly removed from the DB after a delete command.
+    /// Also counts commits.
+    fn destroy_resource_and_check_collection_and_commits() {
+        let store = init("counter");
         let agents_url = format!("{}/agents", store.get_base_url());
         let agents_collection_1 = store.get_resource_extended(&agents_url, false).unwrap();
         let agents_collection_count_1 = agents_collection_1
@@ -650,6 +680,16 @@ pub mod test {
             agents_collection_count_1, 1,
             "The Agents collection is not one (we assume there is one agent already present from init)"
         );
+
+        // We will count the commits, and check if they've incremented later on.
+        let commits_url = format!("{}/commits", store.get_base_url());
+        let commits_collection_1 = store.get_resource_extended(&commits_url, false).unwrap();
+        let commits_collection_count_1 = commits_collection_1
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        println!("Commits collection count 1: {}", commits_collection_count_1);
 
         let mut resource = crate::agents::Agent::new(None, &store)
             .unwrap()
@@ -667,6 +707,19 @@ pub mod test {
             "The Resource was not found in the collection."
         );
 
+        let commits_collection_2 = store.get_resource_extended(&commits_url, false).unwrap();
+        let commits_collection_count_2 = commits_collection_2
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        println!("Commits collection count 2: {}", commits_collection_count_2);
+        assert_eq!(
+            commits_collection_count_2,
+            commits_collection_count_1 + 1,
+            "The commits collection did not increase after saving the resource."
+        );
+
         resource.destroy(&store).unwrap();
         let agents_collection_3 = store.get_resource_extended(&agents_url, false).unwrap();
         let agents_collection_count_3 = agents_collection_3
@@ -678,5 +731,38 @@ pub mod test {
             agents_collection_count_3, 1,
             "The collection count did not decrease after destroying the resource."
         );
+
+        let commits_collection_3 = store.get_resource_extended(&commits_url, false).unwrap();
+        let commits_collection_count_3 = commits_collection_3
+            .get(crate::urls::COLLECTION_MEMBER_COUNT)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        println!("Commits collection count 3: {}", commits_collection_count_3);
+        assert_eq!(
+            commits_collection_count_3,
+            commits_collection_count_2 + 1,
+            "The commits collection did not increase after destroying the resource."
+        );
+    }
+
+    #[test]
+    fn get_extended_resource_pagination() {
+        let store = DB.lock().unwrap().clone();
+        let subject = format!("{}/commits?current_page=2", store.get_base_url());
+        // Should throw, because page 2 is out of bounds for default page size
+        let _wrong_resource = store.get_resource_extended(&subject, false).unwrap_err();
+        // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
+        let subject_with_page_size = format!("{}&page_size=1", subject);
+        let resource = store
+            .get_resource_extended(&subject_with_page_size, false)
+            .unwrap();
+        let cur_page = resource
+            .get(urls::COLLECTION_CURRENT_PAGE)
+            .unwrap()
+            .to_int()
+            .unwrap();
+        assert_eq!(cur_page, 2);
+        assert_eq!(resource.get_subject(), &subject_with_page_size);
     }
 }

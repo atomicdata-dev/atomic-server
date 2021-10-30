@@ -3,6 +3,14 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.28.0
+
+- **IMPORANT**: before upgrading to this version, export your database using your previous version: `atomic-server export`. The database could become corrupted when running the new version.
+- Refactor internal `Value` model and add Nested Resource parsing #195
+- Added tests, improved some documentation
+- Fix indexing commits #194
+- Add more control over adding resources with `Store.add_resource_opts()`
+
 ## v0.27.2
 
 - Make HTTPS optional #192

@@ -46,7 +46,7 @@ impl Commit {
     /// Does not check if the correct rights are present.
     /// If you need more control over which checks to perform, use apply_opts
     pub fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, true, true, false, false, true)
+        self.apply_opts(store, true, true, false, false)
     }
 
     /// Apply a single signed Commit to the store.
@@ -60,7 +60,6 @@ impl Commit {
         validate_signature: bool,
         validate_timestamp: bool,
         validate_rights: bool,
-        update_index: bool,
     ) -> AtomicResult<Resource> {
         let subject_url =
             url::Url::parse(&self.subject).map_err(|e| format!("Subject is not a URL. {}", e))?;
@@ -118,13 +117,12 @@ impl Commit {
                 Resource::new(self.subject.clone())
             }
         };
-        // We apply the Commit, but don't save the resource just yet.
-        // This _must_ be a clone, because otherwise we could have malicious agents granting themselves rights
-        let resource_changed = self.apply_changes(resource_old.clone(), store, update_index)?;
+
+        let resource_new = self.apply_changes(resource_old.clone(), store, false)?;
 
         if validate_rights {
             if is_new {
-                if !crate::hierarchy::check_write(store, &resource_changed, self.signer.clone())? {
+                if !crate::hierarchy::check_write(store, &resource_new, self.signer.clone())? {
                     return Err(format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
                     &self.signer, self.subject).into());
                 }
@@ -149,7 +147,7 @@ impl Commit {
         };
         // Check if all required props are there
         if validate_schema {
-            resource_changed.check_required_props(store)?;
+            resource_new.check_required_props(store)?;
         }
         // If a Destroy field is found, remove the resource and return early
         // TODO: Should we remove the existing commits too? Probably.
@@ -157,12 +155,16 @@ impl Commit {
             if destroy {
                 // Note: the value index is updated before this action, in resource.apply_changes()
                 store.remove_resource(&self.subject)?;
+                store.add_resource_opts(&commit_resource, false, true, false)?;
                 return Ok(commit_resource);
             }
         }
-        // Save the Commit to the Store
-        store.add_resource(&commit_resource)?;
-        store.add_resource(&resource_changed)?;
+        self.apply_changes(resource_old, store, true)?;
+
+        // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
+        store.add_resource_opts(&commit_resource, false, true, false)?;
+        // Save the resource, but skip updating the index - that has been done in a previous step.
+        store.add_resource_opts(&resource_new, false, false, true)?;
         Ok(commit_resource)
     }
 
@@ -208,7 +210,7 @@ impl Commit {
 
     /// Applies a commit without performing authorization / signature / schema checks.
     pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, false, false, false, false, false)
+        self.apply_opts(store, false, false, false, false)
     }
 
     /// Converts a Resource of a Commit into a Commit

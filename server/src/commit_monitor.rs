@@ -1,7 +1,6 @@
 //! The Commit Monitor checks for new commits and notifies listeners.
-//! It is mostly used by WebSockets to notify front-end clients of changes Resources.
+//! It is mostly used by WebSockets to notify front-end clients of changes in Resources.
 
-// TODO: define messages between CommitMonitor and WebSocketConnection
 use crate::{
     actor_messages::{CommitMessage, Subscribe},
     handlers::web_sockets::WebSocketConnection,
@@ -12,16 +11,11 @@ use actix::{
 };
 use std::collections::{HashMap, HashSet};
 
-// We might need this instead of Addr, but I don't understand it
-// type Socket = Recipient<WsMessage>;
-
-/// The Commit Monitor is an Actor that checks for new commits and notifies listeners.
+/// The Commit Monitor is an Actor that manages subscriptions for subjects and sends Commits to listeners.
 pub struct CommitMonitor {
     /// Maintains a list of all the resources that are being subscribed to, and maps these to websocket connections.
     subscriptions: HashMap<String, HashSet<Addr<WebSocketConnection>>>,
 }
-
-impl CommitMonitor {}
 
 // Since his Actor only starts once, there is no need to handle its lifecycle
 impl Actor for CommitMonitor {
@@ -61,10 +55,13 @@ impl Handler<CommitMessage> for CommitMonitor {
             msg.resource.get_subject(),
             self.subscriptions.len()
         );
-        if let Some(set) = self.subscriptions.get(&msg.subject) {
-            log::info!("Updating commit {} for {} sockets", msg.subject, set.len());
-            for connection in set {
-                log::info!("Sending commit for connection");
+        if let Some(subscribers) = self.subscriptions.get(&msg.subject) {
+            log::info!(
+                "Sending commit {} to {} subscribers",
+                msg.subject,
+                subscribers.len()
+            );
+            for connection in subscribers {
                 connection.do_send(msg.clone());
             }
         } else {

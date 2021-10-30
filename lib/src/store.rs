@@ -53,16 +53,24 @@ impl Storelike for Store {
         Ok(())
     }
 
-    /// Adds a Resource to the store.
-    /// Replaces existing resource with the contents.
-    /// In most cases, you should use `.commit()` instead.
-    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
-        resource.check_required_props(self)?;
-        self.add_resource_unsafe(resource)?;
-        Ok(())
-    }
-
-    fn add_resource_unsafe(&self, resource: &crate::Resource) -> AtomicResult<()> {
+    fn add_resource_opts(
+        &self,
+        resource: &Resource,
+        check_required_props: bool,
+        update_index: bool,
+        overwrite_existing: bool,
+    ) -> AtomicResult<()> {
+        if check_required_props {
+            resource.check_required_props(self)?;
+        }
+        if !overwrite_existing {
+            let subject = resource.get_subject();
+            if let Some(_r) = self.hashmap.lock().unwrap().get(subject) {
+                return Err(format!("{} already present, will not overwrite.", subject).into());
+            }
+        }
+        let _ = update_index;
+        // This store has no index, so we don't need to update it.
         self.hashmap
             .lock()
             .unwrap()
@@ -218,24 +226,6 @@ mod test {
         store.populate().unwrap();
         // If nothing happens - this night be deadlock.
         store.get_resource(urls::CLASS).unwrap();
-    }
-
-    #[test]
-    fn get_extended_resource() {
-        let store = Store::init().unwrap();
-        store.populate().unwrap();
-        let subject = "https://atomicdata.dev/classes?current_page=2";
-        // Should throw, because page 2 is out of bounds for default page size
-        let _wrong_resource = store.get_resource_extended(subject, false).unwrap_err();
-        let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
-        let resource = store.get_resource_extended(subject, false).unwrap();
-        let cur_page = resource
-            .get(urls::COLLECTION_CURRENT_PAGE)
-            .unwrap()
-            .to_int()
-            .unwrap();
-        assert_eq!(cur_page, 2);
-        assert_eq!(resource.get_subject(), subject);
     }
 
     #[test]
