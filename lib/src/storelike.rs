@@ -193,7 +193,7 @@ pub trait Storelike: Sized {
     /// let atoms = store.tpf(
     ///     None,
     ///     Some("https://atomicdata.dev/properties/isA"),
-    ///     Some("[\"https://atomicdata.dev/classes/Class\"]"),
+    ///     Some("https://atomicdata.dev/classes/Class"),
     ///     true
     /// ).unwrap();
     /// assert!(atoms.len() > 11)
@@ -322,8 +322,12 @@ pub trait Storelike: Sized {
                 match current {
                     PathReturn::Atom(atom) => {
                         let vector = match resource.get(&atom.property)? {
-                            Value::ResourceArraySubjects(vec) => vec,
-                            _ => return Err("Should be Vector!".into()),
+                            Value::ResourceArray(vec) => vec,
+                            _ => {
+                                return Err(
+                                    "Integers can only be used to traverse ResourceArrays.".into()
+                                )
+                            }
                         };
                         let url: String = vector
                             .get(i as usize)
@@ -333,7 +337,7 @@ pub trait Storelike: Sized {
                                 vector.len(),
                                 vector.len() - 1
                             ))?
-                            .into();
+                            .to_string();
                         subject = url;
                         resource = self.get_resource_extended(&subject, false)?;
                         current = PathReturn::Subject(subject.clone());

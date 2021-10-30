@@ -112,14 +112,16 @@ pub fn add_rights(
     let mut rights_vector: Vec<String> = match target.get(right) {
         // Rights have been set, add to the list
         Ok(val) => {
-            let vec = val.to_vec().map_err(|_| "Invalid value for rights")?;
+            let vec = val
+                .to_subjects(None)
+                .map_err(|_| "Invalid value for rights")?;
             // If the vector already contains the agent, throw an error;
-            for a in vec {
+            for a in &vec {
                 if a == agent {
                     return Ok(());
                 }
             }
-            vec.to_owned()
+            vec
         }
         // No rights have been set, create a new vector
         Err(_) => Vec::new(),

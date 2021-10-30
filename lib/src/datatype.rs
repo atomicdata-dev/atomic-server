@@ -6,6 +6,7 @@ use std::{fmt, string::ParseError};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum DataType {
+    /// Either a full Resource, a link to a resource (subject) or a Nested Anonymous Resource
     AtomicUrl,
     Boolean,
     Date,

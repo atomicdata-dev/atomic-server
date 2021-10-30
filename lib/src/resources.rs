@@ -72,8 +72,8 @@ impl Resource {
     pub fn get_classes(&self, store: &impl Storelike) -> AtomicResult<Vec<Class>> {
         let mut classes: Vec<Class> = Vec::new();
         if let Ok(val) = self.get(crate::urls::IS_A) {
-            for class in val.to_vec()? {
-                classes.push(store.get_class(class)?)
+            for class in val.to_subjects(None)? {
+                classes.push(store.get_class(&class)?)
             }
         }
         Ok(classes)
@@ -82,7 +82,7 @@ impl Resource {
     /// Returns the first item of the is_ array
     pub fn get_main_class(&self) -> AtomicResult<String> {
         if let Ok(val) = self.get(crate::urls::IS_A) {
-            Ok(val.to_vec()?[0].clone())
+            Ok(val.to_subjects(None)?[0].clone())
         } else {
             Err(format!("Resource {} has no class", self.subject).into())
         }
@@ -103,6 +103,11 @@ impl Resource {
 
     pub fn get_subject(&self) -> &String {
         &self.subject
+    }
+
+    /// Returns all PropVals.
+    pub fn into_propvals(self) -> PropVals {
+        self.propvals
     }
 
     /// Create a new, empty Resource.
@@ -311,6 +316,11 @@ impl Resource {
         Ok(())
     }
 
+    /// Overwrites all current PropVals. Does not perform validation.
+    pub fn set_propvals_unsafe(&mut self, propvals: PropVals) {
+        self.propvals = propvals;
+    }
+
     /// Changes the subject of the Resource.
     /// Does not 'move' the Resource
     /// See https://github.com/joepio/atomic/issues/44
@@ -449,12 +459,12 @@ mod test {
                 .unwrap()
                 .to_string()
         );
-        assert!(
+        assert_eq!(
             resource_from_store
                 .get_shortname("is-a", &store)
                 .unwrap()
-                .to_string()
-                == r#"["https://atomicdata.dev/classes/Class"]"#
+                .to_string(),
+            "https://atomicdata.dev/classes/Class"
         );
         assert!(resource_from_store.get_classes(&store).unwrap()[0].shortname == "class");
     }
@@ -508,12 +518,12 @@ mod test {
                 .unwrap()
                 .to_string()
         );
-        assert!(
+        assert_eq!(
             resource_from_store
                 .get_shortname("is-a", &store)
                 .unwrap()
-                .to_string()
-                == r#"["https://atomicdata.dev/classes/Class"]"#
+                .to_string(),
+            "https://atomicdata.dev/classes/Class"
         );
         assert!(resource_from_store.get_classes(&store).unwrap()[0].shortname == "class");
     }
@@ -525,7 +535,7 @@ mod test {
         let mut success = false;
         for (prop, val) in new_resource.get_propvals() {
             if prop == urls::IS_A {
-                assert!(val.to_vec().unwrap()[0] == urls::CLASS);
+                assert!(val.to_subjects(None).unwrap()[0] == urls::CLASS);
                 success = true;
             }
         }

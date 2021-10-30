@@ -221,7 +221,7 @@ impl Commit {
             Err(_) => None,
         };
         let remove = match resource.get(urls::REMOVE) {
-            Ok(found) => Some(found.to_vec()?.clone()),
+            Ok(found) => Some(found.to_subjects(None)?),
             Err(_) => None,
         };
         let destroy = match resource.get(urls::DESTROY) {

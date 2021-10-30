@@ -161,14 +161,15 @@ impl Storelike for Db {
 
     // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
-        let vec = match atom.value.clone() {
-            Value::ResourceArraySubjects(v) => v,
-            Value::AtomicUrl(v) => vec![v],
+        let vec = match &atom.value {
+            // This results in wrong indexing, as some subjects will be numbers.
+            Value::ResourceArray(_v) => atom.values_to_subjects()?,
+            Value::AtomicUrl(v) => vec![v.into()],
             _other => return Ok(()),
         };
 
-        for val in vec {
-            let mut map = self.get_prop_subject_map(&val)?;
+        for subject in vec {
+            let mut map = self.get_prop_subject_map(&subject)?;
 
             let mut set = match map.get_mut(&atom.property) {
                 Some(vals) => vals.to_owned(),
@@ -178,7 +179,7 @@ impl Storelike for Db {
             set.insert(atom.subject.clone());
             map.insert(atom.property.clone(), set);
 
-            self.set_prop_subject_map(&val, &map)?;
+            self.set_prop_subject_map(&subject, &map)?;
         }
         Ok(())
     }
@@ -195,9 +196,10 @@ impl Storelike for Db {
     }
 
     fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
-        let vec = match atom.value.clone() {
-            Value::ResourceArraySubjects(v) => v,
-            other => vec![other.to_string()],
+        let vec = match atom.value.to_owned() {
+            Value::ResourceArray(_v) => atom.values_to_subjects()?,
+            Value::AtomicUrl(subject) => vec![subject],
+            _other => return Ok(()),
         };
 
         for val in vec {
