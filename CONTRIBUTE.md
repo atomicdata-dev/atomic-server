@@ -14,6 +14,18 @@ If you want to share some thoughts on Atomic Data as a standard, please [drop an
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-data-browser), run it with `SNOWPACK_PUBLIC_BASE_URL` set to your `atomic-server` (by default `localhost`).
 
+## Debugging
+
+- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
+
+## GUI + Server
+
+Since `atomic-server` is developed in conjunction with the typescript / react `atomic-data-browser` project, it might make sense to run both locally whilst developing.
+
+- Clone [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
+- Visit `https://localhost:8080` (default)
+- Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
+
 ## Making a perfect pull-request
 
 - Clear explanation in the PR itself of what is changed and why
