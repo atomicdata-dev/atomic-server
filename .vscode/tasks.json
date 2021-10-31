@@ -1,0 +1,31 @@
+{
+	// See https://go.microsoft.com/fwlink/?LinkId=733558
+	// for the documentation about the tasks.json format
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "run atomic-server (cargo run)",
+			"type": "shell",
+			"command": "~/.cargo/bin/cargo", // note: full path to the cargo
+			"args": [
+				"run",
+				"--bin",
+				"atomic-server"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "test atomic-server (cargo test --all)",
+			"type": "shell",
+			"command": "~/.cargo/bin/cargo", // note: full path to the cargo
+			"args": [
+				"test",
+				"--all",
+			],
+			"group": "test"
+		},
+	]
+}
