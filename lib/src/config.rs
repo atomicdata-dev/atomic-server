@@ -39,12 +39,20 @@ pub fn read_config(path: &Path) -> AtomicResult<Config> {
     Ok(config)
 }
 
-/// Writes config file from a specified path
-/// Overwrites any existing config
+/// Writes config file from a specified path.
+/// Overwrites any existing config.
+/// Creates the config directory if it does not exist.
 pub fn write_config(path: &Path, config: Config) -> AtomicResult<String> {
     let out =
         toml::to_string_pretty(&config).map_err(|e| format!("Error serializing config. {}", e))?;
+
+    let prefix = path
+        .parent()
+        .ok_or("Could not get parent dir of config file")?;
+    std::fs::create_dir_all(prefix)
+        .map_err(|e| format!("Could not create config directory {:?} . {}", prefix, e))?;
+
     std::fs::write(path, out.clone())
-        .map_err(|e| format!("Error writing config to {:?}. {}", path, e))?;
+        .map_err(|e| format!("Error writing config file to {:?}. {}", path, e))?;
     Ok(out)
 }

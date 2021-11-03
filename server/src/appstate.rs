@@ -104,7 +104,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
             };
             let config_string =
                 atomic_lib::config::write_config(&config.config_file_path, cfg.clone())?;
-            log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli) to log in with these credentials. \n{}", &config.config_file_path, config_string);
+            log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli or atomic-data-browser) to log in with these credentials. \n{}", &config.config_file_path, config_string);
             cfg
         }
     };

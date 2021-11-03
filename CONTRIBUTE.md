@@ -1,13 +1,13 @@
 # Contribute
 
 I'm glad you're reading this!
-If you encounter issues, add them to the Github issue tracker.
+If you encounter issues, add them to the [Github issue tracker](https://github.com/joepio/atomic-data-rust/issues).
 Same goes for feature requests.
 PR's are welcome, too!
 And join our [Discord](https://discord.gg/a72Rv2P)!
 I'd love to help you out to understand this codebase.
 
-If you want to share some thoughts on Atomic Data as a standard, please [drop an issue in the Atomic Data docs repo](https://github.com/ontola/atomic-data/issues).
+If you want to share some thoughts on the Atomic Data _specification_, please [drop an issue in the Atomic Data docs repo](https://github.com/ontola/atomic-data/issues).
 
 ## Local development
 
