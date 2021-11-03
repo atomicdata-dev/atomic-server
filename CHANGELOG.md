@@ -3,6 +3,13 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.28.1
+
+- Fix docker env issue #202
+- Fix docker image by switching `heim` with `sysinfo` #203
+- Fix path ENV variables
+- Fix logging while terminating existing process
+
 ## v0.28.0
 
 - **IMPORANT**: before upgrading to this version, export your database using your previous version: `atomic-server export`. The database could become corrupted when running the new version.

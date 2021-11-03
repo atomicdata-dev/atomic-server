@@ -9,22 +9,20 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
         Err(_e) => None,
     };
     if let Some(pid) = pid_maybe {
+        use sysinfo::{ProcessExt, SystemExt};
+        let mut s = sysinfo::System::new_all();
         let retry_secs = 1;
         let mut tries_left = 15;
-        match futures::executor::block_on(heim::process::get(pid)) {
-            Ok(process) => {
-                log::warn!(
-                    "Terminating existing running instance of atomic-server (process ID: {})...",
-                    process.pid()
-                );
-                futures::executor::block_on(process.terminate())
-                    .expect("Found running atomic-server, but could not terminate it.");
-                log::info!("Checking if other server has succesfully terminated...",);
-                loop {
-                    if let Err(_e) = futures::executor::block_on(heim::process::get(pid)) {
-                        log::info!("No other atomic-server is running, continuing start-up",);
-                        break;
-                    };
+        if let Some(process) = s.process(pid) {
+            log::warn!(
+                "Terminating existing running instance of atomic-server (process ID: {})...",
+                process.pid()
+            );
+            process.kill(sysinfo::Signal::Term);
+            log::info!("Checking if other server has succesfully terminated...",);
+            loop {
+                s.refresh_processes();
+                if let Some(_process) = s.process(pid) {
                     if tries_left > 1 {
                         tries_left -= 1;
                         log::info!(
@@ -37,9 +35,11 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
                         log::error!("Could not terminate other atomic-server, exiting...");
                         std::process::exit(1);
                     }
-                }
+                    continue;
+                };
+                log::info!("No other atomic-server is running, continuing start-up",);
+                break;
             }
-            Err(_e) => (),
         }
     }
     create_pid(config)
@@ -65,9 +65,8 @@ fn pid_path(config: &Config) -> std::path::PathBuf {
 /// Writes a `pid` file in the config directory to signal which instance is running.
 fn create_pid(config: &Config) -> BetterResult<()> {
     use std::io::Write;
-    let pid = futures::executor::block_on(heim::process::current())
-        .map_err(|_| "Failed to get process info required to create process ID")?
-        .pid();
+    let pid = sysinfo::get_current_pid()
+        .map_err(|_| "Failed to get process info required to create process ID")?;
     let mut pid_file = std::fs::File::create(pid_path(config)).map_err(|_| {
         format!(
             "Could not create process file at {}",
