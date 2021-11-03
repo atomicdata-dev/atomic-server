@@ -554,7 +554,11 @@ pub mod test {
     fn init(id: &str) -> Db {
         let tmp_dir_path = format!("tmp/db/{}", id);
         let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
-        let store = Db::init(&tmp_dir_path, "https://localhost".into()).unwrap();
+        let store = Db::init(
+            std::path::Path::new(&tmp_dir_path),
+            "https://localhost".into(),
+        )
+        .unwrap();
         let agent = store.create_agent(None).unwrap();
         store.set_default_agent(agent);
         store.populate().unwrap();
