@@ -190,3 +190,7 @@ This is not yet possible. See [#13](https://github.com/joepio/atomic-data-rust/i
 ### Collections are empty / TPF is not working
 
 You might have a problem with your index. Try reindexing using `atomic-server --reindex`.
+
+### I get a `failed to retrieve` error when opening
+
+Try re-initializing atomic server `atomic-server --initialize`.
