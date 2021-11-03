@@ -7,17 +7,17 @@ rampup: 2
 plan:
   - name: JSON-AD resource
     request:
-      url: /document/6fr6s0hyhm
+      url: /setup
       headers:
         Accept: "application/ad+json"
   - name: JSON-LD resource
     request:
-      url: /document/6fr6s0hyhm
+      url: /setup
       headers:
         Accept: "application/ld+json"
   - name: TTL resource
     request:
-      url: /document/6fr6s0hyhm
+      url: /setup
       headers:
         Accept: "text/turtle"
   - name: "404"
