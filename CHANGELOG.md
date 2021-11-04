@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.28.2
+
+- Add `enum` support using the `allows-only` Property. #206
+
 ## v0.28.1
 
 - Fix docker env issue #202

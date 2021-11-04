@@ -5,13 +5,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Property {
-    // URL of the class
+    /// The class-type indicates that the Atomic URL should be an instance of this class.
+    /// https://atomicdata.dev/properties/classtype
     pub class_type: Option<String>,
-    // URL of the datatype
+    /// The required datatype for the Property.
+    /// https://atomicdata.dev/properties/datatype
     pub data_type: DataType,
     pub shortname: String,
+    /// URL of the Property
     pub subject: String,
     pub description: String,
+    /// Restricts values to be only one of these Subjects.
+    /// https://atomicdata.dev/properties/allowsOnly
+    pub allows_only: Option<Vec<String>>,
 }
 
 impl PartialEq for Property {
@@ -30,12 +36,17 @@ impl Property {
             Ok(classtype) => Some(classtype.to_string()),
             Err(_) => None,
         };
+        let allows_only = match resource.get(urls::ALLOWS_ONLY) {
+            Ok(classtype) => Some(classtype.to_subjects(None)?),
+            Err(_) => None,
+        };
 
         Ok(Property {
             class_type,
             data_type,
             shortname,
             description,
+            allows_only,
             subject: resource.get_subject().into(),
         })
     }

@@ -25,6 +25,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "shortname".into(),
             description: "A short name of something. It can only contain letters, numbers and dashes `-`. Use dashes to denote spaces between words. Not case sensitive - lowercase only. Useful in programming contexts where the user should be able to type something short to identify a specific thing.".into(),
             subject: urls::SHORTNAME.into(),
+            allows_only: None,
         },
         Property {
             class_type: None,
@@ -32,6 +33,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "description".into(),
             description: "A textual description of something. When making a description, make sure that the first few words tell the most important part. Give examples. Since the text supports markdown, you're free to use links and more.".into(),
             subject: urls::DESCRIPTION.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::CLASS.into()),
@@ -39,6 +41,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "is-a".into(),
             description: "A list of Classes of which the thing is an instance of. The Classes of a Resource determine which Properties are recommended and required.".into(),
             subject: urls::IS_A.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::DATATYPE_CLASS.into()),
@@ -46,6 +49,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "datatype".into(),
             description: "The Datatype of a property, such as String or Timestamp.".into(),
             subject: urls::DATATYPE_PROP.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::CLASS.into()),
@@ -55,6 +59,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
                 "The class-type indicates that the Atomic URL should be an instance of this class."
                     .into(),
             subject: urls::CLASSTYPE_PROP.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::PROPERTY.into()),
@@ -62,6 +67,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "recommends".into(),
             description: "The Properties that are not required, but recommended for this Class.".into(),
             subject: urls::RECOMMENDS.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::PROPERTY.into()),
@@ -69,6 +75,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "requires".into(),
             description: "The Properties that are required for this Class.".into(),
             subject: urls::REQUIRES.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::PROPERTY.into()),
@@ -76,6 +83,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "parent".into(),
             description: "The parent of a Resource sets the hierarchical structure of the Resource, and therefore also the rights / grants. It is used for both navigation, structure and authorization. Parents are the inverse of [children](https://atomicdata.dev/properties/children).".into(),
             subject: urls::PARENT.into(),
+            allows_only: None,
         },
         Property {
             class_type: Some(urls::PROPERTY.into()),
@@ -83,6 +91,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "allows-only".into(),
             description: "Restricts this Property to only the values inside this one. This essentially turns the Property into an `enum`.".into(),
             subject: urls::ALLOWS_ONLY.into(),
+            allows_only: None,
         }
     ];
 
