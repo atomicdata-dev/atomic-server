@@ -98,7 +98,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     let classes = vec![
         Class {
             requires: vec![urls::SHORTNAME.into(), urls::DATATYPE_PROP.into()],
-            recommends: vec![urls::DESCRIPTION.into(), urls::CLASSTYPE_PROP.into(), urls::IS_DYNAMIC.into(), urls::IS_LOCKED.into()],
+            recommends: vec![urls::DESCRIPTION.into(), urls::CLASSTYPE_PROP.into(), urls::IS_DYNAMIC.into(), urls::IS_LOCKED.into(), urls::ALLOWS_ONLY.into()],
             shortname: "property".into(),
             description: "A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`.".into(),
             subject: urls::PROPERTY.into(),
