@@ -96,8 +96,8 @@ sudo apt-get install -y pkg-config libssl-dev --fix-missing
 
 ## Initial setup and configuration
 
-- The server loads the `.env` from the current path by default. Use the `default.env` from this repo as a template and for reference.
-- If you want to run Atomic Server on your own domain, you'll probably want to set `ATOMIC_DOMAIN`, `ATOMIC_HTTPS` and `ATOMIC_EMAIL` in the `.env` (see HTTPS setup below).
+- You can configure the server by passing arguments (see `atomic-server --help`), or by setting ENV variables.
+- The server loads the `.env` from the current path by default. Create a `.env` file from the default template in your current directory with `atomic-server setup-env`.
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
 - Visit `http://localhost/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
@@ -106,21 +106,19 @@ sudo apt-get install -y pkg-config libssl-dev --fix-missing
 
 You'll probably want to make your Atomic Data available through HTTPS.
 You can use the embedded HTTPS / TLS setup powered by [LetsEncrypt](https://letsencrypt.org/), [acme_lib](https://docs.rs/acme-lib/0.8.1/acme_lib/index.html) and [rustls](https://github.com/ctz/rustls).
-To setup HTTPS, we'll need to set some environment variables.
-Open `.env` and set:
 
-```env
-ATOMIC_EMAIL=youremail@example.com
-ATOMIC_DOMAIN=example.com
-ATOMIC_HTTPS=true
-```
+You can do this by passing these flags:
 
-Run the server: `cargo run`.
+Run the server: `atomic-server --https --email some@example.com --domain example.com`.
+
+You can also set these things using a `.env` or by setting them some other way.
+
 Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's Encrypt will send an HTTP request to this server's `/.well-known` directory to check the keys.
 It will now initialize the certificate.
 Read the logs, watch for errors.
 
 HTTPS certificates are automatically renewed when the server is restarted, and the certs are 4 weeks or older.
+They are stored in your `.config/atomic/` dir.
 
 ## Usage
 
