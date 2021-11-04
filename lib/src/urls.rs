@@ -23,6 +23,7 @@ pub const IS_DYNAMIC: &str = "https://atomicdata.dev/properties/isDynamic";
 pub const IS_LOCKED: &str = "https://atomicdata.dev/properties/isLocked";
 pub const DATATYPE_PROP: &str = "https://atomicdata.dev/properties/datatype";
 pub const CLASSTYPE_PROP: &str = "https://atomicdata.dev/properties/classtype";
+pub const ALLOWS_ONLY: &str = "https://atomicdata.dev/properties/allowsOnly";
 // ... for Classes
 pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
 pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";

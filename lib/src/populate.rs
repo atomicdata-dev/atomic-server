@@ -76,6 +76,13 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             shortname: "parent".into(),
             description: "The parent of a Resource sets the hierarchical structure of the Resource, and therefore also the rights / grants. It is used for both navigation, structure and authorization. Parents are the inverse of [children](https://atomicdata.dev/properties/children).".into(),
             subject: urls::PARENT.into(),
+        },
+        Property {
+            class_type: Some(urls::PROPERTY.into()),
+            data_type: DataType::AtomicUrl,
+            shortname: "allows-only".into(),
+            description: "Restricts this Property to only the values inside this one. This essentially turns the Property into an `enum`.".into(),
+            subject: urls::ALLOWS_ONLY.into(),
         }
     ];
 
@@ -91,7 +98,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             requires: vec![urls::SHORTNAME.into(), urls::DESCRIPTION.into()],
             recommends: vec![urls::RECOMMENDS.into(), urls::REQUIRES.into()],
             shortname: "class".into(),
-            description: "A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data and explains what the thing represents. It is convention to use Uppercase in its URL. Note that in Atomic Data, a Resource can have several Classes - not just a single one.".into(),
+            description: "A Class describes an abstract concept, such as 'Person' or 'Blogpost'. It describes the data shape of data (which fields are required and recommended) and explains what the concept represents. It is convention to use Uppercase in its URL.Resources use the [is-a](https://atomicdata.dev/properties/isA) attribute to indicate which classes they are instances of. Note that in Atomic Data, a Resource can have several Classes - not just a single one.".into(),
             subject: urls::CLASS.into(),
         },
         Class {
