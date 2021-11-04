@@ -269,23 +269,33 @@ impl Resource {
     }
 
     /// Inserts a Property/Value combination.
+    /// Checks datatype.
     /// Overwrites existing.
-    /// Adds it to the commit builder.
+    /// Adds the change to the commit builder's `set` map.
     pub fn set_propval(
         &mut self,
         property: String,
         value: Value,
         store: &impl Storelike,
     ) -> AtomicResult<()> {
-        let required_datatype = store.get_property(&property)?.data_type;
-        if required_datatype == value.datatype() {
+        let full_prop = store.get_property(&property)?;
+        if let Some(allowed) = full_prop.allows_only {
+            if !allowed.contains(&value.to_string()) {
+                return Err(format!(
+                    "Property '{}' does not allow value '{}'. Allowed: {:?}",
+                    property, value, allowed
+                )
+                .into());
+            }
+        }
+        if full_prop.data_type == value.datatype() {
             self.set_propval_unsafe(property, value)
         } else {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
                 self.get_subject(),
                 property,
                 value.to_string(),
-                required_datatype,
+                full_prop.data_type,
                 value.datatype()
             ).into())
         }
