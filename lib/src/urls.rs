@@ -57,7 +57,9 @@ pub const COLLECTION_SORT_BY: &str = "https://atomicdata.dev/properties/collecti
 pub const COLLECTION_SORT_DESC: &str = "https://atomicdata.dev/properties/collection/sortDesc";
 // ... for Endpoints
 pub const ENDPOINT_PARAMETERS: &str = "https://atomicdata.dev/properties/endpoint/parameters";
+pub const ENDPOINT_RESULTS: &str = "https://atomicdata.dev/properties/endpoint/results";
 pub const PATH: &str = "https://atomicdata.dev/properties/path";
+pub const SEARCH_QUERY: &str = "https://atomicdata.dev/properties/searchQuery";
 // ... for Hierarchy / Drive
 pub const PARENT: &str = "https://atomicdata.dev/properties/parent";
 pub const READ: &str = "https://atomicdata.dev/properties/read";

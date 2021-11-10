@@ -10,6 +10,26 @@
         "https://atomicdata.dev/properties/shortname": "parameters"
     },
     {
+        "@id": "https://atomicdata.dev/properties/endpoint/results",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+        "https://atomicdata.dev/properties/description": "The results of the endpoint",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "results"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/searchQuery",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "See https://docs.rs/tantivy/0.16.1/tantivy/query/struct.QueryParser.html",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "search-query"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/isDynamic",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
         "https://atomicdata.dev/properties/description": "If this is true, a Property is calculated server side and should therefore not appear in forms.",
