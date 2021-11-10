@@ -114,7 +114,9 @@ pub struct Config {
     pub static_path: PathBuf,
     /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
     pub store_path: PathBuf,
-    /// init app
+    /// Path to where the search index for tantivy full text search is located  (defaults to `~/.config/atomic/search_index`)
+    pub search_index_path: PathBuf,
+    /// If true, the initialization scripts will be ran (create first Drive, Agent, indexing, etc)
     pub initialize: bool,
 }
 
@@ -136,6 +138,8 @@ pub fn init() -> BetterResult<Config> {
     store_path.push("db");
     let mut https_path = config_dir.clone();
     https_path.push("https");
+    let mut search_index_path = config_dir.clone();
+    search_index_path.push("search_index");
     let mut cert_path = config_dir.clone();
     cert_path.push("https/cert.pem");
     let mut key_path = config_dir.clone();
@@ -196,5 +200,6 @@ pub fn init() -> BetterResult<Config> {
         local_base_url,
         static_path,
         store_path,
+        search_index_path,
     })
 }
