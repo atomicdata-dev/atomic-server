@@ -22,6 +22,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
                 .to(handlers::commit::post_commit),
         )
         .service(
+            web::resource("/search")
+                .guard(actix_web::guard::Method(Method::GET))
+                .to(handlers::search::search_query),
+        )
+        .service(
             web::scope("/{path:[^{}]+}")
                 .service(web::resource("").route(web::get().to(handlers::resource::get_resource))),
         )

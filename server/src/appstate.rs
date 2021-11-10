@@ -16,6 +16,16 @@ pub struct AppState {
     pub config: Config,
     /// The Actix Address of the CommitMonitor, which should receive updates when a commit is applied
     pub commit_monitor: actix::Addr<CommitMonitor>,
+    /// Full text search reader for performing queries
+    pub search_reader: tantivy::IndexReader,
+    /// Full text search index
+    pub search_index: tantivy::Index,
+    /// Full text search index writer.
+    /// Just take the read lock for adding documents, and the write lock for committing.
+    // see https://github.com/quickwit-inc/tantivy/issues/550
+    pub search_index_writer: std::sync::Arc<std::sync::RwLock<tantivy::IndexWriter>>,
+    /// Full text search schema
+    pub search_schema: tantivy::schema::Schema,
 }
 
 /// Creates the server context.
@@ -55,10 +65,24 @@ pub fn init(config: Config) -> BetterResult<AppState> {
 
     use actix::Actor;
 
+    // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
+    let commit_monitor = crate::commit_monitor::CommitMonitor::default().start();
+
+    // Initialize search constructs
+    let search_schema = crate::search::build_schema()?;
+    let (search_index_writer, search_index) = crate::search::get_index(&config)?;
+    let search_reader = crate::search::get_reader(&search_index)?;
+    let locked = std::sync::RwLock::from(search_index_writer);
+    let arced = std::sync::Arc::from(locked);
+
     Ok(AppState {
         store,
         config,
-        commit_monitor: crate::commit_monitor::CommitMonitor::default().start(),
+        commit_monitor,
+        search_reader,
+        search_schema,
+        search_index,
+        search_index_writer: arced,
     })
 }
 

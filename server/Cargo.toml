@@ -6,15 +6,11 @@ license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.28.1"
-
 [dependencies]
-acme-lib = {version = "0.8.1", optional = true}
 actix = "0.10.0"
 actix-cors = "0.5.4"
 actix-files = "0.5.0"
-actix-web = {version = "3.3.2", features = ["rustls"]}
 actix-web-actors = "3.0.0"
-atomic_lib = {version = "0.28.1", path = "../lib", features = ["config", "db", "rdf"]}
 chrono = "0.4.19"
 clap = "3.0.0-beta.5"
 dirs = "3.0.1"
@@ -22,15 +18,44 @@ dotenv = "0.15.0"
 env_logger = "0.9.0"
 futures = "0.3.16"
 log = "0.4.11"
-open = {version = "2.0.1", optional = true}
 promptly = "0.3.0"
 regex = "1.4.2"
-rustls = {version = "0.18.1", optional = true}
-serde = {version = "1.0.118", features = ["derive"]}
 serde_json = "1.0.60"
 sysinfo = "0.20.5"
-tokio = {version = "1.4.0", features = ["time"]}
-tray-item = {version = "0.4.0-alpha", optional = true}
+tantivy = "*"
+
+[dependencies.acme-lib]
+optional = true
+version = "0.8.1"
+
+[dependencies.actix-web]
+features = ["rustls"]
+version = "3.3.2"
+
+[dependencies.atomic_lib]
+features = ["config", "db", "rdf"]
+path = "../lib"
+version = "0.28.1"
+
+[dependencies.open]
+optional = true
+version = "2.0.1"
+
+[dependencies.rustls]
+optional = true
+version = "0.18.1"
+
+[dependencies.serde]
+features = ["derive"]
+version = "1.0.118"
+
+[dependencies.tokio]
+features = ["time"]
+version = "1.4.0"
+
+[dependencies.tray-item]
+optional = true
+version = "0.4.0-alpha"
 
 [features]
 default = ["https"]

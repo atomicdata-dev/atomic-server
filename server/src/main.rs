@@ -11,6 +11,8 @@ mod https;
 mod jsonerrors;
 mod process;
 mod routes;
+// #[cfg(feature = "search")]
+mod search;
 mod serve;
 #[cfg(feature = "desktop")]
 mod tray_icon;
