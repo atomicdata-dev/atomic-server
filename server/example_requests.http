@@ -14,6 +14,10 @@ Accept: application/ld+json
 GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: text/turtle
 
+### Full text search
+GET http://localhost/search?q=blup HTTP/1.1
+Accept: application/ld+json
+
 ### Send a Commit
 POST http://localhost/commit HTTP/1.1
 Accept: application/json

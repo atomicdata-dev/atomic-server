@@ -1,5 +1,7 @@
 //! Functions useful in the server
 
+use crate::content_types::ContentType;
+
 // Returns None if the string is empty.
 // Useful for parsing form inputs.
 pub fn empty_to_nothing(string: Option<String>) -> Option<String> {

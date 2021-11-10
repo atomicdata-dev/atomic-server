@@ -48,7 +48,11 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // Building the index here is needed to perform TPF queries on imported resources
+        log::info!(
+            "Building index... (this could take a few minutes for larger existing databases)"
+        );
         store.build_index(true)?;
+        log::info!("Building index finished!");
     }
     set_default_agent(&config, &store)?;
     if config.initialize {

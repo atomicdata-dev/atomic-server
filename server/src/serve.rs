@@ -27,6 +27,8 @@ pub async fn serve(config: crate::config::Config) -> AtomicResult<()> {
                 .expect("Failed to build index");
             log::info!("Building index finished!");
         });
+
+        crate::search::add_all_resources(&appstate)?;
     }
 
     let server = HttpServer::new(move || {

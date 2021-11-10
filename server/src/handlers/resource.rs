@@ -11,7 +11,7 @@ use std::sync::Mutex;
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
 pub async fn get_resource(
-    subject_end: Option<web::Path<String>>,
+    path: Option<web::Path<String>>,
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> BetterResult<HttpResponse> {
@@ -20,7 +20,7 @@ pub async fn get_resource(
     let mut content_type = get_accept(req.headers());
     let base_url = &context.config.local_base_url;
     // Get the subject from the path, or return the home URL
-    let subject = if let Some(subj_end) = subject_end {
+    let subject = if let Some(subj_end) = path {
         let mut subj_end_string = subj_end.as_str();
         if content_type == ContentType::Html {
             if let Some((ext, path)) = try_extension(subj_end_string) {
