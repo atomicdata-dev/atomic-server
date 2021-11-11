@@ -5,6 +5,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## v0.28.2
 
+- Full-text search endpoint, powered by Tantify #40
+- Add RDF-Search usecase (enables re-use of this server as search service for Solid pods)
 - Add `enum` support using the `allows-only` Property. #206
 
 ## v0.28.1

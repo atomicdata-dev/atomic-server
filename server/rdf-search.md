@@ -8,7 +8,7 @@ You can use it like this:
 - **Perform a query** by sendig an HTTP GET request to `/search?q=query` with an `Accept` header set to `application/ld+json`.
 
 Add Turtle to index:
-```
+```HTTP
 POST http://localhost/search HTTP/1.1
 Content-Type: text/turtle
 
@@ -16,27 +16,26 @@ Content-Type: text/turtle
     <http://example.com/foo> a schema:Person ;
         schema:name  "Foo" .
     <http://example.com/bar> a schema:Person ;
-        schema:name  "asdfsajhdfgbasdf" .
+        schema:name  "johnnybravy" .
 ```
 
-Full text search, return only subjects:
+Perform a query:
 
 ```HTTP
-GET http://localhost/search?q=somestring HTTP/1.1
+GET http://localhost/search?q=johnnybravy HTTP/1.1
 Accept: application/ld+json
 ```
 
-
 ## Query parameters
 
-- the `q` parameter contains the actual query, see below for instructions
-- `limit` is for setting a maximum response count (default is 30)
-- `property` is for filtering by some predicate / property URL
+- `q`: contains the actual query, see below for instructions
+- `limit`: setting a maximum response count (default is 30)
+- `property`: filtering by some predicate / property URL
 
 ## Query string options
 
-- Uses fuzzy matching by default
-- Use `AND` or `OR` keywords
+- Uses fuzzy matching by default, unless you use special characters
+- Use `AND` or `OR` keywords, `+include` and `-exclude`, and [more](https://docs.rs/tantivy/0.16.1/tantivy/query/struct.QueryParser.html).
 
 ## Limitations
 
