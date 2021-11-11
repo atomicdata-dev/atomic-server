@@ -63,6 +63,11 @@ pub fn get_schema_fields(appstate: &AppState) -> Fields {
 pub fn add_all_resources(appstate: &AppState) -> BetterResult<()> {
     log::info!("Building search index...");
     for resource in appstate.store.all_resources(true) {
+        // Skip commits
+        // TODO: Better check, this might overfit
+        if resource.get_subject().contains("/commits/") {
+            continue;
+        }
         add_resource(appstate, &resource)?;
     }
     appstate.search_index_writer.write()?.commit().unwrap();
@@ -71,19 +76,25 @@ pub fn add_all_resources(appstate: &AppState) -> BetterResult<()> {
 }
 
 /// Adds a single resource to the search index, but does _not_ commit!
+/// Does not index outgoing links, or resourcesArrays
 /// `appstate.search_index_writer.write()?.commit().unwrap();`
 pub fn add_resource(appstate: &AppState, resource: &Resource) -> BetterResult<()> {
     let fields = get_schema_fields(appstate);
     let subject = resource.get_subject();
     let writer = appstate.search_index_writer.read()?;
     for (prop, val) in resource.get_propvals() {
-        add_triple(
-            &writer,
-            subject.into(),
-            prop.into(),
-            val.to_string(),
-            &fields,
-        )?;
+        match val {
+            atomic_lib::Value::AtomicUrl(_) | atomic_lib::Value::ResourceArray(_) => continue,
+            _ => {
+                add_triple(
+                    &writer,
+                    subject.into(),
+                    prop.into(),
+                    val.to_string(),
+                    &fields,
+                )?;
+            }
+        };
     }
     Ok(())
 }

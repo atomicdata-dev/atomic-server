@@ -28,7 +28,15 @@ pub async fn serve(config: crate::config::Config) -> AtomicResult<()> {
             log::info!("Building index finished!");
         });
 
+        log::info!("Removing existing search index..");
+        appstate_clone
+            .search_index_writer
+            .write()
+            .expect("Could not get a lock on search writer")
+            .delete_all_documents()?;
+        log::info!("Building search index..");
         crate::search::add_all_resources(&appstate)?;
+        log::info!("Search index finished!");
     }
 
     let server = HttpServer::new(move || {
@@ -45,7 +53,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicResult<()> {
             .wrap(cors)
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
-            .configure(crate::routes::config_routes)
+            .configure(|app| crate::routes::config_routes(app, &appstate.config))
             .default_service(web::to(|| {
                 log::error!("Wrong route, should not happen with normal requests");
                 actix_web::HttpResponse::NotFound()
