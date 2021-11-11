@@ -20,7 +20,7 @@
         "https://atomicdata.dev/properties/shortname": "results"
     },
     {
-        "@id": "https://atomicdata.dev/properties/searchQuery",
+        "@id": "https://atomicdata.dev/properties/search/query",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "A full-text search query. \n\nFor all features, see [the Tantivy docs](https://docs.rs/tantivy/0.16.1/tantivy/query/struct.QueryParser.html)",
         "https://atomicdata.dev/properties/isA": [
@@ -29,6 +29,27 @@
         "https://atomicdata.dev/properties/name": "Full-text search query",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "q"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/search/limit",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+        "https://atomicdata.dev/properties/description": "Maximum number of search results.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "limit"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/search/property",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/description": "Filter results by this property URL.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/classType": "https://atomicdata.dev/classes/Property",
+        "https://atomicdata.dev/properties/shortname": "property"
     },
     {
         "@id": "https://atomicdata.dev/properties/isDynamic",
