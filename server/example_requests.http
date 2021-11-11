@@ -15,11 +15,11 @@ GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: text/turtle
 
 ### Full text search
-GET http://localhost/search?q=asdfsajhdfgbasdf HTTP/1.1
+GET http://localhost/search?q=test HTTP/1.1
 Accept: application/ld+json
 
-### Full text search, return only subjects
-GET http://localhost/search?q=asdfsajhdfgbasdf&subjects=true HTTP/1.1
+### Full text search, return full resource bodies. A bit slower, but could actually result in a faster UX.
+GET http://localhost/search?q=test&include=true HTTP/1.1
 Accept: application/ld+json
 
 ### Index at (RDF) document for search
