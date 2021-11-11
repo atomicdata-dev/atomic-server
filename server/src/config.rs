@@ -55,6 +55,9 @@ pub struct Opts {
     /// Path for atomic data config directory. Defaults to "~/.config/atomic/""
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
+    /// When enabled, it allows POSTing to the /search endpoint
+    #[clap(long, env = "ATOMIC_RDF_SEARCH")]
+    pub rdf_search: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

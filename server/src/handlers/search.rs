@@ -8,9 +8,13 @@ use tantivy::{collector::TopDocs, query::QueryParser};
 #[derive(Deserialize, Debug)]
 pub struct SearchQuery {
     /// The actual search query
-    pub q: String,
+    pub q: Option<String>,
     /// Include the full resources in the response
-    pub subjects: Option<bool>,
+    pub include: Option<bool>,
+    /// Maximum amount of results
+    pub limit: Option<usize>,
+    /// Filter by Property URL
+    pub property: Option<String>,
 }
 
 /// Parses a search query and responds with a list of resources
@@ -26,57 +30,98 @@ pub async fn search_query(
     let store = &context.store;
     let searcher = context.search_reader.searcher();
     let fields = crate::search::get_schema_fields(&context);
-
-    let mut should_fuzzy = true;
-    let return_subjects = params.subjects.unwrap_or(false);
-    let query = params.q.clone();
-    // If any of these substrings appear, the user wants an exact / advanced search
-    let dont_fuzz_strings = vec!["*", "AND", "OR", "[", "\""];
-    for dont_fuzz in dont_fuzz_strings {
-        if query.contains(dont_fuzz) {
-            should_fuzzy = false
+    let default_limit = 30;
+    let limit = if let Some(l) = params.limit {
+        if l > 0 {
+            l
+        } else {
+            default_limit
         }
-    }
-
-    let query: Box<dyn tantivy::query::Query> = if should_fuzzy {
-        let term = tantivy::Term::from_field_text(fields.value, &params.q);
-        let query = tantivy::query::FuzzyTermQuery::new_prefix(term, 2, true);
-        Box::new(query)
     } else {
-        // construct the query
-        let query_parser = QueryParser::for_index(
-            &context.search_index,
-            vec![
-                fields.subject,
-                // I don't think we need to search in the property
-                // fields.property,
-                fields.value,
-            ],
-        );
-        let tantivy_query = query_parser
-            .parse_query(&params.q)
-            .map_err(|e| format!("Error parsing query {}", e))?;
-        tantivy_query
+        default_limit
     };
 
-    // execute the query
-    let top_docs = searcher
-        .search(&query, &TopDocs::with_limit(10))
-        .map_err(|e| format!("Error with creating search results: {} ", e))?;
-    let mut subjects: Vec<String> = Vec::new();
+    let mut should_fuzzy = true;
+    if params.property.is_some() {
+        // Fuzzy searching is not possible when filtering by property
+        should_fuzzy = false;
+    }
+    let return_subjects = !params.include.unwrap_or(false);
 
-    // convert found documents to resources
-    for (_score, doc_address) in top_docs {
-        let retrieved_doc = searcher.doc(doc_address).unwrap();
-        let subject_val = retrieved_doc.get_first(fields.subject).unwrap();
-        let subject = match subject_val {
-            tantivy::schema::Value::Str(s) => s,
-            _else => return Err("Subject is not a string!".into()),
-        };
-        if subjects.contains(subject) {
-            continue;
+    let mut subjects: Vec<String> = Vec::new();
+    let mut atoms: Vec<StringAtom> = Vec::new();
+
+    if let Some(q) = params.q.clone() {
+        // If any of these substrings appear, the user wants an exact / advanced search
+        let dont_fuzz_strings = vec!["*", "AND", "OR", "[", "\"", ":", "+", "-", " "];
+        for dont_fuzz in dont_fuzz_strings {
+            if q.contains(dont_fuzz) {
+                should_fuzzy = false
+            }
+        }
+
+        let query: Box<dyn tantivy::query::Query> = if should_fuzzy {
+            let term = tantivy::Term::from_field_text(fields.value, &q);
+            let query = tantivy::query::FuzzyTermQuery::new_prefix(term, 1, true);
+            Box::new(query)
         } else {
-            subjects.push(subject.clone());
+            // construct the query
+            let query_parser = QueryParser::for_index(
+                &context.search_index,
+                vec![
+                    fields.subject,
+                    // I don't think we need to search in the property
+                    // fields.property,
+                    fields.value,
+                ],
+            );
+            let full_query = if let Some(prop) = &params.property {
+                format!("{}:{}", prop, &q)
+            } else {
+                q
+            };
+            let tantivy_query = query_parser
+                .parse_query(&full_query)
+                .map_err(|e| format!("Error parsing query {}", e))?;
+            tantivy_query
+        };
+
+        // execute the query
+        let top_docs = searcher
+            .search(&query, &TopDocs::with_limit(limit))
+            .map_err(|e| format!("Error with creating search results: {} ", e))?;
+
+        // convert found documents to resources
+        for (_score, doc_address) in top_docs {
+            let retrieved_doc = searcher.doc(doc_address).unwrap();
+            let subject_val = retrieved_doc.get_first(fields.subject).unwrap();
+            let prop_val = retrieved_doc.get_first(fields.property).unwrap();
+            let value_val = retrieved_doc.get_first(fields.value).unwrap();
+            let subject = match subject_val {
+                tantivy::schema::Value::Str(s) => s.to_string(),
+                _else => return Err("Subject is not a string!".into()),
+            };
+            let property = match prop_val {
+                tantivy::schema::Value::Str(s) => s.to_string(),
+                _else => return Err("Property is not a string!".into()),
+            };
+            let value = match value_val {
+                tantivy::schema::Value::Str(s) => s.to_string(),
+                _else => return Err("Value is not a string!".into()),
+            };
+            if subjects.contains(&subject) {
+                continue;
+            } else {
+                subjects.push(subject.clone());
+                let atom = StringAtom {
+                    subject,
+                    property,
+                    value,
+                };
+                println!("{:?} - score {}", atom, _score);
+
+                atoms.push(atom);
+            }
         }
     }
 
@@ -95,7 +140,12 @@ pub async fn search_query(
     results_resource.set_propval(urls::DESCRIPTION.into(), atomic_lib::Value::Markdown("Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. ".into()), store)?;
     results_resource.set_propval(
         urls::ENDPOINT_PARAMETERS.into(),
-        vec![urls::SEARCH_QUERY].into(),
+        vec![
+            urls::SEARCH_QUERY,
+            urls::SEARCH_LIMIT,
+            urls::SEARCH_PROPERTY,
+        ]
+        .into(),
         store,
     )?;
 
@@ -167,7 +217,14 @@ fn get_inner_value(t: Term) -> Option<String> {
             rio_api::model::Literal::Typed { value, datatype: _ } => Some(value.into()),
         },
         Term::NamedNode(nn) => Some(nn.iri.into()),
-        Term::BlankNode(bn) => None,
+        Term::BlankNode(_bn) => None,
         Term::Triple(_) => None,
     }
+}
+
+#[derive(Debug)]
+struct StringAtom {
+    subject: String,
+    property: String,
+    value: String,
 }
