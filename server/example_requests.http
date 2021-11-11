@@ -15,8 +15,22 @@ GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: text/turtle
 
 ### Full text search
-GET http://localhost/search?q=blup HTTP/1.1
+GET http://localhost/search?q=asdfsajhdfgbasdf HTTP/1.1
 Accept: application/ld+json
+
+### Full text search, return only subjects
+GET http://localhost/search?q=asdfsajhdfgbasdf&subjects=true HTTP/1.1
+Accept: application/ld+json
+
+### Index at (RDF) document for search
+POST http://localhost/search HTTP/1.1
+Content-Type: text/turtle
+
+@prefix schema: <http://schema.org/> .
+    <http://example.com/foo> a schema:Person ;
+        schema:name  "Foo" .
+    <http://example.com/bar> a schema:Person ;
+        schema:name  "asdfsajhdfgbasdf" .
 
 ### Send a Commit
 POST http://localhost/commit HTTP/1.1

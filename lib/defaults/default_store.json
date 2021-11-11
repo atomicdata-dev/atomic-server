@@ -22,12 +22,13 @@
     {
         "@id": "https://atomicdata.dev/properties/searchQuery",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
-        "https://atomicdata.dev/properties/description": "See https://docs.rs/tantivy/0.16.1/tantivy/query/struct.QueryParser.html",
+        "https://atomicdata.dev/properties/description": "A full-text search query. \n\nFor all features, see [the Tantivy docs](https://docs.rs/tantivy/0.16.1/tantivy/query/struct.QueryParser.html)",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
+        "https://atomicdata.dev/properties/name": "Full-text search query",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
-        "https://atomicdata.dev/properties/shortname": "search-query"
+        "https://atomicdata.dev/properties/shortname": "q"
     },
     {
         "@id": "https://atomicdata.dev/properties/isDynamic",

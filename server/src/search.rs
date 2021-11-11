@@ -75,13 +75,33 @@ pub fn add_all_resources(appstate: &AppState) -> BetterResult<()> {
 pub fn add_resource(appstate: &AppState, resource: &Resource) -> BetterResult<()> {
     let fields = get_schema_fields(appstate);
     let subject = resource.get_subject();
+    let writer = appstate.search_index_writer.read()?;
     for (prop, val) in resource.get_propvals() {
-        let mut doc = Document::default();
-        doc.add_text(fields.property, prop);
-        doc.add_text(fields.value, &val.to_string());
-        doc.add_text(fields.subject, subject);
-        appstate.search_index_writer.read()?.add_document(doc);
+        add_triple(
+            &writer,
+            subject.into(),
+            prop.into(),
+            val.to_string(),
+            &fields,
+        )?;
     }
+    Ok(())
+}
+
+/// Adds a single atom or triple to the search index, but does _not_ commit!
+/// `appstate.search_index_writer.write()?.commit().unwrap();`
+pub fn add_triple(
+    writer: &IndexWriter,
+    subject: String,
+    property: String,
+    value: String,
+    fields: &Fields,
+) -> BetterResult<()> {
+    let mut doc = Document::default();
+    doc.add_text(fields.property, property);
+    doc.add_text(fields.value, value);
+    doc.add_text(fields.subject, subject);
+    writer.add_document(doc);
     Ok(())
 }
 
