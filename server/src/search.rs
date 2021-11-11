@@ -1,6 +1,9 @@
+//! Full-text search, powered by Tantivy.
+//! A folder for the index is stored in the config.
+//! You can see the Endpoint on `http://localhost/search`
+
 use atomic_lib::Resource;
 use atomic_lib::Storelike;
-/// Full-text search, powered by Tantivy.
 use tantivy::schema::*;
 use tantivy::Index;
 use tantivy::IndexWriter;
@@ -10,6 +13,8 @@ use crate::appstate::AppState;
 use crate::config::Config;
 use crate::errors::BetterResult;
 
+/// The actual Schema used for search.
+/// It mimics a single Atom (or Triple).
 pub struct Fields {
     pub subject: Field,
     pub property: Field,
@@ -27,6 +32,7 @@ pub fn build_schema() -> BetterResult<tantivy::schema::Schema> {
     Ok(schema)
 }
 
+/// Creates or reads the index from the `search_index_path` and allocates some heap size.
 pub fn get_index(config: &Config) -> BetterResult<(IndexWriter, Index)> {
     let schema = build_schema()?;
     std::fs::create_dir_all(&config.search_index_path).unwrap();
@@ -39,6 +45,7 @@ pub fn get_index(config: &Config) -> BetterResult<(IndexWriter, Index)> {
     Ok((index_writer, index))
 }
 
+/// Returns the schema for the search index.
 pub fn get_schema_fields(appstate: &AppState) -> Fields {
     let subject = appstate.search_schema.get_field("subject").unwrap();
     let property = appstate.search_schema.get_field("property").unwrap();
@@ -51,6 +58,8 @@ pub fn get_schema_fields(appstate: &AppState) -> Fields {
     }
 }
 
+/// Indexes all resources from the store to search.
+/// At this moment does not remove existing index.
 pub fn add_all_resources(appstate: &AppState) -> BetterResult<()> {
     log::info!("Building search index...");
     for resource in appstate.store.all_resources(true) {
@@ -82,6 +91,6 @@ pub fn get_reader(index: &tantivy::Index) -> BetterResult<tantivy::IndexReader> 
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommit)
         .try_into()
-        .map_err(|e| "Failed getting reader")
+        .map_err(|_e| "Failed getting search reader")
         .unwrap())
 }
