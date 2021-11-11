@@ -11,7 +11,7 @@
     },
     {
         "@id": "https://atomicdata.dev/properties/endpoint/results",
-        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+        "https://atomicdata.dev/properties/isDynamic": true,
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
         "https://atomicdata.dev/properties/description": "The results of the endpoint",
         "https://atomicdata.dev/properties/isA": [
