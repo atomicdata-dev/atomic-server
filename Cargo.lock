@@ -495,6 +495,8 @@ dependencies = [
  "open",
  "promptly",
  "regex",
+ "rio_api",
+ "rio_turtle",
  "rustls 0.18.1",
  "serde",
  "serde_json",
