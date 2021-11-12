@@ -58,6 +58,9 @@ pub struct Opts {
     /// When enabled, it allows POSTing to the /search endpoint
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
+    /// When enabled, previous versions of resources are removed from the search index when updated.
+    #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
+    pub remove_previous_search: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

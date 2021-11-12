@@ -134,7 +134,7 @@ impl Handler<CommitMessage> for WebSocketConnection {
     type Result = ();
 
     fn handle(&mut self, msg: CommitMessage, ctx: &mut ws::WebsocketContext<Self>) {
-        let resource = msg.resource;
+        let resource = msg.commit_response.commit;
         log::info!(
             "handle commit in web socket connection for resource {}",
             resource.get_subject()
