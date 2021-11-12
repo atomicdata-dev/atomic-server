@@ -5,11 +5,12 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
+https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
+
 _Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
 
-The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
-`atomic-server` is a graph database server for storing and sharing typed linked data.
-Demo on [atomicdata.dev](https://atomicdata.dev)
+**Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
+Demo on [atomicdata.dev](https://atomicdata.dev)**
 
 - ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html). Combines safety of structured data with the
 - 🚀  **Fast** (1ms responses on my laptop)
@@ -17,7 +18,8 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
 - 🌐  **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
 - 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/joepio/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
-- ↩️  **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- 💾  **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- 🔄  **Synchronization using websockets**: communicates state changes with a client. Send a `wss` request to `/ws` to open a webscocket.
 - 🧰  **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - 🔎  **Full-text search** with fuzzy search and various operators, often <3ms responses.
 - 📖  **Pagination, sorting and filtering** using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
@@ -26,6 +28,17 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled), [tantivy](https://github.com/quickwit-inc/tantivy) and [more](Cargo.toml).
 
+## README Contents
+
+* [When should you use this](#when-should-you-use-this)
+* [When _not_ to use this](#when--not--to-use-this)
+* [Installation & getting started](#installation---getting-started)
+* [Initial setup and configuration](#initial-setup-and-configuration)
+* [Usage](#usage)
+* [Testing](#testing)
+* [Performance benchmarking](#performance-benchmarking)
+* [FAQ & Troubleshooting](#faq---troubleshooting)
+
 ## When should you use this
 
 - You want to make (high-value) datasets as easily accessible as possible
@@ -33,22 +46,6 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
 - You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
 - You are interested in re-decentralizing the web or want want to work with tech that improves data ownership and interoperability.
 - You like living on the edge (this application is not production ready)
-
-## CLI commands
-
-```
-FLAGS:
-    -h, --help       Prints help information
-    -i, --init       Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands,
-                     and re-builds the index.
-    -r, --reindex    Rebuilds the index (can take a while for large stores).
-    -V, --version    Prints version information
-
-SUBCOMMANDS:
-    export    Create a JSON-AD backup of the store.
-    help      Prints this message or the help of the given subcommand(s)
-    import    Import a JSON-AD backup to the store. Overwrites Resources with same @id.
-```
 
 ## When _not_ to use this
 
@@ -66,6 +63,11 @@ You can run `atomic-server` in four ways:
 - Manually from source
 
 When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration)
+
+### Run as binary
+
+After installing from `cargo install atomic-server` or as a binary, run `atomic-server`.
+Run `atomic-server --help` to learn more about the available commands, such as `export`, `import` and various flags.
 
 ### Run using docker
 
@@ -153,6 +155,7 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
+Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more about Collections, Commits, JSON-AD and other concepts used here.
 
 ## Testing
 
@@ -169,11 +172,17 @@ cargo install drill
 drill -b benchmark.yml --stats
 ```
 
-## FAQ
+## FAQ & Troubleshooting
+
+### Can / should I create backups?
+
+Yes! You should. Especially before installing a newer Atomic-Server version, it might be imcompatible with the previous database model and could corrupt the database.
+Run `atomic-server export` to create a backup in your `~/.config/atomic/backups` folder.
+Import them using `atomic-server import -p ~/.config/atomic/backups/${date}.json`.
 
 ### I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?
 
-You can run `atomic-server --init` to recreate the `/setup` invite. It will be reset to `1` usage.
+You can run `atomic-server --initialize` to recreate the `/setup` invite. It will be reset to `1` usage.
 
 ### How do I migrate my data to a new domain?
 
