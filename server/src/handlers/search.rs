@@ -29,7 +29,7 @@ pub async fn search_query(
 
     let store = &context.store;
     let searcher = context.search_reader.searcher();
-    let fields = crate::search::get_schema_fields(&context);
+    let fields = crate::search::get_schema_fields(&context)?;
     let default_limit = 30;
     let limit = if let Some(l) = params.limit {
         if l > 0 {
@@ -93,10 +93,10 @@ pub async fn search_query(
 
         // convert found documents to resources
         for (_score, doc_address) in top_docs {
-            let retrieved_doc = searcher.doc(doc_address).unwrap();
-            let subject_val = retrieved_doc.get_first(fields.subject).unwrap();
-            let prop_val = retrieved_doc.get_first(fields.property).unwrap();
-            let value_val = retrieved_doc.get_first(fields.value).unwrap();
+            let retrieved_doc = searcher.doc(doc_address)?;
+            let subject_val = retrieved_doc.get_first(fields.subject).ok_or("No 'subject' in search doc found. This is required when indexing. Run with --rebuild-index")?;
+            let prop_val = retrieved_doc.get_first(fields.property).ok_or("No 'property' in search doc found. This is required when indexing. Run with --rebuild-index")?;
+            let value_val = retrieved_doc.get_first(fields.value).ok_or("No 'value' in search doc found. This is required when indexing. Run with --rebuild-index")?;
             let subject = match subject_val {
                 tantivy::schema::Value::Str(s) => s.to_string(),
                 _else => return Err("Subject is not a string!".into()),
@@ -118,8 +118,6 @@ pub async fn search_query(
                     property,
                     value,
                 };
-                println!("{:?} - score {}", atom, _score);
-
                 atoms.push(atom);
             }
         }
@@ -167,7 +165,7 @@ pub async fn search_query(
 }
 
 /// Posts an N-Triples RDF document to index the triples in search
-pub async fn search_index(
+pub async fn search_index_rdf(
     data: web::Data<Mutex<AppState>>,
     body: String,
 ) -> BetterResult<HttpResponse> {
@@ -180,7 +178,7 @@ pub async fn search_index(
     use rio_turtle::{TurtleError, TurtleParser};
 
     let mut writer = appstate.search_index_writer.write()?;
-    let fields = crate::search::get_schema_fields(&appstate);
+    let fields = crate::search::get_schema_fields(&appstate)?;
 
     TurtleParser::new(body.as_ref(), None)
         .parse_all(&mut |t| {
@@ -191,7 +189,7 @@ pub async fn search_index(
             ) {
                 (Some(s), Some(p), Some(o)) => {
                     println!("adding {} {} {}", s, p, o);
-                    crate::search::add_triple(&writer, s, p, o, &fields).unwrap();
+                    crate::search::add_triple(&writer, s, p, o, &fields).ok();
                 }
                 _ => return Ok(()),
             };
@@ -200,7 +198,7 @@ pub async fn search_index(
         .map_err(|e| format!("Error parsing turtle: {}", e))?;
 
     // Store the changes to the writer
-    writer.commit().unwrap();
+    writer.commit()?;
     let mut builder = HttpResponse::Ok();
     Ok(builder.body("Added turtle to store"))
 }

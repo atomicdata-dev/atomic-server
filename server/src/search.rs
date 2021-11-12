@@ -35,27 +35,35 @@ pub fn build_schema() -> BetterResult<tantivy::schema::Schema> {
 /// Creates or reads the index from the `search_index_path` and allocates some heap size.
 pub fn get_index(config: &Config) -> BetterResult<(IndexWriter, Index)> {
     let schema = build_schema()?;
-    std::fs::create_dir_all(&config.search_index_path).unwrap();
-    let mmap_directory =
-        tantivy::directory::MmapDirectory::open(&config.search_index_path).unwrap();
+    std::fs::create_dir_all(&config.search_index_path)?;
+    let mmap_directory = tantivy::directory::MmapDirectory::open(&config.search_index_path)?;
 
-    let index = Index::open_or_create(mmap_directory, schema).unwrap();
+    let index = Index::open_or_create(mmap_directory, schema)?;
     let heap_size_bytes = 50_000_000;
-    let index_writer = index.writer(heap_size_bytes).unwrap();
+    let index_writer = index.writer(heap_size_bytes)?;
     Ok((index_writer, index))
 }
 
 /// Returns the schema for the search index.
-pub fn get_schema_fields(appstate: &AppState) -> Fields {
-    let subject = appstate.search_schema.get_field("subject").unwrap();
-    let property = appstate.search_schema.get_field("property").unwrap();
-    let value = appstate.search_schema.get_field("value").unwrap();
+pub fn get_schema_fields(appstate: &AppState) -> BetterResult<Fields> {
+    let subject = appstate
+        .search_schema
+        .get_field("subject")
+        .ok_or("No 'subject' in the schema")?;
+    let property = appstate
+        .search_schema
+        .get_field("property")
+        .ok_or("No 'property' in the schema")?;
+    let value = appstate
+        .search_schema
+        .get_field("value")
+        .ok_or("No 'value' in the schema")?;
 
-    Fields {
+    Ok(Fields {
         subject,
         property,
         value,
-    }
+    })
 }
 
 /// Indexes all resources from the store to search.
@@ -70,16 +78,16 @@ pub fn add_all_resources(appstate: &AppState) -> BetterResult<()> {
         }
         add_resource(appstate, &resource)?;
     }
-    appstate.search_index_writer.write()?.commit().unwrap();
+    appstate.search_index_writer.write()?.commit()?;
     log::info!("Finished building search index!");
     Ok(())
 }
 
 /// Adds a single resource to the search index, but does _not_ commit!
 /// Does not index outgoing links, or resourcesArrays
-/// `appstate.search_index_writer.write()?.commit().unwrap();`
+/// `appstate.search_index_writer.write()?.commit()?;`
 pub fn add_resource(appstate: &AppState, resource: &Resource) -> BetterResult<()> {
-    let fields = get_schema_fields(appstate);
+    let fields = get_schema_fields(appstate)?;
     let subject = resource.get_subject();
     let writer = appstate.search_index_writer.read()?;
     for (prop, val) in resource.get_propvals() {
@@ -100,7 +108,7 @@ pub fn add_resource(appstate: &AppState, resource: &Resource) -> BetterResult<()
 }
 
 /// Adds a single atom or triple to the search index, but does _not_ commit!
-/// `appstate.search_index_writer.write()?.commit().unwrap();`
+/// `appstate.search_index_writer.write()?.commit()?;`
 pub fn add_triple(
     writer: &IndexWriter,
     subject: String,
@@ -121,7 +129,5 @@ pub fn get_reader(index: &tantivy::Index) -> BetterResult<tantivy::IndexReader> 
     Ok(index
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommit)
-        .try_into()
-        .map_err(|_e| "Failed getting search reader")
-        .unwrap())
+        .try_into()?)
 }

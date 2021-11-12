@@ -30,7 +30,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
         app.service(
             web::resource("/search")
                 .guard(actix_web::guard::Method(Method::POST))
-                .to(handlers::search::search_index),
+                .to(handlers::search::search_index_rdf),
         );
     }
     app.service(

@@ -100,3 +100,30 @@ impl<T> From<std::sync::PoisonError<T>> for AppError {
         }
     }
 }
+
+impl From<std::io::Error> for AppError {
+    fn from(error: std::io::Error) -> Self {
+        AppError {
+            message: error.to_string(),
+            error_type: AppErrorType::OtherError,
+        }
+    }
+}
+
+impl From<tantivy::directory::error::OpenDirectoryError> for AppError {
+    fn from(error: tantivy::directory::error::OpenDirectoryError) -> Self {
+        AppError {
+            message: error.to_string(),
+            error_type: AppErrorType::OtherError,
+        }
+    }
+}
+
+impl From<tantivy::TantivyError> for AppError {
+    fn from(error: tantivy::TantivyError) -> Self {
+        AppError {
+            message: error.to_string(),
+            error_type: AppErrorType::OtherError,
+        }
+    }
+}
