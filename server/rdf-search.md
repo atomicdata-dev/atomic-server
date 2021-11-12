@@ -30,7 +30,7 @@ Accept: application/ld+json
 
 - `q`: contains the actual query, see below for instructions
 - `limit`: setting a maximum response count (default is 30)
-- `property`: filtering by some predicate / property URL
+- `property`: filtering by some predicate / property URL. You can also do this by doing this in your `q`: `some query property:https://example.com/property`
 
 ## Query string options
 
