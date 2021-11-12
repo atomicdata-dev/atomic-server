@@ -48,7 +48,7 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
-        "https://atomicdata.dev/properties/classType": "https://atomicdata.dev/classes/Property",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
         "https://atomicdata.dev/properties/shortname": "property"
     },
     {
