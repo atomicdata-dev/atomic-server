@@ -9,6 +9,17 @@ use crate::{
     Value,
 };
 
+/// Contains two resources. The first is the Resource representation of the applied Commits.
+/// The second is the New resource, if it's not deleted.
+/// The third is the Old resource.
+#[derive(Clone, Debug)]
+pub struct CommitResponse {
+    pub commit: Resource,
+    pub resource_new: Option<Resource>,
+    pub resource_old: Resource,
+    pub full_commit: Commit,
+}
+
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
 #[derive(Clone, Debug, Serialize)]
@@ -45,13 +56,14 @@ impl Commit {
     /// Checks if the signature is created by the Agent, and validates the data shape.
     /// Does not check if the correct rights are present.
     /// If you need more control over which checks to perform, use apply_opts
-    pub fn apply(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, true, true, false, false)
+    pub fn apply(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
+        self.apply_opts(store, true, true, false, false, true)
     }
 
     /// Apply a single signed Commit to the store.
     /// Creates, edits or destroys a resource.
     /// Allows for control over which validations should be performed.
+    /// Returns the generated Commit, the old Resource and the new Resource.
     /// TODO: Should check if the Agent has the correct rights.
     pub fn apply_opts(
         &self,
@@ -60,7 +72,8 @@ impl Commit {
         validate_signature: bool,
         validate_timestamp: bool,
         validate_rights: bool,
-    ) -> AtomicResult<Resource> {
+        update_index: bool,
+    ) -> AtomicResult<CommitResponse> {
         let subject_url =
             url::Url::parse(&self.subject).map_err(|e| format!("Subject is not a URL. {}", e))?;
         if subject_url.query().is_some() {
@@ -155,17 +168,27 @@ impl Commit {
             if destroy {
                 // Note: the value index is updated before this action, in resource.apply_changes()
                 store.remove_resource(&self.subject)?;
-                store.add_resource_opts(&commit_resource, false, true, false)?;
-                return Ok(commit_resource);
+                store.add_resource_opts(&commit_resource, false, update_index, false)?;
+                return Ok(CommitResponse {
+                    resource_new: None,
+                    resource_old,
+                    commit: commit_resource,
+                    full_commit: self.clone(),
+                });
             }
         }
-        self.apply_changes(resource_old, store, true)?;
+        self.apply_changes(resource_old.clone(), store, update_index)?;
 
         // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
-        store.add_resource_opts(&commit_resource, false, true, false)?;
+        store.add_resource_opts(&commit_resource, false, update_index, false)?;
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
-        Ok(commit_resource)
+        Ok(CommitResponse {
+            resource_new: Some(resource_new),
+            resource_old,
+            commit: commit_resource,
+            full_commit: self.clone(),
+        })
     }
 
     /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
@@ -198,6 +221,7 @@ impl Commit {
                 resource.remove_propval(prop);
             }
         }
+        // Remove all atoms from index if destroy
         if let Some(destroy) = self.destroy {
             if destroy {
                 for atom in resource.to_atoms()?.iter() {
@@ -209,8 +233,9 @@ impl Commit {
     }
 
     /// Applies a commit without performing authorization / signature / schema checks.
-    pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        self.apply_opts(store, false, false, false, false)
+    /// Does not update the index.
+    pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
+        self.apply_opts(store, false, false, false, false, false)
     }
 
     /// Converts a Resource of a Commit into a Commit

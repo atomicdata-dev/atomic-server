@@ -9,10 +9,10 @@ pub async fn post_commit(
     data: web::Data<Mutex<AppState>>,
     body: String,
 ) -> BetterResult<HttpResponse> {
-    let mut context = data
+    let mut appstate = data
         .lock()
         .expect("Failed to lock mutexguard in post_commit");
-    let store = &mut context.store;
+    let store = &mut appstate.store;
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
     let incoming_commit = Commit::from_resource(incoming_commit_resource)?;
@@ -23,19 +23,21 @@ pub async fn post_commit(
     ) {
         return Err("Subject of commit should be sent to other domain - this store can not own this resource.".into());
     }
-    let saved_commit_resource = incoming_commit.apply_opts(store, true, true, true, true)?;
+    // We don't update the index, because that's a job for the CommitMonitor. That means it can be done async in a different thread, making this commit response way faster.
+    let commit_response = incoming_commit.apply_opts(store, true, true, true, true, false)?;
+
     // TODO: better response
     let message = format!(
         "Commit succesfully applied. Can be seen at {}",
-        saved_commit_resource.get_subject()
+        commit_response.commit.get_subject()
     );
 
     // When a commit is applied, notify all webhook subscribers
-    context
+    appstate
         .commit_monitor
         .do_send(crate::actor_messages::CommitMessage {
             subject: incoming_commit.subject,
-            resource: saved_commit_resource,
+            commit_response,
         });
 
     log::info!("{}", &message);

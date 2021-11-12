@@ -16,26 +16,26 @@ pub async fn serve(config: crate::config::Config) -> AtomicResult<()> {
         let appstate_clone = appstate.clone();
 
         actix_web::rt::spawn(async move {
-            log::warn!("Building index... This could take a while, expect worse performance until 'Building index finished'");
+            log::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
             appstate_clone
                 .store
                 .clear_index()
-                .expect("Failed to clear index");
+                .expect("Failed to clear value index");
             appstate_clone
                 .store
                 .build_index(true)
-                .expect("Failed to build index");
-            log::info!("Building index finished!");
+                .expect("Failed to build value index");
+            log::info!("Building value index finished!");
         });
-
-        log::info!("Removing existing search index..");
+        log::info!("Removing existing search index...");
         appstate_clone
-            .search_index_writer
+            .search_state
+            .writer
             .write()
             .expect("Could not get a lock on search writer")
             .delete_all_documents()?;
-        log::info!("Building search index..");
-        crate::search::add_all_resources(&appstate)?;
+        log::info!("Building search index...");
+        crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
         log::info!("Search index finished!");
     }
 

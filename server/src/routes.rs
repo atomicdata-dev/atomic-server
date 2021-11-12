@@ -2,6 +2,9 @@ use actix_web::{http::Method, web};
 
 use crate::{config::Config, content_types, handlers};
 
+/// Set up the Actix server routes. This defines which paths are used.
+// Keep in mind that the order of these matters. An early, greedy route will take
+// precedence over a later route.
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         // Catch all HTML requests and send them to the single page app
@@ -37,6 +40,6 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
         web::scope("/{path:[^{}]+}")
             .service(web::resource("").route(web::get().to(handlers::resource::get_resource))),
     )
-    // Also allow the home resource
+    // Also allow the home resource (not matched by the previous one)
     .service(web::resource("/").to(handlers::resource::get_resource));
 }

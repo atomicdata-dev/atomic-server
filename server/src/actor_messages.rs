@@ -22,6 +22,6 @@ pub struct Subscribe {
 pub struct CommitMessage {
     /// Target subject of the commit
     pub subject: String,
-    /// Full resource of the Commit itself
-    pub resource: atomic_lib::Resource,
+    /// Full resource of the Commit itself, the new resource, and the old one
+    pub commit_response: atomic_lib::commit::CommitResponse,
 }

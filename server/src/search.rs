@@ -2,6 +2,7 @@
 //! A folder for the index is stored in the config.
 //! You can see the Endpoint on `http://localhost/search`
 
+use atomic_lib::Db;
 use atomic_lib::Resource;
 use atomic_lib::Storelike;
 use tantivy::schema::*;
@@ -9,7 +10,6 @@ use tantivy::Index;
 use tantivy::IndexWriter;
 use tantivy::ReloadPolicy;
 
-use crate::appstate::AppState;
 use crate::config::Config;
 use crate::errors::BetterResult;
 
@@ -19,6 +19,38 @@ pub struct Fields {
     pub subject: Field,
     pub property: Field,
     pub value: Field,
+}
+
+/// Contains the index and the schema. for search
+#[derive(Clone)]
+pub struct SearchState {
+    /// reader for performing queries
+    pub reader: tantivy::IndexReader,
+    /// index
+    pub index: tantivy::Index,
+    /// For adding stuff to the search index
+    /// Just take the read lock for adding documents, and the write lock for committing.
+    // see https://github.com/quickwit-inc/tantivy/issues/550
+    pub writer: std::sync::Arc<std::sync::RwLock<tantivy::IndexWriter>>,
+    /// The shape of data stored in the index
+    pub schema: tantivy::schema::Schema,
+}
+
+impl SearchState {
+    /// Create a new SearchState for the Server, which includes building the schema and index.
+    pub fn new(config: &Config) -> BetterResult<SearchState> {
+        let schema = crate::search::build_schema()?;
+        let (writer, index) = crate::search::get_index(config)?;
+        let reader = crate::search::get_reader(&index)?;
+        let locked = std::sync::RwLock::from(writer);
+        let arced = std::sync::Arc::from(locked);
+        Ok(SearchState {
+            schema,
+            reader,
+            index,
+            writer: arced,
+        })
+    }
 }
 
 /// Returns the schema for the search index.
@@ -36,26 +68,34 @@ pub fn build_schema() -> BetterResult<tantivy::schema::Schema> {
 pub fn get_index(config: &Config) -> BetterResult<(IndexWriter, Index)> {
     let schema = build_schema()?;
     std::fs::create_dir_all(&config.search_index_path)?;
+    if config.opts.rebuild_index {
+        std::fs::remove_dir_all(&config.search_index_path)?;
+        std::fs::create_dir_all(&config.search_index_path)?;
+    }
     let mmap_directory = tantivy::directory::MmapDirectory::open(&config.search_index_path)?;
-
-    let index = Index::open_or_create(mmap_directory, schema)?;
+    let index = Index::open_or_create(mmap_directory, schema).map_err(|e| {
+        format!(
+            "Failed to create or open search index. Try starting againg with --rebuild-index. Error: {}",
+            e
+        )
+    })?;
     let heap_size_bytes = 50_000_000;
     let index_writer = index.writer(heap_size_bytes)?;
     Ok((index_writer, index))
 }
 
 /// Returns the schema for the search index.
-pub fn get_schema_fields(appstate: &AppState) -> BetterResult<Fields> {
+pub fn get_schema_fields(appstate: &SearchState) -> BetterResult<Fields> {
     let subject = appstate
-        .search_schema
+        .schema
         .get_field("subject")
         .ok_or("No 'subject' in the schema")?;
     let property = appstate
-        .search_schema
+        .schema
         .get_field("property")
         .ok_or("No 'property' in the schema")?;
     let value = appstate
-        .search_schema
+        .schema
         .get_field("value")
         .ok_or("No 'value' in the schema")?;
 
@@ -68,28 +108,26 @@ pub fn get_schema_fields(appstate: &AppState) -> BetterResult<Fields> {
 
 /// Indexes all resources from the store to search.
 /// At this moment does not remove existing index.
-pub fn add_all_resources(appstate: &AppState) -> BetterResult<()> {
-    log::info!("Building search index...");
-    for resource in appstate.store.all_resources(true) {
+pub fn add_all_resources(search_state: &SearchState, store: &Db) -> BetterResult<()> {
+    for resource in store.all_resources(true) {
         // Skip commits
         // TODO: Better check, this might overfit
         if resource.get_subject().contains("/commits/") {
             continue;
         }
-        add_resource(appstate, &resource)?;
+        add_resource(search_state, &resource)?;
     }
-    appstate.search_index_writer.write()?.commit()?;
-    log::info!("Finished building search index!");
+    search_state.writer.write()?.commit()?;
     Ok(())
 }
 
 /// Adds a single resource to the search index, but does _not_ commit!
 /// Does not index outgoing links, or resourcesArrays
 /// `appstate.search_index_writer.write()?.commit()?;`
-pub fn add_resource(appstate: &AppState, resource: &Resource) -> BetterResult<()> {
+pub fn add_resource(appstate: &SearchState, resource: &Resource) -> BetterResult<()> {
     let fields = get_schema_fields(appstate)?;
     let subject = resource.get_subject();
-    let writer = appstate.search_index_writer.read()?;
+    let writer = appstate.writer.read()?;
     for (prop, val) in resource.get_propvals() {
         match val {
             atomic_lib::Value::AtomicUrl(_) | atomic_lib::Value::ResourceArray(_) => continue,
@@ -104,6 +142,17 @@ pub fn add_resource(appstate: &AppState, resource: &Resource) -> BetterResult<()
             }
         };
     }
+    Ok(())
+}
+
+// / Removes a single resource from the search index, but does _not_ commit!
+// / Does not index outgoing links, or resourcesArrays
+// / `appstate.search_index_writer.write()?.commit()?;`
+pub fn remove_resource(search_state: &SearchState, subject: &str) -> BetterResult<()> {
+    let fields = get_schema_fields(search_state)?;
+    let writer = search_state.writer.read()?;
+    let term = tantivy::Term::from_field_text(fields.subject, subject);
+    writer.delete_term(term);
     Ok(())
 }
 

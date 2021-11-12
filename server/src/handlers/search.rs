@@ -28,8 +28,8 @@ pub async fn search_query(
         .expect("Failed to lock mutexguard in search_query");
 
     let store = &context.store;
-    let searcher = context.search_reader.searcher();
-    let fields = crate::search::get_schema_fields(&context)?;
+    let searcher = context.search_state.reader.searcher();
+    let fields = crate::search::get_schema_fields(&context.search_state)?;
     let default_limit = 30;
     let limit = if let Some(l) = params.limit {
         if l > 0 {
@@ -67,7 +67,7 @@ pub async fn search_query(
         } else {
             // construct the query
             let query_parser = QueryParser::for_index(
-                &context.search_index,
+                &context.search_state.index,
                 vec![
                     fields.subject,
                     // I don't think we need to search in the property
@@ -177,8 +177,8 @@ pub async fn search_index_rdf(
     use rio_api::parser::TriplesParser;
     use rio_turtle::{TurtleError, TurtleParser};
 
-    let mut writer = appstate.search_index_writer.write()?;
-    let fields = crate::search::get_schema_fields(&appstate)?;
+    let mut writer = appstate.search_state.writer.write()?;
+    let fields = crate::search::get_schema_fields(&appstate.search_state)?;
 
     TurtleParser::new(body.as_ref(), None)
         .parse_all(&mut |t| {

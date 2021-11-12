@@ -1,5 +1,7 @@
 //! App state, which is accessible from handlers
-use crate::{commit_monitor::CommitMonitor, config::Config, errors::BetterResult};
+use crate::{
+    commit_monitor::CommitMonitor, config::Config, errors::BetterResult, search::SearchState,
+};
 use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
@@ -16,16 +18,7 @@ pub struct AppState {
     pub config: Config,
     /// The Actix Address of the CommitMonitor, which should receive updates when a commit is applied
     pub commit_monitor: actix::Addr<CommitMonitor>,
-    /// Full text search reader for performing queries
-    pub search_reader: tantivy::IndexReader,
-    /// Full text search index
-    pub search_index: tantivy::Index,
-    /// Full text search index writer.
-    /// Just take the read lock for adding documents, and the write lock for committing.
-    // see https://github.com/quickwit-inc/tantivy/issues/550
-    pub search_index_writer: std::sync::Arc<std::sync::RwLock<tantivy::IndexWriter>>,
-    /// Full text search schema
-    pub search_schema: tantivy::schema::Schema,
+    pub search_state: SearchState,
 }
 
 /// Creates the server context.
@@ -41,7 +34,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
 
     const VERSION: &str = env!("CARGO_PKG_VERSION");
     log::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", VERSION);
-
+    log::info!("Opening database...");
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {
         log::info!("Initialize: creating and populating new Database...");
@@ -54,8 +47,10 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         store.build_index(true)?;
         log::info!("Building index finished!");
     }
+    log::info!("Setting default agent...");
     set_default_agent(&config, &store)?;
     if config.initialize {
+        log::info!("Running populate commands...");
         atomic_lib::populate::populate_hierarchy(&store)
             .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
         atomic_lib::populate::populate_collections(&store)
@@ -67,26 +62,23 @@ pub fn init(config: Config) -> BetterResult<AppState> {
         set_up_drive(&store)?;
     }
 
-    use actix::Actor;
+    // Initialize search constructs
+    log::info!("Starting search service...");
+    let search_state = SearchState::new(&config)?;
 
     // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
-    let commit_monitor = crate::commit_monitor::CommitMonitor::default().start();
-
-    // Initialize search constructs
-    let search_schema = crate::search::build_schema()?;
-    let (search_index_writer, search_index) = crate::search::get_index(&config)?;
-    let search_reader = crate::search::get_reader(&search_index)?;
-    let locked = std::sync::RwLock::from(search_index_writer);
-    let arced = std::sync::Arc::from(locked);
+    log::info!("Starting commit monitor...");
+    let commit_monitor = crate::commit_monitor::create_commit_monitor(
+        store.clone(),
+        search_state.clone(),
+        config.clone(),
+    );
 
     Ok(AppState {
         store,
         config,
         commit_monitor,
-        search_reader,
-        search_schema,
-        search_index,
-        search_index_writer: arced,
+        search_state,
     })
 }
 
@@ -143,7 +135,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
         created_at: 0,
         name: None,
     };
-    log::info!("Setting default Agent {}", &agent.subject);
+    log::info!("Default Agent is set: {}", &agent.subject);
     store.set_default_agent(agent);
     Ok(())
 }
