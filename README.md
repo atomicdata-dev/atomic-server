@@ -1,4 +1,4 @@
-https://github.com/quickwit-inc/tantivy/pull/998![atomic data rust logo](./logo.svg)
+![atomic data rust logo](./logo.svg)
 
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
@@ -33,6 +33,8 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled), [tantivy](https://github.com/quickwit-inc/tantivy) and [more](Cargo.toml).
 
 [→ Read more](server/README.md)
+
+https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
 
 ## `atomic-cli`
 
