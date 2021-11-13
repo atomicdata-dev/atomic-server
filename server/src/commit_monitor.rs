@@ -105,6 +105,7 @@ impl Handler<CommitMessage> for CommitMonitor {
                 self.last_search_commit = now;
             }
         } else {
+            // If there is no new resource, it must have been deleted, so let's remove it from the search index.
             crate::search::remove_resource(&self.search_state, &msg.subject).unwrap();
         }
     }
