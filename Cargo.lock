@@ -482,6 +482,7 @@ dependencies = [
  "actix",
  "actix-cors",
  "actix-files",
+ "actix-rt",
  "actix-web",
  "actix-web-actors",
  "atomic_lib",

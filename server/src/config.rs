@@ -15,10 +15,10 @@ pub struct Opts {
     #[clap(subcommand)]
     pub command: Option<Command>,
     /// Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
-    #[clap(long)]
+    #[clap(long, env = "ATOMIC_INITIALIZE")]
     pub initialize: bool,
     /// Re-creates the value index. Parses all the resources. Do this if your collections have issues.
-    #[clap(long)]
+    #[clap(long, env = "ATOMIC_REBUILD_INDEX")]
     pub rebuild_index: bool,
     /// Use staging environments for services like LetsEncrypt
     #[clap(long, env = "ATOMIC_DEVELOPMENT")]

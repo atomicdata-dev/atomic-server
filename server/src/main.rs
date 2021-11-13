@@ -14,6 +14,8 @@ mod routes;
 // #[cfg(feature = "search")]
 mod search;
 mod serve;
+#[cfg(test)]
+mod tests;
 #[cfg(feature = "desktop")]
 mod tray_icon;
 

@@ -59,6 +59,10 @@ version = "1.4.0"
 optional = true
 version = "0.4.0-alpha"
 
+[dev-dependencies]
+# Currently only used for testing, the other actix is included in the web crate
+actix-rt = "1.1.1"
+
 [features]
 default = ["https"]
 desktop = ["tray-item", "open"]
