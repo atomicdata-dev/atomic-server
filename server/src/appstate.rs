@@ -25,8 +25,8 @@ pub struct AppState {
 /// Initializes a store on disk.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> BetterResult<AppState> {
-    // Enable all logging
-    std::env::set_var("RUST_LOG", "info");
+    // Enable logging, but hide most tantivy logs
+    std::env::set_var("RUST_LOG", "info,tantivy=warn");
     env_logger::init();
     // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     let _ = crate::process::terminate_existing_processes(&config)
