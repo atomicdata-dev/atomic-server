@@ -393,9 +393,9 @@ dependencies = [
 
 [[package]]
 name = "aho-corasick"
-version = "0.7.15"
+version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7404febffaa47dac81aa44dba71523c9d069b1bdc50a77db41195149e17f68e5"
+checksum = "1e37cfd5e7657ada45f742d6e99ca5788580b5c529dc78faf11ece6dc702656f"
 dependencies = [
  "memchr",
 ]
@@ -1263,6 +1263,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "fastdivide"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a99a2d53cf90642500986ad22e5083b09e42d44c408f5f112e2a4a0925a643c"
+
+[[package]]
+name = "fastfield_codecs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb0e8bfa31546b4ace05092c9db8d251d7bbc298a384875a08c945a473de4f1f"
+dependencies = [
+ "tantivy-bitpacker",
+ "tantivy-common",
+]
+
+[[package]]
 name = "flate2"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1940,6 +1956,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "lz4_flex"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5827b976d911b5d2e42b2ccfc7c0d2461a1414e8280436885218762fc529b3f8"
+dependencies = [
+ "twox-hash",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1967,19 +1992,27 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60302e4db3a61da70c0cb7991976248362f30319e88850c487b9b95bbf059e00"
 
 [[package]]
-name = "memchr"
-version = "2.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ee1c47aaa256ecabcaea351eae4a9b01ef39ed810004e298d2511ed284b1525"
-
-[[package]]
-name = "memmap"
+name = "measure_time"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6585fd95e7bb50d6cc31e20d4cf9afb4e2ba16c5846fc76793f11218da9c475b"
+checksum = "c68c8a1703dd54ab3307c03401e8b6c42121b67501dd6c6deb5077914ccb8085"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "memchr"
+version = "2.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "308cc39be01b73d0d18f82a0e7b2a3df85245f84af96fdddc5d202d27e47b86a"
+
+[[package]]
+name = "memmap2"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00b6c2ebff6180198788f5db08d7ce3bc1d0b617176678831a7510825973e357"
 dependencies = [
  "libc",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2263,6 +2296,15 @@ name = "os_str_bytes"
 version = "4.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "324abb24c96ea09b7da6aaf68fad1be6242da1042e6f433ee929c26d8fba475b"
+
+[[package]]
+name = "ownedbytes"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc63b0786f6b95cba13bd1d6aea49ad1f595dc4d859305ac123de251575219ed"
+dependencies = [
+ "stable_deref_trait",
+]
 
 [[package]]
 name = "oxilangtag"
@@ -2682,9 +2724,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.4.6"
+version = "1.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a26af418b574bd56588335b3a3659a65725d4e636eb1016c2f9e3b38c7cc759"
+checksum = "d07a8629359eb56f1e2fb1652bb04212c072a87ba68546a04065d525673ac461"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3000,12 +3042,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ecab6c735a6bb4139c0caafd0cc3635748bbb3acf4550e8138122099251f309"
 
 [[package]]
-name = "snap"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45456094d1983e2ee2a18fdfebce3189fa451699d0502cb8e3b49dba5ba41451"
-
-[[package]]
 name = "socket2"
 version = "0.3.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3036,6 +3072,12 @@ checksum = "e113fb6f3de07a243d434a56ec6f186dfd51cb08448239fe7bcae73f87ff28ff"
 dependencies = [
  "version_check 0.9.3",
 ]
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "stdweb"
@@ -3126,9 +3168,9 @@ dependencies = [
 
 [[package]]
 name = "tantivy"
-version = "0.14.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edca90bddda472f39fdc74a031d61d52b08b1de97f2a704afae726a8004abb0d"
+checksum = "25e733d58e88c51fb0ed76305885ce617a49731e3476514cf7ad4394668dfbc7"
 dependencies = [
  "base64 0.13.0",
  "bitpacking",
@@ -3139,31 +3181,53 @@ dependencies = [
  "crossbeam",
  "downcast-rs",
  "fail",
+ "fastdivide",
+ "fastfield_codecs",
  "fnv",
  "fs2",
  "futures",
  "htmlescape",
+ "itertools",
  "levenshtein_automata",
  "log",
  "lru",
- "memmap",
+ "lz4_flex",
+ "measure_time",
+ "memmap2",
  "murmurhash32",
  "num_cpus",
  "once_cell",
+ "ownedbytes",
  "rayon",
  "regex",
  "rust-stemmers",
  "serde",
  "serde_json",
  "smallvec",
- "snap",
  "stable_deref_trait",
+ "tantivy-bitpacker",
+ "tantivy-common",
  "tantivy-fst",
  "tantivy-query-grammar",
  "tempfile",
  "thiserror",
  "uuid",
  "winapi 0.3.9",
+]
+
+[[package]]
+name = "tantivy-bitpacker"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "66d10a5ed75437a4f6bbbba67601cd5adab8d71f5188b677055381f0f36064f2"
+
+[[package]]
+name = "tantivy-common"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "760e44073e328f4ea3f38660da9ba2598a19ad5ad4149cfb89ad89b4d5ee88d9"
+dependencies = [
+ "byteorder",
 ]
 
 [[package]]
@@ -3179,9 +3243,9 @@ dependencies = [
 
 [[package]]
 name = "tantivy-query-grammar"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "70864085b31ecd5af8f53a76506440ece1c426d187f3d72f4b722e238d2ce19a"
+checksum = "466e0218472a9b276a73e38b2571ac02f9a1b270b4481c9cd8cc23a63d1307e9"
 dependencies = [
  "combine",
 ]
@@ -3479,6 +3543,16 @@ dependencies = [
  "thiserror",
  "tokio 0.2.25",
  "trust-dns-proto",
+]
+
+[[package]]
+name = "twox-hash"
+version = "1.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f559b464de2e2bdabcac6a210d12e9b5a5973c251e102c44c585c71d51bd78e"
+dependencies = [
+ "cfg-if 1.0.0",
+ "static_assertions",
 ]
 
 [[package]]

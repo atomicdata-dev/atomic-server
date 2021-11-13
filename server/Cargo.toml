@@ -24,7 +24,7 @@ rio_api = "0.6.1"
 rio_turtle = "0.6.1"
 serde_json = "1.0.60"
 sysinfo = "0.20.5"
-tantivy = "*"
+tantivy = "0.16.1"
 
 [dependencies.acme-lib]
 optional = true
