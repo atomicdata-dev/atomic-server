@@ -3,6 +3,7 @@ use crate::{
     content_types::get_accept,
     content_types::ContentType,
     errors::{AppError, BetterResult},
+    helpers::get_auth_headers,
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
@@ -17,7 +18,8 @@ pub async fn get_resource(
 ) -> BetterResult<HttpResponse> {
     let context = data.lock().unwrap();
 
-    let mut content_type = get_accept(req.headers());
+    let headers = req.headers();
+    let mut content_type = get_accept(headers);
     let base_url = &context.config.local_base_url;
     // Get the subject from the path, or return the home URL
     let subject = if let Some(subj_end) = path {
@@ -40,7 +42,14 @@ pub async fn get_resource(
     } else {
         String::from(base_url)
     };
+
     let store = &context.store;
+
+    // Authentication check. If the user has no headers, continue with the Public Agent.
+    let auth_header_values = get_auth_headers(headers, subject.clone())?;
+    let for_agent =
+        atomic_lib::authentication::get_agent_from_headers_and_check(auth_header_values, store)?;
+
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} as {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
@@ -51,7 +60,7 @@ pub async fn get_resource(
         "no-store, no-cache, must-revalidate, private",
     );
     let resource = store
-        .get_resource_extended(&subject, false)
+        .get_resource_extended(&subject, false, Some(for_agent))
         // TODO: Don't always return 404 - only when it's actually not found!
         .map_err(|e| AppError::other_error(e.to_string()))?;
     match content_type {

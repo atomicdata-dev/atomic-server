@@ -7,8 +7,8 @@ pub type BetterResult<T> = std::result::Result<T, AppError>;
 
 #[derive(Debug)]
 pub enum AppErrorType {
-    #[allow(dead_code)]
     NotFoundError,
+    UnauthorizedError,
     OtherError,
 }
 
@@ -26,6 +26,13 @@ impl AppError {
         AppError {
             message: format!("Resource not found. {}", message),
             error_type: AppErrorType::NotFoundError,
+        }
+    }
+
+    pub fn unauthorized(message: String) -> AppError {
+        AppError {
+            message: format!("Unauthorized. {}", message),
+            error_type: AppErrorType::UnauthorizedError,
         }
     }
 
@@ -49,6 +56,7 @@ impl ResponseError for AppError {
         match self.error_type {
             AppErrorType::NotFoundError => StatusCode::NOT_FOUND,
             AppErrorType::OtherError => StatusCode::INTERNAL_SERVER_ERROR,
+            AppErrorType::UnauthorizedError => StatusCode::UNAUTHORIZED,
         }
     }
     fn error_response(&self) -> HttpResponse {

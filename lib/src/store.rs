@@ -201,7 +201,7 @@ mod test {
     fn path() {
         let store = init_store();
         let res = store
-            .get_path("https://atomicdata.dev/classes/Class shortname", None)
+            .get_path("https://atomicdata.dev/classes/Class shortname", None, None)
             .unwrap();
         match res {
             crate::storelike::PathReturn::Subject(_) => panic!("Should be an Atom"),
@@ -210,7 +210,11 @@ mod test {
             }
         }
         let res = store
-            .get_path("https://atomicdata.dev/classes/Class requires 0", None)
+            .get_path(
+                "https://atomicdata.dev/classes/Class requires 0",
+                None,
+                None,
+            )
             .unwrap();
         match res {
             crate::storelike::PathReturn::Subject(sub) => {
@@ -236,6 +240,7 @@ mod test {
             .get_path(
                 "https://atomicdata.dev/classes/Class requires isa description",
                 None,
+                None,
             )
             .unwrap();
     }
@@ -247,6 +252,7 @@ mod test {
         store
             .get_path(
                 "https://atomicdata.dev/classes/Class requires requires",
+                None,
                 None,
             )
             .unwrap();
