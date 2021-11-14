@@ -8,7 +8,7 @@ use std::{
 
 use crate::{
     datatype::DataType,
-    errors::AtomicResult,
+    errors::{AtomicError, AtomicResult},
     resources::PropVals,
     storelike::{ResourceCollection, Storelike},
     Atom, Resource, Value,
@@ -314,9 +314,10 @@ impl Storelike for Db {
 
         if let Some(agent) = for_agent {
             if !crate::hierarchy::check_read(self, &resource, agent.to_string())? {
-                return Err(
-                    format!("Agent '{}' is not allowed to read '{}'.", agent, subject).into(),
-                );
+                return Err(AtomicError::unauthorized(format!(
+                    "Agent '{}' is not authorized to read '{}'. There should be a `read` right in this resource or one of its parents.",
+                    agent, subject
+                )));
             }
         }
 

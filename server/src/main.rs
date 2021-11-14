@@ -19,11 +19,12 @@ mod tests;
 #[cfg(feature = "desktop")]
 mod tray_icon;
 
-use atomic_lib::{errors::AtomicResult, Storelike};
+use atomic_lib::Storelike;
+use errors::AtomicServerResult;
 use std::{fs::File, io::Write};
 
 #[actix_web::main]
-async fn main() -> AtomicResult<()> {
+async fn main() -> AtomicServerResult<()> {
     // Parse CLI commands, env vars
     let config = config::init().map_err(|e| format!("Initialization failed: {}", e))?;
 

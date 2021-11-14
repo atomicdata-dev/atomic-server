@@ -1,4 +1,4 @@
-use crate::{appstate::AppState, errors::BetterResult};
+use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{urls, Resource, Storelike};
 use serde::Deserialize;
@@ -22,7 +22,7 @@ pub async fn search_query(
     data: web::Data<Mutex<AppState>>,
     params: web::Query<SearchQuery>,
     req: actix_web::HttpRequest,
-) -> BetterResult<HttpResponse> {
+) -> AtomicServerResult<HttpResponse> {
     let context = data
         .lock()
         .expect("Failed to lock mutexguard in search_query");
@@ -170,7 +170,7 @@ pub async fn search_query(
 pub async fn search_index_rdf(
     data: web::Data<Mutex<AppState>>,
     body: String,
-) -> BetterResult<HttpResponse> {
+) -> AtomicServerResult<HttpResponse> {
     let appstate = data
         .lock()
         .expect("Failed to lock mutexguard in search_query");

@@ -1,9 +1,6 @@
 use crate::{
-    appstate::AppState,
-    content_types::get_accept,
-    content_types::ContentType,
-    errors::{AppError, BetterResult},
-    helpers::get_auth_headers,
+    appstate::AppState, content_types::get_accept, content_types::ContentType,
+    errors::AtomicServerResult, helpers::get_auth_headers,
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
@@ -15,7 +12,7 @@ pub async fn get_resource(
     path: Option<web::Path<String>>,
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
-) -> BetterResult<HttpResponse> {
+) -> AtomicServerResult<HttpResponse> {
     let context = data.lock().unwrap();
 
     let headers = req.headers();
@@ -59,10 +56,7 @@ pub async fn get_resource(
         "Cache-Control",
         "no-store, no-cache, must-revalidate, private",
     );
-    let resource = store
-        .get_resource_extended(&subject, false, Some(for_agent))
-        // TODO: Don't always return 404 - only when it's actually not found!
-        .map_err(|e| AppError::other_error(e.to_string()))?;
+    let resource = store.get_resource_extended(&subject, false, Some(for_agent))?;
     match content_type {
         ContentType::Json => {
             let body = resource.to_json(store)?;

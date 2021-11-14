@@ -1,9 +1,9 @@
 //! Checks if the process is running, kills a runnig process if it is.
 
-use crate::{config::Config, errors::BetterResult};
+use crate::{config::Config, errors::AtomicServerResult};
 
 /// Checks if the server is running. If it is, kill that process. Also creates creates a new PID.
-pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
+pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
     let pid_maybe = match std::fs::read_to_string(pid_path(config)) {
         Ok(content) => str::parse::<i32>(&content).ok(),
         Err(_e) => None,
@@ -46,7 +46,7 @@ pub fn terminate_existing_processes(config: &Config) -> BetterResult<()> {
 }
 
 /// Removes the process id file in the config directory meant for signaling this instance is running.
-pub fn remove_pid(config: &Config) -> BetterResult<()> {
+pub fn remove_pid(config: &Config) -> AtomicServerResult<()> {
     if std::fs::remove_file(pid_path(config)).is_err() {
         log::warn!(
             "Could not remove process file at {}",
@@ -63,7 +63,7 @@ fn pid_path(config: &Config) -> std::path::PathBuf {
 }
 
 /// Writes a `pid` file in the config directory to signal which instance is running.
-fn create_pid(config: &Config) -> BetterResult<()> {
+fn create_pid(config: &Config) -> AtomicServerResult<()> {
     use std::io::Write;
     let pid = sysinfo::get_current_pid()
         .map_err(|_| "Failed to get process info required to create process ID")?;

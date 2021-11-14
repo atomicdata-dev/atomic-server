@@ -14,8 +14,6 @@ pub struct AuthValues {
     pub agent_subject: String,
 }
 
-pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
-
 /// Checks if the signature is valid for this timestamp.
 /// Does not check if the agent has rights to access the subject.
 pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicResult<()> {
@@ -42,7 +40,7 @@ pub fn get_agent_from_headers_and_check(
     auth_header_values: Option<AuthValues>,
     store: &impl Storelike,
 ) -> AtomicResult<String> {
-    let mut for_agent = PUBLIC_AGENT.to_string();
+    let mut for_agent = crate::urls::PUBLIC_AGENT.to_string();
     if let Some(auth_vals) = auth_header_values {
         // If there are auth headers, check 'em, make sure they are valid.
         check_auth_signature(&auth_vals.requested_subject, &auth_vals)?;

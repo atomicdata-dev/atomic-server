@@ -2,6 +2,7 @@
 
 use crate::{
     agents::Agent,
+    errors::AtomicError,
     hierarchy,
     schema::{Class, Property},
 };
@@ -173,16 +174,12 @@ pub trait Storelike: Sized {
             if hierarchy::check_read(self, &resource, agent)? {
                 return Ok(resource);
             }
-            return Err("No rights".into());
+            return Err(AtomicError::unauthorized("No rights".into()));
         }
         Ok(resource)
     }
 
-    fn handle_not_found(
-        &self,
-        subject: &str,
-        error: Box<dyn std::error::Error>,
-    ) -> AtomicResult<Resource> {
+    fn handle_not_found(&self, subject: &str, error: AtomicError) -> AtomicResult<Resource> {
         if let Some(self_url) = self.get_self_url() {
             if subject.starts_with(&self_url) {
                 return Err(format!("Failed to retrieve locally: '{}'. {}", subject, error).into());

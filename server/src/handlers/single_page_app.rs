@@ -1,12 +1,12 @@
 use std::sync::Mutex;
 
-use crate::{appstate::AppState, errors::BetterResult};
+use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::HttpResponse;
 
 /// Returns the atomic-data-browser single page application
 pub async fn single_page(
     data: actix_web::web::Data<Mutex<AppState>>,
-) -> BetterResult<HttpResponse> {
+) -> AtomicServerResult<HttpResponse> {
     let context = data
         .lock()
         .expect("Failed to lock mutexguard in single_page");
