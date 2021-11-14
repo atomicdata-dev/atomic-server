@@ -152,8 +152,10 @@ pub async fn search_query(
     } else {
         let mut resources: Vec<Resource> = Vec::new();
         for s in subjects {
-            // If triples isn't set, return
-            resources.push(store.get_resource_extended(&s, true).map_err(|e| format!("Failed to construct search results, because one of the Subjects cannot be returned. Try again with the `&subjects=true` query parameter. Error: {}", e))?);
+            // TODO: use authentication, allow for non-public search
+            let r = store.get_resource_extended(&s, true, Some(atomic_lib::authentication::PUBLIC_AGENT.into()))
+                .map_err(|e| format!("Failed to construct search results, because one of the Subjects cannot be returned. Try again with the `&subjects=true` query parameter. Error: {}", e))?;
+            resources.push(r);
         }
         results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
     }

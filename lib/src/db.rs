@@ -88,7 +88,7 @@ impl Db {
     }
 
     /// Search for a value, get a PropSubjectMap. If it does not exist, create a new one.
-    fn get_prop_subject_map(&self, string_val: &str) -> AtomicResult<PropSubjectMap> {
+    pub fn get_prop_subject_map(&self, string_val: &str) -> AtomicResult<PropSubjectMap> {
         let prop_sub_map = self
             .index_vals
             .get(string_val)
@@ -272,7 +272,12 @@ impl Storelike for Db {
         }
     }
 
-    fn get_resource_extended(&self, subject: &str, skip_dynamic: bool) -> AtomicResult<Resource> {
+    fn get_resource_extended(
+        &self,
+        subject: &str,
+        skip_dynamic: bool,
+        for_agent: Option<String>,
+    ) -> AtomicResult<Resource> {
         // This might add a trailing slash
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
@@ -291,7 +296,7 @@ impl Storelike for Db {
         let mut endpoint_resource = None;
         endpoints.into_iter().for_each(|endpoint| {
             if url.path().starts_with(&endpoint.path) {
-                endpoint_resource = Some((endpoint.handle)(clone.clone(), self))
+                endpoint_resource = Some((endpoint.handle)(clone.clone(), self, for_agent.clone()))
             }
         });
 
@@ -306,6 +311,14 @@ impl Storelike for Db {
 
         // make sure the actual subject matches the one requested
         resource.set_subject(subject.into());
+
+        if let Some(agent) = for_agent {
+            if !crate::hierarchy::check_read(self, &resource, agent.to_string())? {
+                return Err(
+                    format!("Agent '{}' is not allowed to read '{}'.", agent, subject).into(),
+                );
+            }
+        }
 
         // Whether the resource has dynamic properties
         let mut has_dynamic = false;
@@ -629,7 +642,7 @@ pub mod test {
         println!("{:?}", subjects);
         let collections_collection_url = format!("{}/collections", store.get_base_url());
         let collections_resource = store
-            .get_resource_extended(&collections_collection_url, false)
+            .get_resource_extended(&collections_collection_url, false, None)
             .unwrap();
         let member_count = collections_resource
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -674,7 +687,9 @@ pub mod test {
     fn destroy_resource_and_check_collection_and_commits() {
         let store = init("counter");
         let agents_url = format!("{}/agents", store.get_base_url());
-        let agents_collection_1 = store.get_resource_extended(&agents_url, false).unwrap();
+        let agents_collection_1 = store
+            .get_resource_extended(&agents_url, false, None)
+            .unwrap();
         let agents_collection_count_1 = agents_collection_1
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -687,7 +702,9 @@ pub mod test {
 
         // We will count the commits, and check if they've incremented later on.
         let commits_url = format!("{}/commits", store.get_base_url());
-        let commits_collection_1 = store.get_resource_extended(&commits_url, false).unwrap();
+        let commits_collection_1 = store
+            .get_resource_extended(&commits_url, false, None)
+            .unwrap();
         let commits_collection_count_1 = commits_collection_1
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -700,7 +717,9 @@ pub mod test {
             .to_resource(&store)
             .unwrap();
         resource.save_locally(&store).unwrap();
-        let agents_collection_2 = store.get_resource_extended(&agents_url, false).unwrap();
+        let agents_collection_2 = store
+            .get_resource_extended(&agents_url, false, None)
+            .unwrap();
         let agents_collection_count_2 = agents_collection_2
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -711,7 +730,9 @@ pub mod test {
             "The Resource was not found in the collection."
         );
 
-        let commits_collection_2 = store.get_resource_extended(&commits_url, false).unwrap();
+        let commits_collection_2 = store
+            .get_resource_extended(&commits_url, false, None)
+            .unwrap();
         let commits_collection_count_2 = commits_collection_2
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -725,7 +746,9 @@ pub mod test {
         );
 
         resource.destroy(&store).unwrap();
-        let agents_collection_3 = store.get_resource_extended(&agents_url, false).unwrap();
+        let agents_collection_3 = store
+            .get_resource_extended(&agents_url, false, None)
+            .unwrap();
         let agents_collection_count_3 = agents_collection_3
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -736,7 +759,9 @@ pub mod test {
             "The collection count did not decrease after destroying the resource."
         );
 
-        let commits_collection_3 = store.get_resource_extended(&commits_url, false).unwrap();
+        let commits_collection_3 = store
+            .get_resource_extended(&commits_url, false, None)
+            .unwrap();
         let commits_collection_count_3 = commits_collection_3
             .get(crate::urls::COLLECTION_MEMBER_COUNT)
             .unwrap()
@@ -755,11 +780,13 @@ pub mod test {
         let store = DB.lock().unwrap().clone();
         let subject = format!("{}/commits?current_page=2", store.get_base_url());
         // Should throw, because page 2 is out of bounds for default page size
-        let _wrong_resource = store.get_resource_extended(&subject, false).unwrap_err();
+        let _wrong_resource = store
+            .get_resource_extended(&subject, false, None)
+            .unwrap_err();
         // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
         let subject_with_page_size = format!("{}&page_size=1", subject);
         let resource = store
-            .get_resource_extended(&subject_with_page_size, false)
+            .get_resource_extended(&subject_with_page_size, false, None)
             .unwrap();
         let cur_page = resource
             .get(urls::COLLECTION_CURRENT_PAGE)

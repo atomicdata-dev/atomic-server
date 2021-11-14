@@ -106,19 +106,7 @@ impl Commit {
         }
         // Check if the created_at lies in the past
         if validate_timestamp {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_millis() as i64;
-            let acceptable_ms_difference = 10000;
-            if self.created_at > now + acceptable_ms_difference {
-                return Err(format!(
-                    "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
-                    now, self.created_at
-                )
-                .into());
-                // TODO: also check that no younger commits exist
-            }
+            check_timestamp(self.created_at)?;
         }
         let commit_resource: Resource = self.clone().into_resource(store)?;
         let mut is_new = false;
@@ -463,6 +451,25 @@ fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicRes
     let signature_bytes = signature.as_ref();
     let signatureb64 = base64::encode(signature_bytes);
     Ok(signatureb64)
+}
+
+/// The amount of milliseconds that a Commit signature is valid for.
+const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
+
+pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_millis() as i64;
+    if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
+        return Err(format!(
+                    "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
+                    now, timestamp
+                )
+                .into());
+        // TODO: also check that no younger commits exist
+    }
+    Ok(())
 }
 
 #[cfg(test)]

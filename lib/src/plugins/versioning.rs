@@ -24,7 +24,12 @@ pub fn all_versions_endpoint() -> Endpoint {
     }
 }
 
-fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+fn handle_version_request(
+    url: url::Url,
+    store: &impl Storelike,
+    // TODO: Implement auth
+    for_agent: Option<String>,
+) -> AtomicResult<Resource> {
     let params = url.query_pairs();
     let mut commit_url = None;
     for (k, v) in params {
@@ -40,7 +45,11 @@ fn handle_version_request(url: url::Url, store: &impl Storelike) -> AtomicResult
     Ok(resource)
 }
 
-fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+fn handle_all_versions_request(
+    url: url::Url,
+    store: &impl Storelike,
+    for_agent: Option<String>,
+) -> AtomicResult<Resource> {
     let params = url.query_pairs();
     let mut target_subject = None;
     for (k, v) in params {
@@ -64,7 +73,7 @@ fn handle_all_versions_request(url: url::Url, store: &impl Storelike) -> AtomicR
         include_nested: false,
         include_external: false,
     };
-    let mut collection = collection_builder.into_collection(store)?;
+    let mut collection = collection_builder.into_collection(store, for_agent)?;
     let new_members = collection
         .members
         .iter_mut()

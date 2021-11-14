@@ -59,7 +59,8 @@ pub fn init(config: Config) -> BetterResult<AppState> {
             .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         set_up_initial_invite(&store)?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
-        set_up_drive(&store)?;
+        log::info!("Setting rights to Drive {}", store.get_base_url());
+        atomic_lib::populate::set_up_drive(&store)?;
     }
 
     // Initialize search constructs
@@ -178,19 +179,5 @@ fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
         store,
     )?;
     invite.save_locally(store)?;
-    Ok(())
-}
-
-/// Get the Drive resource (base URL), set agent as the Root user, provide write access
-fn set_up_drive(store: &impl Storelike) -> BetterResult<()> {
-    log::info!("Setting rights to Drive {}", store.get_base_url());
-    // Now let's add the agent as the Root user and provide write access
-    let mut drive = store.get_resource(store.get_base_url())?;
-    let agents = vec![store.get_default_agent()?.subject];
-    // TODO: add read rights to public, maybe
-    drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), store)?;
-    drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), store)?;
-    drive.set_propval_string(atomic_lib::urls::DESCRIPTION.into(), &format!("Welcome to your Atomic-Server! Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
-    drive.save_locally(store)?;
     Ok(())
 }

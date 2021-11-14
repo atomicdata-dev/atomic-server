@@ -42,6 +42,7 @@ assert!(fetched_new_resource.get_shortname("description", &store).unwrap().to_st
 
 pub mod agents;
 pub mod atoms;
+pub mod authentication;
 pub mod client;
 pub mod collections;
 pub mod commit;

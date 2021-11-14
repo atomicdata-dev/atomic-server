@@ -2,6 +2,7 @@
 
 use crate::{
     agents::Agent,
+    hierarchy,
     schema::{Class, Property},
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_array};
@@ -157,10 +158,24 @@ pub trait Storelike: Sized {
 
     /// Get's the resource, parses the Query parameters and calculates dynamic properties.
     /// Defaults to get_resource if store doesn't support extended resources
+    /// If `for_agent` is None, no authorization checks will be done, and all resources will return.
+    /// If you want public only resurces, pass `Some(crate::authentication::public_agent)` as the agent.
     /// - *skip_dynamic* Does not calculte dynamic properties. Adds an `incomplete=true` property if the resource should have been dynamic.
-    fn get_resource_extended(&self, subject: &str, skip_dynamic: bool) -> AtomicResult<Resource> {
+    fn get_resource_extended(
+        &self,
+        subject: &str,
+        skip_dynamic: bool,
+        for_agent: Option<String>,
+    ) -> AtomicResult<Resource> {
         let _ignore = skip_dynamic;
-        self.get_resource(subject)
+        let resource = self.get_resource(subject)?;
+        if let Some(agent) = for_agent {
+            if hierarchy::check_read(self, &resource, agent)? {
+                return Ok(resource);
+            }
+            return Err("No rights".into());
+        }
+        Ok(resource)
     }
 
     fn handle_not_found(
@@ -295,8 +310,16 @@ pub trait Storelike: Sized {
     /// Accepts an Atomic Path string, returns the result value (resource or property value)
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
+    /// The `for_agent` argument is used to check if the user has rights to the resource.
+    /// You can pass `None` if you don't care about the rights (e.g. in client side apps)
+    /// If you want to perform read rights checks, pass Some `for_agent` subject
     //  Todo: return something more useful, give more context.
-    fn get_path(&self, atomic_path: &str, mapping: Option<&Mapping>) -> AtomicResult<PathReturn> {
+    fn get_path(
+        &self,
+        atomic_path: &str,
+        mapping: Option<&Mapping>,
+        for_agent: Option<String>,
+    ) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
@@ -314,7 +337,7 @@ pub trait Storelike: Sized {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource = self.get_resource_extended(&subject, false)?;
+        let mut resource = self.get_resource_extended(&subject, false, for_agent.clone())?;
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -348,7 +371,8 @@ pub trait Storelike: Sized {
                             ))?
                             .to_string();
                         subject = url;
-                        resource = self.get_resource_extended(&subject, false)?;
+                        resource =
+                            self.get_resource_extended(&subject, false, for_agent.clone())?;
                         current = PathReturn::Subject(subject.clone());
                         continue;
                     }
