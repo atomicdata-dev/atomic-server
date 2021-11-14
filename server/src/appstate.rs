@@ -7,7 +7,8 @@ use atomic_lib::{
     Storelike,
 };
 
-/// Context for the server (not an individual request).
+/// Data object available to handlers and actors.
+/// Contains the store, configuration and addresses for Actix Actors.
 // This struct is cloned accross all threads, so make sure the fields are thread safe.
 // A good option here is to use Actors for things that can change (e.g. commit_monitor)
 #[derive(Clone)]
