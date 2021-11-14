@@ -7,6 +7,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 - Add authentication to restrict read access. Works by signing requests with Private Keys. #13
 - Refactor internal error model, Use correct HTTP status codes #11
+- Add `public-mode` to server, to keep performance maximum if you don't want authentication.
 
 ## v0.28.2
 
