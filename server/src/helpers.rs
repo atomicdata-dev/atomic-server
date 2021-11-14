@@ -3,7 +3,7 @@
 use actix_web::http::HeaderMap;
 use atomic_lib::authentication::AuthValues;
 
-use crate::errors::AtomicServerResult;
+use crate::{appstate::AppState, errors::AtomicServerResult};
 
 // Returns None if the string is empty.
 // Useful for parsing form inputs.
@@ -53,4 +53,23 @@ pub fn get_auth_headers(
         (None, None, None, None) => Ok(None),
         _missing => Err("Missing authentication headers. You need `x-atomic-public-key`, `x-atomic-signature`, `x-atomic-agent` and `x-atomic-timestamp` for authentication checks.".into()),
     }
+}
+
+/// Checks for authentication headers and returns the agent's subject if everything is well.
+/// Skips these checks in public_mode.
+pub fn get_client_agent(
+    headers: &HeaderMap,
+    appstate: &AppState,
+    requested_subject: String,
+) -> AtomicServerResult<Option<String>> {
+    if appstate.config.opts.public_mode {
+        return Ok(None);
+    }
+    // Authentication check. If the user has no headers, continue with the Public Agent.
+    let auth_header_values = get_auth_headers(headers, requested_subject)?;
+    let for_agent = atomic_lib::authentication::get_agent_from_headers_and_check(
+        auth_header_values,
+        &appstate.store,
+    )?;
+    Ok(Some(for_agent))
 }

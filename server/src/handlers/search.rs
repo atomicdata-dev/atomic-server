@@ -23,13 +23,13 @@ pub async fn search_query(
     params: web::Query<SearchQuery>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
-    let context = data
+    let appstate = data
         .lock()
         .expect("Failed to lock mutexguard in search_query");
 
-    let store = &context.store;
-    let searcher = context.search_state.reader.searcher();
-    let fields = crate::search::get_schema_fields(&context.search_state)?;
+    let store = &appstate.store;
+    let searcher = appstate.search_state.reader.searcher();
+    let fields = crate::search::get_schema_fields(&appstate.search_state)?;
     let default_limit = 30;
     let limit = if let Some(l) = params.limit {
         if l > 0 {
@@ -46,7 +46,6 @@ pub async fn search_query(
         // Fuzzy searching is not possible when filtering by property
         should_fuzzy = false;
     }
-    let return_subjects = !params.include.unwrap_or(false);
 
     let mut subjects: Vec<String> = Vec::new();
     let mut atoms: Vec<StringAtom> = Vec::new();
@@ -67,7 +66,7 @@ pub async fn search_query(
         } else {
             // construct the query
             let query_parser = QueryParser::for_index(
-                &context.search_state.index,
+                &appstate.search_state.index,
                 vec![
                     fields.subject,
                     // I don't think we need to search in the property
@@ -133,7 +132,7 @@ pub async fn search_query(
             .ok_or("Add a query param")?
             .to_string()
     );
-    let mut results_resource = Resource::new(subject);
+    let mut results_resource = Resource::new(subject.clone());
     results_resource.set_propval(urls::IS_A.into(), vec![urls::ENDPOINT].into(), store)?;
     results_resource.set_propval(urls::DESCRIPTION.into(), atomic_lib::Value::Markdown("Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. ".into()), store)?;
     results_resource.set_propval(
@@ -147,22 +146,28 @@ pub async fn search_query(
         store,
     )?;
 
-    if return_subjects {
+    if appstate.config.opts.rdf_search {
+        // Always return all subjects, don't do authentication
         results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), subjects.into(), store)?;
     } else {
+        // Default case: return full resources, do authentication
         let mut resources: Vec<Resource> = Vec::new();
+
+        let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
         for s in subjects {
-            // TODO: use authentication, allow for non-public search
-            let r = store.get_resource_extended(&s, true, Some(atomic_lib::authentication::PUBLIC_AGENT.into()))
-                .map_err(|e| format!("Failed to construct search results, because one of the Subjects cannot be returned. Try again with the `&subjects=true` query parameter. Error: {}", e))?;
-            resources.push(r);
+            log::info!("Subject in search result: {}", s);
+            match store.get_resource_extended(&s, true, for_agent.clone()) {
+                Ok(r) => resources.push(r),
+                Err(_e) => {
+                    log::info!("Skipping result: {} : {}", s, _e);
+                    continue;
+                }
+            }
         }
         results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
     }
-
-    // let json_ad = atomic_lib::serialize::resources_to_json_ad(&resources)?;
     let mut builder = HttpResponse::Ok();
-    // log::info!("Search q: {} hits: {}", &query.q, resources.len());
+    // TODO: support other serialization options
     Ok(builder.body(results_resource.to_json_ad()?))
 }
 

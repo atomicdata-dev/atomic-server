@@ -38,8 +38,8 @@ pub struct Opts {
     /// The IP address of the server
     #[clap(long, default_value = "0.0.0.0", env = "ATOMIC_IP")]
     pub ip: IpAddr,
-    /// If we're using HTTPS or plaintext HTTP.
-    /// Is disabled when using cert_init
+    /// Use HTTPS instead of HTTP.
+    /// Will get certificates from LetsEncrypt.
     #[clap(long, env = "ATOMIC_HTTPS")]
     pub https: bool,
     /// Endpoint where the front-end assets are hosted
@@ -55,12 +55,15 @@ pub struct Opts {
     /// Path for atomic data config directory. Defaults to "~/.config/atomic/""
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
-    /// When enabled, it allows POSTing to the /search endpoint
+    /// CAUTION: Makes data public on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/joepio/atomic-data-rust/blob/master/server/rdf-search.md
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
-    /// When enabled, previous versions of resources are removed from the search index when updated.
+    /// By default, Atomic-Server keeps previous verions of resources indexed in Search. When enabling this flag, previous versions of resources are removed from the search index when their values are updated.
     #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
     pub remove_previous_search: bool,
+    /// CAUTION: Skip authentication checks, making all data public. Improves performance.
+    #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
+    pub public_mode: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

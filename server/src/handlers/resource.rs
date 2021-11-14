@@ -1,6 +1,6 @@
 use crate::{
     appstate::AppState, content_types::get_accept, content_types::ContentType,
-    errors::AtomicServerResult, helpers::get_auth_headers,
+    errors::AtomicServerResult, helpers::get_client_agent,
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
@@ -13,11 +13,11 @@ pub async fn get_resource(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
-    let context = data.lock().unwrap();
+    let appstate = data.lock().unwrap();
 
     let headers = req.headers();
     let mut content_type = get_accept(headers);
-    let base_url = &context.config.local_base_url;
+    let base_url = &appstate.config.local_base_url;
     // Get the subject from the path, or return the home URL
     let subject = if let Some(subj_end) = path {
         let mut subj_end_string = subj_end.as_str();
@@ -40,13 +40,9 @@ pub async fn get_resource(
         String::from(base_url)
     };
 
-    let store = &context.store;
+    let store = &appstate.store;
 
-    // Authentication check. If the user has no headers, continue with the Public Agent.
-    let auth_header_values = get_auth_headers(headers, subject.clone())?;
-    let for_agent =
-        atomic_lib::authentication::get_agent_from_headers_and_check(auth_header_values, store)?;
-
+    let for_agent = get_client_agent(headers, &appstate, subject.clone())?;
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} as {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
@@ -56,7 +52,7 @@ pub async fn get_resource(
         "Cache-Control",
         "no-store, no-cache, must-revalidate, private",
     );
-    let resource = store.get_resource_extended(&subject, false, Some(for_agent))?;
+    let resource = store.get_resource_extended(&subject, false, for_agent)?;
     match content_type {
         ContentType::Json => {
             let body = resource.to_json(store)?;

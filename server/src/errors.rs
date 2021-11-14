@@ -20,29 +20,7 @@ pub struct AtomicServerError {
     pub error_type: AppErrorType,
 }
 
-impl AtomicServerError {
-    #[allow(dead_code)]
-    pub fn not_found(message: String) -> AtomicServerError {
-        AtomicServerError {
-            message: format!("Resource not found. {}", message),
-            error_type: AppErrorType::NotFound,
-        }
-    }
-
-    pub fn unauthorized(message: String) -> AtomicServerError {
-        AtomicServerError {
-            message: format!("Unauthorized. {}", message),
-            error_type: AppErrorType::Unauthorized,
-        }
-    }
-
-    pub fn other_error(message: String) -> AtomicServerError {
-        AtomicServerError {
-            message,
-            error_type: AppErrorType::Other,
-        }
-    }
-}
+impl AtomicServerError {}
 
 #[derive(Serialize)]
 pub struct AppErrorResponse {
@@ -138,6 +116,15 @@ impl From<tantivy::TantivyError> for AtomicServerError {
 
 impl From<acme_lib::Error> for AtomicServerError {
     fn from(error: acme_lib::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+        }
+    }
+}
+
+impl From<actix_web::Error> for AtomicServerError {
+    fn from(error: actix_web::Error) -> Self {
         AtomicServerError {
             message: error.to_string(),
             error_type: AppErrorType::Other,
