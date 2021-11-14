@@ -1,5 +1,5 @@
 use crate::{appstate::AppState, content_types::get_accept};
-use crate::{content_types::ContentType, errors::BetterResult, helpers::empty_to_nothing};
+use crate::{content_types::ContentType, errors::AtomicServerResult, helpers::empty_to_nothing};
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
 use serde::Deserialize;
@@ -19,7 +19,7 @@ pub async fn tpf(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
     query: web::Query<TpfQuery>,
-) -> BetterResult<HttpResponse> {
+) -> AtomicServerResult<HttpResponse> {
     let mut context = data.lock().unwrap();
     let store = &mut context.store;
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data

@@ -1,6 +1,6 @@
 //! Parse CLI options, setup on boot, read .env values
 
-use crate::errors::BetterResult;
+use crate::errors::AtomicServerResult;
 use clap::Parser;
 use dotenv::dotenv;
 use std::env;
@@ -127,7 +127,7 @@ pub struct Config {
 }
 
 /// Creates the server config, reads .env values and sets defaults
-pub fn init() -> BetterResult<Config> {
+pub fn init() -> AtomicServerResult<Config> {
     // Parse .env file (do this before parsing the CLI opts)
     dotenv().ok();
 

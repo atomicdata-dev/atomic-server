@@ -3,7 +3,7 @@
 use actix_web::http::HeaderMap;
 use atomic_lib::authentication::AuthValues;
 
-use crate::errors::BetterResult;
+use crate::errors::AtomicServerResult;
 
 // Returns None if the string is empty.
 // Useful for parsing form inputs.
@@ -24,7 +24,7 @@ pub fn empty_to_nothing(string: Option<String>) -> Option<String> {
 pub fn get_auth_headers(
     map: &HeaderMap,
     requested_subject: String,
-) -> BetterResult<Option<AuthValues>> {
+) -> AtomicServerResult<Option<AuthValues>> {
     let public_key = map.get("x-atomic-public-key");
     let signature = map.get("x-atomic-signature");
     let timestamp = map.get("x-atomic-timestamp");

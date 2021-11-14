@@ -96,3 +96,6 @@ pub const TIMESTAMP: &str = "https://atomicdata.dev/datatypes/timestamp";
 // Methods
 pub const INSERT: &str = "https://atomicdata.dev/methods/insert";
 pub const DELETE: &str = "https://atomicdata.dev/methods/delete";
+
+// Instances
+pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";

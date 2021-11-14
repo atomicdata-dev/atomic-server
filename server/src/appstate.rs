@@ -1,6 +1,6 @@
 //! App state, which is accessible from handlers
 use crate::{
-    commit_monitor::CommitMonitor, config::Config, errors::BetterResult, search::SearchState,
+    commit_monitor::CommitMonitor, config::Config, errors::AtomicServerResult, search::SearchState,
 };
 use atomic_lib::{
     agents::{generate_public_key, Agent},
@@ -24,7 +24,7 @@ pub struct AppState {
 /// Creates the server context.
 /// Initializes a store on disk.
 /// Creates a new agent, if neccessary.
-pub fn init(config: Config) -> BetterResult<AppState> {
+pub fn init(config: Config) -> AtomicServerResult<AppState> {
     // Enable logging, but hide most tantivy logs
     std::env::set_var("RUST_LOG", "info,tantivy=warn");
     env_logger::init();
@@ -84,7 +84,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
 }
 
 /// Create a new agent if it does not yet exist.
-fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()> {
+fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerResult<()> {
     let ag_cfg: atomic_lib::config::Config = match atomic_lib::config::read_config(
         &config.config_file_path,
     ) {
@@ -142,7 +142,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
 }
 
 /// Creates the first Invitation that is opened by the user on the Home page.
-fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
+fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     let subject = format!("{}/setup", store.get_base_url());
     log::info!("Creating initial Invite at {}", subject);
     let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;

@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## v0.29.0
+
+- Add authentication to restrict read access. Works by signing requests with Private Keys. #13
+- Refactor internal error model, Use correct HTTP status codes #11
+
 ## v0.28.2
 
 - Full-text search endpoint, powered by Tantify #40
