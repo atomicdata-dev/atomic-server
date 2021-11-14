@@ -20,8 +20,12 @@ pub async fn tpf(
     req: actix_web::HttpRequest,
     query: web::Query<TpfQuery>,
 ) -> AtomicServerResult<HttpResponse> {
-    let mut context = data.lock().unwrap();
-    let store = &mut context.store;
+    let appstate = data.lock().unwrap();
+    let store = &appstate.store;
+
+    if !appstate.config.opts.public_mode {
+        return Err("/tpf endpoint is only available on public mode".into());
+    }
     // This is how locally items are stored (which don't know their full subject URL) in Atomic Data
     let mut builder = HttpResponse::Ok();
     let content_type = get_accept(req.headers());

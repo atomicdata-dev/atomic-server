@@ -14,6 +14,7 @@ pub struct WsMessage(pub String);
 pub struct Subscribe {
     pub addr: Addr<crate::handlers::web_sockets::WebSocketConnection>,
     pub subject: String,
+    pub agent: String,
 }
 
 /// A message containing a Resource, which should be sent to subscribers

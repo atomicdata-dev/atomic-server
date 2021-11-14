@@ -48,6 +48,7 @@ fn handle_version_request(
 fn handle_all_versions_request(
     url: url::Url,
     store: &impl Storelike,
+    // TODO: implement auth
     for_agent: Option<String>,
 ) -> AtomicResult<Resource> {
     let params = url.query_pairs();

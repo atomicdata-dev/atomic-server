@@ -12,11 +12,12 @@ use actix::{
     prelude::{Actor, Context, Handler},
     Addr,
 };
-use atomic_lib::Db;
+use atomic_lib::{Db, Storelike};
 use chrono::Local;
 use std::collections::{HashMap, HashSet};
 
 /// The Commit Monitor is an Actor that manages subscriptions for subjects and sends Commits to listeners.
+/// It's also responsible for checking whether the rights are present
 pub struct CommitMonitor {
     /// Maintains a list of all the resources that are being subscribed to, and maps these to websocket connections.
     subscriptions: HashMap<String, HashSet<Addr<WebSocketConnection>>>,
@@ -34,15 +35,31 @@ impl Actor for CommitMonitor {
 impl Handler<Subscribe> for CommitMonitor {
     type Result = ();
 
+    // A message comes in when a client subscribes to a subject.
     fn handle(&mut self, msg: Subscribe, _: &mut Context<Self>) {
-        let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
-            set.clone()
-        } else {
-            HashSet::new()
-        };
-        set.insert(msg.addr);
-        log::info!("handle subscribe {} ", msg.subject);
-        self.subscriptions.insert(msg.subject, set);
+        // check if the agent has the rights to subscribe to this resource
+        if let Ok(resource) = self.store.get_resource(&msg.subject) {
+            if let Ok(can) =
+                atomic_lib::hierarchy::check_read(&self.store, &resource, msg.agent.clone())
+            {
+                if can {
+                    let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
+                        set.clone()
+                    } else {
+                        HashSet::new()
+                    };
+                    set.insert(msg.addr);
+                    log::info!("handle subscribe {} ", msg.subject);
+                    self.subscriptions.insert(msg.subject.clone(), set);
+                }
+                log::info!(
+                    "Not allowed {}  to subscribe to {} ",
+                    &msg.agent,
+                    &msg.subject
+                );
+            }
+            // TODO: Handle errors
+        }
     }
 }
 

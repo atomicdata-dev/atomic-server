@@ -1,3 +1,5 @@
+//! Check signatures in authentication headers, find the correct agent. Authorization is done in Hierarchies
+
 use crate::{commit::check_timestamp, errors::AtomicResult, Storelike};
 
 /// Set of values extracted from the request.
