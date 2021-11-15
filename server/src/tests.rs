@@ -48,7 +48,7 @@ async fn init_server() {
     println!("response: {:?}", resp);
     assert!(resp.status().is_success());
     let body = resp.take_body();
-    assert!(body.as_str().contains("html"));
+    assert!(body.as_str().contains("html"), "no html in response");
 
     // Should 404
     let req = test::TestRequest::with_uri("/doesnotexist")

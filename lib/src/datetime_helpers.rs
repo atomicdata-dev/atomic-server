@@ -1,4 +1,4 @@
-/// Returns the current UNIX timestamp in milliseconds
+/// Returns the current timestamp in milliseconds since UNIX epoch
 pub fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
