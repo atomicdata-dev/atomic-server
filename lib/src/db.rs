@@ -83,7 +83,10 @@ impl Db {
                 })?;
                 Ok(propval)
             }
-            None => Err(format!("Resource {} not found", subject).into()),
+            None => Err(AtomicError::not_found(format!(
+                "Resource {} not found",
+                subject
+            ))),
         }
     }
 

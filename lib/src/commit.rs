@@ -6,7 +6,7 @@ use urls::{SET, SIGNER};
 
 use crate::{
     datatype::DataType, datetime_helpers, errors::AtomicResult, resources::PropVals, urls, Atom,
-    Resource, Storelike, Value,
+    AtomicError, Resource, Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -74,8 +74,8 @@ impl Commit {
         validate_rights: bool,
         update_index: bool,
     ) -> AtomicResult<CommitResponse> {
-        let subject_url =
-            url::Url::parse(&self.subject).map_err(|e| format!("Subject is not a URL. {}", e))?;
+        let subject_url = url::Url::parse(&self.subject)
+            .map_err(|e| format!("Subject '{}' is not a URL. {}", &self.subject, e))?;
         if subject_url.query().is_some() {
             return Err("Subject URL cannot have query parameters".into());
         }
@@ -124,8 +124,9 @@ impl Commit {
         if validate_rights {
             if is_new {
                 if !crate::hierarchy::check_write(store, &resource_new, &self.signer)? {
-                    return Err(format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                    &self.signer, self.subject).into());
+                    return Err(AtomicError::unauthorized(
+                        format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                    &self.signer, self.subject)));
                 }
             } else {
                 // Set a parent only if the rights checks are to be validated.
@@ -141,8 +142,8 @@ impl Commit {
                 }
                 // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
                 if !crate::hierarchy::check_write(store, &resource_old, &self.signer)? {
-                    return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                    &self.signer, self.subject).into());
+                    return Err(AtomicError::unauthorized(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                    &self.signer, self.subject)));
                 }
             }
         };

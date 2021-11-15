@@ -1,5 +1,5 @@
 //! Creating a new resource. Provides prompting logic
-use crate::Context;
+use crate::{CLIResult, Context};
 use atomic_lib::mapping;
 use atomic_lib::{
     datatype::DataType,
@@ -44,7 +44,7 @@ fn prompt_instance<'a>(
     context: &'a Context,
     class: &Class,
     preffered_shortname: Option<String>,
-) -> AtomicResult<(Resource, Option<String>)> {
+) -> CLIResult<(Resource, Option<String>)> {
     // Not sure about the best way t
     // The Path is the thing at the end of the URL, from the domain
     // Here I set some (kind of) random numbers.
@@ -123,7 +123,7 @@ fn prompt_field(
     property: &Property,
     optional: bool,
     context: &Context,
-) -> AtomicResult<Option<String>> {
+) -> CLIResult<Option<String>> {
     let mut input: Option<String> = None;
     let msg_appendix: &str = if optional {
         " (optional)"
