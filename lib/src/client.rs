@@ -54,12 +54,17 @@ pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> At
         .set("Accept", content_type)
         .timeout_read(2000)
         .call();
-    if resp.status() != 200 {
-        return Err(format!("Could not fetch url '{}'. Status: {}", url, resp.status()).into());
-    };
+    let status = resp.status();
     let body = resp
         .into_string()
         .map_err(|e| format!("Could not parse HTTP response for {}: {}", url, e))?;
+    if status != 200 {
+        return Err(format!(
+            "Could not fetch url '{}'. Status: {}. Body: {}",
+            url, status, body
+        )
+        .into());
+    };
     Ok(body)
 }
 
