@@ -1,6 +1,6 @@
 use crate::{
-    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, Commit,
-    Resource, Storelike,
+    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, AtomicError,
+    Commit, Resource, Storelike,
 };
 
 pub fn version_endpoint() -> Endpoint {
@@ -40,7 +40,7 @@ fn handle_version_request(
     if commit_url.is_none() {
         return version_endpoint().to_resource(store);
     }
-    let mut resource = construct_version(&commit_url.unwrap(), store)?;
+    let mut resource = construct_version(&commit_url.unwrap(), store, for_agent)?;
     resource.set_subject(url.to_string());
     Ok(resource)
 }
@@ -97,10 +97,23 @@ fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResu
 
 /// Constructs a Resource version for a specific Commit
 /// Only works if the current store has the required Commits
-pub fn construct_version(commit_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
+pub fn construct_version(
+    commit_url: &str,
+    store: &impl Storelike,
+    for_agent: Option<String>,
+) -> AtomicResult<Resource> {
     let commit = store.get_resource(commit_url)?;
     // Get all the commits for the subject of that Commit
     let subject = &commit.get(urls::SUBJECT)?.to_string();
+    if let Some(agent) = for_agent {
+        let current_resource = store.get_resource(subject)?;
+        let can_open = crate::hierarchy::check_read(store, &current_resource, agent)?;
+        if !can_open {
+            return Err(AtomicError::unauthorized(
+                "You do not have permission to construct this resource".to_string(),
+            ));
+        }
+    }
     let mut commits = get_commits_for_resource(subject, store)?;
     // Sort all commits by date
     commits.sort_by(|a, b| a.created_at.cmp(&b.created_at));
@@ -129,12 +142,16 @@ fn construct_version_endpoint_url(store: &impl Storelike, commit_url: &str) -> S
 
 /// Gets a version of a Resource by Commit.
 /// Tries cached version, constructs one if there is no cached version.
-pub fn get_version(commit_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
+pub fn get_version(
+    commit_url: &str,
+    store: &impl Storelike,
+    for_agent: Option<String>,
+) -> AtomicResult<Resource> {
     let version_url = construct_version_endpoint_url(store, commit_url);
     match store.get_resource(&version_url) {
         Ok(cached) => Ok(cached),
         Err(_not_cached) => {
-            let version = construct_version(commit_url, store)?;
+            let version = construct_version(commit_url, store, for_agent)?;
             // Store constructed version for caching
             store.add_resource(&version)?;
             Ok(version)
@@ -170,7 +187,7 @@ mod test {
         let commits = get_commits_for_resource(subject, &store).unwrap();
         assert_eq!(commits.len(), 2);
 
-        let first_version = construct_version(first_commit.get_subject(), &store).unwrap();
+        let first_version = construct_version(first_commit.get_subject(), &store, None).unwrap();
         assert_eq!(
             first_version
                 .get_shortname("description", &store)
@@ -179,7 +196,7 @@ mod test {
             first_val
         );
 
-        let second_version = construct_version(second_commit.get_subject(), &store).unwrap();
+        let second_version = construct_version(second_commit.get_subject(), &store, None).unwrap();
         assert_eq!(
             second_version
                 .get_shortname("description", &store)
