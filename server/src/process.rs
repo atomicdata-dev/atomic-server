@@ -12,7 +12,7 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
         use sysinfo::{ProcessExt, SystemExt};
         let mut s = sysinfo::System::new_all();
         let retry_secs = 1;
-        let mut tries_left = 15;
+        let mut tries_left = 60;
         if let Some(process) = s.process(pid) {
             log::warn!(
                 "Terminating existing running instance of atomic-server (process ID: {})...",
