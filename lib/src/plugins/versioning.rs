@@ -28,7 +28,7 @@ fn handle_version_request(
     url: url::Url,
     store: &impl Storelike,
     // TODO: Implement auth
-    for_agent: Option<String>,
+    for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
     let params = url.query_pairs();
     let mut commit_url = None;
@@ -49,7 +49,7 @@ fn handle_all_versions_request(
     url: url::Url,
     store: &impl Storelike,
     // TODO: implement auth
-    for_agent: Option<String>,
+    for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
     let params = url.query_pairs();
     let mut target_subject = None;
@@ -100,12 +100,12 @@ fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResu
 pub fn construct_version(
     commit_url: &str,
     store: &impl Storelike,
-    for_agent: Option<String>,
+    for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
     let commit = store.get_resource(commit_url)?;
     // Get all the commits for the subject of that Commit
     let subject = &commit.get(urls::SUBJECT)?.to_string();
-    if let Some(agent) = for_agent {
+    if let Some(agent) = &for_agent {
         let current_resource = store.get_resource(subject)?;
         let can_open = crate::hierarchy::check_read(store, &current_resource, agent)?;
         if !can_open {
@@ -145,7 +145,7 @@ fn construct_version_endpoint_url(store: &impl Storelike, commit_url: &str) -> S
 pub fn get_version(
     commit_url: &str,
     store: &impl Storelike,
-    for_agent: Option<String>,
+    for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
     let version_url = construct_version_endpoint_url(store, commit_url);
     match store.get_resource(&version_url) {

@@ -39,9 +39,7 @@ impl Handler<Subscribe> for CommitMonitor {
     fn handle(&mut self, msg: Subscribe, _: &mut Context<Self>) {
         // check if the agent has the rights to subscribe to this resource
         if let Ok(resource) = self.store.get_resource(&msg.subject) {
-            if let Ok(can) =
-                atomic_lib::hierarchy::check_read(&self.store, &resource, msg.agent.clone())
-            {
+            if let Ok(can) = atomic_lib::hierarchy::check_read(&self.store, &resource, &msg.agent) {
                 if can {
                     let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
                         set.clone()

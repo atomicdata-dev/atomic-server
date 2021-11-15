@@ -166,7 +166,7 @@ pub trait Storelike: Sized {
         &self,
         subject: &str,
         skip_dynamic: bool,
-        for_agent: Option<String>,
+        for_agent: Option<&str>,
     ) -> AtomicResult<Resource> {
         let _ignore = skip_dynamic;
         let resource = self.get_resource(subject)?;
@@ -315,7 +315,7 @@ pub trait Storelike: Sized {
         &self,
         atomic_path: &str,
         mapping: Option<&Mapping>,
-        for_agent: Option<String>,
+        for_agent: Option<&str>,
     ) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
@@ -334,7 +334,7 @@ pub trait Storelike: Sized {
         // The URL of the next resource
         let mut subject = id_url;
         // Set the currently selectred resource parent, which starts as the root of the search
-        let mut resource = self.get_resource_extended(&subject, false, for_agent.clone())?;
+        let mut resource = self.get_resource_extended(&subject, false, for_agent)?;
         // During each of the iterations of the loop, the scope changes.
         // Try using pathreturn...
         let mut current: PathReturn = PathReturn::Subject(subject.clone());
@@ -368,8 +368,7 @@ pub trait Storelike: Sized {
                             ))?
                             .to_string();
                         subject = url;
-                        resource =
-                            self.get_resource_extended(&subject, false, for_agent.clone())?;
+                        resource = self.get_resource_extended(&subject, false, for_agent)?;
                         current = PathReturn::Subject(subject.clone());
                         continue;
                     }

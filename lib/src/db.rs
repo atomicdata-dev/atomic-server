@@ -276,7 +276,7 @@ impl Storelike for Db {
         &self,
         subject: &str,
         skip_dynamic: bool,
-        for_agent: Option<String>,
+        for_agent: Option<&str>,
     ) -> AtomicResult<Resource> {
         // This might add a trailing slash
         let mut url = url::Url::parse(subject)?;
@@ -296,7 +296,7 @@ impl Storelike for Db {
         let mut endpoint_resource = None;
         endpoints.into_iter().for_each(|endpoint| {
             if url.path().starts_with(&endpoint.path) {
-                endpoint_resource = Some((endpoint.handle)(clone.clone(), self, for_agent.clone()))
+                endpoint_resource = Some((endpoint.handle)(clone.clone(), self, for_agent))
             }
         });
 
@@ -313,7 +313,7 @@ impl Storelike for Db {
         resource.set_subject(subject.into());
 
         if let Some(agent) = for_agent {
-            if !crate::hierarchy::check_read(self, &resource, agent.to_string())? {
+            if !crate::hierarchy::check_read(self, &resource, agent)? {
                 return Err(AtomicError::unauthorized(format!(
                     "Agent '{}' is not authorized to read '{}'. There should be a `read` right in this resource or one of its parents.",
                     agent, subject

@@ -111,7 +111,7 @@ impl CollectionBuilder {
     pub fn into_collection(
         self,
         store: &impl Storelike,
-        for_agent: Option<String>,
+        for_agent: Option<&str>,
     ) -> AtomicResult<Collection> {
         Collection::new_with_members(store, self, for_agent)
     }
@@ -186,7 +186,7 @@ impl Collection {
     pub fn new_with_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
-        for_agent: Option<String>,
+        for_agent: Option<&str>,
     ) -> AtomicResult<Collection> {
         if collection_builder.page_size < 1 {
             return Err("Page size must be greater than 0".into());
@@ -211,7 +211,7 @@ impl Collection {
         if collection_builder.sort_by.is_some() || collection_builder.include_nested {
             for subject in subjects.iter() {
                 // These nested resources are not fully calculated - they will be presented as -is
-                let resource = store.get_resource_extended(subject, true, for_agent.clone())?;
+                let resource = store.get_resource_extended(subject, true, for_agent)?;
                 resources.push(resource)
             }
             if let Some(sort) = &collection_builder.sort_by {
