@@ -122,9 +122,11 @@ pub trait Storelike: Sized {
     }
 
     /// Fetches a resource, makes sure its subject matches.
+    /// Uses the default agent to sign the request.
     /// Save to the store.
     fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {
-        let resource: Resource = crate::client::fetch_resource(subject, self)?;
+        let resource: Resource =
+            crate::client::fetch_resource(subject, self, self.get_default_agent().ok())?;
         self.add_resource_opts(&resource, true, true, true)?;
         Ok(resource)
     }

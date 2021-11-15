@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, Atom, Resource, Storelike,
-    Value,
+    datatype::DataType, datetime_helpers, errors::AtomicResult, resources::PropVals, urls, Atom,
+    Resource, Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -426,7 +426,7 @@ fn sign_at(
 }
 
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
-fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
+pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
     let private_key_bytes = base64::decode(private_key.to_string()).map_err(|e| {
         format!(
             "Failed decoding private key {}: {}",
@@ -457,10 +457,7 @@ fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicRes
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
 
 pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_millis() as i64;
+    let now = datetime_helpers::now();
     if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
         return Err(format!(
                     "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
