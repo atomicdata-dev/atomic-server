@@ -17,7 +17,7 @@ pub struct Endpoint {
     pub path: String,
     /// The function that is called when the request matches the path
     pub handle:
-        fn(subject: url::Url, store: &Db, for_agent: Option<String>) -> AtomicResult<Resource>,
+        fn(subject: url::Url, store: &Db, for_agent: Option<&str>) -> AtomicResult<Resource>,
     /// The list of properties that can be passed to the Endpoint as Query parameters
     pub params: Vec<String>,
     pub description: String,

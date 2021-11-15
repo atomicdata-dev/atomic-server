@@ -123,7 +123,7 @@ impl Commit {
 
         if validate_rights {
             if is_new {
-                if !crate::hierarchy::check_write(store, &resource_new, self.signer.clone())? {
+                if !crate::hierarchy::check_write(store, &resource_new, &self.signer)? {
                     return Err(format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
                     &self.signer, self.subject).into());
                 }
@@ -140,7 +140,7 @@ impl Commit {
                     )?;
                 }
                 // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
-                if !crate::hierarchy::check_write(store, &resource_old, self.signer.clone())? {
+                if !crate::hierarchy::check_write(store, &resource_old, &self.signer)? {
                     return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
                     &self.signer, self.subject).into());
                 }

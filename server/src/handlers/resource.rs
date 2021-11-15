@@ -52,7 +52,7 @@ pub async fn get_resource(
         "Cache-Control",
         "no-store, no-cache, must-revalidate, private",
     );
-    let resource = store.get_resource_extended(&subject, false, for_agent)?;
+    let resource = store.get_resource_extended(&subject, false, for_agent.as_deref())?;
     match content_type {
         ContentType::Json => {
             let body = resource.to_json(store)?;

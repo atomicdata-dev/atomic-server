@@ -40,7 +40,7 @@ pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicRe
 pub fn check_write(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: String,
+    for_agent: &str,
 ) -> AtomicResult<bool> {
     check_rights(store, resource, for_agent, Right::Write)
 }
@@ -48,7 +48,7 @@ pub fn check_write(
 pub fn check_read(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: String,
+    for_agent: &str,
 ) -> AtomicResult<bool> {
     check_rights(store, resource, for_agent, Right::Read)
 }
@@ -57,12 +57,12 @@ pub fn check_read(
 pub fn check_rights(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: String,
+    for_agent: &str,
     right: Right,
 ) -> AtomicResult<bool> {
     // Check if the resource's write rights explicitly refers to the agent
     if let Ok(arr_val) = resource.get(&right.to_string()) {
-        if arr_val.to_subjects(None)?.contains(&for_agent) {
+        if arr_val.to_subjects(None)?.iter().any(|s| s == for_agent) {
             return Ok(true);
         };
     }
