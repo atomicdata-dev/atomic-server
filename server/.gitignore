@@ -3,3 +3,4 @@
 .ssl/*
 .https/*
 /static/well-known/acme-challenge/*
+.temp
