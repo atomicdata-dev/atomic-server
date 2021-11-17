@@ -12,7 +12,9 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
         use sysinfo::{ProcessExt, SystemExt};
         let mut s = sysinfo::System::new_all();
         let retry_secs = 1;
-        let mut tries_left = 60;
+        let mut tries_left = 30;
+        // either friendly (Terminate) or not friendly (Kill)
+        let mut signal = sysinfo::Signal::Term;
         if let Some(process) = s.process(pid) {
             log::warn!(
                 "Terminating existing running instance of atomic-server (process ID: {})...",
@@ -32,8 +34,14 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
                         );
                         std::thread::sleep(std::time::Duration::from_secs(retry_secs));
                     } else {
-                        log::error!("Could not terminate other atomic-server, exiting...");
-                        std::process::exit(1);
+                        if signal == sysinfo::Signal::Kill {
+                            log::error!("Could not terminate other atomic-server, exiting...");
+                            std::process::exit(1);
+                        }
+                        log::warn!("Terminate signal did not work, let's try again with Kill...",);
+                        _process.kill(sysinfo::Signal::Kill);
+                        tries_left = 15;
+                        signal = sysinfo::Signal::Kill;
                     }
                     continue;
                 };
