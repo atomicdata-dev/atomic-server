@@ -1,5 +1,6 @@
 mod actor_messages;
 mod appstate;
+mod cli;
 mod commit_monitor;
 mod config;
 mod content_types;
@@ -30,7 +31,7 @@ async fn main() -> AtomicServerResult<()> {
 
     // All subcommands (as of now) also require appstate, which is why we have this logic below initial CLI logic.
     match &config.opts.command {
-        Some(config::Command::Export(e)) => {
+        Some(cli::Command::Export(e)) => {
             let path = match e.path.clone() {
                 Some(p) => std::path::Path::new(&p).to_path_buf(),
                 None => {
@@ -52,7 +53,7 @@ async fn main() -> AtomicServerResult<()> {
             println!("Succesfully exported data to {}", path.to_str().unwrap());
             Ok(())
         }
-        Some(config::Command::Import(o)) => {
+        Some(cli::Command::Import(o)) => {
             let path = std::path::Path::new(&o.path);
             let readstring = std::fs::read_to_string(path)?;
             let appstate = appstate::init(config.clone())?;
@@ -61,7 +62,7 @@ async fn main() -> AtomicServerResult<()> {
             println!("Sucesfully imported {:?} to store.", o.path);
             Ok(())
         }
-        Some(config::Command::SetupEnv) => {
+        Some(cli::Command::SetupEnv) => {
             let current_path = std::env::current_dir()?;
             let pathstr = format!(
                 "{}/.env",

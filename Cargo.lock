@@ -488,6 +488,7 @@ dependencies = [
  "atomic_lib",
  "chrono",
  "clap 3.0.0-beta.5",
+ "clap_generate",
  "dirs 3.0.2",
  "dotenv",
  "env_logger 0.9.0",
@@ -858,6 +859,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "clap_generate"
+version = "3.0.0-beta.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "097ab5db1c3417442270cd57c8dd39f6c3114d3ce09d595f9efddbb1fcfaa799"
+dependencies = [
+ "clap 3.0.0-beta.5",
 ]
 
 [[package]]
