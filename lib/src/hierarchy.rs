@@ -1,7 +1,24 @@
 //! The Hierarchy model describes how Resources are structed in a tree-like shape.
 //! It dealt with authorization (read / write grants)
 
+use core::fmt;
+
 use crate::{errors::AtomicResult, urls, Resource, Storelike};
+
+pub enum Right {
+    Read,
+    Write,
+}
+
+impl fmt::Display for Right {
+    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
+        let str = match self {
+            Right::Read => urls::READ,
+            Right::Write => urls::WRITE,
+        };
+        fmt.write_str(str)
+    }
+}
 
 /// Looks for children relations, adds to the resource. Performs a TPF query, might be expensive.
 pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicResult<Resource> {
@@ -20,15 +37,32 @@ pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicRe
     Ok(resource.to_owned())
 }
 
-/// Recursively checks a Resource and its Parents for write.
 pub fn check_write(
     store: &impl Storelike,
     resource: &Resource,
-    agent: String,
+    for_agent: &str,
+) -> AtomicResult<bool> {
+    check_rights(store, resource, for_agent, Right::Write)
+}
+
+pub fn check_read(
+    store: &impl Storelike,
+    resource: &Resource,
+    for_agent: &str,
+) -> AtomicResult<bool> {
+    check_rights(store, resource, for_agent, Right::Read)
+}
+
+/// Recursively checks a Resource and its Parents for rights.
+pub fn check_rights(
+    store: &impl Storelike,
+    resource: &Resource,
+    for_agent: &str,
+    right: Right,
 ) -> AtomicResult<bool> {
     // Check if the resource's write rights explicitly refers to the agent
-    if let Ok(arr_val) = resource.get(urls::WRITE) {
-        if arr_val.to_subjects(None)?.contains(&agent) {
+    if let Ok(arr_val) = resource.get(&right.to_string()) {
+        if arr_val.to_subjects(None)?.iter().any(|s| s == for_agent) {
             return Ok(true);
         };
     }
@@ -39,7 +73,7 @@ pub fn check_write(
             // return Err(format!("Parent ({}) is the same as the current resource - there is a circular parent relationship.", val).into());
             return Ok(false);
         }
-        check_write(store, &parent, agent)
+        check_rights(store, &parent, for_agent, right)
     } else {
         // resource has no parent and agent is not in Write array - check fails
         Ok(false)
@@ -75,5 +109,13 @@ mod test {
 
         // let resource = store.get_resource(&subject).unwrap();
         // assert!(resource.get(property).unwrap().to_string() == value.to_string());
+    }
+
+    #[test]
+    fn display_right() {
+        let read = super::Right::Read;
+        assert_eq!(read.to_string(), super::urls::READ);
+        let write = super::Right::Write;
+        assert_eq!(write.to_string(), super::urls::WRITE);
     }
 }

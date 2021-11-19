@@ -42,6 +42,7 @@ assert!(fetched_new_resource.get_shortname("description", &store).unwrap().to_st
 
 pub mod agents;
 pub mod atoms;
+pub mod authentication;
 pub mod client;
 pub mod collections;
 pub mod commit;
@@ -76,6 +77,8 @@ pub use atoms::Atom;
 pub use commit::Commit;
 #[cfg(feature = "db")]
 pub use db::Db;
+pub use errors::AtomicError;
+pub use errors::AtomicErrorType;
 pub use resources::Resource;
 pub use store::Store;
 pub use storelike::Storelike;

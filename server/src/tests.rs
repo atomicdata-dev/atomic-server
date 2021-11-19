@@ -2,10 +2,13 @@
 //! Most of the more rigorous testing is done in the end-to-end tests:
 //! https://github.com/joepio/atomic-data-browser/tree/main/data-browser/tests
 
+use crate::appstate::AppState;
+
 use super::*;
 use actix_web::{
     dev::{Body, ResponseBody},
-    test, web, App,
+    test::{self, TestRequest},
+    web, App,
 };
 
 trait BodyTest {
@@ -27,9 +30,27 @@ impl BodyTest for ResponseBody<Body> {
     }
 }
 
+/// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
+fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
+    let url = format!("http://localhost{}", path);
+    let headers = atomic_lib::client::get_authentication_headers(
+        &url,
+        &appstate.store.get_default_agent().unwrap(),
+    )
+    .expect("could not get auth headers");
+
+    let mut prereq = test::TestRequest::with_uri(path);
+    for (k, v) in headers {
+        prereq = prereq.header(k, v.clone());
+    }
+    prereq.header("Accept", "application/ad+json")
+}
+
 #[actix_rt::test]
 async fn init_server() {
-    std::env::set_var("ATOMIC_REBUILD_INDEX", "true");
+    std::env::set_var("ATOMIC_CONFIG_DIR", "./.temp");
+    // We need tro run --initialize to make sure the agent has the correct rights / drive
+    std::env::set_var("ATOMIC_INITIALIZE", "true");
     let config = config::init()
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");
@@ -42,57 +63,67 @@ async fn init_server() {
     )
     .await;
 
+    // Does not work, unfortunately, because the server is not accessible.
+    // let fetched =
+    //     atomic_lib::client::fetch_resource(&appstate.config.local_base_url, &appstate.store, None)
+    //         .expect("could not fetch drive");
+
     // Get HTML page
-    let req = test::TestRequest::with_uri("/search?q=test").to_request();
-    let mut resp = test::call_service(&mut app, req).await;
+    let req = build_request_authenticated("/", &appstate).header("Accept", "application/html");
+    let mut resp = test::call_service(&mut app, req.to_request()).await;
     println!("response: {:?}", resp);
     assert!(resp.status().is_success());
     let body = resp.take_body();
-    assert!(body.as_str().contains("html"));
+    assert!(body.as_str().contains("html"), "no html in response");
 
-    // Should 404
-    let req = test::TestRequest::with_uri("/doesnotexist")
-        .header("Accept", "application/ld+json")
-        .to_request();
-    let resp = test::call_service(&mut app, req).await;
-    // Note: This is currently 500, but should be 404 in the future!
-    assert!(resp.status().is_server_error());
+    // Should 401 (Unauthorized)
+    let req = test::TestRequest::with_uri("/properties").header("Accept", "application/ad+json");
+    let resp = test::call_service(&mut app, req.to_request()).await;
+    assert!(
+        resp.status().is_client_error(),
+        "resource should return 401 unauthorized"
+    );
 
     // Get JSON-AD
-    let req = test::TestRequest::with_uri("/setup")
-        .header("Accept", "application/ad+json")
-        .to_request();
-    let mut resp = test::call_service(&mut app, req).await;
+    let req = build_request_authenticated("/properties", &appstate);
+    let mut resp = test::call_service(&mut app, req.to_request()).await;
     assert!(resp.status().is_success(), "setup not returning JSON-AD");
     let body = resp.take_body();
-    assert!(body.as_str().contains("{\n  \"@id\""));
+    assert!(
+        body.as_str().contains("{\n  \"@id\""),
+        "response should be json-ad"
+    );
 
     // Get JSON-LD
-    let req = test::TestRequest::with_uri("/setup")
-        .header("Accept", "application/ld+json")
-        .to_request();
-    let mut resp = test::call_service(&mut app, req).await;
+    let req = build_request_authenticated("/properties", &appstate)
+        .header("Accept", "application/ld+json");
+    let mut resp = test::call_service(&mut app, req.to_request()).await;
     assert!(resp.status().is_success(), "setup not returning JSON-LD");
     let body = resp.take_body();
-    assert!(body.as_str().contains("@context"));
+    assert!(
+        body.as_str().contains("@context"),
+        "response should be json-ld"
+    );
 
     // Get turtle
-    let req = test::TestRequest::with_uri("/setup")
-        .header("Accept", "text/turtle")
-        .to_request();
-    let mut resp = test::call_service(&mut app, req).await;
+    let req = build_request_authenticated("/properties", &appstate).header("Accept", "text/turtle");
+    let mut resp = test::call_service(&mut app, req.to_request()).await;
     assert!(resp.status().is_success());
     let body = resp.take_body();
-    assert!(body.as_str().starts_with("<htt"));
+    assert!(
+        body.as_str().starts_with("<htt"),
+        "response should be turtle"
+    );
 
     // Get Search
     // Does not test the contents of the results - the index isn't built at this point
-    let req = test::TestRequest::with_uri("/search?q=setup")
-        .header("Accept", "application/ad+json")
-        .to_request();
-    let mut resp = test::call_service(&mut app, req).await;
+    let req = build_request_authenticated("/search?q=setup", &appstate);
+    let mut resp = test::call_service(&mut app, req.to_request()).await;
     assert!(resp.status().is_success());
     let body = resp.take_body();
     println!("{}", body.as_str());
-    assert!(body.as_str().contains("/results"));
+    assert!(
+        body.as_str().contains("/results"),
+        "response should be a search resource"
+    );
 }

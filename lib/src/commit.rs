@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, Atom, Resource, Storelike,
-    Value,
+    datatype::DataType, datetime_helpers, errors::AtomicResult, resources::PropVals, urls, Atom,
+    AtomicError, Resource, Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -74,8 +74,8 @@ impl Commit {
         validate_rights: bool,
         update_index: bool,
     ) -> AtomicResult<CommitResponse> {
-        let subject_url =
-            url::Url::parse(&self.subject).map_err(|e| format!("Subject is not a URL. {}", e))?;
+        let subject_url = url::Url::parse(&self.subject)
+            .map_err(|e| format!("Subject '{}' is not a URL. {}", &self.subject, e))?;
         if subject_url.query().is_some() {
             return Err("Subject URL cannot have query parameters".into());
         }
@@ -106,19 +106,7 @@ impl Commit {
         }
         // Check if the created_at lies in the past
         if validate_timestamp {
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .expect("Time went backwards")
-                .as_millis() as i64;
-            let acceptable_ms_difference = 10000;
-            if self.created_at > now + acceptable_ms_difference {
-                return Err(format!(
-                    "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
-                    now, self.created_at
-                )
-                .into());
-                // TODO: also check that no younger commits exist
-            }
+            check_timestamp(self.created_at)?;
         }
         let commit_resource: Resource = self.clone().into_resource(store)?;
         let mut is_new = false;
@@ -135,9 +123,10 @@ impl Commit {
 
         if validate_rights {
             if is_new {
-                if !crate::hierarchy::check_write(store, &resource_new, self.signer.clone())? {
-                    return Err(format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                    &self.signer, self.subject).into());
+                if !crate::hierarchy::check_write(store, &resource_new, &self.signer)? {
+                    return Err(AtomicError::unauthorized(
+                        format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                    &self.signer, self.subject)));
                 }
             } else {
                 // Set a parent only if the rights checks are to be validated.
@@ -152,9 +141,9 @@ impl Commit {
                     )?;
                 }
                 // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
-                if !crate::hierarchy::check_write(store, &resource_old, self.signer.clone())? {
-                    return Err(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                    &self.signer, self.subject).into());
+                if !crate::hierarchy::check_write(store, &resource_old, &self.signer)? {
+                    return Err(AtomicError::unauthorized(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
+                    &self.signer, self.subject)));
                 }
             }
         };
@@ -438,7 +427,7 @@ fn sign_at(
 }
 
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
-fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
+pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
     let private_key_bytes = base64::decode(private_key.to_string()).map_err(|e| {
         format!(
             "Failed decoding private key {}: {}",
@@ -463,6 +452,22 @@ fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicRes
     let signature_bytes = signature.as_ref();
     let signatureb64 = base64::encode(signature_bytes);
     Ok(signatureb64)
+}
+
+/// The amount of milliseconds that a Commit signature is valid for.
+const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
+
+pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
+    let now = datetime_helpers::now();
+    if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
+        return Err(format!(
+                    "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
+                    now, timestamp
+                )
+                .into());
+        // TODO: also check that no younger commits exist
+    }
+    Ok(())
 }
 
 #[cfg(test)]

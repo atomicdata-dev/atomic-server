@@ -1,4 +1,4 @@
-use crate::{appstate::AppState, errors::BetterResult};
+use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{parse::parse_json_ad_commit_resource, Commit, Storelike};
 use std::sync::Mutex;
@@ -8,7 +8,7 @@ use std::sync::Mutex;
 pub async fn post_commit(
     data: web::Data<Mutex<AppState>>,
     body: String,
-) -> BetterResult<HttpResponse> {
+) -> AtomicServerResult<HttpResponse> {
     let mut appstate = data
         .lock()
         .expect("Failed to lock mutexguard in post_commit");

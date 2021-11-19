@@ -11,7 +11,7 @@ use tantivy::IndexWriter;
 use tantivy::ReloadPolicy;
 
 use crate::config::Config;
-use crate::errors::BetterResult;
+use crate::errors::AtomicServerResult;
 
 /// The actual Schema used for search.
 /// It mimics a single Atom (or Triple).
@@ -38,7 +38,7 @@ pub struct SearchState {
 
 impl SearchState {
     /// Create a new SearchState for the Server, which includes building the schema and index.
-    pub fn new(config: &Config) -> BetterResult<SearchState> {
+    pub fn new(config: &Config) -> AtomicServerResult<SearchState> {
         let schema = crate::search::build_schema()?;
         let (writer, index) = crate::search::get_index(config)?;
         let reader = crate::search::get_reader(&index)?;
@@ -54,7 +54,7 @@ impl SearchState {
 }
 
 /// Returns the schema for the search index.
-pub fn build_schema() -> BetterResult<tantivy::schema::Schema> {
+pub fn build_schema() -> AtomicServerResult<tantivy::schema::Schema> {
     let mut schema_builder = Schema::builder();
     // The STORED flag makes the index store the full values. Can be useful.
     schema_builder.add_text_field("subject", TEXT | STORED);
@@ -65,7 +65,7 @@ pub fn build_schema() -> BetterResult<tantivy::schema::Schema> {
 }
 
 /// Creates or reads the index from the `search_index_path` and allocates some heap size.
-pub fn get_index(config: &Config) -> BetterResult<(IndexWriter, Index)> {
+pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, Index)> {
     let schema = build_schema()?;
     std::fs::create_dir_all(&config.search_index_path)?;
     if config.opts.rebuild_index {
@@ -85,7 +85,7 @@ pub fn get_index(config: &Config) -> BetterResult<(IndexWriter, Index)> {
 }
 
 /// Returns the schema for the search index.
-pub fn get_schema_fields(appstate: &SearchState) -> BetterResult<Fields> {
+pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
     let subject = appstate
         .schema
         .get_field("subject")
@@ -108,7 +108,7 @@ pub fn get_schema_fields(appstate: &SearchState) -> BetterResult<Fields> {
 
 /// Indexes all resources from the store to search.
 /// At this moment does not remove existing index.
-pub fn add_all_resources(search_state: &SearchState, store: &Db) -> BetterResult<()> {
+pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServerResult<()> {
     for resource in store.all_resources(true) {
         // Skip commits
         // TODO: Better check, this might overfit
@@ -124,7 +124,7 @@ pub fn add_all_resources(search_state: &SearchState, store: &Db) -> BetterResult
 /// Adds a single resource to the search index, but does _not_ commit!
 /// Does not index outgoing links, or resourcesArrays
 /// `appstate.search_index_writer.write()?.commit()?;`
-pub fn add_resource(appstate: &SearchState, resource: &Resource) -> BetterResult<()> {
+pub fn add_resource(appstate: &SearchState, resource: &Resource) -> AtomicServerResult<()> {
     let fields = get_schema_fields(appstate)?;
     let subject = resource.get_subject();
     let writer = appstate.writer.read()?;
@@ -148,7 +148,7 @@ pub fn add_resource(appstate: &SearchState, resource: &Resource) -> BetterResult
 // / Removes a single resource from the search index, but does _not_ commit!
 // / Does not index outgoing links, or resourcesArrays
 // / `appstate.search_index_writer.write()?.commit()?;`
-pub fn remove_resource(search_state: &SearchState, subject: &str) -> BetterResult<()> {
+pub fn remove_resource(search_state: &SearchState, subject: &str) -> AtomicServerResult<()> {
     let fields = get_schema_fields(search_state)?;
     let writer = search_state.writer.read()?;
     let term = tantivy::Term::from_field_text(fields.subject, subject);
@@ -164,7 +164,7 @@ pub fn add_triple(
     property: String,
     value: String,
     fields: &Fields,
-) -> BetterResult<()> {
+) -> AtomicServerResult<()> {
     let mut doc = Document::default();
     doc.add_text(fields.property, property);
     doc.add_text(fields.value, value);
@@ -174,7 +174,7 @@ pub fn add_triple(
 }
 
 // For a search server you will typically create one reader for the entire lifetime of your program, and acquire a new searcher for every single request.
-pub fn get_reader(index: &tantivy::Index) -> BetterResult<tantivy::IndexReader> {
+pub fn get_reader(index: &tantivy::Index) -> AtomicServerResult<tantivy::IndexReader> {
     Ok(index
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommit)

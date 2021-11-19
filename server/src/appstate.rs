@@ -1,13 +1,14 @@
 //! App state, which is accessible from handlers
 use crate::{
-    commit_monitor::CommitMonitor, config::Config, errors::BetterResult, search::SearchState,
+    commit_monitor::CommitMonitor, config::Config, errors::AtomicServerResult, search::SearchState,
 };
 use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
 };
 
-/// Context for the server (not an individual request).
+/// Data object available to handlers and actors.
+/// Contains the store, configuration and addresses for Actix Actors.
 // This struct is cloned accross all threads, so make sure the fields are thread safe.
 // A good option here is to use Actors for things that can change (e.g. commit_monitor)
 #[derive(Clone)]
@@ -24,9 +25,9 @@ pub struct AppState {
 /// Creates the server context.
 /// Initializes a store on disk.
 /// Creates a new agent, if neccessary.
-pub fn init(config: Config) -> BetterResult<AppState> {
-    // Enable all logging
-    std::env::set_var("RUST_LOG", "info");
+pub fn init(config: Config) -> AtomicServerResult<AppState> {
+    // Enable logging, but hide most tantivy logs
+    std::env::set_var("RUST_LOG", "info,tantivy=warn");
     env_logger::init();
     // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     let _ = crate::process::terminate_existing_processes(&config)
@@ -59,7 +60,8 @@ pub fn init(config: Config) -> BetterResult<AppState> {
             .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         set_up_initial_invite(&store)?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
-        set_up_drive(&store)?;
+        log::info!("Setting rights to Drive {}", store.get_base_url());
+        atomic_lib::populate::set_up_drive(&store)?;
     }
 
     // Initialize search constructs
@@ -83,7 +85,7 @@ pub fn init(config: Config) -> BetterResult<AppState> {
 }
 
 /// Create a new agent if it does not yet exist.
-fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()> {
+fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerResult<()> {
     let ag_cfg: atomic_lib::config::Config = match atomic_lib::config::read_config(
         &config.config_file_path,
     ) {
@@ -141,7 +143,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> BetterResult<()
 }
 
 /// Creates the first Invitation that is opened by the user on the Home page.
-fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
+fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     let subject = format!("{}/setup", store.get_base_url());
     log::info!("Creating initial Invite at {}", subject);
     let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;
@@ -178,19 +180,5 @@ fn set_up_initial_invite(store: &impl Storelike) -> BetterResult<()> {
         store,
     )?;
     invite.save_locally(store)?;
-    Ok(())
-}
-
-/// Get the Drive resource (base URL), set agent as the Root user, provide write access
-fn set_up_drive(store: &impl Storelike) -> BetterResult<()> {
-    log::info!("Setting rights to Drive {}", store.get_base_url());
-    // Now let's add the agent as the Root user and provide write access
-    let mut drive = store.get_resource(store.get_base_url())?;
-    let agents = vec![store.get_default_agent()?.subject];
-    // TODO: add read rights to public, maybe
-    drive.set_propval(atomic_lib::urls::WRITE.into(), agents.clone().into(), store)?;
-    drive.set_propval(atomic_lib::urls::READ.into(), agents.into(), store)?;
-    drive.set_propval_string(atomic_lib::urls::DESCRIPTION.into(), &format!("Welcome to your Atomic-Server! Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
-    drive.save_locally(store)?;
     Ok(())
 }

@@ -3,52 +3,38 @@ use serde::Serialize;
 use std::error::Error;
 
 // More strict Result type
-pub type BetterResult<T> = std::result::Result<T, AppError>;
+pub type AtomicServerResult<T> = std::result::Result<T, AtomicServerError>;
 
 #[derive(Debug)]
 pub enum AppErrorType {
-    #[allow(dead_code)]
-    NotFoundError,
-    OtherError,
+    NotFound,
+    Unauthorized,
+    Other,
 }
 
 // More strict error type, supports HTTP responses
 // Needs a lot of work, though
 #[derive(Debug)]
-pub struct AppError {
+pub struct AtomicServerError {
     pub message: String,
     pub error_type: AppErrorType,
 }
 
-impl AppError {
-    #[allow(dead_code)]
-    pub fn not_found(message: String) -> AppError {
-        AppError {
-            message: format!("Resource not found. {}", message),
-            error_type: AppErrorType::NotFoundError,
-        }
-    }
-
-    pub fn other_error(message: String) -> AppError {
-        AppError {
-            message,
-            error_type: AppErrorType::OtherError,
-        }
-    }
-}
+impl AtomicServerError {}
 
 #[derive(Serialize)]
 pub struct AppErrorResponse {
     pub error: String,
 }
 
-impl Error for AppError {}
+impl Error for AtomicServerError {}
 
-impl ResponseError for AppError {
+impl ResponseError for AtomicServerError {
     fn status_code(&self) -> StatusCode {
         match self.error_type {
-            AppErrorType::NotFoundError => StatusCode::NOT_FOUND,
-            AppErrorType::OtherError => StatusCode::INTERNAL_SERVER_ERROR,
+            AppErrorType::NotFound => StatusCode::NOT_FOUND,
+            AppErrorType::Other => StatusCode::INTERNAL_SERVER_ERROR,
+            AppErrorType::Unauthorized => StatusCode::UNAUTHORIZED,
         }
     }
     fn error_response(&self) -> HttpResponse {
@@ -58,72 +44,105 @@ impl ResponseError for AppError {
     }
 }
 
-impl std::fmt::Display for AppError {
+impl std::fmt::Display for AtomicServerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", &self.message)
     }
 }
 
 // Error conversions
-impl From<&str> for AppError {
+impl From<&str> for AtomicServerError {
     fn from(message: &str) -> Self {
-        AppError {
+        AtomicServerError {
             message: message.into(),
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
         }
     }
 }
 
-impl From<String> for AppError {
+impl From<String> for AtomicServerError {
     fn from(message: String) -> Self {
-        AppError {
+        AtomicServerError {
             message,
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
         }
     }
 }
 
-impl From<std::boxed::Box<dyn std::error::Error>> for AppError {
+impl From<std::boxed::Box<dyn std::error::Error>> for AtomicServerError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
-        AppError {
+        AtomicServerError {
             message: error.to_string(),
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
         }
     }
 }
 
-impl<T> From<std::sync::PoisonError<T>> for AppError {
+impl<T> From<std::sync::PoisonError<T>> for AtomicServerError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
-        AppError {
+        AtomicServerError {
             message: error.to_string(),
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
         }
     }
 }
 
-impl From<std::io::Error> for AppError {
+impl From<std::io::Error> for AtomicServerError {
     fn from(error: std::io::Error) -> Self {
-        AppError {
+        AtomicServerError {
             message: error.to_string(),
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
         }
     }
 }
 
-impl From<tantivy::directory::error::OpenDirectoryError> for AppError {
+impl From<tantivy::directory::error::OpenDirectoryError> for AtomicServerError {
     fn from(error: tantivy::directory::error::OpenDirectoryError) -> Self {
-        AppError {
+        AtomicServerError {
             message: error.to_string(),
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
         }
     }
 }
 
-impl From<tantivy::TantivyError> for AppError {
+impl From<tantivy::TantivyError> for AtomicServerError {
     fn from(error: tantivy::TantivyError) -> Self {
-        AppError {
+        AtomicServerError {
             message: error.to_string(),
-            error_type: AppErrorType::OtherError,
+            error_type: AppErrorType::Other,
+        }
+    }
+}
+
+impl From<acme_lib::Error> for AtomicServerError {
+    fn from(error: acme_lib::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+        }
+    }
+}
+
+impl From<actix_web::Error> for AtomicServerError {
+    fn from(error: actix_web::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+        }
+    }
+}
+
+impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
+    fn from(error: atomic_lib::errors::AtomicError) -> Self {
+        println!("ERROR: {:?}", error);
+        let error_type = match error.error_type {
+            atomic_lib::errors::AtomicErrorType::NotFoundError => AppErrorType::NotFound,
+            atomic_lib::errors::AtomicErrorType::UnauthorizedError => AppErrorType::Unauthorized,
+            _ => AppErrorType::Other,
+        };
+        AtomicServerError {
+            message: error.to_string(),
+            error_type,
         }
     }
 }

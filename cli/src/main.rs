@@ -46,7 +46,7 @@ impl Context<'_> {
 }
 
 /// Reads config files for writing data, or promps the user if they don't yet exist
-fn set_agent_config() -> AtomicResult<Config> {
+fn set_agent_config() -> CLIResult<Config> {
     let agent_config_path = atomic_lib::config::default_config_file_path()?;
     match atomic_lib::config::read_config(&agent_config_path) {
         Ok(found) => Ok(found),
@@ -328,3 +328,5 @@ fn validate(context: &mut Context) {
     let reportstring = context.store.validate().to_string();
     println!("{}", reportstring);
 }
+
+pub type CLIResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;

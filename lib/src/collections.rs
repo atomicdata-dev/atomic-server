@@ -108,8 +108,12 @@ impl CollectionBuilder {
     }
 
     /// Converts the CollectionBuilder into a collection, with Members
-    pub fn into_collection(self, store: &impl Storelike) -> AtomicResult<Collection> {
-        Collection::new_with_members(store, self)
+    pub fn into_collection(
+        self,
+        store: &impl Storelike,
+        for_agent: Option<&str>,
+    ) -> AtomicResult<Collection> {
+        Collection::new_with_members(store, self, for_agent)
     }
 }
 
@@ -182,6 +186,7 @@ impl Collection {
     pub fn new_with_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
+        for_agent: Option<&str>,
     ) -> AtomicResult<Collection> {
         if collection_builder.page_size < 1 {
             return Err("Page size must be greater than 0".into());
@@ -206,7 +211,7 @@ impl Collection {
         if collection_builder.sort_by.is_some() || collection_builder.include_nested {
             for subject in subjects.iter() {
                 // These nested resources are not fully calculated - they will be presented as -is
-                let resource = store.get_resource_extended(subject, true)?;
+                let resource = store.get_resource_extended(subject, true, for_agent)?;
                 resources.push(resource)
             }
             if let Some(sort) = &collection_builder.sort_by {
@@ -415,7 +420,7 @@ pub fn construct_collection(
         include_nested,
         include_external,
     };
-    let collection = Collection::new_with_members(store, collection_builder)?;
+    let collection = Collection::new_with_members(store, collection_builder, None)?;
     collection.add_to_resource(resource, store)
 }
 
@@ -441,7 +446,7 @@ mod test {
             include_nested: false,
             include_external: false,
         };
-        let collection = Collection::new_with_members(&store, collection_builder).unwrap();
+        let collection = Collection::new_with_members(&store, collection_builder, None).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 
@@ -461,7 +466,7 @@ mod test {
             include_nested: false,
             include_external: false,
         };
-        let collection = Collection::new_with_members(&store, collection_builder).unwrap();
+        let collection = Collection::new_with_members(&store, collection_builder, None).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
 
         let resource_collection = &collection.to_resource(&store).unwrap();
@@ -487,7 +492,7 @@ mod test {
             include_nested: true,
             include_external: false,
         };
-        let collection = Collection::new_with_members(&store, collection_builder).unwrap();
+        let collection = Collection::new_with_members(&store, collection_builder, None).unwrap();
         let first_resource = &collection.members_nested.clone().unwrap()[0];
         assert!(first_resource.get_subject().contains("Agent"));
 
@@ -511,7 +516,11 @@ mod test {
             .collect();
         println!("{:?}", subjects);
         let collections_collection = store
-            .get_resource_extended(&format!("{}/collections", store.get_base_url()), false)
+            .get_resource_extended(
+                &format!("{}/collections", store.get_base_url()),
+                false,
+                None,
+            )
             .unwrap();
         assert!(
             collections_collection
@@ -536,7 +545,7 @@ mod test {
         store.populate().unwrap();
 
         let collection_page_size = store
-            .get_resource_extended("https://atomicdata.dev/classes?page_size=1", false)
+            .get_resource_extended("https://atomicdata.dev/classes?page_size=1", false, None)
             .unwrap();
         assert!(
             collection_page_size
@@ -549,6 +558,7 @@ mod test {
             .get_resource_extended(
                 "https://atomicdata.dev/classes?current_page=2&page_size=1",
                 false,
+                None,
             )
             .unwrap();
         assert!(

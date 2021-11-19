@@ -1,26 +1,38 @@
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
-use actix_web::{web, Error, HttpRequest, HttpResponse};
+use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws::{self};
 use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
 
-use crate::{actor_messages::CommitMessage, appstate::AppState, commit_monitor::CommitMonitor};
+use crate::{
+    actor_messages::CommitMessage, appstate::AppState, commit_monitor::CommitMonitor,
+    errors::AtomicServerResult, helpers::get_auth_headers,
+};
 
 /// Get an HTTP request, upgrade it to a Websocket connection
 pub async fn web_socket_handler(
     req: HttpRequest,
     stream: web::Payload,
     data: web::Data<Mutex<AppState>>,
-) -> Result<HttpResponse, Error> {
+) -> AtomicServerResult<HttpResponse> {
     log::info!("Starting websocket");
     let context = data.lock().unwrap();
-    ws::start(
-        WebSocketConnection::new(context.commit_monitor.clone()),
+
+    // Authentication check. If the user has no headers, continue with the Public Agent.
+    let auth_header_values = get_auth_headers(req.headers(), "ws".into())?;
+    let for_agent = atomic_lib::authentication::get_agent_from_headers_and_check(
+        auth_header_values,
+        &context.store,
+    )?;
+
+    let result = ws::start(
+        WebSocketConnection::new(context.commit_monitor.clone(), for_agent),
         &req,
         stream,
-    )
+    )?;
+    Ok(result)
 }
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -37,6 +49,9 @@ pub struct WebSocketConnection {
     subscribed: std::collections::HashSet<String>,
     /// The CommitMonitor Actor that receives and sends messages for Commits
     commit_monitor_addr: Addr<CommitMonitor>,
+    /// The Agent who is connected.
+    /// If it's not specified, it's the Public Agent.
+    agent: String,
 }
 
 impl Actor for WebSocketConnection {
@@ -68,6 +83,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                                 .do_send(crate::actor_messages::Subscribe {
                                     addr: ctx.address(),
                                     subject: subject.to_string(),
+                                    agent: self.agent.clone(),
                                 });
                             self.subscribed.insert(subject.into());
                         } else {
@@ -80,6 +96,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                             self.subscribed.remove(subject);
                         } else {
                             ctx.text("ERROR: UNSUBSCRIBE without subject")
+                        }
+                    }
+                    s if s.starts_with("GET ") => {
+                        let mut parts = s.split("GET ");
+                        if let Some(_subject) = parts.nth(1) {
+                            ctx.text("GET not yet supported, see https://github.com/joepio/atomic-data-rust/issues/180")
                         }
                     }
                     other => {
@@ -99,12 +121,13 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
 }
 
 impl WebSocketConnection {
-    fn new(commit_monitor_addr: Addr<CommitMonitor>) -> Self {
+    fn new(commit_monitor_addr: Addr<CommitMonitor>, agent: String) -> Self {
         Self {
             hb: Instant::now(),
             // Maybe this should be stored only in the CommitMonitor, and not here.
             subscribed: std::collections::HashSet::new(),
             commit_monitor_addr,
+            agent,
         }
     }
 

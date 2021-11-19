@@ -10,7 +10,11 @@ pub fn path_endpoint() -> Endpoint {
     }
 }
 
-fn handle_path_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Resource> {
+fn handle_path_request(
+    url: url::Url,
+    store: &impl Storelike,
+    for_agent: Option<&str>,
+) -> AtomicResult<Resource> {
     let params = url.query_pairs();
     let mut path = None;
     for (k, v) in params {
@@ -21,9 +25,11 @@ fn handle_path_request(url: url::Url, store: &impl Storelike) -> AtomicResult<Re
     if path.is_none() {
         return path_endpoint().to_resource(store);
     }
-    let result = store.get_path(&path.unwrap(), None)?;
+    let result = store.get_path(&path.unwrap(), None, for_agent)?;
     match result {
-        crate::storelike::PathReturn::Subject(subject) => store.get_resource(&subject),
+        crate::storelike::PathReturn::Subject(subject) => {
+            store.get_resource_extended(&subject, false, for_agent)
+        }
         crate::storelike::PathReturn::Atom(atom) => {
             let mut resource = Resource::new(url.to_string());
             resource.set_propval_string(urls::ATOM_SUBJECT.into(), &atom.subject, store)?;

@@ -1,67 +1,9 @@
 //! Parse CLI options, setup on boot, read .env values
 
-use crate::errors::BetterResult;
 use clap::Parser;
 use dotenv::dotenv;
 use std::env;
-use std::net::IpAddr;
 use std::path::PathBuf;
-
-/// Store and share Atomic Data! Visit https://atomicdata.dev for more info. Pass no subcommands to launch the server. The `.env` of your current directory will be read.
-#[derive(Clone, Parser, Debug)]
-#[clap(author = "Joep Meindertsma (joep@ontola.io)")]
-pub struct Opts {
-    /// The subcommand being run
-    #[clap(subcommand)]
-    pub command: Option<Command>,
-    /// Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
-    #[clap(long, env = "ATOMIC_INITIALIZE")]
-    pub initialize: bool,
-    /// Re-creates the value index. Parses all the resources. Do this if your collections have issues.
-    #[clap(long, env = "ATOMIC_REBUILD_INDEX")]
-    pub rebuild_index: bool,
-    /// Use staging environments for services like LetsEncrypt
-    #[clap(long, env = "ATOMIC_DEVELOPMENT")]
-    pub development: bool,
-    /// The origin domain where the app is hosted, without the port and schema values.
-    #[clap(long, default_value = "localhost", env = "ATOMIC_DOMAIN")]
-    pub domain: String,
-    /// The contact mail address for Let's Encrypt HTTPS setup
-    #[clap(long, env = "ATOMIC_EMAIL")]
-    pub email: Option<String>,
-    /// The port where the HTTP app is available
-    #[clap(short, long, default_value = "80", env = "ATOMIC_PORT")]
-    pub port: u32,
-    /// The port where the HTTPS app is available
-    #[clap(long, default_value = "443", env = "ATOMIC_PORT")]
-    pub port_https: u32,
-    /// The IP address of the server
-    #[clap(long, default_value = "0.0.0.0", env = "ATOMIC_IP")]
-    pub ip: IpAddr,
-    /// If we're using HTTPS or plaintext HTTP.
-    /// Is disabled when using cert_init
-    #[clap(long, env = "ATOMIC_HTTPS")]
-    pub https: bool,
-    /// Endpoint where the front-end assets are hosted
-    #[clap(
-        long,
-        default_value = "https://joepio.github.io/atomic-data-browser",
-        env = "ATOMIC_ASSET_URL"
-    )]
-    pub asset_url: String,
-    /// Custom JS script to include in the body of the HTML template
-    #[clap(long, default_value = "", env = "ATOMIC_SCRIPT")]
-    pub script: String,
-    /// Path for atomic data config directory. Defaults to "~/.config/atomic/""
-    #[clap(long, env = "ATOMIC_CONFIG_DIR")]
-    pub config_dir: Option<PathBuf>,
-    /// When enabled, it allows POSTing to the /search endpoint
-    #[clap(long, env = "ATOMIC_RDF_SEARCH")]
-    pub rdf_search: bool,
-    /// When enabled, previous versions of resources are removed from the search index when updated.
-    #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
-    pub remove_previous_search: bool,
-}
 
 #[derive(Parser, Clone, Debug)]
 pub enum Command {
@@ -104,7 +46,7 @@ pub struct Config {
     /// Full domain + schema
     pub local_base_url: String,
     /// CLI + ENV options
-    pub opts: Opts,
+    pub opts: crate::cli::Opts,
     // ===  PATHS  ===
     /// Path for atomic data config `~/.config/atomic/`. Used to construct most other paths.
     pub config_dir: PathBuf,
@@ -127,19 +69,19 @@ pub struct Config {
 }
 
 /// Creates the server config, reads .env values and sets defaults
-pub fn init() -> BetterResult<Config> {
+pub fn init() -> crate::AtomicServerResult<Config> {
     // Parse .env file (do this before parsing the CLI opts)
     dotenv().ok();
 
     // Parse CLI options, .env values, set defaults
-    let opts: Opts = Opts::parse();
+    let opts: crate::cli::Opts = crate::cli::Opts::parse();
 
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
     } else {
         atomic_lib::config::default_config_dir_path()?
     };
-    let mut config_file_path = atomic_lib::config::default_config_file_path()?;
+    let mut config_file_path = config_dir.join("config.toml");
     let mut store_path = config_dir.clone();
     store_path.push("db");
     let mut https_path = config_dir.clone();

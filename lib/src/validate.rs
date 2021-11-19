@@ -33,7 +33,7 @@ pub fn validate_store(
         resource_count += 1;
 
         if fetch_items {
-            match crate::client::fetch_resource(subject, store) {
+            match crate::client::fetch_resource(subject, store, store.get_default_agent().ok()) {
                 Ok(_) => {}
                 Err(e) => unfetchable.push((subject.clone(), e.to_string())),
             }
