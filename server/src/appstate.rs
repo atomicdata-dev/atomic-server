@@ -23,18 +23,20 @@ pub struct AppState {
 }
 
 /// Creates the server context.
-/// Initializes a store on disk.
+/// Initializes or opens a store on disk.
+/// Initializes logging.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
     // Enable logging, but hide most tantivy logs
     std::env::set_var("RUST_LOG", "info,tantivy=warn");
     env_logger::init();
+    const VERSION: &str = env!("CARGO_PKG_VERSION");
+    log::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", VERSION);
+
     // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     let _ = crate::process::terminate_existing_processes(&config)
         .map_err(|e| log::error!("Could not check for running instance: {}", e));
 
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    log::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", VERSION);
     log::info!("Opening database...");
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {

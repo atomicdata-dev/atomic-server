@@ -1,7 +1,10 @@
+use atomic_lib::{errors::AtomicResult, Storelike};
+use std::{fs::File, io::Write};
+
 mod actor_messages;
 mod appstate;
 mod commit_monitor;
-mod config;
+pub mod config;
 mod content_types;
 mod errors;
 mod handlers;
@@ -11,20 +14,16 @@ mod https;
 mod jsonerrors;
 mod process;
 mod routes;
+pub mod serve;
 // #[cfg(feature = "search")]
 mod search;
-mod serve;
 #[cfg(test)]
 mod tests;
 #[cfg(feature = "desktop")]
 mod tray_icon;
 
-use atomic_lib::Storelike;
-use errors::AtomicServerResult;
-use std::{fs::File, io::Write};
-
 #[actix_web::main]
-async fn main() -> AtomicServerResult<()> {
+async fn main() -> AtomicResult<()> {
     // Parse CLI commands, env vars
     let config = config::init().map_err(|e| format!("Initialization failed: {}", e))?;
 
@@ -79,6 +78,6 @@ async fn main() -> AtomicServerResult<()> {
             println!("Sucesfully created {}", pathstr);
             Ok(())
         }
-        None => crate::serve::serve(config).await,
+        None => serve::serve(&config).await,
     }
 }
