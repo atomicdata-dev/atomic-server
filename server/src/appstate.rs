@@ -52,8 +52,10 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     set_default_agent(&config, &store)?;
     if config.initialize {
         log::info!("Running populate commands...");
-        atomic_lib::populate::populate_hierarchy(&store)
+        atomic_lib::populate::create_drive(&store)
             .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
+        atomic_lib::populate::set_drive_rights(&store)
+            .map_err(|e| format!("Failed to set drive rights. {}", e))?;
         atomic_lib::populate::populate_collections(&store)
             .map_err(|e| format!("Failed to populate collections. {}", e))?;
         atomic_lib::populate::populate_endpoints(&store)
@@ -61,7 +63,6 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         set_up_initial_invite(&store)?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
         log::info!("Setting rights to Drive {}", store.get_base_url());
-        atomic_lib::populate::set_up_drive(&store)?;
     }
 
     // Initialize search constructs

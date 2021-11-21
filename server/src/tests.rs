@@ -8,8 +8,10 @@ use super::*;
 use actix_web::{
     dev::{Body, ResponseBody},
     test::{self, TestRequest},
-    web, App,
+    web::Data,
+    App,
 };
+use atomic_lib::urls;
 
 trait BodyTest {
     fn as_str(&self) -> &str;
@@ -19,11 +21,11 @@ impl BodyTest for ResponseBody<Body> {
     fn as_str(&self) -> &str {
         match self {
             ResponseBody::Body(ref b) => match b {
-                Body::Bytes(ref by) => std::str::from_utf8(&by).unwrap(),
+                Body::Bytes(ref by) => std::str::from_utf8(by).unwrap(),
                 _ => panic!(),
             },
             ResponseBody::Other(ref b) => match b {
-                Body::Bytes(ref by) => std::str::from_utf8(&by).unwrap(),
+                Body::Bytes(ref by) => std::str::from_utf8(by).unwrap(),
                 _ => panic!(),
             },
         }
@@ -55,13 +57,14 @@ async fn init_server() {
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");
     let appstate = crate::appstate::init(config.clone()).expect("failed init appstate");
-    let data = web::Data::new(std::sync::Mutex::new(appstate.clone()));
+    let data = Data::new(std::sync::Mutex::new(appstate.clone()));
     let mut app = test::init_service(
         App::new()
             .app_data(data)
             .configure(|app| crate::routes::config_routes(app, &appstate.config)),
     )
     .await;
+    let store = &appstate.store;
 
     // Does not work, unfortunately, because the server is not accessible.
     // let fetched =
@@ -71,17 +74,33 @@ async fn init_server() {
     // Get HTML page
     let req = build_request_authenticated("/", &appstate).header("Accept", "application/html");
     let mut resp = test::call_service(&mut app, req.to_request()).await;
-    println!("response: {:?}", resp);
     assert!(resp.status().is_success());
     let body = resp.take_body();
     assert!(body.as_str().contains("html"), "no html in response");
 
+    // Should 200 (public)
+    let req = test::TestRequest::with_uri("/properties").header("Accept", "application/ad+json");
+    let resp = test::call_service(&mut app, req.to_request()).await;
+    assert_eq!(resp.status().as_u16(), 200, "resource should be public");
+
+    // Edit the properties collection - let's make it hidedn
+    let mut drive = store.get_resource(&appstate.config.local_base_url).unwrap();
+    drive
+        .set_propval(
+            urls::READ.into(),
+            vec![appstate.store.get_default_agent().unwrap().subject].into(),
+            &appstate.store,
+        )
+        .unwrap();
+    drive.save(store).unwrap();
+
     // Should 401 (Unauthorized)
     let req = test::TestRequest::with_uri("/properties").header("Accept", "application/ad+json");
     let resp = test::call_service(&mut app, req.to_request()).await;
-    assert!(
-        resp.status().is_client_error(),
-        "resource should return 401 unauthorized"
+    assert_eq!(
+        resp.status().as_u16(),
+        401,
+        "resource should not be authorized for public"
     );
 
     // Get JSON-AD
