@@ -396,7 +396,7 @@ impl Storelike for Db {
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // This is a potentially expensive operation, but is needed to make TPF queries work with the models created in here
         self.build_index(true)?;
-        crate::populate::populate_hierarchy(self)
+        crate::populate::create_drive(self)
             .map_err(|e| format!("Failed to populate hierarcy. {}", e))?;
         crate::populate::populate_collections(self)
             .map_err(|e| format!("Failed to populate collections. {}", e))?;

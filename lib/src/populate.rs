@@ -141,10 +141,8 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Adds the hierarchy related items (Drive, default Folder) to the Store.
-/// Sets the home page as the top level node, and gives write rights to the default agent.
-/// Requires a `self_url` to be set in the store.
-pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
+/// Creates a Drive resource at the base URL. Does not set rights. Use set_drive_rights for that.
+pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
     let self_url = store
         .get_self_url()
         .ok_or("No self_url set, cannot populate store with Drive")?;
@@ -156,24 +154,12 @@ pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
         base_url.host_str().ok_or("Can't use current base URL")?,
         store,
     )?;
-    // The root agent does not yet exist
-    // let root_agent = store.get_default_agent()?.subject;
-    // drive.set_propval(
-    //     urls::READ.into(),
-    //     Value::ResourceArray(vec![root_agent.clone()]),
-    //     store,
-    // )?;
-    // drive.set_propval(
-    //     urls::WRITE.into(),
-    //     Value::ResourceArray(vec![root_agent]),
-    //     store,
-    // )?;
     drive.save_locally(store)?;
     Ok(())
 }
 
 /// Get the Drive resource (base URL), set agent as the Root user, provide write and read access to the Root user. Also, by default, makes the Root publicly visible.
-pub fn set_up_drive(store: &impl Storelike) -> AtomicResult<()> {
+pub fn set_drive_rights(store: &impl Storelike) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
     let mut drive = store.get_resource(store.get_base_url())?;
     let write_agents = vec![store.get_default_agent()?.subject];

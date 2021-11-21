@@ -62,11 +62,15 @@ pub fn check_rights(
 ) -> AtomicResult<bool> {
     // Check if the resource's write rights explicitly refers to the agent or the public agent
     if let Ok(arr_val) = resource.get(&right.to_string()) {
-        if arr_val.to_subjects(None)?.iter().any(|s| match s.as_str() {
-            urls::PUBLIC_AGENT => true,
-            for_agent => s == for_agent,
-        }) {
-            return Ok(true);
+        for s in arr_val.to_subjects(None)? {
+            match s.as_str() {
+                urls::PUBLIC_AGENT => return Ok(true),
+                agent => {
+                    if agent == for_agent {
+                        return Ok(true);
+                    }
+                }
+            };
         }
     }
     // Try the parents recursively
