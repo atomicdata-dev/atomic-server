@@ -172,14 +172,16 @@ pub fn populate_hierarchy(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Get the Drive resource (base URL), set agent as the Root user, provide write and read access
+/// Get the Drive resource (base URL), set agent as the Root user, provide write and read access to the Root user. Also, by default, makes the Root publicly visible.
 pub fn set_up_drive(store: &impl Storelike) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
     let mut drive = store.get_resource(store.get_base_url())?;
-    let agents = vec![store.get_default_agent()?.subject];
-    // TODO: add read rights to public, maybe
-    drive.set_propval(urls::WRITE.into(), agents.clone().into(), store)?;
-    drive.set_propval(urls::READ.into(), agents.into(), store)?;
+    let write_agents = vec![store.get_default_agent()?.subject];
+    let mut read_agents = write_agents.clone();
+    read_agents.push(urls::PUBLIC_AGENT.into());
+
+    drive.set_propval(urls::WRITE.into(), write_agents.into(), store)?;
+    drive.set_propval(urls::READ.into(), read_agents.into(), store)?;
     drive.set_propval_string(urls::DESCRIPTION.into(), &format!("Welcome to your Atomic-Server! Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
     drive.save_locally(store)?;
     Ok(())
