@@ -11,12 +11,15 @@ fn main() {
   let config: atomic_server_lib::config::Config = atomic_server_lib::config::init()
     .map_err(|e| format!("Initialization failed: {}", e))
     .expect("failed init config");
+  let config_clone = config.clone();
 
-  // Find a way to combine actix and tauri runtimes...
-  {
-    // let config_clone = config.clone();
-    // atomic_server_lib::serve::serve(&config_clone);
-  }
+  // This is not the cleanest solution, but running actix inside the tauri / tokio runtime is not
+  std::thread::spawn(move || {
+    let rt = actix_rt::Runtime::new().unwrap();
+    rt.block_on(atomic_server_lib::serve::serve(config_clone))
+      .unwrap();
+  });
+
   tauri::Builder::default()
     .menu(crate::menu::build(&ctx))
     .on_menu_event(crate::menu::handle)

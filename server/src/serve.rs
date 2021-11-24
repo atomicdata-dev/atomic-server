@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use crate::errors::AtomicServerResult;
 
 /// Start the server
-pub async fn serve(config: &crate::config::Config) -> AtomicResult<()> {
+pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     // Setup the database and more
     let appstate = crate::appstate::init(config.clone())?;
 
@@ -77,9 +77,9 @@ pub async fn serve(config: &crate::config::Config) -> AtomicResult<()> {
                 if std::fs::File::open(&config.cert_path).is_err()
                     || crate::https::check_expiration_certs()
                 {
-                    crate::https::cert_init_server(config).await?;
+                    crate::https::cert_init_server(&config).await?;
                 }
-                let https_config = crate::https::get_https_config(config)
+                let https_config = crate::https::get_https_config(&config)
                     .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
                 let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
                 println!("{}", message);
@@ -101,7 +101,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicResult<()> {
             .run()
             .await?;
     }
-    crate::process::remove_pid(config)?;
+    crate::process::remove_pid(&config)?;
     Ok(())
 }
 
