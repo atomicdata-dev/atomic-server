@@ -16,10 +16,10 @@ name = "atomic_server"
 path = "src/bin.rs"
 
 [dependencies]
-actix = "0.10.0"
-actix-cors = "0.5.4"
-actix-files = "0.5.0"
-actix-web-actors = "3.0.0"
+actix = "0.12.0"
+actix-cors = "0.6.0-beta.4"
+actix-files = "0.6.0-beta.9"
+actix-web-actors = "4.0.0-beta.7"
 chrono = "0.4.19"
 clap = "3.0.0-beta.5"
 dirs = "3.0.1"
@@ -31,6 +31,7 @@ promptly = "0.3.0"
 regex = "1.4.2"
 rio_api = "0.6.1"
 rio_turtle = "0.6.1"
+rustls-pemfile = "*"
 serde_json = "1.0.60"
 sysinfo = "0.20.5"
 tantivy = "0.16.1"
@@ -41,7 +42,7 @@ version = "0.8.1"
 
 [dependencies.actix-web]
 features = ["rustls"]
-version = "3.3.2"
+version = "4.0.0-beta.12"
 
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]
@@ -54,7 +55,7 @@ version = "2.0.1"
 
 [dependencies.rustls]
 optional = true
-version = "0.18.1"
+version = "0.20.2"
 
 [dependencies.serde]
 features = ["derive"]
@@ -62,15 +63,14 @@ version = "1.0.118"
 
 [dependencies.tokio]
 features = ["time"]
-version = "1.4.0"
+version = "1.14.0"
 
 [dependencies.tray-item]
 optional = true
 version = "0.6.0"
 
 [dev-dependencies]
-# Currently only used for testing, the other actix is included in the web crate
-actix-rt = "1.1.1"
+actix-rt = "2.4.0"
 
 [features]
 default = ["https"]

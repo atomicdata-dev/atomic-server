@@ -39,7 +39,7 @@ pub async fn tpf(
         true,
     )?;
     log::info!("TPF query: {:?}", query);
-    builder.header("Content-Type", content_type.to_mime());
+    builder.insert_header(("Content-Type", content_type.to_mime()));
     match content_type {
         ContentType::JsonAd => {
             let mut resources = vec![];

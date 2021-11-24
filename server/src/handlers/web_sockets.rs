@@ -1,6 +1,6 @@
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, HttpRequest, HttpResponse};
-use actix_web_actors::ws::{self};
+use actix_web_actors::ws;
 use std::{
     sync::Mutex,
     time::{Duration, Instant},
@@ -73,9 +73,10 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                 self.hb = Instant::now();
             }
             // TODO: Check if it's a subscribe / unsubscribe / commit message
-            Ok(ws::Message::Text(text)) => {
+            Ok(ws::Message::Text(bytes)) => {
+                let text = bytes.to_string();
                 log::info!("Incoming websocket text message: {:?}", text);
-                match text.as_str() {
+                match text {
                     s if s.starts_with("SUBSCRIBE ") => {
                         let mut parts = s.split("SUBSCRIBE ");
                         if let Some(subject) = parts.nth(1) {
@@ -110,7 +111,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                     }
                 };
             }
-            Ok(ws::Message::Binary(bin)) => ctx.binary(bin),
+            Ok(ws::Message::Binary(_bin)) => ctx.text("ERROR: Binary not supported"),
             Ok(ws::Message::Close(reason)) => {
                 ctx.close(reason);
                 ctx.stop();
