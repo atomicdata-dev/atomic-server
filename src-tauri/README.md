@@ -14,4 +14,5 @@ tauri build
 
 ## Limitations
 
-- No way to pass flags or other configuration options to `atomic-sever` using the Tauri executable (although you can set ENV varibles)
+- No way to pass flags to `atomic-sever` using the Tauri executable (although you can set ENV varibles)
+- No HTTPS support
