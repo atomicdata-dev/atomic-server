@@ -45,7 +45,8 @@ pub fn get_agent_from_headers_and_check(
     let mut for_agent = crate::urls::PUBLIC_AGENT.to_string();
     if let Some(auth_vals) = auth_header_values {
         // If there are auth headers, check 'em, make sure they are valid.
-        check_auth_signature(&auth_vals.requested_subject, &auth_vals)?;
+        check_auth_signature(&auth_vals.requested_subject, &auth_vals)
+            .map_err(|e| format!("Error checking authentication headers. {}", e))?;
         // check if the timestamp is valid
         check_timestamp(auth_vals.timestamp)?;
         // check if the public key belongs to the agent

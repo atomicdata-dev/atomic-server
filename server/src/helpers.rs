@@ -70,6 +70,7 @@ pub fn get_client_agent(
     let for_agent = atomic_lib::authentication::get_agent_from_headers_and_check(
         auth_header_values,
         &appstate.store,
-    )?;
+    )
+    .map_err(|e| format!("Authentication failed: {}", e))?;
     Ok(Some(for_agent))
 }
