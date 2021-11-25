@@ -424,6 +424,44 @@ pub fn construct_collection(
     collection.add_to_resource(resource, store)
 }
 
+/// Creates a resource in the Store for a Class, for example `/documents`.
+/// Does not save it, though.
+pub fn create_collection_resource_for_class(
+    store: &impl Storelike,
+    class_subject: &str,
+) -> AtomicResult<Resource> {
+    let class = store.get_class(class_subject)?;
+
+    // Pluralize the shortname
+    let pluralized = match class.shortname.as_ref() {
+        "class" => "classes".to_string(),
+        "property" => "properties".to_string(),
+        other => format!("{}s", other),
+    };
+
+    let collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
+
+    let mut collection_resource = collection.to_resource(store)?;
+
+    let drive = store
+        .get_self_url()
+        .ok_or("No self_url present in store, can't populate collections")?;
+
+    // Let the Collections collection be the top level item
+    let parent = if class.subject == urls::COLLECTION {
+        drive
+    } else {
+        format!("{}/collections", drive)
+    };
+
+    collection_resource.set_propval_string(urls::PARENT.into(), &parent, store)?;
+
+    collection_resource.set_propval_string(urls::NAME.into(), &pluralized, store)?;
+
+    // Should we use save_locally, which creates commits, or add_resource_unsafe, which is faster?
+    Ok(collection_resource)
+}
+
 #[cfg(test)]
 mod test {
     use super::*;

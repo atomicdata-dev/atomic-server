@@ -183,8 +183,6 @@ pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
 /// Generates some nice collections for classes, such as `/agent` and `/collection`.
 /// Requires a `self_url` to be set in the store.
 pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
-    use crate::collections::CollectionBuilder;
-
     let classes_atoms = store.tpf(
         None,
         Some("https://atomicdata.dev/properties/isA"),
@@ -193,33 +191,9 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     )?;
 
     for atom in classes_atoms {
-        let class = store.get_class(&atom.subject)?;
-        // Can't import this for some reason - even if it's there in cargo.toml
-        // let plural_name = pluralize_rs::to_plural(class.shortname);
-
-        // Pluralize the shortname
-        let pluralized = match class.shortname.as_ref() {
-            "class" => "classes".to_string(),
-            "property" => "properties".to_string(),
-            other => format!("{}s", other).to_string(),
-        };
-
-        let collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
-
-        let mut collection_resource = collection.to_resource(store)?;
-
-        collection_resource.set_propval_string(
-            urls::PARENT.into(),
-            &store
-                .get_self_url()
-                .ok_or("No self_url present in store, can't populate collections")?,
-            store,
-        )?;
-
-        collection_resource.set_propval_string(urls::NAME.into(), &pluralized, store)?;
-
-        // Should we use save_locally, which creates commits, or add_resource_unsafe, which is faster?
-        collection_resource.save_locally(store)?;
+        let mut collection =
+            crate::collections::create_collection_resource_for_class(store, &atom.subject)?;
+        collection.save_locally(store)?;
     }
 
     Ok(())

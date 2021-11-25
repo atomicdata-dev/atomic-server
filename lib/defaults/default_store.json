@@ -509,6 +509,8 @@
             "https://atomicdata.dev/classes/Class"
         ],
         "https://atomicdata.dev/properties/recommends": [
+            "https://atomicdata.dev/properties/name",
+            "https://atomicdata.dev/properties/description",
             "https://atomicdata.dev/properties/collection/currentPage",
             "https://atomicdata.dev/properties/collection/members",
             "https://atomicdata.dev/properties/collection/pageSize",
