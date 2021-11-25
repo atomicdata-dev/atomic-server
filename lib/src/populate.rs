@@ -97,8 +97,8 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 
     let classes = vec![
         Class {
-            requires: vec![urls::SHORTNAME.into(), urls::DATATYPE_PROP.into()],
-            recommends: vec![urls::DESCRIPTION.into(), urls::CLASSTYPE_PROP.into(), urls::IS_DYNAMIC.into(), urls::IS_LOCKED.into(), urls::ALLOWS_ONLY.into()],
+            requires: vec![urls::SHORTNAME.into(), urls::DATATYPE_PROP.into(), urls::DESCRIPTION.into()],
+            recommends: vec![urls::CLASSTYPE_PROP.into(), urls::IS_DYNAMIC.into(), urls::IS_LOCKED.into(), urls::ALLOWS_ONLY.into()],
             shortname: "property".into(),
             description: "A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`.".into(),
             subject: urls::PROPERTY.into(),
@@ -168,7 +168,7 @@ pub fn set_drive_rights(store: &impl Storelike) -> AtomicResult<()> {
 
     drive.set_propval(urls::WRITE.into(), write_agents.into(), store)?;
     drive.set_propval(urls::READ.into(), read_agents.into(), store)?;
-    drive.set_propval_string(urls::DESCRIPTION.into(), &format!("Welcome to your Atomic-Server! Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
+    drive.set_propval_string(urls::DESCRIPTION.into(), &format!("## Welcome to your Atomic-Server!\n\n Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
     drive.save_locally(store)?;
     Ok(())
 }
