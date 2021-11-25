@@ -7,6 +7,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 - Desktop build (using Tauri) with system tray, icon, installers, menu items. #215
 - Upgraded Actix to latest (needed for Tauri due to usage of Tokio runtime) #215
+- Allow Agents to write and edit themselves #220
+- Less collections for first-time users #224
 
 ## v0.29.0
 
