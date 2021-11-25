@@ -5,7 +5,7 @@
   },
   "build": {
     "distDir": "../server/static",
-    "devPath": "http://localhost",
+    "devPath": "../server/static/tauri-splashscreen.html",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },
@@ -56,8 +56,11 @@
         "title": "Atomic Server",
         "width": 800,
         "height": 600,
+        "alwaysOnTop": false,
         "resizable": true,
-        "fullscreen": false
+        "decorations": true,
+        "fullscreen": false,
+        "url": "tauri-splashscreen.html"
       }
     ],
     "systemTray": {
