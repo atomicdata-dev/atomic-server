@@ -26,8 +26,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-4.0
-      - name: install app dependencies and build it
-        run: yarn && yarn build
+      # - name: install app dependencies and build it
+      #   run: yarn && yarn build
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
