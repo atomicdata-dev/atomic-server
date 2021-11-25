@@ -3,7 +3,7 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## v0.29.1
+## Unreleased
 
 - Desktop build (using Tauri) with system tray, icon, installers, menu items. #215
 - Upgraded Actix to latest (needed for Tauri due to usage of Tokio runtime) #215
