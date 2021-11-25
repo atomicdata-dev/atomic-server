@@ -168,7 +168,12 @@ pub fn set_drive_rights(store: &impl Storelike) -> AtomicResult<()> {
 
     drive.set_propval(urls::WRITE.into(), write_agents.into(), store)?;
     drive.set_propval(urls::READ.into(), read_agents.into(), store)?;
-    drive.set_propval_string(urls::DESCRIPTION.into(), &format!("## Welcome to your Atomic-Server!\n\n Register your User by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.", store.get_base_url()), store)?;
+    drive.set_propval_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
+
+Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
+
+Note that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.
+"#, store.get_base_url()), store)?;
     drive.save_locally(store)?;
     Ok(())
 }
