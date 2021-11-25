@@ -60,6 +60,11 @@ pub fn check_rights(
     for_agent: &str,
     right: Right,
 ) -> AtomicResult<bool> {
+    // Agents will always have the right to edit themselves
+    if resource.get_subject() == for_agent {
+        return Ok(true);
+    }
+
     // Check if the resource's write rights explicitly refers to the agent or the public agent
     if let Ok(arr_val) = resource.get(&right.to_string()) {
         for s in arr_val.to_subjects(None)? {
