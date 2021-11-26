@@ -9,6 +9,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Upgraded Actix to latest (needed for Tauri due to usage of Tokio runtime) #215
 - Allow Agents to write and edit themselves #220
 - Less collections for first-time users #224
+- Sort collections by subject by default
 
 ## v0.29.0
 

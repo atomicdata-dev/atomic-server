@@ -206,6 +206,9 @@ impl Collection {
             .into_iter()
             .collect();
 
+        // Sort by subject, by default
+        subjects.sort();
+
         let mut resources = Vec::new();
         // If sorting is required or the nested resoureces are asked, we need to fetch all resources from the store.
         if collection_builder.sort_by.is_some() || collection_builder.include_nested {
@@ -439,7 +442,19 @@ pub fn create_collection_resource_for_class(
         other => format!("{}s", other),
     };
 
-    let collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
+    let mut collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
+
+    collection.sort_by = match class_subject {
+        urls::COMMIT => Some(urls::CREATED_AT.to_string()),
+        urls::CLASS | urls::PROPERTY => Some(urls::SHORTNAME.to_string()),
+        urls::COLLECTION => Some(urls::COLLECTION_VALUE.to_string()),
+        _other => None,
+    };
+
+    collection.sort_desc = match class_subject {
+        urls::COMMIT => true,
+        _other => false,
+    };
 
     let mut collection_resource = collection.to_resource(store)?;
 
