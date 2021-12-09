@@ -20,6 +20,15 @@
         "https://atomicdata.dev/properties/shortname": "results"
     },
     {
+        "@id": "https://atomicdata.dev/properties/name",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "The name of a thing or person.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "name"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/search/query",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "A full-text search query. \n\nFor all features, see [the Tantivy docs](https://docs.rs/tantivy/0.16.1/tantivy/query/struct.QueryParser.html)",
@@ -376,15 +385,6 @@
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "is-locked"
-    },
-    {
-        "@id": "https://atomicdata.dev/properties/name",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
-        "https://atomicdata.dev/properties/description": "The name of a thing or person.",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Property"
-        ],
-        "https://atomicdata.dev/properties/shortname": "name"
     },
     {
         "@id": "https://atomicdata.dev/properties/path",
