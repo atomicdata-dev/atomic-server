@@ -56,7 +56,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         log::info!("Running populate commands...");
         atomic_lib::populate::create_drive(&store)
             .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
-        atomic_lib::populate::set_drive_rights(&store)
+        atomic_lib::populate::set_drive_rights(&store, true)
             .map_err(|e| format!("Failed to set drive rights. {}", e))?;
         atomic_lib::populate::populate_collections(&store)
             .map_err(|e| format!("Failed to populate collections. {}", e))?;

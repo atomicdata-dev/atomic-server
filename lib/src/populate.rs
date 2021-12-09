@@ -158,13 +158,15 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Get the Drive resource (base URL), set agent as the Root user, provide write and read access to the Root user. Also, by default, makes the Root publicly visible.
-pub fn set_drive_rights(store: &impl Storelike) -> AtomicResult<()> {
+/// Create the default Drive resource (at the base URL), give Write and Read rights to the Root user. Optionally give Public Read rights.
+pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
     let mut drive = store.get_resource(store.get_base_url())?;
     let write_agents = vec![store.get_default_agent()?.subject];
     let mut read_agents = write_agents.clone();
-    read_agents.push(urls::PUBLIC_AGENT.into());
+    if public_read {
+        read_agents.push(urls::PUBLIC_AGENT.into());
+    }
 
     drive.set_propval(urls::WRITE.into(), write_agents.into(), store)?;
     drive.set_propval(urls::READ.into(), read_agents.into(), store)?;
