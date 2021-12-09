@@ -10,6 +10,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Allow Agents to write and edit themselves #220
 - Less collections for first-time users #224
 - Sort collections by subject by default
+- Set default port to 9883 instead of 80 #229
 
 ## v0.29.0
 

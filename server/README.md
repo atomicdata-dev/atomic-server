@@ -105,7 +105,7 @@ sudo apt-get install -y pkg-config libssl-dev --fix-missing
 - The server loads the `.env` from the current path by default. Create a `.env` file from the default template in your current directory with `atomic-server setup-env`.
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
-- Visit `http://localhost/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
+- Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
 
 ### HTTPS Setup
 

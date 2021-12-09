@@ -29,13 +29,14 @@ pub struct Opts {
     /// The contact mail address for Let's Encrypt HTTPS setup
     #[clap(long, env = "ATOMIC_EMAIL")]
     pub email: Option<String>,
-    /// The port where the HTTP app is available
-    #[clap(short, long, default_value = "80", env = "ATOMIC_PORT")]
+    // 9.883 is decimal for the `⚛` character.
+    /// The port where the HTTP app is available. Set to 80 if you want this to be available on the network.
+    #[clap(short, long, default_value = "9883", env = "ATOMIC_PORT")]
     pub port: u32,
-    /// The port where the HTTPS app is available
-    #[clap(long, default_value = "443", env = "ATOMIC_PORT")]
+    /// The port where the HTTPS app is available. Sert to 443 if you want this to be available on the network.
+    #[clap(long, default_value = "9884", env = "ATOMIC_PORT_HTTPS")]
     pub port_https: u32,
-    /// The IP address of the server
+    /// The IP address of the server. Set to 0.0.0.0 if you want this to be available to other devices on your network.
     #[clap(long, default_value = "0.0.0.0", env = "ATOMIC_IP")]
     pub ip: IpAddr,
     /// Use HTTPS instead of HTTP.
