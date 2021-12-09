@@ -708,5 +708,10 @@
             "https://atomicdata.dev/classes/Datatype"
         ],
         "https://atomicdata.dev/properties/shortname": "timestamp"
+    },
+    {
+        "@id": "https://atomicdata.dev/agents/publicAgent",
+        "https://atomicdata.dev/properties/description": "This abstract Agent represents all potential users or visitors. If you want a Resource to be publicly available or editable, use this in your [read](https://atomicdata.dev/properties/read) or [write](https://atomicdata.dev/properties/read) property.",
+        "https://atomicdata.dev/properties/shortname": "public-agent"
     }
 ]
