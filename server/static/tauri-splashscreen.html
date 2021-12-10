@@ -87,7 +87,8 @@
     }
   </script>
   <script>
-    const serverUrl = "http://localhost";
+    // TODO: do not hardcode this value!
+    const serverUrl = "http://localhost:9883";
     // Reload window to check if page is ready
     async function checkServer() {
       let response = await fetch(serverUrl);
