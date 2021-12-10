@@ -114,6 +114,7 @@ impl From<tantivy::TantivyError> for AtomicServerError {
     }
 }
 
+#[cfg(feature = "https")]
 impl From<acme_lib::Error> for AtomicServerError {
     fn from(error: acme_lib::Error) -> Self {
         AtomicServerError {
