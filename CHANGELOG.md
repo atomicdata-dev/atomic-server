@@ -17,26 +17,26 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Sort collections by subject by default
 - Set default port to 9883 instead of 80 #229
 
-## v0.29.0
+## [v0.29.0]
 
 - Add authentication to restrict read access. Works by signing requests with Private Keys. #13
 - Refactor internal error model, Use correct HTTP status codes #11
 - Add `public-mode` to server, to keep performance maximum if you don't want authentication.
 
-## v0.28.2
+## [v0.28.2]
 
 - Full-text search endpoint, powered by Tantify #40
 - Add RDF-Search usecase (enables re-use of this server as search service for Solid pods)
 - Add `enum` support using the `allows-only` Property. #206
 
-## v0.28.1
+## [v0.28.1]
 
 - Fix docker env issue #202
 - Fix docker image by switching `heim` with `sysinfo` #203
 - Fix path ENV variables
 - Fix logging while terminating existing process
 
-## v0.28.0
+## [v0.28.0]
 
 - **IMPORANT**: before upgrading to this version, export your database using your previous version: `atomic-server export`. The database could become corrupted when running the new version.
 - Refactor internal `Value` model and add Nested Resource parsing #195
@@ -44,16 +44,16 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Fix indexing commits #194
 - Add more control over adding resources with `Store.add_resource_opts()`
 
-## v0.27.2
+## [v0.27.2]
 
 - Make HTTPS optional #192
 - Fix parsing .env file
 
-## v0.27.1
+## [v0.27.1]
 
 - Fix bootstrapping issue #193
 
-## v0.27.0
+## [v0.27.0]
 
 - **IMPORANT**: before upgrading to this version, export your database using your previous version: `atomic-server export`. The database could become corrupted when running the new version.
 - Include Resources in Collection responses, improving performance dramatically for collections #62
@@ -63,17 +63,17 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Sort `export` output - first export Properties, fixing #163
 - Add `only-internal` to `export` CLI command in `atomic-server`.
 
-## v0.26.3
+## [v0.26.3]
 
 - Many `atomic-server` CLI improvements. Add options as flags, without needing environment variables. #154
 
-## v0.26.2
+## [v0.26.2]
 
 - Add `setup-env` command to `atomic-server` for creating a `.env` file #154 #187
 - Remove analytics in server
 - Make `asset-url` and `script` in HTML template customizable. #189
 
-## v0.26.1
+## [v0.26.1]
 
 - Improved error message for hierarchy authorization check #178
 - Fix Property `recommends` #177
@@ -82,46 +82,46 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Improve killing existing processes - wait until other process has stopped #167
 - Make `atomic-cli` smaller (don't use `db` feature from `atomic-lib`)
 
-## v0.26.0
+## [v0.26.0]
 
 - Added WebSockets support for live synchronization / real-time updates with the front-end #171
 - Update index after `destroy`ing a resource #173
 
-## v0.25.7
+## [v0.25.7]
 
 - Improve process ID functionality #167
 - Improve invite URL
 
-## v0.25.6
+## [v0.25.6]
 
 - Fix domain .env #169
 - Fix HTTPS port bug
 
-## v0.25.5
+## [v0.25.5]
 
 - Check and terminate running instances of `atomic-server` when running instance #167
 
-## v0.25.4
+## [v0.25.4]
 
 - Add flags for `reindex` and `init`
 - Improve CI for automated tests & builds #165
 
-## v0.25.3
+## [v0.25.3]
 
 - Improve ease of initial setup with initial invite on `/setup` #159 and welcoming descriptions for first Drive and Invite.
 
-## v0.25.2
+## [v0.25.2]
 
 - Fixes caching bugs for collections introduced by #14
 - Fix external resources in Collections #161
 
-## v0.25.1
+## [v0.25.1]
 
 - Add Value indexing, which speeds up TPF queries / collections tremendously #14
 - Add models for Document editor
 - Improve commit authorization checks - allow new resources with existing parents
 
-## v0.24.2
+## [v0.24.2]
 
 - Fix `/path` endpoint return values #143
 - Add ASCI logo in terminal on boot
@@ -133,7 +133,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - TPF endpoint supports JSON-AD #150
 - Custom serializations in `atomic-cli tpf`
 
-## v0.24.1
+## [v0.24.1]
 
 - Add write rights to Agent itself on accepting Invite
 - Fix RDF serialization for dynamic resources #141
@@ -141,33 +141,33 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Make names for agents optional
 - Move shortname property always to first one
 
-## v0.24.0
+## [v0.24.0]
 
 - [Hierarchy](https://docs.atomicdata.dev/hierarchy.html) with breadcrumbs and easy to use navigation #134
 - Authorization using Hierarchy, which means you can add write & read permissions anywhere in a hierarchy.
 - Invites to invite new and existing users to read / edit a bunch of resources. Test it [here](https://atomicdata.dev/invites/1).
 
-## v0.23.5
+## [v0.23.5]
 
 - Build using esbuild instead of webpack #31
 - Some documentation improvements
 - Remove `createdAt` from Agent model required fields
 - Fix `n-triples` content type negotiation
 
-## v0.23.4
+## [v0.23.4]
 
 - Fix deadlock in `cli new` command #124
 - Added boolean, timestamp and unsupported fallback to `cli new` command #30
 - Fix CLI input `server` - no subcommand required for running
 
-## v0.23.3
+## [v0.23.3]
 
 - Added import / export to server and lib  #121
 - Added basic cli functionality with Clap to server #125
 - Added multi-resource JSON-AD array parsing #123
 - Use JSON-LD as default store #79
 
-## v0.23.2
+## [v0.23.2]
 
 - Removed all HTML rendering from `atomic-server` (since we're using `atomic-data-browser`).
 - Changed how config paths are calculated and shared.
@@ -175,7 +175,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add `open config` to tray icon
 - Updated `atomic-cli` path, no longer requires quotes
 
-## v0.23.0
+## [v0.23.0]
 
 - Added versioning #42
 - Added endpoints #110 #73
@@ -185,44 +185,44 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Improved .html page (+PWA support and Matomo tracking)
 - Upgraded various dependencies
 
-## v0.22.4
+## [v0.22.4]
 
 - Reject commits if they are editing a non-owned resource #106
 - Correct response codes (404) #105
 
-## v0.22.3
+## [v0.22.3]
 
 - Use atomic-data-browser js frontent by default #103
 
-## v0.22.2
+## [v0.22.2]
 
 Warning: existing databases will _not_ work with this version.
 
 - Fix deleting items #101
 - Add a datatype for floats #93.
 
-## v0.22.1
+## [v0.22.1]
 
 - Switch to JSON-AD parsing & serialization for Commits #100
 
-## v0.22.0
+## [v0.22.0]
 
 Warning: existing Agents and Commits will no longer work. Be sure to create new ones.
 
 - Change Commit serialization to [match atomic-data-browser](https://github.com/joepio/atomic-data-browser/issues/3) implementation #98.
 
-## v0.21.1
+## [v0.21.1]
 
 - Permissive CORS #92
 
-## v0.21.0
+## [v0.21.0]
 
 - Add JSON-AD serialization #79, use it in Commits
 - Servers are aware of their own URL #51
 - Improved CLI edit feature, more flexible (create new resources if none exist, fix newlines)
 - Add `resource.save_locally()`
 
-## v0.20.4
+## [v0.20.4]
 
 - Fix array length bug in paths
 - Add docker link to homepage
@@ -234,56 +234,56 @@ Warning: existing Agents and Commits will no longer work. Be sure to create new 
 - CLI commit commands shortname fix #83
 - rename `set_propval_by_shortname` to `set_propval_shortname`
 
-## v0.20.3
+## [v0.20.3]
 
 - Added persistence to server docker image #70
 - Improved default Agent setup for server
 
-## v0.20.1
+## [v0.20.1]
 
 - Improved error handling in cli
 - Added tests for cli #67
 - Fixed generated addresses `localhost/collection` vs `localhostcollection`
 - Added dockerfile for server #69
 
-## v0.20.0
+## [v0.20.0]
 
 - Huge refactor of internals. Got rid of all string representations for Atoms, so store should only contain valid data. All Resources have all required props, and data is of the correct datatype.
 - `Resource.save()` can be called! Easy way to store changes, both locally and externally.
 - Added collection sorting #63
 
-## v0.19.0
+## [v0.19.0]
 
 - Added table view for `atomic-server` #53
 - Changed many methods from the `Resource` API to fix some ownership / trait object issues #45. `Resource` no longer has an internal reference to `Store`, so it needs an explicit store in most methods.
 
-## v0.18.0
+## [v0.18.0]
 
 - Atomic-cli 0.18.0 allows for instantiating new Resources, whilst creating commits! It also re-introduces the TPF query.
 
-## v0.17.1
+## [v0.17.1]
 
 - Atomic-server 0.17.1 now automatically renews HTTPS certificates on boot, if needed.
 
-## v0.17.0
+## [v0.17.0]
 
 - `atomic-cli` can now edit data securely on an `atomic-server` #41 #13
 - Root agent is automatically generated #38
 - Convenient Collections (such as a list of all Commits, Classes, Agents, etc.) are generated for every store on `populate()`. #43
 - Fixed some props for Collections and Commits
 
-## v0.15.0
+## [v0.15.0]
 
 - Add dynamic collections with pagination #36 #17
 - Refactor Db to use native values, for allowing nested resources #16
 - Atomic Commits using deterministic serialization and cryptographic signatures #26 #24 #27 #31
 - Recognize filetypes in URL #33
 
-## v0.13.0
+## [v0.13.0]
 
 - Save reference to Store inside Resource #19
 - No more &muts #18 #15
 
-## v0.12.1
+## [v0.12.1]
 
 - Adds HTTPS auto certificate support
