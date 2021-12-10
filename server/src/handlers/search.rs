@@ -1,3 +1,9 @@
+//! Full-text search is achieved with the Tantivy crate.
+//! The index is built whenever --rebuild-index is passed,
+//! or after a commit is processed by the CommitMonitor.
+//! Tantivy requires a strict schema, whereas Atomic is dynamic.
+//! We deal with this discrepency by
+
 use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{urls, Resource, Storelike};
