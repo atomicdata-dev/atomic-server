@@ -12,7 +12,7 @@ name = "atomic_server_lib"
 path = "src/lib.rs"
 
 [[bin]]
-name = "atomic_server"
+name = "atomic-server"
 path = "src/bin.rs"
 
 [dependencies]
