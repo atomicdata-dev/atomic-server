@@ -1,14 +1,21 @@
 use actix_web::{http::Method, web};
+use actix_web_static_files::ResourceFiles;
 
 use crate::{config::Config, content_types, handlers};
 
 /// Should match all routes
 const ANY: &str = "{tail:.*}";
 
+// generate static files route
+include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
+    // create static files route
+    let generated = generate();
+
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         // Catch all HTML requests and send them to the single page app
         .service(
@@ -19,6 +26,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 }))
                 .to(handlers::single_page_app::single_page),
         )
+        .service(ResourceFiles::new("/static", generated))
         .service(
             web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))),
         )
