@@ -21,7 +21,6 @@ actix-cors = "0.6.0-beta.4"
 actix-files = "0.6.0-beta.9"
 actix-web-actors = "4.0.0-beta.7"
 chrono = "0.4.19"
-clap = "3.0.0-beta.5"
 dirs = "3.0.1"
 dotenv = "0.15.0"
 env_logger = "0.9.0"
@@ -48,6 +47,10 @@ version = "4.0.0-beta.12"
 features = ["config", "db", "rdf"]
 path = "../lib"
 version = "0.29.2"
+
+[dependencies.clap]
+features = ["derive", "env"]
+version = "3.0.0-rc.3"
 
 [dependencies.open]
 optional = true
