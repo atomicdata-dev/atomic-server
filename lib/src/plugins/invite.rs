@@ -77,7 +77,12 @@ pub fn construct_invite_redirect(
 
     // TODO: implement rights check
     // check_if_invite_is_valid(invite_resource)?;
+
     add_rights(&agent, target, write, store)?;
+    if write {
+        // Also add read rights
+        add_rights(&agent, target, false, store)?;
+    }
 
     let mut redirect = Resource::new_instance(urls::REDIRECT, store)?;
     redirect.set_propval(
