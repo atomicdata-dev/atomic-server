@@ -16,7 +16,7 @@ use atomic_lib::{urls, Storelike};
 
 /// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
 fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
-    let url = format!("http://localhost{}", path);
+    let url = format!("{}{}", appstate.store.get_base_url(), path);
     let headers = atomic_lib::client::get_authentication_headers(
         &url,
         &appstate.store.get_default_agent().unwrap(),
@@ -31,7 +31,7 @@ fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
 }
 
 #[actix_rt::test]
-async fn init_server() {
+async fn server_tests() {
     std::env::set_var("ATOMIC_CONFIG_DIR", "./.temp");
     // We need tro run --initialize to make sure the agent has the correct rights / drive
     std::env::set_var("ATOMIC_INITIALIZE", "true");
@@ -75,7 +75,7 @@ async fn init_server() {
     // Note: This is currently 500, but should be 404 in the future!
     assert!(resp.status().is_server_error());
 
-    // Edit the properties collection - let's make it hidedn
+    // Edit the properties collection, make it hidden to the public agent
     let mut drive = store.get_resource(&appstate.config.local_base_url).unwrap();
     drive
         .set_propval(
