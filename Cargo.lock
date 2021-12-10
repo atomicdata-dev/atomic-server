@@ -464,7 +464,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.29.0"
+version = "0.29.2"
 dependencies = [
  "acme-lib",
  "actix",
@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.29.0"
+version = "0.29.2"
 dependencies = [
  "base64",
  "bincode",
