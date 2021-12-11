@@ -119,6 +119,8 @@ Run the server: `atomic-server --https --email some@example.com --domain example
 You can also set these things using a `.env` or by setting them some other way.
 
 Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's Encrypt will send an HTTP request to this server's `/.well-known` directory to check the keys.
+The default Ports are `9883` for HTTP, and `9884` for HTTPS.
+If you're running the server publicly, set these to `80` and `433`: `atomic-server --https --port 80 --port-https 433`.
 It will now initialize the certificate.
 Read the logs, watch for errors.
 
