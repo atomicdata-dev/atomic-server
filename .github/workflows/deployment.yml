@@ -40,4 +40,4 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: ~/atomic-server export && ~/atomic-server --ip 0.0.0.0 --https --domain atomicdata.dev --email joep@argu.co &> log-${{ env.RELEASE_VERSION }}
+          script: ~/atomic-server export && ~/atomic-server --ip 0.0.0.0 --https --port-https 443 --domain atomicdata.dev --email joep@argu.co &> log-${{ env.RELEASE_VERSION }}
