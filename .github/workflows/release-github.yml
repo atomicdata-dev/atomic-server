@@ -1,4 +1,4 @@
-name: Release (github + crates.io + docker)
+name: Release github docker crates
 
 on:
   push:

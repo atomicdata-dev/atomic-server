@@ -1,5 +1,6 @@
 [package]
 authors = ["Joep Meindertsma <joep@ontola.io>"]
+default-run = "atomic-server"
 description = "Create, share and model Atomic Data with this graph database server."
 edition = "2021"
 license = "MIT"

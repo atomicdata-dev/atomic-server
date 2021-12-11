@@ -1,9 +1,8 @@
 [package]
 authors = ["you"]
 build = "src/build.rs"
-default-run = "atomic-server-tauri"
-description = "Atomic Server"
-edition = "2018"
+description = "Atomic Server - Tauri desktop"
+edition = "2021"
 license = ""
 name = "atomic-server-tauri"
 repository = ""
