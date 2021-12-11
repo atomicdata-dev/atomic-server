@@ -1,7 +1,8 @@
 [workspace]
+# Tantivy does not build in the CI, so we exclude it
+exclude = ["src-tauri"]
 members = [
   "server",
   "cli",
   "lib",
-  "src-tauri",
 ]
