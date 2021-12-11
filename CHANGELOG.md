@@ -3,7 +3,7 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## Unreleased
+## [v0.29.3] - 2021-12-11
 
 - Stricter authorization checks for Invites #182
 - Add expires at check to Invites #182
