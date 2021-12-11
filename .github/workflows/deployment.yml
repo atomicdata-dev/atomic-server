@@ -17,6 +17,10 @@ jobs:
           args: --release
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
+      # I don't want to keep this.
+      # https://github.com/joepio/atomic-data-rust/issues/230
+      - name: install dependencies
+        run: sudo apt-get install libgtk-3-dev
       - name: Transfer binary rsync
         uses: easingthemes/ssh-deploy@main
         env:
@@ -36,4 +40,4 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: ~/atomic-server export && ~/atomic-server --ip 0.0.0.0 --https --domain atomicdata.dev --email joep@argu.co &> log
+          script: ~/atomic-server export && ~/atomic-server --ip 0.0.0.0 --https --domain atomicdata.dev --email joep@argu.co &> log-${{ env.RELEASE_VERSION }}
