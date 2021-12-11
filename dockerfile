@@ -27,4 +27,4 @@ WORKDIR /server
 COPY --from=builder /app/target/release/atomic-server /server/atomic-server-bin
 ENV ATOMIC_STORE_PATH="/atomic-storage/db"
 ENV ATOMIC_CONFIG_PATH="/atomic-storage/config.toml"
-ENTRYPOINT ["/server/atomic-server-bin"]
+ENTRYPOINT ["/server/atomic-server-bin --port 80 --port-https 433"]
