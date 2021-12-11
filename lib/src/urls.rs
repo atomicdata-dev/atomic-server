@@ -76,6 +76,7 @@ pub const WRITE_BOOL: &str = "https://atomicdata.dev/properties/invite/write";
 pub const INVITE_PUBKEY: &str = "https://atomicdata.dev/properties/invite/publicKey";
 pub const INVITE_AGENT: &str = "https://atomicdata.dev/properties/invite/agent";
 pub const REDIRECT_AGENT: &str = "https://atomicdata.dev/properties/invite/redirectAgent";
+pub const EXPIRES_AT: &str = "https://atomicdata.dev/properties/invite/expiresAt";
 // ... for Atoms
 pub const ATOM_SUBJECT: &str = "https://atomicdata.dev/properties/atom/subject";
 pub const ATOM_PROPERTY: &str = "https://atomicdata.dev/properties/atom/property";
