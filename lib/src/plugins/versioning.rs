@@ -84,15 +84,32 @@ fn handle_all_versions_request(
     collection.to_resource(store)
 }
 
-/// Searches the local store for all commits with this subject
+/// Searches the local store for all commits with this subject, returns sorted from old to new.
 fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Vec<Commit>> {
     let commit_atoms = store.tpf(None, Some(urls::SUBJECT), Some(subject), false)?;
     let mut commit_resources = Vec::new();
     for atom in commit_atoms {
+        // TODO: This will fail if a resource simply uses the SUBJECT url without being a valid Commit.
         let commit = crate::Commit::from_resource(store.get_resource(&atom.subject)?)?;
         commit_resources.push(commit)
     }
+    // Sort all commits by date
+    commit_resources.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
     Ok(commit_resources)
+}
+
+pub fn get_initial_commit_for_resource(
+    subject: &str,
+    store: &impl Storelike,
+) -> AtomicResult<Commit> {
+    let commits = get_commits_for_resource(subject, store)?;
+    if commits.is_empty() {
+        return Err(AtomicError::not_found(
+            "No commits found for this resource".to_string(),
+        ));
+    }
+    Ok(commits.first().unwrap().clone())
 }
 
 /// Constructs a Resource version for a specific Commit
@@ -114,9 +131,7 @@ pub fn construct_version(
             ));
         }
     }
-    let mut commits = get_commits_for_resource(subject, store)?;
-    // Sort all commits by date
-    commits.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    let commits = get_commits_for_resource(subject, store)?;
     let mut version = Resource::new(subject.into());
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {

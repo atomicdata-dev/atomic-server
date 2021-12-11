@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, datetime_helpers, errors::AtomicResult, resources::PropVals, urls, Atom,
-    AtomicError, Resource, Storelike, Value,
+    datatype::DataType, datetime_helpers, errors::AtomicResult, hierarchy, resources::PropVals,
+    urls, Atom, AtomicError, Resource, Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -76,6 +76,7 @@ impl Commit {
     ) -> AtomicResult<CommitResponse> {
         let subject_url = url::Url::parse(&self.subject)
             .map_err(|e| format!("Subject '{}' is not a URL. {}", &self.subject, e))?;
+
         if subject_url.query().is_some() {
             return Err("Subject URL cannot have query parameters".into());
         }
@@ -151,6 +152,30 @@ impl Commit {
         if validate_schema {
             resource_new.check_required_props(store)?;
         }
+
+        // TODO: before_apply_commit hooks plugins
+        // This is where users should extend commits
+        for class in resource_new.get_classes(store)? {
+            match class.subject.as_str() {
+                urls::COMMIT => return Err("Commits can not be edited or created directly.".into()),
+                urls::INVITE => {
+                    // Check if the creator has rights to invite people (= write) to the target resource
+                    let target = resource_new
+                        .get(urls::TARGET)
+                        .map_err(|_e| "Invite does not have required Target attribute")?;
+                    let target_resource = store.get_resource(&target.to_string())?;
+                    if !hierarchy::check_write(store, &target_resource, &self.signer)? {
+                        return Err(format!(
+                            "Signer {} does not have the rights to create an Invite for {}. The target resource or its parent needs to provide the signer with Write rights.",
+                            self.signer, target
+                        )
+                        .into());
+                    }
+                }
+                _other => {}
+            };
+        }
+
         // If a Destroy field is found, remove the resource and return early
         // TODO: Should we remove the existing commits too? Probably.
         if let Some(destroy) = self.destroy {
