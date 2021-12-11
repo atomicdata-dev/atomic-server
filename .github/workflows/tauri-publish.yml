@@ -33,7 +33,7 @@ jobs:
         with:
           version: ${{ steps.tag_name.outputs.current_version }}
           path: CHANGELOG.md
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@8e430cc7b0fab28f0a7768f2157933c94f8724f6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
