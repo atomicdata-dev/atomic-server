@@ -197,9 +197,10 @@ Remove the `db` folder in your `atomic` config: `rm -rf ~/.config/atomic/db`.
 
 This is not yet possible. See [#13](https://github.com/joepio/atomic-data-rust/issues/13).
 
-### Collections are empty / TPF is not working
+### Collections are empty / TPF is not working / search is empty
 
-You might have a problem with your index. Try reindexing using `atomic-server --reindex`.
+You might have a problem with your indexes.
+Try rebuilding the indexes using `atomic-server --rebuild-index`.
 
 ### I get a `failed to retrieve` error when opening
 

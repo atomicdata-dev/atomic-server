@@ -32,8 +32,8 @@ jobs:
         uses: mindsers/changelog-reader-action@v2
         with:
           version: ${{ steps.tag_name.outputs.current_version }}
-          path: ../../CHANGELOG.md
-      - uses: tauri-apps/tauri-action@v0
+          path: CHANGELOG.md
+      - uses: tauri-apps/tauri-action@ecbab6a4d4b0deee6a67d644c9b73ed53c5aa739
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
@@ -44,7 +44,7 @@ jobs:
           # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
         with:
           tagName: ${{ steps.changelog_reader.outputs.version }}
-          releaseName: Release ${{ steps.changelog_reader.outputs.version }}
+          releaseName: ${{ steps.changelog_reader.outputs.version }}
           releaseBody: ${{ steps.changelog_reader.outputs.changes }}
           releaseDraft: ${{ steps.changelog_reader.outputs.status == 'unreleased' }}
           prerelease: ${{ steps.changelog_reader.outputs.status == 'prereleased' }}
