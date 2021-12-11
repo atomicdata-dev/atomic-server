@@ -377,6 +377,15 @@
         "https://atomicdata.dev/properties/shortname": "redirect-agent"
     },
     {
+        "@id": "https://atomicdata.dev/properties/invite/expiresAt",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+        "https://atomicdata.dev/properties/description": "When the Invite should stop working.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "expires-at"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/isLocked",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
         "https://atomicdata.dev/properties/description": "If this is true, the Property should probably not be edited, because doing so could lead to serious errors.",
