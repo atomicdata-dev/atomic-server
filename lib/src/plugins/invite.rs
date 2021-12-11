@@ -56,8 +56,6 @@ pub fn construct_invite_redirect(
         })?
         .to_string();
 
-    println!("Invite resource before: {:?}", invite_resource);
-
     if let Ok(usages_left) = invite_resource.get(urls::USAGES_LEFT) {
         let num = usages_left.to_int()?;
         if num == 0 {
@@ -73,10 +71,23 @@ pub fn construct_invite_redirect(
             .map_err(|e| format!("Unable to save updated Invite. {}", e))?;
     }
 
-    println!("Invite resource after: {:?}", invite_resource);
+    if let Ok(expires) = invite_resource.get(urls::EXPIRES_AT) {
+        if expires.to_int()? > crate::datetime_helpers::now() {
+            return Err("Invite is no longer valid".into());
+        }
+    }
 
-    // TODO: implement rights check
-    // check_if_invite_is_valid(invite_resource)?;
+    // Make sure the creator of the invite is still allowed to Write the target
+    let target_resource = store.get_resource(target)?;
+    let invite_creator =
+        crate::plugins::versioning::get_initial_commit_for_resource(target, store)?.signer;
+    if !crate::hierarchy::check_write(store, &target_resource, &invite_creator)? {
+        return Err(format!(
+            "Invite creator {} is not allowed to create invite for target {}",
+            invite_creator, target
+        )
+        .into());
+    }
 
     add_rights(&agent, target, write, store)?;
     if write {
@@ -84,6 +95,7 @@ pub fn construct_invite_redirect(
         add_rights(&agent, target, false, store)?;
     }
 
+    // Construct the Redirect Resource, which might provide the Client with a Subject for his Agent.
     let mut redirect = Resource::new_instance(urls::REDIRECT, store)?;
     redirect.set_propval(
         urls::DESTINATION.into(),
