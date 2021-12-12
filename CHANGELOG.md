@@ -8,6 +8,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Stricter authorization checks for Invites #182
 - Add expires at check to Invites #182
 - Add github CI action for Tauri Builds #221
+- Add `append_subjects` method to Resource, helps dealing with arrays
+- Running `--initialize` is non-destructive - rights to the Drive are only added, not removed.
 
 ## [v0.29.2] - 2021-12-10
 
