@@ -113,7 +113,7 @@ impl CollectionBuilder {
         store: &impl Storelike,
         for_agent: Option<&str>,
     ) -> AtomicResult<Collection> {
-        Collection::new_with_members(store, self, for_agent)
+        Collection::collect_members(store, self, for_agent)
     }
 }
 
@@ -183,7 +183,7 @@ impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     /// Gets the required data from the store.
     /// Applies sorting settings.
-    pub fn new_with_members(
+    pub fn collect_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
         for_agent: Option<&str>,
@@ -214,8 +214,20 @@ impl Collection {
         if collection_builder.sort_by.is_some() || collection_builder.include_nested {
             for subject in subjects.iter() {
                 // These nested resources are not fully calculated - they will be presented as -is
-                let resource = store.get_resource_extended(subject, true, for_agent)?;
-                resources.push(resource)
+                match store.get_resource_extended(subject, true, for_agent) {
+                    Ok(resource) => {
+                        resources.push(resource);
+                    }
+                    Err(e) => match e.error_type {
+                        crate::AtomicErrorType::NotFoundError => {}
+                        crate::AtomicErrorType::UnauthorizedError => {}
+                        crate::AtomicErrorType::OtherError => {
+                            return Err(
+                                format!("Error when getting resource in collection: {}", e).into()
+                            )
+                        }
+                    },
+                }
             }
             if let Some(sort) = &collection_builder.sort_by {
                 resources = sort_resources(resources, sort, collection_builder.sort_desc);
@@ -424,7 +436,7 @@ pub fn construct_collection_from_params(
         include_nested,
         include_external,
     };
-    let collection = Collection::new_with_members(store, collection_builder, for_agent)?;
+    let collection = Collection::collect_members(store, collection_builder, for_agent)?;
     collection.add_to_resource(resource, store)
 }
 
@@ -500,7 +512,7 @@ mod test {
             include_nested: false,
             include_external: false,
         };
-        let collection = Collection::new_with_members(&store, collection_builder, None).unwrap();
+        let collection = Collection::collect_members(&store, collection_builder, None).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 
@@ -520,7 +532,7 @@ mod test {
             include_nested: false,
             include_external: false,
         };
-        let collection = Collection::new_with_members(&store, collection_builder, None).unwrap();
+        let collection = Collection::collect_members(&store, collection_builder, None).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
 
         let resource_collection = &collection.to_resource(&store).unwrap();
@@ -546,7 +558,7 @@ mod test {
             include_nested: true,
             include_external: false,
         };
-        let collection = Collection::new_with_members(&store, collection_builder, None).unwrap();
+        let collection = Collection::collect_members(&store, collection_builder, None).unwrap();
         let first_resource = &collection.members_nested.clone().unwrap()[0];
         assert!(first_resource.get_subject().contains("Agent"));
 
