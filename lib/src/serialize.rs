@@ -264,13 +264,14 @@ mod test {
             .unwrap()
             .to_json_ad()
             .unwrap();
-        println!("json: {}", json);
+        println!("json-ad: {}", json);
         let correct_json = r#"{
   "@id": "https://atomicdata.dev/classes/Agent",
   "https://atomicdata.dev/properties/description": "An Agent is a user that can create or modify data. It has two keys: a private and a public one. The private key should be kept secret. The public key is used to verify signatures (on [Commits](https://atomicdata.dev/classes/Commit)) set by the of the Agent.",
   "https://atomicdata.dev/properties/isA": [
      "https://atomicdata.dev/classes/Class"
   ],
+  "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
   "https://atomicdata.dev/properties/recommends": [
     "https://atomicdata.dev/properties/name",
     "https://atomicdata.dev/properties/description",
@@ -315,6 +316,7 @@ mod test {
             "is-a": [
               "https://atomicdata.dev/classes/Class"
             ],
+            "parent": "https://atomicdata.dev/classes",
             "recommends": [
               "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/description",
@@ -348,6 +350,10 @@ mod test {
                 "@container": "@list",
                 "@id": "https://atomicdata.dev/properties/isA"
               },
+              "parent": {
+                "@id": "https://atomicdata.dev/properties/parent",
+                "@type": "@id"
+              },
               "recommends": {
                 "@container": "@list",
                 "@id": "https://atomicdata.dev/properties/recommends"
@@ -363,6 +369,7 @@ mod test {
             "is-a": [
               "https://atomicdata.dev/classes/Class"
             ],
+            "parent": "https://atomicdata.dev/classes",
             "recommends": [
               "https://atomicdata.dev/properties/name",
               "https://atomicdata.dev/properties/description",
@@ -396,6 +403,6 @@ mod test {
 <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/shortname> "description"^^<https://atomicdata.dev/datatypes/slug> ."#;
         assert!(serialized.contains(r#""description"^^<https://atomicdata.dev/datatypes/slug>"#));
         // This could fail when the `description` resource changes
-        assert!(serialized.lines().count() == 4);
+        assert!(serialized.lines().count() == 5);
     }
 }
