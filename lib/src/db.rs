@@ -332,10 +332,11 @@ impl Storelike for Db {
                 crate::urls::COLLECTION => {
                     has_dynamic = true;
                     if !skip_dynamic {
-                        return crate::collections::construct_collection(
+                        return crate::collections::construct_collection_from_params(
                             self,
                             query_params,
                             &mut resource,
+                            for_agent,
                         );
                     }
                 }

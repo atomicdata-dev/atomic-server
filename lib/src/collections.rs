@@ -368,10 +368,11 @@ impl Collection {
 /// Builds a collection from query params and the passed Collection resource.
 /// The query params are used to override the stored Collection resource properties.
 /// This also sets defaults for Collection properties when fields are missing
-pub fn construct_collection(
+pub fn construct_collection_from_params(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
     resource: &mut Resource,
+    for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
     let mut sort_by = None;
     let mut sort_desc = false;
@@ -423,7 +424,7 @@ pub fn construct_collection(
         include_nested,
         include_external,
     };
-    let collection = Collection::new_with_members(store, collection_builder, None)?;
+    let collection = Collection::new_with_members(store, collection_builder, for_agent)?;
     collection.add_to_resource(resource, store)
 }
 
