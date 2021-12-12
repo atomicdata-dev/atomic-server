@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use crate::errors::AtomicServerResult;
 
 /// Start the server
-pub async fn serve(config: &crate::config::Config) -> AtomicResult<()> {
+pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
     // Setup the database and more
     let appstate = crate::appstate::init(config.clone())?;
 

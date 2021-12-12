@@ -11,7 +11,7 @@ use actix_web::{
     web::Data,
     App,
 };
-use atomic_lib::urls;
+use atomic_lib::{urls, Storelike};
 
 trait BodyTest {
     fn as_str(&self) -> &str;
@@ -85,9 +85,9 @@ async fn server_tests() {
 
     // Should 404
     let req = test::TestRequest::with_uri("/doesnotexist")
-        .insert_header(("Accept", "application/ld+json"))
+        .header("Accept", "application/ld+json")
         .to_request();
-    let resp = test::call_service(&app, req).await;
+    let resp = test::call_service(&mut app, req).await;
     // Note: This is currently 500, but should be 404 in the future!
     assert!(resp.status().is_server_error());
 
