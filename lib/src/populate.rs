@@ -7,7 +7,7 @@ use crate::{
     datatype::DataType,
     errors::AtomicResult,
     schema::{Class, Property},
-    urls, Storelike,
+    urls, Storelike, Value,
 };
 
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.
@@ -129,12 +129,20 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     ];
 
     for p in properties {
-        let resource = p.to_resource()?;
+        let mut resource = p.to_resource()?;
+        resource.set_propval_unsafe(
+            urls::PARENT.into(),
+            Value::AtomicUrl("https://atomicdata.dev/properties".into()),
+        )?;
         store.add_resource_opts(&resource, false, false, true)?;
     }
 
     for c in classes {
-        let resource = c.to_resource()?;
+        let mut resource = c.to_resource()?;
+        resource.set_propval_unsafe(
+            urls::PARENT.into(),
+            Value::AtomicUrl("https://atomicdata.dev/classes".into()),
+        )?;
         store.add_resource_opts(&resource, false, false, true)?;
     }
 
