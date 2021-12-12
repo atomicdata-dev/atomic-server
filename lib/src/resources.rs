@@ -25,6 +25,38 @@ pub struct Resource {
 pub type PropVals = HashMap<String, Value>;
 
 impl Resource {
+    /// Adds a subject to some property vector / array.
+    /// Creates the vector if it does not exist.
+    pub fn append_subjects(
+        &mut self,
+        property: &str,
+        values: Vec<String>,
+        must_be_unique: bool,
+        store: &impl Storelike,
+    ) -> AtomicResult<()> {
+        // Does this property exist?
+        match self.get(property) {
+            Ok(existing) => {
+                let mut subjects = existing.to_subjects(None)?;
+                // Does it contain any of the passed values?
+                // Add them when it doesn't.
+                for value in values {
+                    if subjects.contains(&value) {
+                        if must_be_unique {
+                            subjects.push(value);
+                        }
+                        continue;
+                    } else {
+                        subjects.push(value);
+                        continue;
+                    }
+                }
+                self.set_propval(property.into(), subjects.into(), store)
+            }
+            Err(_no_val) => self.set_propval(property.into(), values.into(), store),
+        }
+    }
+
     /// Fetches all 'required' properties. Returns an error if any are missing in this Resource.
     pub fn check_required_props(&self, store: &impl Storelike) -> AtomicResult<()> {
         let classvec = self.get_classes(store)?;

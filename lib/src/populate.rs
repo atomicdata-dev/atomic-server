@@ -158,7 +158,7 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Create the default Drive resource (at the base URL), give Write and Read rights to the Root user. Optionally give Public Read rights.
+/// Adds rights to the default agent to the Drive resource (at the base URL). Optionally give Public Read rights.
 pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
     let mut drive = store.get_resource(store.get_base_url())?;
@@ -168,14 +168,16 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
         read_agents.push(urls::PUBLIC_AGENT.into());
     }
 
-    drive.set_propval(urls::WRITE.into(), write_agents.into(), store)?;
-    drive.set_propval(urls::READ.into(), read_agents.into(), store)?;
-    drive.set_propval_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
+    drive.append_subjects(urls::WRITE, write_agents, true, store)?;
+    drive.append_subjects(urls::READ, read_agents, true, store)?;
+    if let Err(_no_description) = drive.get(urls::DESCRIPTION) {
+        drive.set_propval_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
 
-Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
+        Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
 
-Note that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.
-"#, store.get_base_url()), store)?;
+        Note that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.
+        "#, store.get_base_url()), store)?;
+    }
     drive.save_locally(store)?;
     Ok(())
 }

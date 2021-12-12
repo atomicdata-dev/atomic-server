@@ -117,7 +117,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
                 }
             }
         }
-        Err(_) => {
+        Err(_no_config) => {
             let agent = store.create_agent(Some("root"))?;
             let cfg = atomic_lib::config::Config {
                 agent: agent.subject.clone(),
