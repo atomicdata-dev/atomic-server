@@ -32,7 +32,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
         .run();
     crate::https::request_cert(config).map_err(|e| format!("Certification init failed: {}", e))?;
     log::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
-    running_server.handle().stop(true).await;
+    running_server.stop(true).await;
     Ok(())
 }
 
@@ -156,27 +156,20 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
 // RUSTLS
 pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::ServerConfig, Error> {
-    use rustls_pemfile::{certs, pkcs8_private_keys};
-    let https_config = rustls::ServerConfig::builder()
-        .with_safe_defaults()
-        .with_no_client_auth();
-    // rustls::NoClientAuth::new()
+    use rustls::internal::pemfile::{certs, pkcs8_private_keys};
+    let mut https_config = rustls::ServerConfig::new(rustls::NoClientAuth::new());
     let cert_file =
         &mut BufReader::new(File::open(config.cert_path.clone()).expect("No HTTPS TLS key found."));
     let key_file = &mut BufReader::new(File::open(&config.key_path).unwrap());
     let cert_chain = certs(cert_file).unwrap();
-    let first_cert = cert_chain.first().unwrap().to_owned();
     let mut keys = pkcs8_private_keys(key_file).unwrap();
     if keys.is_empty() {
         panic!("No key found. Consider deleting the `.https` directory and restart to create new keys.")
     }
-    let a = https_config
-        .with_single_cert(
-            vec![rustls::Certificate(first_cert)],
-            rustls::PrivateKey(keys.remove(0)),
-        )
+    https_config
+        .set_single_cert(cert_chain, keys.remove(0))
         .unwrap();
-    Ok(a)
+    Ok(https_config)
 }
 
 /// Adds a file to the .https folder to indicate age of certificates
