@@ -324,7 +324,6 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents/PhpdE3DbDJScLL2enGFx6Sisyx8Afxs6q/6DRvHgjuw=",
         "https://atomicdata.dev/properties/shortname": "elements"
     },
     {
