@@ -2,9 +2,6 @@ use actix_web::{http::Method, web};
 
 use crate::{config::Config, content_types, handlers};
 
-/// Should match all routes
-const ANY: &str = "{tail:.*}";
-
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
@@ -12,7 +9,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         // Catch all HTML requests and send them to the single page app
         .service(
-            web::resource(ANY)
+            web::resource("/*")
                 .guard(actix_web::guard::Method(Method::GET))
                 .guard(actix_web::guard::fn_guard(|head| {
                     content_types::get_accept(head.headers()) == content_types::ContentType::Html
@@ -40,7 +37,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
         );
     }
     app.service(
-        web::scope(ANY)
+        web::scope("/{path:[^{}]+}")
             .service(web::resource("").route(web::get().to(handlers::resource::get_resource))),
     )
     // Also allow the home resource (not matched by the previous one)

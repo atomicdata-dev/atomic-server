@@ -2,7 +2,7 @@
 
 use actix_web::http::HeaderMap;
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub enum ContentType {
     /// Plain JSON, using shortnames as keys instead of URLs
     /// https://docs.atomicdata.dev/interoperability/json.html#atomic-data-as-plain-json
