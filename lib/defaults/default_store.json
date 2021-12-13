@@ -577,6 +577,7 @@
             "https://atomicdata.dev/properties/collection/totalMembers",
             "https://atomicdata.dev/properties/collection/totalPages",
             "https://atomicdata.dev/properties/collection/value",
+            "https://atomicdata.dev/properties/collection/includeExternal",
             "https://atomicdata.dev/properties/incomplete"
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",

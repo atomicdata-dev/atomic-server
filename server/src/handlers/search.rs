@@ -54,6 +54,7 @@ pub async fn search_query(
     }
 
     let mut subjects: Vec<String> = Vec::new();
+    // These are not used at this moment, but would be quite useful in RDF context.
     let mut atoms: Vec<StringAtom> = Vec::new();
 
     if let Some(q) = params.q.clone() {
