@@ -316,12 +316,7 @@ impl Storelike for Db {
         resource.set_subject(subject.into());
 
         if let Some(agent) = for_agent {
-            if !crate::hierarchy::check_read(self, &resource, agent)? {
-                return Err(AtomicError::unauthorized(format!(
-                    "Agent '{}' is not authorized to read '{}'. There should be a `read` right in this resource or one of its parents.",
-                    agent, subject
-                )));
-            }
+            crate::hierarchy::check_read(self, &resource, agent)?;
         }
 
         // Whether the resource has dynamic properties

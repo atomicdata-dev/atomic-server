@@ -124,12 +124,7 @@ pub fn construct_version(
     let subject = &commit.get(urls::SUBJECT)?.to_string();
     if let Some(agent) = &for_agent {
         let current_resource = store.get_resource(subject)?;
-        let can_open = crate::hierarchy::check_read(store, &current_resource, agent)?;
-        if !can_open {
-            return Err(AtomicError::unauthorized(
-                "You do not have permission to construct this resource".to_string(),
-            ));
-        }
+        crate::hierarchy::check_read(store, &current_resource, agent)?;
     }
     let commits = get_commits_for_resource(subject, store)?;
     let mut version = Resource::new(subject.into());

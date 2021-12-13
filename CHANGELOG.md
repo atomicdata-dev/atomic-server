@@ -11,6 +11,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add `append_subjects` method to Resource, helps dealing with arrays
 - Running `--initialize` is non-destructive - rights to the Drive are only added, not removed.
 - Stricter collection authorization #247
+- Improved `check_rights` API #247
 
 ## [v0.29.2] - 2021-12-10
 

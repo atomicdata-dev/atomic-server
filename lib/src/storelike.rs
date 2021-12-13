@@ -173,10 +173,8 @@ pub trait Storelike: Sized {
         let _ignore = skip_dynamic;
         let resource = self.get_resource(subject)?;
         if let Some(agent) = for_agent {
-            if hierarchy::check_read(self, &resource, agent)? {
-                return Ok(resource);
-            }
-            return Err(AtomicError::unauthorized("No rights".into()));
+            hierarchy::check_read(self, &resource, agent)?;
+            return Ok(resource);
         }
         Ok(resource)
     }
