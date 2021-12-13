@@ -81,13 +81,7 @@ pub fn construct_invite_redirect(
     let target_resource = store.get_resource(target)?;
     let invite_creator =
         crate::plugins::versioning::get_initial_commit_for_resource(target, store)?.signer;
-    if !crate::hierarchy::check_write(store, &target_resource, &invite_creator)? {
-        return Err(format!(
-            "Invite creator {} is not allowed to create invite for target {}",
-            invite_creator, target
-        )
-        .into());
-    }
+    crate::hierarchy::check_write(store, &target_resource, &invite_creator)?;
 
     add_rights(&agent, target, write, store)?;
     if write {

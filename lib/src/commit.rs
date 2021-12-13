@@ -6,7 +6,7 @@ use urls::{SET, SIGNER};
 
 use crate::{
     datatype::DataType, datetime_helpers, errors::AtomicResult, hierarchy, resources::PropVals,
-    urls, Atom, AtomicError, Resource, Storelike, Value,
+    urls, Atom, Resource, Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -124,11 +124,7 @@ impl Commit {
 
         if validate_rights {
             if is_new {
-                if !crate::hierarchy::check_write(store, &resource_new, &self.signer)? {
-                    return Err(AtomicError::unauthorized(
-                        format!("Agent {} is not permitted to create {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                    &self.signer, self.subject)));
-                }
+                hierarchy::check_write(store, &resource_new, &self.signer)?;
             } else {
                 // Set a parent only if the rights checks are to be validated.
                 // If there is no explicit parent set on the previous resource, use a default.
@@ -142,10 +138,7 @@ impl Commit {
                     )?;
                 }
                 // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
-                if !crate::hierarchy::check_write(store, &resource_old, &self.signer)? {
-                    return Err(AtomicError::unauthorized(format!("Agent {} is not permitted to edit {}. There should be a write right referring to this Agent in this Resource or its parent.",
-                    &self.signer, self.subject)));
-                }
+                hierarchy::check_write(store, &resource_old, &self.signer)?;
             }
         };
         // Check if all required props are there
@@ -164,13 +157,7 @@ impl Commit {
                         .get(urls::TARGET)
                         .map_err(|_e| "Invite does not have required Target attribute")?;
                     let target_resource = store.get_resource(&target.to_string())?;
-                    if !hierarchy::check_write(store, &target_resource, &self.signer)? {
-                        return Err(format!(
-                            "Signer {} does not have the rights to create an Invite for {}. The target resource or its parent needs to provide the signer with Write rights.",
-                            self.signer, target
-                        )
-                        .into());
-                    }
+                    hierarchy::check_write(store, &target_resource, &self.signer)?;
                 }
                 _other => {}
             };

@@ -37,58 +37,84 @@ pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicRe
     Ok(resource.to_owned())
 }
 
+/// Throws if not allowed.
+/// Returns string with explanation if allowed.
 pub fn check_write(
     store: &impl Storelike,
     resource: &Resource,
     for_agent: &str,
-) -> AtomicResult<bool> {
+) -> AtomicResult<String> {
     check_rights(store, resource, for_agent, Right::Write)
 }
 
+/// Throws if not allowed.
+/// Returns string with explanation if allowed.
 pub fn check_read(
     store: &impl Storelike,
     resource: &Resource,
     for_agent: &str,
-) -> AtomicResult<bool> {
+) -> AtomicResult<String> {
     check_rights(store, resource, for_agent, Right::Read)
 }
 
 /// Recursively checks a Resource and its Parents for rights.
+/// Throws if not allowed.
+/// Returns string with explanation if allowed.
 pub fn check_rights(
     store: &impl Storelike,
     resource: &Resource,
     for_agent: &str,
     right: Right,
-) -> AtomicResult<bool> {
-    // Agents will always have the right to edit themselves
+) -> AtomicResult<String> {
     if resource.get_subject() == for_agent {
-        return Ok(true);
+        return Ok("Agents can always edit themselves or their children.".into());
     }
 
     // Check if the resource's write rights explicitly refers to the agent or the public agent
     if let Ok(arr_val) = resource.get(&right.to_string()) {
         for s in arr_val.to_subjects(None)? {
             match s.as_str() {
-                urls::PUBLIC_AGENT => return Ok(true),
+                urls::PUBLIC_AGENT => {
+                    return Ok(format!(
+                        "PublicAgent has been granted rights in {}",
+                        resource.get_subject()
+                    ))
+                }
                 agent => {
                     if agent == for_agent {
-                        return Ok(true);
+                        return Ok(format!(
+                            "Write right has been explicitly set in {}",
+                            resource.get_subject()
+                        ));
                     }
                 }
             };
         }
     }
     // Try the parents recursively
-    if let Ok(val) = resource.get(urls::PARENT) {
-        let parent = store.get_resource(&val.to_string())?;
-        if resource.get_subject() == parent.get_subject() {
-            // return Err(format!("Parent ({}) is the same as the current resource - there is a circular parent relationship.", val).into());
-            return Ok(false);
+    if let Ok(parent_val) = resource.get(urls::PARENT) {
+        match store.get_resource(&parent_val.to_string()) {
+            Ok(parent) => {
+                if resource.get_subject() == parent.get_subject() {
+                    return Err(crate::errors::AtomicError::unauthorized(format!(
+                        "There is a circular relationship in {} (parent = same resource).",
+                        resource.get_subject()
+                    )));
+                }
+                check_rights(store, &parent, for_agent, right)
+            }
+            Err(_err) => Err(crate::errors::AtomicError::unauthorized(format!(
+                "Parent of {} ({}) not found: {}",
+                resource.get_subject(),
+                parent_val,
+                _err
+            ))),
         }
-        check_rights(store, &parent, for_agent, right)
     } else {
         // resource has no parent and agent is not in Write array - check fails
-        Ok(false)
+        Err(crate::errors::AtomicError::unauthorized(
+            "No right has been found in this resource or its parents".into(),
+        ))
     }
 }
 
