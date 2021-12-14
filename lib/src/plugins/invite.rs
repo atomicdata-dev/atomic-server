@@ -56,6 +56,7 @@ pub fn construct_invite_redirect(
         })?
         .to_string();
 
+    // If any usages left value is present, make sure it's a positive number and decrement it by 1.
     if let Ok(usages_left) = invite_resource.get(urls::USAGES_LEFT) {
         let num = usages_left.to_int()?;
         if num == 0 {
@@ -78,10 +79,9 @@ pub fn construct_invite_redirect(
     }
 
     // Make sure the creator of the invite is still allowed to Write the target
-    let target_resource = store.get_resource(target)?;
     let invite_creator =
         crate::plugins::versioning::get_initial_commit_for_resource(target, store)?.signer;
-    crate::hierarchy::check_write(store, &target_resource, &invite_creator)?;
+    crate::hierarchy::check_write(store, &store.get_resource(target)?, &invite_creator)?;
 
     add_rights(&agent, target, write, store)?;
     if write {
