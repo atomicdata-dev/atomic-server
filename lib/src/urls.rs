@@ -12,6 +12,7 @@ pub const DRIVE: &str = "https://atomicdata.dev/classes/Drive";
 pub const INVITE: &str = "https://atomicdata.dev/classes/Invite";
 pub const REDIRECT: &str = "https://atomicdata.dev/classes/Redirect";
 pub const ATOM: &str = "https://atomicdata.dev/classes/Atom";
+pub const FILE: &str = "https://atomicdata.dev/classes/File";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -81,6 +82,11 @@ pub const EXPIRES_AT: &str = "https://atomicdata.dev/properties/invite/expiresAt
 pub const ATOM_SUBJECT: &str = "https://atomicdata.dev/properties/atom/subject";
 pub const ATOM_PROPERTY: &str = "https://atomicdata.dev/properties/atom/property";
 pub const ATOM_VALUE: &str = "https://atomicdata.dev/properties/atom/value";
+// ... for Files
+pub const CHECKSUM: &str = "https://atomicdata.dev/properties/checksum";
+pub const FILENAME: &str = "https://atomicdata.dev/properties/filename";
+pub const FILESIZE: &str = "https://atomicdata.dev/properties/filesize";
+pub const MIMETYPE: &str = "https://atomicdata.dev/properties/mimetype";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

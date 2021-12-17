@@ -111,10 +111,16 @@ pub fn check_rights(
             ))),
         }
     } else {
+        let for_string = if for_agent == urls::PUBLIC_AGENT {
+            "the Public Agent".to_string()
+        } else {
+            for_agent.to_string()
+        };
         // resource has no parent and agent is not in Write array - check fails
-        Err(crate::errors::AtomicError::unauthorized(
-            "No right has been found in this resource or its parents".into(),
-        ))
+        Err(crate::errors::AtomicError::unauthorized(format!(
+            "No right has been found for {} in this resource or its parents",
+            for_string
+        )))
     }
 }
 
