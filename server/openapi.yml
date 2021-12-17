@@ -13,10 +13,18 @@ servers:
 paths:
   "/upload":
     post:
-      summary: Uploads a file.
+      summary: Upload a file.
+      description: Requires a `parent` and authentication headers.
       responses:
         "200":
           description: ok
+      parameters:
+        - in: query
+          name: parent
+          schema:
+            type: string
+          required: true
+          description: URL of the Parent Resource
       requestBody:
         content:
           multipart/form-data:

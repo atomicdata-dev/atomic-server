@@ -139,6 +139,46 @@
         "https://atomicdata.dev/properties/shortname": "read"
     },
     {
+        "@id": "https://atomicdata.dev/properties/checksum",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "Base64 encoded SHA-256 checksum of a binary object.",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "checksum"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/filename",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "A filename does not contain strings, and ends with a dot and a file extension.",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "filename"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/filesize",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+        "https://atomicdata.dev/properties/description": "Size of a file in bytes",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "filesize"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/mimetype",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "Mimetype of a file sets is the type of data that is stored in the file. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "mimetype"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/children",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
         "https://atomicdata.dev/properties/description": "The children of a Resource are the items that have this Resource set as Parent. Children are 'below' their Parents, hierarchically. Parents are the boss of children, which means that parents influents things like read and write rights.",
@@ -655,6 +695,23 @@
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
         "https://atomicdata.dev/properties/shortname": "endpoint"
+    },
+    {
+        "@id": "https://atomicdata.dev/classes/File",
+        "https://atomicdata.dev/properties/description": "A single binary file.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+            "https://atomicdata.dev/properties/checksum",
+            "https://atomicdata.dev/properties/filesize",
+            "https://atomicdata.dev/properties/filename"
+        ],
+        "https://atomicdata.dev/properties/recommends": [
+            "https://atomicdata.dev/properties/mimetype"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+        "https://atomicdata.dev/properties/shortname": "file"
     },
     {
         "@id": "https://atomicdata.dev/classes/Invite",

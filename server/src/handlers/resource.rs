@@ -1,6 +1,9 @@
 use crate::{
-    appstate::AppState, content_types::get_accept, content_types::ContentType,
-    errors::AtomicServerResult, helpers::get_client_agent,
+    appstate::AppState,
+    content_types::get_accept,
+    content_types::ContentType,
+    errors::AtomicServerResult,
+    helpers::{get_client_agent, try_extension},
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
@@ -37,6 +40,7 @@ pub async fn get_resource(
         let subject = format!("{}/{}{}", base_url, subj_end_string, querystring);
         subject
     } else {
+        // There is no end string, so It's the root of the URL, the base URL!
         String::from(base_url)
     };
 
@@ -76,22 +80,4 @@ pub async fn get_resource(
             Ok(builder.body(body))
         }
     }
-}
-
-/// Finds the extension
-fn try_extension(path: &str) -> Option<(ContentType, &str)> {
-    let items: Vec<&str> = path.split('.').collect();
-    if items.len() == 2 {
-        let path = items[0];
-        let content_type = match items[1] {
-            "json" => ContentType::Json,
-            "jsonld" => ContentType::JsonLd,
-            "jsonad" => ContentType::JsonAd,
-            "html" => ContentType::Html,
-            "ttl" => ContentType::Turtle,
-            _ => return None,
-        };
-        return Some((content_type, path));
-    }
-    None
 }

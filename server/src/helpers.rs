@@ -3,7 +3,7 @@
 use actix_web::http::HeaderMap;
 use atomic_lib::authentication::AuthValues;
 
-use crate::{appstate::AppState, errors::AtomicServerResult};
+use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
 
 // Returns None if the string is empty.
 // Useful for parsing form inputs.
@@ -55,8 +55,8 @@ pub fn get_auth_headers(
     }
 }
 
-/// Checks for authentication headers and returns the agent's subject if everything is well.
-/// Skips these checks in public_mode.
+/// Checks for authentication headers and returns Some agent's subject if everything is well.
+/// Skips these checks in public_mode and returns Ok(None).
 pub fn get_client_agent(
     headers: &HeaderMap,
     appstate: &AppState,
@@ -73,4 +73,22 @@ pub fn get_client_agent(
     )
     .map_err(|e| format!("Authentication failed: {}", e))?;
     Ok(Some(for_agent))
+}
+
+/// Finds the extension
+pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
+    let items: Vec<&str> = path.split('.').collect();
+    if items.len() == 2 {
+        let path = items[0];
+        let content_type = match items[1] {
+            "json" => ContentType::Json,
+            "jsonld" => ContentType::JsonLd,
+            "jsonad" => ContentType::JsonAd,
+            "html" => ContentType::Html,
+            "ttl" => ContentType::Turtle,
+            _ => return None,
+        };
+        return Some((content_type, path));
+    }
+    None
 }
