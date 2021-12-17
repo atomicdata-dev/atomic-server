@@ -16,6 +16,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 }))
                 .to(handlers::single_page_app::single_page),
         )
+        .service(web::scope("/upload").route("", web::post().to(handlers::upload::upload_handler)))
         .service(
             web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))),
         )

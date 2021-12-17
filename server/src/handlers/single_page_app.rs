@@ -7,14 +7,14 @@ use actix_web::HttpResponse;
 pub async fn single_page(
     data: actix_web::web::Data<Mutex<AppState>>,
 ) -> AtomicServerResult<HttpResponse> {
-    let context = data
+    let appstate = data
         .lock()
         .expect("Failed to lock mutexguard in single_page");
 
     let template = include_str!("../../static/atomic-data-browser.html");
     let body = template
-        .replace("{ script }", &context.config.opts.script)
-        .replace("{ asset_url }", &context.config.opts.asset_url);
+        .replace("{ script }", &appstate.config.opts.script)
+        .replace("{ asset_url }", &appstate.config.opts.asset_url);
 
     let resp = HttpResponse::Ok()
         .content_type("text/html")
