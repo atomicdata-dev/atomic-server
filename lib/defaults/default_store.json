@@ -147,7 +147,6 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/isDynamic": true,
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev",
         "https://atomicdata.dev/properties/shortname": "children"
     },
     {
