@@ -179,6 +179,37 @@
         "https://atomicdata.dev/properties/shortname": "mimetype"
     },
     {
+        "@id": "https://atomicdata.dev/properties/internalId",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "An identifier used internally by the system.",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "internal-id"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/downloadURL",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "The URL where a file can be downloaded.",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "download-url"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/attachments",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/File",
+        "https://atomicdata.dev/properties/description": "File attachments related to this Resource. This relationship can automatically be created by the `/upload` endpoint.",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "attachments"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/children",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
         "https://atomicdata.dev/properties/description": "The children of a Resource are the items that have this Resource set as Parent. Children are 'below' their Parents, hierarchically. Parents are the boss of children, which means that parents influents things like read and write rights.",
@@ -467,7 +498,6 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "is-locked"
     },
     {
@@ -703,12 +733,15 @@
             "https://atomicdata.dev/classes/Class"
         ],
         "https://atomicdata.dev/properties/requires": [
-            "https://atomicdata.dev/properties/checksum",
-            "https://atomicdata.dev/properties/filesize",
-            "https://atomicdata.dev/properties/filename"
+            "https://atomicdata.dev/properties/downloadURL"
         ],
         "https://atomicdata.dev/properties/recommends": [
-            "https://atomicdata.dev/properties/mimetype"
+            "https://atomicdata.dev/properties/description",
+            "https://atomicdata.dev/properties/filesize",
+            "https://atomicdata.dev/properties/filename",
+            "https://atomicdata.dev/properties/checksum",
+            "https://atomicdata.dev/properties/mimetype",
+            "https://atomicdata.dev/properties/internalId"
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
         "https://atomicdata.dev/properties/shortname": "file"

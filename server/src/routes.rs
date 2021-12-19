@@ -1,3 +1,6 @@
+//! Contains routing logic, sends the client to the correct handler.
+//! We should try to minimize what happens in here, since most logic should be defined in Atomic Data - not in the server itself.
+
 use actix_web::{http::Method, web};
 
 use crate::{config::Config, content_types, handlers};
@@ -7,7 +10,8 @@ use crate::{config::Config, content_types, handlers};
 // precedence over a later route.
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
-        // Catch all HTML requests and send them to the single page app
+        .service(web::resource("/download/{path:[^{}]+}").to(handlers::download::handle_download))
+        // Catch all (non-download) HTML requests and send them to the single page app
         .service(
             web::resource("/*")
                 .guard(actix_web::guard::Method(Method::GET))
@@ -17,9 +21,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 .to(handlers::single_page_app::single_page),
         )
         .service(web::scope("/upload").route("", web::post().to(handlers::upload::upload_handler)))
-        .service(
-            web::scope("/tpf").service(web::resource("").route(web::get().to(handlers::tpf::tpf))),
-        )
+        .service(web::resource("/tpf").to(handlers::tpf::tpf))
         .service(
             web::resource("/commit")
                 .guard(actix_web::guard::Method(Method::POST))
@@ -37,10 +39,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 .to(handlers::search::search_index_rdf),
         );
     }
-    app.service(
-        web::scope("/{path:[^{}]+}")
-            .service(web::resource("").route(web::get().to(handlers::resource::get_resource))),
-    )
-    // Also allow the home resource (not matched by the previous one)
-    .service(web::resource("/").to(handlers::resource::get_resource));
+    app.service(web::resource("/{path:[^{}]+}").to(handlers::resource::get_resource))
+        // Also allow the home resource (not matched by the previous one)
+        .service(web::resource("/").to(handlers::resource::get_resource));
 }

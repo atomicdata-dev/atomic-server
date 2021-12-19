@@ -87,7 +87,9 @@ pub const CHECKSUM: &str = "https://atomicdata.dev/properties/checksum";
 pub const FILENAME: &str = "https://atomicdata.dev/properties/filename";
 pub const FILESIZE: &str = "https://atomicdata.dev/properties/filesize";
 pub const MIMETYPE: &str = "https://atomicdata.dev/properties/mimetype";
-
+pub const INTERNAL_ID: &str = "https://atomicdata.dev/properties/internalId";
+pub const DOWNLOAD_URL: &str = "https://atomicdata.dev/properties/downloadURL";
+pub const ATTACHMENTS: &str = "https://atomicdata.dev/properties/attachments";
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
 pub const MARKDOWN: &str = "https://atomicdata.dev/datatypes/markdown";
