@@ -1,4 +1,5 @@
 pub mod commit;
+pub mod download;
 pub mod resource;
 pub mod search;
 pub mod single_page_app;

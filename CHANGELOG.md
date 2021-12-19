@@ -5,7 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [v0.30.0]
 
-- Add file uploading #72
+- Add file uploading and downloading #72
 
 ## [unreleased]
 

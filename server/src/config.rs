@@ -124,6 +124,8 @@ pub struct Config {
     pub static_path: PathBuf,
     /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
     pub store_path: PathBuf,
+    /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
+    pub uploads_path: PathBuf,
     /// Path to where the search index for tantivy full text search is located  (defaults to `~/.config/atomic/search_index`)
     pub search_index_path: PathBuf,
     /// If true, the initialization scripts will be ran (create first Drive, Agent, indexing, etc)
@@ -154,6 +156,8 @@ pub fn init() -> AtomicServerResult<Config> {
     cert_path.push("https/cert.pem");
     let mut key_path = config_dir.clone();
     key_path.push("https/key.pem");
+    let mut uploads_path = config_dir.clone();
+    uploads_path.push("uploads");
 
     // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
@@ -211,5 +215,6 @@ pub fn init() -> AtomicServerResult<Config> {
         static_path,
         store_path,
         search_index_path,
+        uploads_path,
     })
 }
