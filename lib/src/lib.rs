@@ -58,7 +58,6 @@ pub mod errors;
 pub mod hierarchy;
 pub mod mapping;
 pub mod parse;
-#[cfg(feature = "db")]
 pub mod plugins;
 pub mod populate;
 pub mod resources;

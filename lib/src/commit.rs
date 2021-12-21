@@ -184,12 +184,20 @@ impl Commit {
         store.add_resource_opts(&commit_resource, false, update_index, false)?;
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
-        Ok(CommitResponse {
+
+        let commit_response = CommitResponse {
             resource_new: Some(resource_new),
             resource_old,
             commit: commit_resource,
             full_commit: self.clone(),
-        })
+        };
+
+        // https://github.com/joepio/atomic-data-rust/issues/253
+        for handle_after in store.get_handlers().after_commit {
+            handle_after(commit_response.clone())
+        }
+
+        Ok(commit_response)
     }
 
     /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.

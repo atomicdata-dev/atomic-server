@@ -9,6 +9,7 @@ use std::{
 use crate::{
     datatype::DataType,
     errors::{AtomicError, AtomicResult},
+    plugins::handlers::Handlers,
     resources::PropVals,
     storelike::{ResourceCollection, Storelike},
     Atom, Resource, Value,
@@ -33,6 +34,8 @@ pub struct Db {
     index_vals: sled::Tree,
     /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
     base_url: String,
+    /// Handlers are used to extend functionality. They are called on specific events, such as 'after_commit'
+    pub handlers: Handlers,
 }
 
 impl Db {
@@ -49,6 +52,7 @@ impl Db {
             resources,
             index_vals,
             base_url,
+            handlers: Handlers::default(),
         };
         crate::populate::populate_base_models(&store)
             .map_err(|e| format!("Failed to populate base models. {}", e))?;

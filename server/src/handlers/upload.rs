@@ -104,7 +104,10 @@ pub async fn upload_handler(
     // Add the files as `attachments` to the parent
     let mut parent = store.get_resource(&query.parent)?;
     parent.append_subjects(urls::ATTACHMENTS, created_file_subjects, false, store)?;
-    parent.save(store)?;
+    let commit_response = parent.save(store)?;
+
+    // Pass the commit to the commit hanlder. Note that this should ultimately be handled by the Store, probably.
+    // https://github.com/joepio/atomic-data-rust/issues/253
 
     let mut builder = HttpResponse::Ok();
 

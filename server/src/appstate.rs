@@ -79,6 +79,22 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         config.clone(),
     );
 
+    let handle_commit = |commit_response: atomic_lib::commit::CommitResponse| {
+        commit_monitor.do_send(crate::actor_messages::CommitMessage {
+            subject: commit_response.commit.get_subject().clone(),
+            commit_response,
+        })
+    };
+    // fn handle_commit(commit_response: atomic_lib::commit::CommitResponse) {
+    //     commit_monitor.do_send(crate::actor_messages::CommitMessage {
+    //         subject: commit_response.commit.get_subject().clone(),
+    //         commit_response,
+    //     })
+    // }
+
+    // Initialize handlers
+    store.handlers.register_after_commit(handle_commit);
+
     Ok(AppState {
         store,
         config,

@@ -4,6 +4,7 @@ use crate::{
     agents::Agent,
     errors::AtomicError,
     hierarchy,
+    plugins::handlers::Handlers,
     schema::{Class, Property},
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_array};
@@ -149,6 +150,11 @@ pub trait Storelike: Sized {
     fn get_classes_for_subject(&self, subject: &str) -> AtomicResult<Vec<Class>> {
         let classes = self.get_resource(subject)?.get_classes(self)?;
         Ok(classes)
+    }
+
+    /// Returns all Hanlders for this store. Handlers are used to extend functionality. They are called on specific events, such as 'after_commit'
+    fn get_handlers(&self) -> Handlers {
+        crate::plugins::handlers::Handlers::default()
     }
 
     /// Fetches a property by URL, returns a Property instance
