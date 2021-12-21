@@ -74,7 +74,10 @@ impl Resource {
     }
 
     /// Removes / deletes the resource from the store by performing a Commit.
-    pub fn destroy(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
+    pub fn destroy(
+        &mut self,
+        store: &impl Storelike,
+    ) -> AtomicResult<crate::commit::CommitResponse> {
         self.commit.destroy(true);
         self.save(store)
     }
@@ -247,7 +250,7 @@ impl Resource {
     /// Uses default Agent to sign the Commit.
     /// Stores changes on the Subject's Server by sending a Commit.
     /// Returns the generated Commit.
-    pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::Commit> {
+    pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::commit::CommitResponse> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
         let commit = commitbuilder.sign(&agent, store)?;
@@ -257,10 +260,10 @@ impl Resource {
             crate::client::post_commit(&commit, store)?;
         }
         // If that succeeds, save it locally;
-        commit.apply(store)?;
+        let commit_response = commit.apply(store)?;
         // then, reset the internal CommitBuiler.
         self.reset_commit_builder();
-        Ok(commit)
+        Ok(commit_response)
     }
 
     /// Saves the resource (with all the changes) to the store by creating a Commit.
