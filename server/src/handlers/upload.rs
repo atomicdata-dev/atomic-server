@@ -32,7 +32,14 @@ pub async fn upload_handler(
     let appstate = data.lock().unwrap();
     let store = &appstate.store;
     let parent = store.get_resource(&query.parent)?;
-    let subject = format!("{}{}", store.get_base_url(), req.head().uri);
+    let subject = format!(
+        "{}{}",
+        store.get_base_url(),
+        req.head()
+            .uri
+            .path_and_query()
+            .ok_or("Path must be given")?
+    );
     if let Some(agent) = get_client_agent(req.headers(), &appstate, subject)? {
         check_write(store, &parent, &agent)?;
     } else {

@@ -501,7 +501,7 @@
         "https://atomicdata.dev/properties/shortname": "is-locked"
     },
     {
-        "@id": "https://atomicdata.dev/property/paymentPointer",
+        "@id": "https://atomicdata.dev/properties/paymentPointer",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "Payment Pointers are a standardized identifier for payment accounts. In the same way that an email address provides an identifier for a mailbox in the email ecosystem a payment pointer is used by an account holder to share the details of their account with a counter-party.\n\nSee https://paymentpointers.org/\n\nE.g. `$ilp.uphold.com/WBQrZEphkFxj`",
         "https://atomicdata.dev/properties/isA": [
