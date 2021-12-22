@@ -75,25 +75,27 @@ impl Handler<CommitMessage> for CommitMonitor {
     // also because performance is imporatant here -
     // dealing with these indexing things synchronously would be too slow.
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
+        let target = msg.commit_response.full_commit.subject.clone();
+
         log::info!(
             "handle commit for {} with id {}. Current connections: {}",
-            msg.subject,
+            target,
             msg.commit_response.commit.get_subject(),
             self.subscriptions.len()
         );
 
         // Notify websocket listeners
-        if let Some(subscribers) = self.subscriptions.get(&msg.subject) {
+        if let Some(subscribers) = self.subscriptions.get(&target) {
             log::info!(
                 "Sending commit {} to {} subscribers",
-                msg.subject,
+                target,
                 subscribers.len()
             );
             for connection in subscribers {
                 connection.do_send(msg.clone());
             }
         } else {
-            log::info!("No subscribers for {}", msg.subject);
+            log::info!("No subscribers for {}", target);
         }
 
         // Update the value index
@@ -105,7 +107,7 @@ impl Handler<CommitMessage> for CommitMonitor {
         // Update the search index
         if let Some(resource) = &msg.commit_response.resource_new {
             if self.config.opts.remove_previous_search {
-                crate::search::remove_resource(&self.search_state, &msg.subject).unwrap();
+                crate::search::remove_resource(&self.search_state, &target).unwrap();
             };
             // Add new resource to search index
             crate::search::add_resource(&self.search_state, resource).unwrap();
@@ -123,7 +125,7 @@ impl Handler<CommitMessage> for CommitMonitor {
             }
         } else {
             // If there is no new resource, it must have been deleted, so let's remove it from the search index.
-            crate::search::remove_resource(&self.search_state, &msg.subject).unwrap();
+            crate::search::remove_resource(&self.search_state, &target).unwrap();
         }
     }
 }

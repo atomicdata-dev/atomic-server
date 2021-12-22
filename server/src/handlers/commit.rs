@@ -33,12 +33,10 @@ pub async fn post_commit(
     );
 
     // When a commit is applied, notify all webhook subscribers
+    // TODO: add commit handler https://github.com/joepio/atomic-data-rust/issues/253
     appstate
         .commit_monitor
-        .do_send(crate::actor_messages::CommitMessage {
-            subject: incoming_commit.subject,
-            commit_response,
-        });
+        .do_send(crate::actor_messages::CommitMessage { commit_response });
 
     log::info!("{}", &message);
     Ok(builder.body(message))

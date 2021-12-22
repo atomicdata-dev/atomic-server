@@ -4,7 +4,8 @@ use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
 use async_std::prelude::*;
 use atomic_lib::{
-    datetime_helpers::now, hierarchy::check_write, urls, AtomicError, Resource, Storelike, Value,
+    commit::CommitResponse, datetime_helpers::now, hierarchy::check_write, urls, AtomicError,
+    Resource, Storelike, Value,
 };
 use futures::{StreamExt, TryStreamExt};
 use serde::Deserialize;
@@ -42,6 +43,7 @@ pub async fn upload_handler(
     }
 
     let mut created_resources: Vec<Resource> = Vec::new();
+    let mut commit_responses: Vec<CommitResponse> = Vec::new();
 
     while let Ok(Some(mut field)) = body.try_next().await {
         let content_type = field
@@ -92,7 +94,7 @@ pub async fn upload_handler(
         )?;
         resource.set_propval_string(urls::FILENAME.into(), filename, store)?;
         resource.set_propval_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
-        resource.save(store)?;
+        commit_responses.push(resource.save(store)?);
         created_resources.push(resource);
     }
 
@@ -104,7 +106,17 @@ pub async fn upload_handler(
     // Add the files as `attachments` to the parent
     let mut parent = store.get_resource(&query.parent)?;
     parent.append_subjects(urls::ATTACHMENTS, created_file_subjects, false, store)?;
-    parent.save(store)?;
+    commit_responses.push(parent.save(store)?);
+
+    for resp in commit_responses {
+        // When a commit is applied, notify all webhook subscribers
+        // TODO: add commit handler https://github.com/joepio/atomic-data-rust/issues/253
+        appstate
+            .commit_monitor
+            .do_send(crate::actor_messages::CommitMessage {
+                commit_response: resp,
+            });
+    }
 
     let mut builder = HttpResponse::Ok();
 
