@@ -3,12 +3,9 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## [v0.30.0]
+## [v0.30.0] - 2021-12-22
 
 - Add file uploading and downloading #72
-
-## [unreleased]
-
 - Reverted to earlier Actix build, which unfortunately also means you have to wait longer for the Tauri desktop version of Atomic-Server #246
 - Stricter authorization checks for Invites #182
 - Add expires at check to Invites #182
