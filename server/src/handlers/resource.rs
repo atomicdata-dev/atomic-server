@@ -4,6 +4,7 @@ use crate::{
     content_types::ContentType,
     errors::AtomicServerResult,
     helpers::{get_client_agent, try_extension},
+    timer::Timer,
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
@@ -16,6 +17,7 @@ pub async fn get_resource(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
+    let mut timer = Timer::new();
     let appstate = data.lock().unwrap();
 
     let headers = req.headers();
@@ -45,8 +47,11 @@ pub async fn get_resource(
     };
 
     let store = &appstate.store;
+    timer.add("parse_headers");
 
     let for_agent = get_client_agent(headers, &appstate, subject.clone())?;
+    timer.add("get_agent");
+
     let mut builder = HttpResponse::Ok();
     log::info!("get_resource: {} as {}", subject, content_type.to_mime());
     builder.header("Content-Type", content_type.to_mime());
@@ -56,28 +61,21 @@ pub async fn get_resource(
         "Cache-Control",
         "no-store, no-cache, must-revalidate, private",
     );
+
     let resource = store.get_resource_extended(&subject, false, for_agent.as_deref())?;
-    match content_type {
-        ContentType::Json => {
-            let body = resource.to_json(store)?;
-            Ok(builder.body(body))
-        }
-        ContentType::JsonLd => {
-            let body = resource.to_json_ld(store)?;
-            Ok(builder.body(body))
-        }
-        ContentType::JsonAd => {
-            let body = resource.to_json_ad()?;
-            Ok(builder.body(body))
-        }
-        ContentType::Html => {
-            let body = resource.to_json_ad()?;
-            Ok(builder.body(body))
-        }
+    timer.add("get_resource");
+
+    let response_body = match content_type {
+        ContentType::Json => resource.to_json(store)?,
+        ContentType::JsonLd => resource.to_json_ld(store)?,
+        ContentType::JsonAd => resource.to_json_ad()?,
+        ContentType::Html => resource.to_json_ad()?,
         ContentType::Turtle | ContentType::NTriples => {
             let atoms = resource.to_atoms()?;
-            let body = atomic_lib::serialize::atoms_to_ntriples(atoms, store)?;
-            Ok(builder.body(body))
+            atomic_lib::serialize::atoms_to_ntriples(atoms, store)?
         }
-    }
+    };
+    timer.add("serialize");
+    builder.header("Server-Timing", timer.to_header());
+    Ok(builder.body(response_body))
 }

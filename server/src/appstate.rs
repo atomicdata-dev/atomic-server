@@ -37,23 +37,21 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     let _ = crate::process::terminate_existing_processes(&config)
         .map_err(|e| log::error!("Could not check for running instance: {}", e));
 
-    log::info!("Opening database...");
+    log::info!("Opening database at {:?}", &config.store_path);
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {
-        log::info!("Initialize: creating and populating new Database...");
+        log::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // Building the index here is needed to perform TPF queries on imported resources
-        log::info!(
-            "Building index... (this could take a few minutes for larger existing databases)"
-        );
+        log::info!("Building index (this could take a few minutes for larger databases)");
         store.build_index(true)?;
         log::info!("Building index finished!");
     }
-    log::info!("Setting default agent...");
+    log::info!("Setting default agent");
     set_default_agent(&config, &store)?;
     if config.initialize {
-        log::info!("Running populate commands...");
+        log::info!("Running populate commands");
         atomic_lib::populate::create_drive(&store)
             .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
         atomic_lib::populate::set_drive_rights(&store, true)
@@ -68,11 +66,11 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     }
 
     // Initialize search constructs
-    log::info!("Starting search service...");
+    log::info!("Starting search service");
     let search_state = SearchState::new(&config)?;
 
     // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
-    log::info!("Starting commit monitor...");
+    log::info!("Starting commit monitor");
     let commit_monitor = crate::commit_monitor::create_commit_monitor(
         store.clone(),
         search_state.clone(),

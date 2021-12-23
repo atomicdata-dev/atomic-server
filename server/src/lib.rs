@@ -16,5 +16,6 @@ pub mod serve;
 mod search;
 #[cfg(test)]
 mod tests;
+mod timer;
 #[cfg(feature = "desktop")]
 mod tray_icon;
