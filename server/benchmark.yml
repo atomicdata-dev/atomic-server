@@ -1,5 +1,5 @@
 ---
-base: "http://localhost"
+base: "http://localhost:9883"
 iterations: 1000
 concurrency: 4
 rampup: 2
