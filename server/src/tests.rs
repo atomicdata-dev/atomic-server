@@ -88,8 +88,7 @@ async fn server_tests() {
         .header("Accept", "application/ld+json")
         .to_request();
     let resp = test::call_service(&mut app, req).await;
-    // Note: This is currently 500, but should be 404 in the future!
-    assert!(resp.status().is_server_error());
+    assert!(resp.status().is_client_error());
 
     // Edit the properties collection, make it hidden to the public agent
     let mut drive = store.get_resource(&appstate.config.local_base_url).unwrap();
