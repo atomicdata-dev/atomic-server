@@ -1,8 +1,8 @@
 openapi: 3.0.0
 info:
   title: Atomic Server API
-  description: Specification for Atomic Data
-  version: 0.29.3
+  description: Specification for Atomic-Server. This document only contains a subset of what an Atomic-Server can do. Most of the actual endpoints aren't described in this OpenAPI spec, but using Atomic Data Endpoints. You can simply open the `/enpoints` page of your Server and get a more complete list.
+  version: 0.30.0
 
 servers:
   - url: https://atomicdata.dev/
@@ -11,10 +11,55 @@ servers:
     description: Optional server description, e.g. Internal staging server for testing
 
 paths:
+  "/":
+    get:
+      summary: Get a resource
+      description: Send an HTTP GET request to the URL of the resource. The preffered serialization format is [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), since that contains full URLs, but it also supports plain JSON, JSON-LD, Turtle and N-Triples.
+      parameters:
+        - in: header
+          name: x-atomic-public-key
+          description: See [https://docs.atomicdata.dev/authentication.html](https://docs.atomicdata.dev/authentication.html)
+          schema:
+            type: string
+          required: false
+        - in: header
+          name: x-atomic-signature
+          description: See [https://docs.atomicdata.dev/authentication.html](https://docs.atomicdata.dev/authentication.html)
+          schema:
+            type: string
+          required: false
+        - in: header
+          name: x-atomic-timestamp
+          description: See [https://docs.atomicdata.dev/authentication.html](https://docs.atomicdata.dev/authentication.html)
+          schema:
+            type: string
+          required: false
+        - in: header
+          name: x-atomic-agent
+          description: See [https://docs.atomicdata.dev/authentication.html](https://docs.atomicdata.dev/authentication.html)
+          schema:
+            type: string
+          required: false
+      responses:
+        "200":
+          description: A JSON array of user names
+          content:
+            application/ad+json:
+              schema:
+                type: object
+            application/json:
+              schema:
+                type: object
+            application/ld+json:
+              schema:
+                type: object
+            text/turtle:
+              schema:
+                type: object
   "/upload":
     post:
       summary: Upload a file.
-      description: Requires a `parent` and authentication headers.
+      description: Requires a `parent` and authentication headers. Uses multi-part form data.
       responses:
         "200":
           description: ok
@@ -36,13 +81,56 @@ paths:
                   items:
                     type: string
                     format: binary
-  "/":
-    get:
-      summary: Home page
+  "/collections":
+    post:
+      summary: Traverse collections
+      description: "[Collections](https://atomicdata.dev/classes/Collection) are [Endpoints](https://atomicdata.dev/classes/Endpoint) that enable sorting, filtering and pagination. For a complete list of available query parameters, always check the Endpoint itself."
       responses:
-        "200": # status code
+        "200":
+          description: ok
+      parameters:
+        - in: query
+          name: current_page
+          schema:
+            type: number
+        - in: query
+          name: sort_by
+          description: URL of Property to sort by
+          schema:
+            type: string
+        - in: query
+          name: sort_desc
+          schema:
+            type: boolean
+        - in: query
+          name: page_size
+          schema:
+            type: number
+        - in: query
+          name: include_nested
+          schema:
+            type: boolean
+  "/search":
+    get:
+      summary: Full-text search
+      description: "Endpoint that allows searching through all data on an Atomic Server. Powered by Tantivy. For more information, open the Endpoint at https://atomicdata.dev/search"
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          required: true
+          description: Text query. See https://atomicdata.dev/properties/search/query
+      responses:
+        "200":
           description: A JSON array of user names
           content:
             application/json:
               schema:
                 type: object
+    post:
+      summary: Upload RDF (Turtle / N-Triples) documents for indexing
+      description: ""
+      responses:
+        "200":
+          description: A JSON array of user names
