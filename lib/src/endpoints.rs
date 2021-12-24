@@ -5,19 +5,26 @@
 use crate::{
     errors::AtomicResult,
     plugins::{
+        files::upload_endpoint,
         path::path_endpoint,
+        search::search_endpoint,
         versioning::{all_versions_endpoint, version_endpoint},
     },
     urls, Db, Resource, Storelike, Value,
 };
 
+/// The function that is called when the request matches the path
+type HandleFunction =
+    fn(subject: url::Url, store: &Db, for_agent: Option<&str>) -> AtomicResult<Resource>;
+
 /// An API endpoint at some path which accepts requests and returns some Resource.
+#[derive(Clone)]
 pub struct Endpoint {
     /// The part behind the server domain, e.g. '/versions' or '/collections'. Include the slash.
     pub path: String,
-    /// The function that is called when the request matches the path
-    pub handle:
-        fn(subject: url::Url, store: &Db, for_agent: Option<&str>) -> AtomicResult<Resource>,
+    /// The function that is called when the request matches the path.
+    /// If none is given, the endpoint will return the basic Endpoint resource.
+    pub handle: Option<HandleFunction>,
     /// The list of properties that can be passed to the Endpoint as Query parameters
     pub params: Vec<String>,
     pub description: String,
@@ -44,5 +51,11 @@ impl Endpoint {
 }
 
 pub fn default_endpoints() -> Vec<Endpoint> {
-    vec![version_endpoint(), all_versions_endpoint(), path_endpoint()]
+    vec![
+        version_endpoint(),
+        all_versions_endpoint(),
+        path_endpoint(),
+        search_endpoint(),
+        upload_endpoint(),
+    ]
 }

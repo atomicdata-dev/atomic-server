@@ -14,10 +14,10 @@ use crate::{
 /// The third is the Old resource.
 #[derive(Clone, Debug)]
 pub struct CommitResponse {
-    pub commit: Resource,
+    pub commit_resource: Resource,
     pub resource_new: Option<Resource>,
     pub resource_old: Resource,
-    pub full_commit: Commit,
+    pub commit_struct: Commit,
 }
 
 /// A Commit is a set of changes to a Resource.
@@ -173,8 +173,8 @@ impl Commit {
                 return Ok(CommitResponse {
                     resource_new: None,
                     resource_old,
-                    commit: commit_resource,
-                    full_commit: self.clone(),
+                    commit_resource,
+                    commit_struct: self.clone(),
                 });
             }
         }
@@ -187,8 +187,8 @@ impl Commit {
         Ok(CommitResponse {
             resource_new: Some(resource_new),
             resource_old,
-            commit: commit_resource,
-            full_commit: self.clone(),
+            commit_resource,
+            commit_struct: self.clone(),
         })
     }
 

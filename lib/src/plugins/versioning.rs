@@ -9,7 +9,7 @@ pub fn version_endpoint() -> Endpoint {
         params: [urls::SUBJECT.to_string()].into(),
         description: "Constructs a version of a resource from a Commit URL.".to_string(),
         shortname: "versions".to_string(),
-        handle: handle_version_request,
+        handle: Some(handle_version_request),
     }
 }
 
@@ -20,7 +20,7 @@ pub fn all_versions_endpoint() -> Endpoint {
         description: "Shows all versions for some resource. Constructs these using Commits."
             .to_string(),
         shortname: "all-versions".to_string(),
-        handle: handle_all_versions_request,
+        handle: Some(handle_all_versions_request),
     }
 }
 

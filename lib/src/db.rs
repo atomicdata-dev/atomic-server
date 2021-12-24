@@ -8,6 +8,7 @@ use std::{
 
 use crate::{
     datatype::DataType,
+    endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
     storelike::{ResourceCollection, Storelike},
@@ -33,6 +34,8 @@ pub struct Db {
     index_vals: sled::Tree,
     /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
     base_url: String,
+    /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
+    endpoints: Vec<Endpoint>,
 }
 
 impl Db {
@@ -49,6 +52,7 @@ impl Db {
             resources,
             index_vals,
             base_url,
+            endpoints: default_endpoints(),
         };
         crate::populate::populate_base_models(&store)
             .map_err(|e| format!("Failed to populate base models. {}", e))?;
@@ -294,20 +298,22 @@ impl Storelike for Db {
         }
 
         // Check if the subject matches one of the endpoints
-        // TODO: do this on initialize, not on request!
-        let endpoints = crate::endpoints::default_endpoints();
-        let mut endpoint_resource = None;
-        endpoints.into_iter().for_each(|endpoint| {
+        for endpoint in self.endpoints.iter() {
             if url.path().starts_with(&endpoint.path) {
-                endpoint_resource = Some((endpoint.handle)(clone.clone(), self, for_agent))
+                // Not all Endpoitns have a hanlde function.
+                // If there is none, return the endpoint plainly.
+                let mut resource = if let Some(handle) = endpoint.handle {
+                    // Call the handle function for the endpoint, if it exists.
+                    (handle)(clone.clone(), self, for_agent).map_err(|e| {
+                        format!("Error handling {} Endpoint: {}", endpoint.shortname, e)
+                    })?
+                } else {
+                    endpoint.to_resource(self)?
+                };
+                // Extended resources must always return the requested subject as their own subject
+                resource.set_subject(subject.into());
+                return Ok(resource.to_owned());
             }
-        });
-
-        if let Some(resource) = endpoint_resource {
-            let mut resource_updated = resource?;
-            // Extended resources must always return the requested subject as their own subject
-            resource_updated.set_subject(subject.into());
-            return Ok(resource_updated);
         }
 
         let mut resource = self.get_resource(&removed_query_params)?;
