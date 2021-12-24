@@ -7,6 +7,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 - Correct 404 status code
 - Server-Timings header #256
+- Fix indented welcome message
 
 ## [v0.30.0] - 2021-12-22
 

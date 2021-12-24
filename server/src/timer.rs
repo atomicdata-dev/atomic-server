@@ -37,9 +37,7 @@ impl Timer {
     /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Server-Timing
     pub fn to_header(&self) -> String {
         let mut out = String::new();
-        println!("timings length {:?}", self.timings.len());
         for timing in self.timings.iter() {
-            println!("does a push str {:?}", timing.name);
             out.push_str(&format!("{};dur={}, ", timing.name, timing.duration));
         }
         out
