@@ -3,6 +3,7 @@
 Atomic-Server provides a full-text search endpoint (+ GUI) that allows searching in RDF documents.
 You can use it like this:
 
+- Install `atomic-server`. You can use: `cargo install atomic-server`
 - Run `atomic-server` wit the `--rdf-search` flag, or set the `ATOMIC_RDF_SEARCH=true` environment variable if you're running from docker. See the [readme](./README.md) for other instructions.
 - **Add an RDF resource to the index** by sendig an HTTP POST request to `/search` with a Turtle / N-Triples serialized RDF document. If you get a `405` response, make sure the `--rdf-search` flag is set.
 - **Perform a query** by sendig an HTTP GET request to `/search?q=query` with an `Accept` header set to `application/ld+json`.

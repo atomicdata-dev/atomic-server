@@ -15,15 +15,15 @@ GET https://atomicdata.dev/properties/isA HTTP/1.1
 Accept: text/turtle
 
 ### Full text search
-GET http://localhost/search?q=test HTTP/1.1
+GET http://localhost:9883/search?q=Foo HTTP/1.1
 Accept: application/ld+json
 
 ### Full text search, return full resource bodies. A bit slower, but could actually result in a faster UX.
-GET http://localhost/search?q=test&include=true HTTP/1.1
+GET http://localhost:9883/search?q=Foo&include=true HTTP/1.1
 Accept: application/ld+json
 
 ### Index at (RDF) document for search
-POST http://localhost/search HTTP/1.1
+POST http://localhost:9883/search HTTP/1.1
 Content-Type: text/turtle
 
 @prefix schema: <http://schema.org/> .
@@ -33,14 +33,16 @@ Content-Type: text/turtle
         schema:name  "asdfsajhdfgbasdf" .
 
 ### Send a Commit
-POST http://localhost/commit HTTP/1.1
+### The hard part here is setting the correct signature.
+### Use a library (@tomic/lib for JS, and atomic_lib for Rust).
+POST http://localhost:9883/commit HTTP/1.1
 Accept: application/json
 Content-Type: application/json
 
 {
-  "subject": "http://localhost:8081/test",
+  "subject": "http://localhost:9883/test",
   "created_at": 1601239744,
-  "signer": "http://localhost:8081/agents/root",
+  "signer": "http://localhost:9883/agents/root",
   "set": {
     "https://atomicdata.dev/properties/requires": "[\"http/properties/requires\"]"
   },
