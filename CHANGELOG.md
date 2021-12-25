@@ -9,6 +9,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Server-Timings header #256
 - Fix indented welcome message
 - Added various endpoints as resources #259
+- Show version, author and description in cli tool
 
 ## [v0.30.0] - 2021-12-22
 
