@@ -12,19 +12,36 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 ## Local development
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
-If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-data-browser), run it with `SNOWPACK_PUBLIC_BASE_URL` set to your `atomic-server` (by default `localhost`).
-
-## Debugging
-
-- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
-
-## GUI + Server
 
 Since `atomic-server` is developed in conjunction with the typescript / react `atomic-data-browser` project, it might make sense to run both locally whilst developing.
 
 - Clone [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
+
+## Testing
+
+```sh
+# This also makes sure that cli and server work, plus it test the db feature
+cargo test --all
+```
+
+## Performance improvements
+
+```sh
+# Install drill to run benchmarks. 6
+cargo install drill
+drill -b benchmark.yml --stats
+
+# Install flamegraph to gain deep insights into which calls take time
+cargo install flamegraph
+cargo flamegraph --bin atomic-server --dev --root
+open flamegraph.svg
+```
+
+## Debugging
+
+- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
 
 ## Making a perfect pull-request
 

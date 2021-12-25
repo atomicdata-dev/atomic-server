@@ -160,21 +160,6 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
 Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more about Collections, Commits, JSON-AD and other concepts used here.
 
-## Testing
-
-```sh
-# This also makes sure that cli and server work, plus it test the db feature
-cargo test --all
-```
-
-## Performance benchmarking
-
-```sh
-# Install drill
-cargo install drill
-drill -b benchmark.yml --stats
-```
-
 ## FAQ & Troubleshooting
 
 ### Can / should I create backups?
