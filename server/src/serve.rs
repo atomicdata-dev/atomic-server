@@ -7,6 +7,31 @@ use crate::errors::AtomicServerResult;
 
 /// Start the server
 pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
+    // Start logging
+    // Enable logging, but hide most tantivy logs
+    std::env::set_var(
+        "RUST_LOG",
+        format!("{},tantivy=warn", config.opts.log_level),
+    );
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+    // Start tracing
+    // STDOUT log
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let terminal_layer = tracing_subscriber::fmt::Layer::default();
+    let tracing_registry = tracing_subscriber::registry()
+        .with(terminal_layer)
+        .with(filter);
+
+    let (chrome_layer, guard) = tracing_chrome::ChromeLayerBuilder::new()
+        .include_args(true)
+        .build();
+    if config.opts.trace_chrome {
+        tracing::info!("Enabling tracing for Chrome");
+        tracing_registry.with(chrome_layer).init();
+    } else {
+        tracing_registry.init();
+    }
+
     // Setup the database and more
     let appstate = crate::appstate::init(config.clone())?;
 
@@ -102,6 +127,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
             .await?;
     }
     crate::process::remove_pid(config)?;
+    guard.flush();
     Ok(())
 }
 

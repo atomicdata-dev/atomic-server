@@ -26,6 +26,10 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
 
+## Performance monitoring
+
+- Run with `--trace-chrome` to create a tracefile in you current directory. Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph.
+
 ## Making a perfect pull-request
 
 - Clear explanation in the PR itself of what is changed and why
