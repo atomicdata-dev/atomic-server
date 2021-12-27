@@ -5,7 +5,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/aget_basetomic)
 
-_Status: Alpha. Prone to breaking changes. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
+_Status: Beta. [Breaking changes](../changelog.md) are expected until 1.0._
 
 **A command-line application to create, read and interact with Atomic Data.**
 
