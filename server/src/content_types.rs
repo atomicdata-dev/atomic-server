@@ -81,7 +81,7 @@ pub fn parse_accept_header(header: &str) -> ContentType {
             return ContentType::NTriples;
         }
     }
-    log::info!("Unknown Accept header, defaut to HTML: {}", header);
+    tracing::info!("Unknown Accept header, defaut to HTML: {}", header);
     ContentType::Html
 }
 

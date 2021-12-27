@@ -69,7 +69,7 @@ async fn main() -> AtomicServerResult<()> {
                 current_path.to_str().expect("Cannot render path")
             );
             if std::path::Path::new(&pathstr).exists() {
-                log::error!(".env already exists at {}", pathstr);
+                tracing::error!(".env already exists at {}", pathstr);
                 panic!("{} already exists", pathstr);
             }
             let mut file = File::create(&pathstr)

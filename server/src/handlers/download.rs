@@ -27,7 +27,7 @@ pub async fn handle_download(
     };
 
     let for_agent = get_client_agent(headers, &appstate, subject.clone())?;
-    log::info!("handle_download: {}", subject);
+    tracing::info!("handle_download: {}", subject);
     let resource = store.get_resource_extended(&subject, false, for_agent.as_deref())?;
     download_file_handler_partial(&resource, &req, &appstate)
 }

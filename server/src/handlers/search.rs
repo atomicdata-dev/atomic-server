@@ -162,11 +162,11 @@ pub async fn search_query(
 
         let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
         for s in subjects {
-            log::info!("Subject in search result: {}", s);
+            tracing::info!("Subject in search result: {}", s);
             match store.get_resource_extended(&s, true, for_agent.as_deref()) {
                 Ok(r) => resources.push(r),
                 Err(_e) => {
-                    log::info!("Skipping result: {} : {}", s, _e);
+                    tracing::info!("Skipping result: {} : {}", s, _e);
                     continue;
                 }
             }

@@ -38,7 +38,7 @@ pub async fn tpf(
         value.as_deref(),
         true,
     )?;
-    log::info!("TPF query: {:?}", query);
+    tracing::info!("TPF query: {:?}", query);
     builder.header("Content-Type", content_type.to_mime());
     match content_type {
         ContentType::JsonAd => {
@@ -55,7 +55,7 @@ pub async fn tpf(
         }
         ContentType::Json | ContentType::Html | ContentType::JsonLd => {
             // TODO
-            log::error!("This Content-Type is not implemented");
+            tracing::error!("This Content-Type is not implemented");
             Ok(builder.body("This Content-Type is not implemented"))
         }
         ContentType::Turtle | ContentType::NTriples => {

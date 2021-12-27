@@ -39,7 +39,7 @@ impl ResponseError for AtomicServerError {
     }
     fn error_response(&self) -> HttpResponse {
         let body = self.message.clone();
-        log::info!("Error reponse {}: {}", self.status_code(), self.message);
+        tracing::info!("Error reponse {}: {}", self.status_code(), self.message);
         HttpResponse::build(self.status_code()).body(body)
     }
 }
