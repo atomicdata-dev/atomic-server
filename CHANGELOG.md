@@ -5,6 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [unreleased]
 
+- Replace `log` with `tracing` for structured logging #261
 - Correct 404 status code
 - Server-Timings header #256
 - Fix indented welcome message

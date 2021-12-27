@@ -47,7 +47,7 @@ impl Handler<Subscribe> for CommitMonitor {
                         HashSet::new()
                     };
                     set.insert(msg.addr);
-                    tracing::info!("handle subscribe {} ", msg.subject);
+                    // tracing::info!("handle subscribe {} ", msg.subject);
                     self.subscriptions.insert(msg.subject.clone(), set);
                 }
                 Err(unauthorized_err) => {

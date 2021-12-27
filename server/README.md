@@ -7,7 +7,7 @@
 
 https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
 
-_Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
+_Status: Beta. [Breaking changes](../changelog.md) are expected until 1.0._
 
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
