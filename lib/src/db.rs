@@ -91,6 +91,7 @@ impl Db {
     }
 
     /// Search for a value, get a PropSubjectMap. If it does not exist, create a new one.
+    #[tracing::instrument(skip(self))]
     pub fn get_prop_subject_map(&self, string_val: &str) -> AtomicResult<PropSubjectMap> {
         let prop_sub_map = self
             .index_vals

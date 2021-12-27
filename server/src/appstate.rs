@@ -23,33 +23,10 @@ pub struct AppState {
     pub search_state: SearchState,
 }
 
-/// Creates the server context.
+/// Creates the AppState (the server's context available in Handlers).
 /// Initializes or opens a store on disk.
-/// Initializes logging.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
-    // Enable logging, but hide most tantivy logs
-    std::env::set_var(
-        "RUST_LOG",
-        format!("{},tantivy=warn", config.opts.log_level),
-    );
-
-    // Initialize logger
-    {
-        use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-        // Start tracing
-        // STDOUT log
-        let terminal_layer = tracing_subscriber::fmt::Layer::default();
-        let tracing_registry = tracing_subscriber::registry().with(terminal_layer);
-
-        if config.opts.trace_chrome {
-            tracing::info!("Enabling tracing for Chrome");
-            let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
-            tracing_registry.with(chrome_layer).init();
-        } else {
-            tracing_registry.init();
-        }
-    }
     tracing::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", env!("CARGO_PKG_VERSION"));
 
     // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
