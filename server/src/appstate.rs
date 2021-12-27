@@ -6,6 +6,7 @@ use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
 };
+use tracing_chrome::FlushGuard;
 
 /// Data object available to handlers and actors.
 /// Contains the store, configuration and addresses for Actix Actors.
@@ -28,18 +29,28 @@ pub struct AppState {
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
     // Enable logging, but hide most tantivy logs
-    std::env::set_var("RUST_LOG", "info,tantivy=warn");
-    // Logs to the console. The tracing library allows for structured logging.
-    tracing_subscriber::fmt::init();
+    std::env::set_var(
+        "RUST_LOG",
+        format!("{},tantivy=warn", config.opts.log_level),
+    );
 
-    // use tracing_chrome::ChromeLayerBuilder;
-    // use tracing_subscriber::{prelude::*, registry::Registry};
+    // Initialize logger
+    {
+        use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+        // Start tracing
+        // STDOUT log
+        let terminal_layer = tracing_subscriber::fmt::Layer::default();
+        let tracing_registry = tracing_subscriber::registry().with(terminal_layer);
 
-    // let (chrome_layer, _guard) = ChromeLayerBuilder::new().build();
-    // tracing_subscriber::registry().with(chrome_layer).init();
-
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    tracing::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", VERSION);
+        if config.opts.trace_chrome {
+            tracing::info!("Enabling tracing for Chrome");
+            let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+            tracing_registry.with(chrome_layer).init();
+        } else {
+            tracing_registry.init();
+        }
+    }
+    tracing::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", env!("CARGO_PKG_VERSION"));
 
     // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     let _ = crate::process::terminate_existing_processes(&config)

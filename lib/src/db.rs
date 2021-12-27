@@ -275,12 +275,14 @@ impl Storelike for Db {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     fn get_resource_extended(
         &self,
         subject: &str,
         skip_dynamic: bool,
         for_agent: Option<&str>,
     ) -> AtomicResult<Resource> {
+        tracing::trace!("get_resource_extended: {}", subject);
         // This might add a trailing slash
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
@@ -424,6 +426,7 @@ impl Storelike for Db {
     }
 
     // TPF implementation that used the index_value cache, far more performant than the StoreLike implementation
+    #[tracing::instrument(skip(self))]
     fn tpf(
         &self,
         q_subject: Option<&str>,
@@ -432,6 +435,7 @@ impl Storelike for Db {
         // Whether resources from outside the store should be searched through
         include_external: bool,
     ) -> AtomicResult<Vec<Atom>> {
+        tracing::trace!("tpf");
         let mut vec: Vec<Atom> = Vec::new();
 
         let hassub = q_subject.is_some();

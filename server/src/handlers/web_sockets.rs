@@ -17,7 +17,7 @@ pub async fn web_socket_handler(
     stream: web::Payload,
     data: web::Data<Mutex<AppState>>,
 ) -> AtomicServerResult<HttpResponse> {
-    tracing::info!("Starting websocket");
+    // tracing::info!("Starting websocket");
     let context = data.lock().unwrap();
 
     // Authentication check. If the user has no headers, continue with the Public Agent.
@@ -74,7 +74,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
             }
             // TODO: Check if it's a subscribe / unsubscribe / commit message
             Ok(ws::Message::Text(text)) => {
-                tracing::info!("Incoming websocket text message: {:?}", text);
+                // tracing::info!("Incoming websocket text message: {:?}", text);
                 match text.as_str() {
                     s if s.starts_with("SUBSCRIBE ") => {
                         let mut parts = s.split("SUBSCRIBE ");
