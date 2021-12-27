@@ -16,18 +16,18 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
         // either friendly (Terminate) or not friendly (Kill)
         let mut signal = sysinfo::Signal::Term;
         if let Some(process) = s.process(pid) {
-            log::warn!(
+            tracing::warn!(
                 "Terminating existing running instance of atomic-server (process ID: {})...",
                 process.pid()
             );
             process.kill(sysinfo::Signal::Term);
-            log::info!("Checking if other server has succesfully terminated...",);
+            tracing::info!("Checking if other server has succesfully terminated...",);
             loop {
                 s.refresh_processes();
                 if let Some(_process) = s.process(pid) {
                     if tries_left > 1 {
                         tries_left -= 1;
-                        log::info!(
+                        tracing::info!(
                             "Other instance is still running, checking again in {} seconds, for {} more times ",
                             retry_secs,
                             tries_left
@@ -35,17 +35,19 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
                         std::thread::sleep(std::time::Duration::from_secs(retry_secs));
                     } else {
                         if signal == sysinfo::Signal::Kill {
-                            log::error!("Could not terminate other atomic-server, exiting...");
+                            tracing::error!("Could not terminate other atomic-server, exiting...");
                             std::process::exit(1);
                         }
-                        log::warn!("Terminate signal did not work, let's try again with Kill...",);
+                        tracing::warn!(
+                            "Terminate signal did not work, let's try again with Kill...",
+                        );
                         _process.kill(sysinfo::Signal::Kill);
                         tries_left = 15;
                         signal = sysinfo::Signal::Kill;
                     }
                     continue;
                 };
-                log::info!("No other atomic-server is running, continuing start-up",);
+                tracing::info!("No other atomic-server is running, continuing start-up",);
                 break;
             }
         }
@@ -56,7 +58,7 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
 /// Removes the process id file in the config directory meant for signaling this instance is running.
 pub fn remove_pid(config: &Config) -> AtomicServerResult<()> {
     if std::fs::remove_file(pid_path(config)).is_err() {
-        log::warn!(
+        tracing::warn!(
             "Could not remove process file at {}",
             pid_path(config).to_str().unwrap()
         )

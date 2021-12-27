@@ -8,18 +8,18 @@ pub fn tray_icon_process(config: crate::config::Config) {
         };
         let _ = tray.add_menu_item("Open", move || match open::that(&config.local_base_url) {
             Ok(_) => (),
-            Err(err) => (log::error!("Can't open app. {}", err)),
+            Err(err) => (tracing::error!("Can't open app. {}", err)),
         });
         let _ = tray.add_menu_item("Config folder", move || {
             match open::that(&config.config_dir) {
                 Ok(_) => (),
-                Err(err) => (log::error!("Can't open config folder. {}", err)),
+                Err(err) => (tracing::error!("Can't open config folder. {}", err)),
             }
         });
         let _ = tray.add_menu_item("About", move || {
             match open::that("https://github.com/joepio/atomic") {
                 Ok(_) => (),
-                Err(err) => (log::error!("Can't open about page. {}", err)),
+                Err(err) => (tracing::error!("Can't open about page. {}", err)),
             }
         });
         let inner = tray.inner_mut();

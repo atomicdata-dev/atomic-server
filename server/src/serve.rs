@@ -18,7 +18,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
         let appstate_clone = appstate.clone();
 
         actix_web::rt::spawn(async move {
-            log::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
+            tracing::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
             appstate_clone
                 .store
                 .clear_index()
@@ -27,18 +27,18 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
                 .store
                 .build_index(true)
                 .expect("Failed to build value index");
-            log::info!("Building value index finished!");
+            tracing::info!("Building value index finished!");
         });
-        log::info!("Removing existing search index...");
+        tracing::info!("Removing existing search index...");
         appstate_clone
             .search_state
             .writer
             .write()
             .expect("Could not get a lock on search writer")
             .delete_all_documents()?;
-        log::info!("Building search index...");
+        tracing::info!("Building search index...");
         crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
-        log::info!("Search index finished!");
+        tracing::info!("Search index finished!");
     }
 
     let server = HttpServer::new(move || {
@@ -53,11 +53,11 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
         actix_web::App::new()
             .app_data(data)
             .wrap(cors)
-            .wrap(middleware::Logger::default())
+            .wrap(tracing_actix_web::TracingLogger)
             .wrap(middleware::Compress::default())
             .configure(|app| crate::routes::config_routes(app, &appstate.config))
             .default_service(web::to(|| {
-                log::error!("Wrong route, should not happen with normal requests");
+                tracing::error!("Wrong route, should not happen with normal requests");
                 actix_web::HttpResponse::NotFound()
             }))
             .app_data(
