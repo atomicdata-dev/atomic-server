@@ -6,7 +6,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepipo/atomic)
 
-_Status: Alpha. Prone to breaking changes. [Changelog](https://github.com/joepio/atomic/blob/master/CHANGELOG.md)_
+_Status: Beta. [Breaking changes](../changelog.md) are expected until 1.0._
 
 **Rust library for using [Atomic Data](https://docs.atomicdata.dev).
 Powers [`atomic-cli`](../cli/readme.md) and [`atomic-server`](../server/readme.md).**

@@ -11,7 +11,7 @@ This repo consists of three components: A library, a server and a CLI.**
 
 [![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
 
-_Status: Alpha. Not ready for production time. Prone to changes and corrupt databases when upgrading. [Changelog](https://github.com/joepio/atomic-data-rust/blob/master/CHANGELOG.md)_
+_Status: Beta. [Breaking changes](changelog.md) are expected until 1.0._
 
 The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
 `atomic-server` is a graph database server for storing and sharing typed linked data.
