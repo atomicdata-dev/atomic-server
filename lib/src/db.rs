@@ -60,6 +60,7 @@ impl Db {
     }
 
     /// Internal method for fetching Resource data.
+    #[tracing::instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
         let subject_bin = bincode::serialize(subject)?;
@@ -69,6 +70,7 @@ impl Db {
 
     /// Finds resource by Subject, return PropVals HashMap
     /// Deals with the binary API of Sled
+    #[tracing::instrument(skip(self))]
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
         let subject_binary = bincode::serialize(subject)
             .map_err(|e| format!("Can't serialize {}: {}", subject, e))?;
@@ -192,6 +194,7 @@ impl Storelike for Db {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self, resource), fields(sub = %resource.get_subject()))]
     fn add_resource_opts(
         &self,
         resource: &Resource,
@@ -228,6 +231,7 @@ impl Storelike for Db {
         self.set_propvals(resource.get_subject(), resource.get_propvals())
     }
 
+    #[tracing::instrument(skip(self))]
     fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
         let vec = match atom.value.to_owned() {
             Value::ResourceArray(_v) => atom.values_to_subjects()?,
@@ -268,6 +272,7 @@ impl Storelike for Db {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
         let propvals = self.get_propvals(subject);
 
@@ -376,6 +381,7 @@ impl Storelike for Db {
         Ok(resource)
     }
 
+    #[tracing::instrument(skip(self))]
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         let self_url = self
@@ -410,6 +416,7 @@ impl Storelike for Db {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
         if let Ok(found) = self.get_propvals(subject) {
             for (prop, val) in found {

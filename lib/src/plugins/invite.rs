@@ -4,6 +4,7 @@ use crate::{
 };
 
 /// If there is a valid Agent in the correct query param, and the invite is valid, update the rights and respond with a redirect to the target resource
+#[tracing::instrument(skip(store, query_params))]
 pub fn construct_invite_redirect(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
@@ -110,6 +111,7 @@ pub fn construct_invite_redirect(
 /// Overwrites the target resource to include the new rights.
 /// Checks if the Agent has a valid URL.
 /// Will not throw an error if the Agent already has the rights.
+#[tracing::instrument(skip(store))]
 pub fn add_rights(
     agent: &str,
     target: &str,

@@ -10,6 +10,7 @@ use crate::{
 /// Checks the datatypes for the Values.
 /// Ignores all atoms where the subject is different.
 /// WARNING: Calls store methods, and is called by store methods, might get stuck in a loop!
+#[tracing::instrument(skip(store))]
 pub fn fetch_resource(
     subject: &str,
     store: &impl Storelike,

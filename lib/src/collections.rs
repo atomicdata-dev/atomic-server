@@ -153,6 +153,7 @@ pub struct Collection {
 }
 
 /// Sorts a vector or resources by some property.
+#[tracing::instrument]
 fn sort_resources(
     mut resources: ResourceCollection,
     sort_by: &str,
@@ -183,6 +184,7 @@ impl Collection {
     /// Constructs a Collection, which is a paginated list of items with some sorting applied.
     /// Gets the required data from the store.
     /// Applies sorting settings.
+    #[tracing::instrument(skip(store))]
     pub fn collect_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
@@ -381,6 +383,7 @@ impl Collection {
 /// Builds a collection from query params and the passed Collection resource.
 /// The query params are used to override the stored Collection resource properties.
 /// This also sets defaults for Collection properties when fields are missing
+#[tracing::instrument(skip(store, query_params))]
 pub fn construct_collection_from_params(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,

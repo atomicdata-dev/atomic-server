@@ -74,6 +74,7 @@ impl Handler<CommitMessage> for CommitMonitor {
     // I want commits to succeed (no 500 response) even if indexing fails,
     // also because performance is imporatant here -
     // dealing with these indexing things synchronously would be too slow.
+    #[tracing::instrument(name = "handle_commit_message", skip(self))]
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
         let target = msg.commit_response.commit_struct.subject.clone();
 

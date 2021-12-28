@@ -5,14 +5,14 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [unreleased]
 
-- Replace `log` with `tracing` for structured logging #261
-- Add `--log-level` option
-- Add `--trace-chrome` option
+- Replace `log` with `tracing` for structured logging and add tracing to `atomic-lib`, enables better (performance) diagnostics #261
+- Add `--log-level` option #261
+- Add `--trace-chrome` option #261
 - Correct 404 status code
 - Server-Timings header #256
-- Fix indented welcome message
 - Added various endpoints as resources #259
 - Show version, author and description in cli tool
+- Fix indented welcome message in generated Drive
 
 ## [v0.30.0] - 2021-12-22
 

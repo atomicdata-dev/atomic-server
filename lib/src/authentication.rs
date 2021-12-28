@@ -38,6 +38,7 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
 /// Get the Agent's subject from headers
 /// Checks if the auth headers are correct, whether signature matches the public key, whether the timestamp is valid.
 /// by default, returns the public agent
+#[tracing::instrument(skip_all)]
 pub fn get_agent_from_headers_and_check(
     auth_header_values: Option<AuthValues>,
     store: &impl Storelike,
