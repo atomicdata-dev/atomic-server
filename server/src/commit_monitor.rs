@@ -36,7 +36,12 @@ impl Handler<Subscribe> for CommitMonitor {
     type Result = ();
 
     // A message comes in when a client subscribes to a subject.
-    fn handle(&mut self, msg: Subscribe, _: &mut Context<Self>) {
+    #[tracing::instrument(
+        name = "handle_subscribe",
+        skip_all,
+        fields(to = %msg.subject, agent = %msg.agent)
+    )]
+    fn handle(&mut self, msg: Subscribe, _ctx: &mut Context<Self>) {
         // check if the agent has the rights to subscribe to this resource
         if let Ok(resource) = self.store.get_resource(&msg.subject) {
             match atomic_lib::hierarchy::check_read(&self.store, &resource, &msg.agent) {
@@ -74,20 +79,13 @@ impl Handler<CommitMessage> for CommitMonitor {
     // I want commits to succeed (no 500 response) even if indexing fails,
     // also because performance is imporatant here -
     // dealing with these indexing things synchronously would be too slow.
-    #[tracing::instrument(name = "handle_commit_message", skip(self))]
+    #[tracing::instrument(name = "handle_commit_message", skip_all, fields(subscriptions = &self.subscriptions.len(), s = %msg.commit_response.commit_resource.get_subject()))]
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
         let target = msg.commit_response.commit_struct.subject.clone();
 
-        tracing::info!(
-            "handle commit for {} with id {}. Current connections: {}",
-            target,
-            msg.commit_response.commit_resource.get_subject(),
-            self.subscriptions.len()
-        );
-
         // Notify websocket listeners
         if let Some(subscribers) = self.subscriptions.get(&target) {
-            tracing::info!(
+            tracing::debug!(
                 "Sending commit {} to {} subscribers",
                 target,
                 subscribers.len()
@@ -96,7 +94,7 @@ impl Handler<CommitMessage> for CommitMonitor {
                 connection.do_send(msg.clone());
             }
         } else {
-            tracing::info!("No subscribers for {}", target);
+            tracing::debug!("No subscribers for {}", target);
         }
 
         // Update the value index

@@ -12,7 +12,8 @@ use std::sync::Mutex;
 
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
-pub async fn get_resource(
+#[tracing::instrument(skip(data))]
+pub async fn handle_get_resource(
     path: Option<web::Path<String>>,
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,

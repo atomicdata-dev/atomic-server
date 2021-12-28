@@ -43,7 +43,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 .to(handlers::search::search_index_rdf),
         );
     }
-    app.service(web::resource("/{path:[^{}]+}").to(handlers::resource::get_resource))
+    app.service(web::resource("/{path:[^{}]+}").to(handlers::resource::handle_get_resource))
         // Also allow the home resource (not matched by the previous one)
-        .service(web::resource("/").to(handlers::resource::get_resource));
+        .service(web::resource("/").to(handlers::resource::handle_get_resource));
 }

@@ -6,7 +6,6 @@ use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
 };
-use tracing_chrome::FlushGuard;
 
 /// Data object available to handlers and actors.
 /// Contains the store, configuration and addresses for Actix Actors.

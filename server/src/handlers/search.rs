@@ -224,8 +224,8 @@ fn get_inner_value(t: Term) -> Option<String> {
 }
 
 #[derive(Debug)]
-struct StringAtom {
-    subject: String,
-    property: String,
-    value: String,
+pub struct StringAtom {
+    pub subject: String,
+    pub property: String,
+    pub value: String,
 }
