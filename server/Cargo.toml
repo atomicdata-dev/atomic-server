@@ -42,12 +42,12 @@ version = "0.8.1"
 
 [dependencies.actix-web]
 features = ["rustls"]
-version = "3.3.2"
+version = "3.3.3"
 
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]
 path = "../lib"
-version = "0.30.0"
+version = "0.30.1"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
