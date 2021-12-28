@@ -1,7 +1,7 @@
 [package]
 authors = ["Joep Meindertsma <joep@ontola.io>"]
 default-run = "atomic-server"
-description = "Create, share and model Atomic Data with this graph database server."
+description = "Create, share and model Atomic Data with this graph database server. Run atomic-server without any arguments to start the server. Use --help to learn about the options."
 edition = "2021"
 license = "MIT"
 name = "atomic-server"
@@ -50,7 +50,7 @@ path = "../lib"
 version = "0.30.0"
 
 [dependencies.clap]
-features = ["derive", "env"]
+features = ["derive", "env", "cargo"]
 version = "3.0.0-rc.3"
 
 [dependencies.open]

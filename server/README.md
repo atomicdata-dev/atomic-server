@@ -132,8 +132,8 @@ They are stored in your `.config/atomic/` dir.
 
 There are three ways to interact with this server:
 
-- **GUI**: Use the [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) JS frontend by visiting `localhost`.
-- **API**: Check out [./example_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
+- **GUI**: Use the [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) JS frontend by visiting `localhost:9883`.
+- **API**: We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml). Check out [./example_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the Atomic Data Docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
 - **CLI**: The [`atomic-cli`](https://crates.io/crates/atomic-cli/0.24.2) terminal app
 
 ### Use `atomic-cli` as client
@@ -160,21 +160,6 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
 Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more about Collections, Commits, JSON-AD and other concepts used here.
 
-## Testing
-
-```sh
-# This also makes sure that cli and server work, plus it test the db feature
-cargo test --all
-```
-
-## Performance benchmarking
-
-```sh
-# Install drill
-cargo install drill
-drill -b benchmark.yml --stats
-```
-
 ## FAQ & Troubleshooting
 
 ### Can / should I create backups?
@@ -190,7 +175,7 @@ You can run `atomic-server --initialize` to recreate the `/setup` invite. It wil
 ### How do I migrate my data to a new domain?
 
 There are no helper functions for this, but you could `atomic-server export` your JSON-AD, and find + replace your old domain with the new one.
-This could especially be helpful if you're running at `localhost` and want to move to a live server.
+This could especially be helpful if you're running at `localhost:9883` and want to move to a live server.
 
 ### How do I reset my database?
 

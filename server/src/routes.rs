@@ -20,7 +20,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 }))
                 .to(handlers::single_page_app::single_page),
         )
-        .service(web::scope("/upload").route("", web::post().to(handlers::upload::upload_handler)))
+        .service(
+            web::resource("/upload")
+                .guard(actix_web::guard::Method(Method::POST))
+                .to(handlers::upload::upload_handler),
+        )
         .service(web::resource("/tpf").to(handlers::tpf::tpf))
         .service(
             web::resource("/commit")

@@ -26,11 +26,7 @@ pub async fn post_commit(
     // We don't update the index, because that's a job for the CommitMonitor. That means it can be done async in a different thread, making this commit response way faster.
     let commit_response = incoming_commit.apply_opts(store, true, true, true, true, false)?;
 
-    // TODO: better response
-    let message = format!(
-        "Commit succesfully applied. Can be seen at {}",
-        commit_response.commit.get_subject()
-    );
+    let message = commit_response.commit_resource.to_json_ad()?;
 
     // When a commit is applied, notify all webhook subscribers
     // TODO: add commit handler https://github.com/joepio/atomic-data-rust/issues/253

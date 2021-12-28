@@ -12,13 +12,6 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 ## Local development
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
-If you _also_ want to work on [the front-end](https://github.com/joepio/atomic-data-browser), run it with `SNOWPACK_PUBLIC_BASE_URL` set to your `atomic-server` (by default `localhost`).
-
-## Debugging
-
-- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
-
-## GUI + Server
 
 Since `atomic-server` is developed in conjunction with the typescript / react `atomic-data-browser` project, it might make sense to run both locally whilst developing.
 
@@ -26,9 +19,28 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
 
+## Testing
+
+```sh
+# This also makes sure that cli and server work, plus it test the db feature
+cargo test --all
+```
+
+## Debugging
+
+- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
+
 ## Performance monitoring
 
-- Run with `--trace-chrome` to create a tracefile in you current directory. Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph.
+```sh
+# Run with `--trace-chrome` to create a tracefile in you current directory
+atomic-server --trace-chrome
+# Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph.
+
+# Install drill to run benchmarks. 6
+cargo install drill
+drill -b benchmark.yml --stats
+```
 
 ## Making a perfect pull-request
 

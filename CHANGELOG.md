@@ -10,6 +10,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add `--trace-chrome` option #261
 - Correct 404 status code
 - Server-Timings header #256
+- Added various endpoints as resources #259
+- Show version, author and description in cli tool
 - Fix indented welcome message in generated Drive
 
 ## [v0.30.0] - 2021-12-22

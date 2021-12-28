@@ -76,12 +76,12 @@ impl Handler<CommitMessage> for CommitMonitor {
     // dealing with these indexing things synchronously would be too slow.
     #[tracing::instrument(name = "handle_commit_message", skip(self))]
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
-        let target = msg.commit_response.full_commit.subject.clone();
+        let target = msg.commit_response.commit_struct.subject.clone();
 
         tracing::info!(
             "handle commit for {} with id {}. Current connections: {}",
             target,
-            msg.commit_response.commit.get_subject(),
+            msg.commit_response.commit_resource.get_subject(),
             self.subscriptions.len()
         );
 
@@ -101,7 +101,7 @@ impl Handler<CommitMessage> for CommitMonitor {
 
         // Update the value index
         msg.commit_response
-            .full_commit
+            .commit_struct
             .apply_changes(msg.commit_response.resource_old.clone(), &self.store, true)
             .unwrap();
 

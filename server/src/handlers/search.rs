@@ -139,19 +139,9 @@ pub async fn search_query(
             .ok_or("Add a query param")?
             .to_string()
     );
-    let mut results_resource = Resource::new(subject.clone());
-    results_resource.set_propval(urls::IS_A.into(), vec![urls::ENDPOINT].into(), store)?;
-    results_resource.set_propval(urls::DESCRIPTION.into(), atomic_lib::Value::Markdown("Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. ".into()), store)?;
-    results_resource.set_propval(
-        urls::ENDPOINT_PARAMETERS.into(),
-        vec![
-            urls::SEARCH_QUERY,
-            urls::SEARCH_LIMIT,
-            urls::SEARCH_PROPERTY,
-        ]
-        .into(),
-        store,
-    )?;
+
+    let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
+    results_resource.set_subject(subject.clone());
 
     if appstate.config.opts.rdf_search {
         // Always return all subjects, don't do authentication
@@ -162,7 +152,6 @@ pub async fn search_query(
 
         let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
         for s in subjects {
-            tracing::info!("Subject in search result: {}", s);
             match store.get_resource_extended(&s, true, for_agent.as_deref()) {
                 Ok(r) => resources.push(r),
                 Err(_e) => {

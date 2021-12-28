@@ -9,7 +9,7 @@ use std::path::PathBuf;
 
 /// Store and share Atomic Data! Visit https://atomicdata.dev for more info. Pass no subcommands to launch the server. The `.env` of your current directory will be read.
 #[derive(Clone, Parser, Debug)]
-#[clap(author = "Joep Meindertsma (joep@ontola.io)")]
+#[clap(about, author, version)]
 pub struct Opts {
     /// The subcommand being run
     #[clap(subcommand)]
@@ -145,6 +145,14 @@ pub fn init() -> AtomicServerResult<Config> {
 
     // Parse CLI options, .env values, set defaults
     let opts: Opts = Opts::parse();
+
+    // Add metadata to the CLI app.
+    // For some reason, this isn't working.
+    // let app = Opts::into_app();
+    // app.version(crate_version!())
+    //     .about(crate_description!())
+    //     .author(crate_authors!())
+    //     .get_matches();
 
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
