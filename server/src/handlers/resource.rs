@@ -12,7 +12,7 @@ use std::sync::Mutex;
 
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
-#[tracing::instrument(skip(data))]
+#[tracing::instrument(skip(data, req))]
 pub async fn handle_get_resource(
     path: Option<web::Path<String>>,
     data: web::Data<Mutex<AppState>>,
