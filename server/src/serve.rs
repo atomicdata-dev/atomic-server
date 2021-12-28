@@ -7,6 +7,31 @@ use crate::errors::AtomicServerResult;
 
 /// Start the server
 pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
+    // Start logging
+    // Enable logging, but hide most tantivy logs
+    std::env::set_var(
+        "RUST_LOG",
+        format!("{},tantivy=warn", config.opts.log_level),
+    );
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+    // Start tracing
+    // STDOUT log
+    let filter = tracing_subscriber::EnvFilter::from_default_env();
+    let terminal_layer = tracing_subscriber::fmt::Layer::default();
+    let tracing_registry = tracing_subscriber::registry()
+        .with(terminal_layer)
+        .with(filter);
+
+    let (chrome_layer, guard) = tracing_chrome::ChromeLayerBuilder::new()
+        .include_args(true)
+        .build();
+    if config.opts.trace_chrome {
+        tracing::info!("Enabling tracing for Chrome");
+        tracing_registry.with(chrome_layer).init();
+    } else {
+        tracing_registry.init();
+    }
+
     // Setup the database and more
     let appstate = crate::appstate::init(config.clone())?;
 
@@ -18,7 +43,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
         let appstate_clone = appstate.clone();
 
         actix_web::rt::spawn(async move {
-            log::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
+            tracing::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
             appstate_clone
                 .store
                 .clear_index()
@@ -27,18 +52,18 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
                 .store
                 .build_index(true)
                 .expect("Failed to build value index");
-            log::info!("Building value index finished!");
+            tracing::info!("Building value index finished!");
         });
-        log::info!("Removing existing search index...");
+        tracing::info!("Removing existing search index...");
         appstate_clone
             .search_state
             .writer
             .write()
             .expect("Could not get a lock on search writer")
             .delete_all_documents()?;
-        log::info!("Building search index...");
+        tracing::info!("Building search index...");
         crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
-        log::info!("Search index finished!");
+        tracing::info!("Search index finished!");
     }
 
     let server = HttpServer::new(move || {
@@ -53,11 +78,11 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
         actix_web::App::new()
             .app_data(data)
             .wrap(cors)
-            .wrap(middleware::Logger::default())
+            .wrap(tracing_actix_web::TracingLogger)
             .wrap(middleware::Compress::default())
             .configure(|app| crate::routes::config_routes(app, &appstate.config))
             .default_service(web::to(|| {
-                log::error!("Wrong route, should not happen with normal requests");
+                tracing::error!("Wrong route, should not happen with normal requests");
                 actix_web::HttpResponse::NotFound()
             }))
             .app_data(
@@ -102,6 +127,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
             .await?;
     }
     crate::process::remove_pid(config)?;
+    guard.flush();
     Ok(())
 }
 

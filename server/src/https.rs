@@ -16,7 +16,7 @@ const CERTS_CREATED_AT: &str = "./.https/certs_created_at";
 
 /// Starts an HTTP Actix server for HTTPS certificate initialization
 pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
-    log::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
+    tracing::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
     let http_endpoint = format!("{}:{}", config.opts.ip, config.opts.port);
     let mut well_known_folder = config.static_path.clone();
     well_known_folder.push("well-known");
@@ -31,7 +31,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
         .expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
         .run();
     crate::https::request_cert(config).map_err(|e| format!("Certification init failed: {}", e))?;
-    log::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
+    tracing::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
     running_server.stop(true).await;
     Ok(())
 }
@@ -61,7 +61,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
         .email
         .clone()
         .expect("ATOMIC_EMAIL must be set for HTTPS init");
-    log::info!("Requesting Let's Encrypt account with {}", email);
+    tracing::info!("Requesting Let's Encrypt account with {}", email);
     let acc = dir.account(&email)?;
 
     // Order a new TLS certificate for a domain.
@@ -102,7 +102,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
         // The proof is the contents of the file
         let proof = chall.http_proof();
 
-        log::info!("Writing ACME challange to {:?}", challenge_path);
+        tracing::info!("Writing ACME challange to {:?}", challenge_path);
 
         fs::create_dir_all(
             PathBuf::from(&challenge_path)
@@ -144,13 +144,13 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     // Now download the certificate. Also stores the cert in
     // the persistence.
-    log::info!("Downloading certificate...");
+    tracing::info!("Downloading certificate...");
     let cert = ord_cert.download_and_save_cert()?;
 
     fs::write(&config.cert_path, cert.certificate()).expect("Unable to write file");
     fs::write(&config.key_path, cert.private_key()).expect("Unable to write file");
     add_certs_created_at();
-    log::info!("HTTPS init Success!");
+    tracing::info!("HTTPS init Success!");
     Ok(())
 }
 
@@ -189,7 +189,7 @@ pub fn check_expiration_certs() -> bool {
     // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX.
     let expired = certs_age > chrono::Duration::weeks(4);
     if expired {
-        log::warn!("HTTPS Certificates expired, requesting new ones...")
+        tracing::warn!("HTTPS Certificates expired, requesting new ones...")
         // This is where I might need to remove the `.https/` folder, but it seems like it's not necessary
     };
     expired

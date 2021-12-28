@@ -6,6 +6,7 @@ use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
 };
+use tracing_chrome::FlushGuard;
 
 /// Data object available to handlers and actors.
 /// Contains the store, configuration and addresses for Actix Actors.
@@ -22,36 +23,31 @@ pub struct AppState {
     pub search_state: SearchState,
 }
 
-/// Creates the server context.
+/// Creates the AppState (the server's context available in Handlers).
 /// Initializes or opens a store on disk.
-/// Initializes logging.
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
-    // Enable logging, but hide most tantivy logs
-    std::env::set_var("RUST_LOG", "info,tantivy=warn");
-    env_logger::init();
-    const VERSION: &str = env!("CARGO_PKG_VERSION");
-    log::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", VERSION);
+    tracing::info!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", env!("CARGO_PKG_VERSION"));
 
     // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     let _ = crate::process::terminate_existing_processes(&config)
-        .map_err(|e| log::error!("Could not check for running instance: {}", e));
+        .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
 
-    log::info!("Opening database at {:?}", &config.store_path);
+    tracing::info!("Opening database at {:?}", &config.store_path);
     let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
     if config.initialize {
-        log::info!("Initialize: creating and populating new Database");
+        tracing::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // Building the index here is needed to perform TPF queries on imported resources
-        log::info!("Building index (this could take a few minutes for larger databases)");
+        tracing::info!("Building index (this could take a few minutes for larger databases)");
         store.build_index(true)?;
-        log::info!("Building index finished!");
+        tracing::info!("Building index finished!");
     }
-    log::info!("Setting default agent");
+    tracing::info!("Setting default agent");
     set_default_agent(&config, &store)?;
     if config.initialize {
-        log::info!("Running populate commands");
+        tracing::info!("Running populate commands");
         atomic_lib::populate::create_drive(&store)
             .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
         atomic_lib::populate::set_drive_rights(&store, true)
@@ -62,15 +58,15 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
             .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         set_up_initial_invite(&store)?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
-        log::info!("Setting rights to Drive {}", store.get_base_url());
+        tracing::info!("Setting rights to Drive {}", store.get_base_url());
     }
 
     // Initialize search constructs
-    log::info!("Starting search service");
+    tracing::info!("Starting search service");
     let search_state = SearchState::new(&config)?;
 
     // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
-    log::info!("Starting commit monitor");
+    tracing::info!("Starting commit monitor");
     let commit_monitor = crate::commit_monitor::create_commit_monitor(
         store.clone(),
         search_state.clone(),
@@ -98,7 +94,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
                         // If there is an agent in the config, but not in the store,
                         // That probably means that the DB has been erased and only the config file exists.
                         // This means that the Agent from the Config file should be recreated, using its private key.
-                        log::info!("Agent not retrievable, but config was found. Recreating Agent in new store.");
+                        tracing::info!("Agent not retrievable, but config was found. Recreating Agent in new store.");
                         let recreated_agent = Agent::new_from_private_key(
                             "root".into(),
                             store,
@@ -126,7 +122,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
             };
             let config_string =
                 atomic_lib::config::write_config(&config.config_file_path, cfg.clone())?;
-            log::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli or atomic-data-browser) to log in with these credentials. \n{}", &config.config_file_path, config_string);
+            tracing::warn!("No existing config found, created a new Config at {:?}. Copy this to your client machine (running atomic-cli or atomic-data-browser) to log in with these credentials. \n{}", &config.config_file_path, config_string);
             cfg
         }
     };
@@ -138,7 +134,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
         created_at: 0,
         name: None,
     };
-    log::info!("Default Agent is set: {}", &agent.subject);
+    tracing::info!("Default Agent is set: {}", &agent.subject);
     store.set_default_agent(agent);
     Ok(())
 }
@@ -146,7 +142,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
 /// Creates the first Invitation that is opened by the user on the Home page.
 fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     let subject = format!("{}/setup", store.get_base_url());
-    log::info!("Creating initial Invite at {}", subject);
+    tracing::info!("Creating initial Invite at {}", subject);
     let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;
     invite.set_subject(subject);
     // This invite can be used only once

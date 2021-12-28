@@ -65,6 +65,12 @@ pub struct Opts {
     /// CAUTION: Skip authentication checks, making all data public. Improves performance.
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,
+    /// How much logs you want. Choose from "warn", "info", "debug", "trace".
+    #[clap(long, default_value = "info", env = "RUST_LOG")]
+    pub log_level: String,
+    /// Produces a trace log file in the current directory that can be opened with `chrome://tracing`
+    #[clap(long)]
+    pub trace_chrome: bool,
 }
 
 #[derive(Parser, Clone, Debug)]

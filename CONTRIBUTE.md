@@ -26,22 +26,21 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 cargo test --all
 ```
 
-## Performance improvements
-
-```sh
-# Install drill to run benchmarks. 6
-cargo install drill
-drill -b benchmark.yml --stats
-
-# Install flamegraph to gain deep insights into which calls take time
-cargo install flamegraph
-cargo flamegraph --bin atomic-server --dev --root
-open flamegraph.svg
-```
-
 ## Debugging
 
 - **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
+
+## Performance monitoring
+
+```sh
+# Run with `--trace-chrome` to create a tracefile in you current directory
+atomic-server --trace-chrome
+# Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph.
+
+# Install drill to run benchmarks. 6
+cargo install drill
+drill -b benchmark.yml --stats
+```
 
 ## Making a perfect pull-request
 

@@ -47,11 +47,11 @@ impl Handler<Subscribe> for CommitMonitor {
                         HashSet::new()
                     };
                     set.insert(msg.addr);
-                    log::info!("handle subscribe {} ", msg.subject);
+                    // tracing::info!("handle subscribe {} ", msg.subject);
                     self.subscriptions.insert(msg.subject.clone(), set);
                 }
                 Err(unauthorized_err) => {
-                    log::info!(
+                    tracing::info!(
                         "Not allowed {}  to subscribe to {}: {}",
                         &msg.agent,
                         &msg.subject,
@@ -77,7 +77,7 @@ impl Handler<CommitMessage> for CommitMonitor {
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
         let target = msg.commit_response.commit_struct.subject.clone();
 
-        log::info!(
+        tracing::info!(
             "handle commit for {} with id {}. Current connections: {}",
             target,
             msg.commit_response.commit_resource.get_subject(),
@@ -86,7 +86,7 @@ impl Handler<CommitMessage> for CommitMonitor {
 
         // Notify websocket listeners
         if let Some(subscribers) = self.subscriptions.get(&target) {
-            log::info!(
+            tracing::info!(
                 "Sending commit {} to {} subscribers",
                 target,
                 subscribers.len()
@@ -95,7 +95,7 @@ impl Handler<CommitMessage> for CommitMonitor {
                 connection.do_send(msg.clone());
             }
         } else {
-            log::info!("No subscribers for {}", target);
+            tracing::info!("No subscribers for {}", target);
         }
 
         // Update the value index

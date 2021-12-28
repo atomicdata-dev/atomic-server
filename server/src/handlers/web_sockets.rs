@@ -17,7 +17,7 @@ pub async fn web_socket_handler(
     stream: web::Payload,
     data: web::Data<Mutex<AppState>>,
 ) -> AtomicServerResult<HttpResponse> {
-    log::info!("Starting websocket");
+    // tracing::info!("Starting websocket");
     let context = data.lock().unwrap();
 
     // Authentication check. If the user has no headers, continue with the Public Agent.
@@ -74,7 +74,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
             }
             // TODO: Check if it's a subscribe / unsubscribe / commit message
             Ok(ws::Message::Text(text)) => {
-                log::info!("Incoming websocket text message: {:?}", text);
+                // tracing::info!("Incoming websocket text message: {:?}", text);
                 match text.as_str() {
                     s if s.starts_with("SUBSCRIBE ") => {
                         let mut parts = s.split("SUBSCRIBE ");
@@ -105,7 +105,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                         }
                     }
                     other => {
-                        log::warn!("Unmatched message: {}", other);
+                        tracing::warn!("Unmatched message: {}", other);
                         ctx.text(format!("Server receieved unknown message: {}", other));
                     }
                 };
@@ -137,7 +137,7 @@ impl WebSocketConnection {
             // check client heartbeats
             if Instant::now().duration_since(act.hb) > CLIENT_TIMEOUT {
                 // heartbeat timed out
-                log::info!("Websocket Client heartbeat failed, disconnecting!");
+                tracing::info!("Websocket Client heartbeat failed, disconnecting!");
 
                 // We need to kill the Actor responsible for Commit monitoring, too
                 // act.lobby_addr.do_send(Disconnect { id: act.id, room_id: act.room });
@@ -158,7 +158,7 @@ impl Handler<CommitMessage> for WebSocketConnection {
 
     fn handle(&mut self, msg: CommitMessage, ctx: &mut ws::WebsocketContext<Self>) {
         let resource = msg.commit_response.commit_resource;
-        log::info!(
+        tracing::info!(
             "handle commit in web socket connection for resource {}",
             resource.get_subject()
         );

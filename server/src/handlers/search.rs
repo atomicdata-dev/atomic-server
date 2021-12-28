@@ -155,7 +155,7 @@ pub async fn search_query(
             match store.get_resource_extended(&s, true, for_agent.as_deref()) {
                 Ok(r) => resources.push(r),
                 Err(_e) => {
-                    log::info!("Skipping result: {} : {}", s, _e);
+                    tracing::info!("Skipping result: {} : {}", s, _e);
                     continue;
                 }
             }
