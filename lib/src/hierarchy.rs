@@ -5,6 +5,7 @@ use core::fmt;
 
 use crate::{errors::AtomicResult, urls, Resource, Storelike};
 
+#[derive(Debug)]
 pub enum Right {
     Read,
     Write,
@@ -60,6 +61,7 @@ pub fn check_read(
 /// Recursively checks a Resource and its Parents for rights.
 /// Throws if not allowed.
 /// Returns string with explanation if allowed.
+#[tracing::instrument(skip(store, resource))]
 pub fn check_rights(
     store: &impl Storelike,
     resource: &Resource,

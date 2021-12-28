@@ -10,6 +10,7 @@ pub fn path_endpoint() -> Endpoint {
     }
 }
 
+#[tracing::instrument(skip(store))]
 fn handle_path_request(
     url: url::Url,
     store: &impl Storelike,

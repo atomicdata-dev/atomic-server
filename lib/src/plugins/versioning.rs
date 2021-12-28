@@ -24,6 +24,7 @@ pub fn all_versions_endpoint() -> Endpoint {
     }
 }
 
+#[tracing::instrument(skip(store))]
 fn handle_version_request(
     url: url::Url,
     store: &impl Storelike,
@@ -45,6 +46,7 @@ fn handle_version_request(
     Ok(resource)
 }
 
+#[tracing::instrument(skip(store))]
 fn handle_all_versions_request(
     url: url::Url,
     store: &impl Storelike,
@@ -85,6 +87,7 @@ fn handle_all_versions_request(
 }
 
 /// Searches the local store for all commits with this subject, returns sorted from old to new.
+#[tracing::instrument(skip(store))]
 fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Vec<Commit>> {
     let commit_atoms = store.tpf(None, Some(urls::SUBJECT), Some(subject), false)?;
     let mut commit_resources = Vec::new();
@@ -99,6 +102,7 @@ fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResu
     Ok(commit_resources)
 }
 
+#[tracing::instrument(skip(store))]
 pub fn get_initial_commit_for_resource(
     subject: &str,
     store: &impl Storelike,
@@ -114,6 +118,7 @@ pub fn get_initial_commit_for_resource(
 
 /// Constructs a Resource version for a specific Commit
 /// Only works if the current store has the required Commits
+#[tracing::instrument(skip(store))]
 pub fn construct_version(
     commit_url: &str,
     store: &impl Storelike,

@@ -124,6 +124,7 @@ pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServer
 /// Adds a single resource to the search index, but does _not_ commit!
 /// Does not index outgoing links, or resourcesArrays
 /// `appstate.search_index_writer.write()?.commit()?;`
+#[tracing::instrument(skip(appstate))]
 pub fn add_resource(appstate: &SearchState, resource: &Resource) -> AtomicServerResult<()> {
     let fields = get_schema_fields(appstate)?;
     let subject = resource.get_subject();
@@ -148,6 +149,7 @@ pub fn add_resource(appstate: &SearchState, resource: &Resource) -> AtomicServer
 // / Removes a single resource from the search index, but does _not_ commit!
 // / Does not index outgoing links, or resourcesArrays
 // / `appstate.search_index_writer.write()?.commit()?;`
+#[tracing::instrument(skip(search_state))]
 pub fn remove_resource(search_state: &SearchState, subject: &str) -> AtomicServerResult<()> {
     let fields = get_schema_fields(search_state)?;
     let writer = search_state.writer.read()?;
@@ -158,6 +160,7 @@ pub fn remove_resource(search_state: &SearchState, subject: &str) -> AtomicServe
 
 /// Adds a single atom or triple to the search index, but does _not_ commit!
 /// `appstate.search_index_writer.write()?.commit()?;`
+#[tracing::instrument(skip(writer, fields))]
 pub fn add_triple(
     writer: &IndexWriter,
     subject: String,

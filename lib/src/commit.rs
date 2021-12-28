@@ -65,6 +65,7 @@ impl Commit {
     /// Allows for control over which validations should be performed.
     /// Returns the generated Commit, the old Resource and the new Resource.
     /// TODO: Should check if the Agent has the correct rights.
+    #[tracing::instrument(skip(store))]
     pub fn apply_opts(
         &self,
         store: &impl Storelike,
@@ -194,6 +195,7 @@ impl Commit {
 
     /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
     /// Optionally also updates the index in the Store.
+    #[tracing::instrument(skip(store))]
     pub fn apply_changes(
         &self,
         mut resource: Resource,
@@ -240,6 +242,7 @@ impl Commit {
     }
 
     /// Converts a Resource of a Commit into a Commit
+    #[tracing::instrument]
     pub fn from_resource(resource: Resource) -> AtomicResult<Commit> {
         let subject = resource.get(urls::SUBJECT)?.to_string();
         let created_at = resource.get(urls::CREATED_AT)?.to_int()?;
@@ -274,6 +277,7 @@ impl Commit {
     /// Converts the Commit into a Resource with Atomic Values.
     /// Creates an identifier using the base_url
     /// Works for both Signed and Unsigned Commits
+    #[tracing::instrument(skip(store))]
     pub fn into_resource(self, store: &impl Storelike) -> AtomicResult<Resource> {
         let commit_subject = match self.signature.as_ref() {
             Some(sig) => format!("{}/commits/{}", store.get_base_url(), sig),
@@ -335,6 +339,7 @@ impl Commit {
 
     /// Generates a deterministic serialized JSON-AD representation of the Commit.
     /// Removes the signature from the object before serializing, since this function is used to check if the signature is correct.
+    #[tracing::instrument(skip(store))]
     pub fn serialize_deterministically_json_ad(
         &self,
         store: &impl Storelike,
@@ -408,6 +413,7 @@ impl CommitBuilder {
 }
 
 /// Signs a CommitBuilder at a specific unix timestamp.
+#[tracing::instrument(skip(store))]
 fn sign_at(
     commitbuilder: CommitBuilder,
     agent: &crate::agents::Agent,
@@ -439,6 +445,7 @@ fn sign_at(
 }
 
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
+#[tracing::instrument]
 pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
     let private_key_bytes = base64::decode(private_key.to_string()).map_err(|e| {
         format!(

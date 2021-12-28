@@ -16,6 +16,7 @@ use serde_json::Map;
 
 /// Parse a single Json AD string, convert to Atoms
 /// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
+#[tracing::instrument(skip(store))]
 pub fn parse_json_ad_resource(
     string: &str,
     store: &impl crate::Storelike,
@@ -25,6 +26,7 @@ pub fn parse_json_ad_resource(
 }
 
 /// Parses a JSON-AD object, converts it to an Atomic Resource
+#[tracing::instrument(skip(store))]
 fn json_ad_object_to_resource(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,
@@ -37,6 +39,7 @@ fn json_ad_object_to_resource(
 }
 
 /// Parses JSON-AD strings to resources, adds them to the store
+#[tracing::instrument(skip(store))]
 pub fn parse_json_ad_array(
     string: &str,
     store: &impl Storelike,
@@ -75,6 +78,7 @@ pub fn parse_json_ad_array(
 
 /// Parse a single Json AD string that represents an incoming Commit.
 /// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
+#[tracing::instrument(skip(store))]
 pub fn parse_json_ad_commit_resource(
     string: &str,
     store: &impl crate::Storelike,
@@ -101,6 +105,7 @@ pub fn parse_json_ad_commit_resource(
 
 /// Parse a single Json AD string, convert to Atoms
 /// Does not match all props to datatypes, so it could result in invalid data.
+#[tracing::instrument(skip(store))]
 pub fn parse_json_ad_map_to_propvals(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,

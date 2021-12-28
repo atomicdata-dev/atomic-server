@@ -18,7 +18,7 @@ pub struct Subscribe {
 }
 
 /// A message containing a Resource, which should be sent to subscribers
-#[derive(Message, Clone)]
+#[derive(Message, Clone, Debug)]
 #[rtype(result = "()")]
 pub struct CommitMessage {
     /// Full resource of the Commit itself, the new resource, and the old one
