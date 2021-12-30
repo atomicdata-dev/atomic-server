@@ -1,12 +1,15 @@
 # Atomic-server Tauri
 
-_WARNING: Tauri is not compatible with the currenlty used Actix-Web version, so it does not run / build correctly_.
+Tauri build Desktop releases for Atomic-Server.
+It takes care of native installers, app icons, system tray icons, menu items, self-update ([issue](https://github.com/joepio/atomic-data-rust/issues/158)) and more.
 
 ```sh
 # install tauri
 yarn global add @tauri/tauri-cli
 # run dev server
 tauri dev
+# build an installer for your OS
+tauri build
 ```
 
 ## Limitations

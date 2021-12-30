@@ -1,8 +1,8 @@
 //! Content-type / Accept header negotiation, MIME types
 
-use actix_web::http::HeaderMap;
+use actix_web::http::header::HeaderMap;
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum ContentType {
     /// Plain JSON, using shortnames as keys instead of URLs
     /// https://docs.atomicdata.dev/interoperability/json.html#atomic-data-as-plain-json

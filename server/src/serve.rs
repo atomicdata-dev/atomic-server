@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use crate::errors::AtomicServerResult;
 
 /// Start the server
-pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
+pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     // Start logging
     // Enable logging, but hide most tantivy logs
     std::env::set_var(
@@ -78,7 +78,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
         actix_web::App::new()
             .app_data(data)
             .wrap(cors)
-            .wrap(tracing_actix_web::TracingLogger)
+            .wrap(tracing_actix_web::TracingLogger::default())
             .wrap(middleware::Compress::default())
             .configure(|app| crate::routes::config_routes(app, &appstate.config))
             .default_service(web::to(|| {
@@ -102,9 +102,9 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
                 if std::fs::File::open(&config.cert_path).is_err()
                     || crate::https::check_expiration_certs()
                 {
-                    crate::https::cert_init_server(config).await?;
+                    crate::https::cert_init_server(&config).await?;
                 }
-                let https_config = crate::https::get_https_config(config)
+                let https_config = crate::https::get_https_config(&config)
                     .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
                 let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
                 println!("{}", message);
@@ -126,7 +126,7 @@ pub async fn serve(config: &crate::config::Config) -> AtomicServerResult<()> {
             .run()
             .await?;
     }
-    crate::process::remove_pid(config)?;
+    crate::process::remove_pid(&config)?;
     guard.flush();
     Ok(())
 }

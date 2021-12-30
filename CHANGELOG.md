@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [v0.30.2] - 2021-12-30
+
+- Update to actix v4, get Tauri to work again #246
+
 ## [v0.30.1] - 2021-12-28
 
 - Replace `log` with `tracing` for structured logging and add tracing to `atomic-lib`, enables better (performance) diagnostics #261

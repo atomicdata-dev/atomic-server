@@ -27,21 +27,26 @@ pub async fn handle_get_resource(
     // Get the subject from the path, or return the home URL
     let subject = if let Some(subj_end) = path {
         let mut subj_end_string = subj_end.as_str();
-        if content_type == ContentType::Html {
-            if let Some((ext, path)) = try_extension(subj_end_string) {
-                content_type = ext;
-                subj_end_string = path;
-            }
-        }
-        // Check extensions and set datatype. Harder than it looks to get right...
-        // This might not be the best way of creating the subject. But I can't access the full URL from any actix stuff!
-        let querystring = if req.query_string().is_empty() {
-            "".to_string()
+        // If the request is for the root, return the home URL
+        if subj_end_string.is_empty() {
+            base_url.to_string()
         } else {
-            format!("?{}", req.query_string())
-        };
-        let subject = format!("{}/{}{}", base_url, subj_end_string, querystring);
-        subject
+            if content_type == ContentType::Html {
+                if let Some((ext, path)) = try_extension(subj_end_string) {
+                    content_type = ext;
+                    subj_end_string = path;
+                }
+            }
+            // Check extensions and set datatype. Harder than it looks to get right...
+            // This might not be the best way of creating the subject. But I can't access the full URL from any actix stuff!
+            let querystring = if req.query_string().is_empty() {
+                "".to_string()
+            } else {
+                format!("?{}", req.query_string())
+            };
+            let subject = format!("{}/{}{}", base_url, subj_end_string, querystring);
+            subject
+        }
     } else {
         // There is no end string, so It's the root of the URL, the base URL!
         String::from(base_url)
@@ -56,13 +61,13 @@ pub async fn handle_get_resource(
     let mut builder = HttpResponse::Ok();
 
     tracing::info!("get_resource: {} as {}", subject, content_type.to_mime());
-    builder.header("Content-Type", content_type.to_mime());
+    builder.append_header(("Content-Type", content_type.to_mime()));
     // This prevents the browser from displaying the JSON response upon re-opening a closed tab
     // https://github.com/joepio/atomic-data-rust/issues/137
-    builder.header(
+    builder.append_header((
         "Cache-Control",
         "no-store, no-cache, must-revalidate, private",
-    );
+    ));
 
     let resource = store.get_resource_extended(&subject, false, for_agent.as_deref())?;
     timer.add("get_resource");
@@ -78,6 +83,6 @@ pub async fn handle_get_resource(
         }
     };
     timer.add("serialize");
-    builder.header("Server-Timing", timer.to_header());
+    builder.append_header(("Server-Timing", timer.to_header()));
     Ok(builder.body(response_body))
 }

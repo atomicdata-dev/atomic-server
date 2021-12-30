@@ -34,53 +34,50 @@ jobs:
           # (required)
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Disable this until tauri image is ready
-  # https://github.com/joepio/atomic-data-rust/issues/246
-  # publish-tauri:
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       platform: [macos-latest, ubuntu-latest, windows-latest]
-
-  #   runs-on: ${{ matrix.platform }}
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: setup node
-  #       uses: actions/setup-node@v1
-  #       with:
-  #         node-version: 12
-  #     - name: install Rust stable
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: stable
-  #     - name: install webkit2gtk and
-  #         sudo apt-get install -y webkit2gtk-4.0 libappindicator3 (ubuntu only)
-  #       if: matrix.platform == 'ubuntu-latest'
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
-  #     - name: Get Changelog Entry
-  #       id: changelog_reader
-  #       uses: mindsers/changelog-reader-action@v2
-  #       with:
-  #         version: ${{ steps.tag_name.outputs.current_version }}
-  #         path: CHANGELOG.md
-  #     - uses: tauri-apps/tauri-action@ecbab6a4d4b0deee6a67d644c9b73ed53c5aa739
-  #       env:
-  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  #         # TODO: https://github.com/joepio/atomic-data-rust/issues/237
-  #         # ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
-  #         # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-  #         # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-  #         # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_IDENTITY_ID }}
-  #         # APPLE_ID: ${{ secrets.APPLE_ID }}
-  #         # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-  #       with:
-  #         tagName: ${{ steps.changelog_reader.outputs.version }}
-  #         releaseName: ${{ steps.changelog_reader.outputs.version }}
-  #         releaseBody: ${{ steps.changelog_reader.outputs.changes }}
-  #         releaseDraft: ${{ steps.changelog_reader.outputs.status == 'unreleased' }}
-  #         prerelease: ${{ steps.changelog_reader.outputs.status == 'prereleased' }}
+  publish-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: setup node
+        uses: actions/setup-node@v1
+        with:
+          node-version: 12
+      - name: install Rust stable
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: install webkit2gtk and
+          sudo apt-get install -y webkit2gtk-4.0 libappindicator3 (ubuntu only)
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
+      - name: Get Changelog Entry
+        id: changelog_reader
+        uses: mindsers/changelog-reader-action@v2
+        with:
+          version: ${{ steps.tag_name.outputs.current_version }}
+          path: CHANGELOG.md
+      - uses: tauri-apps/tauri-action@ecbab6a4d4b0deee6a67d644c9b73ed53c5aa739
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # TODO: https://github.com/joepio/atomic-data-rust/issues/237
+          # ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_IDENTITY_ID }}
+          # APPLE_ID: ${{ secrets.APPLE_ID }}
+          # APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+        with:
+          tagName: ${{ steps.changelog_reader.outputs.version }}
+          releaseName: ${{ steps.changelog_reader.outputs.version }}
+          releaseBody: ${{ steps.changelog_reader.outputs.changes }}
+          releaseDraft: ${{ steps.changelog_reader.outputs.status == 'unreleased' }}
+          prerelease: ${{ steps.changelog_reader.outputs.status == 'prereleased' }}
 
   upload-assets:
     strategy:
