@@ -1,12 +1,12 @@
 [package]
-authors = ["you"]
+authors = ["joep@ontola.io"]
 build = "src/build.rs"
 description = "Atomic Server - Tauri desktop"
 edition = "2021"
-license = ""
+license = "MIT"
 name = "atomic-server-tauri"
-repository = ""
-version = "0.29.0"
+repository = "https://github.com/joepio/atomic-data-rust"
+version = "0.30.1"
 
 [build-dependencies]
 [build-dependencies.tauri-build]

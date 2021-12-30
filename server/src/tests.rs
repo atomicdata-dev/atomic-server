@@ -6,7 +6,7 @@ use crate::appstate::AppState;
 
 use super::*;
 use actix_web::{
-    body::AnyBody,
+    body::MessageBody,
     dev::ServiceResponse,
     test::{self, TestRequest},
     web::Data,
@@ -69,9 +69,9 @@ async fn server_tests() {
 
     // Should 404
     let req = test::TestRequest::with_uri("/doesnotexist")
-        .header("Accept", "application/ld+json")
+        .append_header(("Accept", "application/ld+json"))
         .to_request();
-    let resp = test::call_service(&mut app, req).await;
+    let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_client_error());
 
     // Edit the properties collection, make it hidden to the public agent
@@ -141,9 +141,8 @@ async fn server_tests() {
 }
 
 /// Gets the body from the response as a String. Why doen't actix provide this?
-fn get_body(resp: ServiceResponse<AnyBody>) -> String {
-    match resp.into_body() {
-        AnyBody::Bytes(ref by) => String::from_utf8(by.as_ref().into()).unwrap(),
-        _ => panic!(),
-    }
+fn get_body(resp: ServiceResponse) -> String {
+    let boxbody = resp.into_body();
+    let bytes = boxbody.try_into_bytes().unwrap();
+    String::from_utf8(bytes.as_ref().into()).unwrap()
 }

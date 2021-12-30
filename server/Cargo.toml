@@ -18,6 +18,7 @@ actix-files = "0.6.0-beta.9"
 actix-multipart = "0.4.0-beta.11"
 actix-web-actors = "4.0.0-beta.7"
 async-std = "1.10.0"
+awc = "3.0.0-beta.17"
 chrono = "0.4.19"
 dirs = "3.0.1"
 dotenv = "0.15.0"
@@ -43,7 +44,7 @@ version = "0.8.1"
 
 [dependencies.actix-web]
 features = ["rustls"]
-version = "4.0.0-beta.12"
+version = "4.0.0-beta.18"
 
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]
@@ -70,13 +71,13 @@ version = "1.0.118"
 features = ["time"]
 version = "1.14.0"
 
-[dependencies.tray-item]
-optional = true
-version = "0.6.0"
-
 [dependencies.tracing-subscriber]
 features = ["env-filter"]
 version = "0.3.4"
+
+[dependencies.tray-item]
+optional = true
+version = "0.6.0"
 
 [dev-dependencies]
 actix-rt = "2.4.0"
