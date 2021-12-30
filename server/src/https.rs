@@ -164,17 +164,19 @@ pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::Server
     let cert_file =
         &mut BufReader::new(File::open(config.cert_path.clone()).expect("No HTTPS TLS key found."));
     let key_file = &mut BufReader::new(File::open(&config.key_path).unwrap());
-    let cert_chain = certs(cert_file).unwrap();
-    let first_cert = cert_chain.first().unwrap().to_owned();
+    let mut cert_chain = Vec::new();
+
+    for bytes in certs(cert_file).unwrap() {
+        let certificate = rustls::Certificate(bytes);
+        cert_chain.push(certificate);
+    }
+    // let first_cert = cert_chain.first().unwrap().to_owned();
     let mut keys = pkcs8_private_keys(key_file).unwrap();
     if keys.is_empty() {
         panic!("No key found. Consider deleting the `.https` directory and restart to create new keys.")
     }
     let a = https_config
-        .with_single_cert(
-            vec![rustls::Certificate(first_cert)],
-            rustls::PrivateKey(keys.remove(0)),
-        )
+        .with_single_cert(cert_chain, rustls::PrivateKey(keys.remove(0)))
         .unwrap();
     Ok(a)
 }
