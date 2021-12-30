@@ -43,5 +43,5 @@ pub fn download_file_handler_partial(
     let mut file_path = appstate.config.uploads_path.clone();
     file_path.push(file_name.to_string());
     let file = NamedFile::open(file_path)?;
-    Ok(file.into_response(req)?)
+    Ok(file.into_response(req))
 }

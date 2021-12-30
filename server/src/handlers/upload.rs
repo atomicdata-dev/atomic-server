@@ -53,9 +53,7 @@ pub async fn upload_handler(
     let mut commit_responses: Vec<CommitResponse> = Vec::new();
 
     while let Ok(Some(mut field)) = body.try_next().await {
-        let content_type = field
-            .content_disposition()
-            .ok_or("actix_web::error::ParseError::Incomplete")?;
+        let content_type = field.content_disposition().clone();
         let filename = content_type.get_filename().ok_or("Filename is missing")?;
 
         let filesdir = format!("{}/uploads", appstate.config.config_dir.to_str().unwrap());

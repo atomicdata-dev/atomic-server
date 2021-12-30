@@ -1,5 +1,4 @@
 use atomic_lib::Storelike;
-use errors::AtomicServerResult;
 use std::{fs::File, io::Write};
 
 mod actor_messages;
@@ -25,7 +24,7 @@ mod tests;
 mod tray_icon;
 
 #[actix_web::main]
-async fn main() -> AtomicServerResult<()> {
+async fn main() -> errors::AtomicServerResult<()> {
     // Parse CLI commands, env vars
     let config = config::init().map_err(|e| format!("Initialization failed: {}", e))?;
 
@@ -80,6 +79,6 @@ async fn main() -> AtomicServerResult<()> {
             println!("Sucesfully created {}", pathstr);
             Ok(())
         }
-        None => serve::serve(&config).await,
+        None => serve::serve(config).await,
     }
 }

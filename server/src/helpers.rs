@@ -1,6 +1,6 @@
 //! Functions useful in the server
 
-use actix_web::http::HeaderMap;
+use actix_web::http::header::HeaderMap;
 use atomic_lib::authentication::AuthValues;
 
 use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
