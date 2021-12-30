@@ -214,6 +214,7 @@ dependencies = [
  "actix-utils",
  "derive_more",
  "futures-core",
+ "http",
  "log",
  "pin-project-lite",
  "tokio-rustls",
@@ -529,6 +530,7 @@ dependencies = [
  "actix-web-actors",
  "async-std",
  "atomic_lib",
+ "awc",
  "chrono",
  "clap",
  "dirs 3.0.2",
@@ -627,6 +629,40 @@ name = "autocfg"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
+
+[[package]]
+name = "awc"
+version = "3.0.0-beta.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2e79692bb8a7966b27f7e908a3bcb46c4ba4eb41ffb736344481b1ace08865d0"
+dependencies = [
+ "actix-codec",
+ "actix-http",
+ "actix-rt",
+ "actix-service",
+ "actix-tls",
+ "actix-utils",
+ "ahash",
+ "base64",
+ "bytes",
+ "cfg-if 1.0.0",
+ "cookie 0.16.0",
+ "derive_more",
+ "futures-core",
+ "futures-util",
+ "h2",
+ "http",
+ "itoa 1.0.1",
+ "log",
+ "mime",
+ "percent-encoding",
+ "pin-project-lite",
+ "rand 0.8.4",
+ "serde",
+ "serde_json",
+ "serde_urlencoded 0.7.0",
+ "tokio",
+]
 
 [[package]]
 name = "base-x"
