@@ -5,6 +5,7 @@ use acme_lib::persist::FilePersist;
 use acme_lib::{Directory, DirectoryUrl, Error};
 use actix_web::{App, HttpServer};
 
+use std::sync::mpsc;
 use std::{
     fs::{self, File},
     io::BufReader,
@@ -16,23 +17,58 @@ const CERTS_CREATED_AT: &str = "./.https/certs_created_at";
 
 /// Starts an HTTP Actix server for HTTPS certificate initialization
 pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
-    tracing::warn!("Server temporarily running in HTTP mode, running Let's Encrypt Certificate initialization...");
-    let http_endpoint = format!("{}:{}", config.opts.ip, config.opts.port);
+    let address = format!("{}:{}", config.opts.ip, config.opts.port);
+    tracing::warn!("Server temporarily running in HTTP mode at {}, running Let's Encrypt Certificate initialization...", address);
+
     let mut well_known_folder = config.static_path.clone();
     well_known_folder.push("well-known");
     fs::create_dir_all(&well_known_folder)?;
-    let init_server = HttpServer::new(move || {
-        App::new().service(
-            actix_files::Files::new("/.well-known", well_known_folder.clone()).show_files_listing(),
-        )
+
+    let (tx, rx) = mpsc::channel();
+
+    let address_clone = address.clone();
+
+    std::thread::spawn(move || {
+        actix_web::rt::System::new().block_on(async move {
+            let init_server = HttpServer::new(move || {
+                App::new().service(
+                    actix_files::Files::new("/.well-known", well_known_folder.clone())
+                        .show_files_listing(),
+                )
+            });
+
+            let running_server = init_server
+                .bind(&address_clone)
+                .expect(&*format!("Cannot bind to endpoint {}", &address_clone))
+                .run();
+
+            tx.send(running_server.handle()).unwrap();
+
+            running_server.await
+        })
     });
-    let running_server = init_server
-        .bind(&http_endpoint)
-        .expect(&*format!("Cannot bind to endpoint {}", &http_endpoint))
-        .run();
+
+    let handle = rx.recv().unwrap();
+
+    let client = awc::Client::new();
+    let well_known_url = format!("http://{}/.well-known/", &config.opts.domain);
+    tracing::info!("Testing availability of {}", &well_known_url);
+    let resp = client
+        .get(&well_known_url)
+        .send()
+        .await
+        .expect("Unable to send request for Let's Encrypt initialization");
+    if resp.status() != 200 {
+        return Err(
+            "Server for HTTP initialization not available, returning a non-200 status code".into(),
+        );
+    } else {
+        tracing::info!("Server for HTTP initialization running correctly");
+    }
+
     crate::https::request_cert(config).map_err(|e| format!("Certification init failed: {}", e))?;
     tracing::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
-    running_server.handle().stop(true).await;
+    handle.stop(true).await;
     Ok(())
 }
 

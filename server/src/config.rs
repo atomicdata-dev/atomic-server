@@ -200,7 +200,7 @@ pub fn init() -> AtomicServerResult<Config> {
 
     if opts.https & opts.email.is_none() {
         return Err(
-            "The email parameter is required for getting an HTTPS certificate from Let'sEncrypt."
+            "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsenrypt.org."
                 .into(),
         );
         // email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
