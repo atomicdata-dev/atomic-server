@@ -51,6 +51,7 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
 ## When _not_ to use this
 
 - If you need stability or reliability, look further (for now).
+- If you need to store large amounts of data (for now). The server still lacks collection caching, which makes filtering / sorting slow on large  collections #114
 - You're dealing with non-public / private data. As of now, this server does not have methods to prevent access to content.
 - Complex query requirements. Check out NEO4j, Apache Jena or maybe TerminusDB.
 
