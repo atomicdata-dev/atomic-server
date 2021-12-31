@@ -52,7 +52,7 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
 
 - If you need stability or reliability, look further (for now).
 - If you need to store large amounts of data (for now). The server still lacks collection caching, which makes filtering / sorting slow on large  collections #114
-- You're dealing with sensitive private data. The authorization mechanisms are relatively new and not rigorously tested. 
+- You're dealing with sensitive private data. The authorization mechanisms are relatively new and not rigorously tested.
 - Complex query requirements. Check out NEO4j, Apache Jena or maybe TerminusDB.
 
 ## Installation & getting started
@@ -66,10 +66,16 @@ You can run `atomic-server` in four ways:
 
 When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration)
 
-### Run as binary
+### Install using cargo
 
-After installing from `cargo install atomic-server` or as a binary, run `atomic-server`.
-Run `atomic-server --help` to learn more about the available commands, such as `export`, `import` and various flags.
+```sh
+# Install from source using cargo, and add it to your path
+cargo install atomic-server
+# Check the available options and commands
+atomic-server --help
+# Run it!
+atomic-server
+```
 
 ### Run using docker
 
@@ -88,10 +94,6 @@ cd atomic-data-rust/server
 cp default.env .env
 # Run the server. It creates a store in ~/.config/atomic/db by default
 cargo run
-# Or tun the extra-cool desktop version with a presence in your app tray
-cargo run --features desktop
-# If you don't need HTTPS (or don't have OpenSSL available on your device)
-cargo run --no-default-features
 ```
 
 Troubleshooting compiling from source:
@@ -109,9 +111,18 @@ sudo apt-get install -y pkg-config libssl-dev --fix-missing
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
 - Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
 
-### HTTPS Setup
+### Running using a tunneling service (easy mode)
 
-You'll probably want to make your Atomic Data available through HTTPS.
+If you want to make your atomic-server available on the web, but don't want (or cannot) deal with setting up port-forwarding and DNS, you can use a tunneling service.
+It's the easiest way to get your server to run on the web, yet still have full control over your server.
+
+- Create an account on some tunneling service, such as [tunnelto.dev](https://tunnelto.dev/) (which we will use here). Make sure to reserve a subdomain, you want it to remain stable.
+- `tunnelto --port 9883 --subdomain joepio --key YOUR_API_KEY`
+- `atomic-server --domain joepio.tunnelto.dev --custom-server-url 'https://joepio.tunnelto.dev' --initialize`
+
+### HTTPS Setup on a VPS (static IP required)
+
+You'll probably want to make your Atomic Data available through HTTPS on some server.
 You can use the embedded HTTPS / TLS setup powered by [LetsEncrypt](https://letsencrypt.org/), [acme_lib](https://docs.rs/acme-lib/0.8.1/acme_lib/index.html) and [rustls](https://github.com/ctz/rustls).
 
 You can do this by passing these flags:
