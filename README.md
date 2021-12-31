@@ -7,7 +7,7 @@
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 This repo consists of three components: A library, a server and a CLI.**
 
-## [`atomic-server`](server/README)
+## [`atomic-server`](server/README.md)
 
 [![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
 
@@ -37,7 +37,7 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
 
 https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
 
-## [`atomic-cli`](cli/README)
+## [`atomic-cli`](cli/README.md)
 
 [![crates.io](https://img.shields.io/crates/v/atomic-cli)](https://crates.io/crates/atomic-cli)
 
