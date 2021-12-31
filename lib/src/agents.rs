@@ -58,7 +58,7 @@ impl Agent {
         Agent {
             private_key: Some(keypair.private),
             public_key: keypair.public.clone(),
-            subject: format!("{}/agents/{}", store.get_base_url(), keypair.public),
+            subject: format!("{}/agents/{}", store.get_server_url(), keypair.public),
             name: name.map(|x| x.to_owned()),
             created_at: datetime_helpers::now(),
         }
@@ -70,7 +70,7 @@ impl Agent {
         Ok(Agent {
             private_key: None,
             public_key: public_key.into(),
-            subject: format!("{}/agents/{}", store.get_base_url(), public_key),
+            subject: format!("{}/agents/{}", store.get_server_url(), public_key),
             name: None,
             created_at: datetime_helpers::now(),
         })

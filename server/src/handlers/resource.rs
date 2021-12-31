@@ -23,13 +23,13 @@ pub async fn handle_get_resource(
 
     let headers = req.headers();
     let mut content_type = get_accept(headers);
-    let base_url = &appstate.config.local_base_url;
+    let server_url = &appstate.config.server_url;
     // Get the subject from the path, or return the home URL
     let subject = if let Some(subj_end) = path {
         let mut subj_end_string = subj_end.as_str();
         // If the request is for the root, return the home URL
         if subj_end_string.is_empty() {
-            base_url.to_string()
+            server_url.to_string()
         } else {
             if content_type == ContentType::Html {
                 if let Some((ext, path)) = try_extension(subj_end_string) {
@@ -44,12 +44,12 @@ pub async fn handle_get_resource(
             } else {
                 format!("?{}", req.query_string())
             };
-            let subject = format!("{}/{}{}", base_url, subj_end_string, querystring);
+            let subject = format!("{}/{}{}", server_url, subj_end_string, querystring);
             subject
         }
     } else {
         // There is no end string, so It's the root of the URL, the base URL!
-        String::from(base_url)
+        String::from(server_url)
     };
 
     let store = &appstate.store;
@@ -60,7 +60,7 @@ pub async fn handle_get_resource(
 
     let mut builder = HttpResponse::Ok();
 
-    tracing::info!("get_resource: {} as {}", subject, content_type.to_mime());
+    // tracing::info!("get_resource: {} as {}", subject, content_type.to_mime());
     builder.append_header(("Content-Type", content_type.to_mime()));
     // This prevents the browser from displaying the JSON response upon re-opening a closed tab
     // https://github.com/joepio/atomic-data-rust/issues/137

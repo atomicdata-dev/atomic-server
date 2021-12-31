@@ -169,7 +169,7 @@ impl Resource {
             .collect();
         let subject = format!(
             "{}/{}/{}",
-            store.get_base_url(),
+            store.get_server_url(),
             &class.shortname,
             random_string
         );

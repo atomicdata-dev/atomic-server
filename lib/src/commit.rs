@@ -275,15 +275,15 @@ impl Commit {
     }
 
     /// Converts the Commit into a Resource with Atomic Values.
-    /// Creates an identifier using the base_url
+    /// Creates an identifier using the server_url
     /// Works for both Signed and Unsigned Commits
     #[tracing::instrument(skip(store))]
     pub fn into_resource(self, store: &impl Storelike) -> AtomicResult<Resource> {
         let commit_subject = match self.signature.as_ref() {
-            Some(sig) => format!("{}/commits/{}", store.get_base_url(), sig),
+            Some(sig) => format!("{}/commits/{}", store.get_server_url(), sig),
             None => {
                 let now = crate::datetime_helpers::now();
-                format!("{}/commitsUnsigned/{}", store.get_base_url(), now)
+                format!("{}/commitsUnsigned/{}", store.get_server_url(), now)
             }
         };
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;

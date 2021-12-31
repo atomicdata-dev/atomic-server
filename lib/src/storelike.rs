@@ -73,11 +73,11 @@ pub trait Storelike: Sized {
         Ok(())
     }
 
-    /// Returns the root URL where the default store is.
+    /// Returns the base URL where the default store is.
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_base_url(&self) -> &str;
+    fn get_server_url(&self) -> &str;
 
     /// Returns the root URL where this instance of the store is hosted.
     /// Should return `None` if this is simply a client and not a server.
@@ -152,6 +152,7 @@ pub trait Storelike: Sized {
     }
 
     /// Fetches a property by URL, returns a Property instance
+    #[tracing::instrument(skip(self))]
     fn get_property(&self, subject: &str) -> AtomicResult<Property> {
         let prop = self
             .get_resource(subject)

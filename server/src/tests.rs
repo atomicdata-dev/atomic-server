@@ -16,7 +16,7 @@ use atomic_lib::{urls, Storelike};
 
 /// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
 fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
-    let url = format!("{}{}", appstate.store.get_base_url(), path);
+    let url = format!("{}{}", appstate.store.get_server_url(), path);
     let headers = atomic_lib::client::get_authentication_headers(
         &url,
         &appstate.store.get_default_agent().unwrap(),
@@ -50,7 +50,7 @@ async fn server_tests() {
 
     // Does not work, unfortunately, because the server is not accessible.
     // let fetched =
-    //     atomic_lib::client::fetch_resource(&appstate.config.local_base_url, &appstate.store, None)
+    //     atomic_lib::client::fetch_resource(&appstate.config.server_url, &appstate.store, None)
     //         .expect("could not fetch drive");
 
     // Get HTML page
@@ -75,7 +75,7 @@ async fn server_tests() {
     assert!(resp.status().is_client_error());
 
     // Edit the properties collection, make it hidden to the public agent
-    let mut drive = store.get_resource(&appstate.config.local_base_url).unwrap();
+    let mut drive = store.get_resource(&appstate.config.server_url).unwrap();
     drive
         .set_propval(
             urls::READ.into(),

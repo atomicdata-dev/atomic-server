@@ -33,7 +33,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
 
     tracing::info!("Opening database at {:?}", &config.store_path);
-    let store = atomic_lib::Db::init(&config.store_path, config.local_base_url.clone())?;
+    let store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
     if config.initialize {
         tracing::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)
@@ -57,7 +57,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
             .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         set_up_initial_invite(&store)?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
-        tracing::info!("Setting rights to Drive {}", store.get_base_url());
+        tracing::info!("Setting rights to Drive {}", store.get_server_url());
     }
 
     // Initialize search constructs
@@ -89,7 +89,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
             match store.get_resource(&agent_config.agent) {
                 Ok(_) => agent_config,
                 Err(e) => {
-                    if agent_config.agent.contains(&config.local_base_url) {
+                    if agent_config.agent.contains(&config.server_url) {
                         // If there is an agent in the config, but not in the store,
                         // That probably means that the DB has been erased and only the config file exists.
                         // This means that the Agent from the Config file should be recreated, using its private key.
@@ -114,7 +114,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
             let agent = store.create_agent(Some("root"))?;
             let cfg = atomic_lib::config::Config {
                 agent: agent.subject.clone(),
-                server: config.local_base_url.clone(),
+                server: config.server_url.clone(),
                 private_key: agent
                     .private_key
                     .expect("No private key for agent. Check the config file."),
@@ -140,7 +140,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
 
 /// Creates the first Invitation that is opened by the user on the Home page.
 fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
-    let subject = format!("{}/setup", store.get_base_url());
+    let subject = format!("{}/setup", store.get_server_url());
     tracing::info!("Creating initial Invite at {}", subject);
     let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;
     invite.set_subject(subject);
@@ -157,12 +157,12 @@ fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     )?;
     invite.set_propval(
         atomic_lib::urls::TARGET.into(),
-        atomic_lib::Value::AtomicUrl(store.get_base_url().into()),
+        atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
         store,
     )?;
     invite.set_propval(
         atomic_lib::urls::PARENT.into(),
-        atomic_lib::Value::AtomicUrl(store.get_base_url().into()),
+        atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
         store,
     )?;
     invite.set_propval(
@@ -172,7 +172,7 @@ fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     )?;
     invite.set_propval_string(
         atomic_lib::urls::DESCRIPTION.into(),
-        "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once. If you, for whatever reason, need a new `/setup` invite, you can pass the `--init` flag to `atomic-server`.",
+        "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once. If you, for whatever reason, need a new `/setup` invite, you can pass the `--initialize` flag to `atomic-server`.",
         store,
     )?;
     invite.save_locally(store)?;

@@ -34,7 +34,7 @@ pub async fn upload_handler(
     let parent = store.get_resource(&query.parent)?;
     let subject = format!(
         "{}{}",
-        store.get_base_url(),
+        store.get_server_url(),
         req.head()
             .uri
             .path_and_query()
@@ -84,8 +84,8 @@ pub async fn upload_handler(
             .map_err(|_e| "Too large")?;
 
         let subject_path = format!("files/{}", urlencoding::encode(&file_id));
-        let new_subject = format!("{}/{}", store.get_base_url(), subject_path);
-        let download_url = format!("{}/download/{}", store.get_base_url(), subject_path);
+        let new_subject = format!("{}/{}", store.get_server_url(), subject_path);
+        let download_url = format!("{}/download/{}", store.get_server_url(), subject_path);
 
         let mut resource = atomic_lib::Resource::new_instance(urls::FILE, store)?;
         resource.set_subject(new_subject);

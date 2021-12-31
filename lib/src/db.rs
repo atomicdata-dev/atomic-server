@@ -32,17 +32,17 @@ pub struct Db {
     resources: sled::Tree,
     // Stores all Atoms. The key is the atom.value, the value a vector of Atoms.
     index_vals: sled::Tree,
-    /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
-    base_url: String,
+    /// The address where the db will be hosted, e.g. http://localhost/
+    server_url: String,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
 }
 
 impl Db {
     /// Creates a new store at the specified path, or opens the store if it already exists.
-    /// The base_url is the domain where the db will be hosted, e.g. http://localhost/
+    /// The server_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
-    pub fn init(path: &std::path::Path, base_url: String) -> AtomicResult<Db> {
+    pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
         let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
         let index_vals = db.open_tree("index_vals")?;
@@ -51,7 +51,7 @@ impl Db {
             default_agent: Arc::new(Mutex::new(None)),
             resources,
             index_vals,
-            base_url,
+            server_url,
             endpoints: default_endpoints(),
         };
         crate::populate::populate_base_models(&store)
@@ -255,14 +255,14 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_base_url(&self) -> &str {
-        &self.base_url
+    fn get_server_url(&self) -> &str {
+        &self.server_url
     }
 
     // Since the DB is often also the server, this should make sense.
     // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
     fn get_self_url(&self) -> Option<String> {
-        Some(self.get_base_url().into())
+        Some(self.get_server_url().into())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -521,7 +521,7 @@ impl Storelike for Db {
                     let spm = self.get_prop_subject_map(q_value.unwrap())?;
                     if hasprop {
                         if let Some(set) = spm.get(q_property.unwrap()) {
-                            let base = self.get_base_url();
+                            let base = self.get_server_url();
                             for subj in set {
                                 if !include_external && !subj.starts_with(base) {
                                     continue;
@@ -658,7 +658,7 @@ pub mod test {
             .map(|r| r.get_subject().into())
             .collect();
         println!("{:?}", subjects);
-        let collections_collection_url = format!("{}/collections", store.get_base_url());
+        let collections_collection_url = format!("{}/collections", store.get_server_url());
         let collections_resource = store
             .get_resource_extended(&collections_collection_url, false, None)
             .unwrap();
@@ -704,7 +704,7 @@ pub mod test {
     /// Also counts commits.
     fn destroy_resource_and_check_collection_and_commits() {
         let store = init("counter");
-        let agents_url = format!("{}/agents", store.get_base_url());
+        let agents_url = format!("{}/agents", store.get_server_url());
         let agents_collection_1 = store
             .get_resource_extended(&agents_url, false, None)
             .unwrap();
@@ -719,7 +719,7 @@ pub mod test {
         );
 
         // We will count the commits, and check if they've incremented later on.
-        let commits_url = format!("{}/commits", store.get_base_url());
+        let commits_url = format!("{}/commits", store.get_server_url());
         let commits_collection_1 = store
             .get_resource_extended(&commits_url, false, None)
             .unwrap();
@@ -796,7 +796,7 @@ pub mod test {
     #[test]
     fn get_extended_resource_pagination() {
         let store = DB.lock().unwrap().clone();
-        let subject = format!("{}/commits?current_page=2", store.get_base_url());
+        let subject = format!("{}/commits?current_page=2", store.get_server_url());
         // Should throw, because page 2 is out of bounds for default page size
         let _wrong_resource = store
             .get_resource_extended(&subject, false, None)

@@ -31,7 +31,7 @@ pub fn handle(
       "open" => app
         .create_window(
           "Atomic Server",
-          WindowUrl::App(config.local_base_url.clone().into()),
+          WindowUrl::App(config.server_url.clone().into()),
           |window_builder, webview_attributes| {
             (window_builder.title("Atomic Data"), webview_attributes)
           },
@@ -39,7 +39,7 @@ pub fn handle(
         .unwrap(),
       "docs" => shell::open("https://docs.atomicdata.dev".into(), None).unwrap(),
       "config" => shell::open(config.config_dir.to_str().unwrap().to_string(), None).unwrap(),
-      "browser" => shell::open(config.local_base_url.clone(), None).unwrap(),
+      "browser" => shell::open(config.server_url.clone(), None).unwrap(),
       _ => {}
     }
   }

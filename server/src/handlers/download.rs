@@ -14,12 +14,12 @@ pub async fn handle_download(
 ) -> AtomicServerResult<HttpResponse> {
     let appstate = data.lock().unwrap();
     let headers = req.headers();
-    let base_url = &appstate.config.local_base_url;
+    let server_url = &appstate.config.server_url;
     let store = &appstate.store;
 
     // We replace `/download` with `/` to get the subject of the Resource.
     let subject = if let Some(pth) = path {
-        let subject = format!("{}/{}", base_url, pth);
+        let subject = format!("{}/{}", server_url, pth);
         subject
     } else {
         // There is no end string, so It's the root of the URL, the base URL!

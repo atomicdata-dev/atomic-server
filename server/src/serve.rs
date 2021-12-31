@@ -92,7 +92,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             )
     });
 
-    let message = format!("{}\n\nVisit {}\n\n", BANNER, config.local_base_url);
+    let message = format!("{}\n\nVisit {}\n\n", BANNER, config.server_url);
 
     if config.opts.https {
         if cfg!(feature = "https") {

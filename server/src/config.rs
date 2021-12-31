@@ -65,7 +65,10 @@ pub struct Opts {
     /// CAUTION: Skip authentication checks, making all data public. Improves performance.
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,
-    /// How much logs you want. Choose from "warn", "info", "debug", "trace".
+    /// The full URL of the server. It should resolve to the home page. Set this if you use an external server or tunnel, instead of directly exposing atomic-server. If you leave this out, it will be generated from `domain`, `port` and `http` / `https`.
+    #[clap(long, env = "ATOMIC_SERVER_URL")]
+    pub server_url: Option<String>,
+    /// How much logs you want. Choose from "warn", "info", "debug", "trace" (from few to many logs).
     #[clap(long, default_value = "info", env = "RUST_LOG")]
     pub log_level: String,
     /// Produces a trace log file in the current directory that can be opened with `chrome://tracing`
@@ -111,8 +114,8 @@ pub struct ServerOpts {}
 /// These values are set when the server initializes, and do not change while running.
 #[derive(Clone)]
 pub struct Config {
-    /// Full domain + schema
-    pub local_base_url: String,
+    /// Full domain + schema, e.g. `https://example.com`. Is either generated from `domain` and `schema`, or is the `custom_server_url`.
+    pub server_url: String,
     /// CLI + ENV options
     pub opts: Opts,
     // ===  PATHS  ===
@@ -145,14 +148,6 @@ pub fn init() -> AtomicServerResult<Config> {
 
     // Parse CLI options, .env values, set defaults
     let opts: Opts = Opts::parse();
-
-    // Add metadata to the CLI app.
-    // For some reason, this isn't working.
-    // let app = Opts::into_app();
-    // app.version(crate_version!())
-    //     .about(crate_description!())
-    //     .author(crate_authors!())
-    //     .get_matches();
 
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
@@ -207,8 +202,11 @@ pub fn init() -> AtomicServerResult<Config> {
     }
 
     let schema = if opts.https { "https" } else { "http" };
-    // I'm not convinced that this is the best way to do this.
-    let local_base_url = if opts.https && opts.port_https == 443 || !opts.https && opts.port == 80 {
+
+    // This logic could be a bit too complicated, but I'm not sure on how to make this simpler.
+    let server_url = if let Some(addr) = opts.server_url.clone() {
+        addr
+    } else if opts.https && opts.port_https == 443 || !opts.https && opts.port == 80 {
         format!("{}://{}", schema, opts.domain)
     } else {
         format!("{}://{}:{}", schema, opts.domain, opts.port)
@@ -225,7 +223,7 @@ pub fn init() -> AtomicServerResult<Config> {
         config_file_path,
         https_path,
         key_path,
-        local_base_url,
+        server_url,
         static_path,
         store_path,
         search_index_path,

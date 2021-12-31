@@ -97,9 +97,9 @@ pub fn fetch_tpf(
 
 /// Posts a Commit to the endpoint of the Subject from the Commit
 pub fn post_commit(commit: &crate::Commit, store: &impl Storelike) -> AtomicResult<()> {
-    let base_url = crate::url_helpers::base_url(commit.get_subject())?;
+    let server_url = crate::url_helpers::server_url(commit.get_subject())?;
     // Default Commit endpoint is `https://example.com/commit`
-    let endpoint = format!("{}commit", base_url);
+    let endpoint = format!("{}commit", server_url);
     post_commit_custom_endpoint(&endpoint, commit, store)
 }
 

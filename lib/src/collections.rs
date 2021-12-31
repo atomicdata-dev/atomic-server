@@ -94,7 +94,7 @@ impl CollectionBuilder {
         store: &impl Storelike,
     ) -> CollectionBuilder {
         CollectionBuilder {
-            subject: format!("{}/{}", store.get_base_url(), path),
+            subject: format!("{}/{}", store.get_server_url(), path),
             property: Some(urls::IS_A.into()),
             value: Some(class_url.into()),
             sort_by: None,
@@ -587,7 +587,7 @@ mod test {
         println!("{:?}", subjects);
         let collections_collection = store
             .get_resource_extended(
-                &format!("{}/collections", store.get_base_url()),
+                &format!("{}/collections", store.get_server_url()),
                 false,
                 None,
             )

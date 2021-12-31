@@ -156,10 +156,10 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
         .ok_or("No self_url set, cannot populate store with Drive")?;
     let mut drive = crate::Resource::new_instance(urls::DRIVE, store)?;
     drive.set_subject(self_url);
-    let base_url = url::Url::parse(store.get_base_url())?;
+    let server_url = url::Url::parse(store.get_server_url())?;
     drive.set_propval_string(
         urls::NAME.into(),
-        base_url.host_str().ok_or("Can't use current base URL")?,
+        server_url.host_str().ok_or("Can't use current base URL")?,
         store,
     )?;
     drive.save_locally(store)?;
@@ -169,7 +169,7 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
 /// Adds rights to the default agent to the Drive resource (at the base URL). Optionally give Public Read rights.
 pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
-    let mut drive = store.get_resource(store.get_base_url())?;
+    let mut drive = store.get_resource(store.get_server_url())?;
     let write_agents = vec![store.get_default_agent()?.subject];
     let mut read_agents = write_agents.clone();
     if public_read {
@@ -184,7 +184,7 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
 Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
 
 Note that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.
-"#, store.get_base_url()), store)?;
+"#, store.get_server_url()), store)?;
     }
     drive.save_locally(store)?;
     Ok(())

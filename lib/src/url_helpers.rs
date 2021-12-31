@@ -3,7 +3,7 @@
 use crate::errors::AtomicResult;
 use url::Url;
 
-pub fn base_url(url: &str) -> AtomicResult<String> {
+pub fn server_url(url: &str) -> AtomicResult<String> {
     let mut parsed: Url = Url::parse(url)?;
 
     match parsed.path_segments_mut() {

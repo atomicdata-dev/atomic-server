@@ -6,7 +6,7 @@ pub fn tray_icon_process(config: crate::config::Config) {
             Ok(item) => item,
             Err(_e) => return,
         };
-        let _ = tray.add_menu_item("Open", move || match open::that(&config.local_base_url) {
+        let _ = tray.add_menu_item("Open", move || match open::that(&config.server_url) {
             Ok(_) => (),
             Err(err) => (tracing::error!("Can't open app. {}", err)),
         });

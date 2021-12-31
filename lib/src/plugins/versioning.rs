@@ -150,7 +150,7 @@ pub fn construct_version(
 fn construct_version_endpoint_url(store: &impl Storelike, commit_url: &str) -> String {
     format!(
         "{}/versioning?commit={}",
-        store.get_base_url(),
+        store.get_server_url(),
         urlencoding::encode(commit_url)
     )
 }
