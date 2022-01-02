@@ -221,8 +221,14 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 /// Makes sure they are fetchable
 pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
     let endpoints = crate::endpoints::default_endpoints();
+    let endpoints_collection = format!("{}/endpoints", store.get_server_url());
     for endpoint in endpoints {
         let mut resource = endpoint.to_resource(store)?;
+        resource.set_propval(
+            urls::PARENT.into(),
+            Value::AtomicUrl(endpoints_collection.clone()),
+            store,
+        )?;
         resource.save_locally(store)?;
     }
     Ok(())
