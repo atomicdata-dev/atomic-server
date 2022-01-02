@@ -143,6 +143,7 @@
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "Base64 encoded SHA-256 checksum of a binary object.",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/isDynamic": true,
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
@@ -162,6 +163,7 @@
         "@id": "https://atomicdata.dev/properties/filesize",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
         "https://atomicdata.dev/properties/description": "Size of a file in bytes",
+        "https://atomicdata.dev/properties/isDynamic": true,
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
@@ -172,6 +174,7 @@
         "@id": "https://atomicdata.dev/properties/mimetype",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "Mimetype of a file sets is the type of data that is stored in the file. See https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types",
+        "https://atomicdata.dev/properties/isDynamic": true,
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
@@ -182,6 +185,7 @@
         "@id": "https://atomicdata.dev/properties/internalId",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "An identifier used internally by the system.",
+        "https://atomicdata.dev/properties/isDynamic": true,
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
@@ -192,6 +196,7 @@
         "@id": "https://atomicdata.dev/properties/downloadURL",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "The URL where a file can be downloaded.",
+        "https://atomicdata.dev/properties/isDynamic": true,
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
