@@ -12,9 +12,6 @@ use std::{
     path::PathBuf,
 };
 
-/// Path to a file that contains the date where the certificate was created
-const CERTS_CREATED_AT: &str = "./.https/certs_created_at";
-
 /// Starts an HTTP Actix server for HTTPS certificate initialization
 pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
     let address = format!("{}:{}", config.opts.ip, config.opts.port);
@@ -185,7 +182,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     fs::write(&config.cert_path, cert.certificate()).expect("Unable to write file");
     fs::write(&config.key_path, cert.private_key()).expect("Unable to write file");
-    add_certs_created_at();
+    add_certs_created_at(&config);
     tracing::info!("HTTPS init Success!");
     Ok(())
 }
@@ -217,19 +214,28 @@ pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::Server
     Ok(a)
 }
 
+fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
+    // ~/.config/atomic/https
+    let mut path = config.cert_path.parent().unwrap().to_path_buf();
+    path.push("certs_created_at");
+    path
+}
+
 /// Adds a file to the .https folder to indicate age of certificates
-fn add_certs_created_at() {
+fn add_certs_created_at(config: &crate::config::Config) {
     let now_string = chrono::Utc::now();
-    fs::write(CERTS_CREATED_AT, now_string.to_string())
-        .expect(&*format!("Unable to write {}", CERTS_CREATED_AT));
+    let path = certs_created_at_path(config);
+    fs::write(path, now_string.to_string()).expect(&*format!("Unable to write {:?}", path));
 }
 
 /// Checks if the certificates need to be renewed.
-pub fn check_expiration_certs() -> bool {
-    let created_at = std::fs::read_to_string(CERTS_CREATED_AT)
-        .expect(&*format!("Unable to read {}", CERTS_CREATED_AT))
+pub fn check_expiration_certs(config: &crate::config::Config) -> bool {
+    let path = certs_created_at_path(config);
+
+    let created_at = std::fs::read_to_string(path)
+        .expect(&*format!("Unable to read {:?}", &path))
         .parse::<chrono::DateTime<chrono::Utc>>()
-        .expect(&*format!("failed to parse {}", CERTS_CREATED_AT));
+        .expect(&*format!("failed to parse {:?}", &path));
     let certs_age: chrono::Duration = chrono::Utc::now() - created_at;
     // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX.
     let expired = certs_age > chrono::Duration::weeks(4);
