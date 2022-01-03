@@ -6,6 +6,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## [v0.30.3] - 2021-12-31
 
 - Fix HTTPS initialization
+- Add `--server-url` option
+- Improved logs (better fitting level options, less verbose by default)
 - rename `base_url` to `server_url`
 
 ## [v0.30.2] - 2021-12-30
