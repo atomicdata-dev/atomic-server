@@ -182,7 +182,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     fs::write(&config.cert_path, cert.certificate()).expect("Unable to write file");
     fs::write(&config.key_path, cert.private_key()).expect("Unable to write file");
-    add_certs_created_at(&config);
+    add_certs_created_at(config);
     tracing::info!("HTTPS init Success!");
     Ok(())
 }
@@ -217,7 +217,7 @@ pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::Server
 fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
     // ~/.config/atomic/https
     let mut path = config.cert_path.parent().unwrap().to_path_buf();
-    path.push("/certs_created_at");
+    path.push("certs_created_at");
     path
 }
 
