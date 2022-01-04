@@ -217,7 +217,7 @@ pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::Server
 fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
     // ~/.config/atomic/https
     let mut path = config.cert_path.parent().unwrap().to_path_buf();
-    path.push("certs_created_at");
+    path.push("/certs_created_at");
     path
 }
 
