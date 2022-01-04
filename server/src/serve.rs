@@ -107,6 +107,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
                 let https_config = crate::https::get_https_config(&config)
                     .expect("HTTPS TLS Configuration with Let's Encrypt failed.");
                 let endpoint = format!("{}:{}", config.opts.ip, config.opts.port_https);
+                tracing::info!("Binding HTTPS server to endpoint {}", endpoint);
                 println!("{}", message);
                 server
                     .bind_rustls(&endpoint, https_config)
@@ -119,6 +120,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
         }
     } else {
         let endpoint = format!("{}:{}", config.opts.ip, config.opts.port);
+        tracing::info!("Binding HTTP server to endpoint {}", endpoint);
         println!("{}", message);
         server
             .bind(&format!("{}:{}", config.opts.ip, config.opts.port))
