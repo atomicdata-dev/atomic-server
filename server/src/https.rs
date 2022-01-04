@@ -225,14 +225,14 @@ fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
 fn add_certs_created_at(config: &crate::config::Config) {
     let now_string = chrono::Utc::now();
     let path = certs_created_at_path(config);
-    fs::write(path, now_string.to_string()).expect(&*format!("Unable to write {:?}", path));
+    fs::write(&path, now_string.to_string()).expect(&*format!("Unable to write {:?}", &path));
 }
 
 /// Checks if the certificates need to be renewed.
 pub fn check_expiration_certs(config: &crate::config::Config) -> bool {
     let path = certs_created_at_path(config);
 
-    let created_at = std::fs::read_to_string(path)
+    let created_at = std::fs::read_to_string(&path)
         .expect(&*format!("Unable to read {:?}", &path))
         .parse::<chrono::DateTime<chrono::Utc>>()
         .expect(&*format!("failed to parse {:?}", &path));

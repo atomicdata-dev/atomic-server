@@ -100,7 +100,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             {
                 // If there is no certificate file, or the certs are too old, start HTTPS initialization
                 if std::fs::File::open(&config.cert_path).is_err()
-                    || crate::https::check_expiration_certs()
+                    || crate::https::check_expiration_certs(&config)
                 {
                     crate::https::cert_init_server(&config).await?;
                 }
