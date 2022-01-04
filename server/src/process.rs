@@ -77,14 +77,15 @@ fn create_pid(config: &Config) -> AtomicServerResult<()> {
     use std::io::Write;
     let pid = sysinfo::get_current_pid()
         .map_err(|_| "Failed to get process info required to create process ID")?;
-    let mut pid_file = std::fs::File::create(pid_path(config)).map_err(|_| {
+    let mut pid_file = std::fs::File::create(pid_path(config)).map_err(|e| {
         format!(
-            "Could not create process file at {}",
+            "Could not create process file at {}. {}",
             pid_path(config).to_str().unwrap(),
+            e
         )
     })?;
     pid_file
         .write_all(pid.to_string().as_bytes())
-        .map_err(|_| "failed to write process file")?;
+        .map_err(|e| format!("failed to write process file. {}", e))?;
     Ok(())
 }
