@@ -163,7 +163,6 @@ impl Value {
                     .for_each(|(i, r)| match r.to_owned() {
                         SubResource::Resource(e) => vec.push(e.get_subject().into()),
                         SubResource::Nested(_e) => {
-                            println!("hopw");
                             let path_base = if let Some(p) = &parent_path {
                                 p.to_string()
                             } else {

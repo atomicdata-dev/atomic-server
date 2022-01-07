@@ -118,7 +118,6 @@ pub fn generate_public_key(private_key: &str) -> Pair {
 pub fn verify_public_key(public_key: &str) -> AtomicResult<()> {
     let pubkey_bin = base64::decode(public_key)
         .map_err(|e| format!("Invalid public key. Not valid Base64. {}", e))?;
-    println!("{}", public_key.len());
     if pubkey_bin.len() != 32 {
         return Err(format!(
             "Invalid public key, should be 32 bytes long instead of {}. Key: {}",
