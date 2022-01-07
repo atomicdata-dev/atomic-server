@@ -41,4 +41,4 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           # a local .env contains setup parameters, such as IP and ports
-          script: ~/atomic-server export && ~/atomic-server &> log-${{ env.RELEASE_VERSION }}
+          script: ~/atomic-server export && systemctl restart atomic
