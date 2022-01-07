@@ -24,6 +24,7 @@ pub struct SearchQuery {
 }
 
 /// Parses a search query and responds with a list of resources
+#[tracing::instrument(skip(data, req))]
 pub async fn search_query(
     data: web::Data<Mutex<AppState>>,
     params: web::Query<SearchQuery>,
@@ -92,9 +93,14 @@ pub async fn search_query(
             tantivy_query
         };
 
+        // With this first limit, we go for a greater number - as the user may not have the rights to the first ones!
+        // We filter these results later.
+        // https://github.com/joepio/atomic-data-rust/issues/279.
+        let initial_results_limit = 100;
+
         // execute the query
         let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(limit))
+            .search(&query, &TopDocs::with_limit(initial_results_limit))
             .map_err(|e| format!("Error with creating search results: {} ", e))?;
 
         // convert found documents to resources
@@ -105,15 +111,33 @@ pub async fn search_query(
             let value_val = retrieved_doc.get_first(fields.value).ok_or("No 'value' in search doc found. This is required when indexing. Run with --rebuild-index")?;
             let subject = match subject_val {
                 tantivy::schema::Value::Str(s) => s.to_string(),
-                _else => return Err("Subject is not a string!".into()),
+                _else => {
+                    return Err(format!(
+                        "Search schema error: Subject is not a string! Doc: {:?}",
+                        retrieved_doc
+                    )
+                    .into())
+                }
             };
             let property = match prop_val {
                 tantivy::schema::Value::Str(s) => s.to_string(),
-                _else => return Err("Property is not a string!".into()),
+                _else => {
+                    return Err(format!(
+                        "Search schema error: Property is not a string! Doc: {:?}",
+                        retrieved_doc
+                    )
+                    .into())
+                }
             };
             let value = match value_val {
                 tantivy::schema::Value::Str(s) => s.to_string(),
-                _else => return Err("Value is not a string!".into()),
+                _else => {
+                    return Err(format!(
+                        "Search schema error: Value is not a string! Doc: {:?}",
+                        retrieved_doc
+                    )
+                    .into())
+                }
             };
             if subjects.contains(&subject) {
                 continue;
@@ -144,18 +168,28 @@ pub async fn search_query(
     results_resource.set_subject(subject.clone());
 
     if appstate.config.opts.rdf_search {
-        // Always return all subjects, don't do authentication
+        // Always return all subjects in `--rdf-search` mode, don't do authentication
         results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), subjects.into(), store)?;
     } else {
         // Default case: return full resources, do authentication
         let mut resources: Vec<Resource> = Vec::new();
 
+        // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
+        // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
+        // https://github.com/joepio/atomic-data-rust/issues/279
+        // https://github.com/joepio/atomic-data-rust/issues/280
         let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
         for s in subjects {
             match store.get_resource_extended(&s, true, for_agent.as_deref()) {
-                Ok(r) => resources.push(r),
+                Ok(r) => {
+                    if resources.len() < limit {
+                        resources.push(r);
+                    } else {
+                        break;
+                    }
+                }
                 Err(_e) => {
-                    tracing::info!("Skipping result: {} : {}", s, _e);
+                    tracing::info!("Skipping search result: {} : {}", s, _e);
                     continue;
                 }
             }
