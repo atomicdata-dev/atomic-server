@@ -41,6 +41,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 .to(handlers::search::search_query),
         );
     if config.opts.rdf_search {
+        tracing::info!("RDF search enabled. You can POST to /search to index RDF documents.");
         app.service(
             web::resource("/search")
                 .guard(actix_web::guard::Method(Method::POST))

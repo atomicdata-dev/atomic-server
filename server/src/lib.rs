@@ -17,5 +17,6 @@ mod search;
 #[cfg(test)]
 mod tests;
 mod timer;
+mod trace;
 #[cfg(feature = "desktop")]
 mod tray_icon;

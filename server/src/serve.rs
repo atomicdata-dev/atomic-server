@@ -5,65 +5,48 @@ use std::sync::Mutex;
 
 use crate::errors::AtomicServerResult;
 
+fn rebuild_index(appstate: &crate::appstate::AppState) -> AtomicServerResult<()> {
+    let appstate_clone = appstate.clone();
+
+    actix_web::rt::spawn(async move {
+        tracing::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
+        appstate_clone
+            .store
+            .clear_index()
+            .expect("Failed to clear value index");
+        appstate_clone
+            .store
+            .build_index(true)
+            .expect("Failed to build value index");
+        tracing::info!("Building value index finished!");
+    });
+    tracing::info!("Removing existing search index...");
+    appstate_clone
+        .search_state
+        .writer
+        .write()
+        .expect("Could not get a lock on search writer")
+        .delete_all_documents()?;
+    tracing::info!("Building search index...");
+    crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
+    tracing::info!("Search index finished!");
+    Ok(())
+}
+
 /// Start the server
 pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
-    // Start logging
-    // Enable logging, but hide most tantivy logs
-    std::env::set_var(
-        "RUST_LOG",
-        format!("{},tantivy=warn", config.opts.log_level),
-    );
-    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-    // Start tracing
-    // STDOUT log
-    let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let terminal_layer = tracing_subscriber::fmt::Layer::default();
-    let tracing_registry = tracing_subscriber::registry()
-        .with(terminal_layer)
-        .with(filter);
-
-    let (chrome_layer, guard) = tracing_chrome::ChromeLayerBuilder::new()
-        .include_args(true)
-        .build();
-    if config.opts.trace_chrome {
-        tracing::info!("Enabling tracing for Chrome");
-        tracing_registry.with(chrome_layer).init();
-    } else {
-        tracing_registry.init();
-    }
+    let tracing_chrome_flush_guard = crate::trace::init_tracing(&config);
+    println!("Atomic-server {}. Use --help for more options. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust.", env!("CARGO_PKG_VERSION"));
 
     // Setup the database and more
     let appstate = crate::appstate::init(config.clone())?;
 
-    // Start other async processes
+    // Start async processes
     #[cfg(feature = "desktop")]
     crate::tray_icon::tray_icon_process(config.clone());
 
     if config.opts.rebuild_index {
-        let appstate_clone = appstate.clone();
-
-        actix_web::rt::spawn(async move {
-            tracing::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
-            appstate_clone
-                .store
-                .clear_index()
-                .expect("Failed to clear value index");
-            appstate_clone
-                .store
-                .build_index(true)
-                .expect("Failed to build value index");
-            tracing::info!("Building value index finished!");
-        });
-        tracing::info!("Removing existing search index...");
-        appstate_clone
-            .search_state
-            .writer
-            .write()
-            .expect("Could not get a lock on search writer")
-            .delete_all_documents()?;
-        tracing::info!("Building search index...");
-        crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
-        tracing::info!("Search index finished!");
+        rebuild_index(&appstate)?;
     }
 
     let server = HttpServer::new(move || {
@@ -80,6 +63,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             .wrap(cors)
             .wrap(tracing_actix_web::TracingLogger::default())
             .wrap(middleware::Compress::default())
+            // Here are the actual handlers / endpoints
             .configure(|app| crate::routes::config_routes(app, &appstate.config))
             .default_service(web::to(|| {
                 tracing::error!("Wrong route, should not happen with normal requests");
@@ -128,8 +112,11 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             .run()
             .await?;
     }
+
+    // Cleanup, runs when server is stopped
+    tracing_chrome_flush_guard.flush();
     crate::process::remove_pid(&config)?;
-    guard.flush();
+    tracing::info!("Server stopped");
     Ok(())
 }
 

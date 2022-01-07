@@ -62,6 +62,11 @@ pub fn remove_pid(config: &Config) -> AtomicServerResult<()> {
             "Could not remove process file at {}",
             pid_path(config).to_str().unwrap()
         )
+    } else {
+        tracing::info!(
+            "Removed process file at {}",
+            pid_path(config).to_str().unwrap()
+        );
     }
     Ok(())
 }
