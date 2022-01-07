@@ -12,7 +12,7 @@ use serde::Deserialize;
 
 use crate::{appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent};
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct UploadQuery {
     parent: String,
 }
@@ -23,6 +23,7 @@ pub struct UploadQuery {
 /// Submission is done using multipart/form-data.
 /// The file is stored in the `/uploads` directory.
 /// An `attachment` relationship is created from the parent
+#[tracing::instrument(skip(data, req, body))]
 pub async fn upload_handler(
     mut body: Multipart,
     data: web::Data<Mutex<AppState>>,

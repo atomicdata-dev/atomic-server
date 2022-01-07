@@ -7,6 +7,7 @@ use atomic_lib::{urls, Resource, Storelike};
 use crate::{appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent};
 
 /// Downloads the File of the Resource that matches the same URL minus the `/download` path.
+#[tracing::instrument(skip(data, req))]
 pub async fn handle_download(
     path: Option<web::Path<String>>,
     data: web::Data<Mutex<AppState>>,

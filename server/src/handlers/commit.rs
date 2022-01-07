@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 /// Send and process a Commit.
 /// Currently only accepts JSON-AD
+#[tracing::instrument(skip(data))]
 pub async fn post_commit(
     data: web::Data<Mutex<AppState>>,
     body: String,

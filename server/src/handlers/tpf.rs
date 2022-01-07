@@ -15,6 +15,7 @@ pub struct TpfQuery {
 
 /// Triple Pattern Fragment handler.
 /// Reads optional 'subject' 'property' 'value' from query params, searches the store, return triples.
+#[tracing::instrument(skip(data, req))]
 pub async fn tpf(
     data: web::Data<Mutex<AppState>>,
     req: actix_web::HttpRequest,

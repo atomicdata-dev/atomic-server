@@ -12,12 +12,12 @@ use crate::{
 };
 
 /// Get an HTTP request, upgrade it to a Websocket connection
+#[tracing::instrument(skip(data, stream))]
 pub async fn web_socket_handler(
     req: HttpRequest,
     stream: web::Payload,
     data: web::Data<Mutex<AppState>>,
 ) -> AtomicServerResult<HttpResponse> {
-    tracing::debug!("Starting websocket");
     let context = data.lock().unwrap();
 
     // Authentication check. If the user has no headers, continue with the Public Agent.
@@ -26,6 +26,7 @@ pub async fn web_socket_handler(
         auth_header_values,
         &context.store,
     )?;
+    tracing::debug!("Starting websocket for {}", for_agent);
 
     let result = ws::start(
         WebSocketConnection::new(context.commit_monitor.clone(), for_agent),

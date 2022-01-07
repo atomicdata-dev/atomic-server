@@ -18,10 +18,14 @@ pub fn init_tracing(config: &crate::config::Config) -> tracing_chrome::FlushGuar
         .include_args(true)
         .build();
     if config.opts.trace_chrome {
-        tracing::info!("Enabling tracing for Chrome");
         tracing_registry.with(chrome_layer).init();
     } else {
         tracing_registry.init();
+    }
+    if config.opts.trace_chrome {
+        tracing::info!(
+            "Enabling tracing for Chrome. Saving file (after run) to ./trace-timestamp.json",
+        );
     }
     flush_guard
 }
