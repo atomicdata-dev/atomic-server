@@ -3,6 +3,12 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [unreleased]
+
+- More tracing / logging insights
+- More search results for authorized resources #279
+- Fix panic on unwrapping multipart upload
+
 ## [v0.30.3] - 2021-12-31
 
 - Fix HTTPS initialization

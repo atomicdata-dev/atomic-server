@@ -72,7 +72,7 @@ pub async fn upload_handler(
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
-            let data = chunk.unwrap();
+            let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
             // TODO: Update a SHA256 hash here for checksum
             file.write_all(&data).await?;
         }
