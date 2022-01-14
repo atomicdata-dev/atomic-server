@@ -8,6 +8,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - More tracing / logging insights
 - More search results for authorized resources #279
 - Fix panic on unwrapping multipart upload
+- Improve tauri dev UX
 
 ## [v0.30.3] - 2021-12-31
 

@@ -4,8 +4,8 @@
     "version": "0.30.2"
   },
   "build": {
-    "distDir": "../server/static",
-    "devPath": "../server/static/tauri-splashscreen.html",
+    "distDir": "dist",
+    "devPath": "http://localhost:8080",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },
@@ -23,10 +23,10 @@
       ],
       "resources": [],
       "externalBin": [],
-      "copyright": "",
+      "copyright": "MIT license - joep@ontola.io",
       "category": "DeveloperTool",
       "shortDescription": "Atomic Server is a graph database with an easy to use GUI. Model, share and create Atomic Data.",
-      "longDescription": "Atomic Server is a graph database with an easy to use GUI. Model, share and create Atomic Data...",
+      "longDescription": "Atomic Server is a graph database with an easy to use GUI. Model, share and create Atomic Data.",
       "deb": {
         "depends": [],
         "useBootstrapper": false
@@ -59,8 +59,7 @@
         "alwaysOnTop": false,
         "resizable": true,
         "decorations": true,
-        "fullscreen": false,
-        "url": "tauri-splashscreen.html"
+        "fullscreen": false
       }
     ],
     "systemTray": {
