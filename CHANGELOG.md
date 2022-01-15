@@ -3,7 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## [unreleased]
+## [v0.30.4] - 2021-01-15
+
+Run with `--rebuild-index` the first time, if you use an existing database.
+Note that due to an issue in actix, I'm unable to publish the `atomic-server` crate at this moment.
+You can still build from source by cloning the repo.
 
 - Improve performance for applying commits and updating index (from ca. 50ms to <1ms), refactor value index #282
 - More tracing / logging insights
