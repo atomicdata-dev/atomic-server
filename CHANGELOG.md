@@ -5,6 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [unreleased]
 
+- Improve performance for applying commits and updating index (from ca. 50ms to <1ms), refactor value index #282
 - More tracing / logging insights
 - More search results for authorized resources #279
 - Fix panic on unwrapping multipart upload
