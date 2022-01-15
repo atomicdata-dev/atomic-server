@@ -24,6 +24,8 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 ```sh
 # This also makes sure that cli and server work, plus it test the db feature
 cargo test --all
+# Run specific tests
+cargo test --all-features --package atomic_lib --lib -- db::test::testname
 ```
 
 ## Debugging
@@ -46,7 +48,7 @@ drill -b benchmark.yml --stats
 
 - Clear explanation in the PR itself of what is changed and why
 - Reference to relevant issues in commit messages (e.g. `#123 my commit message`)
-- Tests are passing `cargo test --all`. Run specific tests with `cargo test --all-features --package atomic_lib --lib -- db::test::testname`.
+- Tests are passing `cargo test --all`.
 - Linters are happy `cargo fmt` & `cargo clippy`
 
 # CI, Versioning and Tagging

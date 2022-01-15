@@ -7,7 +7,6 @@ use std::{
 };
 
 use crate::{
-    datatype::DataType,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -96,41 +95,9 @@ impl Db {
         }
     }
 
-    /// Search for a value, get a PropSubjectMap. If it does not exist, create a new one.
-    #[tracing::instrument(skip(self))]
-    pub fn get_prop_subject_map(&self, string_val: &str) -> AtomicResult<PropSubjectMap> {
-        let prop_sub_map = self
-            .index_vals
-            .get(string_val)
-            .map_err(|e| format!("Can't open {} from value index: {}", string_val, e))?;
-        match prop_sub_map.as_ref() {
-            Some(binpropval) => {
-                let psm: PropSubjectMap = bincode::deserialize(binpropval).map_err(|e| {
-                    format!(
-                        "Deserialize PropSubjectMap error: {} {}",
-                        corrupt_db_message(string_val),
-                        e
-                    )
-                })?;
-                Ok(psm)
-            }
-            None => {
-                let psm: PropSubjectMap = PropSubjectMap::new();
-                Ok(psm)
-            }
-        }
-    }
-
     /// Returns true if the index has been built.
     pub fn has_index(&self) -> bool {
         !self.index_vals.is_empty()
-    }
-
-    fn set_prop_subject_map(&self, string_val: &str, psm: &PropSubjectMap) -> AtomicResult<()> {
-        let psm_binary = bincode::serialize(psm)
-            .map_err(|e| format!("Can't serialize value {}: {}", string_val, e))?;
-        self.index_vals.insert(string_val, psm_binary)?;
-        Ok(())
     }
 
     /// Removes all values from the index.
@@ -172,25 +139,20 @@ impl Storelike for Db {
     // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
     #[tracing::instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
-        let subjects_vec = match &atom.value {
+        let values_vec = match &atom.value {
             // This results in wrong indexing, as some subjects will be numbers.
             Value::ResourceArray(_v) => atom.values_to_subjects()?,
             Value::AtomicUrl(v) => vec![v.into()],
             _other => return Ok(()),
         };
 
-        for subject in subjects_vec {
-            let mut map = self.get_prop_subject_map(&subject)?;
+        for val_subject in values_vec {
+            // https://github.com/joepio/atomic-data-rust/issues/282
+            // The key is a newline delimited string, with the following format:
+            let key = key_for_value_index(&val_subject, &atom.property, &atom.subject);
 
-            let mut set = match map.get_mut(&atom.property) {
-                Some(vals) => vals.to_owned(),
-                None => HashSet::new(),
-            };
-
-            set.insert(atom.subject.clone());
-            map.insert(atom.property.clone(), set);
-
-            self.set_prop_subject_map(&subject, &map)?;
+            // It's OK if this overwrites a value
+            let _existing = self.index_vals.insert(key.as_bytes(), b"")?;
         }
         Ok(())
     }
@@ -241,17 +203,8 @@ impl Storelike for Db {
         };
 
         for val in vec {
-            let mut map = self.get_prop_subject_map(&val)?;
-
-            let mut set = match map.get_mut(&atom.property) {
-                Some(vals) => vals.to_owned(),
-                None => HashSet::new(),
-            };
-
-            set.remove(&atom.subject);
-            map.insert(atom.property.clone(), set);
-
-            self.set_prop_subject_map(&val, &map)?;
+            let key = key_for_value_index(&val, &atom.property, &atom.subject);
+            self.index_vals.remove(&key.as_bytes())?;
         }
         Ok(())
     }
@@ -519,41 +472,17 @@ impl Storelike for Db {
             },
             None => {
                 if hasval {
-                    let spm = self.get_prop_subject_map(q_value.unwrap())?;
-                    if hasprop {
-                        if let Some(set) = spm.get(q_property.unwrap()) {
-                            let base = self.get_server_url();
-                            for subj in set {
-                                if !include_external && !subj.starts_with(base) {
-                                    continue;
-                                }
-                                let property_full = self.get_property(q_property.unwrap())?;
-                                let mut datatype = property_full.data_type;
-                                // The value index stores only single subjects, not arrays.
-                                // However, this also means that it is not possible to find the actual _value_ of a thing
-                                // So for arrays, we simply return AtomicURLs.
-                                if datatype == DataType::ResourceArray {
-                                    datatype = DataType::AtomicUrl
-                                }
-                                let atom = Atom::new(
-                                    subj.into(),
-                                    q_property.unwrap().into(),
-                                    Value::new(q_value.unwrap(), &datatype)?,
-                                );
-                                vec.push(atom);
-                            }
-                        }
+                    let key_prefix = if hasprop {
+                        format!("{}\n{}\n", q_value.unwrap(), q_property.unwrap())
                     } else {
-                        for (prop, set) in spm.iter() {
-                            for subj in set {
-                                let property_full = self.get_property(prop)?;
-                                let atom = Atom::new(
-                                    subj.into(),
-                                    prop.into(),
-                                    Value::new(q_value.unwrap(), &property_full.data_type)?,
-                                );
-                                vec.push(atom);
-                            }
+                        format!("{}\n", q_value.unwrap())
+                    };
+                    for item in self.index_vals.scan_prefix(key_prefix) {
+                        let (k, _v) = item?;
+                        let key_string = String::from_utf8(k.to_vec())?;
+                        let atom = key_to_atom(&key_string)?;
+                        if include_external || atom.subject.starts_with(self.get_server_url()) {
+                            vec.push(atom)
                         }
                     }
                     return Ok(vec);
@@ -566,6 +495,23 @@ impl Storelike for Db {
             }
         }
     }
+}
+
+fn key_for_value_index(val: &str, prop: &str, subject: &str) -> String {
+    format!("{}\n{}\n{}", val, prop, subject)
+}
+
+/// Parses a Value index key string, converts it into an atom. Note that the Value of the atom will allways be a string here.
+fn key_to_atom(key: &str) -> AtomicResult<Atom> {
+    let mut parts = key.split('\n');
+    let val = parts.next().ok_or("Invalid key for value index")?;
+    let prop = parts.next().ok_or("Invalid key for value index")?;
+    let subj = parts.next().ok_or("Invalid key for value index")?;
+    Ok(Atom::new(
+        subj.into(),
+        prop.into(),
+        Value::AtomicUrl(val.into()),
+    ))
 }
 
 fn corrupt_db_message(subject: &str) -> String {
@@ -684,7 +630,7 @@ pub mod test {
         let subject = urls::CLASS.into();
         let property: String = urls::PARENT.into();
         let val_string = urls::AGENT;
-        let value = Value::new(val_string, &DataType::AtomicUrl).unwrap();
+        let value = Value::new(val_string, &crate::datatype::DataType::AtomicUrl).unwrap();
         // This atom should normally not exist - Agent is not the parent of Class.
         let atom = Atom::new(subject, property.clone(), value);
         store.add_atom_to_index(&atom).unwrap();
@@ -692,7 +638,11 @@ pub mod test {
             .tpf(None, Some(&property), Some(val_string), false)
             .unwrap();
         // Don't find the atom if no_external is true.
-        assert_eq!(found_no_external.len(), 0);
+        assert_eq!(
+            found_no_external.len(),
+            0,
+            "found items - should ignore external items"
+        );
         let found_external = store
             .tpf(None, Some(&property), Some(val_string), true)
             .unwrap();
