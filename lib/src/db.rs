@@ -170,15 +170,16 @@ impl Storelike for Db {
     }
 
     // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
+    #[tracing::instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
-        let vec = match &atom.value {
+        let subjects_vec = match &atom.value {
             // This results in wrong indexing, as some subjects will be numbers.
             Value::ResourceArray(_v) => atom.values_to_subjects()?,
             Value::AtomicUrl(v) => vec![v.into()],
             _other => return Ok(()),
         };
 
-        for subject in vec {
+        for subject in subjects_vec {
             let mut map = self.get_prop_subject_map(&subject)?;
 
             let mut set = match map.get_mut(&atom.property) {
