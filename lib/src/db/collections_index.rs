@@ -42,14 +42,17 @@ pub struct IndexAtom {
     pub value: String,
 }
 
+/// Last character in lexicographic ordering
+const FINAL_CHAR: &str = "\u{ffff}";
+
 #[tracing::instrument(skip(store))]
 pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Option<QueryResult>> {
     let iter = if let Some(start) = &q.start_val {
-        let start = create_collection_members_key(&q.into(), start);
-        let end = create_collection_members_key(&q.into(), "\u{ffff}");
-        store.members_index.range(start.as_bytes()..end.as_bytes())
+        let start = create_collection_members_key(&q.into(), Some(start), None)?;
+        let end = create_collection_members_key(&q.into(), Some(FINAL_CHAR), None)?;
+        store.members_index.range(start..end)
     } else {
-        let key = create_collection_members_key(&q.into(), "");
+        let key = create_collection_members_key(&q.into(), None, None)?;
         store.members_index.scan_prefix(key)
     };
     let mut subjects: Vec<String> = vec![];
@@ -60,9 +63,9 @@ pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Op
             }
         }
         if i >= q.offset {
-            let (_k, v) = kv.map_err(|_e| "Unable to parse query_cached")?;
-            let subject = String::from_utf8(v.to_vec())?;
-            subjects.push(subject)
+            let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
+            let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+            subjects.push(subject.into())
         }
     }
     if subjects.is_empty() {
@@ -159,49 +162,103 @@ pub fn update_member(
     atom: &IndexAtom,
     delete: bool,
 ) -> AtomicResult<()> {
-    let key = create_collection_members_key(collection, &atom.value);
-
-    // TODO: Remove .unwraps()
+    let key = create_collection_members_key(collection, Some(&atom.value), Some(&atom.subject))?;
     if delete {
-        let remove = |old: Option<&[u8]>| -> Option<Vec<u8>> {
-            if let Some(bytes) = old {
-                let subjects: Vec<String> = bincode::deserialize(bytes).unwrap();
-
-                let filtered: Vec<String> = subjects
-                    .into_iter()
-                    .filter(|x| x == &atom.subject)
-                    .collect();
-
-                let bytes = bincode::serialize(&filtered).unwrap();
-                Some(bytes)
-            } else {
-                None
-            }
-        };
-        store.members_index.update_and_fetch(key, remove)?;
+        store.members_index.remove(key)?;
     } else {
-        let append = |old: Option<&[u8]>| -> Option<Vec<u8>> {
-            let mut subjects: Vec<String> = if let Some(bytes) = old {
-                bincode::deserialize(bytes).unwrap()
-            } else {
-                vec![]
-            };
-            if !subjects.contains(&atom.subject) {
-                subjects.push(atom.subject.clone());
-            }
-            let bytes = bincode::serialize(&subjects).unwrap();
-            Some(bytes)
+        store.members_index.insert(key, b"")?;
+    }
+    Ok(())
+}
+
+/// We can only store one bytearray as a key in Sled.
+/// We separate the various items in it using this bit that's illegal in UTF-8.
+const SEPARATION_BIT: u8 = 0xff;
+
+const MAX_LEN: usize = 20;
+
+/// Creates a key for a collection + value combination.
+/// These are designed to be lexicographically sortable.
+#[tracing::instrument()]
+pub fn create_collection_members_key(
+    collection: &QueryFilter,
+    value: Option<&str>,
+    subject: Option<&str>,
+) -> AtomicResult<Vec<u8>> {
+    let mut q_filter_bytes: Vec<u8> = bincode::serialize(collection)?;
+    q_filter_bytes.push(SEPARATION_BIT);
+
+    let mut value_bytes: Vec<u8> = if let Some(val) = value {
+        let shorter = if val.len() > MAX_LEN {
+            &val[0..MAX_LEN]
+        } else {
+            val
         };
-        store.members_index.update_and_fetch(key, append)?;
+        shorter.as_bytes().to_vec()
+    } else {
+        vec![]
+    };
+    value_bytes.push(SEPARATION_BIT);
+
+    let subject_bytes = if let Some(sub) = subject {
+        sub.as_bytes().to_vec()
+    } else {
+        vec![]
     };
 
-    Ok(())
+    let bytesvec: Vec<u8> = [q_filter_bytes, value_bytes, subject_bytes].concat();
+    Ok(bytesvec)
 }
 
 /// Creates a key for a collection + value combination.
 /// These are designed to be lexicographically sortable.
 #[tracing::instrument()]
-pub fn create_collection_members_key(collection: &QueryFilter, value: &str) -> String {
-    let col_str = serde_json::to_string(collection).unwrap();
-    format!("{}\n{}", col_str, value)
+pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, &str, &str)> {
+    let mut iter = bytes.split(|b| b == &SEPARATION_BIT);
+    let q_filter_bytes = iter.next().ok_or("No q_filter_bytes")?;
+    let value_bytes = iter.next().ok_or("No value_bytes")?;
+    let subject_bytes = iter.next().ok_or("No value_bytes")?;
+
+    let q_filter: QueryFilter = bincode::deserialize(q_filter_bytes)?;
+    let value = if !value_bytes.is_empty() {
+        std::str::from_utf8(value_bytes).unwrap()
+    } else {
+        return Err("Can't parse value".into());
+    };
+    let subject = if !subject_bytes.is_empty() {
+        std::str::from_utf8(subject_bytes).unwrap()
+    } else {
+        return Err("Can't parse subject".into());
+    };
+    Ok((q_filter, value, subject))
+}
+
+#[cfg(test)]
+pub mod test {
+    use super::*;
+
+    #[test]
+    fn create_and_parse_key() {
+        round_trip("\n", "\n");
+        round_trip("short", "short");
+        round_trip("12905.125.15", "12905.125.15");
+        round_trip(
+            "29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB",
+            "29NA(E*Tn3028nt87n_#",
+        );
+
+        fn round_trip(val: &str, val_check: &str) {
+            let collection = QueryFilter {
+                property: Some("http://example.org/prop".to_string()),
+                value: Some("http://example.org/value".to_string()),
+                sort_by: None,
+            };
+            let subject = "https://example.com/subject";
+            let key = create_collection_members_key(&collection, Some(val), Some(subject)).unwrap();
+            let (col, val_out, sub_out) = parse_collection_members_key(&key).unwrap();
+            assert_eq!(col.property, collection.property);
+            assert_eq!(val_check, val_out);
+            assert_eq!(sub_out, subject);
+        }
+    }
 }
