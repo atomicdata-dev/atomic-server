@@ -486,8 +486,10 @@ pub struct Query {
     pub value: Option<String>,
     /// Maximum of items to return
     pub limit: Option<usize>,
-    /// Value at which to start lexicographically sorting things.
+    /// Value at which to begin lexicographically sorting things.
     pub start_val: Option<String>,
+    /// Value at which to stop lexicographically sorting things.
+    pub end_val: Option<String>,
     /// How many items to skip from the first one
     pub offset: usize,
     /// The Property URL that is used to sort the results

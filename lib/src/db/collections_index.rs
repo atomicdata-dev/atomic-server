@@ -43,18 +43,34 @@ pub struct IndexAtom {
 }
 
 /// Last character in lexicographic ordering
-const FINAL_CHAR: &str = "\u{ffff}";
+const FIRST_CHAR: &str = "\u{0000}";
+const END_CHAR: &str = "\u{ffff}";
 
 #[tracing::instrument(skip(store))]
 pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Option<QueryResult>> {
-    let iter = if let Some(start) = &q.start_val {
-        let start = create_collection_members_key(&q.into(), Some(start), None)?;
-        let end = create_collection_members_key(&q.into(), Some(FINAL_CHAR), None)?;
-        store.members_index.range(start..end)
+    // let iter = if let Some(start) = &q.start_val {
+    //     let start = create_collection_members_key(&q.into(), Some(start), None)?;
+    //     let end = create_collection_members_key(&q.into(), Some(FINAL_CHAR), None)?;
+    //     store.members_index.range(start..end)
+    // } else {
+    //     let key = create_collection_members_key(&q.into(), None, None)?;
+    //     // store.members_index.scan_prefix(key)
+    // };
+    let start = if let Some(val) = &q.start_val {
+        val
     } else {
-        let key = create_collection_members_key(&q.into(), None, None)?;
-        store.members_index.scan_prefix(key)
+        FIRST_CHAR
     };
+    let end = if let Some(val) = &q.end_val {
+        val
+    } else {
+        END_CHAR
+    };
+    let start_key = create_collection_members_key(&q.into(), Some(start), None)?;
+    let end_key = create_collection_members_key(&q.into(), Some(end), None)?;
+
+    let iter = store.members_index.range(start_key..end_key);
+
     let mut subjects: Vec<String> = vec![];
     for (i, kv) in iter.enumerate() {
         if let Some(limit) = q.limit {
@@ -175,7 +191,7 @@ pub fn update_member(
 /// We separate the various items in it using this bit that's illegal in UTF-8.
 const SEPARATION_BIT: u8 = 0xff;
 
-const MAX_LEN: usize = 20;
+pub const MAX_LEN: usize = 20;
 
 /// Creates a key for a collection + value combination.
 /// These are designed to be lexicographically sortable.
@@ -196,14 +212,14 @@ pub fn create_collection_members_key(
         };
         shorter.as_bytes().to_vec()
     } else {
-        vec![]
+        vec![0]
     };
     value_bytes.push(SEPARATION_BIT);
 
     let subject_bytes = if let Some(sub) = subject {
         sub.as_bytes().to_vec()
     } else {
-        vec![]
+        vec![0]
     };
 
     let bytesvec: Vec<u8> = [q_filter_bytes, value_bytes, subject_bytes].concat();
@@ -260,5 +276,32 @@ pub mod test {
             assert_eq!(val_check, val_out);
             assert_eq!(sub_out, subject);
         }
+    }
+
+    #[test]
+    fn lexicographic_partial() {
+        let q = QueryFilter {
+            property: Some("http://example.org/prop".to_string()),
+            value: Some("http://example.org/value".to_string()),
+            sort_by: None,
+        };
+
+        let start_none = create_collection_members_key(&q, None, None).unwrap();
+        let start_str = create_collection_members_key(&q, Some("a"), None).unwrap();
+        let mid1 = create_collection_members_key(&q, Some("a"), Some("wadiaodn")).unwrap();
+        let mid2 = create_collection_members_key(&q, Some("hi there"), Some("egnsoinge")).unwrap();
+        let end = create_collection_members_key(&q, Some(END_CHAR), None).unwrap();
+
+        assert!(start_none < start_str);
+        assert!(start_str < mid1);
+        assert!(mid1 < mid2);
+        assert!(mid2 < end);
+
+        let mut sorted = vec![&end, &start_str, &mid1, &mid2, &start_none];
+        sorted.sort();
+
+        let expected = vec![&start_none, &start_str, &mid1, &mid2, &end];
+
+        assert_eq!(sorted, expected);
     }
 }

@@ -203,6 +203,7 @@ impl Collection {
             value: collection_builder.value.clone(),
             limit: Some(collection_builder.page_size),
             start_val: None,
+            end_val: None,
             offset: collection_builder.page_size * collection_builder.current_page,
             sort_by: collection_builder.sort_by.clone(),
             sort_desc: collection_builder.sort_desc,

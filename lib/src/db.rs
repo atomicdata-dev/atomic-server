@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    db::collections_index::MAX_LEN,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -418,8 +419,7 @@ impl Storelike for Db {
                 }
                 Value::Resource(r) => vec![r.get_subject().into()],
                 other => {
-                    // Only the first 20 charactere are indexed. They are only used for sorting, after all
-                    let short_string = &other.to_string()[..20];
+                    let short_string = &other.to_string()[..MAX_LEN];
                     vec![short_string.into()]
                 }
             };
