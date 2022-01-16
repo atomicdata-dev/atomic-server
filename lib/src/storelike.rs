@@ -67,7 +67,8 @@ pub trait Storelike: Sized {
         for r in self.all_resources(include_external) {
             let atoms = r.to_atoms()?;
             for atom in atoms {
-                self.add_atom_to_index(&atom)?;
+                self.add_atom_to_index(&atom)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
             }
         }
         Ok(())
@@ -407,6 +408,61 @@ pub trait Storelike: Sized {
         crate::populate::populate_default_store(self)
     }
 
+    /// Search the Store, returns the matching subjects.
+    /// The second returned vector should be filled if query.include_resources is true.
+    /// Tries `query_cache`, which you should implement yourself.
+    fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
+        let atoms = self.tpf(
+            None,
+            q.property.as_deref(),
+            q.value.as_deref(),
+            q.include_external,
+        )?;
+
+        // Remove duplicate subjects
+        let mut subjects_deduplicated: Vec<String> = atoms
+            .iter()
+            .map(|atom| atom.subject.clone())
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect();
+
+        // Sort by subject, better than no sorting
+        subjects_deduplicated.sort();
+
+        // WARNING: Entering expensive loop!
+        // This is needed for sorting, authorization and including nested resources.
+        // It could be skipped if there is no authorization and sorting requirement.
+        let mut resources = Vec::new();
+        for subject in subjects_deduplicated.iter() {
+            // These nested resources are not fully calculated - they will be presented as -is
+            match self.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+                Ok(resource) => {
+                    resources.push(resource);
+                }
+                Err(e) => match e.error_type {
+                    crate::AtomicErrorType::NotFoundError => {}
+                    crate::AtomicErrorType::UnauthorizedError => {}
+                    crate::AtomicErrorType::OtherError => {
+                        return Err(
+                            format!("Error when getting resource in collection: {}", e).into()
+                        )
+                    }
+                },
+            }
+        }
+
+        if let Some(sort) = &q.sort_by {
+            resources = crate::collections::sort_resources(resources, sort, q.sort_desc);
+        }
+        let mut subjects = Vec::new();
+        for r in resources.iter() {
+            subjects.push(r.get_subject().clone())
+        }
+
+        Ok((subjects, resources))
+    }
+
     /// Removes an Atom from the PropSubjectMap.
     fn remove_atom_from_index(&self, _atom: &Atom) -> AtomicResult<()> {
         Ok(())
@@ -420,3 +476,30 @@ pub trait Storelike: Sized {
         crate::validate::validate_store(self, false)
     }
 }
+
+/// Use this to construct a list of Resources
+#[derive(Debug)]
+pub struct Query {
+    /// Filter by Property
+    pub property: Option<String>,
+    /// Filter by Value
+    pub value: Option<String>,
+    /// Maximum of items to return
+    pub limit: Option<usize>,
+    /// Value at which to start lexicographically sorting things.
+    pub start_val: Option<String>,
+    /// How many items to skip from the first one
+    pub offset: usize,
+    /// The Property URL that is used to sort the results
+    pub sort_by: Option<String>,
+    /// Sort descending instead of ascending.
+    pub sort_desc: bool,
+    /// Whether to include non-server resources
+    pub include_external: bool,
+    /// Whether to include full Resources in the result, if not, will add empty vector here.
+    pub include_nested: bool,
+    /// For which Agent the query is executed. Pass `None`if you want to skip permission checks.
+    pub for_agent: Option<String>,
+}
+
+pub type QueryResult = (Vec<String>, Vec<Resource>);

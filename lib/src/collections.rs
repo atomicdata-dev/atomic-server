@@ -1,6 +1,10 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a TPF query
-use crate::{errors::AtomicResult, storelike::ResourceCollection, urls, Resource, Storelike};
+use crate::{
+    errors::AtomicResult,
+    storelike::{Query, ResourceCollection},
+    urls, Resource, Storelike,
+};
 
 #[derive(Debug)]
 pub struct TpfQuery {
@@ -154,7 +158,7 @@ pub struct Collection {
 
 /// Sorts a vector or resources by some property.
 #[tracing::instrument]
-fn sort_resources(
+pub fn sort_resources(
     mut resources: ResourceCollection,
     sort_by: &str,
     sort_desc: bool,
@@ -193,53 +197,21 @@ impl Collection {
         if collection_builder.page_size < 1 {
             return Err("Page size must be greater than 0".into());
         }
-        // Execute the TPF query, get all the subjects.
-        // Note that these are not yet authorized.
-        let atoms = store.tpf(
-            None,
-            collection_builder.property.as_deref(),
-            collection_builder.value.as_deref(),
-            collection_builder.include_external,
-        )?;
-        // Remove duplicate subjects
-        let mut subjects_deduplicated: Vec<String> = atoms
-            .iter()
-            .map(|atom| atom.subject.clone())
-            .collect::<std::collections::HashSet<String>>()
-            .into_iter()
-            .collect();
 
-        // Sort by subject, better than no sorting
-        subjects_deduplicated.sort();
+        let q = Query {
+            property: collection_builder.property.clone(),
+            value: collection_builder.value.clone(),
+            limit: Some(collection_builder.page_size),
+            start_val: None,
+            offset: collection_builder.page_size * collection_builder.current_page,
+            sort_by: collection_builder.sort_by.clone(),
+            sort_desc: collection_builder.sort_desc,
+            include_external: collection_builder.include_external,
+            include_nested: collection_builder.include_nested,
+            for_agent: for_agent.map(|a| a.to_string()),
+        };
+        let (subjects, resources) = store.query(&q)?;
 
-        // WARNING: Entering expensive loop!
-        // This is needed for sorting, authorization and including nested resources.
-        // It could be skipped if there is no authorization and sorting requirement.
-        let mut resources = Vec::new();
-        for subject in subjects_deduplicated.iter() {
-            // These nested resources are not fully calculated - they will be presented as -is
-            match store.get_resource_extended(subject, true, for_agent) {
-                Ok(resource) => {
-                    resources.push(resource);
-                }
-                Err(e) => match e.error_type {
-                    crate::AtomicErrorType::NotFoundError => {}
-                    crate::AtomicErrorType::UnauthorizedError => {}
-                    crate::AtomicErrorType::OtherError => {
-                        return Err(
-                            format!("Error when getting resource in collection: {}", e).into()
-                        )
-                    }
-                },
-            }
-        }
-        if let Some(sort) = &collection_builder.sort_by {
-            resources = sort_resources(resources, sort, collection_builder.sort_desc);
-        }
-        let mut subjects = Vec::new();
-        for r in resources.iter() {
-            subjects.push(r.get_subject().clone())
-        }
         let mut all_pages: Vec<Vec<String>> = Vec::new();
         let mut all_pages_nested: Vec<Vec<Resource>> = Vec::new();
         let mut page: Vec<String> = Vec::new();

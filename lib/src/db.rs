@@ -6,22 +6,31 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use serde::{Deserialize, Serialize};
-
 use crate::{
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
-    storelike::{ResourceCollection, Storelike},
+    storelike::{Query, QueryResult, ResourceCollection, Storelike},
+    values::SubResource,
     Atom, Resource, Value,
 };
 
-/// Inside the index_vals, each value is mapped to this type.
+use self::collections_index::{
+    check_if_atom_matches_watched_collections, query_indexed, update_member, watch_collection,
+    IndexAtom,
+};
+
+mod collections_index;
+
+/// Inside the reference_index, each value is mapped to this type.
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
 pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 
 /// The Db is a persistent on-disk Atomic Data store.
-/// It's an implementation of Storelike.
+/// It's an implementation of [Storelike].
+/// It uses [sled::Tree] as a Key Value store.
+/// It builds a value index for performant [Query]s.
+/// It stores [Resource]s as [PropVals]s by their subject as key.
 #[derive(Clone)]
 pub struct Db {
     /// The Key-Value store that contains all data.
@@ -31,12 +40,14 @@ pub struct Db {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a string, the value a [PropVals]. Both must be serialized using bincode.
     resources: sled::Tree,
-    /// Stores all Atoms, indexes by their Value. See [key_for_value_index]
-    value_index: sled::Tree,
+    /// Index for all AtommicURLs, indexed by their Value. Used to speed up TPF queries. See [key_for_reference_index]
+    reference_index: sled::Tree,
     /// Stores the members of Collections, easily sortable.
+    /// See [collections_index]
     members_index: sled::Tree,
-    /// A list of all the Collections currently being used. Is used to update `index_members`.
-    watched_collections: sled::Tree,
+    /// A list of all the Collections currently being used. Is used to update `members_index`.
+    /// See [collections_index]
+    watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
     server_url: String,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
@@ -50,20 +61,19 @@ impl Db {
     pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
         let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
-        let index_vals = db.open_tree("index_vals")?;
-        let index_members = db.open_tree("index_members")?;
-        let watched_collections = db.open_tree("watched_collections")?;
+        let reference_index = db.open_tree("reference_index")?;
+        let members_index = db.open_tree("members_index")?;
+        let watched_queries = db.open_tree("watched_queries")?;
         let store = Db {
             db,
             default_agent: Arc::new(Mutex::new(None)),
             resources,
-            value_index: index_vals,
-            members_index: index_members,
+            reference_index,
+            members_index,
             server_url,
-            watched_collections,
+            watched_queries,
             endpoints: default_endpoints(),
         };
-        store.create_watched_collections()?;
         crate::populate::populate_base_models(&store)
             .map_err(|e| format!("Failed to populate base models. {}", e))?;
         Ok(store)
@@ -108,113 +118,12 @@ impl Db {
 
     /// Returns true if the index has been built.
     pub fn has_index(&self) -> bool {
-        !self.value_index.is_empty()
+        !self.reference_index.is_empty()
     }
 
     /// Removes all values from the index.
     pub fn clear_index(&self) -> AtomicResult<()> {
-        self.value_index.clear()?;
-        Ok(())
-    }
-
-    /// Initialize the index for Collections
-    // TODO: This is probably no the most reliable way of finding the collections to watch.
-    // I suppose we should add these dynamically when a Collection is being requested.
-    fn create_watched_collections(&self) -> AtomicResult<()> {
-        let collections_url = format!("{}/collections", self.server_url);
-        let collections_resource = self.get_resource_extended(&collections_url, false, None)?;
-        for member_subject in collections_resource
-            .get(crate::urls::COLLECTION_MEMBERS)?
-            .to_subjects(None)?
-        {
-            let collection = self.get_resource_extended(&member_subject, false, None)?;
-            let value = if let Ok(val) = collection.get(crate::urls::COLLECTION_VALUE) {
-                Some(val.to_string())
-            } else {
-                None
-            };
-            let property = if let Ok(val) = collection.get(crate::urls::COLLECTION_PROPERTY) {
-                Some(val.to_string())
-            } else {
-                None
-            };
-            let col_index = CollectionIndex {
-                subject: member_subject.clone(),
-                property,
-                value,
-            };
-            self.watched_collections
-                .insert(&collections_url.as_bytes(), bincode::serialize(&col_index)?)?;
-        }
-        Ok(())
-    }
-
-    /// Check whether the Atom will be hit by a TPF query matching the Collections.
-    /// Updates the index accordingly.
-    #[tracing::instrument(skip(self))]
-    fn update_collections_index_for_atom(
-        &self,
-        atom: &IndexAtom,
-        delete: bool,
-    ) -> AtomicResult<()> {
-        for item in self.watched_collections.iter() {
-            if let Ok((_k, v)) = item {
-                let collection = bincode::deserialize::<CollectionIndex>(&v)?;
-                let should_update = match (&collection.property, &collection.value) {
-                    (Some(prop), Some(val)) => prop == &atom.property && val == &atom.value,
-                    (Some(prop), None) => prop == &atom.property,
-                    (None, Some(val)) => val == &atom.value,
-                    // We should not create indexes for Collections that iterate over _all_ resources.
-                    _ => false,
-                };
-                if should_update {
-                    self.update_member(&collection.subject, atom, delete)?;
-                }
-            } else {
-                return Err(format!("Can't deserialize collection index: {:?}", item).into());
-            }
-        }
-        Ok(())
-    }
-
-    /// Adds or removes a single item (IndexAtom) to the index_members cache.
-    #[tracing::instrument(skip(self))]
-    fn update_member(&self, collection: &str, atom: &IndexAtom, delete: bool) -> AtomicResult<()> {
-        let key = format!("{}\n{}", collection, atom.value);
-
-        // TODO: Remove .unwraps()
-
-        if delete {
-            let remove = |old: Option<&[u8]>| -> Option<Vec<u8>> {
-                if let Some(bytes) = old {
-                    let subjects: Vec<String> = bincode::deserialize(bytes).unwrap();
-
-                    let filtered: Vec<String> = subjects
-                        .into_iter()
-                        .filter(|x| x == &atom.subject)
-                        .collect();
-
-                    let bytes = bincode::serialize(&filtered).unwrap();
-                    Some(bytes)
-                } else {
-                    None
-                }
-            };
-            self.members_index.update_and_fetch(key, remove)?;
-        } else {
-            let append = |old: Option<&[u8]>| -> Option<Vec<u8>> {
-                let mut subjects: Vec<String> = if let Some(bytes) = old {
-                    bincode::deserialize(bytes).unwrap()
-                } else {
-                    vec![]
-                };
-                subjects.push(atom.subject.clone());
-                let bytes = bincode::serialize(&subjects).unwrap();
-                Some(bytes)
-            };
-            self.members_index.update_and_fetch(key, append)?;
-        };
-
+        self.reference_index.clear()?;
         Ok(())
     }
 }
@@ -261,7 +170,7 @@ impl Storelike for Db {
         for val_subject in values_vec {
             // https://github.com/joepio/atomic-data-rust/issues/282
             // The key is a newline delimited string, with the following format:
-            let index_atom = IndexAtom {
+            let index_atom = collections_index::IndexAtom {
                 value: val_subject,
                 property: atom.property.clone(),
                 subject: atom.subject.clone(),
@@ -269,11 +178,14 @@ impl Storelike for Db {
 
             // It's OK if this overwrites a value
             let _existing = self
-                .value_index
-                .insert(key_for_value_index(&index_atom).as_bytes(), b"")?;
+                .reference_index
+                .insert(key_for_reference_index(&index_atom).as_bytes(), b"")?;
 
             // Also update the members index to keep collections performant
-            self.update_collections_index_for_atom(&index_atom, false)?;
+            collections_index::check_if_atom_matches_watched_collections(self, &index_atom, false)
+                .map_err(|e| {
+                    format!("Failed to check_if_atom_matches_watched_collections. {}", e)
+                })?;
         }
         Ok(())
     }
@@ -305,11 +217,14 @@ impl Storelike for Db {
                 for (prop, val) in pv.iter() {
                     // Possible performance hit - these clones can be replaced by modifying remove_atom_from_index
                     let remove_atom = crate::Atom::new(subject.into(), prop.into(), val.clone());
-                    self.remove_atom_from_index(&remove_atom)?;
+                    self.remove_atom_from_index(&remove_atom).map_err(|e| {
+                        format!("Failed to remove atom to index {}. {}", remove_atom, e)
+                    })?;
                 }
             }
             for a in resource.to_atoms()? {
-                self.add_atom_to_index(&a)?;
+                self.add_atom_to_index(&a)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
             }
         }
         self.set_propvals(resource.get_subject(), resource.get_propvals())
@@ -330,10 +245,10 @@ impl Storelike for Db {
                 subject: atom.subject.clone(),
             };
 
-            self.value_index
-                .remove(&key_for_value_index(&index_atom).as_bytes())?;
+            self.reference_index
+                .remove(&key_for_reference_index(&index_atom).as_bytes())?;
 
-            self.update_collections_index_for_atom(&index_atom, true)?;
+            check_if_atom_matches_watched_collections(self, &index_atom, true)?;
         }
         Ok(())
     }
@@ -462,6 +377,95 @@ impl Storelike for Db {
             )?;
         }
         Ok(resource)
+    }
+
+    /// Search the Store, returns the matching subjects.
+    /// The second returned vector should be filled if query.include_resources is true.
+    /// Tries `query_cache`, which you should implement yourself.
+    #[tracing::instrument(skip(self))]
+    fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
+        if let Ok(Some(res)) = query_indexed(self, q) {
+            // Yay, we have a cache hit!
+            return Ok(res);
+        }
+
+        // No cache hit, perform the query
+        let atoms = self.tpf(
+            None,
+            q.property.as_deref(),
+            q.value.as_deref(),
+            q.include_external,
+        )?;
+
+        // Add all atoms to the index, so next time we do get a cache hit.
+        for atom in &atoms {
+            let vals: Vec<String> = match &atom.value {
+                Value::ResourceArray(vec) => {
+                    let mut vals = vec![];
+                    for item in vec {
+                        match item {
+                            SubResource::Resource(r) => vals.push(r.get_subject().into()),
+                            SubResource::Subject(s) => vals.push(s.into()),
+                            // We don't index Nested resources at this time
+                            SubResource::Nested(_ignored) => {}
+                        }
+                    }
+                    vals
+                }
+                // We don't index Nested resources at this time
+                Value::NestedResource(_) => {
+                    vec![]
+                }
+                Value::Resource(r) => vec![r.get_subject().into()],
+                other => {
+                    // Only the first 20 charactere are indexed. They are only used for sorting, after all
+                    let short_string = &other.to_string()[..20];
+                    vec![short_string.into()]
+                }
+            };
+            for value in vals {
+                let index_atom = IndexAtom {
+                    subject: atom.subject.clone(),
+                    property: atom.subject.clone(),
+                    value,
+                };
+                update_member(self, &q.into(), &index_atom, false)?;
+            }
+        }
+
+        // Maybe make this optional?
+        watch_collection(self, &q.into())?;
+
+        // Retry the same query!
+        if let Ok(Some(res)) = query_indexed(self, q) {
+            // Yay, we have a cache hit!
+            return Ok(res);
+        }
+
+        let mut subjects = Vec::new();
+        let mut resources = Vec::new();
+        for atom in atoms.iter() {
+            // These nested resources are not fully calculated - they will be presented as -is
+            subjects.push(atom.subject.clone());
+            if q.include_nested {
+                match self.get_resource_extended(&atom.subject, true, q.for_agent.as_deref()) {
+                    Ok(resource) => {
+                        resources.push(resource);
+                    }
+                    Err(e) => match e.error_type {
+                        crate::AtomicErrorType::NotFoundError => {}
+                        crate::AtomicErrorType::UnauthorizedError => {}
+                        crate::AtomicErrorType::OtherError => {
+                            return Err(
+                                format!("Error when getting resource in collection: {}", e).into()
+                            )
+                        }
+                    },
+                }
+            }
+        }
+
+        Ok((subjects, resources))
     }
 
     #[tracing::instrument(skip(self))]
@@ -606,7 +610,7 @@ impl Storelike for Db {
                     } else {
                         format!("{}\n", q_value.unwrap())
                     };
-                    for item in self.value_index.scan_prefix(key_prefix) {
+                    for item in self.reference_index.scan_prefix(key_prefix) {
                         let (k, _v) = item?;
                         let key_string = String::from_utf8(k.to_vec())?;
                         let atom = key_to_atom(&key_string)?;
@@ -627,11 +631,11 @@ impl Storelike for Db {
 }
 
 /// Constructs the Key for the index_value cache.
-fn key_for_value_index(atom: &IndexAtom) -> String {
+fn key_for_reference_index(atom: &IndexAtom) -> String {
     format!("{}\n{}\n{}", atom.value, atom.property, atom.subject)
 }
 
-/// Parses a Value index key string, converts it into an atom. Note that the Value of the atom will allways be a string here.
+/// Parses a Value index key string, converts it into an atom. Note that the Value of the atom will allways be a single AtomicURL here.
 fn key_to_atom(key: &str) -> AtomicResult<Atom> {
     let mut parts = key.split('\n');
     let val = parts.next().ok_or("Invalid key for value index")?;
@@ -646,28 +650,6 @@ fn key_to_atom(key: &str) -> AtomicResult<Atom> {
 
 fn corrupt_db_message(subject: &str) -> String {
     return format!("Could not deserialize item {} from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.", subject);
-}
-
-/// A Value in the `watched_collections`.
-/// These are used to check whether collections have to be updated when values have changed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct CollectionIndex {
-    /// The URL of the Collection, including query parameters
-    subject: String,
-    /// Whether the collection is filtering by property
-    property: Option<String>,
-    /// Filtering by value
-    value: Option<String>,
-}
-
-/// Differs from a Regular Atom, since the value here is the stringified representation of the value.
-/// In the case of ResourceArrays, only a _single_ subject is used.
-/// One IndexAtom for every member of the ResourceArray is created.
-#[derive(Debug, Clone)]
-struct IndexAtom {
-    subject: String,
-    property: String,
-    value: String,
 }
 
 const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.";
