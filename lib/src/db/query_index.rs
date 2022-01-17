@@ -48,7 +48,8 @@ pub const FIRST_CHAR: &str = "\u{0000}";
 pub const END_CHAR: &str = "\u{ffff}";
 
 #[tracing::instrument(skip(store))]
-pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Option<QueryResult>> {
+/// Performs a query on the `members_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
+pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<Option<QueryResult>> {
     let start = if let Some(val) = &q.start_val {
         val
     } else {
@@ -62,11 +63,13 @@ pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Op
     let start_key = create_collection_members_key(&q.into(), Some(start), None)?;
     let end_key = create_collection_members_key(&q.into(), Some(end), None)?;
 
-    let iter = store.members_index.range(start_key..end_key);
-    // TODO: Get sorting working!
-    // if q.sort_desc {
-    //     iter = iter.rev();
-    // }
+    let iter: Box<dyn Iterator<Item = std::result::Result<(sled::IVec, sled::IVec), sled::Error>>> =
+        if q.sort_desc {
+            Box::new(store.members_index.range(start_key..end_key).rev())
+        } else {
+            Box::new(store.members_index.range(start_key..end_key))
+        };
+
     let mut subjects: Vec<String> = vec![];
     for (i, kv) in iter.enumerate() {
         if let Some(limit) = q.limit {
