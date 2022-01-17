@@ -30,6 +30,7 @@ Demo on [atomicdata.dev](https://atomicdata.dev)
 - 🔐  **Authorization** (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
 - 📲  **Invite and sharing system** with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 - 📂  **File management**: Upload, download and preview attachments.
+- 🖥️  **Desktop app**: Easy desktop installation, with status bar icon, powered by [tauri](https://github.com/tauri-apps/tauri/).
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled), [tantivy](https://github.com/quickwit-inc/tantivy) and [more](Cargo.toml).
 
