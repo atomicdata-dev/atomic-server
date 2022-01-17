@@ -44,8 +44,8 @@ pub struct IndexAtom {
 }
 
 /// Last character in lexicographic ordering
-const FIRST_CHAR: &str = "\u{0000}";
-const END_CHAR: &str = "\u{ffff}";
+pub const FIRST_CHAR: &str = "\u{0000}";
+pub const END_CHAR: &str = "\u{ffff}";
 
 #[tracing::instrument(skip(store))]
 pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Option<QueryResult>> {
@@ -63,7 +63,10 @@ pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Op
     let end_key = create_collection_members_key(&q.into(), Some(end), None)?;
 
     let iter = store.members_index.range(start_key..end_key);
-
+    // TODO: Get sorting working!
+    // if q.sort_desc {
+    //     iter = iter.rev();
+    // }
     let mut subjects: Vec<String> = vec![];
     for (i, kv) in iter.enumerate() {
         if let Some(limit) = q.limit {
@@ -74,7 +77,6 @@ pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Op
         if i >= q.offset {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
-            println!("hit {}   -   {}   -  {:?}", subject, _val, _q_filter);
             subjects.push(subject.into())
         }
     }
@@ -219,7 +221,8 @@ pub fn create_collection_members_key(
         } else {
             val
         };
-        shorter.as_bytes().to_vec()
+        let lowercase = shorter.to_lowercase();
+        lowercase.as_bytes().to_vec()
     } else {
         vec![0]
     };
@@ -246,14 +249,16 @@ pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, 
 
     let q_filter: QueryFilter = bincode::deserialize(q_filter_bytes)?;
     let value = if !value_bytes.is_empty() {
-        std::str::from_utf8(value_bytes).unwrap()
+        std::str::from_utf8(value_bytes)
+            .map_err(|e| format!("Can't parse value in members_key: {}", e))?
     } else {
-        return Err("Can't parse value".into());
+        return Err("Can't parse value in members_key".into());
     };
     let subject = if !subject_bytes.is_empty() {
-        std::str::from_utf8(subject_bytes).unwrap()
+        std::str::from_utf8(subject_bytes)
+            .map_err(|e| format!("Can't parse subject in members_key: {}", e))?
     } else {
-        return Err("Can't parse subject".into());
+        return Err("Can't parse subject in members_key".into());
     };
     Ok((q_filter, value, subject))
 }
@@ -266,10 +271,11 @@ pub mod test {
     fn create_and_parse_key() {
         round_trip("\n", "\n");
         round_trip("short", "short");
+        round_trip("UP", "up");
         round_trip("12905.125.15", "12905.125.15");
         round_trip(
-            "29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB",
-            "29NA(E*Tn3028nt87n_#",
+            "29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB",
+            "29na(e*tn3028nt87n_#t&*nf_ae*&#n@_t*&!#b_&*tn&*aebt&*#b&tb@#!#@bb29na(e*tn3028nt87n_#t&*nf_ae*&#n@_t*&!#b_&*tn&*aebt&*#b",
         );
 
         fn round_trip(val: &str, val_check: &str) {
@@ -297,19 +303,21 @@ pub mod test {
 
         let start_none = create_collection_members_key(&q, None, None).unwrap();
         let start_str = create_collection_members_key(&q, Some("a"), None).unwrap();
-        let mid1 = create_collection_members_key(&q, Some("a"), Some("wadiaodn")).unwrap();
-        let mid2 = create_collection_members_key(&q, Some("hi there"), Some("egnsoinge")).unwrap();
+        let a_downcase = create_collection_members_key(&q, Some("a"), Some("wadiaodn")).unwrap();
+        let b_upcase = create_collection_members_key(&q, Some("B"), Some("wadiaodn")).unwrap();
+        let mid3 = create_collection_members_key(&q, Some("hi there"), Some("egnsoinge")).unwrap();
         let end = create_collection_members_key(&q, Some(END_CHAR), None).unwrap();
 
         assert!(start_none < start_str);
-        assert!(start_str < mid1);
-        assert!(mid1 < mid2);
-        assert!(mid2 < end);
+        assert!(start_str < a_downcase);
+        assert!(a_downcase < b_upcase);
+        assert!(b_upcase < mid3);
+        assert!(mid3 < end);
 
-        let mut sorted = vec![&end, &start_str, &mid1, &mid2, &start_none];
+        let mut sorted = vec![&end, &start_str, &a_downcase, &b_upcase, &start_none];
         sorted.sort();
 
-        let expected = vec![&start_none, &start_str, &mid1, &mid2, &end];
+        let expected = vec![&start_none, &start_str, &a_downcase, &b_upcase, &end];
 
         assert_eq!(sorted, expected);
     }

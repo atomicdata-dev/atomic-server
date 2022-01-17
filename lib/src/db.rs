@@ -15,8 +15,8 @@ use crate::{
 };
 
 use self::query_index::{
-    add_atoms_to_index, check_if_atom_matches_watched_collections, query_indexed, update_member,
-    watch_collection, IndexAtom, QueryFilter,
+    add_atoms_to_index, check_if_atom_matches_watched_collections, query_indexed, watch_collection,
+    IndexAtom, QueryFilter, END_CHAR,
 };
 
 mod query_index;
@@ -120,9 +120,11 @@ impl Db {
         !self.reference_index.is_empty()
     }
 
-    /// Removes all values from the index.
+    /// Removes all values from the indexes.
     pub fn clear_index(&self) -> AtomicResult<()> {
         self.reference_index.clear()?;
+        self.members_index.clear()?;
+        self.watched_queries.clear()?;
         Ok(())
     }
 }
@@ -396,12 +398,6 @@ impl Storelike for Db {
             q.include_external,
         )?;
 
-        // Retry the same query!
-        if let Ok(Some(res)) = query_indexed(self, q) {
-            // Yay, we have a cache hit!
-            return Ok(res);
-        }
-
         let mut subjects = Vec::new();
         let mut resources = Vec::new();
         for atom in atoms.iter() {
@@ -426,8 +422,27 @@ impl Storelike for Db {
             }
         }
 
+        if subjects.is_empty() {
+            return Ok((subjects, resources));
+        }
+
+        // If there is a sort value, we need to change the items to contain that sorted value, instead of the one matched in the TPF query
         if let Some(sort) = &q.sort_by {
-            resources.
+            // We don't use the existing array, we clear it.
+            atoms = Vec::new();
+            for r in &resources {
+                // Users _can_ sort by optional properties! So we need a fallback defauil
+                let fallback_default = crate::Value::String(END_CHAR.into());
+                let sorted_val = r.get(sort).unwrap_or(&fallback_default);
+                let atom = Atom {
+                    subject: r.get_subject().to_string(),
+                    property: sort.to_string(),
+                    value: sorted_val.to_owned(),
+                };
+                atoms.push(atom)
+            }
+            // Now we sort by the value that the user wants to sort by
+            atoms.sort_by(|a, b| a.value.to_string().cmp(&b.value.to_string()));
         }
 
         let q_filter: QueryFilter = q.into();
@@ -436,7 +451,14 @@ impl Storelike for Db {
         // Maybe make this optional?
         watch_collection(self, &q_filter)?;
 
-        Ok((subjects, resources))
+        // Retry the same query!
+        if let Ok(Some(res)) = query_indexed(self, q) {
+            // Yay, we have a cache hit!
+            Ok(res)
+        } else {
+            Err("Query failed after adding atoms to index".into())
+        }
+        // Ok((subjects, resources))
     }
 
     #[tracing::instrument(skip(self))]
@@ -481,7 +503,7 @@ impl Storelike for Db {
                 let remove_atom = crate::Atom::new(subject.into(), prop, val);
                 self.remove_atom_from_index(&remove_atom)?;
             }
-            let binary_subject = bincode::serialize(subject).unwrap();
+            let binary_subject = bincode::serialize(subject)?;
             let _found = self.resources.remove(&binary_subject)?;
         } else {
             return Err(format!(
