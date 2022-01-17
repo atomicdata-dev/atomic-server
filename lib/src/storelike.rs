@@ -460,7 +460,11 @@ pub trait Storelike: Sized {
             subjects.push(r.get_subject().clone())
         }
 
-        Ok((subjects, resources))
+        Ok(QueryResult {
+            count: atoms.len(),
+            subjects,
+            resources,
+        })
     }
 
     /// Removes an Atom from the PropSubjectMap.
@@ -504,4 +508,8 @@ pub struct Query {
     pub for_agent: Option<String>,
 }
 
-pub type QueryResult = (Vec<String>, Vec<Resource>);
+pub struct QueryResult {
+    pub subjects: Vec<String>,
+    pub resources: Vec<Resource>,
+    pub count: usize,
+}

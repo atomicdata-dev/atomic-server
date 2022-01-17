@@ -211,58 +211,21 @@ impl Collection {
             include_nested: collection_builder.include_nested,
             for_agent: for_agent.map(|a| a.to_string()),
         };
-        let (subjects, resources) = store.query(&q)?;
 
-        let mut all_pages: Vec<Vec<String>> = Vec::new();
-        let mut all_pages_nested: Vec<Vec<Resource>> = Vec::new();
-        let mut page: Vec<String> = Vec::new();
-        let mut page_nested: Vec<Resource> = Vec::new();
-        let current_page = collection_builder.current_page;
-        for (i, subject) in subjects.iter().enumerate() {
-            page.push(subject.into());
-            if collection_builder.include_nested {
-                page_nested.push(resources[i].clone());
-            }
-            if page.len() >= collection_builder.page_size {
-                all_pages.push(page);
-                all_pages_nested.push(page_nested);
-                page = Vec::new();
-                page_nested = Vec::new();
-                // No need to calculte more than necessary
-                if all_pages.len() > current_page {
-                    break;
-                }
-            }
-            // Add the last page when handling the last subject
-            if i == subjects.len() - 1 {
-                all_pages.push(page);
-                all_pages_nested.push(page_nested);
-                break;
-            }
-        }
-        if all_pages.is_empty() {
-            all_pages.push(Vec::new());
-            all_pages_nested.push(Vec::new());
-        }
-        // Maybe I should default to last page, if current_page is too high?
-        let members = all_pages
-            .get(current_page)
-            .ok_or(format!("Page number {} is too high", current_page))?
-            .clone();
-        let total_items = subjects.len();
-        // Construct the pages (TODO), use pageSize
-        let total_pages =
-            (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
-        let members_nested = if collection_builder.include_nested {
-            Some(
-                all_pages_nested
-                    .get(current_page)
-                    .ok_or(format!("Page number {} is too high", current_page))?
-                    .clone(),
+        let query_result = store.query(&q)?;
+        let members = query_result.subjects;
+        let members_nested = Some(query_result.resources);
+        let total_items = query_result.count;
+        let pages_fraction = total_items as f64 / collection_builder.page_size as f64;
+        let total_pages = pages_fraction.ceil() as usize;
+        if collection_builder.current_page > total_pages {
+            return Err(format!(
+                "Page number out of bounds, got {}, max {}",
+                collection_builder.current_page, total_pages
             )
-        } else {
-            None
-        };
+            .into());
+        }
+
         let collection = Collection {
             total_pages,
             members,

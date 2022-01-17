@@ -385,9 +385,11 @@ impl Storelike for Db {
     /// Tries `query_cache`, which you should implement yourself.
     #[tracing::instrument(skip(self))]
     fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
-        if let Ok(Some(res)) = query_indexed(self, q) {
-            // Yay, we have a cache hit!
-            return Ok(res);
+        if let Ok(res) = query_indexed(self, q) {
+            if res.count > 0 {
+                // Yay, we have a cache hit!
+                return Ok(res);
+            }
         }
 
         // No cache hit, perform the query
@@ -423,7 +425,11 @@ impl Storelike for Db {
         }
 
         if subjects.is_empty() {
-            return Ok((subjects, resources));
+            return Ok(QueryResult {
+                subjects,
+                resources,
+                count: atoms.len(),
+            });
         }
 
         // If there is a sort value, we need to change the items to contain that sorted value, instead of the one matched in the TPF query
@@ -452,13 +458,7 @@ impl Storelike for Db {
         watch_collection(self, &q_filter)?;
 
         // Retry the same query!
-        if let Ok(Some(res)) = query_indexed(self, q) {
-            // Yay, we have a cache hit!
-            Ok(res)
-        } else {
-            Err("Query failed after adding atoms to index".into())
-        }
-        // Ok((subjects, resources))
+        query_indexed(self, q)
     }
 
     #[tracing::instrument(skip(self))]

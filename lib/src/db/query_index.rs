@@ -49,7 +49,7 @@ pub const END_CHAR: &str = "\u{ffff}";
 
 #[tracing::instrument(skip(store))]
 /// Performs a query on the `members_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
-pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<Option<QueryResult>> {
+pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     let start = if let Some(val) = &q.start_val {
         val
     } else {
@@ -71,20 +71,23 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<Option<QueryResult>>
         };
 
     let mut subjects: Vec<String> = vec![];
+    let mut count = 0;
     for (i, kv) in iter.enumerate() {
         if let Some(limit) = q.limit {
-            if i >= limit {
-                break;
+            if subjects.len() < limit && i >= q.offset {
+                let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
+                let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+                subjects.push(subject.into())
             }
-        }
-        if i >= q.offset {
-            let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
-            let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
-            subjects.push(subject.into())
+            count = i;
         }
     }
     if subjects.is_empty() {
-        return Ok(None);
+        return Ok(QueryResult {
+            subjects: vec![],
+            resources: vec![],
+            count,
+        });
     }
     let mut resources = Vec::new();
     if q.include_nested {
@@ -93,7 +96,12 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<Option<QueryResult>>
             resources.push(resource);
         }
     }
-    Ok(Some((subjects, resources)))
+
+    Ok(QueryResult {
+        count,
+        resources,
+        subjects,
+    })
 }
 
 /// Adss atoms for a specific query to the index
