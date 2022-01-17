@@ -214,6 +214,14 @@ impl Value {
         }
         Err(format!("Value {} is not a Nested Resource", self).into())
     }
+
+    /// Returns a Lexicographically sortable string representation of the value
+    pub fn to_sortable_string(&self) -> AtomicResult<&PropVals> {
+        if let Value::NestedResource(SubResource::Nested(nested)) = self {
+            return Ok(nested);
+        }
+        Err(format!("Value {} is not a Nested Resource", self).into())
+    }
 }
 
 impl From<String> for Value {

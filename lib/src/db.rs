@@ -7,21 +7,19 @@ use std::{
 };
 
 use crate::{
-    db::collections_index::MAX_LEN,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
     storelike::{Query, QueryResult, ResourceCollection, Storelike},
-    values::SubResource,
     Atom, Resource, Value,
 };
 
-use self::collections_index::{
-    check_if_atom_matches_watched_collections, query_indexed, update_member, watch_collection,
-    IndexAtom,
+use self::query_index::{
+    add_atoms_to_index, check_if_atom_matches_watched_collections, query_indexed, update_member,
+    watch_collection, IndexAtom, QueryFilter,
 };
 
-mod collections_index;
+mod query_index;
 
 /// Inside the reference_index, each value is mapped to this type.
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
@@ -171,7 +169,7 @@ impl Storelike for Db {
         for val_subject in values_vec {
             // https://github.com/joepio/atomic-data-rust/issues/282
             // The key is a newline delimited string, with the following format:
-            let index_atom = collections_index::IndexAtom {
+            let index_atom = query_index::IndexAtom {
                 value: val_subject,
                 property: atom.property.clone(),
                 subject: atom.subject.clone(),
@@ -183,7 +181,7 @@ impl Storelike for Db {
                 .insert(key_for_reference_index(&index_atom).as_bytes(), b"")?;
 
             // Also update the members index to keep collections performant
-            collections_index::check_if_atom_matches_watched_collections(self, &index_atom, false)
+            query_index::check_if_atom_matches_watched_collections(self, &index_atom, false)
                 .map_err(|e| {
                     format!("Failed to check_if_atom_matches_watched_collections. {}", e)
                 })?;
@@ -391,50 +389,12 @@ impl Storelike for Db {
         }
 
         // No cache hit, perform the query
-        let atoms = self.tpf(
+        let mut atoms = self.tpf(
             None,
             q.property.as_deref(),
             q.value.as_deref(),
             q.include_external,
         )?;
-
-        // Add all atoms to the index, so next time we do get a cache hit.
-        for atom in &atoms {
-            let vals: Vec<String> = match &atom.value {
-                Value::ResourceArray(vec) => {
-                    let mut vals = vec![];
-                    for item in vec {
-                        match item {
-                            SubResource::Resource(r) => vals.push(r.get_subject().into()),
-                            SubResource::Subject(s) => vals.push(s.into()),
-                            // We don't index Nested resources at this time
-                            SubResource::Nested(_ignored) => {}
-                        }
-                    }
-                    vals
-                }
-                // We don't index Nested resources at this time
-                Value::NestedResource(_) => {
-                    vec![]
-                }
-                Value::Resource(r) => vec![r.get_subject().into()],
-                other => {
-                    let short_string = &other.to_string()[..MAX_LEN];
-                    vec![short_string.into()]
-                }
-            };
-            for value in vals {
-                let index_atom = IndexAtom {
-                    subject: atom.subject.clone(),
-                    property: atom.subject.clone(),
-                    value,
-                };
-                update_member(self, &q.into(), &index_atom, false)?;
-            }
-        }
-
-        // Maybe make this optional?
-        watch_collection(self, &q.into())?;
 
         // Retry the same query!
         if let Ok(Some(res)) = query_indexed(self, q) {
@@ -447,7 +407,8 @@ impl Storelike for Db {
         for atom in atoms.iter() {
             // These nested resources are not fully calculated - they will be presented as -is
             subjects.push(atom.subject.clone());
-            if q.include_nested {
+            // We need the Resources if we want to sort by a non-subject value
+            if q.include_nested || q.sort_by.is_some() {
                 match self.get_resource_extended(&atom.subject, true, q.for_agent.as_deref()) {
                     Ok(resource) => {
                         resources.push(resource);
@@ -464,6 +425,16 @@ impl Storelike for Db {
                 }
             }
         }
+
+        if let Some(sort) = &q.sort_by {
+            resources.
+        }
+
+        let q_filter: QueryFilter = q.into();
+
+        add_atoms_to_index(self, &atoms, &q_filter)?;
+        // Maybe make this optional?
+        watch_collection(self, &q_filter)?;
 
         Ok((subjects, resources))
     }

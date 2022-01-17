@@ -5,11 +5,12 @@
 use crate::{
     errors::AtomicResult,
     storelike::{Query, QueryResult},
-    Db, Storelike,
+    Atom, Db, Storelike,
 };
 use serde::{Deserialize, Serialize};
 
-/// Represents a filter on the Store.
+/// A subset of a full [Query].
+/// Represents a sorted filter on the Store.
 /// A Value in the `watched_collections`.
 /// These are used to check whether collections have to be updated when values have changed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,14 +49,6 @@ const END_CHAR: &str = "\u{ffff}";
 
 #[tracing::instrument(skip(store))]
 pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Option<QueryResult>> {
-    // let iter = if let Some(start) = &q.start_val {
-    //     let start = create_collection_members_key(&q.into(), Some(start), None)?;
-    //     let end = create_collection_members_key(&q.into(), Some(FINAL_CHAR), None)?;
-    //     store.members_index.range(start..end)
-    // } else {
-    //     let key = create_collection_members_key(&q.into(), None, None)?;
-    //     // store.members_index.scan_prefix(key)
-    // };
     let start = if let Some(val) = &q.start_val {
         val
     } else {
@@ -81,6 +74,7 @@ pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Op
         if i >= q.offset {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+            println!("hit {}   -   {}   -  {:?}", subject, _val, _q_filter);
             subjects.push(subject.into())
         }
     }
@@ -95,6 +89,20 @@ pub fn query_indexed(store: &Db, q: &crate::storelike::Query) -> AtomicResult<Op
         }
     }
     Ok(Some((subjects, resources)))
+}
+
+/// Adss atoms for a specific query to the index
+pub fn add_atoms_to_index(store: &Db, atoms: &[Atom], q_filter: &QueryFilter) -> AtomicResult<()> {
+    // Add all atoms to the index, so next time we do get a cache hit.
+    for atom in atoms {
+        let index_atom = IndexAtom {
+            subject: atom.subject.clone(),
+            property: atom.subject.clone(),
+            value: atom.value.to_string(),
+        };
+        update_member(store, q_filter, &index_atom, false)?;
+    }
+    Ok(())
 }
 
 #[tracing::instrument(skip(store))]
@@ -191,7 +199,8 @@ pub fn update_member(
 /// We separate the various items in it using this bit that's illegal in UTF-8.
 const SEPARATION_BIT: u8 = 0xff;
 
-pub const MAX_LEN: usize = 20;
+/// Maximum string length for values in the members_index. Should be long enough to contain pretty long URLs, but not very long documents.
+pub const MAX_LEN: usize = 120;
 
 /// Creates a key for a collection + value combination.
 /// These are designed to be lexicographically sortable.
