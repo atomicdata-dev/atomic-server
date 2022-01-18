@@ -160,14 +160,14 @@ impl Storelike for Db {
         Ok(())
     }
 
-    // This only adds ResourceArrays and AtomicURLs at this moment, which means that many values cannot be accessed in the TPF query (thus, collections)
     #[tracing::instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
         let values_vec = match &atom.value {
             // This results in wrong indexing, as some subjects will be numbers.
             Value::ResourceArray(_v) => atom.values_to_subjects()?,
             Value::AtomicUrl(v) => vec![v.into()],
-            _other => return Ok(()),
+            // This might result in unnecassarily long strings, sometimes. We may want to shorten them later.
+            val => vec![val.to_string()],
         };
 
         for val_subject in values_vec {
@@ -401,6 +401,7 @@ impl Storelike for Db {
             q.value.as_deref(),
             q.include_external,
         )?;
+        let count = atoms.len();
 
         let mut subjects = Vec::new();
         let mut resources = Vec::new();
@@ -430,7 +431,7 @@ impl Storelike for Db {
             return Ok(QueryResult {
                 subjects,
                 resources,
-                count: atoms.len(),
+                count,
             });
         }
 
@@ -608,6 +609,7 @@ impl Storelike for Db {
                     for item in self.reference_index.scan_prefix(key_prefix) {
                         let (k, _v) = item?;
                         let key_string = String::from_utf8(k.to_vec())?;
+                        // WARNING: Converts all Atoms to Strings, the datatype is lost here
                         let atom = key_to_atom(&key_string)?;
                         if include_external || atom.subject.starts_with(self.get_server_url()) {
                             vec.push(atom)

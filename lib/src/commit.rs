@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, datetime_helpers, errors::AtomicResult, hierarchy, resources::PropVals,
-    urls, Atom, Resource, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, hierarchy, resources::PropVals, urls, Atom, Resource,
+    Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -282,7 +282,7 @@ impl Commit {
         let commit_subject = match self.signature.as_ref() {
             Some(sig) => format!("{}/commits/{}", store.get_server_url(), sig),
             None => {
-                let now = crate::datetime_helpers::now();
+                let now = crate::utils::now();
                 format!("{}/commitsUnsigned/{}", store.get_server_url(), now)
             }
         };
@@ -387,7 +387,7 @@ impl CommitBuilder {
         agent: &crate::agents::Agent,
         store: &impl Storelike,
     ) -> AtomicResult<Commit> {
-        let now = crate::datetime_helpers::now();
+        let now = crate::utils::now();
         sign_at(self, agent, now, store)
     }
 
@@ -477,7 +477,7 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
 
 pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
-    let now = datetime_helpers::now();
+    let now = crate::utils::now();
     if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
         return Err(format!(
                     "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",

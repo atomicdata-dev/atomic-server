@@ -90,6 +90,9 @@ pub const MIMETYPE: &str = "https://atomicdata.dev/properties/mimetype";
 pub const INTERNAL_ID: &str = "https://atomicdata.dev/properties/internalId";
 pub const DOWNLOAD_URL: &str = "https://atomicdata.dev/properties/downloadURL";
 pub const ATTACHMENTS: &str = "https://atomicdata.dev/properties/attachments";
+// ... for Documents and Elements
+pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
+
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
 pub const MARKDOWN: &str = "https://atomicdata.dev/datatypes/markdown";

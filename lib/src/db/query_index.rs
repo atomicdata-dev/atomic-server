@@ -79,7 +79,7 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
                 let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
                 subjects.push(subject.into())
             }
-            count = i;
+            count = i + 1;
         }
     }
     if subjects.is_empty() {

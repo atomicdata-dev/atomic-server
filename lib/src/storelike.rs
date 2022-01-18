@@ -511,5 +511,6 @@ pub struct Query {
 pub struct QueryResult {
     pub subjects: Vec<String>,
     pub resources: Vec<Resource>,
+    /// The amount of hits that were found, including the ones that were out of bounds or not authorized.
     pub count: usize,
 }

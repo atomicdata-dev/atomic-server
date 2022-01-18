@@ -70,6 +70,7 @@ pub mod storelike;
 mod test_utils;
 mod url_helpers;
 pub mod urls;
+pub mod utils;
 pub mod validate;
 pub mod values;
 

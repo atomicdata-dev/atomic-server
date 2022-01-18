@@ -25,7 +25,7 @@ pub fn fetch_resource(
 /// Returns the various x-atomic authentication headers, includign agent signature
 pub fn get_authentication_headers(url: &str, agent: &Agent) -> AtomicResult<Vec<(String, String)>> {
     let mut headers = Vec::new();
-    let now = crate::datetime_helpers::now().to_string();
+    let now = crate::utils::now().to_string();
     let message = format!("{} {}", url, now);
     let signature = sign_message(
         &message,
@@ -97,7 +97,7 @@ pub fn fetch_tpf(
 
 /// Posts a Commit to the endpoint of the Subject from the Commit
 pub fn post_commit(commit: &crate::Commit, store: &impl Storelike) -> AtomicResult<()> {
-    let server_url = crate::url_helpers::server_url(commit.get_subject())?;
+    let server_url = crate::utils::server_url(commit.get_subject())?;
     // Default Commit endpoint is `https://example.com/commit`
     let endpoint = format!("{}commit", server_url);
     post_commit_custom_endpoint(&endpoint, commit, store)

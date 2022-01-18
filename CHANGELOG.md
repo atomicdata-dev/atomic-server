@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [UNRELEASED]
+
+- Huge performance increase for queries! Added sortable index, big refactor #114
+- Added `store.query()` function with better query options.
+
 ## [v0.30.4] - 2021-01-15
 
 Run with `--rebuild-index` the first time, if you use an existing database.

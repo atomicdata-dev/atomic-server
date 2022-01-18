@@ -1,6 +1,5 @@
 use crate::{
-    agents::Agent, errors::AtomicResult, url_helpers::check_valid_url, urls, Resource, Storelike,
-    Value,
+    agents::Agent, errors::AtomicResult, urls, utils::check_valid_url, Resource, Storelike, Value,
 };
 
 /// If there is a valid Agent in the correct query param, and the invite is valid, update the rights and respond with a redirect to the target resource
@@ -74,7 +73,7 @@ pub fn construct_invite_redirect(
     }
 
     if let Ok(expires) = invite_resource.get(urls::EXPIRES_AT) {
-        if expires.to_int()? > crate::datetime_helpers::now() {
+        if expires.to_int()? > crate::utils::now() {
             return Err("Invite is no longer valid".into());
         }
     }

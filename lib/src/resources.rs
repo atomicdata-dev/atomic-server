@@ -1,5 +1,6 @@
 //! A resource is a set of Atoms that share a URL
 
+use crate::utils::random_string;
 use crate::values::Value;
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
@@ -155,23 +156,24 @@ impl Resource {
         }
     }
 
+    /// Create a new resource with a generated Subject
+    pub fn new_generate_subject(store: &impl Storelike) -> Resource {
+        let generated = format!("{}/{}", store.get_server_url(), random_string());
+
+        Resource::new(generated)
+    }
+
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
     /// Does not save the resource to the store.
     pub fn new_instance(class_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
         let class = store.get_class(class_url)?;
-        use rand::Rng;
-        let random_string: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(7)
-            .map(char::from)
-            .collect();
         let subject = format!(
             "{}/{}/{}",
             store.get_server_url(),
             &class.shortname,
-            random_string
+            random_string()
         );
         let mut resource = Resource {
             propvals,

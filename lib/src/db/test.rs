@@ -240,3 +240,90 @@ fn get_extended_resource_pagination() {
     assert_eq!(cur_page, 2);
     assert_eq!(resource.get_subject(), &subject_with_page_size);
 }
+
+/// Generate a bunch of resources, query them
+#[test]
+fn query_test() {
+    let store = &DB.lock().unwrap().clone();
+
+    let demo_val = "myval".to_string();
+    let demo_reference = urls::PARAGRAPH;
+
+    let count = 10;
+    let limit = 5;
+    assert!(
+        count > limit,
+        "following tests might not make sense if count is less than limit"
+    );
+
+    let sort_by = urls::DESCRIPTION;
+
+    for _x in 0..count {
+        let mut demo_resource = Resource::new_generate_subject(store);
+        demo_resource
+            .set_propval_string(urls::PARENT.into(), demo_reference, store)
+            .unwrap();
+        demo_resource
+            .set_propval(urls::SHORTNAME.into(), Value::Slug(demo_val.clone()), store)
+            .unwrap();
+        demo_resource
+            .set_propval(
+                sort_by.into(),
+                Value::Markdown(crate::utils::random_string()),
+                store,
+            )
+            .unwrap();
+        demo_resource.save(store).unwrap();
+    }
+
+    let mut q = Query {
+        property: Some(urls::PARENT.into()),
+        value: Some(demo_reference.into()),
+        limit: Some(limit),
+        start_val: None,
+        end_val: None,
+        offset: 0,
+        sort_by: None,
+        sort_desc: false,
+        include_external: true,
+        include_nested: false,
+        for_agent: None,
+    };
+    let res = store.query(&q).unwrap();
+    assert_eq!(
+        res.count, count,
+        "number of references without property filter"
+    );
+    assert_eq!(limit, res.subjects.len(), "limit");
+
+    q.property = None;
+    q.value = Some(demo_val);
+    let res = store.query(&q).unwrap();
+    assert_eq!(res.count, count, "literal value");
+
+    q.offset = 9;
+    let res = store.query(&q).unwrap();
+    assert_eq!(res.subjects.len(), count - q.offset, "offset");
+    assert_eq!(res.resources.len(), 0, "no nested resources");
+
+    q.offset = 0;
+    q.include_nested = true;
+    let res = store.query(&q).unwrap();
+    assert_eq!(res.resources.len(), limit, "nested resources");
+
+    q.sort_by = Some(sort_by.into());
+    let res = store.query(&q).unwrap();
+    assert!(
+        res.resources[0].get(sort_by).unwrap().to_string()
+            < res.resources[limit - 1].get(sort_by).unwrap().to_string(),
+        "sort by asc"
+    );
+
+    q.sort_desc = true;
+    let res = store.query(&q).unwrap();
+    assert!(
+        res.resources[0].get(sort_by).unwrap().to_string()
+            > res.resources[limit - 1].get(sort_by).unwrap().to_string(),
+        "sort by desc"
+    );
+}

@@ -2,7 +2,7 @@
 
 use crate::{
     datatype::match_datatype, datatype::DataType, errors::AtomicResult, resources::PropVals,
-    url_helpers::check_valid_url, Resource,
+    utils::check_valid_url, Resource,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};

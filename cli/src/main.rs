@@ -37,7 +37,7 @@ impl Context<'_> {
         self.store.set_default_agent(Agent {
             subject: write_ctx.agent.clone(),
             private_key: Some(write_ctx.private_key.clone()),
-            created_at: atomic_lib::datetime_helpers::now(),
+            created_at: atomic_lib::utils::now(),
             name: None,
             public_key: generate_public_key(&write_ctx.private_key).public,
         });
