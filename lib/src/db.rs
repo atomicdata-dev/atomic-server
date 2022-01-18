@@ -331,7 +331,7 @@ impl Storelike for Db {
         resource.set_subject(subject.into());
 
         if let Some(agent) = for_agent {
-            crate::hierarchy::check_read(self, &resource, agent)?;
+            let _explanation = crate::hierarchy::check_read(self, &resource, agent)?;
         }
 
         // Whether the resource has dynamic properties
@@ -410,7 +410,8 @@ impl Storelike for Db {
             subjects.push(atom.subject.clone());
             // We need the Resources if we want to sort by a non-subject value
             if q.include_nested || q.sort_by.is_some() {
-                match self.get_resource_extended(&atom.subject, true, q.for_agent.as_deref()) {
+                // We skip checking for Agent, because we don't return these results directly anyway
+                match self.get_resource_extended(&atom.subject, true, None) {
                     Ok(resource) => {
                         resources.push(resource);
                     }
@@ -427,10 +428,10 @@ impl Storelike for Db {
             }
         }
 
-        if subjects.is_empty() {
+        if atoms.is_empty() {
             return Ok(QueryResult {
-                subjects,
-                resources,
+                subjects: vec![],
+                resources: vec![],
                 count,
             });
         }

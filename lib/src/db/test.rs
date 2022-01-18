@@ -260,8 +260,14 @@ fn query_test() {
 
     for _x in 0..count {
         let mut demo_resource = Resource::new_generate_subject(store);
+        // We make one resource public
+        if _x == 1 {
+            demo_resource
+                .set_propval(urls::READ.into(), vec![urls::PUBLIC_AGENT].into(), store)
+                .unwrap();
+        }
         demo_resource
-            .set_propval_string(urls::PARENT.into(), demo_reference, store)
+            .set_propval_string(urls::DESTINATION.into(), demo_reference, store)
             .unwrap();
         demo_resource
             .set_propval(urls::SHORTNAME.into(), Value::Slug(demo_val.clone()), store)
@@ -277,7 +283,7 @@ fn query_test() {
     }
 
     let mut q = Query {
-        property: Some(urls::PARENT.into()),
+        property: Some(urls::DESTINATION.into()),
         value: Some(demo_reference.into()),
         limit: Some(limit),
         start_val: None,
@@ -313,17 +319,28 @@ fn query_test() {
 
     q.sort_by = Some(sort_by.into());
     let res = store.query(&q).unwrap();
-    assert!(
-        res.resources[0].get(sort_by).unwrap().to_string()
-            < res.resources[limit - 1].get(sort_by).unwrap().to_string(),
-        "sort by asc"
-    );
+    let mut prev_resource = res.resources[0].clone();
+    for r in res.resources {
+        let previous = prev_resource.get(sort_by).unwrap().to_string();
+        let current = r.get(sort_by).unwrap().to_string();
+        assert!(
+            previous <= current,
+            "should be ascending: {} - {}",
+            previous,
+            current
+        );
+        prev_resource = r;
+    }
 
     q.sort_desc = true;
     let res = store.query(&q).unwrap();
-    assert!(
-        res.resources[0].get(sort_by).unwrap().to_string()
-            > res.resources[limit - 1].get(sort_by).unwrap().to_string(),
-        "sort by desc"
-    );
+    let first = res.resources[0].get(sort_by).unwrap().to_string();
+    let later = res.resources[limit - 1].get(sort_by).unwrap().to_string();
+    assert!(first > later, "sort by desc");
+
+    q.for_agent = Some(urls::PUBLIC_AGENT.into());
+    let res = store.query(&q).unwrap();
+    assert_eq!(res.subjects.len(), 1, "authorized subjects");
+    assert_eq!(res.resources.len(), 1, "authorized resources");
+    assert_eq!(res.count, 1, "authorized count");
 }

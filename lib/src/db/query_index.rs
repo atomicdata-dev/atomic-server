@@ -90,17 +90,36 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         });
     }
     let mut resources = Vec::new();
-    if q.include_nested {
+    // When an agent is defined, we must perform authorization checks
+    let mut subjects_filtered = Vec::new();
+    if q.include_nested || q.for_agent.is_some() {
         for subject in &subjects {
-            let resource = store.get_resource_extended(subject, true, q.for_agent.as_deref())?;
-            resources.push(resource);
+            match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+                Ok(resource) => {
+                    resources.push(resource);
+                    subjects_filtered.push(subject.clone());
+                }
+                Err(e) => match e.error_type {
+                    crate::AtomicErrorType::NotFoundError => {}
+                    crate::AtomicErrorType::UnauthorizedError => {
+                        println!("Unauthorized error: {}", e);
+                    }
+                    crate::AtomicErrorType::OtherError => {
+                        return Err(
+                            format!("Error when getting resource in collection: {}", e).into()
+                        )
+                    }
+                },
+            }
         }
+    } else {
+        subjects_filtered = subjects;
     }
 
     Ok(QueryResult {
         count,
         resources,
-        subjects,
+        subjects: subjects_filtered,
     })
 }
 

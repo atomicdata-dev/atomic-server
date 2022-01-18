@@ -43,5 +43,5 @@ pub fn random_string() -> String {
         .take(7)
         .map(char::from)
         .collect();
-    random_string
+    random_string.to_lowercase()
 }
