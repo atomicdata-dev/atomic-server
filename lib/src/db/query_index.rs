@@ -71,55 +71,47 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         };
 
     let mut subjects: Vec<String> = vec![];
+    let mut resources = Vec::new();
     let mut count = 0;
+
     for (i, kv) in iter.enumerate() {
         if let Some(limit) = q.limit {
             if subjects.len() < limit && i >= q.offset {
                 let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
                 let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
-                subjects.push(subject.into())
+
+                // When an agent is defined, we must perform authorization checks
+                if q.include_nested || q.for_agent.is_some() {
+                    match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+                        Ok(resource) => {
+                            resources.push(resource);
+                            subjects.push(subject.into())
+                        }
+                        Err(e) => match e.error_type {
+                            crate::AtomicErrorType::NotFoundError => {}
+                            crate::AtomicErrorType::UnauthorizedError => {}
+                            crate::AtomicErrorType::OtherError => {
+                                return Err(format!(
+                                    "Error when getting resource in collection: {}",
+                                    e
+                                )
+                                .into())
+                            }
+                        },
+                    }
+                } else {
+                    // If there is no need for nested resources, and no auth checks, we can skip the expensive part!
+                    subjects.push(subject.into())
+                }
             }
             count = i + 1;
         }
-    }
-    if subjects.is_empty() {
-        return Ok(QueryResult {
-            subjects: vec![],
-            resources: vec![],
-            count,
-        });
-    }
-    let mut resources = Vec::new();
-    // When an agent is defined, we must perform authorization checks
-    let mut subjects_filtered = Vec::new();
-    if q.include_nested || q.for_agent.is_some() {
-        for subject in &subjects {
-            match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
-                Ok(resource) => {
-                    resources.push(resource);
-                    subjects_filtered.push(subject.clone());
-                }
-                Err(e) => match e.error_type {
-                    crate::AtomicErrorType::NotFoundError => {}
-                    crate::AtomicErrorType::UnauthorizedError => {
-                        println!("Unauthorized error: {}", e);
-                    }
-                    crate::AtomicErrorType::OtherError => {
-                        return Err(
-                            format!("Error when getting resource in collection: {}", e).into()
-                        )
-                    }
-                },
-            }
-        }
-    } else {
-        subjects_filtered = subjects;
     }
 
     Ok(QueryResult {
         count,
         resources,
-        subjects: subjects_filtered,
+        subjects,
     })
 }
 
