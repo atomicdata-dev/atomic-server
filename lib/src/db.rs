@@ -7,6 +7,7 @@ use std::{
 };
 
 use crate::{
+    db::query_index::value_to_indexable_strings,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -15,8 +16,8 @@ use crate::{
 };
 
 use self::query_index::{
-    add_atoms_to_index, check_if_atom_matches_watched_collections, query_indexed, watch_collection,
-    IndexAtom, QueryFilter, END_CHAR,
+    add_atoms_to_index, check_if_atom_matches_watched_query_filters, query_indexed,
+    watch_collection, IndexAtom, QueryFilter, END_CHAR,
 };
 
 mod query_index;
@@ -29,9 +30,15 @@ pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 
 /// The Db is a persistent on-disk Atomic Data store.
 /// It's an implementation of [Storelike].
-/// It uses [sled::Tree] as a Key Value store.
+/// It uses [sled::Tree]s as Key Value stores.
 /// It builds a value index for performant [Query]s.
 /// It stores [Resource]s as [PropVals]s by their subject as key.
+///
+/// ## Resources
+///
+/// ## Value Index
+///
+/// The Value index stores
 #[derive(Clone)]
 pub struct Db {
     /// The Key-Value store that contains all data.
@@ -132,6 +139,7 @@ impl Db {
 }
 
 impl Storelike for Db {
+    #[tracing::instrument(skip(self))]
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
         // Start with a nested HashMap, containing only strings.
         let mut map: HashMap<String, Resource> = HashMap::new();
@@ -161,13 +169,11 @@ impl Storelike for Db {
     }
 
     #[tracing::instrument(skip(self))]
-    fn add_atom_to_index(&self, atom: &Atom) -> AtomicResult<()> {
-        let values_vec = match &atom.value {
-            // This results in wrong indexing, as some subjects will be numbers.
-            Value::ResourceArray(_v) => atom.values_to_subjects()?,
-            Value::AtomicUrl(v) => vec![v.into()],
-            // This might result in unnecassarily long strings, sometimes. We may want to shorten them later.
-            val => vec![val.to_string()],
+    fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
+        let values_vec = if let Some(vals) = value_to_indexable_strings(&atom.value) {
+            vals
+        } else {
+            return Ok(());
         };
 
         for val_subject in values_vec {
@@ -185,7 +191,7 @@ impl Storelike for Db {
                 .insert(key_for_reference_index(&index_atom).as_bytes(), b"")?;
 
             // Also update the members index to keep collections performant
-            query_index::check_if_atom_matches_watched_collections(self, &index_atom, false)
+            check_if_atom_matches_watched_query_filters(self, &index_atom, false, resource)
                 .map_err(|e| {
                     format!("Failed to check_if_atom_matches_watched_collections. {}", e)
                 })?;
@@ -216,17 +222,19 @@ impl Storelike for Db {
         }
         if update_index {
             if let Some(pv) = existing {
+                println!("existing propvals {:?}", pv);
                 let subject = resource.get_subject();
                 for (prop, val) in pv.iter() {
                     // Possible performance hit - these clones can be replaced by modifying remove_atom_from_index
                     let remove_atom = crate::Atom::new(subject.into(), prop.into(), val.clone());
-                    self.remove_atom_from_index(&remove_atom).map_err(|e| {
-                        format!("Failed to remove atom to index {}. {}", remove_atom, e)
-                    })?;
+                    self.remove_atom_from_index(&remove_atom, resource)
+                        .map_err(|e| {
+                            format!("Failed to remove atom to index {}. {}", remove_atom, e)
+                        })?;
                 }
             }
             for a in resource.to_atoms()? {
-                self.add_atom_to_index(&a)
+                self.add_atom_to_index(&a, resource)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
             }
         }
@@ -234,11 +242,11 @@ impl Storelike for Db {
     }
 
     #[tracing::instrument(skip(self))]
-    fn remove_atom_from_index(&self, atom: &Atom) -> AtomicResult<()> {
-        let vec = match atom.value.to_owned() {
-            Value::ResourceArray(_v) => atom.values_to_subjects()?,
-            Value::AtomicUrl(subject) => vec![subject],
-            _other => return Ok(()),
+    fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
+        let vec = if let Some(vals) = value_to_indexable_strings(&atom.value) {
+            vals
+        } else {
+            return Ok(());
         };
 
         for val in vec {
@@ -251,7 +259,7 @@ impl Storelike for Db {
             self.reference_index
                 .remove(&key_for_reference_index(&index_atom).as_bytes())?;
 
-            check_if_atom_matches_watched_collections(self, &index_atom, true)?;
+            check_if_atom_matches_watched_query_filters(self, &index_atom, true, resource)?;
         }
         Ok(())
     }
@@ -390,6 +398,7 @@ impl Storelike for Db {
         if let Ok(res) = query_indexed(self, q) {
             if res.count > 0 {
                 // Yay, we have a cache hit!
+                // We don't have to perform a (more expansive) TPF query + sorting
                 return Ok(res);
             }
         }
@@ -457,9 +466,9 @@ impl Storelike for Db {
 
         let q_filter: QueryFilter = q.into();
 
-        add_atoms_to_index(self, &atoms, &q_filter)?;
         // Maybe make this optional?
         watch_collection(self, &q_filter)?;
+        add_atoms_to_index(self, &atoms, &q_filter)?;
 
         // Retry the same query!
         query_indexed(self, q)
@@ -503,9 +512,10 @@ impl Storelike for Db {
     #[tracing::instrument(skip(self))]
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
         if let Ok(found) = self.get_propvals(subject) {
-            for (prop, val) in found {
-                let remove_atom = crate::Atom::new(subject.into(), prop, val);
-                self.remove_atom_from_index(&remove_atom)?;
+            let resource = Resource::from_propvals(found, subject.to_string());
+            for (prop, val) in resource.get_propvals() {
+                let remove_atom = crate::Atom::new(subject.into(), prop.clone(), val.clone());
+                self.remove_atom_from_index(&remove_atom, &resource)?;
             }
             let binary_subject = bincode::serialize(subject)?;
             let _found = self.resources.remove(&binary_subject)?;

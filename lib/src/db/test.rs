@@ -108,7 +108,9 @@ fn add_atom_to_index() {
     let value = Value::new(val_string, &crate::datatype::DataType::AtomicUrl).unwrap();
     // This atom should normally not exist - Agent is not the parent of Class.
     let atom = Atom::new(subject, property.clone(), value);
-    store.add_atom_to_index(&atom).unwrap();
+    store
+        .add_atom_to_index(&atom, &Resource::new("ds".into()))
+        .unwrap();
     let found_no_external = store
         .tpf(None, Some(&property), Some(val_string), false)
         .unwrap();
@@ -318,9 +320,11 @@ fn query_test() {
     assert_eq!(res.resources.len(), limit, "nested resources");
 
     q.sort_by = Some(sort_by.into());
-    let res = store.query(&q).unwrap();
+    let mut res = store.query(&q).unwrap();
     let mut prev_resource = res.resources[0].clone();
-    for r in res.resources {
+    // For one resource, we will change the order by changing its value
+    let mut res_changed_order = None;
+    for (i, r) in res.resources.iter_mut().enumerate() {
         let previous = prev_resource.get(sort_by).unwrap().to_string();
         let current = r.get(sort_by).unwrap().to_string();
         assert!(
@@ -329,8 +333,24 @@ fn query_test() {
             previous,
             current
         );
-        prev_resource = r;
+        // We change the order!
+        if i == 4 {
+            r.set_propval(sort_by.into(), Value::Markdown("!first".into()), store)
+                .unwrap();
+            r.save(store).unwrap();
+            res_changed_order = Some(r.clone());
+        }
+        prev_resource = r.clone();
     }
+
+    assert_eq!(res.count, count, "count changed after updating one value");
+
+    q.sort_by = Some(sort_by.into());
+    let res = store.query(&q).unwrap();
+    assert!(
+        res.resources[0].get_subject() == res_changed_order.unwrap().get_subject(),
+        "order did not change after updating resource"
+    );
 
     q.sort_desc = true;
     let res = store.query(&q).unwrap();

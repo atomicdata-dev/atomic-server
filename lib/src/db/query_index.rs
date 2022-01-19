@@ -5,7 +5,7 @@
 use crate::{
     errors::AtomicResult,
     storelike::{Query, QueryResult},
-    Atom, Db, Storelike,
+    Atom, Db, Resource, Storelike, Value,
 };
 use serde::{Deserialize, Serialize};
 
@@ -81,6 +81,8 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
                 let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
 
                 // When an agent is defined, we must perform authorization checks
+                // WARNING: EXPENSIVE!
+                // TODO: Make async
                 if q.include_nested || q.for_agent.is_some() {
                     match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
                         Ok(resource) => {
@@ -124,7 +126,7 @@ pub fn add_atoms_to_index(store: &Db, atoms: &[Atom], q_filter: &QueryFilter) ->
             property: atom.subject.clone(),
             value: atom.value.to_string(),
         };
-        update_member(store, q_filter, &index_atom, false)?;
+        update_indexed_member(store, q_filter, &index_atom, false)?;
     }
     Ok(())
 }
@@ -174,26 +176,94 @@ pub fn create_watched_collections(store: &Db) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Check whether the Atom will be hit by a TPF query matching the Collections.
+/// Checks if the resource will match with a QueryFilter.
+/// Does any value or property or sort value match?
+/// Returns the matching property, if found.
+/// E.g. if a Resource
+fn check_resource_query_filter_property(
+    resource: &Resource,
+    q_filter: &QueryFilter,
+) -> Option<String> {
+    if let Some(property) = &q_filter.property {
+        if let Ok(matched_propval) = resource.get(property) {
+            if let Some(filter_val) = &q_filter.value {
+                if &matched_propval.to_string() == filter_val {
+                    return Some(property.to_string());
+                }
+            } else {
+                return Some(property.to_string());
+            }
+        }
+    } else if let Some(filter_val) = &q_filter.value {
+        for (prop, val) in resource.get_propvals() {
+            if &val.to_string() == filter_val {
+                return Some(prop.to_string());
+            }
+        }
+        return None;
+    }
+    None
+}
+
+// This is probably the most complex function in the whole repo.
+// If things go wrong when making changes, add a test and fix stuff in the logic below.
+pub fn should_update(q_filter: &QueryFilter, atom: &IndexAtom, resource: &Resource) -> bool {
+    let resource_check = check_resource_query_filter_property(resource, q_filter);
+    let matching_prop = if let Some(p) = resource_check {
+        p
+    } else {
+        return false;
+    };
+
+    match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
+        // Whenever the atom matches with either the sorted or the filtered prop, we have to update
+        (Some(filterprop), Some(filter_val), Some(sortprop)) => {
+            if sortprop == &atom.property {
+                return true;
+            }
+            if filterprop == &atom.property && &atom.value.to_string() == filter_val {
+                return true;
+            }
+            // If either one of these match
+            let relevant_prop = filterprop == &atom.property || sortprop == &atom.property;
+            // And the value matches, we have to update
+            relevant_prop && filter_val == &atom.value
+        }
+        (Some(filter_prop), Some(_filter_val), None) => filter_prop == &atom.property,
+        (Some(filter_prop), None, Some(sort_by)) => {
+            filter_prop == &atom.property || sort_by == &atom.property
+        }
+        (None, Some(filter_val), None) => {
+            filter_val == &atom.value || matching_prop == atom.property
+        }
+        (None, Some(filter_val), Some(sort_by)) => {
+            filter_val == &atom.value
+                || matching_prop == atom.property
+                || &matching_prop == sort_by
+                || &atom.property == sort_by
+        }
+        // We should not create indexes for Collections that iterate over _all_ resources.
+        _ => false,
+    }
+}
+
+/// This is called when an atom is added or deleted.
+/// Check whether the Atom will be hit by a TPF query matching the [QueryFilter].
 /// Updates the index accordingly.
 #[tracing::instrument(skip(store))]
-pub fn check_if_atom_matches_watched_collections(
+pub fn check_if_atom_matches_watched_query_filters(
     store: &Db,
     atom: &IndexAtom,
     delete: bool,
+    resource: &Resource,
 ) -> AtomicResult<()> {
     for item in store.watched_queries.iter() {
         if let Ok((k, _v)) = item {
-            let collection = bincode::deserialize::<QueryFilter>(&k)?;
-            let should_update = match (&collection.property, &collection.value) {
-                (Some(prop), Some(val)) => prop == &atom.property && val == &atom.value,
-                (Some(prop), None) => prop == &atom.property,
-                (None, Some(val)) => val == &atom.value,
-                // We should not create indexes for Collections that iterate over _all_ resources.
-                _ => false,
-            };
+            let q_filter = bincode::deserialize::<QueryFilter>(&k)?;
+            let should_update = should_update(&q_filter, atom, resource);
+
             if should_update {
-                update_member(store, &collection, atom, delete)?;
+                update_indexed_member(store, &q_filter, atom, delete)?;
             }
         } else {
             return Err(format!("Can't deserialize collection index: {:?}", item).into());
@@ -204,7 +274,7 @@ pub fn check_if_atom_matches_watched_collections(
 
 /// Adds or removes a single item (IndexAtom) to the index_members cache.
 #[tracing::instrument(skip(store))]
-pub fn update_member(
+pub fn update_indexed_member(
     store: &Db,
     collection: &QueryFilter,
     atom: &IndexAtom,
@@ -283,6 +353,21 @@ pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, 
         return Err("Can't parse subject in members_key".into());
     };
     Ok((q_filter, value, subject))
+}
+
+/// Converts one Value to a bunch of indexable items.
+/// Returns None for unsupported types.
+pub fn value_to_indexable_strings(value: &Value) -> Option<Vec<String>> {
+    let vals = match value {
+        // This results in wrong indexing, as some subjects will be numbers.
+        Value::ResourceArray(_v) => value.to_subjects(None).unwrap_or_else(|_| vec![]),
+        Value::AtomicUrl(v) => vec![v.into()],
+        // We don't index nested resources for now
+        Value::NestedResource(_r) => return None,
+        // This might result in unnecassarily long strings, sometimes. We may want to shorten them later.
+        val => vec![val.to_string()],
+    };
+    Some(vals)
 }
 
 #[cfg(test)]

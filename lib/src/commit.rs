@@ -195,6 +195,7 @@ impl Commit {
 
     /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
     /// Optionally also updates the index in the Store.
+    /// The Old Resource is only needed when `update_index` is true, and is used for checking
     #[tracing::instrument(skip(store))]
     pub fn apply_changes(
         &self,
@@ -203,15 +204,18 @@ impl Commit {
         update_index: bool,
     ) -> AtomicResult<Resource> {
         if let Some(set) = self.set.clone() {
-            for (prop, val) in set.iter() {
+            for (prop, new_val) in set.iter() {
                 if update_index {
-                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    if let Ok(_v) = resource.get(prop) {
-                        store.remove_atom_from_index(&atom)?;
+                    let new_atom =
+                        Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
+                    if let Ok(old_val) = resource.get(prop) {
+                        let old_atom =
+                            Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
+                        store.remove_atom_from_index(&old_atom, &resource)?;
                     }
-                    store.add_atom_to_index(&atom)?;
+                    store.add_atom_to_index(&new_atom, &resource)?;
                 }
-                resource.set_propval(prop.into(), val.to_owned(), store)?;
+                resource.set_propval(prop.into(), new_val.to_owned(), store)?;
             }
         }
         if let Some(remove) = self.remove.clone() {
@@ -219,7 +223,7 @@ impl Commit {
                 if update_index {
                     let val = resource.get(prop)?;
                     let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    store.remove_atom_from_index(&atom)?;
+                    store.remove_atom_from_index(&atom, &resource)?;
                 }
                 resource.remove_propval(prop);
             }
@@ -228,7 +232,7 @@ impl Commit {
         if let Some(destroy) = self.destroy {
             if destroy {
                 for atom in resource.to_atoms()?.iter() {
-                    store.remove_atom_from_index(atom)?;
+                    store.remove_atom_from_index(atom, &resource)?;
                 }
             }
         }

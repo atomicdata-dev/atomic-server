@@ -33,7 +33,7 @@ pub trait Storelike: Sized {
 
     /// Adds an Atom to the PropSubjectMap. Overwrites if already present.
     /// The default implementation for this does not do anything, so overwrite it if your store needs indexing.
-    fn add_atom_to_index(&self, _atom: &Atom) -> AtomicResult<()> {
+    fn add_atom_to_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
         Ok(())
     }
 
@@ -67,7 +67,7 @@ pub trait Storelike: Sized {
         for r in self.all_resources(include_external) {
             let atoms = r.to_atoms()?;
             for atom in atoms {
-                self.add_atom_to_index(&atom)
+                self.add_atom_to_index(&atom, &r)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
             }
         }
@@ -468,7 +468,7 @@ pub trait Storelike: Sized {
     }
 
     /// Removes an Atom from the PropSubjectMap.
-    fn remove_atom_from_index(&self, _atom: &Atom) -> AtomicResult<()> {
+    fn remove_atom_from_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
         Ok(())
     }
 
