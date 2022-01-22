@@ -6,7 +6,7 @@ use ntest::timeout;
 /// Creates new temporary database, populates it, removes previous one.
 /// Can only be run one thread at a time, because it requires a lock on the DB file.
 fn init(id: &str) -> Db {
-    let tmp_dir_path = format!("tmp/db/{}", id);
+    let tmp_dir_path = format!(".temp/db/{}", id);
     let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
     let store = Db::init(
         std::path::Path::new(&tmp_dir_path),
@@ -243,9 +243,10 @@ fn get_extended_resource_pagination() {
     assert_eq!(resource.get_subject(), &subject_with_page_size);
 }
 
-/// Generate a bunch of resources, query them
+/// Generate a bunch of resources, query them.
+/// Checks if cache is properly invalidated on modifying or deleting resources.
 #[test]
-fn query_test() {
+fn query_cache_invalidation() {
     let store = &DB.lock().unwrap().clone();
 
     let demo_val = "myval".to_string();
@@ -323,7 +324,7 @@ fn query_test() {
     let mut res = store.query(&q).unwrap();
     let mut prev_resource = res.resources[0].clone();
     // For one resource, we will change the order by changing its value
-    let mut res_changed_order = None;
+    let mut resource_changed_order_opt = None;
     for (i, r) in res.resources.iter_mut().enumerate() {
         let previous = prev_resource.get(sort_by).unwrap().to_string();
         let current = r.get(sort_by).unwrap().to_string();
@@ -338,18 +339,28 @@ fn query_test() {
             r.set_propval(sort_by.into(), Value::Markdown("!first".into()), store)
                 .unwrap();
             r.save(store).unwrap();
-            res_changed_order = Some(r.clone());
+            resource_changed_order_opt = Some(r.clone());
         }
         prev_resource = r.clone();
     }
+
+    let mut resource_changed_order = resource_changed_order_opt.unwrap();
 
     assert_eq!(res.count, count, "count changed after updating one value");
 
     q.sort_by = Some(sort_by.into());
     let res = store.query(&q).unwrap();
-    assert!(
-        res.resources[0].get_subject() == res_changed_order.unwrap().get_subject(),
+    assert_eq!(
+        res.resources[0].get_subject(),
+        resource_changed_order.get_subject(),
         "order did not change after updating resource"
+    );
+
+    resource_changed_order.destroy(store).unwrap();
+    let res = store.query(&q).unwrap();
+    assert!(
+        res.resources[0].get_subject() != resource_changed_order.get_subject(),
+        "deleted resoruce still in results"
     );
 
     q.sort_desc = true;

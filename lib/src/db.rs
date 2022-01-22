@@ -222,7 +222,6 @@ impl Storelike for Db {
         }
         if update_index {
             if let Some(pv) = existing {
-                println!("existing propvals {:?}", pv);
                 let subject = resource.get_subject();
                 for (prop, val) in pv.iter() {
                     // Possible performance hit - these clones can be replaced by modifying remove_atom_from_index
