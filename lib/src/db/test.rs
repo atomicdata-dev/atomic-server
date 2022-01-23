@@ -173,7 +173,7 @@ fn destroy_resource_and_check_collection_and_commits() {
         .unwrap();
     assert_eq!(
         agents_collection_count_2, 2,
-        "The Resource was not found in the collection."
+        "The new Agent resource did not increase the collection member count."
     );
 
     let commits_collection_2 = store

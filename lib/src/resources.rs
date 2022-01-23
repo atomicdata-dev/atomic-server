@@ -1,5 +1,6 @@
 //! A resource is a set of Atoms that share a URL
 
+use crate::commit::{CommitOpts, CommitResponse};
 use crate::utils::random_string;
 use crate::values::Value;
 use crate::{commit::CommitBuilder, errors::AtomicResult};
@@ -262,7 +263,14 @@ impl Resource {
             crate::client::post_commit(&commit, store)?;
         }
         // If that succeeds, save it locally;
-        let commit_response = commit.apply(store)?;
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: true,
+        };
+        let commit_response = commit.apply_opts(store, &opts)?;
         // then, reset the internal CommitBuiler.
         self.reset_commit_builder();
         Ok(commit_response)
@@ -270,17 +278,23 @@ impl Resource {
 
     /// Saves the resource (with all the changes) to the store by creating a Commit.
     /// Uses default Agent to sign the Commit.
-    /// Returns the generated Commit.
+    /// Returns the generated Commit and the new Resource.
     /// Does not validate rights / hierarchy.
     /// Does not store these changes on the server of the Subject - the Commit will be lost, unless you handle it manually.
-    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
+    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
         let commit = commitbuilder.sign(&agent, store)?;
-        commit.apply(store)?;
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: true,
+        };
+        let res = commit.apply_opts(store, &opts)?;
         self.reset_commit_builder();
-        let resource = commit.into_resource(store)?;
-        Ok(resource)
+        Ok(res)
     }
 
     /// Insert a Property/Value combination.

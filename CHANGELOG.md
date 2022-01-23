@@ -7,6 +7,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 - Huge performance increase for queries! Added sortable index, big refactor #114
 - Added `store.query()` function with better query options.
+- `Resource.save` returns a `CommitResponse`.
+- Refactor `Commit.apply_opts`, structure options.
 
 ## [v0.30.4] - 2021-01-15
 

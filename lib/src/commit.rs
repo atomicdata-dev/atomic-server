@@ -20,6 +20,15 @@ pub struct CommitResponse {
     pub commit_struct: Commit,
 }
 
+#[derive(Clone, Debug)]
+pub struct CommitOpts {
+    pub validate_schema: bool,
+    pub validate_signature: bool,
+    pub validate_timestamp: bool,
+    pub validate_rights: bool,
+    pub update_index: bool,
+}
+
 /// A Commit is a set of changes to a Resource.
 /// Use CommitBuilder if you're programmatically constructing a Delta.
 #[derive(Clone, Debug, Serialize)]
@@ -57,7 +66,14 @@ impl Commit {
     /// Does not check if the correct rights are present.
     /// If you need more control over which checks to perform, use apply_opts
     pub fn apply(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
-        self.apply_opts(store, true, true, false, false, true)
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: true,
+            validate_timestamp: true,
+            validate_rights: false,
+            update_index: true,
+        };
+        self.apply_opts(store, &opts)
     }
 
     /// Apply a single signed Commit to the store.
@@ -69,11 +85,7 @@ impl Commit {
     pub fn apply_opts(
         &self,
         store: &impl Storelike,
-        validate_schema: bool,
-        validate_signature: bool,
-        validate_timestamp: bool,
-        validate_rights: bool,
-        update_index: bool,
+        opts: &CommitOpts,
     ) -> AtomicResult<CommitResponse> {
         let subject_url = url::Url::parse(&self.subject)
             .map_err(|e| format!("Subject '{}' is not a URL. {}", &self.subject, e))?;
@@ -82,7 +94,7 @@ impl Commit {
             return Err("Subject URL cannot have query parameters".into());
         }
 
-        if validate_signature {
+        if opts.validate_signature {
             let signature = match self.signature.as_ref() {
                 Some(sig) => sig,
                 None => return Err("No signature set".into()),
@@ -107,7 +119,7 @@ impl Commit {
                 })?;
         }
         // Check if the created_at lies in the past
-        if validate_timestamp {
+        if opts.validate_timestamp {
             check_timestamp(self.created_at)?;
         }
         let commit_resource: Resource = self.clone().into_resource(store)?;
@@ -123,7 +135,7 @@ impl Commit {
 
         let resource_new = self.apply_changes(resource_old.clone(), store, false)?;
 
-        if validate_rights {
+        if opts.validate_rights {
             if is_new {
                 hierarchy::check_write(store, &resource_new, &self.signer)?;
             } else {
@@ -143,7 +155,7 @@ impl Commit {
             }
         };
         // Check if all required props are there
-        if validate_schema {
+        if opts.validate_schema {
             resource_new.check_required_props(store)?;
         }
 
@@ -170,7 +182,7 @@ impl Commit {
             if destroy {
                 // Note: the value index is updated before this action, in resource.apply_changes()
                 store.remove_resource(&self.subject)?;
-                store.add_resource_opts(&commit_resource, false, update_index, false)?;
+                store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
                 return Ok(CommitResponse {
                     resource_new: None,
                     resource_old,
@@ -179,10 +191,10 @@ impl Commit {
                 });
             }
         }
-        self.apply_changes(resource_old.clone(), store, update_index)?;
+        self.apply_changes(resource_old.clone(), store, opts.update_index)?;
 
         // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
-        store.add_resource_opts(&commit_resource, false, update_index, false)?;
+        store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
         Ok(CommitResponse {
@@ -242,7 +254,14 @@ impl Commit {
     /// Applies a commit without performing authorization / signature / schema checks.
     /// Does not update the index.
     pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
-        self.apply_opts(store, false, false, false, false, false)
+        let opts = CommitOpts {
+            validate_schema: false,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: false,
+        };
+        self.apply_opts(store, &opts)
     }
 
     /// Converts a Resource of a Commit into a Commit
@@ -513,7 +532,14 @@ mod test {
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store).unwrap();
         let commit_subject = commit.get_subject().to_string();
-        let _created_resource = commit.apply(&store).unwrap();
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: true,
+            validate_timestamp: true,
+            validate_rights: false,
+            update_index: true,
+        };
+        let _created_resource = commit.apply_opts(&store, &opts).unwrap();
 
         let resource = store.get_resource(subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
