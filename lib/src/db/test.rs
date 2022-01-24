@@ -381,7 +381,7 @@ fn queries() {
 #[test]
 /// Changing these values actually correctly updates the index.
 fn index_invalidate_cache() {
-    let store = &DB.lock().unwrap().clone();
+    let store = &init_db("invalidate_cache");
 
     // Make sure to use Properties that are not in the default store
 

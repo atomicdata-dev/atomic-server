@@ -206,7 +206,7 @@ impl Commit {
                 if update_index {
                     let new_atom =
                         Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
-                    if let Ok(old_val) = resource.get(prop) {
+                    if let Ok(old_val) = resource_unedited.get(prop) {
                         let old_atom =
                             Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
                         store.remove_atom_from_index(&old_atom, &resource_unedited)?;
@@ -219,7 +219,7 @@ impl Commit {
             for prop in remove.iter() {
                 resource.remove_propval(prop);
                 if update_index {
-                    let val = resource.get(prop)?;
+                    let val = resource_unedited.get(prop)?;
                     let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
                     store.remove_atom_from_index(&atom, &resource_unedited)?;
                 }

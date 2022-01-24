@@ -220,7 +220,7 @@ pub trait Storelike: Sized {
     /// let atoms = store.tpf(
     ///     None,
     ///     Some("https://atomicdata.dev/properties/isA"),
-    ///     Some("https://atomicdata.dev/classes/Class"),
+    ///     Some(&atomic_lib::Value::AtomicUrl("https://atomicdata.dev/classes/Class".into())),
     ///     true
     /// ).unwrap();
     /// assert!(atoms.len() > 11)

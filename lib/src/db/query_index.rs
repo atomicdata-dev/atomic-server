@@ -61,8 +61,8 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     } else {
         Value::String(END_CHAR.into())
     };
-    let start_key = create_collection_members_key(&q.into(), Some(&start), None)?;
-    let end_key = create_collection_members_key(&q.into(), Some(&end), None)?;
+    let start_key = create_query_index_key(&q.into(), Some(&start), None)?;
+    let end_key = create_query_index_key(&q.into(), Some(&end), None)?;
 
     let iter: Box<dyn Iterator<Item = std::result::Result<(sled::IVec, sled::IVec), sled::Error>>> =
         if q.sort_desc {
@@ -261,16 +261,6 @@ pub fn check_if_atom_matches_watched_query_filters(
             if should_update {
                 update_indexed_member(store, &q_filter, atom, delete)?;
             }
-            if index_atom.property == crate::urls::IS_A {
-                if should_update {
-                    println!("SHOULD {:?} atom: {}", index_atom, atom);
-                } else {
-                    println!(
-                        "NOT {:?} atom: {}, q_filter {:?}, resource: {:?}",
-                        index_atom, atom, q_filter, resource
-                    );
-                }
-            }
         } else {
             return Err(format!("Can't deserialize collection index: {:?}", item).into());
         }
@@ -286,7 +276,7 @@ pub fn update_indexed_member(
     atom: &Atom,
     delete: bool,
 ) -> AtomicResult<()> {
-    let key = create_collection_members_key(
+    let key = create_query_index_key(
         collection,
         // Maybe here we should serialize the value a bit different - as a sortable string, where Arrays are sorted by their length.
         Some(&atom.value),
@@ -310,12 +300,12 @@ pub const MAX_LEN: usize = 120;
 /// Creates a key for a collection + value combination.
 /// These are designed to be lexicographically sortable.
 #[tracing::instrument()]
-pub fn create_collection_members_key(
-    collection: &QueryFilter,
+pub fn create_query_index_key(
+    query_filter: &QueryFilter,
     value: Option<&Value>,
     subject: Option<&str>,
 ) -> AtomicResult<Vec<u8>> {
-    let mut q_filter_bytes: Vec<u8> = bincode::serialize(collection)?;
+    let mut q_filter_bytes: Vec<u8> = bincode::serialize(query_filter)?;
     q_filter_bytes.push(SEPARATION_BIT);
 
     let mut value_bytes: Vec<u8> = if let Some(val) = value {
@@ -428,7 +418,7 @@ pub mod test {
                 sort_by: None,
             };
             let subject = "https://example.com/subject";
-            let key = create_collection_members_key(&collection, Some(val), Some(subject)).unwrap();
+            let key = create_query_index_key(&collection, Some(val), Some(subject)).unwrap();
             let (col, val_out, sub_out) = parse_collection_members_key(&key).unwrap();
             assert_eq!(col.property, collection.property);
             assert_eq!(val_check.to_string(), val_out);
@@ -444,26 +434,26 @@ pub mod test {
             sort_by: None,
         };
 
-        let start_none = create_collection_members_key(&q, None, None).unwrap();
-        let num_1 = create_collection_members_key(&q, Some(&Value::Float(1.0)), None).unwrap();
-        let num_2 = create_collection_members_key(&q, Some(&Value::Float(2.0)), None).unwrap();
-        let num_10 = create_collection_members_key(&q, Some(&Value::Float(10.0)), None).unwrap();
-        let start_str =
-            create_collection_members_key(&q, Some(&Value::String("1".into())), None).unwrap();
+        let start_none = create_query_index_key(&q, None, None).unwrap();
+        let num_1 = create_query_index_key(&q, Some(&Value::Float(1.0)), None).unwrap();
+        let num_2 = create_query_index_key(&q, Some(&Value::Float(2.0)), None).unwrap();
+        // let num_10 = create_query_index_key(&q, Some(&Value::Float(10.0)), None).unwrap();
+        let num_1000 = create_query_index_key(&q, Some(&Value::Float(1000.0)), None).unwrap();
+        let start_str = create_query_index_key(&q, Some(&Value::String("1".into())), None).unwrap();
         let a_downcase =
-            create_collection_members_key(&q, Some(&Value::String("a".into())), None).unwrap();
-        let b_upcase =
-            create_collection_members_key(&q, Some(&Value::String("B".into())), None).unwrap();
-        let mid3 = create_collection_members_key(&q, Some(&Value::String("hi there".into())), None)
-            .unwrap();
-        let end =
-            create_collection_members_key(&q, Some(&Value::String(END_CHAR.into())), None).unwrap();
+            create_query_index_key(&q, Some(&Value::String("a".into())), None).unwrap();
+        let b_upcase = create_query_index_key(&q, Some(&Value::String("B".into())), None).unwrap();
+        let mid3 =
+            create_query_index_key(&q, Some(&Value::String("hi there".into())), None).unwrap();
+        let end = create_query_index_key(&q, Some(&Value::String(END_CHAR.into())), None).unwrap();
 
         assert!(start_none < num_1);
         assert!(num_1 < num_2);
         // TODO: Fix sorting numbers
+        // https://github.com/joepio/atomic-data-rust/issues/287
         // assert!(num_2 < num_10);
-        assert!(num_10 < a_downcase);
+        // assert!(num_10 < num_1000);
+        assert!(num_1000 < a_downcase);
         assert!(a_downcase < b_upcase);
         assert!(b_upcase < mid3);
         assert!(mid3 < end);
