@@ -7,7 +7,6 @@ use std::{
 };
 
 use crate::{
-    db::query_index::value_to_indexable_strings,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -16,8 +15,8 @@ use crate::{
 };
 
 use self::query_index::{
-    add_atoms_to_index, check_if_atom_matches_watched_query_filters, query_indexed,
-    watch_collection, IndexAtom, QueryFilter, END_CHAR,
+    atom_to_indexable_atoms, check_if_atom_matches_watched_query_filters, query_indexed,
+    update_indexed_member, watch_collection, IndexAtom, QueryFilter, END_CHAR,
 };
 
 mod query_index;
@@ -170,28 +169,17 @@ impl Storelike for Db {
 
     #[tracing::instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        let values_vec = if let Some(vals) = value_to_indexable_strings(&atom.value) {
-            vals
-        } else {
-            return Ok(());
-        };
-
-        for val_subject in values_vec {
-            // https://github.com/joepio/atomic-data-rust/issues/282
-            // The key is a newline delimited string, with the following format:
-            let index_atom = query_index::IndexAtom {
-                value: val_subject,
-                property: atom.property.clone(),
-                subject: atom.subject.clone(),
-            };
-
+        // TODO: Don't iterate over indexable atoms
+        // Iterate over Atoms!
+        // We need
+        for index_atom in atom_to_indexable_atoms(atom)? {
             // It's OK if this overwrites a value
             let _existing = self
                 .reference_index
                 .insert(key_for_reference_index(&index_atom).as_bytes(), b"")?;
 
-            // Also update the members index to keep collections performant
-            check_if_atom_matches_watched_query_filters(self, &index_atom, false, resource)
+            // Also update the query index to keep collections performant
+            check_if_atom_matches_watched_query_filters(self, &index_atom, &atom, false, resource)
                 .map_err(|e| {
                     format!("Failed to check_if_atom_matches_watched_collections. {}", e)
                 })?;
@@ -242,23 +230,11 @@ impl Storelike for Db {
 
     #[tracing::instrument(skip(self))]
     fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        let vec = if let Some(vals) = value_to_indexable_strings(&atom.value) {
-            vals
-        } else {
-            return Ok(());
-        };
-
-        for val in vec {
-            let index_atom = IndexAtom {
-                value: val,
-                property: atom.property.clone(),
-                subject: atom.subject.clone(),
-            };
-
+        for index_atom in atom_to_indexable_atoms(atom)? {
             self.reference_index
                 .remove(&key_for_reference_index(&index_atom).as_bytes())?;
 
-            check_if_atom_matches_watched_query_filters(self, &index_atom, true, resource)?;
+            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)?;
         }
         Ok(())
     }
@@ -467,7 +443,11 @@ impl Storelike for Db {
 
         // Maybe make this optional?
         watch_collection(self, &q_filter)?;
-        add_atoms_to_index(self, &atoms, &q_filter)?;
+
+        // Add the atoms to the query_index
+        for atom in atoms {
+            update_indexed_member(self, &q_filter, &atom, false)?;
+        }
 
         // Retry the same query!
         query_indexed(self, q)

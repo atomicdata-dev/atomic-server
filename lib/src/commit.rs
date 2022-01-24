@@ -62,25 +62,8 @@ pub struct Commit {
 impl Commit {
     /// Apply a single signed Commit to the store.
     /// Creates, edits or destroys a resource.
-    /// Checks if the signature is created by the Agent, and validates the data shape.
-    /// Does not check if the correct rights are present.
-    /// If you need more control over which checks to perform, use apply_opts
-    pub fn apply(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
-        let opts = CommitOpts {
-            validate_schema: true,
-            validate_signature: true,
-            validate_timestamp: true,
-            validate_rights: false,
-            update_index: true,
-        };
-        self.apply_opts(store, &opts)
-    }
-
-    /// Apply a single signed Commit to the store.
-    /// Creates, edits or destroys a resource.
     /// Allows for control over which validations should be performed.
     /// Returns the generated Commit, the old Resource and the new Resource.
-    /// TODO: Should check if the Agent has the correct rights.
     #[tracing::instrument(skip(store))]
     pub fn apply_opts(
         &self,
@@ -514,6 +497,16 @@ pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
 
 #[cfg(test)]
 mod test {
+    lazy_static::lazy_static! {
+        pub static ref OPTS: CommitOpts = CommitOpts {
+            validate_schema: true,
+            validate_signature: true,
+            validate_timestamp: true,
+            validate_rights: false,
+            update_index: true,
+        };
+    }
+
     use super::*;
     use crate::{agents::Agent, Storelike};
 
@@ -532,14 +525,7 @@ mod test {
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store).unwrap();
         let commit_subject = commit.get_subject().to_string();
-        let opts = CommitOpts {
-            validate_schema: true,
-            validate_signature: true,
-            validate_timestamp: true,
-            validate_rights: false,
-            update_index: true,
-        };
-        let _created_resource = commit.apply_opts(&store, &opts).unwrap();
+        let _created_resource = commit.apply_opts(&store, &OPTS).unwrap();
 
         let resource = store.get_resource(subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
@@ -635,13 +621,13 @@ mod test {
             let subject = "https://invalid.com?q=invalid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store).unwrap();
-            commit.apply(&store).unwrap_err();
+            commit.apply_opts(&store, &OPTS).unwrap_err();
         }
         {
             let subject = "https://valid.com/valid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store).unwrap();
-            commit.apply(&store).unwrap();
+            commit.apply_opts(&store, &OPTS).unwrap();
         }
     }
 }

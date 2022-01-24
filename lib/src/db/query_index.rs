@@ -117,20 +117,6 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     })
 }
 
-/// Adss atoms for a specific query to the index
-pub fn add_atoms_to_index(store: &Db, atoms: &[Atom], q_filter: &QueryFilter) -> AtomicResult<()> {
-    // Add all atoms to the index, so next time we do get a cache hit.
-    for atom in atoms {
-        let index_atom = IndexAtom {
-            subject: atom.subject.clone(),
-            property: atom.subject.clone(),
-            value: atom.value.to_string(),
-        };
-        update_indexed_member(store, q_filter, &index_atom, false)?;
-    }
-    Ok(())
-}
-
 #[tracing::instrument(skip(store))]
 pub fn watch_collection(store: &Db, q_filter: &QueryFilter) -> AtomicResult<()> {
     store
@@ -250,17 +236,19 @@ pub fn should_update(q_filter: &QueryFilter, atom: &IndexAtom, resource: &Resour
 /// This is called when an atom is added or deleted.
 /// Check whether the Atom will be hit by a TPF query matching the [QueryFilter].
 /// Updates the index accordingly.
+/// We need both the `index_atom` and the full `atom`.
 #[tracing::instrument(skip(store))]
 pub fn check_if_atom_matches_watched_query_filters(
     store: &Db,
-    atom: &IndexAtom,
+    index_atom: &IndexAtom,
+    atom: &Atom,
     delete: bool,
     resource: &Resource,
 ) -> AtomicResult<()> {
     for item in store.watched_queries.iter() {
         if let Ok((k, _v)) = item {
             let q_filter = bincode::deserialize::<QueryFilter>(&k)?;
-            let should_update = should_update(&q_filter, atom, resource);
+            let should_update = should_update(&q_filter, index_atom, resource);
 
             if should_update {
                 update_indexed_member(store, &q_filter, atom, delete)?;
@@ -277,16 +265,30 @@ pub fn check_if_atom_matches_watched_query_filters(
 pub fn update_indexed_member(
     store: &Db,
     collection: &QueryFilter,
-    atom: &IndexAtom,
+    atom: &Atom,
     delete: bool,
 ) -> AtomicResult<()> {
-    let key = create_collection_members_key(collection, Some(&atom.value), Some(&atom.subject))?;
+    let key = create_collection_members_key(
+        collection,
+        // Maybe here we should serialize the value a bit different - as a sortable string, where Arrays are sorted by their length.
+        Some(&atom_value_to_string(&atom.value)),
+        Some(&atom.subject),
+    )?;
     if delete {
         store.members_index.remove(key)?;
     } else {
         store.members_index.insert(key, b"")?;
     }
     Ok(())
+}
+
+/// This function converts atoms to a string that can be used for sorting.
+/// Values in the query_index are stored in a way that makes sense for sorting
+fn atom_value_to_string(val: &Value) -> String {
+    match val {
+        Value::ResourceArray(arr) => arr.len().to_string(),
+        other => other.to_string(),
+    }
 }
 
 /// We can only store one bytearray as a key in Sled.
@@ -357,7 +359,7 @@ pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, 
 
 /// Converts one Value to a bunch of indexable items.
 /// Returns None for unsupported types.
-pub fn value_to_indexable_strings(value: &Value) -> Option<Vec<String>> {
+pub fn value_to_reference_index_string(value: &Value) -> Option<Vec<String>> {
     let vals = match value {
         // This results in wrong indexing, as some subjects will be numbers.
         Value::ResourceArray(_v) => value.to_subjects(None).unwrap_or_else(|_| vec![]),
@@ -368,6 +370,23 @@ pub fn value_to_indexable_strings(value: &Value) -> Option<Vec<String>> {
         val => vec![val.to_string()],
     };
     Some(vals)
+}
+
+/// Converts one Atom to a series of stringified values that can be indexed.
+pub fn atom_to_indexable_atoms(atom: &Atom) -> AtomicResult<Vec<IndexAtom>> {
+    let index_atoms = match value_to_reference_index_string(&atom.value) {
+        Some(v) => v,
+        None => return Ok(vec![]),
+    };
+    let index_atoms = index_atoms
+        .into_iter()
+        .map(|v| IndexAtom {
+            value: v,
+            subject: atom.subject.clone(),
+            property: atom.property.clone(),
+        })
+        .collect();
+    Ok(index_atoms)
 }
 
 #[cfg(test)]

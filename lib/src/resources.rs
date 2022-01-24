@@ -556,7 +556,18 @@ mod test {
             .clone()
             .sign(&agent, &store)
             .unwrap();
-        commit.apply(&store).unwrap();
+        commit
+            .apply_opts(
+                &store,
+                &CommitOpts {
+                    validate_schema: true,
+                    validate_signature: true,
+                    validate_timestamp: true,
+                    validate_rights: false,
+                    update_index: true,
+                },
+            )
+            .unwrap();
         assert!(
             new_resource
                 .get_shortname("shortname", &store)

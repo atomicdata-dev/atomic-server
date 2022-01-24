@@ -9,6 +9,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Added `store.query()` function with better query options.
 - `Resource.save` returns a `CommitResponse`.
 - Refactor `Commit.apply_opts`, structure options.
+- Remove the potentially confusing `commit.apply` method.
 
 ## [v0.30.4] - 2021-01-15
 

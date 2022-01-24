@@ -158,11 +158,12 @@ fn destroy_resource_and_check_collection_and_commits() {
         .unwrap();
     println!("Commits collection count 1: {}", commits_collection_count_1);
 
+    // Create a new agent, check if it is added to the new Agents collection as a Member.
     let mut resource = crate::agents::Agent::new(None, &store)
         .unwrap()
         .to_resource(&store)
         .unwrap();
-    resource.save_locally(&store).unwrap();
+    let _res = resource.save_locally(&store).unwrap();
     let agents_collection_2 = store
         .get_resource_extended(&agents_url, false, None)
         .unwrap();
@@ -246,7 +247,7 @@ fn get_extended_resource_pagination() {
 /// Generate a bunch of resources, query them.
 /// Checks if cache is properly invalidated on modifying or deleting resources.
 #[test]
-fn query_cache_invalidation() {
+fn queries() {
     let store = &DB.lock().unwrap().clone();
 
     let demo_val = "myval".to_string();
@@ -376,4 +377,101 @@ fn query_cache_invalidation() {
     // TODO: Ideally, the count is authorized too. But doing that could be hard. (or expensive)
     // https://github.com/joepio/atomic-data-rust/issues/286
     // assert_eq!(res.count, 1, "authorized count");
+}
+
+#[test]
+/// Changing these values actually correctly updates the index.
+fn index_invalidate_cache() {
+    let store = &DB.lock().unwrap().clone();
+
+    // Make sure to use Properties that are not in the default store
+
+    // Do strings work?
+    test_collection_update_value(
+        store,
+        urls::FILENAME,
+        Value::String("old_val".into()),
+        Value::String("1".into()),
+    );
+    // Do booleans work?
+    test_collection_update_value(
+        store,
+        urls::IS_LOCKED,
+        Value::Boolean(true),
+        Value::Boolean(false),
+    );
+    // Do ResourceArrays work?
+    test_collection_update_value(
+        store,
+        urls::ATTACHMENTS,
+        Value::ResourceArray(vec![
+            "http://example.com/1".into(),
+            "http://example.com/2".into(),
+            "http://example.com/3".into(),
+        ]),
+        Value::ResourceArray(vec!["http://example.com/1".into()]),
+    );
+}
+
+/// Generates a bunch of resources, changes the value for one of them, checks if the order has changed correctly.
+/// new_val should be lexicograhically _smaller_ than old_val.
+fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, new_val: Value) {
+    println!("cache_invalidation test for {}", property_url);
+    let count = 10;
+    let limit = 5;
+    assert!(
+        count > limit,
+        "the following tests might not make sense if count is less than limit"
+    );
+
+    for _x in 0..count {
+        let mut demo_resource = Resource::new_generate_subject(store);
+        demo_resource
+            .set_propval(property_url.into(), old_val.clone(), store)
+            .unwrap();
+        demo_resource.save(store).unwrap();
+    }
+
+    let q = Query {
+        property: Some(property_url.into()),
+        value: None,
+        limit: Some(limit),
+        start_val: None,
+        end_val: None,
+        offset: 0,
+        sort_by: Some(property_url.into()),
+        sort_desc: false,
+        include_external: true,
+        include_nested: true,
+        for_agent: None,
+    };
+    let mut res = store.query(&q).unwrap();
+    assert_eq!(
+        res.count, count,
+        "Not the right amount of members in this collection"
+    );
+
+    // For one resource, we will change the order by changing its value
+    let mut resource_changed_order_opt = None;
+    for (i, r) in res.resources.iter_mut().enumerate() {
+        // We change the order!
+        if i == 4 {
+            r.set_propval(property_url.into(), new_val.clone(), store)
+                .unwrap();
+            r.save(store).unwrap();
+            resource_changed_order_opt = Some(r.clone());
+        }
+    }
+
+    let resource_changed_order =
+        resource_changed_order_opt.expect("not enough resources in collection");
+
+    let res = store.query(&q).expect("No first result ");
+    assert_eq!(res.count, count, "count changed after updating one value");
+
+    assert_eq!(
+        res.subjects.first().unwrap(),
+        resource_changed_order.get_subject(),
+        "Updated resource is not the first Result of the new query"
+    );
 }
