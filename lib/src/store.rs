@@ -127,7 +127,7 @@ impl Storelike for Store {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::urls;
+    use crate::{urls, Value};
 
     fn init_store() -> Store {
         let store = Store::init().unwrap();
@@ -174,6 +174,8 @@ mod test {
     #[test]
     fn tpf() {
         let store = init_store();
+        let val = &Value::Slug("class".into());
+        let val_url = &Value::AtomicUrl(urls::CLASS.into());
         // All atoms
         let atoms = store.tpf(None, None, None, true).unwrap();
         assert!(atoms.len() > 10);
@@ -181,20 +183,21 @@ mod test {
         let atoms = store.tpf(Some(urls::CLASS), None, None, true).unwrap();
         assert_eq!(atoms.len(), 6);
         // Find by value
-        let atoms = store.tpf(None, None, Some("class"), true).unwrap();
+        let atoms = store.tpf(None, None, Some(val), true).unwrap();
         assert_eq!(atoms[0].subject, urls::CLASS);
         assert_eq!(atoms.len(), 1);
         // Find by property and value
         let atoms = store
-            .tpf(None, Some(urls::SHORTNAME), Some("class"), true)
+            .tpf(None, Some(urls::SHORTNAME), Some(val), true)
             .unwrap();
         assert!(atoms[0].subject == urls::CLASS);
-        assert!(atoms.len() == 1);
+        assert_eq!(atoms.len(), 1);
         // Find item in array
         let atoms = store
-            .tpf(None, Some(urls::IS_A), Some(urls::CLASS), true)
+            .tpf(None, Some(urls::IS_A), Some(val_url), true)
             .unwrap();
-        assert!(atoms.len() > 3);
+        println!("{:?}", atoms);
+        assert!(atoms.len() > 3, "Find item in array");
     }
 
     #[test]

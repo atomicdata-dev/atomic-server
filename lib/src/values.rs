@@ -216,11 +216,23 @@ impl Value {
     }
 
     /// Returns a Lexicographically sortable string representation of the value
-    pub fn to_sortable_string(&self) -> AtomicResult<&PropVals> {
-        if let Value::NestedResource(SubResource::Nested(nested)) = self {
-            return Ok(nested);
+    pub fn to_sortable_string(&self) -> String {
+        match self {
+            Value::ResourceArray(arr) => arr.len().to_string(),
+            other => other.to_string(),
         }
-        Err(format!("Value {} is not a Nested Resource", self).into())
+    }
+}
+
+/// Check if the value `q_val` is present in `val`
+pub fn query_value_compare(val: &Value, q_val: &Value) -> bool {
+    let query_value = q_val.to_string();
+    match val {
+        Value::ResourceArray(_vec) => {
+            let subs = val.to_subjects(None).unwrap_or_default();
+            subs.iter().any(|v| v == &query_value)
+        }
+        other => other.to_string() == query_value,
     }
 }
 

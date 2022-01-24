@@ -5,6 +5,7 @@
 use crate::{
     errors::AtomicResult,
     storelike::{Query, QueryResult},
+    values::query_value_compare,
     Atom, Db, Resource, Storelike, Value,
 };
 use serde::{Deserialize, Serialize};
@@ -18,7 +19,7 @@ pub struct QueryFilter {
     /// Filtering by property URL
     pub property: Option<String>,
     /// Filtering by value
-    pub value: Option<String>,
+    pub value: Option<Value>,
     /// The property by which the collection is sorted
     pub sort_by: Option<String>,
 }
@@ -51,17 +52,17 @@ pub const END_CHAR: &str = "\u{ffff}";
 /// Performs a query on the `members_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
 pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     let start = if let Some(val) = &q.start_val {
-        val
+        val.clone()
     } else {
-        FIRST_CHAR
+        Value::String(FIRST_CHAR.into())
     };
     let end = if let Some(val) = &q.end_val {
-        val
+        val.clone()
     } else {
-        END_CHAR
+        Value::String(END_CHAR.into())
     };
-    let start_key = create_collection_members_key(&q.into(), Some(start), None)?;
-    let end_key = create_collection_members_key(&q.into(), Some(end), None)?;
+    let start_key = create_collection_members_key(&q.into(), Some(&start), None)?;
+    let end_key = create_collection_members_key(&q.into(), Some(&end), None)?;
 
     let iter: Box<dyn Iterator<Item = std::result::Result<(sled::IVec, sled::IVec), sled::Error>>> =
         if q.sort_desc {
@@ -118,6 +119,7 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
 }
 
 #[tracing::instrument(skip(store))]
+/// Adds a QueryFilter to the `watched_queries`
 pub fn watch_collection(store: &Db, q_filter: &QueryFilter) -> AtomicResult<()> {
     store
         .watched_queries
@@ -138,7 +140,8 @@ pub fn create_watched_collections(store: &Db) -> AtomicResult<()> {
     {
         let collection = store.get_resource_extended(&member_subject, false, None)?;
         let value = if let Ok(val) = collection.get(crate::urls::COLLECTION_VALUE) {
-            Some(val.to_string())
+            // TODO: check the datatype. Now we assume it's a string
+            Some(val.clone())
         } else {
             None
         };
@@ -173,7 +176,7 @@ fn check_resource_query_filter_property(
     if let Some(property) = &q_filter.property {
         if let Ok(matched_propval) = resource.get(property) {
             if let Some(filter_val) = &q_filter.value {
-                if &matched_propval.to_string() == filter_val {
+                if matched_propval.to_string() == filter_val.to_string() {
                     return Some(property.to_string());
                 }
             } else {
@@ -182,7 +185,7 @@ fn check_resource_query_filter_property(
         }
     } else if let Some(filter_val) = &q_filter.value {
         for (prop, val) in resource.get_propvals() {
-            if &val.to_string() == filter_val {
+            if query_value_compare(val, filter_val) {
                 return Some(prop.to_string());
             }
         }
@@ -193,7 +196,7 @@ fn check_resource_query_filter_property(
 
 // This is probably the most complex function in the whole repo.
 // If things go wrong when making changes, add a test and fix stuff in the logic below.
-pub fn should_update(q_filter: &QueryFilter, atom: &IndexAtom, resource: &Resource) -> bool {
+pub fn should_update(q_filter: &QueryFilter, index_atom: &IndexAtom, resource: &Resource) -> bool {
     let resource_check = check_resource_query_filter_property(resource, q_filter);
     let matching_prop = if let Some(p) = resource_check {
         p
@@ -204,32 +207,36 @@ pub fn should_update(q_filter: &QueryFilter, atom: &IndexAtom, resource: &Resour
     match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
         // Whenever the atom matches with either the sorted or the filtered prop, we have to update
         (Some(filterprop), Some(filter_val), Some(sortprop)) => {
-            if sortprop == &atom.property {
+            if sortprop == &index_atom.property {
                 return true;
             }
-            if filterprop == &atom.property && &atom.value.to_string() == filter_val {
+            if filterprop == &index_atom.property
+                && index_atom.value.to_string() == filter_val.to_string()
+            {
                 return true;
             }
             // If either one of these match
-            let relevant_prop = filterprop == &atom.property || sortprop == &atom.property;
+            let relevant_prop =
+                filterprop == &index_atom.property || sortprop == &index_atom.property;
             // And the value matches, we have to update
-            relevant_prop && filter_val == &atom.value
+            relevant_prop && filter_val.to_string() == index_atom.value
         }
-        (Some(filter_prop), Some(_filter_val), None) => filter_prop == &atom.property,
+        (Some(filter_prop), Some(_filter_val), None) => filter_prop == &index_atom.property,
         (Some(filter_prop), None, Some(sort_by)) => {
-            filter_prop == &atom.property || sort_by == &atom.property
+            filter_prop == &index_atom.property || sort_by == &index_atom.property
         }
+        (Some(filter_prop), None, None) => filter_prop == &index_atom.property,
         (None, Some(filter_val), None) => {
-            filter_val == &atom.value || matching_prop == atom.property
+            filter_val.to_string() == index_atom.value || matching_prop == index_atom.property
         }
         (None, Some(filter_val), Some(sort_by)) => {
-            filter_val == &atom.value
-                || matching_prop == atom.property
+            filter_val.to_string() == index_atom.value
+                || matching_prop == index_atom.property
                 || &matching_prop == sort_by
-                || &atom.property == sort_by
+                || &index_atom.property == sort_by
         }
         // We should not create indexes for Collections that iterate over _all_ resources.
-        _ => false,
+        _ => todo!(),
     }
 }
 
@@ -247,11 +254,22 @@ pub fn check_if_atom_matches_watched_query_filters(
 ) -> AtomicResult<()> {
     for item in store.watched_queries.iter() {
         if let Ok((k, _v)) = item {
-            let q_filter = bincode::deserialize::<QueryFilter>(&k)?;
+            let q_filter = bincode::deserialize::<QueryFilter>(&k)
+                .map_err(|e| format!("Could not deserialize QueryFilter: {}", e))?;
             let should_update = should_update(&q_filter, index_atom, resource);
 
             if should_update {
                 update_indexed_member(store, &q_filter, atom, delete)?;
+            }
+            if index_atom.property == crate::urls::IS_A {
+                if should_update {
+                    println!("SHOULD {:?} atom: {}", index_atom, atom);
+                } else {
+                    println!(
+                        "NOT {:?} atom: {}, q_filter {:?}, resource: {:?}",
+                        index_atom, atom, q_filter, resource
+                    );
+                }
             }
         } else {
             return Err(format!("Can't deserialize collection index: {:?}", item).into());
@@ -271,7 +289,7 @@ pub fn update_indexed_member(
     let key = create_collection_members_key(
         collection,
         // Maybe here we should serialize the value a bit different - as a sortable string, where Arrays are sorted by their length.
-        Some(&atom_value_to_string(&atom.value)),
+        Some(&atom.value),
         Some(&atom.subject),
     )?;
     if delete {
@@ -280,15 +298,6 @@ pub fn update_indexed_member(
         store.members_index.insert(key, b"")?;
     }
     Ok(())
-}
-
-/// This function converts atoms to a string that can be used for sorting.
-/// Values in the query_index are stored in a way that makes sense for sorting
-fn atom_value_to_string(val: &Value) -> String {
-    match val {
-        Value::ResourceArray(arr) => arr.len().to_string(),
-        other => other.to_string(),
-    }
 }
 
 /// We can only store one bytearray as a key in Sled.
@@ -303,17 +312,18 @@ pub const MAX_LEN: usize = 120;
 #[tracing::instrument()]
 pub fn create_collection_members_key(
     collection: &QueryFilter,
-    value: Option<&str>,
+    value: Option<&Value>,
     subject: Option<&str>,
 ) -> AtomicResult<Vec<u8>> {
     let mut q_filter_bytes: Vec<u8> = bincode::serialize(collection)?;
     q_filter_bytes.push(SEPARATION_BIT);
 
     let mut value_bytes: Vec<u8> = if let Some(val) = value {
-        let shorter = if val.len() > MAX_LEN {
-            &val[0..MAX_LEN]
+        let val_string = val.to_sortable_string();
+        let shorter = if val_string.len() > MAX_LEN {
+            &val_string[0..MAX_LEN]
         } else {
-            val
+            &val_string
         };
         let lowercase = shorter.to_lowercase();
         lowercase.as_bytes().to_vec()
@@ -391,30 +401,37 @@ pub fn atom_to_indexable_atoms(atom: &Atom) -> AtomicResult<Vec<IndexAtom>> {
 
 #[cfg(test)]
 pub mod test {
+    use crate::{db::test::init_db, urls};
+
     use super::*;
 
     #[test]
     fn create_and_parse_key() {
-        round_trip("\n", "\n");
-        round_trip("short", "short");
-        round_trip("UP", "up");
-        round_trip("12905.125.15", "12905.125.15");
+        round_trip_same(Value::String("\n".into()));
+        round_trip_same(Value::String("short".into()));
+        round_trip_same(Value::Float(1.142));
+        round_trip_same(Value::Float(-1.142));
         round_trip(
-            "29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB",
-            "29na(e*tn3028nt87n_#t&*nf_ae*&#n@_t*&!#b_&*tn&*aebt&*#b&tb@#!#@bb29na(e*tn3028nt87n_#t&*nf_ae*&#n@_t*&!#b_&*tn&*aebt&*#b",
+            &Value::String("UPPERCASE".into()),
+            &Value::String("uppercase".into()),
         );
+        round_trip(&Value::String("29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB29NA(E*Tn3028nt87n_#T&*NF_AE*&#N@_T*&!#B_&*TN&*AEBT&*#B&TB@#!#@BB".into()), &Value::String("29na(e*tn3028nt87n_#t&*nf_ae*&#n@_t*&!#b_&*tn&*aebt&*#b&tb@#!#@bb29na(e*tn3028nt87n_#t&*nf_ae*&#n@_t*&!#b_&*tn&*aebt&*#b".into()));
 
-        fn round_trip(val: &str, val_check: &str) {
+        fn round_trip_same(val: Value) {
+            round_trip(&val, &val)
+        }
+
+        fn round_trip(val: &Value, val_check: &Value) {
             let collection = QueryFilter {
                 property: Some("http://example.org/prop".to_string()),
-                value: Some("http://example.org/value".to_string()),
+                value: Some(Value::AtomicUrl("http://example.org/value".to_string())),
                 sort_by: None,
             };
             let subject = "https://example.com/subject";
             let key = create_collection_members_key(&collection, Some(val), Some(subject)).unwrap();
             let (col, val_out, sub_out) = parse_collection_members_key(&key).unwrap();
             assert_eq!(col.property, collection.property);
-            assert_eq!(val_check, val_out);
+            assert_eq!(val_check.to_string(), val_out);
             assert_eq!(sub_out, subject);
         }
     }
@@ -423,19 +440,30 @@ pub mod test {
     fn lexicographic_partial() {
         let q = QueryFilter {
             property: Some("http://example.org/prop".to_string()),
-            value: Some("http://example.org/value".to_string()),
+            value: Some(Value::AtomicUrl("http://example.org/value".to_string())),
             sort_by: None,
         };
 
         let start_none = create_collection_members_key(&q, None, None).unwrap();
-        let start_str = create_collection_members_key(&q, Some("a"), None).unwrap();
-        let a_downcase = create_collection_members_key(&q, Some("a"), Some("wadiaodn")).unwrap();
-        let b_upcase = create_collection_members_key(&q, Some("B"), Some("wadiaodn")).unwrap();
-        let mid3 = create_collection_members_key(&q, Some("hi there"), Some("egnsoinge")).unwrap();
-        let end = create_collection_members_key(&q, Some(END_CHAR), None).unwrap();
+        let num_1 = create_collection_members_key(&q, Some(&Value::Float(1.0)), None).unwrap();
+        let num_2 = create_collection_members_key(&q, Some(&Value::Float(2.0)), None).unwrap();
+        let num_10 = create_collection_members_key(&q, Some(&Value::Float(10.0)), None).unwrap();
+        let start_str =
+            create_collection_members_key(&q, Some(&Value::String("1".into())), None).unwrap();
+        let a_downcase =
+            create_collection_members_key(&q, Some(&Value::String("a".into())), None).unwrap();
+        let b_upcase =
+            create_collection_members_key(&q, Some(&Value::String("B".into())), None).unwrap();
+        let mid3 = create_collection_members_key(&q, Some(&Value::String("hi there".into())), None)
+            .unwrap();
+        let end =
+            create_collection_members_key(&q, Some(&Value::String(END_CHAR.into())), None).unwrap();
 
-        assert!(start_none < start_str);
-        assert!(start_str < a_downcase);
+        assert!(start_none < num_1);
+        assert!(num_1 < num_2);
+        // TODO: Fix sorting numbers
+        // assert!(num_2 < num_10);
+        assert!(num_10 < a_downcase);
         assert!(a_downcase < b_upcase);
         assert!(b_upcase < mid3);
         assert!(mid3 < end);
@@ -446,5 +474,95 @@ pub mod test {
         let expected = vec![&start_none, &start_str, &a_downcase, &b_upcase, &end];
 
         assert_eq!(sorted, expected);
+    }
+
+    #[test]
+    fn should_update_or_not() {
+        let store = &init_db("should_update_or_not");
+
+        let prop = urls::IS_A.to_string();
+        let class = urls::AGENT;
+
+        let qf_prop_val = QueryFilter {
+            property: Some(prop.clone()),
+            value: Some(Value::AtomicUrl(class.to_string())),
+            sort_by: None,
+        };
+
+        let qf_prop = QueryFilter {
+            property: Some(prop.clone()),
+            value: None,
+            sort_by: None,
+        };
+
+        let qf_val = QueryFilter {
+            property: None,
+            value: Some(Value::AtomicUrl(class.to_string())),
+            sort_by: None,
+        };
+
+        let resource_correct_class = Resource::new_instance(class, store).unwrap();
+
+        let index_atom = IndexAtom {
+            subject: "https://example.com/someAgent".into(),
+            property: prop.clone(),
+            value: class.to_string(),
+        };
+
+        // We should be able to find the resource by propval, val, and / or prop.
+        assert!(should_update(&qf_val, &index_atom, &resource_correct_class));
+        assert!(should_update(
+            &qf_prop_val,
+            &index_atom,
+            &resource_correct_class
+        ));
+        assert!(should_update(
+            &qf_prop,
+            &index_atom,
+            &resource_correct_class
+        ));
+
+        // Test when a different value is passed
+        let resource_wrong_class = Resource::new_instance(urls::PARAGRAPH, store).unwrap();
+        assert!(should_update(&qf_prop, &index_atom, &resource_wrong_class));
+        assert!(!should_update(&qf_val, &index_atom, &resource_wrong_class));
+        assert!(!should_update(
+            &qf_prop_val,
+            &index_atom,
+            &resource_wrong_class
+        ));
+
+        let qf_prop_val_sort = QueryFilter {
+            property: Some(prop.clone()),
+            value: Some(Value::AtomicUrl(class.to_string())),
+            sort_by: Some(urls::DESCRIPTION.to_string()),
+        };
+        let qf_prop_sort = QueryFilter {
+            property: Some(prop.clone()),
+            value: None,
+            sort_by: Some(urls::DESCRIPTION.to_string()),
+        };
+        let qf_val_sort = QueryFilter {
+            property: Some(prop.clone()),
+            value: Some(Value::AtomicUrl(class.to_string())),
+            sort_by: Some(urls::DESCRIPTION.to_string()),
+        };
+
+        // We should update with a sort_by attribute
+        assert!(should_update(
+            &qf_prop_val_sort,
+            &index_atom,
+            &resource_correct_class
+        ));
+        assert!(should_update(
+            &qf_prop_sort,
+            &index_atom,
+            &resource_correct_class
+        ));
+        assert!(should_update(
+            &qf_val_sort,
+            &index_atom,
+            &resource_correct_class
+        ));
     }
 }

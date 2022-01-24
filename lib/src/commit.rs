@@ -198,36 +198,38 @@ impl Commit {
         store: &impl Storelike,
         update_index: bool,
     ) -> AtomicResult<Resource> {
+        let resource_unedited = resource.clone();
         if let Some(set) = self.set.clone() {
             for (prop, new_val) in set.iter() {
+                resource.set_propval(prop.into(), new_val.to_owned(), store)?;
+
                 if update_index {
                     let new_atom =
                         Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
                     if let Ok(old_val) = resource.get(prop) {
                         let old_atom =
                             Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
-                        store.remove_atom_from_index(&old_atom, &resource)?;
+                        store.remove_atom_from_index(&old_atom, &resource_unedited)?;
                     }
                     store.add_atom_to_index(&new_atom, &resource)?;
                 }
-                resource.set_propval(prop.into(), new_val.to_owned(), store)?;
             }
         }
         if let Some(remove) = self.remove.clone() {
             for prop in remove.iter() {
+                resource.remove_propval(prop);
                 if update_index {
                     let val = resource.get(prop)?;
                     let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    store.remove_atom_from_index(&atom, &resource)?;
+                    store.remove_atom_from_index(&atom, &resource_unedited)?;
                 }
-                resource.remove_propval(prop);
             }
         }
         // Remove all atoms from index if destroy
         if let Some(destroy) = self.destroy {
             if destroy {
                 for atom in resource.to_atoms()?.iter() {
-                    store.remove_atom_from_index(atom, &resource)?;
+                    store.remove_atom_from_index(atom, &resource_unedited)?;
                 }
             }
         }

@@ -5,6 +5,7 @@ use crate::{
     errors::AtomicError,
     hierarchy,
     schema::{Class, Property},
+    values::query_value_compare,
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_array};
 use crate::{mapping::Mapping, values::Value, Atom, Resource};
@@ -230,7 +231,7 @@ pub trait Storelike: Sized {
         &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
-        q_value: Option<&str>,
+        q_value: Option<&Value>,
         // Whether resources from outside the store should be searched through
         include_external: bool,
     ) -> AtomicResult<Vec<Atom>> {
@@ -254,27 +255,13 @@ pub trait Storelike: Sized {
             return Ok(vec);
         }
 
-        // If the value is a resourcearray, check if it is inside
-        let val_equals = |val: &str| {
-            let q = q_value.unwrap();
-            val == q || {
-                if val.starts_with('[') {
-                    match crate::parse::parse_json_array(val) {
-                        Ok(vec) => return vec.contains(&q.into()),
-                        Err(_) => return val == q,
-                    }
-                }
-                false
-            }
-        };
-
         // Find atoms matching the TPF query in a single resource
         let mut find_in_resource = |resource: &Resource| {
             let subj = resource.get_subject();
             for (prop, val) in resource.get_propvals().iter() {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                     if hasval {
-                        if val_equals(&val.to_string()) {
+                        if query_value_compare(val, q_value.unwrap()) {
                             vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                         }
                         break;
@@ -282,7 +269,7 @@ pub trait Storelike: Sized {
                         vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                     }
                     break;
-                } else if hasval && !hasprop && val_equals(&val.to_string()) {
+                } else if hasval && !hasprop && query_value_compare(val, q_value.unwrap()) {
                     vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                 }
             }
@@ -415,7 +402,7 @@ pub trait Storelike: Sized {
         let atoms = self.tpf(
             None,
             q.property.as_deref(),
-            q.value.as_deref(),
+            q.value.as_ref(),
             q.include_external,
         )?;
 
@@ -487,13 +474,13 @@ pub struct Query {
     /// Filter by Property
     pub property: Option<String>,
     /// Filter by Value
-    pub value: Option<String>,
+    pub value: Option<Value>,
     /// Maximum of items to return
     pub limit: Option<usize>,
     /// Value at which to begin lexicographically sorting things.
-    pub start_val: Option<String>,
+    pub start_val: Option<Value>,
     /// Value at which to stop lexicographically sorting things.
-    pub end_val: Option<String>,
+    pub end_val: Option<Value>,
     /// How many items to skip from the first one
     pub offset: usize,
     /// The Property URL that is used to sort the results

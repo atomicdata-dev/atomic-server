@@ -1,6 +1,6 @@
 use crate::{
     collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, AtomicError,
-    Commit, Resource, Storelike,
+    Commit, Resource, Storelike, Value,
 };
 
 pub fn version_endpoint() -> Endpoint {
@@ -89,7 +89,12 @@ fn handle_all_versions_request(
 /// Searches the local store for all commits with this subject, returns sorted from old to new.
 #[tracing::instrument(skip(store))]
 fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Vec<Commit>> {
-    let commit_atoms = store.tpf(None, Some(urls::SUBJECT), Some(subject), false)?;
+    let commit_atoms = store.tpf(
+        None,
+        Some(urls::SUBJECT),
+        Some(&Value::AtomicUrl(subject.into())),
+        false,
+    )?;
     let mut commit_resources = Vec::new();
     for atom in commit_atoms {
         // TODO: This will fail if a resource simply uses the SUBJECT url without being a valid Commit.

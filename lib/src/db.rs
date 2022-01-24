@@ -169,9 +169,6 @@ impl Storelike for Db {
 
     #[tracing::instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        // TODO: Don't iterate over indexable atoms
-        // Iterate over Atoms!
-        // We need
         for index_atom in atom_to_indexable_atoms(atom)? {
             // It's OK if this overwrites a value
             let _existing = self
@@ -179,7 +176,7 @@ impl Storelike for Db {
                 .insert(key_for_reference_index(&index_atom).as_bytes(), b"")?;
 
             // Also update the query index to keep collections performant
-            check_if_atom_matches_watched_query_filters(self, &index_atom, &atom, false, resource)
+            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, false, resource)
                 .map_err(|e| {
                     format!("Failed to check_if_atom_matches_watched_collections. {}", e)
                 })?;
@@ -216,7 +213,7 @@ impl Storelike for Db {
                     let remove_atom = crate::Atom::new(subject.into(), prop.into(), val.clone());
                     self.remove_atom_from_index(&remove_atom, resource)
                         .map_err(|e| {
-                            format!("Failed to remove atom to index {}. {}", remove_atom, e)
+                            format!("Failed to remove atom from index {}. {}", remove_atom, e)
                         })?;
                 }
             }
@@ -234,7 +231,8 @@ impl Storelike for Db {
             self.reference_index
                 .remove(&key_for_reference_index(&index_atom).as_bytes())?;
 
-            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)?;
+            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)
+                .map_err(|e| format!("Checking atom went wrong: {}", e))?;
         }
         Ok(())
     }
@@ -382,7 +380,7 @@ impl Storelike for Db {
         let mut atoms = self.tpf(
             None,
             q.property.as_deref(),
-            q.value.as_deref(),
+            q.value.as_ref(),
             q.include_external,
         )?;
         let count = atoms.len();
@@ -518,7 +516,7 @@ impl Storelike for Db {
         &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
-        q_value: Option<&str>,
+        q_value: Option<&Value>,
         // Whether resources from outside the store should be searched through
         include_external: bool,
     ) -> AtomicResult<Vec<Atom>> {
@@ -545,7 +543,7 @@ impl Storelike for Db {
 
         // If the value is a resourcearray, check if it is inside
         let val_equals = |val: &str| {
-            let q = q_value.unwrap();
+            let q = q_value.unwrap().to_sortable_string();
             val == q || {
                 if val.starts_with('[') {
                     match crate::parse::parse_json_array(val) {

@@ -5,7 +5,7 @@ use ntest::timeout;
 
 /// Creates new temporary database, populates it, removes previous one.
 /// Can only be run one thread at a time, because it requires a lock on the DB file.
-fn init(id: &str) -> Db {
+pub fn init_db(id: &str) -> Db {
     let tmp_dir_path = format!(".temp/db/{}", id);
     let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
     let store = Db::init(
@@ -25,7 +25,7 @@ fn init(id: &str) -> Db {
 use lazy_static::lazy_static; // 1.4.0
 use std::sync::Mutex;
 lazy_static! {
-    pub static ref DB: Mutex<Db> = Mutex::new(init("shared"));
+    pub static ref DB: Mutex<Db> = Mutex::new(init_db("shared"));
 }
 
 #[test]
@@ -104,15 +104,14 @@ fn add_atom_to_index() {
     let store = DB.lock().unwrap().clone();
     let subject = urls::CLASS.into();
     let property: String = urls::PARENT.into();
-    let val_string = urls::AGENT;
-    let value = Value::new(val_string, &crate::datatype::DataType::AtomicUrl).unwrap();
+    let value = Value::AtomicUrl(urls::AGENT.into());
     // This atom should normally not exist - Agent is not the parent of Class.
-    let atom = Atom::new(subject, property.clone(), value);
+    let atom = Atom::new(subject, property.clone(), value.clone());
     store
         .add_atom_to_index(&atom, &Resource::new("ds".into()))
         .unwrap();
     let found_no_external = store
-        .tpf(None, Some(&property), Some(val_string), false)
+        .tpf(None, Some(&property), Some(&value), false)
         .unwrap();
     // Don't find the atom if no_external is true.
     assert_eq!(
@@ -121,7 +120,7 @@ fn add_atom_to_index() {
         "found items - should ignore external items"
     );
     let found_external = store
-        .tpf(None, Some(&property), Some(val_string), true)
+        .tpf(None, Some(&property), Some(&value), true)
         .unwrap();
     // If we see the atom, it's in the index.
     assert_eq!(found_external.len(), 1);
@@ -131,7 +130,7 @@ fn add_atom_to_index() {
 /// Check if a resource is properly removed from the DB after a delete command.
 /// Also counts commits.
 fn destroy_resource_and_check_collection_and_commits() {
-    let store = init("counter");
+    let store = init_db("counter");
     let agents_url = format!("{}/agents", store.get_server_url());
     let agents_collection_1 = store
         .get_resource_extended(&agents_url, false, None)
@@ -174,7 +173,7 @@ fn destroy_resource_and_check_collection_and_commits() {
         .unwrap();
     assert_eq!(
         agents_collection_count_2, 2,
-        "The new Agent resource did not increase the collection member count."
+        "The new Agent resource did not increase the collection member count from 1 to 2."
     );
 
     let commits_collection_2 = store
@@ -250,8 +249,8 @@ fn get_extended_resource_pagination() {
 fn queries() {
     let store = &DB.lock().unwrap().clone();
 
-    let demo_val = "myval".to_string();
-    let demo_reference = urls::PARAGRAPH;
+    let demo_val = Value::Slug("myval".to_string());
+    let demo_reference = Value::AtomicUrl(urls::PARAGRAPH.into());
 
     let count = 10;
     let limit = 5;
@@ -271,10 +270,10 @@ fn queries() {
                 .unwrap();
         }
         demo_resource
-            .set_propval_string(urls::DESTINATION.into(), demo_reference, store)
+            .set_propval(urls::DESTINATION.into(), demo_reference.clone(), store)
             .unwrap();
         demo_resource
-            .set_propval(urls::SHORTNAME.into(), Value::Slug(demo_val.clone()), store)
+            .set_propval(urls::SHORTNAME.into(), demo_val.clone(), store)
             .unwrap();
         demo_resource
             .set_propval(
@@ -288,7 +287,7 @@ fn queries() {
 
     let mut q = Query {
         property: Some(urls::DESTINATION.into()),
-        value: Some(demo_reference.into()),
+        value: Some(demo_reference),
         limit: Some(limit),
         start_val: None,
         end_val: None,

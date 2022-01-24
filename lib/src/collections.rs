@@ -3,7 +3,7 @@
 use crate::{
     errors::AtomicResult,
     storelike::{Query, ResourceCollection},
-    urls, Resource, Storelike,
+    urls, Resource, Storelike, Value,
 };
 
 #[derive(Debug)]
@@ -198,9 +198,16 @@ impl Collection {
             return Err("Page size must be greater than 0".into());
         }
 
+        let value_filter = if let Some(val) = &collection_builder.value {
+            // Warning: this des _assume_ that the value is a string. This will work for most datatypes, but not for things like resource arrays!
+            Some(Value::String(val.clone()))
+        } else {
+            None
+        };
+
         let q = Query {
             property: collection_builder.property.clone(),
-            value: collection_builder.value.clone(),
+            value: value_filter,
             limit: Some(collection_builder.page_size),
             start_val: None,
             end_val: None,

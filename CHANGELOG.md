@@ -10,6 +10,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - `Resource.save` returns a `CommitResponse`.
 - Refactor `Commit.apply_opts`, structure options.
 - Remove the potentially confusing `commit.apply` method.
+- `store.tpf` now takes `Value` instead of `String`.
 
 ## [v0.30.4] - 2021-01-15
 
