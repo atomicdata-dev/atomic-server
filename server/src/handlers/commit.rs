@@ -1,6 +1,6 @@
 use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::{web, HttpResponse};
-use atomic_lib::{parse::parse_json_ad_commit_resource, Commit, Storelike};
+use atomic_lib::{commit::CommitOpts, parse::parse_json_ad_commit_resource, Commit, Storelike};
 use std::sync::Mutex;
 
 /// Send and process a Commit.
@@ -25,7 +25,14 @@ pub async fn post_commit(
         return Err("Subject of commit should be sent to other domain - this store can not own this resource.".into());
     }
     // We don't update the index, because that's a job for the CommitMonitor. That means it can be done async in a different thread, making this commit response way faster.
-    let commit_response = incoming_commit.apply_opts(store, true, true, true, true, false)?;
+    let opts = CommitOpts {
+        validate_schema: true,
+        validate_signature: true,
+        validate_timestamp: true,
+        validate_rights: true,
+        update_index: false,
+    };
+    let commit_response = incoming_commit.apply_opts(store, &opts)?;
 
     let message = commit_response.commit_resource.to_json_ad()?;
 

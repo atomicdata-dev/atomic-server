@@ -129,20 +129,20 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     ];
 
     for p in properties {
-        let mut resource = p.to_resource()?;
+        let mut resource = p.to_resource();
         resource.set_propval_unsafe(
             urls::PARENT.into(),
             Value::AtomicUrl("https://atomicdata.dev/properties".into()),
-        )?;
+        );
         store.add_resource_opts(&resource, false, false, true)?;
     }
 
     for c in classes {
-        let mut resource = c.to_resource()?;
+        let mut resource = c.to_resource();
         resource.set_propval_unsafe(
             urls::PARENT.into(),
             Value::AtomicUrl("https://atomicdata.dev/classes".into()),
-        )?;
+        );
         store.add_resource_opts(&resource, false, false, true)?;
     }
 
@@ -203,7 +203,9 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     let classes_atoms = store.tpf(
         None,
         Some("https://atomicdata.dev/properties/isA"),
-        Some("https://atomicdata.dev/classes/Class"),
+        Some(&Value::AtomicUrl(
+            "https://atomicdata.dev/classes/Class".into(),
+        )),
         true,
     )?;
 

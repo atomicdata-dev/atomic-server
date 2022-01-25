@@ -5,6 +5,7 @@ use crate::{
     errors::AtomicError,
     hierarchy,
     schema::{Class, Property},
+    values::query_value_compare,
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_array};
 use crate::{mapping::Mapping, values::Value, Atom, Resource};
@@ -33,7 +34,7 @@ pub trait Storelike: Sized {
 
     /// Adds an Atom to the PropSubjectMap. Overwrites if already present.
     /// The default implementation for this does not do anything, so overwrite it if your store needs indexing.
-    fn add_atom_to_index(&self, _atom: &Atom) -> AtomicResult<()> {
+    fn add_atom_to_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
         Ok(())
     }
 
@@ -67,7 +68,8 @@ pub trait Storelike: Sized {
         for r in self.all_resources(include_external) {
             let atoms = r.to_atoms()?;
             for atom in atoms {
-                self.add_atom_to_index(&atom)?;
+                self.add_atom_to_index(&atom, &r)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
             }
         }
         Ok(())
@@ -218,7 +220,7 @@ pub trait Storelike: Sized {
     /// let atoms = store.tpf(
     ///     None,
     ///     Some("https://atomicdata.dev/properties/isA"),
-    ///     Some("https://atomicdata.dev/classes/Class"),
+    ///     Some(&atomic_lib::Value::AtomicUrl("https://atomicdata.dev/classes/Class".into())),
     ///     true
     /// ).unwrap();
     /// assert!(atoms.len() > 11)
@@ -229,7 +231,7 @@ pub trait Storelike: Sized {
         &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
-        q_value: Option<&str>,
+        q_value: Option<&Value>,
         // Whether resources from outside the store should be searched through
         include_external: bool,
     ) -> AtomicResult<Vec<Atom>> {
@@ -253,27 +255,13 @@ pub trait Storelike: Sized {
             return Ok(vec);
         }
 
-        // If the value is a resourcearray, check if it is inside
-        let val_equals = |val: &str| {
-            let q = q_value.unwrap();
-            val == q || {
-                if val.starts_with('[') {
-                    match crate::parse::parse_json_array(val) {
-                        Ok(vec) => return vec.contains(&q.into()),
-                        Err(_) => return val == q,
-                    }
-                }
-                false
-            }
-        };
-
         // Find atoms matching the TPF query in a single resource
         let mut find_in_resource = |resource: &Resource| {
             let subj = resource.get_subject();
             for (prop, val) in resource.get_propvals().iter() {
                 if hasprop && q_property.as_ref().unwrap() == prop {
                     if hasval {
-                        if val_equals(&val.to_string()) {
+                        if query_value_compare(val, q_value.unwrap()) {
                             vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                         }
                         break;
@@ -281,7 +269,7 @@ pub trait Storelike: Sized {
                         vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                     }
                     break;
-                } else if hasval && !hasprop && val_equals(&val.to_string()) {
+                } else if hasval && !hasprop && query_value_compare(val, q_value.unwrap()) {
                     vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
                 }
             }
@@ -407,8 +395,67 @@ pub trait Storelike: Sized {
         crate::populate::populate_default_store(self)
     }
 
+    /// Search the Store, returns the matching subjects.
+    /// The second returned vector should be filled if query.include_resources is true.
+    /// Tries `query_cache`, which you should implement yourself.
+    fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
+        let atoms = self.tpf(
+            None,
+            q.property.as_deref(),
+            q.value.as_ref(),
+            q.include_external,
+        )?;
+
+        // Remove duplicate subjects
+        let mut subjects_deduplicated: Vec<String> = atoms
+            .iter()
+            .map(|atom| atom.subject.clone())
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect();
+
+        // Sort by subject, better than no sorting
+        subjects_deduplicated.sort();
+
+        // WARNING: Entering expensive loop!
+        // This is needed for sorting, authorization and including nested resources.
+        // It could be skipped if there is no authorization and sorting requirement.
+        let mut resources = Vec::new();
+        for subject in subjects_deduplicated.iter() {
+            // These nested resources are not fully calculated - they will be presented as -is
+            match self.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+                Ok(resource) => {
+                    resources.push(resource);
+                }
+                Err(e) => match e.error_type {
+                    crate::AtomicErrorType::NotFoundError => {}
+                    crate::AtomicErrorType::UnauthorizedError => {}
+                    crate::AtomicErrorType::OtherError => {
+                        return Err(
+                            format!("Error when getting resource in collection: {}", e).into()
+                        )
+                    }
+                },
+            }
+        }
+
+        if let Some(sort) = &q.sort_by {
+            resources = crate::collections::sort_resources(resources, sort, q.sort_desc);
+        }
+        let mut subjects = Vec::new();
+        for r in resources.iter() {
+            subjects.push(r.get_subject().clone())
+        }
+
+        Ok(QueryResult {
+            count: atoms.len(),
+            subjects,
+            resources,
+        })
+    }
+
     /// Removes an Atom from the PropSubjectMap.
-    fn remove_atom_from_index(&self, _atom: &Atom) -> AtomicResult<()> {
+    fn remove_atom_from_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
         Ok(())
     }
 
@@ -419,4 +466,38 @@ pub trait Storelike: Sized {
     fn validate(&self) -> crate::validate::ValidationReport {
         crate::validate::validate_store(self, false)
     }
+}
+
+/// Use this to construct a list of Resources
+#[derive(Debug)]
+pub struct Query {
+    /// Filter by Property
+    pub property: Option<String>,
+    /// Filter by Value
+    pub value: Option<Value>,
+    /// Maximum of items to return
+    pub limit: Option<usize>,
+    /// Value at which to begin lexicographically sorting things.
+    pub start_val: Option<Value>,
+    /// Value at which to stop lexicographically sorting things.
+    pub end_val: Option<Value>,
+    /// How many items to skip from the first one
+    pub offset: usize,
+    /// The Property URL that is used to sort the results
+    pub sort_by: Option<String>,
+    /// Sort descending instead of ascending.
+    pub sort_desc: bool,
+    /// Whether to include non-server resources
+    pub include_external: bool,
+    /// Whether to include full Resources in the result, if not, will add empty vector here.
+    pub include_nested: bool,
+    /// For which Agent the query is executed. Pass `None`if you want to skip permission checks.
+    pub for_agent: Option<String>,
+}
+
+pub struct QueryResult {
+    pub subjects: Vec<String>,
+    pub resources: Vec<Resource>,
+    /// The amount of hits that were found, including the ones that were out of bounds or not authorized.
+    pub count: usize,
 }

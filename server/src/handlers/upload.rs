@@ -4,8 +4,8 @@ use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
 use async_std::prelude::*;
 use atomic_lib::{
-    commit::CommitResponse, datetime_helpers::now, hierarchy::check_write, urls, AtomicError,
-    Resource, Storelike, Value,
+    commit::CommitResponse, hierarchy::check_write, urls, utils::now, AtomicError, Resource,
+    Storelike, Value,
 };
 use futures::{StreamExt, TryStreamExt};
 use serde::Deserialize;

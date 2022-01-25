@@ -2,7 +2,7 @@
 //! Agents are actors (such as users) that can edit content.
 //! https://docs.atomicdata.dev/commits/concepts.html
 
-use crate::{datetime_helpers, errors::AtomicResult, urls, Resource, Storelike};
+use crate::{errors::AtomicResult, urls, Resource, Storelike};
 
 #[derive(Clone, Debug)]
 pub struct Agent {
@@ -60,7 +60,7 @@ impl Agent {
             public_key: keypair.public.clone(),
             subject: format!("{}/agents/{}", store.get_server_url(), keypair.public),
             name: name.map(|x| x.to_owned()),
-            created_at: datetime_helpers::now(),
+            created_at: crate::utils::now(),
         }
     }
 
@@ -72,7 +72,7 @@ impl Agent {
             public_key: public_key.into(),
             subject: format!("{}/agents/{}", store.get_server_url(), public_key),
             name: None,
-            created_at: datetime_helpers::now(),
+            created_at: crate::utils::now(),
         })
     }
 }

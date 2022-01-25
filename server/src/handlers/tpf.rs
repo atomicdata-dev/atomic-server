@@ -1,7 +1,7 @@
 use crate::{appstate::AppState, content_types::get_accept};
 use crate::{content_types::ContentType, errors::AtomicServerResult, helpers::empty_to_nothing};
 use actix_web::{web, HttpResponse};
-use atomic_lib::Storelike;
+use atomic_lib::{Storelike, Value};
 use serde::Deserialize;
 use std::collections::HashSet;
 use std::sync::Mutex;
@@ -32,11 +32,11 @@ pub async fn tpf(
     let content_type = get_accept(req.headers());
     let subject = empty_to_nothing(query.subject.clone());
     let property = empty_to_nothing(query.property.clone());
-    let value = empty_to_nothing(query.value.clone());
+    let value = query.value.clone().map(Value::String);
     let atoms = store.tpf(
         subject.as_deref(),
         property.as_deref(),
-        value.as_deref(),
+        value.as_ref(),
         true,
     )?;
     tracing::info!("TPF query: {:?}", query);

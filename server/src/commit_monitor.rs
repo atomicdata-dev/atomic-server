@@ -43,26 +43,36 @@ impl Handler<Subscribe> for CommitMonitor {
     )]
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Context<Self>) {
         // check if the agent has the rights to subscribe to this resource
-        if let Ok(resource) = self.store.get_resource(&msg.subject) {
-            match atomic_lib::hierarchy::check_read(&self.store, &resource, &msg.agent) {
-                Ok(_explanation) => {
-                    let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
-                        set.clone()
-                    } else {
-                        HashSet::new()
-                    };
-                    set.insert(msg.addr);
-                    tracing::debug!("handle subscribe {} ", msg.subject);
-                    self.subscriptions.insert(msg.subject.clone(), set);
+        match self.store.get_resource(&msg.subject) {
+            Ok(resource) => {
+                match atomic_lib::hierarchy::check_read(&self.store, &resource, &msg.agent) {
+                    Ok(_explanation) => {
+                        let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
+                            set.clone()
+                        } else {
+                            HashSet::new()
+                        };
+                        set.insert(msg.addr);
+                        tracing::debug!("handle subscribe {} ", msg.subject);
+                        self.subscriptions.insert(msg.subject.clone(), set);
+                    }
+                    Err(unauthorized_err) => {
+                        tracing::debug!(
+                            "Not allowed {} to subscribe to {}: {}",
+                            &msg.agent,
+                            &msg.subject,
+                            unauthorized_err
+                        );
+                    }
                 }
-                Err(unauthorized_err) => {
-                    tracing::debug!(
-                        "Not allowed {}  to subscribe to {}: {}",
-                        &msg.agent,
-                        &msg.subject,
-                        unauthorized_err
-                    );
-                }
+            }
+            Err(e) => {
+                tracing::debug!(
+                    "Ubsubscribe failed for {} by {}: {}",
+                    &msg.subject,
+                    msg.agent,
+                    e
+                );
             }
         }
     }

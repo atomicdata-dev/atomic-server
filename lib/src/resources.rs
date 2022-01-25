@@ -1,5 +1,7 @@
 //! A resource is a set of Atoms that share a URL
 
+use crate::commit::{CommitOpts, CommitResponse};
+use crate::utils::random_string;
 use crate::values::Value;
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
@@ -155,23 +157,24 @@ impl Resource {
         }
     }
 
+    /// Create a new resource with a generated Subject
+    pub fn new_generate_subject(store: &impl Storelike) -> Resource {
+        let generated = format!("{}/{}", store.get_server_url(), random_string());
+
+        Resource::new(generated)
+    }
+
     /// Create a new instance of some Class.
     /// The subject is generated, but can be changed.
     /// Does not save the resource to the store.
     pub fn new_instance(class_url: &str, store: &impl Storelike) -> AtomicResult<Resource> {
         let propvals: PropVals = HashMap::new();
         let class = store.get_class(class_url)?;
-        use rand::Rng;
-        let random_string: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(7)
-            .map(char::from)
-            .collect();
         let subject = format!(
             "{}/{}/{}",
             store.get_server_url(),
             &class.shortname,
-            random_string
+            random_string()
         );
         let mut resource = Resource {
             propvals,
@@ -260,7 +263,14 @@ impl Resource {
             crate::client::post_commit(&commit, store)?;
         }
         // If that succeeds, save it locally;
-        let commit_response = commit.apply(store)?;
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: true,
+        };
+        let commit_response = commit.apply_opts(store, &opts)?;
         // then, reset the internal CommitBuiler.
         self.reset_commit_builder();
         Ok(commit_response)
@@ -268,17 +278,23 @@ impl Resource {
 
     /// Saves the resource (with all the changes) to the store by creating a Commit.
     /// Uses default Agent to sign the Commit.
-    /// Returns the generated Commit.
+    /// Returns the generated Commit and the new Resource.
     /// Does not validate rights / hierarchy.
     /// Does not store these changes on the server of the Subject - the Commit will be lost, unless you handle it manually.
-    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
+    pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
         let commit = commitbuilder.sign(&agent, store)?;
-        commit.apply(store)?;
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: true,
+        };
+        let res = commit.apply_opts(store, &opts)?;
         self.reset_commit_builder();
-        let resource = commit.into_resource(store)?;
-        Ok(resource)
+        Ok(res)
     }
 
     /// Insert a Property/Value combination.
@@ -299,7 +315,7 @@ impl Resource {
             )
         })?;
         let val = Value::new(value, &fullprop.data_type)?;
-        self.set_propval_unsafe(property_url, val)?;
+        self.set_propval_unsafe(property_url, val);
         Ok(())
     }
 
@@ -324,7 +340,8 @@ impl Resource {
             }
         }
         if full_prop.data_type == value.datatype() {
-            self.set_propval_unsafe(property, value)
+            self.set_propval_unsafe(property, value);
+            Ok(())
         } else {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
                 self.get_subject(),
@@ -340,10 +357,9 @@ impl Resource {
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
     /// Adds it to the CommitBuilder.
-    pub fn set_propval_unsafe(&mut self, property: String, value: Value) -> AtomicResult<()> {
+    pub fn set_propval_unsafe(&mut self, property: String, value: Value) {
         self.propvals.insert(property.clone(), value.clone());
         self.commit.set(property, value);
-        Ok(())
     }
 
     /// Sets a property / value combination.
@@ -357,7 +373,7 @@ impl Resource {
     ) -> AtomicResult<()> {
         let fullprop = self.resolve_shortname_to_property(property, store)?;
         let fullval = Value::new(value, &fullprop.data_type)?;
-        self.set_propval_unsafe(fullprop.subject, fullval)?;
+        self.set_propval_unsafe(fullprop.subject, fullval);
         Ok(())
     }
 
@@ -540,7 +556,18 @@ mod test {
             .clone()
             .sign(&agent, &store)
             .unwrap();
-        commit.apply(&store).unwrap();
+        commit
+            .apply_opts(
+                &store,
+                &CommitOpts {
+                    validate_schema: true,
+                    validate_signature: true,
+                    validate_timestamp: true,
+                    validate_rights: false,
+                    update_index: true,
+                },
+            )
+            .unwrap();
         assert!(
             new_resource
                 .get_shortname("shortname", &store)

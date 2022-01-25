@@ -3,7 +3,7 @@
 
 use core::fmt;
 
-use crate::{errors::AtomicResult, urls, Resource, Storelike};
+use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
 
 #[derive(Debug)]
 pub enum Right {
@@ -26,7 +26,7 @@ pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicRe
     let atoms = store.tpf(
         None,
         Some(urls::PARENT),
-        Some(resource.get_subject()),
+        Some(&Value::AtomicUrl(resource.get_subject().into())),
         false,
     )?;
     let mut children: Vec<String> = Vec::new();

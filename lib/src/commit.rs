@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, datetime_helpers, errors::AtomicResult, hierarchy, resources::PropVals,
-    urls, Atom, Resource, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, hierarchy, resources::PropVals, urls, Atom, Resource,
+    Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -18,6 +18,15 @@ pub struct CommitResponse {
     pub resource_new: Option<Resource>,
     pub resource_old: Resource,
     pub commit_struct: Commit,
+}
+
+#[derive(Clone, Debug)]
+pub struct CommitOpts {
+    pub validate_schema: bool,
+    pub validate_signature: bool,
+    pub validate_timestamp: bool,
+    pub validate_rights: bool,
+    pub update_index: bool,
 }
 
 /// A Commit is a set of changes to a Resource.
@@ -53,27 +62,13 @@ pub struct Commit {
 impl Commit {
     /// Apply a single signed Commit to the store.
     /// Creates, edits or destroys a resource.
-    /// Checks if the signature is created by the Agent, and validates the data shape.
-    /// Does not check if the correct rights are present.
-    /// If you need more control over which checks to perform, use apply_opts
-    pub fn apply(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
-        self.apply_opts(store, true, true, false, false, true)
-    }
-
-    /// Apply a single signed Commit to the store.
-    /// Creates, edits or destroys a resource.
     /// Allows for control over which validations should be performed.
     /// Returns the generated Commit, the old Resource and the new Resource.
-    /// TODO: Should check if the Agent has the correct rights.
     #[tracing::instrument(skip(store))]
     pub fn apply_opts(
         &self,
         store: &impl Storelike,
-        validate_schema: bool,
-        validate_signature: bool,
-        validate_timestamp: bool,
-        validate_rights: bool,
-        update_index: bool,
+        opts: &CommitOpts,
     ) -> AtomicResult<CommitResponse> {
         let subject_url = url::Url::parse(&self.subject)
             .map_err(|e| format!("Subject '{}' is not a URL. {}", &self.subject, e))?;
@@ -82,7 +77,7 @@ impl Commit {
             return Err("Subject URL cannot have query parameters".into());
         }
 
-        if validate_signature {
+        if opts.validate_signature {
             let signature = match self.signature.as_ref() {
                 Some(sig) => sig,
                 None => return Err("No signature set".into()),
@@ -107,7 +102,7 @@ impl Commit {
                 })?;
         }
         // Check if the created_at lies in the past
-        if validate_timestamp {
+        if opts.validate_timestamp {
             check_timestamp(self.created_at)?;
         }
         let commit_resource: Resource = self.clone().into_resource(store)?;
@@ -123,7 +118,7 @@ impl Commit {
 
         let resource_new = self.apply_changes(resource_old.clone(), store, false)?;
 
-        if validate_rights {
+        if opts.validate_rights {
             if is_new {
                 hierarchy::check_write(store, &resource_new, &self.signer)?;
             } else {
@@ -143,7 +138,7 @@ impl Commit {
             }
         };
         // Check if all required props are there
-        if validate_schema {
+        if opts.validate_schema {
             resource_new.check_required_props(store)?;
         }
 
@@ -170,7 +165,7 @@ impl Commit {
             if destroy {
                 // Note: the value index is updated before this action, in resource.apply_changes()
                 store.remove_resource(&self.subject)?;
-                store.add_resource_opts(&commit_resource, false, update_index, false)?;
+                store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
                 return Ok(CommitResponse {
                     resource_new: None,
                     resource_old,
@@ -179,10 +174,10 @@ impl Commit {
                 });
             }
         }
-        self.apply_changes(resource_old.clone(), store, update_index)?;
+        self.apply_changes(resource_old.clone(), store, opts.update_index)?;
 
         // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
-        store.add_resource_opts(&commit_resource, false, update_index, false)?;
+        store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
         Ok(CommitResponse {
@@ -195,6 +190,7 @@ impl Commit {
 
     /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
     /// Optionally also updates the index in the Store.
+    /// The Old Resource is only needed when `update_index` is true, and is used for checking
     #[tracing::instrument(skip(store))]
     pub fn apply_changes(
         &self,
@@ -202,33 +198,38 @@ impl Commit {
         store: &impl Storelike,
         update_index: bool,
     ) -> AtomicResult<Resource> {
+        let resource_unedited = resource.clone();
         if let Some(set) = self.set.clone() {
-            for (prop, val) in set.iter() {
+            for (prop, new_val) in set.iter() {
+                resource.set_propval(prop.into(), new_val.to_owned(), store)?;
+
                 if update_index {
-                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    if let Ok(_v) = resource.get(prop) {
-                        store.remove_atom_from_index(&atom)?;
+                    let new_atom =
+                        Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
+                    if let Ok(old_val) = resource_unedited.get(prop) {
+                        let old_atom =
+                            Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
+                        store.remove_atom_from_index(&old_atom, &resource_unedited)?;
                     }
-                    store.add_atom_to_index(&atom)?;
+                    store.add_atom_to_index(&new_atom, &resource)?;
                 }
-                resource.set_propval(prop.into(), val.to_owned(), store)?;
             }
         }
         if let Some(remove) = self.remove.clone() {
             for prop in remove.iter() {
-                if update_index {
-                    let val = resource.get(prop)?;
-                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    store.remove_atom_from_index(&atom)?;
-                }
                 resource.remove_propval(prop);
+                if update_index {
+                    let val = resource_unedited.get(prop)?;
+                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                    store.remove_atom_from_index(&atom, &resource_unedited)?;
+                }
             }
         }
         // Remove all atoms from index if destroy
         if let Some(destroy) = self.destroy {
             if destroy {
                 for atom in resource.to_atoms()?.iter() {
-                    store.remove_atom_from_index(atom)?;
+                    store.remove_atom_from_index(atom, &resource_unedited)?;
                 }
             }
         }
@@ -238,7 +239,14 @@ impl Commit {
     /// Applies a commit without performing authorization / signature / schema checks.
     /// Does not update the index.
     pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
-        self.apply_opts(store, false, false, false, false, false)
+        let opts = CommitOpts {
+            validate_schema: false,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: false,
+        };
+        self.apply_opts(store, &opts)
     }
 
     /// Converts a Resource of a Commit into a Commit
@@ -282,7 +290,7 @@ impl Commit {
         let commit_subject = match self.signature.as_ref() {
             Some(sig) => format!("{}/commits/{}", store.get_server_url(), sig),
             None => {
-                let now = crate::datetime_helpers::now();
+                let now = crate::utils::now();
                 format!("{}/commitsUnsigned/{}", store.get_server_url(), now)
             }
         };
@@ -387,7 +395,7 @@ impl CommitBuilder {
         agent: &crate::agents::Agent,
         store: &impl Storelike,
     ) -> AtomicResult<Commit> {
-        let now = crate::datetime_helpers::now();
+        let now = crate::utils::now();
         sign_at(self, agent, now, store)
     }
 
@@ -477,7 +485,7 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
 
 pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
-    let now = datetime_helpers::now();
+    let now = crate::utils::now();
     if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
         return Err(format!(
                     "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
@@ -491,6 +499,16 @@ pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
 
 #[cfg(test)]
 mod test {
+    lazy_static::lazy_static! {
+        pub static ref OPTS: CommitOpts = CommitOpts {
+            validate_schema: true,
+            validate_signature: true,
+            validate_timestamp: true,
+            validate_rights: false,
+            update_index: true,
+        };
+    }
+
     use super::*;
     use crate::{agents::Agent, Storelike};
 
@@ -509,7 +527,7 @@ mod test {
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store).unwrap();
         let commit_subject = commit.get_subject().to_string();
-        let _created_resource = commit.apply(&store).unwrap();
+        let _created_resource = commit.apply_opts(&store, &OPTS).unwrap();
 
         let resource = store.get_resource(subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
@@ -605,13 +623,13 @@ mod test {
             let subject = "https://invalid.com?q=invalid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store).unwrap();
-            commit.apply(&store).unwrap_err();
+            commit.apply_opts(&store, &OPTS).unwrap_err();
         }
         {
             let subject = "https://valid.com/valid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store).unwrap();
-            commit.apply(&store).unwrap();
+            commit.apply_opts(&store, &OPTS).unwrap();
         }
     }
 }

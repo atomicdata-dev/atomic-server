@@ -1,6 +1,10 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a TPF query
-use crate::{errors::AtomicResult, storelike::ResourceCollection, urls, Resource, Storelike};
+use crate::{
+    errors::AtomicResult,
+    storelike::{Query, ResourceCollection},
+    urls, Resource, Storelike, Value,
+};
 
 #[derive(Debug)]
 pub struct TpfQuery {
@@ -154,7 +158,7 @@ pub struct Collection {
 
 /// Sorts a vector or resources by some property.
 #[tracing::instrument]
-fn sort_resources(
+pub fn sort_resources(
     mut resources: ResourceCollection,
     sort_by: &str,
     sort_desc: bool,
@@ -163,8 +167,8 @@ fn sort_resources(
         let val_a = a.get(sort_by);
         let val_b = b.get(sort_by);
         if val_a.is_err() || val_b.is_err() {
-            return std::cmp::Ordering::Equal;
-        }
+            return std::cmp::Ordering::Greater;
+        };
         if val_b.unwrap().to_string() > val_a.unwrap().to_string() {
             if sort_desc {
                 std::cmp::Ordering::Greater
@@ -193,103 +197,43 @@ impl Collection {
         if collection_builder.page_size < 1 {
             return Err("Page size must be greater than 0".into());
         }
-        // Execute the TPF query, get all the subjects.
-        // Note that these are not yet authorized.
-        let atoms = store.tpf(
-            None,
-            collection_builder.property.as_deref(),
-            collection_builder.value.as_deref(),
-            collection_builder.include_external,
-        )?;
-        // Remove duplicate subjects
-        let mut subjects_deduplicated: Vec<String> = atoms
-            .iter()
-            .map(|atom| atom.subject.clone())
-            .collect::<std::collections::HashSet<String>>()
-            .into_iter()
-            .collect();
 
-        // Sort by subject, better than no sorting
-        subjects_deduplicated.sort();
+        // Warning: this _assumes_ that the Value is a string.
+        // This will work for most datatypes, but not for things like resource arrays!
+        // We could improve this by taking the datatype of the `property`, and parsing the string.
+        let value_filter = collection_builder
+            .value
+            .as_ref()
+            .map(|val| Value::String(val.clone()));
 
-        // WARNING: Entering expensive loop!
-        // This is needed for sorting, authorization and including nested resources.
-        // It could be skipped if there is no authorization and sorting requirement.
-        let mut resources = Vec::new();
-        for subject in subjects_deduplicated.iter() {
-            // These nested resources are not fully calculated - they will be presented as -is
-            match store.get_resource_extended(subject, true, for_agent) {
-                Ok(resource) => {
-                    resources.push(resource);
-                }
-                Err(e) => match e.error_type {
-                    crate::AtomicErrorType::NotFoundError => {}
-                    crate::AtomicErrorType::UnauthorizedError => {}
-                    crate::AtomicErrorType::OtherError => {
-                        return Err(
-                            format!("Error when getting resource in collection: {}", e).into()
-                        )
-                    }
-                },
-            }
-        }
-        if let Some(sort) = &collection_builder.sort_by {
-            resources = sort_resources(resources, sort, collection_builder.sort_desc);
-        }
-        let mut subjects = Vec::new();
-        for r in resources.iter() {
-            subjects.push(r.get_subject().clone())
-        }
-        let mut all_pages: Vec<Vec<String>> = Vec::new();
-        let mut all_pages_nested: Vec<Vec<Resource>> = Vec::new();
-        let mut page: Vec<String> = Vec::new();
-        let mut page_nested: Vec<Resource> = Vec::new();
-        let current_page = collection_builder.current_page;
-        for (i, subject) in subjects.iter().enumerate() {
-            page.push(subject.into());
-            if collection_builder.include_nested {
-                page_nested.push(resources[i].clone());
-            }
-            if page.len() >= collection_builder.page_size {
-                all_pages.push(page);
-                all_pages_nested.push(page_nested);
-                page = Vec::new();
-                page_nested = Vec::new();
-                // No need to calculte more than necessary
-                if all_pages.len() > current_page {
-                    break;
-                }
-            }
-            // Add the last page when handling the last subject
-            if i == subjects.len() - 1 {
-                all_pages.push(page);
-                all_pages_nested.push(page_nested);
-                break;
-            }
-        }
-        if all_pages.is_empty() {
-            all_pages.push(Vec::new());
-            all_pages_nested.push(Vec::new());
-        }
-        // Maybe I should default to last page, if current_page is too high?
-        let members = all_pages
-            .get(current_page)
-            .ok_or(format!("Page number {} is too high", current_page))?
-            .clone();
-        let total_items = subjects.len();
-        // Construct the pages (TODO), use pageSize
-        let total_pages =
-            (total_items + collection_builder.page_size - 1) / collection_builder.page_size;
-        let members_nested = if collection_builder.include_nested {
-            Some(
-                all_pages_nested
-                    .get(current_page)
-                    .ok_or(format!("Page number {} is too high", current_page))?
-                    .clone(),
-            )
-        } else {
-            None
+        let q = Query {
+            property: collection_builder.property.clone(),
+            value: value_filter,
+            limit: Some(collection_builder.page_size),
+            start_val: None,
+            end_val: None,
+            offset: collection_builder.page_size * collection_builder.current_page,
+            sort_by: collection_builder.sort_by.clone(),
+            sort_desc: collection_builder.sort_desc,
+            include_external: collection_builder.include_external,
+            include_nested: collection_builder.include_nested,
+            for_agent: for_agent.map(|a| a.to_string()),
         };
+
+        let query_result = store.query(&q)?;
+        let members = query_result.subjects;
+        let members_nested = Some(query_result.resources);
+        let total_items = query_result.count;
+        let pages_fraction = total_items as f64 / collection_builder.page_size as f64;
+        let total_pages = pages_fraction.ceil() as usize;
+        if collection_builder.current_page > total_pages {
+            return Err(format!(
+                "Page number out of bounds, got {}, max {}",
+                collection_builder.current_page, total_pages
+            )
+            .into());
+        }
+
         let collection = Collection {
             total_pages,
             members,
@@ -649,6 +593,31 @@ mod test {
                 .unwrap()
                 .to_string()
                 == "2"
+        );
+    }
+
+    #[test]
+    fn sorting_resources() {
+        let prop = urls::DESCRIPTION.to_string();
+        let mut a = Resource::new("first".into());
+        a.set_propval_unsafe(prop.clone(), Value::Markdown("1".into()));
+        let mut b = Resource::new("second".into());
+        b.set_propval_unsafe(prop.clone(), Value::Markdown("2".into()));
+        let mut c = Resource::new("third_missing_property".into());
+
+        let asc = vec![a.clone(), b.clone(), c.clone()];
+        let sorted = sort_resources(asc.clone(), &prop, false);
+        assert_eq!(a.get_subject(), sorted[0].get_subject());
+        assert_eq!(b.get_subject(), sorted[1].get_subject());
+        assert_eq!(c.get_subject(), sorted[2].get_subject());
+
+        let sorted_desc = sort_resources(asc.clone(), &prop, true);
+        assert_eq!(b.get_subject(), sorted_desc[0].get_subject());
+        assert_eq!(a.get_subject(), sorted_desc[1].get_subject());
+        assert_eq!(
+            c.get_subject(),
+            sorted_desc[2].get_subject(),
+            "c is missing the sorted property - it should _alway_ be last"
         );
     }
 }
