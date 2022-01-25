@@ -3,29 +3,13 @@ use crate::urls;
 use super::*;
 use ntest::timeout;
 
-/// Creates new temporary database, populates it, removes previous one.
-/// Can only be run one thread at a time, because it requires a lock on the DB file.
-pub fn init_db(id: &str) -> Db {
-    let tmp_dir_path = format!(".temp/db/{}", id);
-    let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
-    let store = Db::init(
-        std::path::Path::new(&tmp_dir_path),
-        "https://localhost".into(),
-    )
-    .unwrap();
-    let agent = store.create_agent(None).unwrap();
-    store.set_default_agent(agent);
-    store.populate().unwrap();
-    store
-}
-
 /// Share the Db instance between tests. Otherwise, all tests try to init the same location on disk and throw errors.
 /// Note that not all behavior can be properly tested with a shared database.
 /// If you need a clean one, juts call init("someId").
 use lazy_static::lazy_static; // 1.4.0
 use std::sync::Mutex;
 lazy_static! {
-    pub static ref DB: Mutex<Db> = Mutex::new(init_db("shared"));
+    pub static ref DB: Mutex<Db> = Mutex::new(Db::init_temp("shared").unwrap());
 }
 
 #[test]
@@ -130,7 +114,7 @@ fn add_atom_to_index() {
 /// Check if a resource is properly removed from the DB after a delete command.
 /// Also counts commits.
 fn destroy_resource_and_check_collection_and_commits() {
-    let store = init_db("counter");
+    let store = Db::init_temp("counter").unwrap();
     let agents_url = format!("{}/agents", store.get_server_url());
     let agents_collection_1 = store
         .get_resource_extended(&agents_url, false, None)
@@ -381,7 +365,7 @@ fn queries() {
 #[test]
 /// Changing these values actually correctly updates the index.
 fn index_invalidate_cache() {
-    let store = &init_db("invalidate_cache");
+    let store = &Db::init_temp("invalidate_cache").unwrap();
 
     // Make sure to use Properties that are not in the default store
 

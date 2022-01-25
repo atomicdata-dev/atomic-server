@@ -603,7 +603,7 @@ mod test {
         a.set_propval_unsafe(prop.clone(), Value::Markdown("1".into()));
         let mut b = Resource::new("second".into());
         b.set_propval_unsafe(prop.clone(), Value::Markdown("2".into()));
-        let mut c = Resource::new("third_missing_property".into());
+        let c = Resource::new("third_missing_property".into());
 
         let asc = vec![a.clone(), b.clone(), c.clone()];
         let sorted = sort_resources(asc.clone(), &prop, false);
@@ -611,7 +611,7 @@ mod test {
         assert_eq!(b.get_subject(), sorted[1].get_subject());
         assert_eq!(c.get_subject(), sorted[2].get_subject());
 
-        let sorted_desc = sort_resources(asc.clone(), &prop, true);
+        let sorted_desc = sort_resources(asc, &prop, true);
         assert_eq!(b.get_subject(), sorted_desc[0].get_subject());
         assert_eq!(a.get_subject(), sorted_desc[1].get_subject());
         assert_eq!(

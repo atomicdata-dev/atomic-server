@@ -1,15 +1,32 @@
-# Contribute
+# Guide for Atomic Data Rust contributors
 
-I'm glad you're reading this!
-If you encounter issues, add them to the [Github issue tracker](https://github.com/joepio/atomic-data-rust/issues).
+First things first: I'm glad you're reading this!
+If you encounter any issues, add them to the [Github issue tracker](https://github.com/joepio/atomic-data-rust/issues).
 Same goes for feature requests.
 PR's are welcome, too!
 And join our [Discord](https://discord.gg/a72Rv2P)!
 I'd love to help you out to understand this codebase.
-
 If you want to share some thoughts on the Atomic Data _specification_, please [drop an issue in the Atomic Data docs repo](https://github.com/ontola/atomic-data/issues).
 
-## Local development
+## Table of contents
+
+- [Table of contents](#table-of-contents)
+- [Running locally](#running-locally)
+- [Testing](#testing)
+- [Debugging](#debugging)
+- [Performance monitoring](#performance-monitoring)
+  - [Tracing](#tracing)
+  - [Criterion benchmarks](#criterion-benchmarks)
+  - [Drill](#drill)
+- [CI, Versioning and Tagging](#ci-versioning-and-tagging)
+- [Doing the CI's work](#doing-the-cis-work)
+  - [Building and publishing binaries](#building-and-publishing-binaries)
+  - [Publishing to Cargo](#publishing-to-cargo)
+  - [Publishing server to Docker](#publishing-server-to-docker)
+  - [Deploying to atomicdata.dev](#deploying-to-atomicdatadev)
+- [Publishing atomic-cli to WAPM](#publishing-atomic-cli-to-wapm)
+
+## Running locally
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 
@@ -34,24 +51,42 @@ cargo test --all-features --package atomic_lib --lib -- db::test::testname
 
 ## Performance monitoring
 
-```sh
-# Run with `--trace-chrome` to create a tracefile in you current directory
-atomic-server --trace-chrome
-# Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph.
+We want to make Atomic Server as fast as possible.
+For doing this, we have at least three tools: tracing, criterion and drill.
 
-# Install drill to run benchmarks. 6
+### Tracing
+
+- Use the `tracing::instrument` macro to make functions traceable. Check out the [tracing](https://docs.rs/tracing/latest/tracing/) docs for more info.
+- Run the server with the `--trace-chrome` flag.
+- Close the server. A `trace-{unix-timestamp}.json` file will be generated in the current directory.
+- Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph that you can zoom into.
+
+```sh
+atomic-server --trace-chrome
+```
+
+### Criterion benchmarks
+
+We have benchmarks in the `/lib/benchmarks` folder. Make sure there's a benchmark for the thing you're trying to optimize, run the benchmark, then make some changes to the code, then run the benchmark again. You should be able to see the difference in performance.
+
+```sh
+# install
+cargo install cargo-criterion
+# run benchmark
+cargo criterion
+```
+
+### Drill
+
+HTTP-level benchmarking tool.
+Sends a ton of requests, measures how long it takes.
+
+```sh
 cargo install drill
 drill -b benchmark.yml --stats
 ```
 
-## Making a perfect pull-request
-
-- Clear explanation in the PR itself of what is changed and why
-- Reference to relevant issues in commit messages (e.g. `#123 my commit message`)
-- Tests are passing `cargo test --all`.
-- Linters are happy `cargo fmt` & `cargo clippy`
-
-# CI, Versioning and Tagging
+## CI, Versioning and Tagging
 
 - We use Github Actions for building, testing and creating releases. See #165 for progress.
 - Use `cargo workspaces version patch --force *` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
@@ -61,7 +96,12 @@ drill -b benchmark.yml --stats
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 
-## Building and publishing binaries
+
+## Doing the CI's work
+
+If the CI scripts for some reason do not do their job (buildin releases, docker file, publishing to cargo), you can follow these instructions:
+
+### Building and publishing binaries
 
 1. `cargo build --release`
 1. `cargo build --release --features desktop` if you want the tray item (mac + win support)
@@ -69,7 +109,7 @@ drill -b benchmark.yml --stats
 
 I've got to automate this process some day...
 
-## Publishing to Cargo
+### Publishing to Cargo
 
 1. Update the versions in cargo.toml files using Semantic Versioning.
 1. run `cargo publish` in `lib`, than you can run the same in `cli` and `server`
@@ -78,7 +118,7 @@ OR
 
 1. Install `cargo install cargo-release` and run `cargo release patch`
 
-## Publishing server to Docker
+### Publishing server to Docker
 
 DockerHub has been setup to track the `master` branch, but it does not tag builds other than `latest`.
 
@@ -90,7 +130,7 @@ or:
 
 1. build and publish various builds (warning: building to ARM takes long!): `docker buildx build --platform linux/amd64,linux/arm64 . -t joepmeneer/atomic-server:v0.20.4 -t joepmeneer/atomic-server:latest --push`. Note that including the armv7 platform `linux/arm/v7` currently fails.
 
-## Deploying to atomicdata.dev
+### Deploying to atomicdata.dev
 
 1. Run the [`deploy` Github action](https://github.com/joepio/atomic-data-rust/actions/workflows/deployment.yml)
 
@@ -98,13 +138,9 @@ or do it manually:
 
 1. `cd server`
 1. `cargo build --release --target x86_64-unknown-linux-gnu`
-1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.23.0`
+1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.{version}`
 1. `ssh atomic` (@joepio manages server)
-1. `htop` and kill `atomic`
-1. `cd atomic/server`
-1. `git pull` (if relevant static files have changed)
-1. `rm -rf  ~/.config/atomic/db` (if the db is corrupted / migrated)
-1. `./atomic-server-v0.23.0 &> log-v0.23.0-1` to start and log to file
+2. `service atomic restart`
 
 ## Publishing atomic-cli to WAPM
 
