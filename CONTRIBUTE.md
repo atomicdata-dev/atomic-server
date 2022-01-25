@@ -55,6 +55,7 @@ drill -b benchmark.yml --stats
 
 - We use Github Actions for building, testing and creating releases. See #165 for progress.
 - Use `cargo workspaces version patch --force *` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
+- Update the `tauri.conf.json` manually
 - Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.
 - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
