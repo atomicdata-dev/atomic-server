@@ -30,16 +30,29 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled), [tantivy](https://github.com/quickwit-inc/tantivy) and [more](Cargo.toml).
 
-## README Contents
+## Table of contents
 
-* [When should you use this](#when-should-you-use-this)
-* [When _not_ to use this](#when--not--to-use-this)
-* [Installation & getting started](#installation---getting-started)
-* [Initial setup and configuration](#initial-setup-and-configuration)
-* [Usage](#usage)
-* [Testing](#testing)
-* [Performance benchmarking](#performance-benchmarking)
-* [FAQ & Troubleshooting](#faq---troubleshooting)
+- [Table of contents](#table-of-contents)
+- [When should you use this](#when-should-you-use-this)
+- [When _not_ to use this](#when-not-to-use-this)
+- [Installation & getting started](#installation--getting-started)
+  - [Install using cargo](#install-using-cargo)
+  - [Run using docker](#run-using-docker)
+  - [Install from source](#install-from-source)
+- [Initial setup and configuration](#initial-setup-and-configuration)
+  - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
+  - [HTTPS Setup on a VPS (static IP required)](#https-setup-on-a-vps-static-ip-required)
+- [Usage](#usage)
+  - [Use `atomic-cli` as client](#use-atomic-cli-as-client)
+  - [API](#api)
+- [FAQ & Troubleshooting](#faq--troubleshooting)
+  - [Can / should I create backups?](#can--should-i-create-backups)
+  - [I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?](#i-lost-the-key--secret-to-my-root-agent-and-the-setup-invite-is-no-longer-usable-what-now)
+  - [How do I migrate my data to a new domain?](#how-do-i-migrate-my-data-to-a-new-domain)
+  - [How do I reset my database?](#how-do-i-reset-my-database)
+  - [How do I make my data private, yet available online?](#how-do-i-make-my-data-private-yet-available-online)
+  - [Collections are empty / TPF is not working / search is empty](#collections-are-empty--tpf-is-not-working--search-is-empty)
+  - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
 
 ## When should you use this
 
