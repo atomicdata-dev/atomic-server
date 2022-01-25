@@ -182,7 +182,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
 
     fs::write(&config.cert_path, cert.certificate()).expect("Unable to write file");
     fs::write(&config.key_path, cert.private_key()).expect("Unable to write file");
-    add_certs_created_at(config);
+    set_certs_created_at_file(config);
     tracing::info!("HTTPS init Success!");
     Ok(())
 }
@@ -222,14 +222,18 @@ fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
 }
 
 /// Adds a file to the .https folder to indicate age of certificates
-fn add_certs_created_at(config: &crate::config::Config) {
+fn set_certs_created_at_file(config: &crate::config::Config) {
     let now_string = chrono::Utc::now();
     let path = certs_created_at_path(config);
     fs::write(&path, now_string.to_string()).expect(&*format!("Unable to write {:?}", &path));
 }
 
 /// Checks if the certificates need to be renewed.
-pub fn check_expiration_certs(config: &crate::config::Config) -> bool {
+/// Will be true if there are no certs yet.
+pub fn should_renew_certs_check(config: &crate::config::Config) -> bool {
+    if std::fs::File::open(&config.cert_path).is_err() {
+        return true;
+    }
     let path = certs_created_at_path(config);
 
     let created_at = std::fs::read_to_string(&path)

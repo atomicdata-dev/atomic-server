@@ -597,6 +597,7 @@ impl Storelike for Db {
                         let key_string = String::from_utf8(k.to_vec())?;
                         // WARNING: Converts all Atoms to Strings, the datatype is lost here
                         let atom = key_to_atom(&key_string)?;
+                        // NOTE: This means we'll include random values that start with the current server URL, including paragraphs for example.
                         if include_external || atom.subject.starts_with(self.get_server_url()) {
                             vec.push(atom)
                         }
