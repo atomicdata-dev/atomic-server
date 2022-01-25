@@ -9,7 +9,7 @@ repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.0"
 
 [[bench]]
-features = ["db"]
+all-features = true
 harness = false
 name = "benchmarks"
 # path = "src/db/benchmarks.rs"
