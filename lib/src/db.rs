@@ -6,6 +6,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use tracing::{instrument, trace};
+
 use crate::{
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
@@ -87,7 +89,7 @@ impl Db {
     }
 
     /// Internal method for fetching Resource data.
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
         let subject_bin = bincode::serialize(subject)?;
@@ -97,7 +99,7 @@ impl Db {
 
     /// Finds resource by Subject, return PropVals HashMap
     /// Deals with the binary API of Sled
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
         let subject_binary = bincode::serialize(subject)
             .map_err(|e| format!("Can't serialize {}: {}", subject, e))?;
@@ -138,7 +140,7 @@ impl Db {
 }
 
 impl Storelike for Db {
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
         // Start with a nested HashMap, containing only strings.
         let mut map: HashMap<String, Resource> = HashMap::new();
@@ -167,14 +169,11 @@ impl Storelike for Db {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
         for index_atom in atom_to_indexable_atoms(atom)? {
             // It's OK if this overwrites a value
-            let _existing = self
-                .reference_index
-                .insert(key_for_reference_index(&index_atom).as_bytes(), b"")?;
-
+            add_atom_to_reference_index(&index_atom, self)?;
             // Also update the query index to keep collections performant
             check_if_atom_matches_watched_query_filters(self, &index_atom, atom, false, resource)
                 .map_err(|e| {
@@ -184,7 +183,7 @@ impl Storelike for Db {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self, resource), fields(sub = %resource.get_subject()))]
+    #[instrument(skip(self, resource), fields(sub = %resource.get_subject()))]
     fn add_resource_opts(
         &self,
         resource: &Resource,
@@ -225,11 +224,10 @@ impl Storelike for Db {
         self.set_propvals(resource.get_subject(), resource.get_propvals())
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
         for index_atom in atom_to_indexable_atoms(atom)? {
-            self.reference_index
-                .remove(&key_for_reference_index(&index_atom).as_bytes())?;
+            delete_atom_from_reference_index(&index_atom, self)?;
 
             check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)
                 .map_err(|e| format!("Checking atom went wrong: {}", e))?;
@@ -254,7 +252,7 @@ impl Storelike for Db {
         }
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource> {
         let propvals = self.get_propvals(subject);
 
@@ -267,14 +265,14 @@ impl Storelike for Db {
         }
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn get_resource_extended(
         &self,
         subject: &str,
         skip_dynamic: bool,
         for_agent: Option<&str>,
     ) -> AtomicResult<Resource> {
-        tracing::trace!("get_resource_extended: {}", subject);
+        trace!("get_resource_extended: {}", subject);
         // This might add a trailing slash
         let mut url = url::Url::parse(subject)?;
         let clone = url.clone();
@@ -366,7 +364,7 @@ impl Storelike for Db {
     /// Search the Store, returns the matching subjects.
     /// The second returned vector should be filled if query.include_resources is true.
     /// Tries `query_cache`, which you should implement yourself.
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
         if let Ok(res) = query_indexed(self, q) {
             if res.count > 0 {
@@ -451,7 +449,7 @@ impl Storelike for Db {
         query_indexed(self, q)
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
         let mut resources: ResourceCollection = Vec::new();
         let self_url = self
@@ -486,7 +484,7 @@ impl Storelike for Db {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
         if let Ok(found) = self.get_propvals(subject) {
             let resource = Resource::from_propvals(found, subject.to_string());
@@ -511,7 +509,7 @@ impl Storelike for Db {
     }
 
     // TPF implementation that used the index_value cache, far more performant than the StoreLike implementation
-    #[tracing::instrument(skip(self))]
+    #[instrument(skip(self))]
     fn tpf(
         &self,
         q_subject: Option<&str>,
@@ -520,7 +518,7 @@ impl Storelike for Db {
         // Whether resources from outside the store should be searched through
         include_external: bool,
     ) -> AtomicResult<Vec<Atom>> {
-        tracing::trace!("tpf");
+        trace!("tpf");
         let mut vec: Vec<Atom> = Vec::new();
 
         let hassub = q_subject.is_some();
@@ -547,7 +545,7 @@ impl Storelike for Db {
             val == q || {
                 if val.starts_with('[') {
                     match crate::parse::parse_json_array(val) {
-                        Ok(vec) => return vec.contains(&q.into()),
+                        Ok(vec) => return vec.contains(&q),
                         Err(_) => return val == q,
                     }
                 }
@@ -613,6 +611,22 @@ impl Storelike for Db {
             }
         }
     }
+}
+
+#[instrument(skip(store))]
+fn add_atom_to_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
+    let _existing = store
+        .reference_index
+        .insert(key_for_reference_index(index_atom).as_bytes(), b"")?;
+    Ok(())
+}
+
+#[instrument(skip(store))]
+fn delete_atom_from_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
+    store
+        .reference_index
+        .remove(&key_for_reference_index(index_atom).as_bytes())?;
+    Ok(())
 }
 
 /// Constructs the Key for the index_value cache.

@@ -210,9 +210,7 @@ pub fn should_update(q_filter: &QueryFilter, index_atom: &IndexAtom, resource: &
             if sortprop == &index_atom.property {
                 return true;
             }
-            if filterprop == &index_atom.property
-                && index_atom.value.to_string() == filter_val.to_string()
-            {
+            if filterprop == &index_atom.property && index_atom.value == filter_val.to_string() {
                 return true;
             }
             // If either one of these match
@@ -244,7 +242,7 @@ pub fn should_update(q_filter: &QueryFilter, index_atom: &IndexAtom, resource: &
 /// Check whether the Atom will be hit by a TPF query matching the [QueryFilter].
 /// Updates the index accordingly.
 /// We need both the `index_atom` and the full `atom`.
-#[tracing::instrument(skip(store))]
+#[tracing::instrument(skip_all)]
 pub fn check_if_atom_matches_watched_query_filters(
     store: &Db,
     index_atom: &IndexAtom,
@@ -373,6 +371,7 @@ pub fn value_to_reference_index_string(value: &Value) -> Option<Vec<String>> {
 }
 
 /// Converts one Atom to a series of stringified values that can be indexed.
+#[tracing::instrument(skip(atom))]
 pub fn atom_to_indexable_atoms(atom: &Atom) -> AtomicResult<Vec<IndexAtom>> {
     let index_atoms = match value_to_reference_index_string(&atom.value) {
         Some(v) => v,

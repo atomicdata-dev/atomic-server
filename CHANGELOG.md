@@ -3,16 +3,17 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## [UNRELEASED]
+## [v0.31.0] - 2022-01-25
 
 - Huge performance increase for queries! Added sortable index, big refactor #114
-- Added `store.query()` function with better query options.
+- Added `store.query()` function with better query options, such as `starts_at` and `limit`. Under the hood, this powers `Collection`s,
 - `Resource.save` returns a `CommitResponse`.
 - Refactor `Commit.apply_opts`, structure options.
 - Remove the potentially confusing `commit.apply` method.
-- `store.tpf` now takes `Value` instead of `String`.
+- `store.tpf` now takes a `Value` instead of `String`.
+- Improved sorting logic. Still has some problems.
 
-## [v0.30.4] - 2021-01-15
+## [v0.30.4] - 2022-01-15
 
 Run with `--rebuild-index` the first time, if you use an existing database.
 Note that due to an issue in actix, I'm unable to publish the `atomic-server` crate at this moment.

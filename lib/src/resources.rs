@@ -315,7 +315,7 @@ impl Resource {
             )
         })?;
         let val = Value::new(value, &fullprop.data_type)?;
-        self.set_propval_unsafe(property_url, val)?;
+        self.set_propval_unsafe(property_url, val);
         Ok(())
     }
 
@@ -340,7 +340,8 @@ impl Resource {
             }
         }
         if full_prop.data_type == value.datatype() {
-            self.set_propval_unsafe(property, value)
+            self.set_propval_unsafe(property, value);
+            Ok(())
         } else {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
                 self.get_subject(),
@@ -356,10 +357,9 @@ impl Resource {
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
     /// Adds it to the CommitBuilder.
-    pub fn set_propval_unsafe(&mut self, property: String, value: Value) -> AtomicResult<()> {
+    pub fn set_propval_unsafe(&mut self, property: String, value: Value) {
         self.propvals.insert(property.clone(), value.clone());
         self.commit.set(property, value);
-        Ok(())
     }
 
     /// Sets a property / value combination.
@@ -373,7 +373,7 @@ impl Resource {
     ) -> AtomicResult<()> {
         let fullprop = self.resolve_shortname_to_property(property, store)?;
         let fullval = Value::new(value, &fullprop.data_type)?;
-        self.set_propval_unsafe(fullprop.subject, fullval)?;
+        self.set_propval_unsafe(fullprop.subject, fullval);
         Ok(())
     }
 

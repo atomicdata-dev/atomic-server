@@ -167,8 +167,8 @@ pub fn sort_resources(
         let val_a = a.get(sort_by);
         let val_b = b.get(sort_by);
         if val_a.is_err() || val_b.is_err() {
-            return std::cmp::Ordering::Equal;
-        }
+            return std::cmp::Ordering::Greater;
+        };
         if val_b.unwrap().to_string() > val_a.unwrap().to_string() {
             if sort_desc {
                 std::cmp::Ordering::Greater
@@ -198,12 +198,13 @@ impl Collection {
             return Err("Page size must be greater than 0".into());
         }
 
-        let value_filter = if let Some(val) = &collection_builder.value {
-            // Warning: this des _assume_ that the value is a string. This will work for most datatypes, but not for things like resource arrays!
-            Some(Value::String(val.clone()))
-        } else {
-            None
-        };
+        // Warning: this _assumes_ that the Value is a string.
+        // This will work for most datatypes, but not for things like resource arrays!
+        // We could improve this by taking the datatype of the `property`, and parsing the string.
+        let value_filter = collection_builder
+            .value
+            .as_ref()
+            .map(|val| Value::String(val.clone()));
 
         let q = Query {
             property: collection_builder.property.clone(),
@@ -592,6 +593,31 @@ mod test {
                 .unwrap()
                 .to_string()
                 == "2"
+        );
+    }
+
+    #[test]
+    fn sorting_resources() {
+        let prop = urls::DESCRIPTION.to_string();
+        let mut a = Resource::new("first".into());
+        a.set_propval_unsafe(prop.clone(), Value::Markdown("1".into()));
+        let mut b = Resource::new("second".into());
+        b.set_propval_unsafe(prop.clone(), Value::Markdown("2".into()));
+        let mut c = Resource::new("third_missing_property".into());
+
+        let asc = vec![a.clone(), b.clone(), c.clone()];
+        let sorted = sort_resources(asc.clone(), &prop, false);
+        assert_eq!(a.get_subject(), sorted[0].get_subject());
+        assert_eq!(b.get_subject(), sorted[1].get_subject());
+        assert_eq!(c.get_subject(), sorted[2].get_subject());
+
+        let sorted_desc = sort_resources(asc.clone(), &prop, true);
+        assert_eq!(b.get_subject(), sorted_desc[0].get_subject());
+        assert_eq!(a.get_subject(), sorted_desc[1].get_subject());
+        assert_eq!(
+            c.get_subject(),
+            sorted_desc[2].get_subject(),
+            "c is missing the sorted property - it should _alway_ be last"
         );
     }
 }
