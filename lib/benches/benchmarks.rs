@@ -1,3 +1,7 @@
+//! Various benchmarks for atomic_lib.
+//! Should be run using `cargo bench`.
+//! Add features here
+
 use atomic_lib::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use rand::distributions::Alphanumeric;
