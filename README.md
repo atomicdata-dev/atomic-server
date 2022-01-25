@@ -69,7 +69,7 @@ Powers both `atomic-cli` and `atomic-server`.
 
 Issues and PR's are welcome!
 And join our [Discord][discord-url]!
-[Read more.](CONTRIBUTE.md)
+[Read more in the Contributors guide.](CONTRIBUTE.md)
 
 [discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
 [discord-url]: https://discord.gg/a72Rv2P

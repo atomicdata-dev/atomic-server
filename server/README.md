@@ -78,7 +78,8 @@ You can run `atomic-server` in four ways:
 - Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
 - Manually from source
 
-When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration)
+When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration).
+If you want to run this locally as a developer / contributor, check out [the Contributors guide](../CONTRIBUTE.md).
 
 ### Install using cargo
 
