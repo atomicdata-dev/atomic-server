@@ -8,6 +8,12 @@ readme = "README.md"
 repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.0"
 
+[[bench]]
+features = ["db"]
+harness = false
+name = "benchmarks"
+# path = "src/db/benchmarks.rs"
+
 [dependencies]
 base64 = "0.13.0"
 bincode = {version = "1.3.2", optional = true}
@@ -27,6 +33,8 @@ url = "2.2.1"
 urlencoding = "2.1.0"
 
 [dev-dependencies]
+criterion = "0.3"
+iai = "0.1"
 lazy_static = "1.4.0"
 ntest = "0.7.3"
 

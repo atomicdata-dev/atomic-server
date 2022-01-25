@@ -390,7 +390,7 @@ pub fn atom_to_indexable_atoms(atom: &Atom) -> AtomicResult<Vec<IndexAtom>> {
 
 #[cfg(test)]
 pub mod test {
-    use crate::{db::test::init_db, urls};
+    use crate::urls;
 
     use super::*;
 
@@ -467,7 +467,7 @@ pub mod test {
 
     #[test]
     fn should_update_or_not() {
-        let store = &init_db("should_update_or_not");
+        let store = &Db::init_temp("should_update_or_not").unwrap();
 
         let prop = urls::IS_A.to_string();
         let class = urls::AGENT;

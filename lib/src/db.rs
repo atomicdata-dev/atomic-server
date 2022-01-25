@@ -88,6 +88,20 @@ impl Db {
         Ok(store)
     }
 
+    /// Create a temporary Db. Useful for testing.
+    pub fn init_temp(id: &str) -> AtomicResult<Db> {
+        let tmp_dir_path = format!(".temp/db/{}", id);
+        let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
+        let store = Db::init(
+            std::path::Path::new(&tmp_dir_path),
+            "https://localhost".into(),
+        )?;
+        let agent = store.create_agent(None)?;
+        store.set_default_agent(agent);
+        store.populate()?;
+        Ok(store)
+    }
+
     /// Internal method for fetching Resource data.
     #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
