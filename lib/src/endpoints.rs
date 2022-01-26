@@ -1,6 +1,7 @@
 //! Endpoints are experimental plugin-like objects, that allow for dynamic resources.
 //! An endpoint is a resource that accepts one or more query parameters, and returns a resource that is probably calculated at runtime.
-//! Examples of endpoints are versions for resources, or (pages for) collections
+//! Examples of endpoints are versions for resources, or (pages for) collections.
+//! See https://docs.atomicdata.dev/endpoints.html or https://atomicdata.dev/classes/Endpoint
 
 use crate::{
     errors::AtomicResult,

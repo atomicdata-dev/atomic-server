@@ -1,9 +1,27 @@
 /*!
-`atomic_lib` helps you to get, store, serialize, parse and validate [Atomic Data](https://docs.atomicdata.dev).
+`atomic_lib` helps you to get, store, serialize, parse and validate Atomic Data.
 
-The [Store](struct.Store) contains most of the logic that you need.
+See the [Atomic Data Docs](https://docs.atomicdata.dev) for more information.
 
-# Getting started
+## Features
+
+- Two stores for Atomic Data:
+  - **In-memory** [Store] for getting / setting data. Useful for client applications.
+  - **On disk** database ([Db]), powered by Sled. Useful for applications that persist Atomic Data, such as [`atomic-server`](https://crates.io/crates/atomic-server).
+- [JSON-AD Parser & Serializer](https://docs.atomicdata.dev/core/json-ad.html): [serialize] [parse]
+- Serialization of atomic data  to JSON-AD, plain JSON, RDF, Turtle, N-Triples and JSON-LD.
+- [Path](https://docs.atomicdata.dev/core/paths.html) traversal
+- Convert Atomic Data to Rust native types with [Value]
+- Validate [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- [Commit]s (transactions / delta's / changes / updates / versioning / history).
+- [plugins] system (although not very mature)
+- [collections] (pagination, sorting, filtering)
+- Querying (using triple pattern fragments) (see [storelike::Query])
+- [plugins::invite] for sharing
+- [hierarchy] for authorization
+- Saving Atomic Config files.
+
+## Getting started
 
 ```
 // Import the `Storelike` trait to get access to most functions
