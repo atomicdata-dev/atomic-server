@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [UNRELEASED]
+
+- Upgrade `actix` dependencies
+
 ## [v0.31.0] - 2022-01-25
 
 - Huge performance increase for queries! Added sortable index, big refactor #114
