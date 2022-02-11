@@ -21,6 +21,7 @@ tracing = "0.1.29"
 ureq = "1.5.4"
 url = "2.2.1"
 urlencoding = "2.1.0"
+wasmedge-sys = "0.2.2"
 
 [dependencies.bincode]
 optional = true
