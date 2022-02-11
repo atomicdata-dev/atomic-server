@@ -80,9 +80,6 @@ pub fn parse_accept_header(header: &str) -> ContentType {
         if mimepart.contains(MIME_NT) {
             return ContentType::NTriples;
         }
-        if mimepart.contains(MIME_NT) {
-            return ContentType::NT
-        }
     }
     tracing::info!("Unknown Accept header, defaut to HTML: {}", header);
     ContentType::Html
