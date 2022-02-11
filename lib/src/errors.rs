@@ -200,6 +200,8 @@ impl From<Infallible> for AtomicError {
     }
 }
 
+// LIBRARY ERRORS
+
 #[cfg(feature = "db")]
 impl From<sled::Error> for AtomicError {
     fn from(error: sled::Error) -> Self {
@@ -213,6 +215,37 @@ impl From<sled::Error> for AtomicError {
 #[cfg(feature = "db")]
 impl From<Box<bincode::ErrorKind>> for AtomicError {
     fn from(error: Box<bincode::ErrorKind>) -> Self {
+        AtomicError {
+            message: error.to_string(),
+            error_type: AtomicErrorType::OtherError,
+        }
+    }
+}
+
+// WASMER ERRORS
+
+#[cfg(feature = "db")]
+impl From<wasmer::RuntimeError> for AtomicError {
+    fn from(error: wasmer::RuntimeError) -> Self {
+        AtomicError {
+            message: error.to_string(),
+            error_type: AtomicErrorType::OtherError,
+        }
+    }
+}
+
+#[cfg(feature = "db")]
+impl From<wasmer::InstantiationError> for AtomicError {
+    fn from(error: wasmer::InstantiationError) -> Self {
+        AtomicError {
+            message: error.to_string(),
+            error_type: AtomicErrorType::OtherError,
+        }
+    }
+}
+#[cfg(feature = "db")]
+impl From<wasmer::ExportError> for AtomicError {
+    fn from(error: wasmer::ExportError) -> Self {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
