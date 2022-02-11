@@ -73,6 +73,8 @@ pub mod db;
 pub mod endpoints;
 pub mod errors;
 pub mod hierarchy;
+#[cfg(feature = "js")]
+pub mod js;
 pub mod mapping;
 pub mod parse;
 #[cfg(feature = "db")]
