@@ -17,7 +17,7 @@ The easiest way to share [Atomic Data](https://docs.atomicdata.dev/) on the web.
 `atomic-server` is a graph database server for storing and sharing typed linked data.
 Demo on [atomicdata.dev](https://atomicdata.dev)
 
-- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html). Combines safety of structured data with the
+- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html), combining the best of RDF, JSON and type safety.
 - 🚀  **Fast** (1ms responses on my laptop)
 - 🪶  **Lightweight** (15MB binary, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
