@@ -12,7 +12,7 @@ _Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
 
-- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html). Combines safety of structured data with the
+- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html), combining the best of RDF, JSON and type safety.
 - 🚀  **Fast** (1ms responses on my laptop)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
