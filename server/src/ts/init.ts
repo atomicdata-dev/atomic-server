@@ -1,5 +1,7 @@
 // console.log('hello world')
 
-AtomicServer.addEventListener("something", (event) => {
-  console.log("event happened ")
-})
+function myFunc(event: String) {
+  return event + "executed correctly"
+}
+
+globalThis.myFunc = myFunc;

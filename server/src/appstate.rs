@@ -10,7 +10,7 @@ use atomic_lib::{
 };
 use green_copper_runtime::moduleloaders::FileSystemModuleLoader;
 use hirofa_utils::js_utils::{
-    adapters::{proxies::JsProxy, JsRealmAdapter},
+    adapters::{proxies::JsProxy, JsRealmAdapter, JsValueAdapter},
     facades::{JsRuntimeBuilder, JsRuntimeFacade},
     Script,
 };
@@ -105,22 +105,26 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
 
     // run init script
     js_rt
-        .eval_module_sync(Script::new("file://init.ts", include_str!("./ts/init.ts")))
+        .eval_sync(Script::new("file://init.ts", include_str!("./ts/init.ts")))
         .map_err(|e| "Failed to initialize GreenCopper runtime: ".to_string() + &e.to_string())?;
 
     // dispatch test event
     // NEVER panic in the JS thread
-    js_rt
-        .js_loop_realm_sync(None, |rt, realm| {
-            realm.js_proxy_dispatch_static_event(
+
+    js_rt.js_loop_realm_sync(None, |rt, realm| {
+        let result = realm
+            .js_function_invoke_by_name(
                 &[],
-                "AtomicServer",
-                "something",
-                &realm.js_null_create().ok().unwrap(),
+                "myFunc",
+                &[realm
+                    .js_string_create("lol")
+                    .ok()
+                    .expect("wrong argument to js func")],
             )
-        })
-        .ok()
-        .expect("test event failed");
+            .ok()
+            .unwrap();
+        tracing::info!("JS result: {:?}", result.js_to_string().ok().unwrap());
+    });
 
     tracing::info!("AppState initialized");
 

@@ -648,6 +648,7 @@ dependencies = [
  "async-std",
  "atomic_lib",
  "awc",
+ "backtrace",
  "chrono",
  "clap 3.0.0-rc.9",
  "dirs 3.0.2",

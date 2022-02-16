@@ -19,11 +19,11 @@ actix-multipart = "0.4.0-beta.13"
 actix-web-actors = "4.0.0-beta.11"
 async-std = "1.10.0"
 awc = "3.0.0-beta.20"
+backtrace = "*"
 chrono = "0.4.19"
 dirs = "3.0.1"
 dotenv = "0.15.0"
 futures = "0.3.16"
-green_copper_runtime = {git = "https://github.com/HiRoFa/GreenCopperRuntime", branch = "main"}
 hirofa_utils = "*"
 promptly = "0.3.0"
 quickjs_runtime = "0.7.0"
@@ -39,7 +39,6 @@ tracing = "0.1.30"
 tracing-actix-web = "0.5.0-rc.2"
 tracing-chrome = "0.4.0"
 tracing-log = "0.1.2"
-typescript_utils = {git = "https://github.com/HiRoFa/typescript_utils", branch = "main"}
 urlencoding = "2.1.0"
 
 [dependencies.acme-lib]
@@ -58,6 +57,10 @@ version = "0.31.0"
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
 version = "3.0.0-rc.3"
+
+[dependencies.green_copper_runtime]
+branch = "main"
+git = "https://github.com/HiRoFa/GreenCopperRuntime"
 
 [dependencies.open]
 optional = true
@@ -82,6 +85,10 @@ version = "0.3.4"
 [dependencies.tray-item]
 optional = true
 version = "0.6.0"
+
+[dependencies.typescript_utils]
+branch = "main"
+git = "https://github.com/HiRoFa/typescript_utils"
 
 [dev-dependencies]
 actix-rt = "2.5.1"
