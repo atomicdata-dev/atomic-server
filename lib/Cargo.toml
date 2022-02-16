@@ -33,6 +33,42 @@ ureq = "2"
 url = "2"
 urlencoding = "2"
 
+[dependencies.bincode]
+optional = true
+version = "1.3.2"
+
+[dependencies.dirs]
+optional = true
+version = "4.0.0"
+
+[dependencies.rand]
+version = "0.8.3"
+
+[dependencies.rio_api]
+optional = true
+version = "0.6.1"
+
+[dependencies.rio_turtle]
+optional = true
+version = "0.6.1"
+
+[dependencies.serde]
+features = ["derive"]
+version = "1.0.125"
+
+[dependencies.sled]
+features = ["no_logs"]
+optional = true
+version = "0.34.6"
+
+[dependencies.toml]
+optional = true
+version = "0.5.8"
+
+[dependencies.wasmer]
+optional = true
+version = "2.1.1"
+
 [dev-dependencies]
 criterion = "0.3"
 iai = "0.1"
