@@ -81,7 +81,8 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         config.clone(),
     );
 
-    // Instnatiate runtime for QuickJS GreenCopper
+    tracing::info!("Starting GreenCopper JS runtime");
+    // Initialize runtime for QuickJS GreenCopper
     let mut builder = quickjs_runtime::builder::QuickJsRuntimeBuilder::new();
     builder = green_copper_runtime::init_greco_rt2(builder, false, false, false);
     builder = builder.js_script_pre_processor(typescript_utils::TypeScriptPreProcessor::new(
@@ -94,36 +95,41 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     let js_rt = builder.js_build();
 
     // init proxies
-    js_rt.js_loop_realm_sync(None, |rt, realm| {
-        let proxy = JsProxy::new(&[], "AtomicServer").set_static_event_target(true);
+    // js_rt.js_loop_realm_sync(None, |rt, realm| {
+    //     let proxy = JsProxy::new(&[], "AtomicServer").set_static_event_target(true);
 
-        realm
-            .js_proxy_install(proxy, true)
-            .ok()
-            .expect("JS proxy install failed");
-    });
+    //     realm
+    //         .js_proxy_install(proxy, true)
+    //         .ok()
+    //         .expect("JS proxy install failed");
+    // });
 
-    // run init script
+    // evaluate init script
     js_rt
         .eval_sync(Script::new("file://init.ts", include_str!("./ts/init.ts")))
         .map_err(|e| "Failed to initialize GreenCopper runtime: ".to_string() + &e.to_string())?;
 
     // dispatch test event
     // NEVER panic in the JS thread
-
     js_rt.js_loop_realm_sync(None, |rt, realm| {
         let result = realm
             .js_function_invoke_by_name(
                 &[],
                 "myFunc",
                 &[realm
-                    .js_string_create("lol")
+                    .js_string_create("hello world")
                     .ok()
                     .expect("wrong argument to js func")],
             )
             .ok()
-            .unwrap();
-        tracing::info!("JS result: {:?}", result.js_to_string().ok().unwrap());
+            .expect("JS function invocation failed");
+        tracing::info!(
+            "JS result: {:?}",
+            result
+                .js_to_string()
+                .ok()
+                .expect("JS result is not a string")
+        );
     });
 
     tracing::info!("AppState initialized");
