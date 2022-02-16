@@ -1,13 +1,16 @@
 [package]
-name = "atomic-plugin-example"
-version = "0.1.0"
 authors = ["Joep Meindertsma <joep@ontola.io>"]
 edition = "2018"
+name = "atomic-plugin-example"
+version = "0.1.0"
+[dependencies]
+reqwasm = "0.4.1"
 
 [lib]
-name = "atomic_plugin_example"
 crate-type = ["cdylib"]
+name = "atomic_plugin_example"
 
-# Make wasm size smaller: https://rustwasm.github.io/docs/book/reference/code-size.html#optimizing-builds-for-code-size
+[profile]
 [profile.release]
+# Make wasm size smaller: https://rustwasm.github.io/docs/book/reference/code-size.html#optimizing-builds-for-code-size
 lto = true

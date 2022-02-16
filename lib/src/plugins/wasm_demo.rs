@@ -41,13 +41,15 @@ fn handle_wasm_demo_request(
         //     i32.add))
         // "#;
 
-        let fn_name = "fibonacci";
-        let arguments = &[Value::I32(10)];
         let wasm_store = wasmer::Store::default();
         // Creating this module can be costly, so it should probably be done earlier (server init)
         let module =
             Module::new(&wasm_store, module_u8).map_err(|e| format!("module error: {}", e))?;
-        let result = run_wasm(&module, arguments, fn_name)?;
+
+        let fib_name = "fibonacci";
+        let fib_args = &[Value::I32(10)];
+
+        let result = run_wasm(&module, &[], "author")?;
         let mut resource = Resource::new("sub".into());
         resource.set_propval_string(urls::DESCRIPTION.into(), &result, store)?;
         Ok(resource)

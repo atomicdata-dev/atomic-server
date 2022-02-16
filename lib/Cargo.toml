@@ -7,31 +7,56 @@ name = "atomic_lib"
 readme = "README.md"
 repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.0"
-
 [[bench]]
 all-features = true
 harness = false
 name = "benchmarks"
-# path = "src/db/benchmarks.rs"
 
 [dependencies]
 base64 = "0.13.0"
-bincode = {version = "1.3.2", optional = true}
-dirs = {version = "4.0.0", optional = true}
-rand = {version = "0.8.3"}
 regex = "1.4.5"
 ring = "0.16.20"
-rio_api = {version = "0.6.1", optional = true}
-rio_turtle = {version = "0.6.1", optional = true}
-serde = {version = "1.0.125", features = ["derive"]}
 serde_json = "1.0.64"
-sled = {version = "0.34.6", optional = true, features = ["no_logs"]}
-toml = {version = "0.5.8", optional = true}
 tracing = "0.1.29"
 ureq = "1.5.4"
 url = "2.2.1"
 urlencoding = "2.1.0"
-wasmer = {version="1.0.2", optional = true}
+
+[dependencies.bincode]
+optional = true
+version = "1.3.2"
+
+[dependencies.dirs]
+optional = true
+version = "4.0.0"
+
+[dependencies.rand]
+version = "0.8.3"
+
+[dependencies.rio_api]
+optional = true
+version = "0.6.1"
+
+[dependencies.rio_turtle]
+optional = true
+version = "0.6.1"
+
+[dependencies.serde]
+features = ["derive"]
+version = "1.0.125"
+
+[dependencies.sled]
+features = ["no_logs"]
+optional = true
+version = "0.34.6"
+
+[dependencies.toml]
+optional = true
+version = "0.5.8"
+
+[dependencies.wasmer]
+optional = true
+version = "2.1.1"
 
 [dev-dependencies]
 criterion = "0.3"
