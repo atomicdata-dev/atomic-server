@@ -53,6 +53,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
         // The appstate can be accessed in Handlers using
         // data: web::Data<Mutex<AppState>>
         // In the argument of a handler function
+        // TODO: RWlock / Arc instead of mutex?
         let data = web::Data::new(Mutex::new(appstate.clone()));
         // Allow requests from other domains
         // let cors = Cors::default().allow_any_origin();

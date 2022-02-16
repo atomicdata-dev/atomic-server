@@ -1,4 +1,6 @@
 //! App state, which is accessible from handlers
+use std::sync::Arc;
+
 use crate::{
     commit_monitor::CommitMonitor, config::Config, errors::AtomicServerResult, search::SearchState,
 };
@@ -6,6 +8,13 @@ use atomic_lib::{
     agents::{generate_public_key, Agent},
     Storelike,
 };
+use green_copper_runtime::moduleloaders::FileSystemModuleLoader;
+use hirofa_utils::js_utils::{
+    adapters::{proxies::JsProxy, JsRealmAdapter},
+    facades::{JsRuntimeBuilder, JsRuntimeFacade},
+    Script,
+};
+use quickjs_runtime::quickjsrealmadapter::QuickJsRealmAdapter;
 
 /// Data object available to handlers and actors.
 /// Contains the store, configuration and addresses for Actix Actors.
@@ -20,6 +29,7 @@ pub struct AppState {
     /// The Actix Address of the CommitMonitor, which should receive updates when a commit is applied
     pub commit_monitor: actix::Addr<CommitMonitor>,
     pub search_state: SearchState,
+    pub js_rt: Arc<quickjs_runtime::facades::QuickJsRuntimeFacade>,
 }
 
 /// Creates the AppState (the server's context available in Handlers).
@@ -71,11 +81,55 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         config.clone(),
     );
 
+    // Instnatiate runtime for QuickJS GreenCopper
+    let mut builder = quickjs_runtime::builder::QuickJsRuntimeBuilder::new();
+    builder = green_copper_runtime::init_greco_rt2(builder, false, false, false);
+    builder = builder.js_script_pre_processor(typescript_utils::TypeScriptPreProcessor::new(
+        typescript_utils::TargetVersion::Es2020,
+        false,
+        true,
+    ));
+    // Note that reference path is `file:///main.ts`
+    builder = builder.js_script_module_loader(FileSystemModuleLoader::new("./src/ts"));
+    let js_rt = builder.js_build();
+
+    // init proxies
+    js_rt.js_loop_realm_sync(None, |rt, realm| {
+        let proxy = JsProxy::new(&[], "AtomicServer").set_static_event_target(true);
+
+        realm
+            .js_proxy_install(proxy, true)
+            .ok()
+            .expect("JS proxy install failed");
+    });
+
+    // run init script
+    js_rt
+        .eval_module_sync(Script::new("file://init.ts", include_str!("./ts/init.ts")))
+        .map_err(|e| "Failed to initialize GreenCopper runtime: ".to_string() + &e.to_string())?;
+
+    // dispatch test event
+    // NEVER panic in the JS thread
+    js_rt
+        .js_loop_realm_sync(None, |rt, realm| {
+            realm.js_proxy_dispatch_static_event(
+                &[],
+                "AtomicServer",
+                "something",
+                &realm.js_null_create().ok().unwrap(),
+            )
+        })
+        .ok()
+        .expect("test event failed");
+
+    tracing::info!("AppState initialized");
+
     Ok(AppState {
         store,
         config,
         commit_monitor,
         search_state,
+        js_rt: Arc::new(js_rt),
     })
 }
 
