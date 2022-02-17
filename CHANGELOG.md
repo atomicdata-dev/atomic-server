@@ -5,7 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [UNRELEASED]
 
-- Upgrade `actix` dependencies
+- Upgrade `actix` and `tauri` dependencies #301
 
 ## [v0.31.0] - 2022-01-25
 

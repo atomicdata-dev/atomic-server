@@ -3,22 +3,6 @@ use tauri::{
   WindowMenuEvent,
 };
 
-/// Handle events on menu items
-pub fn handle(event: WindowMenuEvent) {
-  let event_name = event.menu_item_id();
-  event.window().emit("menu", event_name).unwrap();
-  match event_name {
-    "Learn More" => {
-      shell::open(
-        "https://github.com/joepio/atomic-data-rust".to_string(),
-        None,
-      )
-      .unwrap();
-    }
-    _ => {}
-  }
-}
-
 /// Create the task bar menu items
 pub fn build(ctx: &Context<EmbeddedAssets>) -> Menu {
   let menu = Menu::new()
