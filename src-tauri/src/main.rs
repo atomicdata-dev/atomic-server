@@ -1,10 +1,6 @@
 mod menu;
 mod system_tray;
 
-pub async fn test() {
-  println!("test local");
-}
-
 fn main() {
   let ctx = tauri::generate_context!();
 
@@ -22,11 +18,10 @@ fn main() {
 
   tauri::Builder::default()
     .menu(crate::menu::build(&ctx))
-    .on_menu_event(crate::menu::handle)
     .system_tray(crate::system_tray::build())
-    .on_system_tray_event(move |e, h| {
+    .on_system_tray_event(move |a, h| {
       let cfg = config.clone();
-      crate::system_tray::handle(e, h, &cfg)
+      crate::system_tray::handle(a, h, &cfg)
     })
     .run(ctx)
     .expect("Tauri Error.");

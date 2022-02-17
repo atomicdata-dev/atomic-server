@@ -7,6 +7,7 @@ It takes care of native installers, app icons, system tray icons, menu items, se
 # install tauri
 yarn global add @tauri/tauri-cli
 # run dev server
+# make sure that `atomic-data-browser` is running on port 8080 (see ## Running in development)
 tauri dev
 # build an installer for your OS
 tauri build
