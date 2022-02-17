@@ -8,7 +8,6 @@ use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{urls, Resource, Storelike};
 use serde::Deserialize;
-use std::sync::Mutex;
 use tantivy::{collector::TopDocs, query::QueryParser};
 
 #[derive(Deserialize, Debug)]
@@ -24,16 +23,12 @@ pub struct SearchQuery {
 }
 
 /// Parses a search query and responds with a list of resources
-#[tracing::instrument(skip(data, req))]
+#[tracing::instrument(skip(appstate, req))]
 pub async fn search_query(
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     params: web::Query<SearchQuery>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
-    let appstate = data
-        .lock()
-        .expect("Failed to lock mutexguard in search_query");
-
     let store = &appstate.store;
     let searcher = appstate.search_state.reader.searcher();
     let fields = crate::search::get_schema_fields(&appstate.search_state)?;
@@ -202,14 +197,11 @@ pub async fn search_query(
 }
 
 /// Posts an N-Triples RDF document to index the triples in search
+#[tracing::instrument(skip(appstate))]
 pub async fn search_index_rdf(
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     body: String,
 ) -> AtomicServerResult<HttpResponse> {
-    let appstate = data
-        .lock()
-        .expect("Failed to lock mutexguard in search_query");
-
     // Parse Turtle
     use rio_api::parser::TriplesParser;
     use rio_turtle::{TurtleError, TurtleParser};
