@@ -72,6 +72,18 @@ pub fn check_rights(
         return Ok("Agents can always edit themselves or their children.".into());
     }
 
+    // Handle Commits.
+    if let Ok(commit_subject) = resource.get(urls::SUBJECT) {
+        return match right {
+            Right::Read => {
+                // Commits can be read when their subject / target is readable.
+                let target = store.get_resource(&commit_subject.to_string())?;
+                check_rights(store, &target, for_agent, right)
+            }
+            Right::Write => Err("Commits cannot be edited.".into()),
+        };
+    }
+
     // Check if the resource's write rights explicitly refers to the agent or the public agent
     if let Ok(arr_val) = resource.get(&right.to_string()) {
         for s in arr_val.to_subjects(None)? {
@@ -93,6 +105,7 @@ pub fn check_rights(
             };
         }
     }
+
     // Try the parents recursively
     if let Ok(parent_val) = resource.get(urls::PARENT) {
         match store.get_resource(&parent_val.to_string()) {
