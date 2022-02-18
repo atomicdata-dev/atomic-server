@@ -8,18 +8,16 @@ use crate::{
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
-use std::sync::Mutex;
 
 /// Respond to a single resource.
 /// The URL should match the Subject of the resource.
-#[tracing::instrument(skip(data, req))]
+#[tracing::instrument(skip(appstate, req))]
 pub async fn handle_get_resource(
     path: Option<web::Path<String>>,
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
     let mut timer = Timer::new();
-    let appstate = data.lock().unwrap();
 
     let headers = req.headers();
     let mut content_type = get_accept(headers);

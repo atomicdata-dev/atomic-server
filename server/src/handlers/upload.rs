@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, path::Path, sync::Mutex};
+use std::{ffi::OsStr, path::Path};
 
 use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
@@ -23,14 +23,13 @@ pub struct UploadQuery {
 /// Submission is done using multipart/form-data.
 /// The file is stored in the `/uploads` directory.
 /// An `attachment` relationship is created from the parent
-#[tracing::instrument(skip(data, req, body))]
+#[tracing::instrument(skip(appstate, req, body))]
 pub async fn upload_handler(
     mut body: Multipart,
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     query: web::Query<UploadQuery>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
-    let appstate = data.lock().unwrap();
     let store = &appstate.store;
     let parent = store.get_resource(&query.parent)?;
     let subject = format!(

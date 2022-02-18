@@ -1,16 +1,11 @@
-use std::sync::Mutex;
-
 use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::HttpResponse;
 
 /// Returns the atomic-data-browser single page application
+#[tracing::instrument(skip(appstate))]
 pub async fn single_page(
-    data: actix_web::web::Data<Mutex<AppState>>,
+    appstate: actix_web::web::Data<AppState>,
 ) -> AtomicServerResult<HttpResponse> {
-    let appstate = data
-        .lock()
-        .expect("Failed to lock mutexguard in single_page");
-
     let template = include_str!("../../static/atomic-data-browser.html");
     let body = template
         .replace("{ script }", &appstate.config.opts.script)

@@ -1,10 +1,7 @@
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
-use std::{
-    sync::Mutex,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::{
     actor_messages::CommitMessage, appstate::AppState, commit_monitor::CommitMonitor,
@@ -12,24 +9,22 @@ use crate::{
 };
 
 /// Get an HTTP request, upgrade it to a Websocket connection
-#[tracing::instrument(skip(data, stream))]
+#[tracing::instrument(skip(appstate, stream))]
 pub async fn web_socket_handler(
     req: HttpRequest,
     stream: web::Payload,
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
 ) -> AtomicServerResult<HttpResponse> {
-    let context = data.lock().unwrap();
-
     // Authentication check. If the user has no headers, continue with the Public Agent.
     let auth_header_values = get_auth_headers(req.headers(), "ws".into())?;
     let for_agent = atomic_lib::authentication::get_agent_from_headers_and_check(
         auth_header_values,
-        &context.store,
+        &appstate.store,
     )?;
     tracing::debug!("Starting websocket for {}", for_agent);
 
     let result = ws::start(
-        WebSocketConnection::new(context.commit_monitor.clone(), for_agent),
+        WebSocketConnection::new(appstate.commit_monitor.clone(), for_agent),
         &req,
         stream,
     )?;

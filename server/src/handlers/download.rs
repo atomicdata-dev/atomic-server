@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use actix_files::NamedFile;
 use actix_web::{web, HttpRequest, HttpResponse};
 use atomic_lib::{urls, Resource, Storelike};
@@ -7,13 +5,12 @@ use atomic_lib::{urls, Resource, Storelike};
 use crate::{appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent};
 
 /// Downloads the File of the Resource that matches the same URL minus the `/download` path.
-#[tracing::instrument(skip(data, req))]
+#[tracing::instrument(skip(appstate, req))]
 pub async fn handle_download(
     path: Option<web::Path<String>>,
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
-    let appstate = data.lock().unwrap();
     let headers = req.headers();
     let server_url = &appstate.config.server_url;
     let store = &appstate.store;

@@ -4,7 +4,6 @@ use actix_web::{web, HttpResponse};
 use atomic_lib::{Storelike, Value};
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
 pub struct TpfQuery {
@@ -15,13 +14,12 @@ pub struct TpfQuery {
 
 /// Triple Pattern Fragment handler.
 /// Reads optional 'subject' 'property' 'value' from query params, searches the store, return triples.
-#[tracing::instrument(skip(data, req))]
+#[tracing::instrument(skip(appstate, req))]
 pub async fn tpf(
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     req: actix_web::HttpRequest,
     query: web::Query<TpfQuery>,
 ) -> AtomicServerResult<HttpResponse> {
-    let appstate = data.lock().unwrap();
     let store = &appstate.store;
 
     if !appstate.config.opts.public_mode {

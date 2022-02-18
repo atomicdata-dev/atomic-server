@@ -2,7 +2,7 @@
 //! Most of the more rigorous testing is done in the end-to-end tests:
 //! https://github.com/joepio/atomic-data-browser/tree/main/data-browser/tests
 
-use crate::appstate::AppState;
+use crate::{appstate::AppState, config::Opts};
 
 use super::*;
 use actix_web::{
@@ -13,6 +13,7 @@ use actix_web::{
     App,
 };
 use atomic_lib::{urls, Storelike};
+use clap::StructOpt;
 
 /// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
 fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
@@ -32,14 +33,12 @@ fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
 
 #[actix_rt::test]
 async fn server_tests() {
-    std::env::set_var("ATOMIC_CONFIG_DIR", "./.temp");
-    // We need tro run --initialize to make sure the agent has the correct rights / drive
-    std::env::set_var("ATOMIC_INITIALIZE", "true");
-    let config = config::init()
+    let opts = Opts::parse_from(&["atomic-server", "--initialize", "--config-dir", "./.temp"]);
+    let config = config::build_config(opts)
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");
     let appstate = crate::appstate::init(config.clone()).expect("failed init appstate");
-    let data = Data::new(std::sync::Mutex::new(appstate.clone()));
+    let data = Data::new(appstate.clone());
     let app = test::init_service(
         App::new()
             .app_data(data)
@@ -57,8 +56,10 @@ async fn server_tests() {
     let req =
         build_request_authenticated("/", &appstate).insert_header(("Accept", "application/html"));
     let resp = test::call_service(&app, req.to_request()).await;
-    assert!(resp.status().is_success());
+    let is_success = resp.status().is_success();
     let body = get_body(resp);
+    println!("{:?}", body);
+    assert!(is_success);
     assert!(body.as_str().contains("html"));
 
     // Should 200 (public)

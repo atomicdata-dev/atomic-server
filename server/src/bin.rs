@@ -27,7 +27,8 @@ mod tray_icon;
 #[actix_web::main]
 async fn main() -> errors::AtomicServerResult<()> {
     // Parse CLI commands, env vars
-    let config = config::init().map_err(|e| format!("Initialization failed: {}", e))?;
+    let config = config::build_config(config::read_opts())
+        .map_err(|e| format!("Initialization failed: {}", e))?;
 
     // All subcommands (as of now) also require appstate, which is why we have this logic below initial CLI logic.
     match &config.opts.command {

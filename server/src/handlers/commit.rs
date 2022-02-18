@@ -1,19 +1,15 @@
 use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{commit::CommitOpts, parse::parse_json_ad_commit_resource, Commit, Storelike};
-use std::sync::Mutex;
 
 /// Send and process a Commit.
 /// Currently only accepts JSON-AD
-#[tracing::instrument(skip(data))]
+#[tracing::instrument(skip(appstate))]
 pub async fn post_commit(
-    data: web::Data<Mutex<AppState>>,
+    appstate: web::Data<AppState>,
     body: String,
 ) -> AtomicServerResult<HttpResponse> {
-    let mut appstate = data
-        .lock()
-        .expect("Failed to lock mutexguard in post_commit");
-    let store = &mut appstate.store;
+    let store = &appstate.store;
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
     let incoming_commit = Commit::from_resource(incoming_commit_resource)?;

@@ -1,7 +1,6 @@
 use actix_cors::Cors;
 use actix_web::{middleware, web, HttpServer};
 use atomic_lib::Storelike;
-use std::sync::Mutex;
 
 use crate::errors::AtomicServerResult;
 
@@ -50,16 +49,10 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     }
 
     let server = HttpServer::new(move || {
-        // The appstate can be accessed in Handlers using
-        // data: web::Data<Mutex<AppState>>
-        // In the argument of a handler function
-        let data = web::Data::new(Mutex::new(appstate.clone()));
-        // Allow requests from other domains
-        // let cors = Cors::default().allow_any_origin();
         let cors = Cors::permissive();
 
         actix_web::App::new()
-            .app_data(data)
+            .app_data(web::Data::new(appstate.clone()))
             .wrap(cors)
             .wrap(tracing_actix_web::TracingLogger::default())
             .wrap(middleware::Compress::default())

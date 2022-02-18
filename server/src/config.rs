@@ -14,35 +14,45 @@ pub struct Opts {
     /// The subcommand being run
     #[clap(subcommand)]
     pub command: Option<Command>,
+
     /// Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
     #[clap(long, env = "ATOMIC_INITIALIZE")]
     pub initialize: bool,
+
     /// Re-creates the value index. Parses all the resources. Do this if your collections have issues.
     #[clap(long, env = "ATOMIC_REBUILD_INDEX")]
     pub rebuild_index: bool,
+
     /// Use staging environments for services like LetsEncrypt
     #[clap(long, env = "ATOMIC_DEVELOPMENT")]
     pub development: bool,
+
     /// The origin domain where the app is hosted, without the port and schema values.
     #[clap(long, default_value = "localhost", env = "ATOMIC_DOMAIN")]
     pub domain: String,
+
     /// The contact mail address for Let's Encrypt HTTPS setup
     #[clap(long, env = "ATOMIC_EMAIL")]
     pub email: Option<String>,
+
     // 9.883 is decimal for the `⚛` character.
     /// The port where the HTTP app is available. Set to 80 if you want this to be available on the network.
     #[clap(short, long, default_value = "9883", env = "ATOMIC_PORT")]
     pub port: u32,
+
     /// The port where the HTTPS app is available. Sert to 443 if you want this to be available on the network.
     #[clap(long, default_value = "9884", env = "ATOMIC_PORT_HTTPS")]
     pub port_https: u32,
+
     /// The IP address of the server. Set to 0.0.0.0 if you want this to be available to other devices on your network.
     #[clap(long, default_value = "0.0.0.0", env = "ATOMIC_IP")]
     pub ip: IpAddr,
+
     /// Use HTTPS instead of HTTP.
     /// Will get certificates from LetsEncrypt.
     #[clap(long, env = "ATOMIC_HTTPS")]
     pub https: bool,
+
     /// Endpoint where the front-end assets are hosted
     #[clap(
         long,
@@ -50,27 +60,35 @@ pub struct Opts {
         env = "ATOMIC_ASSET_URL"
     )]
     pub asset_url: String,
+
     /// Custom JS script to include in the body of the HTML template
     #[clap(long, default_value = "", env = "ATOMIC_SCRIPT")]
     pub script: String,
+
     /// Path for atomic data config directory. Defaults to "~/.config/atomic/""
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
+
     /// CAUTION: Makes data public on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/joepio/atomic-data-rust/blob/master/server/rdf-search.md
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
+
     /// By default, Atomic-Server keeps previous verions of resources indexed in Search. When enabling this flag, previous versions of resources are removed from the search index when their values are updated.
     #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
     pub remove_previous_search: bool,
+
     /// CAUTION: Skip authentication checks, making all data public. Improves performance.
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,
+
     /// The full URL of the server. It should resolve to the home page. Set this if you use an external server or tunnel, instead of directly exposing atomic-server. If you leave this out, it will be generated from `domain`, `port` and `http` / `https`.
     #[clap(long, env = "ATOMIC_SERVER_URL")]
     pub server_url: Option<String>,
+
     /// How much logs you want. Choose from "warn", "info", "debug", "trace" (from few to many logs).
     #[clap(long, default_value = "info", env = "RUST_LOG")]
     pub log_level: String,
+
     /// Produces a trace log file in the current directory that can be opened with `chrome://tracing`
     #[clap(long)]
     pub trace_chrome: bool,
@@ -141,14 +159,17 @@ pub struct Config {
     pub initialize: bool,
 }
 
-/// Creates the server config, reads .env values and sets defaults
-pub fn init() -> AtomicServerResult<Config> {
+/// Parse .env and CLI options
+pub fn read_opts() -> Opts {
     // Parse .env file (do this before parsing the CLI opts)
     dotenv().ok();
 
     // Parse CLI options, .env values, set defaults
-    let opts: Opts = Opts::parse();
+    Opts::parse()
+}
 
+/// Creates the server config, reads .env values and sets defaults
+pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
     } else {
