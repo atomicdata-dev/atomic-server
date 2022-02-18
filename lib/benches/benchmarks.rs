@@ -3,7 +3,7 @@
 //! See contribute.md for more information.
 
 use atomic_lib::*;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 
