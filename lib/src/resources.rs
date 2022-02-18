@@ -11,6 +11,7 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::instrument;
 
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
@@ -391,6 +392,7 @@ impl Resource {
     }
 
     /// Converts Resource to JSON-AD string.
+    #[instrument(skip_all)]
     pub fn to_json_ad(&self) -> AtomicResult<String> {
         let obj = crate::serialize::propvals_to_json_ad_map(
             self.get_propvals(),
@@ -400,6 +402,7 @@ impl Resource {
     }
 
     /// Converts Resource to plain JSON string.
+    #[instrument(skip_all)]
     pub fn to_json(&self, store: &impl Storelike) -> AtomicResult<String> {
         let obj = crate::serialize::propvals_to_json_ld(
             self.get_propvals(),
@@ -411,6 +414,7 @@ impl Resource {
     }
 
     /// Converts Resource to JSON-LD string, with @context object and RDF compatibility.
+    #[instrument(skip_all)]
     pub fn to_json_ld(&self, store: &impl Storelike) -> AtomicResult<String> {
         let obj = crate::serialize::propvals_to_json_ld(
             self.get_propvals(),
@@ -422,6 +426,7 @@ impl Resource {
     }
 
     // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
+    #[instrument(skip_all)]
     pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
         let mut atoms: Vec<Atom> = Vec::new();
         for (property, value) in self.propvals.iter() {

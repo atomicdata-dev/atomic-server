@@ -5,7 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [UNRELEASED]
 
-- Upgrade `actix` and `tauri` dependencies #301
+- Upgrade `actix`, `clap` and `tauri` dependencies #301
 - No `Mutex` for `Appstate` in server #303
 
 ## [v0.31.0] - 2022-01-25

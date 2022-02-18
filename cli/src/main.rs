@@ -1,7 +1,7 @@
 use atomic_lib::{agents::generate_public_key, mapping::Mapping};
 use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::{errors::AtomicResult, Storelike};
-use clap::{crate_version, App, AppSettings, Arg, ArgMatches, SubCommand};
+use clap::{crate_version, Arg, ArgMatches, Command};
 use colored::*;
 use dirs::home_dir;
 use std::{cell::RefCell, path::PathBuf, sync::Mutex};
@@ -15,17 +15,17 @@ mod print;
 
 #[allow(dead_code)]
 /// The Context contains all the data for executing a single CLI command, such as the passed arguments and the in memory store.
-pub struct Context<'a> {
+pub struct Context {
     store: atomic_lib::Store,
     mapping: Mutex<Mapping>,
-    matches: ArgMatches<'a>,
+    matches: ArgMatches,
     config_folder: PathBuf,
     user_mapping_path: PathBuf,
     /// A set of configuration options that are required for writing data on some server
     write: RefCell<Option<Config>>,
 }
 
-impl Context<'_> {
+impl Context {
     /// Sets an agent
     pub fn get_write_context(&self) -> Config {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
@@ -71,22 +71,22 @@ fn set_agent_config() -> CLIResult<Config> {
 }
 
 fn main() -> AtomicResult<()> {
-    let matches = App::new("atomic-cli")
+    let matches = Command::new("atomic-cli")
         .version(crate_version!())
         .author("Joep Meindertsma <joep@ontola.io>")
         .about("Create, share, fetch and model Atomic Data!")
         .after_help("Visit https://atomicdata.dev for more info")
-        .setting(AppSettings::ArgRequiredElseHelp)
+        .arg_required_else_help(true)
         .subcommand(
-            SubCommand::with_name("new").about("Create a Resource")
+            Command::new("new").about("Create a Resource")
             .arg(
-                Arg::with_name("class")
+                Arg::new("class")
                     .help("The URL or shortname of the Class that should be created")
                     .required(true),
             )
         )
         .subcommand(
-            SubCommand::with_name("get")
+            Command::new("get")
                     .about("Get a Resource or Value by using Atomic Paths.",
                     )
                     .after_help("\
@@ -97,7 +97,7 @@ fn main() -> AtomicResult<()> {
                     $ atomic get https://example.com \n\n\
                     Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
                     ")
-                .arg(Arg::with_name("path")
+                .arg(Arg::new("path")
                     .help("\
                     The subject URL, shortname or path to be fetched. \
                     Use quotes for paths. \
@@ -107,7 +107,7 @@ fn main() -> AtomicResult<()> {
                     .required(true)
                     .min_values(1)
                 )
-                .arg(Arg::with_name("as")
+                .arg(Arg::new("as")
                     .long("as")
                     .possible_values(&SERIALIZE_OPTIONS)
                     .default_value("pretty")
@@ -116,7 +116,7 @@ fn main() -> AtomicResult<()> {
                 )
         )
         .subcommand(
-            SubCommand::with_name("tpf")
+            Command::new("tpf")
                     .about("Finds Atoms using Triple Pattern Fragments.",
                     )
                     .after_help("\
@@ -124,19 +124,19 @@ fn main() -> AtomicResult<()> {
                     Use a dot to indicate that you don't need to filter. \
                     Subjects and properties need to be full URLs. \
                     ")
-                .arg(Arg::with_name("subject")
+                .arg(Arg::new("subject")
                     .help("The subject URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
                     .required(true)
                 )
-                .arg(Arg::with_name("property")
+                .arg(Arg::new("property")
                     .help("The property URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
                     .required(true)
                 )
-                .arg(Arg::with_name("value")
+                .arg(Arg::new("value")
                     .help("The value URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
                     .required(true)
                 )
-                .arg(Arg::with_name("as")
+                .arg(Arg::new("as")
                     .long("as")
                     .possible_values(&SERIALIZE_OPTIONS)
                     .default_value("pretty")
@@ -145,63 +145,63 @@ fn main() -> AtomicResult<()> {
                 )
         )
         .subcommand(
-            SubCommand::with_name("set")
+            Command::new("set")
                 .about("Update a single Atom. Creates both the Resource if they don't exist. Overwrites existing.")
-                .arg(Arg::with_name("subject")
+                .arg(Arg::new("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
                 )
-                .arg(Arg::with_name("property")
+                .arg(Arg::new("property")
                     .help("Property URL or shortname of the property")
                     .required(true)
                 )
-                .arg(Arg::with_name("value")
+                .arg(Arg::new("value")
                     .help("String representation of the Value to be changed")
                     .required(true)
                 )
         )
         .subcommand(
-            SubCommand::with_name("remove")
+            Command::new("remove")
                 .about("Remove a single Atom from a Resource.")
-                .arg(Arg::with_name("subject")
+                .arg(Arg::new("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
                 )
-                .arg(Arg::with_name("property")
+                .arg(Arg::new("property")
                     .help("Property URL or shortname of the property to be deleted")
                     .required(true)
                 )
         )
         .subcommand(
-            SubCommand::with_name("edit")
+            Command::new("edit")
                 .about("Edit a single Atom from a Resource using your text editor.")
-                .arg(Arg::with_name("subject")
+                .arg(Arg::new("subject")
                     .help("Subject URL or bookmark of the resource")
                     .required(true)
                 )
-                .arg(Arg::with_name("property")
+                .arg(Arg::new("property")
                     .help("Property URL or shortname of the property to be edited")
                     .required(true)
                 )
         )
         .subcommand(
-            SubCommand::with_name("destroy")
+            Command::new("destroy")
                 .about("Permanently removes a Resource.")
-                .arg(Arg::with_name("subject")
+                .arg(Arg::new("subject")
                     .help("Subject URL or bookmark of the resource to be destroyed")
                     .required(true)
                 )
         )
         .subcommand(
-            SubCommand::with_name("config")
+            Command::new("config")
                 .about("Returns the path of the config file")
-                .arg(Arg::with_name("subject")
+                .arg(Arg::new("subject")
                     .help("Subject URL or bookmark of the resource to be destroyed")
                     .required(true)
                 )
         )
-        .subcommand(SubCommand::with_name("list").about("List all bookmarks"))
-        .subcommand(SubCommand::with_name("validate").about("Validates the store").setting(AppSettings::Hidden))
+        .subcommand(Command::new("list").about("List all bookmarks"))
+        .subcommand(Command::new("validate").about("Validates the store").hide(true))
         .get_matches();
 
     let config_folder = home_dir()

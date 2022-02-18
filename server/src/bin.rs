@@ -30,7 +30,6 @@ async fn main() -> errors::AtomicServerResult<()> {
     let config = config::build_config(config::read_opts())
         .map_err(|e| format!("Initialization failed: {}", e))?;
 
-    // All subcommands (as of now) also require appstate, which is why we have this logic below initial CLI logic.
     match &config.opts.command {
         Some(config::Command::Export(e)) => {
             let path = match e.path.clone() {

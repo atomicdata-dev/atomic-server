@@ -2,6 +2,7 @@
 
 use serde_json::Map;
 use serde_json::Value as SerdeValue;
+use tracing::instrument;
 
 use crate::{
     datatype::DataType, errors::AtomicResult, resources::PropVals, Resource, Storelike, Value,
@@ -70,7 +71,9 @@ fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
     Ok(json_val)
 }
 
-/// Serializes a Resource to a Serde JSON Map
+/// Serializes a Resource to a Serde JSON Map according to the JSON-AD spec.
+/// https://docs.atomicdata.dev/core/json-ad.html
+#[instrument(skip_all)]
 pub fn propvals_to_json_ad_map(
     propvals: &PropVals,
     subject: Option<String>,
@@ -86,7 +89,10 @@ pub fn propvals_to_json_ad_map(
     Ok(obj)
 }
 
-/// Serializes a Resource to a Serde JSON Map
+/// Serializes a Resource to a Serde JSON Map.
+/// Supports both JSON and JSON-LD.
+/// If you opt in for JSON-LD, an @context object is created mapping the shortnames to URLs.
+/// https://docs.atomicdata.dev/interoperability/json.html#from-atomic-data-to-json-ld
 pub fn propvals_to_json_ld(
     propvals: &PropVals,
     subject: Option<String>,
