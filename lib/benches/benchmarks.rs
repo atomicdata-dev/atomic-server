@@ -1,6 +1,6 @@
 //! Various benchmarks for atomic_lib.
-//! Should be run using `cargo criterion`.
-//! Add features here
+//! Should be run using `cargo criterion` or `cargo bench --all-features`.
+//! See contribute.md for more information.
 
 use atomic_lib::*;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
@@ -64,6 +64,18 @@ fn criterion_benchmark(c: &mut Criterion) {
     c.bench_function("resource.to_json_ad()", |b| {
         b.iter(|| {
             big_resource.to_json_ad().unwrap();
+        })
+    });
+
+    c.bench_function("resource.to_json_ld()", |b| {
+        b.iter(|| {
+            big_resource.to_json_ld(&store).unwrap();
+        })
+    });
+
+    c.bench_function("resource.to_json()", |b| {
+        b.iter(|| {
+            big_resource.to_json(&store).unwrap();
         })
     });
 }
