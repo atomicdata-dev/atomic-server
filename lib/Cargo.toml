@@ -8,11 +8,12 @@ readme = "README.md"
 repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.0"
 
-# [[bench]]
-# all-features = true
-# harness = false
-# name = "benchmarks"
-# # path = "src/db/benchmarks.rs"
+# Enables benchmarks to use the features, such as Db
+[[bench]]
+all-features = true
+harness = false
+name = "benchmarks"
+# path = "benches/benchmarks.rs"
 
 [dependencies]
 base64 = "0.13.0"

@@ -74,6 +74,8 @@ We have benchmarks in the `/lib/benchmarks` folder. Make sure there's a benchmar
 cargo install cargo-criterion
 # run benchmark
 cargo criterion
+# or if that does not work
+cargo bench --all-features
 ```
 
 ### Drill

@@ -1,5 +1,5 @@
 //! Various benchmarks for atomic_lib.
-//! Should be run using `cargo bench`.
+//! Should be run using `cargo criterion`.
 //! Add features here
 
 use atomic_lib::*;
@@ -31,7 +31,7 @@ fn random_resource(atom: &Atom) -> Resource {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let store = Db::init_temp("bench").unwrap();
+    let store = atomic_lib::Db::init_temp("bench").unwrap();
 
     c.bench_function("add_atom_to_index", |b| {
         b.iter(|| {
@@ -54,6 +54,16 @@ fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let mut resource = random_resource(&random_atom());
             resource.save(&store).unwrap();
+        })
+    });
+
+    let big_resource = store
+        .get_resource_extended("https://localhost/collections", false, None)
+        .unwrap();
+
+    c.bench_function("resource.to_json_ad()", |b| {
+        b.iter(|| {
+            big_resource.to_json_ad().unwrap();
         })
     });
 }
