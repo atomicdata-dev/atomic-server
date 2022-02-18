@@ -315,7 +315,7 @@ impl Commit {
         )?;
         if let Some(set) = self.set {
             let mut newset = PropVals::new();
-            for (prop, val) in set.clone() {
+            for (prop, val) in set {
                 newset.insert(prop, val);
             }
             resource.set_propval(urls::SET.into(), newset.into(), store)?;
@@ -455,20 +455,10 @@ fn sign_at(
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
 #[tracing::instrument]
 pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
-    let private_key_bytes = base64::decode(private_key.to_string()).map_err(|e| {
-        format!(
-            "Failed decoding private key {}: {}",
-            private_key.to_string(),
-            e
-        )
-    })?;
-    let public_key_bytes = base64::decode(public_key.to_string()).map_err(|e| {
-        format!(
-            "Failed decoding public key {}: {}",
-            public_key.to_string(),
-            e
-        )
-    })?;
+    let private_key_bytes = base64::decode(private_key.to_string())
+        .map_err(|e| format!("Failed decoding private key {}: {}", private_key, e))?;
+    let public_key_bytes = base64::decode(public_key.to_string())
+        .map_err(|e| format!("Failed decoding public key {}: {}", public_key, e))?;
     let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(
         &private_key_bytes,
         &public_key_bytes,

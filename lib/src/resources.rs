@@ -347,7 +347,7 @@ impl Resource {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
                 self.get_subject(),
                 property,
-                value.to_string(),
+                value,
                 full_prop.data_type,
                 value.datatype()
             ).into())
@@ -425,7 +425,6 @@ impl Resource {
         serde_json::to_string_pretty(&obj).map_err(|_| "Could not serialize to JSON-LD".into())
     }
 
-    // This turned out to be more difficult than I though. I need the full Property, which the Resource does not possess.
     #[instrument(skip_all)]
     pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
         let mut atoms: Vec<Atom> = Vec::new();
@@ -434,6 +433,13 @@ impl Resource {
             atoms.push(atom);
         }
         Ok(atoms)
+    }
+
+    #[instrument(skip_all)]
+    #[cfg(feature = "rdf")]
+    /// Serializes the Resource to the RDF N-Triples format.
+    pub fn to_n_triples(&self, store: &impl Storelike) -> AtomicResult<String> {
+        crate::serialize::atoms_to_ntriples(self.to_atoms()?, store)
     }
 }
 
@@ -590,10 +596,7 @@ mod test {
         );
         println!(
             "{}",
-            resource_from_store
-                .get_shortname("is-a", &store)
-                .unwrap()
-                .to_string()
+            resource_from_store.get_shortname("is-a", &store).unwrap()
         );
         assert_eq!(
             resource_from_store

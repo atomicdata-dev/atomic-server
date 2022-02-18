@@ -78,6 +78,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             big_resource.to_json(&store).unwrap();
         })
     });
+
+    c.bench_function("resource.to_n_triples()", |b| {
+        b.iter(|| {
+            big_resource.to_n_triples(&store).unwrap();
+        })
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
