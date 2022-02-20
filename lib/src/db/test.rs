@@ -175,7 +175,7 @@ fn destroy_resource_and_check_collection_and_commits() {
         "The commits collection did not increase after saving the resource."
     );
 
-    resource.destroy(&store).unwrap();
+    _res.resource_new.unwrap().destroy(&store).unwrap();
     let agents_collection_3 = store
         .get_resource_extended(&agents_url, false, None)
         .unwrap();
@@ -324,8 +324,8 @@ fn queries() {
         if i == 4 {
             r.set_propval(sort_by.into(), Value::Markdown("!first".into()), store)
                 .unwrap();
-            r.save(store).unwrap();
-            resource_changed_order_opt = Some(r.clone());
+            let resp = r.save(store).unwrap();
+            resource_changed_order_opt = resp.resource_new.clone();
         }
         prev_resource = r.clone();
     }
