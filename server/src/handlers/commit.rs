@@ -26,6 +26,7 @@ pub async fn post_commit(
         validate_signature: true,
         validate_timestamp: true,
         validate_rights: true,
+        validate_previous_commit: true,
         update_index: false,
     };
     let commit_response = incoming_commit.apply_opts(store, &opts)?;

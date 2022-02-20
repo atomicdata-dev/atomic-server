@@ -197,7 +197,8 @@ mod test {
         resource
             .set_propval_string(crate::urls::DESCRIPTION.into(), first_val, &store)
             .unwrap();
-        let first_commit = resource.save_locally(&store).unwrap().commit_resource;
+        let first_result = resource.save_locally(&store).unwrap();
+        let first_commit = first_result.commit_resource;
 
         let second_val = "Hello universe";
         resource

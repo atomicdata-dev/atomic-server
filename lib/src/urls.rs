@@ -36,6 +36,8 @@ pub const DESTROY: &str = "https://atomicdata.dev/properties/destroy";
 pub const SIGNER: &str = "https://atomicdata.dev/properties/signer";
 pub const CREATED_AT: &str = "https://atomicdata.dev/properties/createdAt";
 pub const SIGNATURE: &str = "https://atomicdata.dev/properties/signature";
+pub const PREVIOUS_COMMIT: &str = "https://atomicdata.dev/properties/previousCommit";
+pub const LAST_COMMIT: &str = "https://atomicdata.dev/properties/lastCommit";
 // ... for Agents
 pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
 pub const NAME: &str = "https://atomicdata.dev/properties/name";

@@ -21,11 +21,21 @@ pub struct CommitResponse {
 }
 
 #[derive(Clone, Debug)]
+/// Describes options for applying a Commit.
+/// Skip the checks you don't need to get better performance, or if you want to break the rules a little.
 pub struct CommitOpts {
+    /// Makes sure all `required` properties are present.
     pub validate_schema: bool,
+    /// Checks the public key and the signature of the Commit.
     pub validate_signature: bool,
+    /// Checks whether the Commit isn't too old, or has been created in the future.
     pub validate_timestamp: bool,
+    /// Checks whether the creator of the Commit has the rights to edit the Resource.
     pub validate_rights: bool,
+    /// Checks whether the previous Commit applied to the resource matches the one mentioned in the Commit/
+    /// This makes sure that the Commit is not applied twice, or that the one creating it had a faulty state.
+    pub validate_previous_commit: bool,
+    /// Updates the indexes in the Store. Is a bit more costly.
     pub update_index: bool,
 }
 
@@ -55,6 +65,9 @@ pub struct Commit {
     /// Base64 encoded signature of the JSON serialized Commit
     #[serde(rename = "https://atomicdata.dev/properties/signature")]
     pub signature: Option<String>,
+    /// The previously applied commit to this Resource.
+    #[serde(rename = "https://atomicdata.dev/properties/previousCommit")]
+    pub previous_commit: Option<String>,
     /// The URL of the Commit
     pub url: Option<String>,
 }
@@ -116,7 +129,29 @@ impl Commit {
             }
         };
 
-        let resource_new = self.apply_changes(resource_old.clone(), store, false)?;
+        // Make sure the one creating the commit had the same idea of what the current state is.
+        if opts.validate_previous_commit {
+            if let Ok(last_resource_val) = resource_old.get(urls::LAST_COMMIT) {
+                let prev_resource = last_resource_val.to_string();
+
+                if let Some(commit_prev) = self.previous_commit.clone() {
+                    if prev_resource != commit_prev {
+                        return Err(format!(
+                            "previousCommit mismatch. Expected '{}' from Commit, but got in the Resource '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
+                            commit_prev, prev_resource,
+                        )
+                        .into());
+                    }
+                } else {
+                    return Err(format!("Resource {} already exists, and it has a `lastCommit` field, so a `previousCommit` field is required in your Commit. It's currently missing.", self.subject).into());
+                }
+            } else {
+                // If there is no lastCommit in the Resource, we'll accept the Commit.
+                tracing::warn!("No `lastCommit` in Resource. This can be a bug, or it could be that the resource was never properly updated.");
+            }
+        };
+
+        let mut resource_new = self.apply_changes(resource_old.clone(), store, false)?;
 
         if opts.validate_rights {
             if is_new {
@@ -174,7 +209,16 @@ impl Commit {
                 });
             }
         }
+
+        // We apply the changes again, but this time also update the index
         self.apply_changes(resource_old.clone(), store, opts.update_index)?;
+
+        // Set the `lastCommit` to the newly created Commit
+        resource_new.set_propval(
+            urls::LAST_COMMIT.to_string(),
+            Value::AtomicUrl(commit_resource.get_subject().into()),
+            store,
+        )?;
 
         // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
         store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
@@ -244,6 +288,7 @@ impl Commit {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_previous_commit: false,
             update_index: false,
         };
         self.apply_opts(store, &opts)
@@ -267,6 +312,10 @@ impl Commit {
             Ok(found) => Some(found.to_bool()?),
             Err(_) => None,
         };
+        let previous_commit = match resource.get(urls::PREVIOUS_COMMIT) {
+            Ok(found) => Some(found.to_string()),
+            Err(_) => None,
+        };
         let signature = resource.get(urls::SIGNATURE)?.to_string();
         let url = Some(resource.get_subject().into());
 
@@ -277,6 +326,7 @@ impl Commit {
             set,
             remove,
             destroy,
+            previous_commit,
             signature: Some(signature),
             url,
         })
@@ -330,6 +380,13 @@ impl Commit {
                 resource.set_propval(urls::DESTROY.into(), true.into(), store)?;
             }
         }
+        if let Some(previous_commit) = self.previous_commit {
+            resource.set_propval(
+                urls::PREVIOUS_COMMIT.into(),
+                Value::AtomicUrl(previous_commit),
+                store,
+            )?;
+        }
         resource.set_propval(
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
@@ -364,16 +421,24 @@ impl Commit {
 /// Use this for creating Commits.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitBuilder {
-    /// The subject URL that is to be modified by this Delta
+    /// The subject URL that is to be modified by this Delta.
+    /// Not the URL of the Commit itself.
+    /// https://atomicdata.dev/properties/subject
     subject: String,
     /// The set of PropVals that need to be added.
     /// Overwrites existing values
+    /// https://atomicdata.dev/properties/set
     set: std::collections::HashMap<String, Value>,
     /// The set of property URLs that need to be removed
+    /// https://atomicdata.dev/properties/remove
     remove: HashSet<String>,
     /// If set to true, deletes the entire resource
+    /// https://atomicdata.dev/properties/destroy
     destroy: bool,
     // pub signature: String,
+    /// The previous Commit that was applied to the target resource (the subject) of this Commit. You should be able to follow these from Commit to Commit to establish an audit trail.
+    /// https://atomicdata.dev/properties/previousCommit
+    previous_commit: Option<String>,
 }
 
 impl CommitBuilder {
@@ -384,17 +449,24 @@ impl CommitBuilder {
             set: HashMap::new(),
             remove: HashSet::new(),
             destroy: false,
+            previous_commit: None,
         }
     }
 
     /// Creates the Commit and signs it using a signature.
-    /// Does not send it - see atomic_lib::client::post_commit
-    /// Private key is the base64 encoded pkcs8 for the signer
+    /// Does not send it - see [atomic_lib::client::post_commit].
+    /// Private key is the base64 encoded pkcs8 for the signer.
+    /// Sets the `previousCommit` using the `lastCommit`.
     pub fn sign(
-        self,
+        mut self,
         agent: &crate::agents::Agent,
         store: &impl Storelike,
+        resource: &Resource,
     ) -> AtomicResult<Commit> {
+        if let Ok(last) = resource.get(urls::LAST_COMMIT) {
+            self.previous_commit = Some(last.to_string());
+        }
+
         let now = crate::utils::now();
         sign_at(self, agent, now, store)
     }
@@ -435,6 +507,7 @@ fn sign_at(
         remove: Some(commitbuilder.remove.into_iter().collect()),
         destroy: Some(commitbuilder.destroy),
         created_at: sign_date,
+        previous_commit: commitbuilder.previous_commit,
         signature: None,
         url: None,
     };
@@ -474,6 +547,7 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
 /// The amount of milliseconds that a Commit signature is valid for.
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
 
+/// Checks if the Commit has been created in the future or if it is expired.
 pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
     let now = crate::utils::now();
     if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
@@ -494,6 +568,7 @@ mod test {
             validate_schema: true,
             validate_signature: true,
             validate_timestamp: true,
+            validate_previous_commit: true,
             validate_rights: false,
             update_index: true,
         };
@@ -508,6 +583,7 @@ mod test {
         store.populate().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
         let subject = "https://localhost/new_thing";
+        let resource = Resource::new(subject.into());
         let mut commitbuiler = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
         let value1 = Value::new("Some value", &DataType::Markdown).unwrap();
@@ -515,7 +591,7 @@ mod test {
         let property2 = crate::urls::SHORTNAME;
         let value2 = Value::new("someval", &DataType::Slug).unwrap();
         commitbuiler.set(property2.into(), value2);
-        let commit = commitbuiler.sign(&agent, &store).unwrap();
+        let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
         let commit_subject = commit.get_subject().to_string();
         let _created_resource = commit.apply_opts(&store, &OPTS).unwrap();
 
@@ -550,6 +626,7 @@ mod test {
             signer: String::from("https://localhost/author"),
             set: Some(set),
             remove: Some(remove),
+            previous_commit: None,
             destroy: Some(destroy),
             signature: None,
             url: None,
@@ -603,22 +680,23 @@ mod test {
     fn invalid_subjects() {
         let store = crate::Store::init().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
+        let resource = Resource::new("https://localhost/test_resource".into());
 
         {
             let subject = "invalid URL";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
-            let _ = commitbuiler.sign(&agent, &store).unwrap_err();
+            let _ = commitbuiler.sign(&agent, &store, &resource).unwrap_err();
         }
         {
             let subject = "https://invalid.com?q=invalid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
-            let commit = commitbuiler.sign(&agent, &store).unwrap();
+            let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
             commit.apply_opts(&store, &OPTS).unwrap_err();
         }
         {
             let subject = "https://valid.com/valid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
-            let commit = commitbuiler.sign(&agent, &store).unwrap();
+            let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
             commit.apply_opts(&store, &OPTS).unwrap();
         }
     }

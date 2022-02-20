@@ -83,6 +83,7 @@ impl Resource {
     ) -> AtomicResult<crate::commit::CommitResponse> {
         self.commit.destroy(true);
         self.save(store)
+            .map_err(|e| format!("Failed to destroy {} : {}", self.subject, e).into())
     }
 
     pub fn from_propvals(propvals: PropVals, subject: String) -> Resource {
@@ -257,7 +258,7 @@ impl Resource {
     pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::commit::CommitResponse> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
-        let commit = commitbuilder.sign(&agent, store)?;
+        let commit = commitbuilder.sign(&agent, store, &self)?;
         let should_post = store.get_self_url().is_none();
         if should_post {
             // First, post it to the store where the data must reside
@@ -269,9 +270,14 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_previous_commit: true,
             update_index: true,
         };
         let commit_response = commit.apply_opts(store, &opts)?;
+        if let Some(new) = &commit_response.resource_new {
+            self.subject = new.subject.clone();
+            self.propvals = new.propvals.clone();
+        }
         // then, reset the internal CommitBuiler.
         self.reset_commit_builder();
         Ok(commit_response)
@@ -285,17 +291,22 @@ impl Resource {
     pub fn save_locally(&mut self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
         let agent = store.get_default_agent()?;
         let commitbuilder = self.get_commit_builder().clone();
-        let commit = commitbuilder.sign(&agent, store)?;
+        let commit = commitbuilder.sign(&agent, store, self)?;
         let opts = CommitOpts {
             validate_schema: true,
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_previous_commit: true,
             update_index: true,
         };
-        let res = commit.apply_opts(store, &opts)?;
+        let commit_response = commit.apply_opts(store, &opts)?;
+        if let Some(new) = &commit_response.resource_new {
+            self.subject = new.subject.clone();
+            self.propvals = new.propvals.clone();
+        }
         self.reset_commit_builder();
-        Ok(res)
+        Ok(commit_response)
     }
 
     /// Insert a Property/Value combination.
@@ -565,7 +576,7 @@ mod test {
         let commit = new_resource
             .get_commit_builder()
             .clone()
-            .sign(&agent, &store)
+            .sign(&agent, &store, &new_resource)
             .unwrap();
         commit
             .apply_opts(
@@ -575,6 +586,7 @@ mod test {
                     validate_signature: true,
                     validate_timestamp: true,
                     validate_rights: false,
+                    validate_previous_commit: true,
                     update_index: true,
                 },
             )
