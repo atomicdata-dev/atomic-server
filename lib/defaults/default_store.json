@@ -506,6 +506,18 @@
         "https://atomicdata.dev/properties/shortname": "is-locked"
     },
     {
+        "@id": "https://atomicdata.dev/properties/lastCommit",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Commit",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/description": "The last Commit that was applied to this Resource. This is used when checking whether two systems have the same version of a resource.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/isDynamic": true,
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "last-commit"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/paymentPointer",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "Payment Pointers are a standardized identifier for payment accounts. In the same way that an email address provides an identifier for a mailbox in the email ecosystem a payment pointer is used by an account holder to share the details of their account with a counter-party.\n\nSee https://paymentpointers.org/\n\nE.g. `$ilp.uphold.com/WBQrZEphkFxj`",
@@ -524,6 +536,17 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/shortname": "path"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/previousCommit",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Commit",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/description": "The previous Commit that was applied to the target resource (the subject) of this Commit. You should be able to follow these from Commit to Commit to establish an audit trail.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "previous-commit"
     },
     {
         "@id": "https://atomicdata.dev/properties/privateKey",
