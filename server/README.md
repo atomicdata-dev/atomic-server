@@ -20,7 +20,7 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 - 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/joepio/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
 - 💾  **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
 - 🔄  **Synchronization using websockets**: communicates state changes with a client. Send a `wss` request to `/ws` to open a webscocket.
-- 🧰  **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
+- 🧰  **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - 🔎  **Full-text search** with fuzzy search and various operators, often <3ms responses.
 - 📖  **Pagination, sorting and filtering** using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
 - 🔐  **Authorization** (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
@@ -192,7 +192,7 @@ Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more ab
 
 ### Can / should I create backups?
 
-Yes! You should. Especially before installing a newer Atomic-Server version, it might be imcompatible with the previous database model and could corrupt the database.
+You should. Especially before installing a newer Atomic-Server version, it might be imcompatible with the previous database model and could corrupt the database.
 Run `atomic-server export` to create a backup in your `~/.config/atomic/backups` folder.
 Import them using `atomic-server import -p ~/.config/atomic/backups/${date}.json`.
 
@@ -211,7 +211,8 @@ Remove the `db` folder in your `atomic` config: `rm -rf ~/.config/atomic/db`.
 
 ### How do I make my data private, yet available online?
 
-This is not yet possible. See [#13](https://github.com/joepio/atomic-data-rust/issues/13).
+You can press the menu icon (the three dots in the navigation bar), go to sharing, and uncheck the public `read` right.
+See the [Hierarchy chapter](https://docs.atomicdata.dev/hierarchy.html) in the docs on more info of the authorization model.
 
 ### Collections are empty / TPF is not working / search is empty
 
