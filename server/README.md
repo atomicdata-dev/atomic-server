@@ -53,6 +53,7 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
   - [How do I make my data private, yet available online?](#how-do-i-make-my-data-private-yet-available-online)
   - [Collections are empty / TPF is not working / search is empty](#collections-are-empty--tpf-is-not-working--search-is-empty)
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
+  - [Can I embed Atomic-Server in another application?](#can-i-embed-atomic-server-in-another-application)
 
 ## When should you use this
 
@@ -220,3 +221,8 @@ Try rebuilding the indexes using `atomic-server --rebuild-index`.
 ### I get a `failed to retrieve` error when opening
 
 Try re-initializing atomic server `atomic-server --initialize`.
+
+### Can I embed Atomic-Server in another application?
+
+Yes. This is what I'm doing with the Tauri desktop distribution of Atomic-Server.
+Check out the [`src-tauri`](https://github.com/joepio/atomic-data-rust/tree/master/src-tauri) code for an example!
