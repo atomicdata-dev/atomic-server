@@ -4,7 +4,8 @@ mod system_tray;
 fn main() {
   let ctx = tauri::generate_context!();
 
-  let config: atomic_server_lib::config::Config = atomic_server_lib::config::init()
+  let opts = atomic_server_lib::config::read_opts();
+  let config: atomic_server_lib::config::Config = atomic_server_lib::config::build_config(opts)
     .map_err(|e| format!("Initialization failed: {}", e))
     .expect("failed init config");
   let config_clone = config.clone();
