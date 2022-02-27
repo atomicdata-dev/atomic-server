@@ -135,6 +135,7 @@ impl Commit {
                 let prev_resource = last_resource_val.to_string();
 
                 if let Some(commit_prev) = self.previous_commit.clone() {
+                    // TODO: try auto merge
                     if prev_resource != commit_prev {
                         return Err(format!(
                             "previousCommit mismatch. Expected '{}' from Commit, but got in the Resource '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
@@ -143,7 +144,7 @@ impl Commit {
                         .into());
                     }
                 } else {
-                    return Err(format!("Resource {} already exists, and it has a `lastCommit` field, so a `previousCommit` field is required in your Commit. It's currently missing.", self.subject).into());
+                    return Err(format!("Missing `previousCommit`. Resource {} already exists, and it has a `lastCommit` field, so a `previousCommit` field is required in your Commit.", self.subject).into());
                 }
             } else {
                 // If there is no lastCommit in the Resource, we'll accept the Commit.
