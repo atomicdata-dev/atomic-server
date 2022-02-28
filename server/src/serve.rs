@@ -41,9 +41,6 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     let appstate = crate::appstate::init(config.clone())?;
 
     // Start async processes
-    #[cfg(feature = "desktop")]
-    crate::tray_icon::tray_icon_process(config.clone());
-
     if config.opts.rebuild_index {
         rebuild_index(&appstate)?;
     }

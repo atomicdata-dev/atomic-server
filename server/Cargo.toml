@@ -56,10 +56,6 @@ version = "0.31.0"
 features = ["derive", "env", "cargo"]
 version = "3.1.0"
 
-[dependencies.open]
-optional = true
-version = "2.0.1"
-
 [dependencies.rustls]
 optional = true
 version = "0.20.2"
@@ -76,16 +72,11 @@ version = "1.14.0"
 features = ["env-filter"]
 version = "0.3.4"
 
-[dependencies.tray-item]
-optional = true
-version = "0.6.0"
-
 [dev-dependencies]
 actix-rt = "2.5.1"
 
 [features]
 default = ["https"]
-desktop = ["tray-item", "open"]
 https = ["acme-lib", "rustls"]
 
 [lib]
