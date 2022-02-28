@@ -664,11 +664,11 @@ checksum = "cdb031dd78e28731d87d56cc8ffef4a8f36ca26c38fe2de700543e627f8a464a"
 
 [[package]]
 name = "awc"
-version = "3.0.0-beta.20"
+version = "3.0.0-beta.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a64a95bbf4905fd057ea45b70fdfeeb9c7ae09f03f091642c4e66a16ebb3ad5"
+checksum = "d91ad5074d7d2d8be6ef74d4ecb79c0f4d5f58bdc7ec896d5fbaa9f2fb9bfa5e"
 dependencies = [
- "actix-codec 0.4.1",
+ "actix-codec 0.5.0",
  "actix-http",
  "actix-rt",
  "actix-service",
