@@ -153,10 +153,7 @@ pub async fn search_query(
     let subject = format!(
         "{}{}",
         store.get_self_url().ok_or("No base URL set")?,
-        req.uri()
-            .path_and_query()
-            .ok_or("Add a query param")?
-            .to_string()
+        req.uri().path_and_query().ok_or("Add a query param")?
     );
 
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;

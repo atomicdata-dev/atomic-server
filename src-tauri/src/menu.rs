@@ -1,7 +1,4 @@
-use tauri::{
-  api::shell, utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu,
-  WindowMenuEvent,
-};
+use tauri::{utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu};
 
 /// Create the task bar menu items
 pub fn build(ctx: &Context<EmbeddedAssets>) -> Menu {
