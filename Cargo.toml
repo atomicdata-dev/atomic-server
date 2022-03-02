@@ -3,5 +3,5 @@ members = [
   "server",
   "cli",
   "lib",
-  "src-tauri",
+  "desktop",
 ]

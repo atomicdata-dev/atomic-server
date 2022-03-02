@@ -9,6 +9,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - No `Mutex` for `Appstate` in server #303
 - Allow reading Commits #307
 - Removed system tray from `atomic-server`, since I only want to maintain the Tauri version
+- Rename `src-tauri` to `desktop` and make the tauri code part of the cargo workspace
 
 ## [v0.31.0] - 2022-01-25
 
