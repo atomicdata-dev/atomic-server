@@ -1,13 +1,13 @@
-# Atomic-server Tauri
+# Atomic-Server Desktop (powered by Tauri)
 
-Tauri build Desktop releases for Atomic-Server.
-It takes care of native installers, app icons, system tray icons, menu items, self-update ([issue](https://github.com/joepio/atomic-data-rust/issues/158)) and more.
+Desktop release for Atomic-Server.
+[Tauri] takes care of native installers, app icons, system tray icons, menu items, self-update ([issue](https://github.com/joepio/atomic-data-rust/issues/158)) and more.
 
 ```sh
 # install tauri
-yarn global add @tauri/tauri-cli
-# run dev server
+cargo install tauri-cli
 # make sure that `atomic-data-browser` is running on port 8080 (see ## Running in development)
+# run dev server
 tauri dev
 # build an installer for your OS
 tauri build
