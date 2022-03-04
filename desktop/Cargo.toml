@@ -29,7 +29,7 @@ version = "1.0"
 
 [dependencies.tauri]
 features = ["api-all", "system-tray"]
-version = "1.0.0-rc.2"
+version = "1.0.0-rc.3"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

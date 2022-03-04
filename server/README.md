@@ -226,4 +226,4 @@ Try re-initializing atomic server `atomic-server --initialize`.
 ### Can I embed Atomic-Server in another application?
 
 Yes. This is what I'm doing with the Tauri desktop distribution of Atomic-Server.
-Check out the [`src-tauri`](https://github.com/joepio/atomic-data-rust/tree/master/src-tauri) code for an example!
+Check out the [`desktop`](https://github.com/joepio/atomic-data-rust/tree/master/desktop) code for an example!
