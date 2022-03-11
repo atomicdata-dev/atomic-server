@@ -27,7 +27,7 @@ pub struct AppState {
 /// Creates a new agent, if neccessary.
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
     tracing::info!("Initializing AppState");
-    // Check if atomic-server is already running somwehere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
+    // Check if atomic-server is already running somewhere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     let _ = crate::process::terminate_existing_processes(&config)
         .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
 

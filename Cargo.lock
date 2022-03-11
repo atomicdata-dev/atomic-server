@@ -318,6 +318,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "actix-web-static-files"
+version = "3.0.5"
+source = "git+https://github.com/kilork/actix-web-static-files.git?rev=2d3b6160f0de4ba061c5d76b5704f34fb677f6df#2d3b6160f0de4ba061c5d76b5704f34fb677f6df"
+dependencies = [
+ "actix-web",
+ "derive_more",
+ "futures-util",
+ "static-files",
+]
+
+[[package]]
 name = "actix_derive"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -636,6 +647,7 @@ dependencies = [
  "actix-rt",
  "actix-web",
  "actix-web-actors",
+ "actix-web-static-files",
  "async-std",
  "atomic_lib",
  "awc",
@@ -653,6 +665,7 @@ dependencies = [
  "sanitize-filename",
  "serde",
  "serde_json",
+ "static-files",
  "sysinfo",
  "tantivy",
  "tokio",
@@ -1068,6 +1081,16 @@ name = "cfg_aliases"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
+
+[[package]]
+name = "change-detection"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "159fa412eae48a1d94d0b9ecdb85c97ce56eb2a347c62394d3fdbf221adabc1a"
+dependencies = [
+ "path-matchers",
+ "path-slash",
+]
 
 [[package]]
 name = "chrono"
@@ -3416,6 +3439,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
+name = "path-matchers"
+version = "1.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "36cd9b72a47679ec193a5f0229d9ab686b7bd45e1fbc59ccf953c9f3d83f7b2b"
+dependencies = [
+ "glob",
+]
+
+[[package]]
+name = "path-slash"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3cacbb3c4ff353b534a67fb8d7524d00229da4cb1dc8c79f4db96e375ab5b619"
+
+[[package]]
 name = "pathdiff"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4554,6 +4592,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87cf4f5369e6d3044b5e365c9690f451516ac8f0954084622b49ea3fde2f6de5"
 dependencies = [
  "loom",
+]
+
+[[package]]
+name = "static-files"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64712ea1e3e140010e1d9605872ba205afa2ab5bd38191cc6ebd248ae1f6a06b"
+dependencies = [
+ "change-detection",
+ "mime_guess",
+ "path-slash",
 ]
 
 [[package]]

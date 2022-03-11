@@ -31,6 +31,7 @@ rio_turtle = "0.6.1"
 rustls-pemfile = "0.2.1"
 sanitize-filename = "0.3.0"
 serde_json = "1.0.60"
+static-files = "0.2.3"
 sysinfo = "0.20.5"
 tantivy = "0.16.1"
 tracing = "0.1.31"
@@ -72,8 +73,16 @@ version = "1.17.0"
 features = ["env-filter"]
 version = "0.3.9"
 
+[dependencies.actix-web-static-files]
+git = "https://github.com/kilork/actix-web-static-files.git"
+rev = "2d3b6160f0de4ba061c5d76b5704f34fb677f6df"
+# version = "0.4.0"
+
 [dev-dependencies]
 actix-rt = "2.5.1"
+
+[build-dependencies]
+static-files = "0.2.3"
 
 [features]
 default = ["https"]

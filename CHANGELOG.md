@@ -5,6 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## [UNRELEASED]
 
+- Host the data-browser assets / JS bundles from `atomic-server`'s binary #185
 - Upgrade `actix`, `clap` and `tauri` dependencies #301
 - No `Mutex` for `Appstate` in server #303
 - Allow reading Commits #307
