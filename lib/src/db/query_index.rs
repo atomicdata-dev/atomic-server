@@ -75,40 +75,59 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     let mut resources = Vec::new();
     let mut count = 0;
 
-    for (i, kv) in iter.enumerate() {
-        if let Some(limit) = q.limit {
-            if subjects.len() < limit && i >= q.offset {
-                let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
-                let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+    let self_url = store
+        .get_self_url()
+        .ok_or("No self_url set, required for Queries")?;
 
-                // When an agent is defined, we must perform authorization checks
-                // WARNING: EXPENSIVE!
-                // TODO: Make async
-                if q.include_nested || q.for_agent.is_some() {
-                    match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
-                        Ok(resource) => {
-                            resources.push(resource);
-                            subjects.push(subject.into())
-                        }
-                        Err(e) => match e.error_type {
-                            crate::AtomicErrorType::NotFoundError => {}
-                            crate::AtomicErrorType::UnauthorizedError => {}
-                            crate::AtomicErrorType::OtherError => {
-                                return Err(format!(
-                                    "Error when getting resource in collection: {}",
-                                    e
-                                )
-                                .into())
-                            }
-                        },
-                    }
-                } else {
-                    // If there is no need for nested resources, and no auth checks, we can skip the expensive part!
-                    subjects.push(subject.into())
-                }
+    let limit = if let Some(limit) = q.limit {
+        limit
+    } else {
+        std::usize::MAX
+    };
+
+    for (i, kv) in iter.enumerate() {
+        // The user's maximum amount of results has not yet been reached
+        // and
+        // The users minimum starting distance (offset) has been reached
+        let in_selection = subjects.len() < limit && i >= q.offset;
+        if in_selection {
+            let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
+            let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+
+            // If no external resources should be included, skip this one if it's an external resource
+            if !q.include_external && !subject.starts_with(&self_url) {
+                continue;
             }
-            count = i + 1;
+
+            // When an agent is defined, we must perform authorization checks
+            // WARNING: EXPENSIVE!
+            // TODO: Make async
+            if q.include_nested || q.for_agent.is_some() {
+                match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+                    Ok(resource) => {
+                        resources.push(resource);
+                        subjects.push(subject.into())
+                    }
+                    Err(e) => match e.error_type {
+                        crate::AtomicErrorType::NotFoundError => {}
+                        crate::AtomicErrorType::UnauthorizedError => {}
+                        crate::AtomicErrorType::OtherError => {
+                            return Err(
+                                format!("Error when getting resource in collection: {}", e).into()
+                            )
+                        }
+                    },
+                }
+            } else {
+                // If there is no need for nested resources, and no auth checks, we can skip the expensive part!
+                subjects.push(subject.into())
+            }
         }
+        // We iterate over every single resource, even if we don't perform any computation on the items.
+        // This helps with pagination, but it comes at a serious performance cost. We might need to change how this works later on.
+        // Also, this count does not take into account the `include_external` filter.
+        // https://github.com/joepio/atomic-data-rust/issues/290
+        count = i + 1;
     }
 
     Ok(QueryResult {

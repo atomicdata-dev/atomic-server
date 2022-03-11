@@ -393,7 +393,8 @@ impl Storelike for Db {
             None,
             q.property.as_deref(),
             q.value.as_ref(),
-            q.include_external,
+            // We filter later on, not here
+            true,
         )?;
         let count = atoms.len();
 

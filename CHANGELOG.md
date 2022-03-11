@@ -10,6 +10,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Allow reading Commits #307
 - Removed system tray from `atomic-server`, since I only want to maintain the Tauri version
 - Rename `src-tauri` to `desktop` and make the tauri code part of the cargo workspace
+- In Queries, respect a `limit` of `None` and `include_external` #317
 
 ## [v0.31.0] - 2022-01-25
 

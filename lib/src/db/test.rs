@@ -362,6 +362,35 @@ fn queries() {
     // assert_eq!(res.count, 1, "authorized count");
 }
 
+/// Check if `include_external` is respected.
+#[test]
+fn query_include_external() {
+    let store = &DB.lock().unwrap().clone();
+
+    let mut q = Query {
+        property: None,
+        value: None,
+        limit: None,
+        start_val: None,
+        end_val: None,
+        offset: 0,
+        sort_by: None,
+        sort_desc: false,
+        include_external: true,
+        include_nested: false,
+        for_agent: None,
+    };
+    let res_include = store.query(&q).unwrap();
+    q.include_external = false;
+    let res_no_include = store.query(&q).unwrap();
+    println!("{:?}", res_include.subjects.len());
+    println!("{:?}", res_no_include.subjects.len());
+    assert!(
+        res_include.subjects.len() > res_no_include.subjects.len(),
+        "Amount of results should be higher for include_external"
+    );
+}
+
 #[test]
 /// Changing these values actually correctly updates the index.
 fn index_invalidate_cache() {
