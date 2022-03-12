@@ -15,7 +15,7 @@ pub fn build(ctx: &Context<EmbeddedAssets>) -> Menu {
 }
 
 trait AddDefaultSubmenus {
-  fn add_default_app_submenu(self, app_name: &str) -> Self;
+  fn add_default_app_submenu(self, _app_name: &str) -> Self;
   fn add_default_file_submenu(self) -> Self;
   fn add_default_edit_submenu(self) -> Self;
   fn add_default_view_submenu(self) -> Self;

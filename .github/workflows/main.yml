@@ -1,4 +1,4 @@
-on: [push, pull_request, workflow_dispatch]
+on: [push, workflow_dispatch]
 
 name: Lint & test
 
@@ -81,3 +81,31 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
+
+  e2e:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
+      - run: npx playwright install --with-deps
+      - run: npm i @playwright/test --global
+      - uses: actions/setup-node@v2
+        with:
+          # Required by playwright
+          node-version: "14"
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v1.3.0
+      - uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --locked
+      - run: nohup ./target/release/atomic-server &
+      - run: npx playwright test "e2e.spec.ts"

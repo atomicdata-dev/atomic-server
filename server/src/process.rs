@@ -21,7 +21,7 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
                 process.pid()
             );
             process.kill(sysinfo::Signal::Term);
-            tracing::info!("Checking if other server has succesfully terminated...",);
+            tracing::info!("Checking if other server has successfully terminated...",);
             loop {
                 s.refresh_processes();
                 if let Some(_process) = s.process(pid) {
