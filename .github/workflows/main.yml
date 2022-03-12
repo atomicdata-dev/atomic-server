@@ -90,7 +90,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
       - run: npx playwright install --with-deps
-      - run: npm i @playwright/test --global
+      - run: cd server/e2e_tests && npm i && npm run test
       - uses: actions/setup-node@v2
         with:
           # Required by playwright
@@ -108,4 +108,3 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/release/atomic-server &
-      - run: cd server/e2e_tests && npm run test
