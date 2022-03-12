@@ -106,5 +106,5 @@ jobs:
         with:
           command: build
           args: --locked
-      - run: nohup ./target/release/atomic-server &
+      - run: nohup ./target/debug/atomic-server &
       - run: cd server/e2e_tests/ && npm i && npm run test
