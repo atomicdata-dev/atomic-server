@@ -84,6 +84,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
                 server
                     .bind_rustls(&endpoint, https_config)
                     .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
+                    .shutdown_timeout(TIMEOUT)
                     .run()
                     .await?;
             }
@@ -97,6 +98,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
         server
             .bind(&format!("{}:{}", config.opts.ip, config.opts.port))
             .expect(&*format!("Cannot bind to endpoint {}", &endpoint))
+            .shutdown_timeout(TIMEOUT)
             .run()
             .await?;
     }
@@ -114,6 +116,9 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     tracing::info!("Server stopped");
     Ok(())
 }
+
+/// Amount of seconds before server shuts down connections after SIGTERM signal
+const TIMEOUT: u64 = 15;
 
 const BANNER: &str = r#"
          __                  _
