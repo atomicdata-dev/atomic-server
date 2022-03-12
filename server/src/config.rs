@@ -54,11 +54,7 @@ pub struct Opts {
     pub https: bool,
 
     /// Endpoint where the front-end assets are hosted
-    #[clap(
-        long,
-        default_value = "https://joepio.github.io/atomic-data-browser",
-        env = "ATOMIC_ASSET_URL"
-    )]
+    #[clap(long, default_value = "/app_assets", env = "ATOMIC_ASSET_URL")]
     pub asset_url: String,
 
     /// Custom JS script to include in the body of the HTML template

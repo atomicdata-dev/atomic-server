@@ -98,16 +98,19 @@ drill -b benchmark.yml --stats
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 
-
 ## Doing the CI's work
 
 If the CI scripts for some reason do not do their job (buildin releases, docker file, publishing to cargo), you can follow these instructions:
 
 ### Building and publishing binaries
 
-1. `cargo build --release`
-1. `cargo build --release --features desktop` if you want the tray item (mac + win support)
-1. Create a release on github, add the binaries.
+1. Make sure to update the `app_assets` folder:
+   1. get [atomic-data-browser](https://github.com/joepio/atomic-data-browser) locally
+   2. run `yarn build`
+   3. copy the contents of `publish` to `app_assets`
+2. `cargo build --release`
+3. `cargo build --release --features desktop` if you want the tray item (mac + win support)
+4. Create a release on github, add the binaries.
 
 I've got to automate this process some day...
 

@@ -8,12 +8,20 @@ use crate::{config::Config, content_types, handlers};
 /// Should match all routes
 const ANY: &str = "{tail:.*}";
 
+use actix_web_static_files::ResourceFiles;
+// Includes the `static_import` folder files, used for hosting front-end components.
+include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
+    let generated = generate();
+
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
+        // .service(web::resource("/sw.js").to(handlers::service_worker::service_worker))
         .service(web::resource("/download/{path:[^{}]+}").to(handlers::download::handle_download))
+        .service(ResourceFiles::new("/app_assets", generated))
         // Catch all (non-download) HTML requests and send them to the single page app
         .service(
             web::resource(ANY)
