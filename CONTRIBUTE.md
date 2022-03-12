@@ -19,7 +19,8 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
 - [CI, Versioning and Tagging](#ci-versioning-and-tagging)
-- [Doing the CI's work](#doing-the-cis-work)
+- [Including JS app_assets](#including-js-app_assets)
+- [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
   - [Building and publishing binaries](#building-and-publishing-binaries)
   - [Publishing to Cargo](#publishing-to-cargo)
   - [Publishing server to Docker](#publishing-server-to-docker)
@@ -98,16 +99,21 @@ drill -b benchmark.yml --stats
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 
-## Doing the CI's work
+## Including JS app_assets
+
+Before tagging a new version, make sure to update the `app_assets` folder:
+
+1. get [atomic-data-browser](https://github.com/joepio/atomic-data-browser) locally
+2. run `yarn build`
+3. copy the contents of `publish` to `app_assets`
+4. search and replace `./workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
+
+## Publishing manually - doing the CI's work
 
 If the CI scripts for some reason do not do their job (buildin releases, docker file, publishing to cargo), you can follow these instructions:
 
 ### Building and publishing binaries
 
-1. Make sure to update the `app_assets` folder:
-   1. get [atomic-data-browser](https://github.com/joepio/atomic-data-browser) locally
-   2. run `yarn build`
-   3. copy the contents of `publish` to `app_assets`
 2. `cargo build --release`
 3. `cargo build --release --features desktop` if you want the tray item (mac + win support)
 4. Create a release on github, add the binaries.

@@ -6,12 +6,13 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## [UNRELEASED]
 
 - Host the data-browser assets / JS bundles from `atomic-server`'s binary #185
+- Allow reading Commits #307
 - Upgrade `actix`, `clap` and `tauri` dependencies #301
 - No `Mutex` for `Appstate` in server #303
-- Allow reading Commits #307
 - Removed system tray from `atomic-server`, since I only want to maintain the Tauri version
 - Rename `src-tauri` to `desktop` and make the tauri code part of the cargo workspace
 - In Queries, respect a `limit` of `None` and `include_external` #317
+- Run end-to-end tests from `atomic-data-browser` in `atomic-data-rust` CI #204
 
 ## [v0.31.0] - 2022-01-25
 
