@@ -95,7 +95,6 @@ jobs:
         with:
           # Required by playwright
           node-version: "14"
-      - run: cd server/e2e_test && npm run test
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -109,3 +108,4 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/release/atomic-server &
+      - run: cd server/e2e_tests && npm run test
