@@ -254,17 +254,21 @@ impl Resource {
     /// Saves the resource (with all the changes) to the store by creating a Commit.
     /// Uses default Agent to sign the Commit.
     /// Stores changes on the Subject's Server by sending a Commit.
-    /// Returns the generated Commit.
+    /// Returns the generated Commit, the new Resource and the old Resource.
     pub fn save(&mut self, store: &impl Storelike) -> AtomicResult<crate::commit::CommitResponse> {
         let agent = store.get_default_agent()?;
-        let commitbuilder = self.get_commit_builder().clone();
-        let commit = commitbuilder.sign(&agent, store, &self)?;
-        let should_post = store.get_self_url().is_none();
+        let commit_builder = self.get_commit_builder().clone();
+        let commit = commit_builder.sign(&agent, store, self)?;
+        // If the current client is a server, and the subject is hosted here, don't post
+        let should_post = if let Some(self_url) = store.get_self_url() {
+            !self.subject.starts_with(&self_url)
+        } else {
+            // Current client is not a server, has no own persisted store
+            true
+        };
         if should_post {
-            // First, post it to the store where the data must reside
             crate::client::post_commit(&commit, store)?;
         }
-        // If that succeeds, save it locally;
         let opts = CommitOpts {
             validate_schema: true,
             validate_signature: false,
@@ -278,7 +282,6 @@ impl Resource {
             self.subject = new.subject.clone();
             self.propvals = new.propvals.clone();
         }
-        // then, reset the internal CommitBuiler.
         self.reset_commit_builder();
         Ok(commit_response)
     }
@@ -537,10 +540,7 @@ mod test {
         );
         println!(
             "{}",
-            resource_from_store
-                .get_shortname("is-a", &store)
-                .unwrap()
-                .to_string()
+            resource_from_store.get_shortname("is-a", &store).unwrap()
         );
         assert_eq!(
             resource_from_store
