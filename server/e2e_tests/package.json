@@ -1,0 +1,14 @@
+{
+  "name": "atomic_e2e_tests",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test 'e2e.spec.ts'"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@playwright/test": "^1.19.2"
+  }
+}

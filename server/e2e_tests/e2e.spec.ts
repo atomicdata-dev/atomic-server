@@ -11,7 +11,7 @@ const documentTitle = '[data-test="document-title"]';
 const sidebarDriveEdit = '[data-test="sidebar-drive-edit"]';
 const currentDriveTitle = '[data-test=current-drive-title]';
 const navbarCurrentUser = '[data-test="navbar-current-user"]';
-const demoFileName = 'logo.svg';
+const demoFileName = '../../logo.svg';
 const demoFile = `./${demoFileName}`;
 
 const serverUrl = 'http://localhost:9883';
