@@ -12,7 +12,7 @@ pub fn set(context: &Context) -> AtomicResult<()> {
         Err(_) => atomic_lib::Resource::new(subject),
     };
     resource.set_propval_shortname(&property, &value, &context.store)?;
-    post(context, resource.get_commit_builder().clone())?;
+    resource.save(&context.store)?;
     Ok(())
 }
 
@@ -35,7 +35,7 @@ pub fn edit(context: &Context) -> AtomicResult<()> {
     // Remove newline - or else I can's save shortnames or numbers using vim;
     let trimmed = edited.trim_end_matches('\n');
     resource.set_propval_shortname(&prop, trimmed, &context.store)?;
-    post(context, resource.get_commit_builder().clone())?;
+    resource.save(&context.store)?;
     Ok(())
 }
 
@@ -45,28 +45,15 @@ pub fn remove(context: &Context) -> AtomicResult<()> {
     let prop = argument_to_string(context, "property")?;
     let mut resource = context.store.get_resource(&subject)?;
     resource.remove_propval_shortname(&prop, &context.store)?;
-    post(context, resource.get_commit_builder().clone())?;
+    resource.save(&context.store)?;
     Ok(())
 }
 
 /// Apply a Commit using the destroy method - removes a resource
 pub fn destroy(context: &Context) -> AtomicResult<()> {
     let subject = argument_to_url(context, "subject")?;
-    let mut commit_builder = atomic_lib::commit::CommitBuilder::new(subject);
-    commit_builder.destroy(true);
-    post(context, commit_builder)?;
-    Ok(())
-}
-
-/// Signs the Commit, Posts it and applies it to the server
-fn post(context: &Context, commit_builder: atomic_lib::commit::CommitBuilder) -> AtomicResult<()> {
-    context.get_write_context();
-    let agent = context
-        .store
-        .get_default_agent()
-        .expect("No default agent set");
-    let commit = commit_builder.sign(&agent, &context.store)?;
-    atomic_lib::client::post_commit(&commit, &context.store)?;
+    let mut resource = context.store.get_resource(&subject)?;
+    resource.destroy(&context.store)?;
     Ok(())
 }
 
