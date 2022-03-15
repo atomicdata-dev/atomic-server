@@ -8,9 +8,9 @@ Desktop release for Atomic-Server.
 cargo install tauri-cli
 # make sure that `atomic-data-browser` is running on port 8080 (see ## Running in development)
 # run dev server
-tauri dev
+cargo tauri dev
 # build an installer for your OS
-tauri build
+cargo tauri build
 ```
 
 ## Running in development

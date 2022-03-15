@@ -43,6 +43,7 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
   - [HTTPS Setup on a VPS (static IP required)](#https-setup-on-a-vps-static-ip-required)
 - [Usage](#usage)
+  - [Using Atomic-Server with the browser GUI](#using-atomic-server-with-the-browser-gui)
   - [Use `atomic-cli` as client](#use-atomic-cli-as-client)
   - [API](#api)
 - [FAQ & Troubleshooting](#faq--troubleshooting)
@@ -98,6 +99,7 @@ atomic-server
 The `dockerfile` is located in the project root, above this `server` folder.
 
 - Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+- If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
 
 ### Install from source
@@ -163,6 +165,32 @@ There are three ways to interact with this server:
 - **GUI**: Use the [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) JS frontend by visiting `localhost:9883`.
 - **API**: We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml). Check out [./example_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the Atomic Data Docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
 - **CLI**: The [`atomic-cli`](https://crates.io/crates/atomic-cli/0.24.2) terminal app
+
+### Using Atomic-Server with the browser GUI
+
+Open your server in your browser.
+By default, that's [`http://localhost:9883`](http://localhost:9883).
+Fun fact: `&#9883;` is HTML entity code for the Atom icon: ⚛.
+
+The first screen should show you your [_Drive_](https://atomicdata.dev/classes/Drive).
+You can think of this as your root folder.
+It is the resource hosted at the root URL, effectively being the home page of your server.
+
+There's an instruction on the screen about the `/setup` page.
+Click this, and you'll get a screen showing an [_Invite_](https://atomicdata.dev/classes/Invite).
+Normally, you could `Accept as new user`, but since you're running on `localhost`, you won't be able to use the newly created Agent on non-local Atomic-Servers.
+Therefore, it may be best to create an Agent on some _other_ running server, such as the [demo Invite on AtomicData.dev](https://atomicdata.dev/invites/1).
+And after that, copy the Secret from the `User settings` panel from AtomicData.dev, go back to your `localhost` version, and press `sign in`.
+Paste the Secret, and voila! You're signed in.
+
+Now, again go to `/setup`. This time, you can `Accept as {user}`.
+After clicking, your Agent has gotten `write` rights for the Drive!
+You can verify this by hovering over the description field, clicking the edit icon, and making a few changes.
+You can also press the menu button (three dots, top left) and press `Data view` to see your agent after the `write` field.
+Note that you can now edit every field.
+You can also fetch your data now as various formats.
+
+Try checking out the other features in the menu bar, and check out the `collections`.
 
 ### Use `atomic-cli` as client
 
