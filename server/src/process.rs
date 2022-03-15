@@ -1,4 +1,4 @@
-//! Checks if the process is running, kills a runnig process if it is.
+//! Checks if the process is running, kills a running process if it is.
 
 use crate::{config::Config, errors::AtomicServerResult};
 
