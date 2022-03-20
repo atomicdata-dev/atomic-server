@@ -39,6 +39,7 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
   - [Install using cargo](#install-using-cargo)
   - [Run using docker](#run-using-docker)
   - [Install from source](#install-from-source)
+  - [Troubleshooting compiling from source:](#troubleshooting-compiling-from-source)
 - [Initial setup and configuration](#initial-setup-and-configuration)
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
   - [HTTPS Setup on a VPS (static IP required)](#https-setup-on-a-vps-static-ip-required)
@@ -87,7 +88,8 @@ If you want to run this locally as a developer / contributor, check out [the Con
 
 ```sh
 # Install from source using cargo, and add it to your path
-cargo install atomic-server
+# If things go wrong, check out `Troubleshooting compiling from source:` below
+cargo install atomic-server --locked
 # Check the available options and commands
 atomic-server --help
 # Run it!
@@ -105,7 +107,7 @@ The `dockerfile` is located in the project root, above this `server` folder.
 ### Install from source
 
 ```sh
-# Clone this repoo
+# Clone this repo
 git clone git@github.com:joepio/atomic-data-rust.git
 cd atomic-data-rust/server
 # Optional, but recommended: Create a new .env using the template.
@@ -114,11 +116,11 @@ cp default.env .env
 cargo run
 ```
 
-Troubleshooting compiling from source:
+### Troubleshooting compiling from source:
 
 ```sh
-# If pkg-config or libssl-dev is not installed, make sure to install them
-sudo apt-get install -y pkg-config libssl-dev --fix-missing
+# If cc-linker, pkg-config or libssl-dev is not installed, make sure to install them
+sudo apt-get install -y build-essential pkg-config libssl-dev --fix-missing
 ```
 
 ## Initial setup and configuration
