@@ -166,6 +166,13 @@ or do it manually:
 1. `ssh atomic` (@joepio manages server)
 2. `service atomic restart`
 
+```sh
+# logs
+journalctl -u atomic.service
+# logs, since one hour, follow
+journalctl -u atomic.service --since "1 hour ago" -f
+```
+
 ## Publishing atomic-cli to WAPM
 
 1. Install `wasmer` and `cargo-wasi`.

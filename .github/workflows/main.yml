@@ -129,4 +129,4 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/debug/atomic-server &
-      - run: cd server/e2e_tests/ && npm i && npm run test
+      - run: cd server/e2e_tests/ && npm i && npx playwright install && npm run test
