@@ -262,7 +262,7 @@ fn queries() {
         demo_resource
             .set_propval(
                 sort_by.into(),
-                Value::Markdown(crate::utils::random_string()),
+                Value::Markdown(crate::utils::random_string(10)),
                 store,
             )
             .unwrap();

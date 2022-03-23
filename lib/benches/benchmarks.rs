@@ -2,19 +2,11 @@
 //! Should be run using `cargo criterion` or `cargo bench --all-features`.
 //! See contribute.md for more information.
 
+use atomic_lib::utils::random_string;
 use atomic_lib::*;
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-
-fn random_string(n: usize) -> String {
-    let rand_string: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(n)
-        .map(char::from)
-        .collect();
-    rand_string
-}
 
 fn random_atom() -> Atom {
     Atom::new(

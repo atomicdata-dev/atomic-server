@@ -160,7 +160,7 @@ impl Resource {
 
     /// Create a new resource with a generated Subject
     pub fn new_generate_subject(store: &impl Storelike) -> Resource {
-        let generated = format!("{}/{}", store.get_server_url(), random_string());
+        let generated = format!("{}/{}", store.get_server_url(), random_string(10));
 
         Resource::new(generated)
     }
@@ -175,7 +175,7 @@ impl Resource {
             "{}/{}/{}",
             store.get_server_url(),
             &class.shortname,
-            random_string()
+            random_string(10)
         );
         let mut resource = Resource {
             propvals,

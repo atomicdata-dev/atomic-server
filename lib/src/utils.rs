@@ -35,12 +35,12 @@ pub fn now() -> i64 {
         .as_millis() as i64
 }
 
-/// Generates a relatively short random string
-pub fn random_string() -> String {
+/// Generates a relatively short random string of n length
+pub fn random_string(n: usize) -> String {
     use rand::Rng;
     let random_string: String = rand::thread_rng()
         .sample_iter(&rand::distributions::Alphanumeric)
-        .take(7)
+        .take(n)
         .map(char::from)
         .collect();
     random_string.to_lowercase()

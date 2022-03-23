@@ -41,10 +41,12 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 ## Testing
 
 ```sh
+# Make sure nextest is installed
+cargo install nextest
 # This also makes sure that cli and server work, plus it test the db feature
-cargo test --all
-# Run specific tests
-cargo test --all-features --package atomic_lib --lib -- db::test::testname
+cargo nextest run
+# Run specific test(s)
+cargo nextest run test_name_substring
 # End-to-end tests, powered by PlayWright and Atomic-Data-Browser
 cd server/e2e_tests/ && npm i && npm run test
 ```
