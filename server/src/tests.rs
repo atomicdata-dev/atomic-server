@@ -33,7 +33,13 @@ fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
 
 #[actix_rt::test]
 async fn server_tests() {
-    let opts = Opts::parse_from(&["atomic-server", "--initialize", "--config-dir", "./.temp"]);
+    let unique_string = atomic_lib::utils::random_string(10);
+    let opts = Opts::parse_from(&[
+        "atomic-server",
+        "--initialize",
+        "--config-dir",
+        &format!("./.temp/{}", unique_string),
+    ]);
     let config = config::build_config(opts)
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");

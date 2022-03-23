@@ -13,6 +13,7 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
 - [Testing](#testing)
+- [Code coverage](#code-coverage)
 - [Debugging](#debugging)
 - [Performance monitoring](#performance-monitoring)
   - [Tracing](#tracing)
@@ -40,10 +41,22 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 ## Testing
 
 ```sh
+# Make sure nextest is installed
+cargo install nextest
 # This also makes sure that cli and server work, plus it test the db feature
-cargo test --all
-# Run specific tests
-cargo test --all-features --package atomic_lib --lib -- db::test::testname
+cargo nextest run
+# Run specific test(s)
+cargo nextest run test_name_substring
+# End-to-end tests, powered by PlayWright and Atomic-Data-Browser
+cd server/e2e_tests/ && npm i && npm run test
+```
+
+## Code coverage
+
+```sh
+# install cargo-llvm-cov, see https://github.com/taiki-e/cargo-llvm-cov
+# Run the tests with a coverage report
+cargo llvm-cov --all-features --show-missing-lines
 ```
 
 ## Debugging
@@ -152,6 +165,13 @@ or do it manually:
 1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.{version}`
 1. `ssh atomic` (@joepio manages server)
 2. `service atomic restart`
+
+```sh
+# logs
+journalctl -u atomic.service
+# logs, since one hour, follow
+journalctl -u atomic.service --since "1 hour ago" -f
+```
 
 ## Publishing atomic-cli to WAPM
 

@@ -88,7 +88,8 @@ impl Db {
         Ok(store)
     }
 
-    /// Create a temporary Db. Useful for testing.
+    /// Create a temporary Db in `.temp/db/{id}`. Useful for testing.
+    /// Populates the database, creates a default agent, and sets the server_url to "http://localhost/".
     pub fn init_temp(id: &str) -> AtomicResult<Db> {
         let tmp_dir_path = format!(".temp/db/{}", id);
         let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);

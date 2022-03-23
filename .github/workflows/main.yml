@@ -30,6 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
       - uses: actions/checkout@v2
+      - uses: taiki-e/install-action@nextest
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -39,8 +40,29 @@ jobs:
         uses: Swatinem/rust-cache@v1.3.0
       - uses: actions-rs/cargo@v1
         with:
-          command: test
+          command: nextest
+          args: run --all-features --retries 3
 
+  coverage:
+    name: Code coverage
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
+      - uses: actions/checkout@v2
+      - name: Install Rust and llvm-tools-preview
+        run: rustup toolchain install nightly --component llvm-tools-preview
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate code coverage
+        run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+          fail_ci_if_error: true
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
@@ -107,4 +129,4 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/debug/atomic-server &
-      - run: cd server/e2e_tests/ && npm i && npm run test
+      - run: cd server/e2e_tests/ && npm i && npx playwright install && npm run test

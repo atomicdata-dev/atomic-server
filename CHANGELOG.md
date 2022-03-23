@@ -13,6 +13,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Rename `src-tauri` to `desktop` and make the tauri code part of the cargo workspace
 - In Queries, respect a `limit` of `None` and `include_external` #317
 - Run end-to-end tests from `atomic-data-browser` in `atomic-data-rust` CI #204
+- Use `nextest` for testing #338
+- Improve and monitor test coverage #337
 
 ## [v0.31.0] - 2022-01-25
 
