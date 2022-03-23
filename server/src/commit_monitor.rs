@@ -68,7 +68,7 @@ impl Handler<Subscribe> for CommitMonitor {
             }
             Err(e) => {
                 tracing::debug!(
-                    "Ubsubscribe failed for {} by {}: {}",
+                    "Unsubscribe failed for {} by {}: {}",
                     &msg.subject,
                     msg.agent,
                     e
@@ -87,7 +87,7 @@ impl Handler<CommitMessage> for CommitMonitor {
     // This has a bunch of .unwrap() / panics, which is not ideal.
     // However, I don't want to make this a blocking call,
     // I want commits to succeed (no 500 response) even if indexing fails,
-    // also because performance is imporatant here -
+    // also because performance is important here -
     // dealing with these indexing things synchronously would be too slow.
     #[tracing::instrument(name = "handle_commit_message", skip_all, fields(subscriptions = &self.subscriptions.len(), s = %msg.commit_response.commit_resource.get_subject()))]
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
@@ -112,6 +112,13 @@ impl Handler<CommitMessage> for CommitMonitor {
             .commit_struct
             .apply_changes(msg.commit_response.resource_old.clone(), &self.store, true)
             .unwrap();
+
+        // Add commit itself to the value index
+        for atom in msg.commit_response.commit_resource.to_atoms().unwrap() {
+            self.store
+                .add_atom_to_index(&atom, &msg.commit_response.commit_resource)
+                .unwrap();
+        }
 
         // Update the search index
         if let Some(resource) = &msg.commit_response.resource_new {
