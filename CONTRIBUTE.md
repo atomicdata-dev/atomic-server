@@ -19,7 +19,7 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
   - [Tracing](#tracing)
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
-- [CI, Versioning and Tagging](#ci-versioning-and-tagging)
+- [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
 - [Including JS app_assets](#including-js-app_assets)
 - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
   - [Building and publishing binaries](#building-and-publishing-binaries)
@@ -40,6 +40,8 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 
 ## Testing
 
+- All tests are run in CI
+
 ```sh
 # Make sure nextest is installed
 cargo install nextest
@@ -52,6 +54,9 @@ cd server/e2e_tests/ && npm i && npm run test
 ```
 
 ## Code coverage
+
+- Visible at https://app.codecov.io/gh/joepio/atomic-data-rust/
+- Checked in CI
 
 ```sh
 # install cargo-llvm-cov, see https://github.com/taiki-e/cargo-llvm-cov
@@ -102,9 +107,9 @@ cargo install drill
 drill -b benchmark.yml --stats
 ```
 
-## CI, Versioning and Tagging
+## Releases, Versioning and Tagging
 
-- We use Github Actions for building, testing and creating releases. See #165 for progress.
+- We use Github Actions for building, testing and creating releases.
 - Use `cargo workspaces version patch --force *` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
 - Update the `tauri.conf.json` manually
 - Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.

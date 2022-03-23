@@ -15,6 +15,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Run end-to-end tests from `atomic-data-browser` in `atomic-data-rust` CI #204
 - Use `nextest` for testing #338
 - Improve and monitor test coverage #337
+- Fix commit indexing #345
 
 ## [v0.31.0] - 2022-01-25
 
