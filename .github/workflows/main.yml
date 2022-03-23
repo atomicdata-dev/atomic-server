@@ -47,6 +47,9 @@ jobs:
     name: Code coverage
     runs-on: ubuntu-latest
     steps:
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
       - uses: actions/checkout@v2
       - name: Install Rust and llvm-tools-preview
         run: rustup toolchain install nightly --component llvm-tools-preview
