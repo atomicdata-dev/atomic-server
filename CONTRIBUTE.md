@@ -13,6 +13,7 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
 - [Testing](#testing)
+- [Code coverage](#code-coverage)
 - [Debugging](#debugging)
 - [Performance monitoring](#performance-monitoring)
   - [Tracing](#tracing)
@@ -44,6 +45,16 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 cargo test --all
 # Run specific tests
 cargo test --all-features --package atomic_lib --lib -- db::test::testname
+# End-to-end tests, powered by PlayWright and Atomic-Data-Browser
+cd server/e2e_tests/ && npm i && npm run test
+```
+
+## Code coverage
+
+```sh
+# install cargo-llvm-cov, see https://github.com/taiki-e/cargo-llvm-cov
+# Run the tests with a coverage report
+cargo llvm-cov --all-features --show-missing-lines
 ```
 
 ## Debugging
