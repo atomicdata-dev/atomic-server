@@ -65,7 +65,7 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
 
-    /// CAUTION: Makes data public on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/joepio/atomic-data-rust/blob/master/server/rdf-search.md
+    /// CAUTION: Makes data publicly readable on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/joepio/atomic-data-rust/blob/master/server/rdf-search.md
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
 
@@ -73,7 +73,7 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
     pub remove_previous_search: bool,
 
-    /// CAUTION: Skip authentication checks, making all data public. Improves performance.
+    /// CAUTION: Skip authentication checks, making all data publicly readable. Improves performance.
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,
 
