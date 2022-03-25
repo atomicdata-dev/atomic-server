@@ -12,10 +12,10 @@ use crate::Context;
 pub const SERIALIZE_OPTIONS: [&str; 7] =
     ["pretty", "json", "jsonld", "jsonad", "nt", "turtle", "n3"];
 
-/// Returns preffered serialization format. Defaults to pretty.
+/// Returns preferred serialization format. Defaults to pretty.
 pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
-    let format = if let Some(preffered_format) = argmatches.value_of("as") {
-        match preffered_format {
+    let format = if let Some(preferred_format) = argmatches.value_of("as") {
+        match preferred_format {
             "pretty" => (Format::Pretty),
             "json" => (Format::Json),
             "jsonld" => (Format::JsonLd),
