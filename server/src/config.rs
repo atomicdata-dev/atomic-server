@@ -69,7 +69,7 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
 
-    /// By default, Atomic-Server keeps previous verions of resources indexed in Search. When enabling this flag, previous versions of resources are removed from the search index when their values are updated.
+    /// By default, Atomic-Server keeps previous versions of resources indexed in Search. When enabling this flag, previous versions of resources are removed from the search index when their values are updated.
     #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
     pub remove_previous_search: bool,
 
