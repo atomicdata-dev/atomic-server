@@ -253,6 +253,11 @@ Try rebuilding the indexes using `atomic-server --rebuild-index`.
 
 Try re-initializing atomic server `atomic-server --initialize`.
 
+### What is `rdf-search` mode?
+
+This turns `atomic-server` into a full-text search server that indexed RDF Turtle documents. 
+Check out [the readme](./rdf-search.md).
+
 ### Can I embed Atomic-Server in another application?
 
 Yes. This is what I'm doing with the Tauri desktop distribution of Atomic-Server.
