@@ -43,7 +43,7 @@ impl ContentType {
     }
 }
 
-/// Returns the preffered content type.
+/// Returns the preferred content type.
 /// Defaults to HTML if none is found.
 pub fn get_accept(map: &HeaderMap) -> ContentType {
     let accept_header = match map.get("Accept") {

@@ -14,7 +14,7 @@ paths:
   "/":
     get:
       summary: Get a resource
-      description: Send an HTTP GET request to the URL of the resource. The preffered serialization format is [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), since that contains full URLs, but it also supports plain JSON, JSON-LD, Turtle and N-Triples.
+      description: Send an HTTP GET request to the URL of the resource. The preferred serialization format is [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), since that contains full URLs, but it also supports plain JSON, JSON-LD, Turtle and N-Triples.
       parameters:
         - in: header
           name: x-atomic-public-key

@@ -43,7 +43,7 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
 fn prompt_instance<'a>(
     context: &'a Context,
     class: &Class,
-    preffered_shortname: Option<String>,
+    preferred_shortname: Option<String>,
 ) -> CLIResult<(Resource, Option<String>)> {
     // Not sure about the best way t
     // The Path is the thing at the end of the URL, from the domain
@@ -54,7 +54,7 @@ fn prompt_instance<'a>(
     let write_ctx = context.get_write_context();
 
     let mut subject = format!("{}/{}", write_ctx.server, path);
-    if let Some(sn) = &preffered_shortname {
+    if let Some(sn) = &preferred_shortname {
         subject = format!("{}/{}-{}", write_ctx.server, path, sn);
     }
 
@@ -68,15 +68,15 @@ fn prompt_instance<'a>(
 
     for prop_subject in &class.requires {
         let field = context.store.get_property(prop_subject)?;
-        if field.subject == atomic_lib::urls::SHORTNAME && preffered_shortname.clone().is_some() {
+        if field.subject == atomic_lib::urls::SHORTNAME && preferred_shortname.clone().is_some() {
             new_resource.set_propval_string(
                 field.subject.clone(),
-                &preffered_shortname.clone().unwrap(),
+                &preferred_shortname.clone().unwrap(),
                 &context.store,
             )?;
             println!(
                 "Shortname set to {}",
-                preffered_shortname.clone().unwrap().bold().green()
+                preferred_shortname.clone().unwrap().bold().green()
             );
             continue;
         }

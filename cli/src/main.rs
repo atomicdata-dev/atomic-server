@@ -192,14 +192,6 @@ fn main() -> AtomicResult<()> {
                     .required(true)
                 )
         )
-        .subcommand(
-            Command::new("config")
-                .about("Returns the path of the config file")
-                .arg(Arg::new("subject")
-                    .help("Subject URL or bookmark of the resource to be destroyed")
-                    .required(true)
-                )
-        )
         .subcommand(Command::new("list").about("List all bookmarks"))
         .subcommand(Command::new("validate").about("Validates the store").hide(true))
         .get_matches();
