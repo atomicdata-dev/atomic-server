@@ -44,6 +44,10 @@ Accept: application/ld+json
 - No support for Quads (will error)
 - Only returns subjects of triples that matched the query; does not return full resources.
 
+## Also check out
+
+- https://github.com/ontola/solid-search-community-server, a plugin for the Community Solid Server.
+
 ## Acknowledgements
 
 - Thanks to the NLNet Search & Discovery grant for making a financial contribution to this project!
