@@ -1,5 +1,4 @@
 /// Functions made available from Atomic-Server to Atomic Plugins
-///
 use fp_bindgen::{prelude::*, types::CargoDependency};
 use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
@@ -186,9 +185,9 @@ fp_export! {
     async fn fetch_data(url: String) -> String;
 }
 
-const VERSION: &str = "1.0.0";
-const AUTHORS: &str = r#"["Fiberplane <info@fiberplane.com>"]"#;
-const NAME: &str = "example-bindings";
+const VERSION: &str = "0.0.1";
+const AUTHORS: &str = r#"["Joep Meindertsma <joep@ontola.io>"]"#;
+const NAME: &str = "atomic-bindings";
 
 fn main() {
     for bindings_type in [

@@ -1,0 +1,13 @@
+[package]
+name = "atomic-bindings"
+version = "0.0.1"
+authors = ["Joep Meindertsma <joep@ontola.io>"]
+edition = "2018"
+
+[dependencies]
+fp-bindgen-support = { path = "../../../../fp-bindgen-support", version = "1.0.0", features = ["async", "guest", "http"] }
+http = { version = "0.2" }
+once_cell = { version = "1.4" }
+rmp-serde = { version = "1.0" }
+serde = { version = "1.0", features = ["derive"] }
+serde_bytes = { version = "0.11" }

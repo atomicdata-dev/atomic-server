@@ -1,21 +1,12 @@
 [package]
-authors = ["Joep Meindertsma <joep@ontola.io>"]
+authors = ["Fiberplane <info@fiberplane.com>"]
 edition = "2018"
-name = "atomic-plugin-example"
-version = "0.1.0"
-
-[dependencies]
-
-[dependencies.atomic_lib]
-features = ["config", "db", "rdf"]
-path = "../lib"
-version = "0.31.1"
+name = "example-plugin"
+version = "0.0.1"
 
 [lib]
 crate-type = ["cdylib"]
-name = "atomic_plugin_example"
 
-[profile]
-[profile.release]
-# Make wasm size smaller: https://rustwasm.github.io/docs/book/reference/code-size.html#optimizing-builds-for-code-size
-lto = true
+[dependencies]
+atomic-bindings = {path = "../lib/bindings/rust-plugin"}
+time = {version = "0.3", features = ["serde-human-readable"]}
