@@ -9,10 +9,7 @@ FROM rust  as cacher
 WORKDIR /app
 RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
-# Add tauri dependencies - these are not needed in the final image!
-RUN sudo apt-get update
-RUN sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
-RUN cargo chef cook --release --recipe-path recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json --manifest-path server/Cargo.toml
 
 FROM rust  as builder
 WORKDIR /app
