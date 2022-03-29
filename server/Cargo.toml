@@ -7,10 +7,12 @@ license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.1"
-
 [[bin]]
 name = "atomic-server"
 path = "src/bin.rs"
+
+[build-dependencies]
+static-files = "0.2.3"
 
 [dependencies]
 actix = "=0.12.0"
@@ -47,6 +49,9 @@ version = "0.8"
 [dependencies.actix-web]
 features = ["rustls"]
 version = "4.0"
+
+[dependencies.actix-web-static-files]
+version = "4.0.0"
 
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]

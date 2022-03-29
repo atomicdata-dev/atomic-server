@@ -29,6 +29,7 @@ fn handle_wasm_demo_request(
         wasm_demo_endpoint().to_resource(store)
     } else {
         // Requires compiling atomic-plugin-demo
+        // cargo build --target wasm32-unknown-unknown --release
         let module_u8 = include_bytes!(
             "../../../target/wasm32-unknown-unknown/release/atomic_plugin_example.wasm"
         );
@@ -49,7 +50,7 @@ fn handle_wasm_demo_request(
         let fib_name = "fibonacci";
         let fib_args = &[Value::I32(10)];
 
-        let result = run_wasm(&module, &[], "author")?;
+        let result = run_wasm(&module, fib_args, "author")?;
         let mut resource = Resource::new("sub".into());
         resource.set_propval_string(urls::DESCRIPTION.into(), &result, store)?;
         Ok(resource)

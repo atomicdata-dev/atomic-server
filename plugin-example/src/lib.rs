@@ -1,22 +1,69 @@
-#[no_mangle]
-pub fn fibonacci(n: u32) -> u32 {
-    // let resp = reqwasm::Request::get("/path").send().await.unwrap();
-    // assert_eq!(resp.status(), 200);
+use atomic_lib::plugins::plugin::*;
+use std::collections::{BTreeMap, HashMap};
+use std::panic;
 
-    match n {
-        0 | 1 => n,
-        _ => fibonacci(n - 1) + fibonacci(n - 2),
+fn init_panic_hook() {
+    use std::sync::Once;
+    static SET_HOOK: Once = Once::new();
+    SET_HOOK.call_once(|| {
+        panic::set_hook(Box::new(|info| log(info.to_string())));
+    });
+}
+
+#[fp_export_impl(example_bindings)]
+fn my_plain_exported_function(a: u32, b: u32) -> u32 {
+    init_panic_hook();
+
+    a + my_plain_imported_function(a, b)
+}
+
+#[fp_export_impl(example_bindings)]
+fn my_complex_exported_function(a: ComplexHostToGuest) -> ComplexGuestToHost {
+    init_panic_hook();
+
+    let simple = Simple {
+        bar: a.simple.bar,
+        foo: 2 * a.simple.foo,
+    };
+
+    my_complex_imported_function(ComplexGuestToHost {
+        map: BTreeMap::new(),
+        simple: simple.clone(),
+    });
+
+    ComplexGuestToHost {
+        map: BTreeMap::new(),
+        simple,
     }
 }
 
-// #[no_mangle]
-// pub async fn fetch() -> String {
-//     let resp = reqwasm::http::Request::get("/path").send().await.unwrap();
-//     assert_eq!(resp.status(), 200);
-//     resp.text().await.unwrap()
-// }
+#[fp_export_impl(example_bindings)]
+async fn my_async_exported_function() -> ComplexGuestToHost {
+    init_panic_hook();
 
-#[no_mangle]
-pub fn author() -> String {
-    String::from("Hello from Rust")
+    let result = my_async_imported_function().await;
+    ComplexGuestToHost {
+        map: BTreeMap::new(),
+        simple: result.simple,
+    }
+}
+
+#[fp_export_impl(example_bindings)]
+async fn fetch_data(url: String) -> String {
+    init_panic_hook();
+
+    let result = make_request(RequestOptions {
+        url,
+        method: RequestMethod::Get,
+        headers: HashMap::new(),
+        body: None,
+    })
+    .await;
+
+    match result {
+        Ok(response) => {
+            String::from_utf8(response.body.to_vec()).unwrap_or_else(|_| "Invalid utf8".to_owned())
+        }
+        Err(err) => format!("Error: {:?}", err),
+    }
 }
