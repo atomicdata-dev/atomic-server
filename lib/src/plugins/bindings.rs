@@ -198,7 +198,7 @@ fn main() {
             dependencies: BTreeMap::from([(
                 "fp-bindgen-support",
                 CargoDependency {
-                    path: Some("../../../../fp-bindgen-support"),
+                    path: None,
                     features: BTreeSet::from(["async", "guest"]),
                     ..CargoDependency::default()
                 },
