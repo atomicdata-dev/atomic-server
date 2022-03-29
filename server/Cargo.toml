@@ -6,18 +6,18 @@ edition = "2021"
 license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/joepio/atomic-data-rust"
-version = "0.31.0"
+version = "0.31.1"
 
 [[bin]]
 name = "atomic-server"
 path = "src/bin.rs"
 
 [dependencies]
-actix = "0.12.0"
+actix = "=0.12.0"
 actix-cors = "0.6.0"
 actix-files = "0.6.0"
 actix-multipart = "0.4.0"
-actix-web-actors = "4.1.0"
+actix-web-actors = "=4.0.0"
 async-std = "1.10.0"
 awc = "3.0.0-beta.21"
 chrono = "0.4.19"
@@ -51,7 +51,7 @@ version = "4.0.1"
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]
 path = "../lib"
-version = "0.31.0"
+version = "0.31.1"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
@@ -74,9 +74,7 @@ features = ["env-filter"]
 version = "0.3.9"
 
 [dependencies.actix-web-static-files]
-git = "https://github.com/kilork/actix-web-static-files.git"
-rev = "2d3b6160f0de4ba061c5d76b5704f34fb677f6df"
-# version = "0.4.0"
+version = "4.0.0"
 
 [dev-dependencies]
 actix-rt = "2.5.1"

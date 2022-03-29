@@ -290,9 +290,9 @@ dependencies = [
 
 [[package]]
 name = "actix-web-actors"
-version = "4.1.0"
+version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31efe7896f3933ce03dd4710be560254272334bb321a18fd8ff62b1a557d9d19"
+checksum = "f1afe39026e519503c1a3a4a9ebd22c9b4b6930e85842c6d1c8958aea7a87ed1"
 dependencies = [
  "actix",
  "actix-codec",
@@ -319,8 +319,9 @@ dependencies = [
 
 [[package]]
 name = "actix-web-static-files"
-version = "3.0.5"
-source = "git+https://github.com/kilork/actix-web-static-files.git?rev=2d3b6160f0de4ba061c5d76b5704f34fb677f6df#2d3b6160f0de4ba061c5d76b5704f34fb677f6df"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830ce9c2daaefe6fc8a484774b9fc9e79ab5b4685064c85d50fd55e820b9a6c5"
 dependencies = [
  "actix-web",
  "derive_more",
@@ -623,7 +624,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "assert_cmd",
  "atomic_lib",
@@ -637,7 +638,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "acme-lib",
  "actix",
@@ -679,7 +680,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server-tauri"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "actix-rt",
  "atomic-server",
@@ -697,7 +698,7 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 
 [[package]]
 name = "atomic_lib"
-version = "0.31.0"
+version = "0.31.1"
 dependencies = [
  "base64",
  "bincode",
