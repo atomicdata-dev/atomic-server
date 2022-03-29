@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test 'e2e.spec.ts'"
+    "test": "playwright test 'e2e.spec.ts'",
+    "test-debug": "PWDEBUG=1 playwright test 'e2e.spec.ts'",
+    "test-query": "PWDEBUG=1 playwright test 'e2e.spec.ts' -g"
   },
   "author": "",
   "license": "ISC",

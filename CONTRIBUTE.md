@@ -50,7 +50,12 @@ cargo nextest run
 # Run specific test(s)
 cargo nextest run test_name_substring
 # End-to-end tests, powered by PlayWright and Atomic-Data-Browser
+# First, run the server
+cargo run
+# now, open new terminal window
 cd server/e2e_tests/ && npm i && npm run test
+# if things go wrong, debug!
+npm run test-query {testname}
 ```
 
 ## Code coverage
