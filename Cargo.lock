@@ -15,7 +15,7 @@ dependencies = [
  "serde",
  "serde_json",
  "time 0.1.44",
- "ureq",
+ "ureq 1.5.5",
 ]
 
 [[package]]
@@ -684,7 +684,7 @@ dependencies = [
  "sled",
  "toml",
  "tracing",
- "ureq",
+ "ureq 2.4.0",
  "url",
  "urlencoding",
 ]
@@ -5475,6 +5475,23 @@ dependencies = [
  "url",
  "webpki 0.21.4",
  "webpki-roots 0.21.1",
+]
+
+[[package]]
+name = "ureq"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9399fa2f927a3d327187cbd201480cee55bee6ac5d3c77dd27f0c6814cff16d5"
+dependencies = [
+ "base64",
+ "chunked_transfer",
+ "flate2",
+ "log",
+ "once_cell",
+ "rustls 0.20.4",
+ "url",
+ "webpki 0.22.0",
+ "webpki-roots 0.22.2",
 ]
 
 [[package]]

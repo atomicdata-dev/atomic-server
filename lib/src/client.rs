@@ -51,10 +51,15 @@ pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> At
     if let Some(agent) = for_agent {
         get_authentication_headers(url, &agent)?;
     }
-    let resp = ureq::get(url)
+
+    let agent = ureq::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build();
+    let resp = agent
+        .get(url)
         .set("Accept", content_type)
-        .timeout_read(2000)
-        .call();
+        .call()
+        .map_err(|e| format!("Error when fetching {} : {}", url, e))?;
     let status = resp.status();
     let body = resp
         .into_string()
@@ -112,12 +117,17 @@ pub fn post_commit_custom_endpoint(
 ) -> AtomicResult<()> {
     let json = commit.clone().into_resource(store)?.to_json_ad()?;
 
-    let resp = ureq::post(endpoint)
-        .set("Content-Type", "application/json")
-        .timeout_read(2000)
-        .send_string(&json);
+    let agent = ureq::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build();
 
-    if resp.error() {
+    let resp = agent
+        .post(endpoint)
+        .set("Content-Type", "application/json")
+        .send_string(&json)
+        .map_err(|e| format!("Error when posting commit to {} : {}", endpoint, e))?;
+
+    if resp.status() != 200 {
         Err(format!(
             "Failed applying commit to {}. Status: {} Body: {}",
             endpoint,
