@@ -347,7 +347,7 @@ impl Storelike for Db {
                 crate::urls::INVITE => {
                     has_dynamic = true;
                     if !skip_dynamic {
-                        return crate::plugins::invite::construct_invite_redirect(
+                        return crate::endpoints::invite::construct_invite_redirect(
                             self,
                             query_params,
                             &mut resource,

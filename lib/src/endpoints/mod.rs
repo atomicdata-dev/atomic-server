@@ -3,17 +3,14 @@
 //! Examples of endpoints are versions for resources, or (pages for) collections.
 //! See https://docs.atomicdata.dev/endpoints.html or https://atomicdata.dev/classes/Endpoint
 
-use crate::{
-    errors::AtomicResult,
-    plugins::{
-        files::upload_endpoint,
-        path::path_endpoint,
-        search::search_endpoint,
-        versioning::{all_versions_endpoint, version_endpoint},
-        wasm_demo::wasm_demo_endpoint,
-    },
-    urls, Db, Resource, Storelike, Value,
-};
+mod files;
+pub mod invite;
+mod path;
+pub mod search;
+mod versioning;
+mod wasm_demo;
+
+use crate::{errors::AtomicResult, urls, Db, Resource, Storelike, Value};
 
 /// The function that is called when the request matches the path
 type HandleFunction =
@@ -54,11 +51,11 @@ impl Endpoint {
 
 pub fn default_endpoints() -> Vec<Endpoint> {
     vec![
-        version_endpoint(),
-        all_versions_endpoint(),
-        path_endpoint(),
-        search_endpoint(),
-        upload_endpoint(),
-        wasm_demo_endpoint(),
+        versioning::version_endpoint(),
+        versioning::all_versions_endpoint(),
+        path::path_endpoint(),
+        search::search_endpoint(),
+        files::upload_endpoint(),
+        wasm_demo::wasm_demo_endpoint(),
     ]
 }

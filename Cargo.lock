@@ -609,6 +609,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "atomic-bindings"
+version = "0.0.1"
+dependencies = [
+ "fp-bindgen-support 1.0.0 (git+ssh://git@github.com/fiberplane/fp-bindgen.git?branch=main)",
+ "http",
+ "once_cell",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "atomic-cli"
 version = "0.31.1"
 dependencies = [
@@ -687,11 +699,13 @@ checksum = "065374052e7df7ee4047b1160cca5e1467a12351a40b3da123c870ba0b8eda2a"
 name = "atomic_lib"
 version = "0.31.1"
 dependencies = [
+ "atomic-bindings",
  "base64",
  "bincode",
  "criterion",
  "dirs 4.0.0",
  "fp-bindgen",
+ "fp-bindgen-support 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "http",
  "iai",
  "lazy_static",
@@ -705,12 +719,15 @@ dependencies = [
  "serde_bytes",
  "serde_json",
  "sled",
+ "tokio",
  "toml",
  "tracing",
  "ureq 2.4.0",
  "url",
  "urlencoding",
  "wasmer",
+ "wasmer-compiler-cranelift",
+ "wasmer-engine-universal",
 ]
 
 [[package]]
@@ -2020,7 +2037,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6b3aca199c1598d59c98f962197ac6b4da42dfc6123d66e50acf3e41756c3e88"
 dependencies = [
  "Inflector",
- "fp-bindgen-macros",
+ "fp-bindgen-macros 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "http",
  "pretty_assertions",
  "proc-macro2",
@@ -2042,6 +2059,46 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "fp-bindgen-macros"
+version = "1.0.0"
+source = "git+ssh://git@github.com/fiberplane/fp-bindgen.git?branch=main#ded7bab53a15406e7e9a2df3e5893d81e0de74ef"
+dependencies = [
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "fp-bindgen-support"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cbd93232cb06813f9825e2b5c74479679a20799f079ea41d0b08181860a3ddd9"
+dependencies = [
+ "fp-bindgen-macros 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "http",
+ "once_cell",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
+ "thiserror",
+ "wasmer",
+]
+
+[[package]]
+name = "fp-bindgen-support"
+version = "1.0.0"
+source = "git+ssh://git@github.com/fiberplane/fp-bindgen.git?branch=main#ded7bab53a15406e7e9a2df3e5893d81e0de74ef"
+dependencies = [
+ "fp-bindgen-macros 1.0.0 (git+ssh://git@github.com/fiberplane/fp-bindgen.git?branch=main)",
+ "http",
+ "once_cell",
+ "rmp-serde",
+ "serde",
+ "serde_bytes",
 ]
 
 [[package]]
@@ -4387,6 +4444,17 @@ checksum = "4f55e5fa1446c4d5dd1f5daeed2a4fe193071771a2636274d0d7a3b082aa7ad6"
 dependencies = [
  "byteorder",
  "num-traits",
+]
+
+[[package]]
+name = "rmp-serde"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f3eedffbfcc6a428f230c04baf8f59bd73c1781361e4286111fe900849aaddaf"
+dependencies = [
+ "byteorder",
+ "rmp",
+ "serde",
 ]
 
 [[package]]

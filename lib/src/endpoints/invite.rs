@@ -80,7 +80,7 @@ pub fn construct_invite_redirect(
 
     // Make sure the creator of the invite is still allowed to Write the target
     let invite_creator =
-        crate::plugins::versioning::get_initial_commit_for_resource(target, store)?.signer;
+        crate::endpoints::versioning::get_initial_commit_for_resource(target, store)?.signer;
     crate::hierarchy::check_write(store, &store.get_resource(target)?, &invite_creator)?;
 
     add_rights(&agent, target, write, store)?;

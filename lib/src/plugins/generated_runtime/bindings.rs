@@ -1,4 +1,4 @@
-use super::types::*;
+use atomic_bindings::*;
 use fp_bindgen_support::{
     common::mem::FatPtr,
     host::{
@@ -53,7 +53,7 @@ impl Runtime {
         let url = export_to_guest_raw(&env, url);
         let function = instance
             .exports
-            .get_native_function::<(FatPtr), FatPtr>("__fp_gen_fetch_data")
+            .get_native_function::<FatPtr, FatPtr>("__fp_gen_fetch_data")
             .map_err(|_| InvocationError::FunctionNotExported)?;
         let result = function.call(url)?;
         let result = ModuleRawFuture::new(env.clone(), result).await;
@@ -97,7 +97,7 @@ impl Runtime {
         let a = export_to_guest_raw(&env, a);
         let function = instance
             .exports
-            .get_native_function::<(FatPtr), FatPtr>("__fp_gen_my_complex_exported_function")
+            .get_native_function::<FatPtr, FatPtr>("__fp_gen_my_complex_exported_function")
             .map_err(|_| InvocationError::FunctionNotExported)?;
         let result = function.call(a)?;
         let result = import_from_guest_raw(&env, result);
@@ -125,32 +125,32 @@ impl Runtime {
 fn create_import_object(store: &Store, env: &RuntimeInstanceData) -> ImportObject {
     imports! {
        "fp" => {
-           "__fp_host_resolve_async_value" => Function :: new_native_with_env (store , env . clone () , resolve_async_value) ,
-           "__fp_gen_count_words" => Function :: new_native_with_env (store , env . clone () , _count_words) ,
-           "__fp_gen_log" => Function :: new_native_with_env (store , env . clone () , _log) ,
-           "__fp_gen_make_request" => Function :: new_native_with_env (store , env . clone () , _make_request) ,
-           "__fp_gen_my_async_imported_function" => Function :: new_native_with_env (store , env . clone () , _my_async_imported_function) ,
-           "__fp_gen_my_complex_imported_function" => Function :: new_native_with_env (store , env . clone () , _my_complex_imported_function) ,
-           "__fp_gen_my_plain_imported_function" => Function :: new_native_with_env (store , env . clone () , _my_plain_imported_function) ,
+           "__fp_host_resolve_async_value" => Function::new_native_with_env(store, env.clone(), resolve_async_value),
+           "__fp_gen_count_words" => Function::new_native_with_env(store,env. clone(), _count_words) ,
+           "__fp_gen_log" => Function::new_native_with_env(store, env.clone(), _log) ,
+           "__fp_gen_make_request" => Function::new_native_with_env(store, env.clone(), _make_request) ,
+           "__fp_gen_my_async_imported_function" => Function::new_native_with_env(store, env.clone(), _my_async_imported_function),
+           "__fp_gen_my_complex_imported_function" => Function::new_native_with_env(store, env.clone(), _my_complex_imported_function) ,
+           "__fp_gen_my_plain_imported_function" => Function::new_native_with_env(store, env.clone(), _my_plain_imported_function) ,
         }
     }
 }
 
 pub fn _count_words(env: &RuntimeInstanceData, string: FatPtr) -> FatPtr {
     let string = import_from_guest::<String>(env, string);
-    let result = super::count_words(string);
+    let result = atomic_bindings::count_words(string);
     export_to_guest(env, &result)
 }
 
 pub fn _log(env: &RuntimeInstanceData, message: FatPtr) {
     let message = import_from_guest::<String>(env, message);
-    let result = super::log(message);
+    let result = atomic_bindings::log(message);
     ()
 }
 
 pub fn _make_request(env: &RuntimeInstanceData, opts: FatPtr) -> FatPtr {
     let opts = import_from_guest::<RequestOptions>(env, opts);
-    let result = super::make_request(opts);
+    let result = atomic_bindings::make_request(opts);
     let env = env.clone();
     let async_ptr = create_future_value(&env);
     let handle = tokio::runtime::Handle::current();
@@ -163,7 +163,7 @@ pub fn _make_request(env: &RuntimeInstanceData, opts: FatPtr) -> FatPtr {
 }
 
 pub fn _my_async_imported_function(env: &RuntimeInstanceData) -> FatPtr {
-    let result = super::my_async_imported_function();
+    let result = atomic_bindings::my_async_imported_function();
     let env = env.clone();
     let async_ptr = create_future_value(&env);
     let handle = tokio::runtime::Handle::current();
@@ -177,11 +177,11 @@ pub fn _my_async_imported_function(env: &RuntimeInstanceData) -> FatPtr {
 
 pub fn _my_complex_imported_function(env: &RuntimeInstanceData, a: FatPtr) -> FatPtr {
     let a = import_from_guest::<ComplexAlias>(env, a);
-    let result = super::my_complex_imported_function(a);
+    let result = atomic_bindings::my_complex_imported_function(a);
     export_to_guest(env, &result)
 }
 
 pub fn _my_plain_imported_function(env: &RuntimeInstanceData, a: u32, b: u32) -> u32 {
-    let result = super::my_plain_imported_function(a, b);
+    let result = atomic_bindings::my_plain_imported_function(a, b);
     result
 }

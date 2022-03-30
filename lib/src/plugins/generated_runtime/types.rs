@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, collections::HashMap};
 
-pub use example_bindings::RequestMethod;
-pub use example_bindings::RequestOptions;
-pub use example_bindings::Response;
+pub use atomic_bindings::RequestMethod;
+pub use atomic_bindings::RequestOptions;
+pub use atomic_bindings::Response;
 
 pub type Body = serde_bytes::ByteBuf;
 
@@ -54,9 +54,15 @@ pub struct GroupImportedType2 {
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HttpRequestOptions {
-    #[serde(deserialize_with = "fp_bindgen_support::http::deserialize_uri", serialize_with = "fp_bindgen_support::http::serialize_uri")]
+    #[serde(
+        deserialize_with = "fp_bindgen_support::http::deserialize_uri",
+        serialize_with = "fp_bindgen_support::http::serialize_uri"
+    )]
     pub url: http::Uri,
-    #[serde(deserialize_with = "fp_bindgen_support::http::deserialize_http_method", serialize_with = "fp_bindgen_support::http::serialize_http_method")]
+    #[serde(
+        deserialize_with = "fp_bindgen_support::http::deserialize_http_method",
+        serialize_with = "fp_bindgen_support::http::serialize_http_method"
+    )]
     pub method: http::Method,
     pub headers: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -88,7 +94,9 @@ pub enum RequestError {
     },
     /// Misc.
     #[serde(rename = "other/misc")]
-    Other { reason: String },
+    Other {
+        reason: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]

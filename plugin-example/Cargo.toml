@@ -8,5 +8,5 @@ version = "0.0.1"
 crate-type = ["cdylib"]
 
 [dependencies]
-atomic-bindings = {path = "../lib/bindings/rust-plugin"}
+atomic-bindings = {path = "../bindings/rust-plugin"}
 time = {version = "0.3", features = ["serde-human-readable"]}

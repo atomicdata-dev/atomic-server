@@ -1,8 +1,4 @@
-mod bindings;
-mod types;
-
-use time::OffsetDateTime;
-use types::*;
+use atomic_bindings::*;
 
 fn log(msg: String) {
     println!("Provider log: {}", msg);
@@ -34,8 +30,6 @@ fn make_host_to_guest() -> ComplexHostToGuest {
         points: vec![],
         recursive: vec![],
         complex_nested: None,
-        timestamp: OffsetDateTime::now_utc(),
-        renamed: None,
         r#type: "Foobar".to_owned(),
         value: Value::Integer(1),
     }

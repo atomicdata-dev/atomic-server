@@ -1,5 +1,4 @@
 use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Resource, Storelike};
-use wasmer::{imports, Instance, Module, Value};
 
 pub fn wasm_demo_endpoint() -> Endpoint {
     Endpoint {
@@ -29,6 +28,9 @@ fn handle_wasm_demo_request(
         wasm_demo_endpoint().to_resource(store)
     } else {
         // TODO: run the WASM code!
-        Runtime::start()
+        // Runtime::start()
+        let resource = Resource::new("adwda".into());
+        println!("We have a var!");
+        Ok(resource)
     }
 }

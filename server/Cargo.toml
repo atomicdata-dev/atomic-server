@@ -54,7 +54,7 @@ version = "4.0"
 version = "4.0.0"
 
 [dependencies.atomic_lib]
-features = ["config", "db", "rdf"]
+features = ["config", "db", "rdf", "plugins"]
 path = "../lib"
 version = "0.31"
 

@@ -156,7 +156,8 @@ pub async fn search_query(
         req.uri().path_and_query().ok_or("Add a query param")?
     );
 
-    let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
+    let mut results_resource =
+        atomic_lib::endpoints::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());
 
     if appstate.config.opts.rdf_search {
