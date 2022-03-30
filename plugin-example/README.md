@@ -16,7 +16,7 @@ Check this issue: https://github.com/joepio/atomic/issues/73.
 ```bash
 # Compile to WASM
 cargo build --target wasm32-unknown-unknown --release
-# Move to this folder
+# Move to this folder, overwrite existing file
 mv ../../target/wasm32-unknown-unknown/release/plugin-example.wasm ./plugin_example.wasm
 # Start the server!
 cargo run --bin server

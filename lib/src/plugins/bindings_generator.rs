@@ -1,4 +1,13 @@
-/// Functions made available from Atomic-Server to Atomic Plugins
+/*
+Contains the type definitions for the Plugins, including definitions for the imported and exported functions.
+Is used to generate the `./generate_runtime` folder, and the `atomic-bindings` crate.
+
+If you make changes to the plugin bindings, recompile them:
+
+1. Compile the bindings folder in the root of the repo `cargo run --bin generate-bindings --features plugins`
+2. Move the `rust-wasmer-runtime` files to `lib/src/plugins/generated_runtime`
+*/
+
 use fp_bindgen::{prelude::*, types::CargoDependency};
 use http::{Method, Uri};
 use serde::{Deserialize, Serialize};
@@ -51,7 +60,7 @@ pub struct ComplexGuestToHost {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Serializable)]
-#[fp(rust_wasmer_runtime_module = "example_bindings")]
+#[fp(rust_wasmer_runtime_module = "atomic_bindings")]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RequestMethod {
     Delete,
@@ -62,7 +71,7 @@ pub enum RequestMethod {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, Serializable)]
-#[fp(rust_wasmer_runtime_module = "example_bindings")]
+#[fp(rust_wasmer_runtime_module = "atomic_bindings")]
 #[serde(rename_all = "camelCase")]
 pub struct RequestOptions {
     pub url: String,
@@ -85,7 +94,7 @@ pub struct HttpRequestOptions {
 
 /// A response to a request.
 #[derive(Clone, Debug, Deserialize, Serialize, Serializable)]
-#[fp(rust_wasmer_runtime_module = "example_bindings")]
+#[fp(rust_wasmer_runtime_module = "atomic_bindings")]
 #[serde(rename_all = "camelCase")]
 pub struct Response {
     /// Response headers, by name.
@@ -178,6 +187,7 @@ fp_export! {
 
     fn my_plain_exported_function(a: u32, b: u32) -> u32;
 
+    /// Example documentation
     fn my_complex_exported_function(a: ComplexHostToGuest) -> ComplexAlias;
 
     async fn my_async_exported_function() -> ComplexGuestToHost;
@@ -189,6 +199,7 @@ const VERSION: &str = "0.0.1";
 const AUTHORS: &str = r#"["Joep Meindertsma <joep@ontola.io>"]"#;
 const NAME: &str = "atomic-bindings";
 
+/// Generates the bindings in the repo `./bindings` folder
 fn main() {
     for bindings_type in [
         BindingsType::RustPlugin(RustPluginConfig {

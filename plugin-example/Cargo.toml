@@ -4,10 +4,6 @@ edition = "2018"
 name = "plugin-example"
 version = "0.0.1"
 
-[build]
-out-dir = "out"
-target = "wasm32-unknown-unknown"
-
 [lib]
 crate-type = ["cdylib"]
 

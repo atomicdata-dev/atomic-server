@@ -1,4 +1,4 @@
-use atomic_bindings::{ComplexAlias, ComplexGuestToHost, ComplexHostToGuest, RequestOptions};
+use super::types::*;
 use fp_bindgen_support::{
     common::mem::FatPtr,
     host::{
@@ -53,7 +53,7 @@ impl Runtime {
         let url = export_to_guest_raw(&env, url);
         let function = instance
             .exports
-            .get_native_function::<FatPtr, FatPtr>("__fp_gen_fetch_data")
+            .get_native_function::<(FatPtr), FatPtr>("__fp_gen_fetch_data")
             .map_err(|_| InvocationError::FunctionNotExported)?;
         let result = function.call(url)?;
         let result = ModuleRawFuture::new(env.clone(), result).await;
@@ -98,7 +98,7 @@ impl Runtime {
         let a = export_to_guest_raw(&env, a);
         let function = instance
             .exports
-            .get_native_function::<FatPtr, FatPtr>("__fp_gen_my_complex_exported_function")
+            .get_native_function::<(FatPtr), FatPtr>("__fp_gen_my_complex_exported_function")
             .map_err(|_| InvocationError::FunctionNotExported)?;
         let result = function.call(a)?;
         let result = import_from_guest_raw(&env, result);
@@ -126,13 +126,13 @@ impl Runtime {
 fn create_import_object(store: &Store, env: &RuntimeInstanceData) -> ImportObject {
     imports! {
        "fp" => {
-           "__fp_host_resolve_async_value" => Function::new_native_with_env(store, env.clone(), resolve_async_value),
-           "__fp_gen_count_words" => Function::new_native_with_env(store,env. clone(), _count_words) ,
-           "__fp_gen_log" => Function::new_native_with_env(store, env.clone(), _log) ,
-           "__fp_gen_make_request" => Function::new_native_with_env(store, env.clone(), _make_request) ,
-           "__fp_gen_my_async_imported_function" => Function::new_native_with_env(store, env.clone(), _my_async_imported_function),
-           "__fp_gen_my_complex_imported_function" => Function::new_native_with_env(store, env.clone(), _my_complex_imported_function) ,
-           "__fp_gen_my_plain_imported_function" => Function::new_native_with_env(store, env.clone(), _my_plain_imported_function) ,
+           "__fp_host_resolve_async_value" => Function :: new_native_with_env (store , env . clone () , resolve_async_value) ,
+           "__fp_gen_count_words" => Function :: new_native_with_env (store , env . clone () , _count_words) ,
+           "__fp_gen_log" => Function :: new_native_with_env (store , env . clone () , _log) ,
+           "__fp_gen_make_request" => Function :: new_native_with_env (store , env . clone () , _make_request) ,
+           "__fp_gen_my_async_imported_function" => Function :: new_native_with_env (store , env . clone () , _my_async_imported_function) ,
+           "__fp_gen_my_complex_imported_function" => Function :: new_native_with_env (store , env . clone () , _my_complex_imported_function) ,
+           "__fp_gen_my_plain_imported_function" => Function :: new_native_with_env (store , env . clone () , _my_plain_imported_function) ,
         }
     }
 }

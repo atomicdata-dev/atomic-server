@@ -21,6 +21,7 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
   - [Drill](#drill)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
 - [Including JS app_assets](#including-js-app_assets)
+- [Compiling the plugin bindings](#compiling-the-plugin-bindings)
 - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
   - [Building and publishing binaries](#building-and-publishing-binaries)
   - [Publishing to Cargo](#publishing-to-cargo)
@@ -130,6 +131,13 @@ Before tagging a new version, make sure to update the `app_assets` folder:
 2. run `yarn build`
 3. copy the contents of `publish` to `app_assets`
 4. search and replace `./workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
+
+## Compiling the plugin bindings
+
+If you make changes to the plugin bindings, recompile them:
+
+1. Compile the bindings folder in the root of the repo `cargo run --bin generate-bindings --features plugins`
+2. Move the `rust-wasmer-runtime` files to `lib/src/plugins/generated_runtime`
 
 ## Publishing manually - doing the CI's work
 

@@ -11,7 +11,7 @@ version = "0.31.1"
 [[bin]]
 description = "Generate `fp-bindgen` bindings for the plugin runtime and types. Run this in the root folder of the repository."
 name = "generate-bindings"
-path = "src/plugins/bindings.rs"
+path = "src/plugins/bindings_generator.rs"
 required-features = ["plugins"]
 
 # Enables benchmarks to use the features, such as Db
@@ -82,6 +82,7 @@ optional = true
 version = "2"
 
 [dependencies.tokio]
+features = ["rt"]
 optional = true
 version = "1.17"
 

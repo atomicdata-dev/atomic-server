@@ -7,6 +7,7 @@ pub async fn fetch_data(url: String) -> String;
 pub async fn my_async_exported_function() -> ComplexGuestToHost;
 
 #[fp_bindgen_support::fp_export_signature]
+/// Example documentation
 pub fn my_complex_exported_function(a: ComplexHostToGuest) -> ComplexAlias;
 
 #[fp_bindgen_support::fp_export_signature]

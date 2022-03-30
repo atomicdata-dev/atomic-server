@@ -1,4 +1,4 @@
-use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Resource, Storelike};
+use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Resource, Storelike, Value};
 
 pub fn wasm_demo_endpoint() -> Endpoint {
     Endpoint {
@@ -27,8 +27,7 @@ fn handle_wasm_demo_request(
     if var.is_none() {
         wasm_demo_endpoint().to_resource(store)
     } else {
-        // TODO: run the WASM code!
-        // Runtime::start()
+        let mut resource = Resource::new("subject_will_be_replaced".into());
         #[cfg_attr(feature = "plugins", allow(unused_variables))]
         {
             let module_u8 = include_bytes!(
@@ -38,9 +37,12 @@ fn handle_wasm_demo_request(
             let runtime =
                 crate::plugins::generated_runtime::bindings::Runtime::new(&module_u8).unwrap();
             let result = runtime.my_plain_exported_function(1, 2).unwrap();
+            resource.set_propval(
+                crate::urls::DESCRIPTION.into(),
+                Value::Markdown(format!("result: {}", result)),
+                store,
+            )?;
         }
-        let resource = Resource::new("adwda".into());
-        println!("We have a var!");
         Ok(resource)
     }
 }
