@@ -1,8 +1,12 @@
 [package]
 authors = ["Fiberplane <info@fiberplane.com>"]
 edition = "2018"
-name = "example-plugin"
+name = "plugin-example"
 version = "0.0.1"
+
+[build]
+out-dir = "out"
+target = "wasm32-unknown-unknown"
 
 [lib]
 crate-type = ["cdylib"]

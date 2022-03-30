@@ -29,6 +29,16 @@ fn handle_wasm_demo_request(
     } else {
         // TODO: run the WASM code!
         // Runtime::start()
+        #[cfg_attr(feature = "plugins", allow(unused_variables))]
+        {
+            let module_u8 = include_bytes!(
+                // "../../../target/wasm32-unknown-unknown/release/plugin_example.wasm"
+                "../../../plugin-example/plugin_example.wasm"
+            );
+            let runtime =
+                crate::plugins::generated_runtime::bindings::Runtime::new(&module_u8).unwrap();
+            let result = runtime.my_plain_exported_function(1, 2).unwrap();
+        }
         let resource = Resource::new("adwda".into());
         println!("We have a var!");
         Ok(resource)

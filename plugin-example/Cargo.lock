@@ -33,14 +33,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c4872d67bab6358e59559027aa3b9157c53d9358c51423c17554809a8858e0f8"
 
 [[package]]
-name = "example-plugin"
-version = "0.0.1"
-dependencies = [
- "atomic-bindings",
- "time",
-]
-
-[[package]]
 name = "fnv"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -116,6 +108,14 @@ name = "once_cell"
 version = "1.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "87f3e037eac156d1775da914196f0f37741a274155e34a0b7e427c35d2a2ecb9"
+
+[[package]]
+name = "plugin-example"
+version = "0.0.1"
+dependencies = [
+ "atomic-bindings",
+ "time",
+]
 
 [[package]]
 name = "proc-macro-error"

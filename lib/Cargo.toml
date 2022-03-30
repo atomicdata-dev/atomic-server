@@ -66,9 +66,15 @@ features = ["async", "host", "http", "guest"]
 optional = true
 version = "1.0.0"
 
-[dependencies.wasmer-compiler-cranelift]
-optional = true
-version = "2"
+# [dependencies.wasmer-compiler-cranelift]
+# optional = true
+# version = "2"
+
+[target.'cfg(any(target_arch = "arm", target_arch = "aarch64"))'.dependencies]
+wasmer-compiler-cranelift = {version = "2.1"}
+
+[target.'cfg(not(any(target_arch = "arm", target_arch = "aarch64")))'.dependencies]
+wasmer-compiler-singlepass = {version = "2.1"}
 
 [dependencies.wasmer-engine-universal]
 features = ["compiler"]
@@ -133,7 +139,6 @@ plugins = [
   "http",
   "serde_bytes",
   "tokio",
-  "wasmer-compiler-cranelift",
   "wasmer-engine-universal",
   "wasmer",
 ]

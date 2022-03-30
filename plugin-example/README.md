@@ -5,17 +5,19 @@ A minimal example of an Atomic Plugin, written in Rust, compiled to WASM.
 ## How Atomic Plugins work
 
 Atomic Plugins are WASM (WebAssembly) applications that are executed in a Sandbox in an Atomic Server.
-This makes them safe, performant, and very easy to install - no need to reboot the Server.
+This will make them safe, performant, and very easy to install.
+It's currently a work-in-progress.
+Powered by [`fp-bindgen`](https://github.com/fiberplane/fp-bindgen/).
+
 Check this issue: https://github.com/joepio/atomic/issues/73.
 
-## How to run
+## How to compile and run
 
 ```bash
 # Compile to WASM
 cargo build --target wasm32-unknown-unknown --release
-# Run it using Wasmer, see https://wasmer.io/
-wasmer ./target/wasm32-unknown-unknown/release/atomic_plugin_example.wasm -i fibonacci 20
-# Or start a server and open it on http://localhost/show?subject=http%3A%2F%2Flocalhost%2Fwasm
+# Move to this folder
+mv ../../target/wasm32-unknown-unknown/release/plugin-example.wasm ./plugin_example.wasm
+# Start the server!
+cargo run --bin server
 ```
-
-Inspired by https://codeburst.io/webassembly-and-rust-there-and-back-again-9ad76f61d616

@@ -1,8 +1,9 @@
 [workspace]
-exclude = ["plugin-example"]
+# exclude = ["plugin-example"]
 members = [
   "server",
   "cli",
   "lib",
   "desktop",
+  "plugin-example",
 ]
