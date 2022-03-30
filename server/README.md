@@ -14,7 +14,7 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 
 - ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html). Combines safety of structured data with the
 - 🚀  **Fast** (1ms responses on my laptop)
-- 🪶  **Lightweight** (15MB binary, no runtime dependencies)
+- 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
 - 🌐  **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
 - 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/joepio/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
@@ -255,7 +255,7 @@ Try re-initializing atomic server `atomic-server --initialize`.
 
 ### What is `rdf-search` mode?
 
-This turns `atomic-server` into a full-text search server that indexed RDF Turtle documents. 
+This turns `atomic-server` into a full-text search server that indexed RDF Turtle documents.
 Check out [the readme](./rdf-search.md).
 
 ### Can I embed Atomic-Server in another application?
