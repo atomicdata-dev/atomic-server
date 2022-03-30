@@ -9,16 +9,16 @@ repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.1"
 
 [dependencies]
-atomic_lib = {version = "0.31.1", path = "../lib", features = ["config", "rdf"]}
-clap = {version = "3.1.0", features = ["cargo"]}
-colored = "2.0.0"
-dirs = "3.0.1"
-edit = {version = "0.1.2", optional = true}
-promptly = "0.3.0"
-regex = "1.4.2"
+atomic_lib = {version = "0.31", path = "../lib", features = ["config", "rdf"]}
+clap = {version = "3", features = ["cargo"]}
+colored = "2"
+dirs = "3"
+edit = {version = "0.1", optional = true}
+promptly = "0.3"
+regex = "1"
 
 [dev-dependencies]
-assert_cmd = "2.0.4"
+assert_cmd = "2"
 
 [features]
 default = ["native"]

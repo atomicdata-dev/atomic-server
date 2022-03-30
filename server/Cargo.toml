@@ -14,73 +14,73 @@ path = "src/bin.rs"
 
 [dependencies]
 actix = "=0.12.0"
-actix-cors = "0.6.0"
-actix-files = "0.6.0"
-actix-multipart = "0.4.0"
+actix-cors = "0.6"
+actix-files = "0.6"
+actix-multipart = "0.4"
 actix-web-actors = "=4.0.0"
-async-std = "1.10.0"
-awc = "3.0.0-beta.21"
-chrono = "0.4.19"
-dirs = "3.0.1"
-dotenv = "0.15.0"
-futures = "0.3.16"
-promptly = "0.3.0"
-regex = "1.4.2"
-rio_api = "0.6.1"
-rio_turtle = "0.6.1"
-rustls-pemfile = "0.2.1"
-sanitize-filename = "0.3.0"
-serde_json = "1.0.60"
-static-files = "0.2.3"
-sysinfo = "0.20.5"
-tantivy = "0.16.1"
-tracing = "0.1.31"
-tracing-actix-web = "0.5.1"
-tracing-chrome = "0.4.0"
-tracing-log = "0.1.2"
-urlencoding = "2.1.0"
+async-std = "1"
+awc = "3"
+chrono = "0.4"
+dirs = "3"
+dotenv = "0.15"
+futures = "0.3"
+promptly = "0.3"
+regex = "1"
+rio_api = "0.6"
+rio_turtle = "0.6"
+rustls-pemfile = "0.2"
+sanitize-filename = "0.3"
+serde_json = "1"
+static-files = "0.2"
+sysinfo = "0.20"
+tantivy = "0.16"
+tracing = "0.1"
+tracing-actix-web = "0.5"
+tracing-chrome = "0.4"
+tracing-log = "0.1"
+urlencoding = "2"
 
 [dependencies.acme-lib]
 optional = true
-version = "0.8.1"
+version = "0.8"
 
 [dependencies.actix-web]
 features = ["rustls"]
-version = "4.0.1"
+version = "4.0"
 
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]
 path = "../lib"
-version = "0.31.1"
+version = "0.31"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
-version = "3.1.0"
+version = "3"
 
 [dependencies.rustls]
 optional = true
-version = "0.20.2"
+version = "0.20"
 
 [dependencies.serde]
 features = ["derive"]
-version = "1.0.136"
+version = "1"
 
 [dependencies.tokio]
 features = ["time"]
-version = "1.17.0"
+version = "1"
 
 [dependencies.tracing-subscriber]
 features = ["env-filter"]
-version = "0.3.9"
+version = "0.3"
 
 [dependencies.actix-web-static-files]
-version = "4.0.0"
+version = "4"
 
 [dev-dependencies]
-actix-rt = "2.5.1"
+actix-rt = "2"
 
 [build-dependencies]
-static-files = "0.2.3"
+static-files = "0.2"
 
 [features]
 default = ["https"]
