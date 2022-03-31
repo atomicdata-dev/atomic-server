@@ -1,7 +1,8 @@
 use tauri::api::shell;
+use tauri::window::WindowBuilder;
 use tauri::{
   AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
-  SystemTrayMenuItem, WindowBuilder, WindowUrl,
+  SystemTrayMenuItem, WindowUrl,
 };
 
 pub fn build() -> SystemTray {
@@ -29,24 +30,20 @@ pub fn handle(
         std::process::exit(0);
       }
       "open" => {
-        app
-          .create_window(
-            "Atomic Server",
-            WindowUrl::App(config.server_url.clone().into()),
-            |window_builder, webview_attributes| {
-              (window_builder.title("Atomic Data"), webview_attributes)
-            },
-          )
-          .unwrap();
+        WindowBuilder::new(
+          app,
+          "Atomic Server",
+          WindowUrl::App(config.server_url.clone().into()),
+        );
       }
       "docs" => shell::open(&app.shell_scope(), "https://docs.atomicdata.dev", None).unwrap(),
       "config" => shell::open(
         &app.shell_scope(),
-        config.config_dir.to_str().unwrap().to_string(),
+        config.config_dir.to_str().unwrap(),
         None,
       )
       .unwrap(),
-      "browser" => shell::open(&app.shell_scope(), config.server_url.to_string(), None).unwrap(),
+      "browser" => shell::open(&app.shell_scope(), &config.server_url, None).unwrap(),
       _ => {}
     }
   }

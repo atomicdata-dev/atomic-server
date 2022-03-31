@@ -3,6 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## UNRELEASED
+
+- **Warning**: Search index will have to be rebuilt. Start with `--rebuild-index`.
+- Updated various dependencies, and made `cargo.toml` less restrictive.
+
 ## [v0.31.1] - 2022-03-29
 
 - Host the data-browser assets / JS bundles from `atomic-server`'s binary #185

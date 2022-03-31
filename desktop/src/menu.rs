@@ -1,4 +1,6 @@
-use tauri::{utils::assets::EmbeddedAssets, Context, CustomMenuItem, Menu, MenuItem, Submenu};
+use tauri::{
+  utils::assets::EmbeddedAssets, AboutMetadata, Context, CustomMenuItem, Menu, MenuItem, Submenu,
+};
 
 /// Create the task bar menu items
 pub fn build(ctx: &Context<EmbeddedAssets>) -> Menu {
@@ -24,11 +26,18 @@ trait AddDefaultSubmenus {
 
 impl AddDefaultSubmenus for Menu {
   fn add_default_app_submenu(self, app_name: &str) -> Menu {
+    let about = AboutMetadata::new()
+      .authors(vec!["Joep Meindertsma".into()])
+      .copyright("MIT License".into())
+      .license("MIT".into())
+      .website("https://atomicdata.dev".into())
+      .website_label("atomicdata.dev".into());
+
     #[cfg(target_os = "macos")]
     return self.add_submenu(Submenu::new(
       app_name.to_string(),
       Menu::new()
-        .add_native_item(MenuItem::About(app_name.to_string()))
+        .add_native_item(MenuItem::About(app_name.to_string(), about))
         .add_native_item(MenuItem::Separator)
         .add_native_item(MenuItem::Hide)
         .add_native_item(MenuItem::HideOthers)

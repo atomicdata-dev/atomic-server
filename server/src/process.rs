@@ -8,7 +8,8 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
         Ok(content) => str::parse::<i32>(&content).ok(),
         Err(_e) => None,
     };
-    if let Some(pid) = pid_maybe {
+    if let Some(pid_int) = pid_maybe {
+        let pid = pid_int.into();
         use sysinfo::{ProcessExt, SystemExt};
         let mut s = sysinfo::System::new_all();
         let retry_secs = 1;
@@ -20,7 +21,7 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
                 "Terminating existing running instance of atomic-server (process ID: {})...",
                 process.pid()
             );
-            process.kill(sysinfo::Signal::Term);
+            process.kill();
             tracing::info!("Checking if other server has successfully terminated...",);
             loop {
                 s.refresh_processes();
@@ -41,7 +42,7 @@ pub fn terminate_existing_processes(config: &Config) -> AtomicServerResult<()> {
                         tracing::warn!(
                             "Terminate signal did not work, let's try again with Kill...",
                         );
-                        _process.kill(sysinfo::Signal::Kill);
+                        _process.kill();
                         tries_left = 15;
                         signal = sysinfo::Signal::Kill;
                     }
