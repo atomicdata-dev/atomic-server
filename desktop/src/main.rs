@@ -20,10 +20,7 @@ fn main() {
   tauri::Builder::default()
     .menu(crate::menu::build(&ctx))
     .system_tray(crate::system_tray::build())
-    .on_system_tray_event(move |a, h| {
-      let cfg = config.clone();
-      crate::system_tray::handle(a, h, &cfg)
-    })
+    .on_system_tray_event(move |a, h| crate::system_tray::handle(a, h, &config))
     .run(ctx)
     .expect("Tauri Error.");
 }

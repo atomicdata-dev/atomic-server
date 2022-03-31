@@ -204,7 +204,7 @@ pub fn atoms_to_ntriples(atoms: Vec<crate::Atom>, store: &impl Storelike) -> Ato
             object,
         })?
     }
-    let out = String::from_utf8(formatter.finish())?;
+    let out = String::from_utf8(formatter.finish()?)?;
     Ok(out)
 }
 

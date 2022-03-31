@@ -75,7 +75,7 @@ pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, Index)> {
     let mmap_directory = tantivy::directory::MmapDirectory::open(&config.search_index_path)?;
     let index = Index::open_or_create(mmap_directory, schema).map_err(|e| {
         format!(
-            "Failed to create or open search index. Try starting againg with --rebuild-index. Error: {}",
+            "Failed to create or open search index. Try starting again with --rebuild-index. Error: {}",
             e
         )
     })?;
@@ -172,7 +172,7 @@ pub fn add_triple(
     doc.add_text(fields.property, property);
     doc.add_text(fields.value, value);
     doc.add_text(fields.subject, subject);
-    writer.add_document(doc);
+    writer.add_document(doc)?;
     Ok(())
 }
 
