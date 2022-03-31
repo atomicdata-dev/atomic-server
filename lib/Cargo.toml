@@ -22,17 +22,9 @@ name = "benchmarks"
 
 [dependencies]
 base64 = "0.13"
-bincode = {version = "1", optional = true}
-dirs = {version = "4", optional = true}
-rand = {version = "0.8"}
 regex = "1"
 ring = "0.16"
-rio_api = {version = "0.7", optional = true}
-rio_turtle = {version = "0.7", optional = true}
-serde = {version = "1", features = ["derive"]}
 serde_json = "1"
-sled = {version = "0.34", optional = true, features = ["no_logs"]}
-toml = {version = "0.5", optional = true}
 tracing = "0.1"
 ureq = "2"
 url = "2"
@@ -45,11 +37,11 @@ version = "0.0.1"
 
 [dependencies.bincode]
 optional = true
-version = "1.3.2"
+version = "1"
 
 [dependencies.dirs]
 optional = true
-version = "4.0.0"
+version = "4"
 
 [dependencies.fp-bindgen]
 features = [
@@ -59,12 +51,12 @@ features = [
   "generators",
 ]
 optional = true
-version = "1.0.0"
+version = "1"
 
 [dependencies.fp-bindgen-support]
 features = ["async", "host", "http", "guest"]
 optional = true
-version = "1.0.0"
+version = "1"
 
 # [dependencies.wasmer-compiler-cranelift]
 # optional = true
@@ -84,43 +76,43 @@ version = "2"
 [dependencies.tokio]
 features = ["rt"]
 optional = true
-version = "1.17"
+version = "1"
 
 [dependencies.http]
 optional = true
-version = "0.2.6"
+version = "0.2"
 
 [dependencies.serde_bytes]
 optional = true
 version = "0.11"
 
 [dependencies.rand]
-version = "0.8.3"
+version = "0.8"
 
 [dependencies.rio_api]
 optional = true
-version = "0.6.1"
+version = "0.7"
 
 [dependencies.rio_turtle]
 optional = true
-version = "0.6.1"
+version = "0.7"
 
 [dependencies.serde]
 features = ["derive"]
-version = "1.0.125"
+version = "1"
 
 [dependencies.sled]
 features = ["no_logs"]
 optional = true
-version = "0.34.6"
+version = "0.34"
 
 [dependencies.toml]
 optional = true
-version = "0.5.8"
+version = "0.5"
 
 [dependencies.wasmer]
 optional = true
-version = "2.2.1"
+version = "2"
 
 [dev-dependencies]
 criterion = "0.3"
