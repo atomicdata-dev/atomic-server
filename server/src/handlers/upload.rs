@@ -1,8 +1,7 @@
-use std::{ffi::OsStr, path::Path};
+use std::{ffi::OsStr, io::Write, path::Path};
 
 use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
-use async_std::prelude::*;
 use atomic_lib::{
     commit::CommitResponse, hierarchy::check_write, urls, utils::now, AtomicError, Resource,
     Storelike, Value,
@@ -57,7 +56,7 @@ pub async fn upload_handler(
         let filename = content_type.get_filename().ok_or("Filename is missing")?;
 
         let filesdir = format!("{}/uploads", appstate.config.config_dir.to_str().unwrap());
-        async_std::fs::create_dir_all(&filesdir).await?;
+        std::fs::create_dir_all(&filesdir)?;
 
         let file_id = format!(
             "{}-{}",
@@ -67,18 +66,17 @@ pub async fn upload_handler(
                 .replace(" ", "-")
         );
         let file_path = format!("{}/{}", filesdir, file_id);
-        let mut file = async_std::fs::File::create(file_path).await?;
+        let mut file = std::fs::File::create(file_path)?;
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
             let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
             // TODO: Update a SHA256 hash here for checksum
-            file.write_all(&data).await?;
+            file.write_all(&data)?;
         }
 
         let byte_count: i64 = file
-            .metadata()
-            .await?
+            .metadata()?
             .len()
             .try_into()
             .map_err(|_e| "Too large")?;
