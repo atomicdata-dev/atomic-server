@@ -46,7 +46,11 @@
       }
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "https://raw.githubusercontent.com/joepio/atomic-data-rust/master/desktop/latest-version.json"
+      ],
+      "dialog": true
     },
     "allowlist": {
       "all": true
