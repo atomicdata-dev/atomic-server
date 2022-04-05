@@ -1,0 +1,19 @@
+{
+  "name": "v0.31.1",
+  "notes": "Test version",
+  "pub_date": "2020-06-22T19:25:57Z",
+  "platforms": {
+    "darwin": {
+      "signature": "",
+      "url": "https://github.com/joepio/atomic-data-rust/releases/download/v0.31.1/Atomic.Server_0.31.1_aarch64.m1.macbook.dmg"
+    },
+    "linux": {
+      "signature": "",
+      "url": "https://github.com/joepio/atomic-data-rust/releases/download/v0.31.1/Atomic.Server_0.31.1_linux.m1.macbook.dmg"
+    },
+    "win64": {
+      "signature": "",
+      "url": "https://github.com/joepio/atomic-data-rust/releases/download/v0.31.1/Atomic.Server_0.31.1_win64.macbook.dmg"
+    }
+  }
+}

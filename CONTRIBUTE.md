@@ -121,6 +121,7 @@ drill -b benchmark.yml --stats
 - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
+- After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
 
 ## Including JS app_assets
 
@@ -137,11 +138,9 @@ If the CI scripts for some reason do not do their job (buildin releases, docker 
 
 ### Building and publishing binaries
 
-2. `cargo build --release`
-3. `cargo build --release --features desktop` if you want the tray item (mac + win support)
-4. Create a release on github, add the binaries.
-
-I've got to automate this process some day...
+1. `cargo build --release`
+2. `cargo tauri build` (on every OS!)
+3. Create a release on github, add the binaries and tauri builds
 
 ### Publishing to Cargo
 
