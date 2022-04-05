@@ -5,8 +5,6 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
 
-https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
-
 _Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
@@ -29,6 +27,8 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 - 🖥️  **Desktop app**: Easy desktop installation, with status bar icon, powered by [tauri](https://github.com/tauri-apps/tauri/).
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled), [tantivy](https://github.com/quickwit-inc/tantivy) and [more](Cargo.toml).
+
+https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
 
 ## Table of contents
 
@@ -59,18 +59,18 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](
 
 ## When should you use this
 
-- You want to make (high-value) datasets as easily accessible as possible
-- You want to specify and share a common vocabulary / ontology / schema for some specific domain or dataset. Example classes [here](https://atomicdata.dev/classes).
-- You want to use and share linked data, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
-- You are interested in re-decentralizing the web or want want to work with tech that improves data ownership and interoperability.
+- You want a powerful, lightweight, fast and easy to use **CMS** with editors, modelling capabilities and an intuitive API
+- You want to make (high-value) **datasets as easily accessible as possible**
+- You want to specify and share a **common vocabulary** / ontology / schema for some specific domain or dataset. Example classes [here](https://atomicdata.dev/classes).
+- You want to use and **share linked data**, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
+- You are interested in **re-decentralizing the web** or want want to work with tech that improves data ownership and interoperability.
 - You like living on the edge (this application is not production ready)
 
 ## When _not_ to use this
 
-- If you need stability or reliability, look further (for now).
-- If you need to store large amounts of data (for now). The server still lacks collection caching, which makes filtering / sorting slow on large  collections #114
-- You're dealing with sensitive private data. The authorization mechanisms are relatively new and not rigorously tested.
-- Complex query requirements. Check out NEO4j, Apache Jena or maybe TerminusDB.
+- If you need **stability**, look further (for now). This is beta sofware and is prone to change.
+- You're dealing with **sensitive / private data**. The authorization mechanisms are relatively new and not rigorously tested.
+- **Complex query requirements**. Check out NEO4j, Apache Jena or maybe TerminusDB.
 
 ## Installation & getting started
 
@@ -129,7 +129,7 @@ sudo apt-get install -y build-essential pkg-config libssl-dev --fix-missing
 - The server loads the `.env` from the current path by default. Create a `.env` file from the default template in your current directory with `atomic-server setup-env`.
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
 - A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
-- Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one.
+- Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one. Note that if you create a `localhost` agent, it cannot be used on the web (since, well, it's local).
 
 ### Running using a tunneling service (easy mode)
 
@@ -165,7 +165,7 @@ They are stored in your `.config/atomic/` dir.
 There are three ways to interact with this server:
 
 - **GUI**: Use the [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) JS frontend by visiting `localhost:9883`.
-- **API**: We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml). Check out [./example_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the Atomic Data Docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
+- **API**: We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml). Check out [./_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the Atomic Data Docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
 - **CLI**: The [`atomic-cli`](https://crates.io/crates/atomic-cli/0.24.2) terminal app
 
 ### Using Atomic-Server with the browser GUI
@@ -216,13 +216,14 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
+We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml).
 Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more about Collections, Commits, JSON-AD and other concepts used here.
 
 ## FAQ & Troubleshooting
 
 ### Can / should I create backups?
 
-You should. Especially before installing a newer Atomic-Server version, it might be imcompatible with the previous database model and could corrupt the database.
+You should. Especially before installing a newer Atomic-Server version, as it might be imcompatible with the previous database model and could corrupt the database.
 Run `atomic-server export` to create a backup in your `~/.config/atomic/backups` folder.
 Import them using `atomic-server import -p ~/.config/atomic/backups/${date}.json`.
 
@@ -244,10 +245,11 @@ Remove the `db` folder in your `atomic` config: `rm -rf ~/.config/atomic/db`.
 You can press the menu icon (the three dots in the navigation bar), go to sharing, and uncheck the public `read` right.
 See the [Hierarchy chapter](https://docs.atomicdata.dev/hierarchy.html) in the docs on more info of the authorization model.
 
-### Collections are empty / TPF is not working / search is empty
+### Items are missing in my Collections / Search results
 
 You might have a problem with your indexes.
 Try rebuilding the indexes using `atomic-server --rebuild-index`.
+Also, if you can, recreate and describe the indexing issue in the issue tracker, so we can fix it.
 
 ### I get a `failed to retrieve` error when opening
 
