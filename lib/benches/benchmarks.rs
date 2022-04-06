@@ -76,6 +76,12 @@ fn criterion_benchmark(c: &mut Criterion) {
             big_resource.to_n_triples(&store).unwrap();
         })
     });
+
+    c.bench_function("all_resources()", |b| {
+        b.iter(|| {
+            store.all_resources(false);
+        })
+    });
 }
 
 criterion_group!(benches, criterion_benchmark);
