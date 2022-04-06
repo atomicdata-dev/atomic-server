@@ -512,11 +512,12 @@ impl Storelike for Db {
             let subject: String = String::from_utf8_lossy(&subject).to_string();
             if !include_external && !subject.starts_with(&self_url) {
                 continue;
+            } else {
+                let propvals: PropVals = bincode::deserialize(&resource_bin)
+                    .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
+                let resource = Resource::from_propvals(propvals, subject);
+                resources.push(resource);
             }
-            let propvals: PropVals = bincode::deserialize(&resource_bin)
-                .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
-            let resource = Resource::from_propvals(propvals, subject);
-            resources.push(resource);
         }
         resources
     }

@@ -46,4 +46,10 @@ fn main() {
             .to_string()
             == "the age of a person"
     );
+    // println!("All resources internal only - include_external: false");
+    // println!("{:#?}", store.all_resources(false));
+    println!("All resources - include_external: false");
+    println!("{:#?}", store.all_resources(false).len());
+    println!("All resources - include_external: true");
+    println!("{:#?}", store.all_resources(true).len());
 }
