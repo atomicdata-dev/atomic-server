@@ -172,6 +172,9 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
         atomic_lib::config::default_config_dir_path()?
     };
     let mut config_file_path = config_dir.join("config.toml");
+
+    let data_path =
+
     let mut store_path = config_dir.clone();
     store_path.push("db");
     let mut https_path = config_dir.clone();
