@@ -545,7 +545,7 @@ dependencies = [
  "atomic_lib",
  "clap 3.1.6",
  "colored",
- "dirs 4.0.0",
+ "dirs",
  "edit",
  "promptly",
  "regex",
@@ -568,7 +568,7 @@ dependencies = [
  "awc",
  "chrono",
  "clap 3.1.6",
- "dirs 3.0.2",
+ "directories",
  "dotenv",
  "futures",
  "promptly",
@@ -611,7 +611,7 @@ dependencies = [
  "base64",
  "bincode",
  "criterion",
- "dirs 4.0.0",
+ "directories",
  "iai",
  "lazy_static",
  "ntest",
@@ -1498,10 +1498,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "dirs"
-version = "3.0.2"
+name = "directories"
+version = "4.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30baa043103c9d0c2a57cf537cc2f35623889dc0d405e6c3cccfadbc81c71309"
+checksum = "f51c5d4ddabd36886dd3e1438cb358cdcb0d7c499cb99cb4ac2e38e18b5cb210"
 dependencies = [
  "dirs-sys",
 ]
