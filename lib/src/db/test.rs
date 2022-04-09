@@ -383,8 +383,8 @@ fn query_include_external() {
     let res_include = store.query(&q).unwrap();
     q.include_external = false;
     let res_no_include = store.query(&q).unwrap();
-    println!("{:?}", res_include.subjects.len());
-    println!("{:?}", res_no_include.subjects.len());
+    println!("***Query  {:?}", res_include.subjects.len());
+    println!("***Query no include {:?}", res_no_include.subjects.len());
     assert!(
         res_include.subjects.len() > res_no_include.subjects.len(),
         "Amount of results should be higher for include_external"
@@ -396,9 +396,10 @@ fn query_include_external() {
 fn test_db_resources_all(){
     let store = &DB.lock().unwrap().clone();
     let res_no_include=store.all_resources(false).len();
+    println!("*** running with TRUE");
     let res_include=store.all_resources(true).len();
     assert!(
-        res_no_include > res_include,
+         res_include < res_no_include,
         "Amount of results should be higher for include_external"
     );
 }

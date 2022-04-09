@@ -6,6 +6,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+
+use sled::IVec;
 use tracing::{instrument, trace};
 
 use crate::{
@@ -467,21 +469,30 @@ impl Storelike for Db {
 
     #[instrument(skip(self))]
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
+        fn process_resource(item: Result<(IVec, IVec), sled::Error>)->Resource {
+            let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
+            let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
+            // FIXME: if not include_external filter by subject.starts_with 
+            // foo.map(|foo_val| foo_val < 5).unwrap_or(true)
+            // if !include_external && !subject.starts_with(&self_url) {
+                // continue;
+            // } else {
+                let propvals: PropVals = bincode::deserialize(&resource_bin)
+                    .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
+                let resource = Resource::from_propvals(propvals, subject);
+                resource
+            // }
+
+        }
         let mut resources: ResourceCollection = Vec::new();
         let self_url = self
             .get_self_url()
             .expect("No self URL set, is required in DB");
+            
         for item in self.resources.into_iter() {
-            let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
-            if !include_external && !subject.starts_with(&self_url) {
-                continue;
-            } else {
-                let propvals: PropVals = bincode::deserialize(&resource_bin)
-                    .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
-                let resource = Resource::from_propvals(propvals, subject);
-                resources.push(resource);
-            }
+
+            let resource=process_resource(item);
+            resources.push(resource);
         }
         resources
     }
