@@ -103,7 +103,14 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
 
     // Cleanup, runs when server is stopped
     tracing_chrome_flush_guard.flush();
-    crate::process::remove_pid(&config)?;
+
+    if cfg!(feature = "process-management") {
+        #[cfg(feature = "process-management")]
+        {
+            crate::process::remove_pid(&config)?;
+        }
+    }
+
     tracing::info!("Server stopped");
     Ok(())
 }

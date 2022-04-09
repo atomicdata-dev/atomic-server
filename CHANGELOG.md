@@ -13,6 +13,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Added `data-dir` flag
 - Replaced `awc` with `ureq` #374
 - Get rid of `.unwrap` calls in `commit_monitor` #345
+- Make process management optional #324 #334
 
 ## [v0.31.1] - 2022-03-29
 

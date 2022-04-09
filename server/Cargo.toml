@@ -33,7 +33,6 @@ rustls-pemfile = "0.2"
 sanitize-filename = "0.3"
 serde_json = "1"
 static-files = "0.2"
-sysinfo = "0.23"
 tantivy = "0.17"
 tracing = "0.1"
 tracing-actix-web = "0.5"
@@ -45,6 +44,10 @@ urlencoding = "2"
 [dependencies.acme-lib]
 optional = true
 version = "0.8"
+
+[dependencies.sysinfo]
+optional = true
+sysinfo = "0.23"
 
 [dependencies.actix-web]
 features = ["rustls"]
@@ -84,6 +87,7 @@ actix-rt = "2"
 [features]
 default = ["https"]
 https = ["acme-lib", "rustls"]
+process-management = ["sysinfo"]
 
 [lib]
 name = "atomic_server_lib"
