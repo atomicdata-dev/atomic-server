@@ -231,7 +231,9 @@ fn get_extended_resource_pagination() {
 /// Checks if cache is properly invalidated on modifying or deleting resources.
 #[test]
 fn queries() {
-    let store = &DB.lock().unwrap().clone();
+    // Re-using the same instance can cause issues with testing concurrently.
+    // let store = &DB.lock().unwrap().clone();
+    let store = &Db::init_temp("queries").unwrap();
 
     let demo_val = Value::Slug("myval".to_string());
     let demo_reference = Value::AtomicUrl(urls::PARAGRAPH.into());
