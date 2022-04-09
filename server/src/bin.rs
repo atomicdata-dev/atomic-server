@@ -60,6 +60,25 @@ async fn main() -> errors::AtomicServerResult<()> {
             println!("Sucesfully imported {:?} to store.", o.path);
             Ok(())
         }
+        Some(config::Command::ShowConfig) => {
+            println!("{:#?}", config);
+            Ok(())
+        }
+        Some(config::Command::Reset) => {
+            if dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
+                .with_prompt(
+                    format!("Warning!! Do you really want to remove all data from your atomic-server? This will delete {:?}", &config.store_path),
+                )
+                .interact()
+                .unwrap()
+            {
+                std::fs::remove_dir_all(config.store_path).map(|e| format!("unable to remove directory: {:?}", e))?;
+                println!("Done");
+            } else {
+                println!("Ok, not removing anything.");
+            }
+            Ok(())
+        }
         Some(config::Command::SetupEnv) => {
             let current_path = std::env::current_dir()?;
             let pathstr = format!(

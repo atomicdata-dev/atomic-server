@@ -38,7 +38,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 - [Installation & getting started](#installation--getting-started)
   - [Install using cargo](#install-using-cargo)
   - [Run using docker](#run-using-docker)
-  - [Install from source](#install-from-source)
+  - [Run from source](#run-from-source)
   - [Troubleshooting compiling from source:](#troubleshooting-compiling-from-source)
 - [Initial setup and configuration](#initial-setup-and-configuration)
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
@@ -53,8 +53,9 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [How do I migrate my data to a new domain?](#how-do-i-migrate-my-data-to-a-new-domain)
   - [How do I reset my database?](#how-do-i-reset-my-database)
   - [How do I make my data private, yet available online?](#how-do-i-make-my-data-private-yet-available-online)
-  - [Collections are empty / TPF is not working / search is empty](#collections-are-empty--tpf-is-not-working--search-is-empty)
+  - [Items are missing in my Collections / Search results](#items-are-missing-in-my-collections--search-results)
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
+  - [What is `rdf-search` mode?](#what-is-rdf-search-mode)
   - [Can I embed Atomic-Server in another application?](#can-i-embed-atomic-server-in-another-application)
 
 ## When should you use this
@@ -104,15 +105,11 @@ The `dockerfile` is located in the project root, above this `server` folder.
 - If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
 
-### Install from source
+### Run from source
 
 ```sh
-# Clone this repo
 git clone git@github.com:joepio/atomic-data-rust.git
 cd atomic-data-rust/server
-# Optional, but recommended: Create a new .env using the template.
-cp default.env .env
-# Run the server. It creates a store in ~/.config/atomic/db by default
 cargo run
 ```
 
@@ -128,7 +125,7 @@ sudo apt-get install -y build-essential pkg-config libssl-dev --fix-missing
 - You can configure the server by passing arguments (see `atomic-server --help`), or by setting ENV variables.
 - The server loads the `.env` from the current path by default. Create a `.env` file from the default template in your current directory with `atomic-server setup-env`.
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
-- A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
+- A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, the HTTPS certificates other configuration. Depending on your OS, the actual data is stored in different locations. See use the `show-config` command to find out where, if you need the files.
 - Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one. Note that if you create a `localhost` agent, it cannot be used on the web (since, well, it's local).
 
 ### Running using a tunneling service (easy mode)
