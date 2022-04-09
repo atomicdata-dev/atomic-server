@@ -10,6 +10,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Updated various dependencies, and made `cargo.toml` less restrictive.
 - Remove `async-std` calls from `upload.rs`
 - Added `reset` and `show-config` commands to `atomic-server`.
+- Added `data-dir` flag
 - Replaced `awc` with `ureq` #374
 
 ## [v0.31.1] - 2022-03-29

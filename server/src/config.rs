@@ -65,6 +65,10 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
 
+    /// Path for atomic data store folder.
+    #[clap(long, env = "ATOMIC_STORE_DIR")]
+    pub data_dir: Option<PathBuf>,
+
     /// CAUTION: Makes data publicly readable on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/joepio/atomic-data-rust/blob/master/server/rdf-search.md
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
@@ -151,9 +155,9 @@ pub struct Config {
     pub config_file_path: PathBuf,
     /// Path where the public static files folder is located
     pub static_path: PathBuf,
-    /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
+    /// Path to where the store / database is located.
     pub store_path: PathBuf,
-    /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
+    /// Path to where the uploaded files are stored.
     pub uploads_path: PathBuf,
     /// Path to where the search index for tantivy full text search is located  (defaults to `~/.config/atomic/search_index`)
     pub search_index_path: PathBuf,
@@ -172,26 +176,32 @@ pub fn read_opts() -> Opts {
 
 /// Creates the server config, reads .env values and sets defaults
 pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
+    // Directories & file system
+    let project_dirs = directories::ProjectDirs::from("", "", "atomic-data")
+        .expect("Could not find Project directories on your OS");
+
+    // Persistent user data
+
+    let data_dir = opts
+        .data_dir
+        .clone()
+        .unwrap_or_else(|| project_dirs.data_dir().to_owned());
+    let mut store_path = data_dir.clone();
+    store_path.push("store");
+
+    let mut uploads_path = data_dir.clone();
+    uploads_path.push("uploads");
+
+    let mut static_path = data_dir;
+    static_path.push("static");
+
+    // Config data
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
     } else {
         atomic_lib::config::default_config_dir_path()?
     };
     let mut config_file_path = config_dir.join("config.toml");
-
-    let project_dirs = directories::ProjectDirs::from("", "", "atomic-data")
-        .expect("Could not find Project directories on your OS");
-
-    // Persistent user data
-
-    let data_dir = project_dirs.data_dir();
-    let mut store_path = data_dir.to_owned();
-    store_path.push("store");
-
-    let mut uploads_path = data_dir.to_owned();
-    uploads_path.push("uploads");
-
-    // Config data
 
     let mut https_path = config_dir.clone();
     https_path.push("https");
@@ -252,9 +262,6 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     } else {
         format!("{}://{}:{}", schema, opts.domain, opts.port)
     };
-
-    let mut static_path = config_dir.clone();
-    static_path.push("public");
 
     Ok(Config {
         initialize,
