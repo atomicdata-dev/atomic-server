@@ -47,13 +47,15 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
 
     let handle = rx.recv().unwrap();
 
-    let client = awc::Client::new();
+    let agent = ureq::builder()
+        .timeout(std::time::Duration::from_secs(2))
+        .build();
+
     let well_known_url = format!("http://{}/.well-known/", &config.opts.domain);
     tracing::info!("Testing availability of {}", &well_known_url);
-    let resp = client
+    let resp = agent
         .get(&well_known_url)
-        .send()
-        .await
+        .call()
         .expect("Unable to send request for Let's Encrypt initialization");
     if resp.status() != 200 {
         return Err(
