@@ -101,6 +101,12 @@ pub enum Command {
     /// Creates a `.env` file in your current directory that shows various options that you can set.
     #[clap(name = "setup-env")]
     SetupEnv,
+    /// Returns the currently selected options, based on the passed flags and parsed environment variables.
+    #[clap(name = "show-config")]
+    ShowConfig,
+    /// Danger! Removes all data from the store.
+    #[clap(name = "reset")]
+    Reset,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -126,7 +132,7 @@ pub struct ServerOpts {}
 
 /// Configuration for the server.
 /// These values are set when the server initializes, and do not change while running.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// Full domain + schema, e.g. `https://example.com`. Is either generated from `domain` and `schema`, or is the `custom_server_url`.
     pub server_url: String,
@@ -173,20 +179,35 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     };
     let mut config_file_path = config_dir.join("config.toml");
 
-    let data_path =
+    let project_dirs = directories::ProjectDirs::from("", "", "atomic-data")
+        .expect("Could not find Project directories on your OS");
 
-    let mut store_path = config_dir.clone();
-    store_path.push("db");
+    // Persistent user data
+
+    let data_dir = project_dirs.data_dir();
+    let mut store_path = data_dir.to_owned();
+    store_path.push("store");
+
+    let mut uploads_path = data_dir.to_owned();
+    uploads_path.push("uploads");
+
+    // Config data
+
     let mut https_path = config_dir.clone();
     https_path.push("https");
-    let mut search_index_path = config_dir.clone();
-    search_index_path.push("search_index");
+
     let mut cert_path = config_dir.clone();
     cert_path.push("https/cert.pem");
+
     let mut key_path = config_dir.clone();
     key_path.push("https/key.pem");
-    let mut uploads_path = config_dir.clone();
-    uploads_path.push("uploads");
+
+    // Cache data
+
+    let cache_dir = project_dirs.cache_dir();
+
+    let mut search_index_path = cache_dir.to_owned();
+    search_index_path.push("search_index");
 
     // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
@@ -215,7 +236,7 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
 
     if opts.https & opts.email.is_none() {
         return Err(
-            "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsenrypt.org."
+            "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsencrypt.org."
                 .into(),
         );
         // email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
