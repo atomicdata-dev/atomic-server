@@ -37,9 +37,10 @@ async fn server_tests() {
     let opts = Opts::parse_from(&[
         "atomic-server",
         "--initialize",
-        "--config-dir",
+        "--data-dir",
         &format!("./.temp/{}", unique_string),
     ]);
+
     let config = config::build_config(opts)
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");
