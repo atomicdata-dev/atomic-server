@@ -15,7 +15,7 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 - [Testing](#testing)
 - [Code coverage](#code-coverage)
 - [Debugging](#debugging)
-- [Performance monitoring](#performance-monitoring)
+- [Performance monitoring / benchmarks](#performance-monitoring--benchmarks)
   - [Tracing](#tracing)
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
@@ -73,7 +73,7 @@ cargo llvm-cov --all-features --show-missing-lines
 
 - **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
 
-## Performance monitoring
+## Performance monitoring / benchmarks
 
 We want to make Atomic Server as fast as possible.
 For doing this, we have at least three tools: tracing, criterion and drill.
