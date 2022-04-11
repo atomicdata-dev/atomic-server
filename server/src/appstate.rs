@@ -24,12 +24,18 @@ pub struct AppState {
 
 /// Creates the AppState (the server's context available in Handlers).
 /// Initializes or opens a store on disk.
-/// Creates a new agent, if neccessary.
+/// Creates a new agent, if necessary.
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
     tracing::info!("Initializing AppState");
+
     // Check if atomic-server is already running somewhere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
-    let _ = crate::process::terminate_existing_processes(&config)
-        .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
+    if cfg!(feature = "process-management") {
+        #[cfg(feature = "process-management")]
+        {
+            let _ = crate::process::terminate_existing_processes(&config)
+                .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
+        }
+    }
 
     tracing::info!("Opening database at {:?}", &config.store_path);
     let store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;

@@ -65,6 +65,10 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
 
+    /// Path for atomic data store folder.
+    #[clap(long, env = "ATOMIC_STORE_DIR")]
+    pub data_dir: Option<PathBuf>,
+
     /// CAUTION: Makes data publicly readable on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/joepio/atomic-data-rust/blob/master/server/rdf-search.md
     #[clap(long, env = "ATOMIC_RDF_SEARCH")]
     pub rdf_search: bool,
@@ -101,6 +105,12 @@ pub enum Command {
     /// Creates a `.env` file in your current directory that shows various options that you can set.
     #[clap(name = "setup-env")]
     SetupEnv,
+    /// Returns the currently selected options, based on the passed flags and parsed environment variables.
+    #[clap(name = "show-config")]
+    ShowConfig,
+    /// Danger! Removes all data from the store.
+    #[clap(name = "reset")]
+    Reset,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -126,7 +136,7 @@ pub struct ServerOpts {}
 
 /// Configuration for the server.
 /// These values are set when the server initializes, and do not change while running.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Config {
     /// Full domain + schema, e.g. `https://example.com`. Is either generated from `domain` and `schema`, or is the `custom_server_url`.
     pub server_url: String,
@@ -145,9 +155,9 @@ pub struct Config {
     pub config_file_path: PathBuf,
     /// Path where the public static files folder is located
     pub static_path: PathBuf,
-    /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
+    /// Path to where the store / database is located.
     pub store_path: PathBuf,
-    /// Path to where the store is located. (defaults to `~/.config/atomic/db`)
+    /// Path to where the uploaded files are stored.
     pub uploads_path: PathBuf,
     /// Path to where the search index for tantivy full text search is located  (defaults to `~/.config/atomic/search_index`)
     pub search_index_path: PathBuf,
@@ -166,24 +176,48 @@ pub fn read_opts() -> Opts {
 
 /// Creates the server config, reads .env values and sets defaults
 pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
+    // Directories & file system
+    let project_dirs = directories::ProjectDirs::from("", "", "atomic-data")
+        .expect("Could not find Project directories on your OS");
+
+    // Persistent user data
+
+    let data_dir = opts
+        .data_dir
+        .clone()
+        .unwrap_or_else(|| project_dirs.data_dir().to_owned());
+    let mut store_path = data_dir.clone();
+    store_path.push("store");
+
+    let mut uploads_path = data_dir.clone();
+    uploads_path.push("uploads");
+
+    let mut static_path = data_dir;
+    static_path.push("static");
+
+    // Config data
     let config_dir = if let Some(dir) = &opts.config_dir {
         dir.clone()
     } else {
         atomic_lib::config::default_config_dir_path()?
     };
     let mut config_file_path = config_dir.join("config.toml");
-    let mut store_path = config_dir.clone();
-    store_path.push("db");
+
     let mut https_path = config_dir.clone();
     https_path.push("https");
-    let mut search_index_path = config_dir.clone();
-    search_index_path.push("search_index");
+
     let mut cert_path = config_dir.clone();
     cert_path.push("https/cert.pem");
+
     let mut key_path = config_dir.clone();
     key_path.push("https/key.pem");
-    let mut uploads_path = config_dir.clone();
-    uploads_path.push("uploads");
+
+    // Cache data
+
+    let cache_dir = project_dirs.cache_dir();
+
+    let mut search_index_path = cache_dir.to_owned();
+    search_index_path.push("search_index");
 
     // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
@@ -212,7 +246,7 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
 
     if opts.https & opts.email.is_none() {
         return Err(
-            "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsenrypt.org."
+            "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsencrypt.org."
                 .into(),
         );
         // email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
@@ -228,9 +262,6 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     } else {
         format!("{}://{}:{}", schema, opts.domain, opts.port)
     };
-
-    let mut static_path = config_dir.clone();
-    static_path.push("public");
 
     Ok(Config {
         initialize,
