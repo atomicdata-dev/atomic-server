@@ -5,11 +5,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
-// my attempt of async
-use futures::{stream, Stream, StreamExt};
-use std::thread::{self, JoinHandle};
-use async_trait::async_trait;
-// 
+
 use sled::IVec;
 use tracing::{instrument, trace};
 
@@ -76,7 +72,7 @@ impl Db {
         let db = sled::Config::default()
         .path(path)
         .flush_every_ms(Some(10_000))
-        .cache_capacity(100 * 1024 * 1024)
+        .cache_capacity(1000 * 1024 * 1024)
         .open()?;
         let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
         let reference_index = db.open_tree("reference_index")?;
