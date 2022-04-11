@@ -56,4 +56,7 @@ fn main() {
     println!("Elapsed: {:.2?}", elapsed);
     // println!("All resources - include_external: true");
     println!("{:#?}", store.all_resources(false));
+     println!("All resources - include_external: true");
+     println!("{:#?}", store.all_resources(true).len());
+     println!("{:?}",store.get_self_url());
 }
