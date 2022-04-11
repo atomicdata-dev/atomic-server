@@ -55,5 +55,5 @@ fn main() {
     let elapsed = now.elapsed();
     println!("Elapsed: {:.2?}", elapsed);
     // println!("All resources - include_external: true");
-    // println!("{:#?}", store.all_resources(true).len());
+    println!("{:#?}", store.all_resources(false));
 }

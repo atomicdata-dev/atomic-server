@@ -5,8 +5,11 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
-
-
+// my attempt of async
+use futures::{stream, Stream, StreamExt};
+use std::thread::{self, JoinHandle};
+use async_trait::async_trait;
+// 
 use sled::IVec;
 use tracing::{instrument, trace};
 
@@ -70,7 +73,11 @@ impl Db {
     /// The server_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
-        let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
+        let db = sled::Config::default()
+        .path(path)
+        .flush_every_ms(Some(10_000))
+        .cache_capacity(100 * 1024 * 1024)
+        .open()?;
         let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
         let reference_index = db.open_tree("reference_index")?;
         let members_index = db.open_tree("members_index")?;
@@ -109,7 +116,7 @@ impl Db {
     #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
-        let subject_bin = bincode::serialize(subject)?;
+        let subject_bin = subject.as_bytes();
         self.resources.insert(subject_bin, resource_bin)?;
         Ok(())
     }
@@ -118,8 +125,7 @@ impl Db {
     /// Deals with the binary API of Sled
     #[instrument(skip(self))]
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
-        let subject_binary = bincode::serialize(subject)
-            .map_err(|e| format!("Can't serialize {}: {}", subject, e))?;
+        let subject_binary = subject.as_bytes();
         let propval_maybe = self
             .resources
             .get(subject_binary)
@@ -467,11 +473,21 @@ impl Storelike for Db {
         query_indexed(self, q)
     }
 
+    // #[instrument(skip(self))]
+    // fn resource_iter(&self) -> Resource {
+    //     // FIXME: change subject from bincode to as_bytes + change iterator with range from empty prefix subject
+    /// let scan_key: &[u8] = b"a non-present key before yo!";
+/// let mut iter = db.range(scan_key..);
+    // }
+
     #[instrument(skip(self))]
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
-        fn process_resource(item: Result<(IVec, IVec), sled::Error>)->Resource {
+        // FIXME: Try rossbeam channels here
+        // TODO: change iter iter with range from prefix - if bool true set prefix
+        //  spawn number of threads use boxed str for subject inside lambda function inside thread 
+         fn process_resource(item: Result<(IVec, IVec), sled::Error>)->Resource {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
+            let subject= String::from_utf8_lossy(&subject).to_string();
             // FIXME: if not include_external filter by subject.starts_with 
             // foo.map(|foo_val| foo_val < 5).unwrap_or(true)
             // if !include_external && !subject.starts_with(&self_url) {
@@ -485,10 +501,10 @@ impl Storelike for Db {
 
         }
         let mut resources: ResourceCollection = Vec::new();
-        let self_url = self
+        let _self_url = self
             .get_self_url()
             .expect("No self URL set, is required in DB");
-            
+        println!("Length of resources{:#?}",self.resources.len());
         for item in self.resources.into_iter() {
 
             let resource=process_resource(item);

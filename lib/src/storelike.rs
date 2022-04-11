@@ -63,6 +63,8 @@ pub trait Storelike: Sized {
     /// WARNING: This could be very expensive!
     fn all_resources(&self, include_external: bool) -> ResourceCollection;
 
+    // fn resource_iter(&self) -> Resource;
+
     /// Constructs the value index from all resources in the store. Could take a while.
     fn build_index(&self, include_external: bool) -> AtomicResult<()> {
         for r in self.all_resources(include_external) {
