@@ -8,8 +8,10 @@ pub fn construct_invite_redirect(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
     invite_resource: &mut Resource,
-    subject: &str,
+    // Not used for invite redirects, invites are always public
+    for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
+    let requested_subject = invite_resource.get_subject().to_string();
     let mut pub_key = None;
     let mut invite_agent = None;
     for (k, v) in query_params {
@@ -69,7 +71,7 @@ pub fn construct_invite_redirect(
             return Err("No usages left for this invite".into());
         }
         // Since the requested subject might have query params, we don't want to overwrite that one - we want to overwrite the clean resource.
-        let mut url = url::Url::parse(subject)?;
+        let mut url = url::Url::parse(&requested_subject)?;
         url.set_query(None);
         invite_resource.set_subject(url.to_string());
         invite_resource.set_propval(urls::USAGES_LEFT.into(), Value::Integer(num - 1), store)?;
@@ -109,7 +111,7 @@ pub fn construct_invite_redirect(
         store,
     )?;
     // The front-end requires the @id to be the same as requested
-    redirect.set_subject(subject.into());
+    redirect.set_subject(requested_subject);
     Ok(redirect)
 }
 

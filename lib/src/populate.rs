@@ -191,10 +191,14 @@ Note that, by default, all resources are `public`. You can edit this by opening 
     Ok(())
 }
 
-/// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary) from default_store.jsonld
+/// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary)
 pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
-    let json = include_str!("../defaults/default_store.json");
-    store.import(json)?;
+    store
+        .import(include_str!("../defaults/default_store.json"))
+        .map_err(|e| format!("Failed to import default_store.json: {e}"))?;
+    store
+        .import(include_str!("../defaults/chatroom.json"))
+        .map_err(|e| format!("Failed to import chatroom.json: {e}"))?;
     Ok(())
 }
 

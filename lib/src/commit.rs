@@ -129,6 +129,8 @@ impl Commit {
             }
         };
 
+        let mut resource_new = self.apply_changes(resource_old.clone(), store, false)?;
+
         // Make sure the one creating the commit had the same idea of what the current state is.
         if !is_new && opts.validate_previous_commit {
             if let Ok(last_resource_val) = resource_old.get(urls::LAST_COMMIT) {
@@ -195,6 +197,21 @@ impl Commit {
                             target, e
                         )
                     })?;
+                }
+                urls::MESSAGE => {
+                    // Set a `created_at`
+                    resource_new.set_propval(
+                        urls::CREATED_AT.into(),
+                        Value::Timestamp(crate::utils::now()),
+                        store,
+                    )?;
+                    // Update the ChatRoom
+                    let parent_subject = resource_new
+                        .get(urls::PARENT)
+                        .map_err(|_e| "Message must have a Parent!")?
+                        .to_string();
+                    // What to do, what to do...
+                    store.invalidate(&parent_subject)?;
                 }
                 _other => {}
             };

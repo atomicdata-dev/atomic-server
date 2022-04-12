@@ -1,0 +1,43 @@
+[
+  {
+    "@id": "https://atomicdata.dev/properties/messages",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Message",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The messages in the ChatRoom. This list depends on the other query parameters passed to the ChatRoom resource. By default, only the most recent messages are in this array.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/isDynamic": true,
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "messages"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/ChatRoom",
+    "https://atomicdata.dev/properties/description": "A place where users can post and view chat messages.\n\nThis is a dynamic resource, which means that its contents can be modified using query parameters.  ",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/messages",
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "chatroom"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Message",
+    "https://atomicdata.dev/properties/description": "A single Chat Message, usually in a ChatRoom.\n\nInformation about its creator, and created data can be found using `last-commit`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/description",
+      "https://atomicdata.dev/properties/parent"
+    ],
+    "https://atomicdata.dev/properties/shortname": "message"
+  }
+]
