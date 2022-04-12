@@ -353,7 +353,7 @@ impl Storelike for Db {
                             self,
                             query_params,
                             &mut resource,
-                            subject,
+                            for_agent,
                         );
                     }
                 }
@@ -361,6 +361,17 @@ impl Storelike for Db {
                     has_dynamic = true;
                     if !skip_dynamic {
                         return crate::hierarchy::add_children(self, &mut resource);
+                    }
+                }
+                crate::urls::CHATROOM => {
+                    has_dynamic = true;
+                    if !skip_dynamic {
+                        return crate::plugins::chatroom::construct_chatroom(
+                            self,
+                            query_params,
+                            &mut resource,
+                            for_agent,
+                        );
                     }
                 }
                 _ => {}

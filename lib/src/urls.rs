@@ -13,6 +13,9 @@ pub const INVITE: &str = "https://atomicdata.dev/classes/Invite";
 pub const REDIRECT: &str = "https://atomicdata.dev/classes/Redirect";
 pub const ATOM: &str = "https://atomicdata.dev/classes/Atom";
 pub const FILE: &str = "https://atomicdata.dev/classes/File";
+pub const CHATROOM: &str = "https://atomicdata.dev/classes/ChatRoom";
+pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
+pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -92,8 +95,8 @@ pub const MIMETYPE: &str = "https://atomicdata.dev/properties/mimetype";
 pub const INTERNAL_ID: &str = "https://atomicdata.dev/properties/internalId";
 pub const DOWNLOAD_URL: &str = "https://atomicdata.dev/properties/downloadURL";
 pub const ATTACHMENTS: &str = "https://atomicdata.dev/properties/attachments";
-// ... for Documents and Elements
-pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
+// ... for ChatRooms and Messages
+pub const MESSAGES: &str = "https://atomicdata.dev/properties/messages";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
