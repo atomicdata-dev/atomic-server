@@ -12,6 +12,7 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
+- [IDE setup (VSCode)](#ide-setup-vscode)
 - [Testing](#testing)
 - [Code coverage](#code-coverage)
 - [Debugging](#debugging)
@@ -37,6 +38,12 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 - Clone [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
+
+## IDE setup (VSCode)
+
+This project is primarily being developed in VSCode.
+That doesn't mean that you should, too, but it means you're less likely to run into issues.
+The `/.vscode` directory contains various tasks, recommended extensions, and some settings overwrites.
 
 ## Testing
 
