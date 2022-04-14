@@ -6,7 +6,7 @@ Therefore, we need migrations to convert the old schema to the new one.
 
 ## Adding a Migration
 
-- Write a function called `v{OLD}_to_v{NEW} that takes a [Db].
+- Write a function called `v{OLD}_to_v{NEW} that takes a [Db]. Make sure it removed the old `Tree`. Use [assert] to check if the process worked.
 - In [migrate_maybe] add the key of the outdated Tree
 - Add the function to the [migrate_maybe] `match` statement, select the older version of the Tree
 - Update the Tree key used in [Db::init]
@@ -30,14 +30,19 @@ pub fn migrate_maybe(store: &Db) -> AtomicResult<()> {
 fn v0_to_v1(store: &Db) -> AtomicResult<()> {
     tracing::warn!("Migrating resources schema from v0 to v1...");
     let new = store.db.open_tree("resources_v1")?;
+    let old_key = "resources";
+    let old = store.db.open_tree(old_key)?;
     let mut count = 0;
 
-    let config = sled::Config::new().temporary(true);
-    let db = config.open().unwrap();
+    for item in old.into_iter() {
+        let (subject, resource_bin) = item.expect("Unable to convert into iterable");
+        let subject: String =
+            bincode::deserialize(&subject).expect("Unable to deserialize subject");
+        new.insert(subject.as_bytes(), resource_bin)?;
+        count += 1;
+    }
 
-    use sled::Transactional;
-
-    // TODO: Let this compile!:
+    // TODO: Prefer transactional approach, but issue preventing me from compiling:
     // https://github.com/spacejam/sled/issues/1406
     // (&store.resources, &new)
     //     .transaction(|(old, new)| {
@@ -57,6 +62,12 @@ fn v0_to_v1(store: &Db) -> AtomicResult<()> {
         store.resources.len(),
         "Not all resources were migrated."
     );
+
+    assert!(
+        store.db.drop_tree(old_key)?,
+        "Old resources tree not properly removed."
+    );
+
     tracing::warn!("Finished migration of {} resources", count);
     Ok(())
 }

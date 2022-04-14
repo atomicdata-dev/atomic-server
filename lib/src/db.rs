@@ -61,8 +61,6 @@ pub struct Db {
     /// A list of all the Collections currently being used. Is used to update `members_index`.
     /// See [collections_index]
     watched_queries: sled::Tree,
-    /// Contains settings such as schema versions.
-    internal: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
     server_url: String,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
@@ -79,7 +77,6 @@ impl Db {
         let reference_index = db.open_tree("reference_index")?;
         let members_index = db.open_tree("members_index")?;
         let watched_queries = db.open_tree("watched_queries")?;
-        let internal = db.open_tree("internal")?;
         let store = Db {
             db,
             default_agent: Arc::new(Mutex::new(None)),
@@ -89,7 +86,6 @@ impl Db {
             server_url,
             watched_queries,
             endpoints: default_endpoints(),
-            internal,
         };
         migrate_maybe(&store)?;
         crate::populate::populate_base_models(&store)
