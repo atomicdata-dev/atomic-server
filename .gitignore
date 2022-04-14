@@ -2,3 +2,4 @@
 .env
 trace-*.json
 .temp
+.DS_Store
