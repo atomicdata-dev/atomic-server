@@ -7,10 +7,12 @@ license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/joepio/atomic-data-rust"
 version = "0.31.1"
-
 [[bin]]
 name = "atomic-server"
 path = "src/bin.rs"
+
+[build-dependencies]
+static-files = "0.2"
 
 [dependencies]
 actix = "=0.12.0"
@@ -18,9 +20,9 @@ actix-cors = "0.6"
 actix-files = "0.6"
 actix-multipart = "0.4"
 actix-web-actors = "=4.0.0"
-awc = "3"
 chrono = "0.4"
-dirs = "3"
+dialoguer = "0.10"
+directories = ">= 2, < 5"
 dotenv = "0.15"
 futures = "0.3"
 promptly = "0.3"
@@ -31,21 +33,28 @@ rustls-pemfile = "0.2"
 sanitize-filename = "0.3"
 serde_json = "1"
 static-files = "0.2"
-sysinfo = "0.23"
 tantivy = "0.17"
 tracing = "0.1"
 tracing-actix-web = "0.5"
 tracing-chrome = "0.5"
 tracing-log = "0.1"
+ureq = "2"
 urlencoding = "2"
 
 [dependencies.acme-lib]
 optional = true
 version = "0.8"
 
+[dependencies.sysinfo]
+optional = true
+sysinfo = "0.23"
+
 [dependencies.actix-web]
 features = ["rustls"]
 version = "4.0"
+
+[dependencies.actix-web-static-files]
+version = "4"
 
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf"]
@@ -72,18 +81,13 @@ version = "1"
 features = ["env-filter"]
 version = "0.3"
 
-[dependencies.actix-web-static-files]
-version = "4"
-
 [dev-dependencies]
 actix-rt = "2"
-
-[build-dependencies]
-static-files = "0.2"
 
 [features]
 default = ["https"]
 https = ["acme-lib", "rustls"]
+process-management = ["sysinfo"]
 
 [lib]
 name = "atomic_server_lib"

@@ -28,7 +28,7 @@ features = ["derive"]
 version = "1.0"
 
 [dependencies.tauri]
-features = ["api-all", "system-tray"]
+features = ["api-all", "system-tray", "updater"]
 version = "1.0.0-rc.6"
 
 [features]

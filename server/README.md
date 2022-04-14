@@ -10,23 +10,23 @@ _Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
 
-- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html). Combines safety of structured data with the
-- 🚀  **Fast** (1ms responses on my laptop)
+- 🚀  **Fast** (1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
+- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html).
 - 🌐  **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
 - 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/joepio/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
 - 💾  **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
-- 🔄  **Synchronization using websockets**: communicates state changes with a client. Send a `wss` request to `/ws` to open a webscocket.
+- 🔄  **Synchronization using websockets**: communicates state changes with a client.
 - 🧰  **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
-- 🔎  **Full-text search** with fuzzy search and various operators, often <3ms responses.
-- 📖  **Pagination, sorting and filtering** using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)
+- 🔎  **Full-text search** with fuzzy search and various operators, often <3ms responses. Powered by [tantivy](https://github.com/quickwit-inc/tantivy).
+- 📖  **Pagination, sorting and filtering** queries using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html).
 - 🔐  **Authorization** (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
 - 📲  **Invite and sharing system** with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 - 📂  **File management**: Upload, download and preview attachments.
 - 🖥️  **Desktop app**: Easy desktop installation, with status bar icon, powered by [tauri](https://github.com/tauri-apps/tauri/).
 
-Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib), [actix-web](https://github.com/actix/actix-web), [sled](https://github.com/spacejam/sled), [tantivy](https://github.com/quickwit-inc/tantivy) and [more](Cargo.toml).
+Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib) and [more](Cargo.toml).
 
 https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
 
@@ -38,7 +38,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 - [Installation & getting started](#installation--getting-started)
   - [Install using cargo](#install-using-cargo)
   - [Run using docker](#run-using-docker)
-  - [Install from source](#install-from-source)
+  - [Run from source](#run-from-source)
   - [Troubleshooting compiling from source:](#troubleshooting-compiling-from-source)
 - [Initial setup and configuration](#initial-setup-and-configuration)
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
@@ -53,8 +53,9 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [How do I migrate my data to a new domain?](#how-do-i-migrate-my-data-to-a-new-domain)
   - [How do I reset my database?](#how-do-i-reset-my-database)
   - [How do I make my data private, yet available online?](#how-do-i-make-my-data-private-yet-available-online)
-  - [Collections are empty / TPF is not working / search is empty](#collections-are-empty--tpf-is-not-working--search-is-empty)
+  - [Items are missing in my Collections / Search results](#items-are-missing-in-my-collections--search-results)
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
+  - [What is `rdf-search` mode?](#what-is-rdf-search-mode)
   - [Can I embed Atomic-Server in another application?](#can-i-embed-atomic-server-in-another-application)
 
 ## When should you use this
@@ -104,15 +105,11 @@ The `dockerfile` is located in the project root, above this `server` folder.
 - If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
 
-### Install from source
+### Run from source
 
 ```sh
-# Clone this repo
 git clone git@github.com:joepio/atomic-data-rust.git
 cd atomic-data-rust/server
-# Optional, but recommended: Create a new .env using the template.
-cp default.env .env
-# Run the server. It creates a store in ~/.config/atomic/db by default
 cargo run
 ```
 
@@ -128,7 +125,7 @@ sudo apt-get install -y build-essential pkg-config libssl-dev --fix-missing
 - You can configure the server by passing arguments (see `atomic-server --help`), or by setting ENV variables.
 - The server loads the `.env` from the current path by default. Create a `.env` file from the default template in your current directory with `atomic-server setup-env`.
 - After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/joepio/atomic-data-browser) clients for authorization.
-- A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, your data, the HTTPS certificates and a folder for public static files.
+- A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, the HTTPS certificates other configuration. Depending on your OS, the actual data is stored in different locations. See use the `show-config` command to find out where, if you need the files.
 - Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one. Note that if you create a `localhost` agent, it cannot be used on the web (since, well, it's local).
 
 ### Running using a tunneling service (easy mode)

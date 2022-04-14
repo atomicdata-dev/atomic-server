@@ -12,10 +12,11 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
+- [IDE setup (VSCode)](#ide-setup-vscode)
 - [Testing](#testing)
 - [Code coverage](#code-coverage)
 - [Debugging](#debugging)
-- [Performance monitoring](#performance-monitoring)
+- [Performance monitoring / benchmarks](#performance-monitoring--benchmarks)
   - [Tracing](#tracing)
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
@@ -37,6 +38,12 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 - Clone [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
+
+## IDE setup (VSCode)
+
+This project is primarily being developed in VSCode.
+That doesn't mean that you should, too, but it means you're less likely to run into issues.
+The `/.vscode` directory contains various tasks, recommended extensions, and some settings overwrites.
 
 ## Testing
 
@@ -73,7 +80,7 @@ cargo llvm-cov --all-features --show-missing-lines
 
 - **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
 
-## Performance monitoring
+## Performance monitoring / benchmarks
 
 We want to make Atomic Server as fast as possible.
 For doing this, we have at least three tools: tracing, criterion and drill.
@@ -121,6 +128,7 @@ drill -b benchmark.yml --stats
 - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
+- After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
 
 ## Including JS app_assets
 
@@ -137,11 +145,9 @@ If the CI scripts for some reason do not do their job (buildin releases, docker 
 
 ### Building and publishing binaries
 
-2. `cargo build --release`
-3. `cargo build --release --features desktop` if you want the tray item (mac + win support)
-4. Create a release on github, add the binaries.
-
-I've got to automate this process some day...
+1. `cargo build --release`
+2. `cargo tauri build` (on every OS!)
+3. Create a release on github, add the binaries and tauri builds
 
 ### Publishing to Cargo
 
