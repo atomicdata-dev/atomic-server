@@ -107,7 +107,7 @@ impl Db {
     #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
-        let subject_bin = bincode::serialize(subject)?;
+        let subject_bin = subject.as_bytes();
         self.resources.insert(subject_bin, resource_bin)?;
         Ok(())
     }
@@ -116,8 +116,7 @@ impl Db {
     /// Deals with the binary API of Sled
     #[instrument(skip(self))]
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
-        let subject_binary = bincode::serialize(subject)
-            .map_err(|e| format!("Can't serialize {}: {}", subject, e))?;
+        let subject_binary = subject.as_bytes();
         let propval_maybe = self
             .resources
             .get(subject_binary)
@@ -473,7 +472,7 @@ impl Storelike for Db {
             .expect("No self URL set, is required in DB");
         for item in self.resources.into_iter() {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
+            let subject = String::from_utf8_lossy(&subject).to_string();
             if !include_external && !subject.starts_with(&self_url) {
                 continue;
             } else {
