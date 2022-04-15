@@ -9,6 +9,7 @@ use std::{
 use tracing::{instrument, trace};
 
 use crate::{
+    commit::CommitResponse,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -65,6 +66,8 @@ pub struct Db {
     server_url: String,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
+    /// Function called whenever a Commit is applied.
+    on_commit: Option<Arc<Box<dyn Fn(&CommitResponse) + Send + Sync>>>,
 }
 
 impl Db {
@@ -86,6 +89,7 @@ impl Db {
             server_url,
             watched_queries,
             endpoints: default_endpoints(),
+            on_commit: None,
         };
         migrate_maybe(&store).map(|e| format!("Error during migration of database: {:?}", e))?;
         crate::populate::populate_base_models(&store)
@@ -114,6 +118,11 @@ impl Db {
         let resource_bin = bincode::serialize(propvals)?;
         self.resources.insert(subject.as_bytes(), resource_bin)?;
         Ok(())
+    }
+
+    /// Sets a function that is called by the store whenever a Commit is applied.
+    pub fn set_handle_commit(&mut self, on_commit: Box<dyn Fn(&CommitResponse) + Send + Sync>) {
+        self.on_commit = Some(Arc::new(on_commit));
     }
 
     /// Finds resource by Subject, return PropVals HashMap
@@ -387,6 +396,12 @@ impl Storelike for Db {
             )?;
         }
         Ok(resource)
+    }
+
+    fn handle_commit(&self, commit_response: &CommitResponse) {
+        if let Some(fun) = &self.on_commit {
+            fun(commit_response);
+        }
     }
 
     /// Search the Store, returns the matching subjects.

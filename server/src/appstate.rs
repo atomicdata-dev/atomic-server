@@ -4,6 +4,7 @@ use crate::{
 };
 use atomic_lib::{
     agents::{generate_public_key, Agent},
+    commit::CommitResponse,
     Storelike,
 };
 
@@ -40,7 +41,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     }
 
     tracing::info!("Opening database at {:?}", &config.store_path);
-    let store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
+    let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
     if config.initialize {
         tracing::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)
@@ -75,6 +76,17 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         search_state.clone(),
         config.clone(),
     );
+
+    let commit_monitor_clone = commit_monitor.clone();
+
+    // This closure is called every time a Commit is created
+    let send_commit = move |commit_response: &CommitResponse| {
+        commit_monitor_clone.do_send(crate::actor_messages::CommitMessage {
+            commit_response: commit_response.clone(),
+        });
+        tracing::info!("Sending commit to commit monitor");
+    };
+    store.set_handle_commit(Box::new(send_commit));
 
     Ok(AppState {
         store,

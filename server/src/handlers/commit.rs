@@ -38,5 +38,7 @@ pub async fn post_commit(
     appstate
         .commit_monitor
         .do_send(crate::actor_messages::CommitMessage { commit_response });
+
+    tracing::info!("{}", &message);
     Ok(builder.body(message))
 }
