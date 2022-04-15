@@ -2,6 +2,7 @@
 
 use crate::{
     agents::Agent,
+    commit::CommitResponse,
     errors::AtomicError,
     hierarchy,
     schema::{Class, Property},
@@ -189,6 +190,10 @@ pub trait Storelike: Sized {
         }
         Ok(resource)
     }
+
+    /// This function is called whenever a Commit is applied.
+    /// Implement this if you want to have custom handlers for Commits.
+    fn handle_commit(&self, commit_response: &CommitResponse) {}
 
     fn handle_not_found(&self, subject: &str, error: AtomicError) -> AtomicResult<Resource> {
         if let Some(self_url) = self.get_self_url() {

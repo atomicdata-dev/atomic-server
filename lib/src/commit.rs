@@ -200,18 +200,18 @@ impl Commit {
                 }
                 urls::MESSAGE => {
                     // Set a `created_at`
-                    resource_new.set_propval(
-                        urls::CREATED_AT.into(),
-                        Value::Timestamp(crate::utils::now()),
-                        store,
-                    )?;
+                    // resource_new.set_propval(
+                    //     urls::CREATED_AT.into(),
+                    //     Value::Timestamp(crate::utils::now()),
+                    //     store,
+                    // )?;
                     // Update the ChatRoom
                     let parent_subject = resource_new
                         .get(urls::PARENT)
                         .map_err(|_e| "Message must have a Parent!")?
                         .to_string();
                     // What to do, what to do...
-                    store.invalidate(&parent_subject)?;
+                    // store.invalidate(&parent_subject)?;
                 }
                 _other => {}
             };
@@ -247,12 +247,16 @@ impl Commit {
         store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
-        Ok(CommitResponse {
+
+        let commit_response = CommitResponse {
             resource_new: Some(resource_new),
             resource_old,
             commit_resource,
             commit_struct: self.clone(),
-        })
+        };
+
+        store.handle_commit(&commit_response);
+        Ok(commit_response)
     }
 
     /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
