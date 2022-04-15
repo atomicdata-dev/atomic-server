@@ -129,7 +129,7 @@ impl Commit {
             }
         };
 
-        let mut resource_new = self.apply_changes(resource_old.clone(), store, false)?;
+        let resource_new = self.apply_changes(resource_old.clone(), store, false)?;
 
         // Make sure the one creating the commit had the same idea of what the current state is.
         if !is_new && opts.validate_previous_commit {
