@@ -16,11 +16,15 @@ use crate::{
     Atom, Resource, Value,
 };
 
-use self::query_index::{
-    atom_to_indexable_atoms, check_if_atom_matches_watched_query_filters, query_indexed,
-    update_indexed_member, watch_collection, IndexAtom, QueryFilter, END_CHAR,
+use self::{
+    migrations::migrate_maybe,
+    query_index::{
+        atom_to_indexable_atoms, check_if_atom_matches_watched_query_filters, query_indexed,
+        update_indexed_member, watch_collection, IndexAtom, QueryFilter, END_CHAR,
+    },
 };
 
+mod migrations;
 mod query_index;
 #[cfg(test)]
 pub mod test;
@@ -47,7 +51,7 @@ pub struct Db {
     /// Try not to use this directly, but use the Trees.
     db: sled::Db,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
-    /// Stores all resources. The Key is the Subject as a string, the value a [PropVals]. Both must be serialized using bincode.
+    /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
     /// Index for all AtommicURLs, indexed by their Value. Used to speed up TPF queries. See [key_for_reference_index]
     reference_index: sled::Tree,
@@ -69,7 +73,7 @@ impl Db {
     /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
-        let resources = db.open_tree("resources").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
+        let resources = db.open_tree("resources_v1").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
         let reference_index = db.open_tree("reference_index")?;
         let members_index = db.open_tree("members_index")?;
         let watched_queries = db.open_tree("watched_queries")?;
@@ -83,6 +87,7 @@ impl Db {
             watched_queries,
             endpoints: default_endpoints(),
         };
+        migrate_maybe(&store)?;
         crate::populate::populate_base_models(&store)
             .map_err(|e| format!("Failed to populate base models. {}", e))?;
         Ok(store)
@@ -107,8 +112,7 @@ impl Db {
     #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
-        let subject_bin = bincode::serialize(subject)?;
-        self.resources.insert(subject_bin, resource_bin)?;
+        self.resources.insert(subject.as_bytes(), resource_bin)?;
         Ok(())
     }
 
@@ -116,11 +120,9 @@ impl Db {
     /// Deals with the binary API of Sled
     #[instrument(skip(self))]
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
-        let subject_binary = bincode::serialize(subject)
-            .map_err(|e| format!("Can't serialize {}: {}", subject, e))?;
         let propval_maybe = self
             .resources
-            .get(subject_binary)
+            .get(subject.as_bytes())
             .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
         match propval_maybe.as_ref() {
             Some(binpropval) => {
@@ -473,7 +475,7 @@ impl Storelike for Db {
             .expect("No self URL set, is required in DB");
         for item in self.resources.into_iter() {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = bincode::deserialize(&subject).expect(DB_CORRUPT_MSG);
+            let subject: String = String::from_utf8_lossy(&subject).to_string();
             if !include_external && !subject.starts_with(&self_url) {
                 continue;
             } else {
@@ -509,8 +511,7 @@ impl Storelike for Db {
                 let remove_atom = crate::Atom::new(subject.into(), prop.clone(), val.clone());
                 self.remove_atom_from_index(&remove_atom, &resource)?;
             }
-            let binary_subject = bincode::serialize(subject)?;
-            let _found = self.resources.remove(&binary_subject)?;
+            let _found = self.resources.remove(&subject.as_bytes())?;
         } else {
             return Err(format!(
                 "Resource {} could not be deleted, because it was not found in the store.",
