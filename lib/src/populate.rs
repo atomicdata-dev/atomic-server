@@ -170,10 +170,13 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
 pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
     let mut drive = store.get_resource(store.get_server_url())?;
-    let write_agents = vec![store.get_default_agent()?.subject];
-    let mut read_agents = write_agents.clone();
+    let write_agent = store.get_default_agent()?.subject;
+    let read_agent = write_agent.clone();
+
+    drive.push_propval(urls::WRITE, write_agent.into(), true, store)?;
+    drive.push_propval(urls::READ, read_agent.into(), true, store)?;
     if public_read {
-        read_agents.push(urls::PUBLIC_AGENT.into());
+        drive.push_propval(urls::READ, urls::PUBLIC_AGENT.into(), true, store)?;
     }
 
     // TODO: update these

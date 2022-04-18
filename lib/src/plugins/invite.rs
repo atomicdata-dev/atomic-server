@@ -157,3 +157,17 @@ pub fn add_rights(
 
     Ok(())
 }
+
+/// Check if the creator has rights to invite people (= write) to the target resource
+pub fn before_apply_commit(
+    store: &impl Storelike,
+    commit: &crate::Commit,
+    resource_new: &Resource,
+) -> AtomicResult<()> {
+    let target = resource_new
+        .get(urls::TARGET)
+        .map_err(|_e| "Invite does not have required Target attribute")?;
+    let target_resource = store.get_resource(&target.to_string())?;
+    crate::hierarchy::check_write(store, &target_resource, &commit.signer)?;
+    Ok(())
+}

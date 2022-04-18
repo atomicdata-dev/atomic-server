@@ -274,6 +274,12 @@ impl From<Vec<String>> for Value {
     }
 }
 
+impl From<Vec<SubResource>> for Value {
+    fn from(val: Vec<SubResource>) -> Self {
+        Value::ResourceArray(val)
+    }
+}
+
 impl From<PropVals> for Value {
     fn from(val: PropVals) -> Self {
         Value::NestedResource(SubResource::Nested(val))

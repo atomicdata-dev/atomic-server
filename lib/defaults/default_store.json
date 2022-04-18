@@ -569,6 +569,16 @@
         "https://atomicdata.dev/properties/shortname": "public-key"
     },
     {
+        "@id": "https://atomicdata.dev/properties/push",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/description": "Pushing is adding one (or more) Resources to a [ResourceArray](https://atomicdata.dev/datatypes/resourceArray). It is a method that is parsed on Commits.\n\nThe `push` field should be a JSON object where each key is a Property URL, and each value is a ResourceArray. \n\nWhen applying `push`, append all the elements to the corresponding existing ResourceArray. If it does not exist yet, create the ResourceArray.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "push"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/read",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",

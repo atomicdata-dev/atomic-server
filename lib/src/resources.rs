@@ -2,7 +2,7 @@
 
 use crate::commit::{CommitOpts, CommitResponse};
 use crate::utils::random_string;
-use crate::values::Value;
+use crate::values::{SubResource, Value};
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     mapping::is_url,
@@ -28,38 +28,6 @@ pub struct Resource {
 pub type PropVals = HashMap<String, Value>;
 
 impl Resource {
-    /// Adds a subject to some property vector / array.
-    /// Creates the vector if it does not exist.
-    pub fn append_subjects(
-        &mut self,
-        property: &str,
-        values: Vec<String>,
-        must_be_unique: bool,
-        store: &impl Storelike,
-    ) -> AtomicResult<()> {
-        // Does this property exist?
-        match self.get(property) {
-            Ok(existing) => {
-                let mut subjects = existing.to_subjects(None)?;
-                // Does it contain any of the passed values?
-                // Add them when it doesn't.
-                for value in values {
-                    if subjects.contains(&value) {
-                        if must_be_unique {
-                            subjects.push(value);
-                        }
-                        continue;
-                    } else {
-                        subjects.push(value);
-                        continue;
-                    }
-                }
-                self.set_propval(property.into(), subjects.into(), store)
-            }
-            Err(_no_val) => self.set_propval(property.into(), values.into(), store),
-        }
-    }
-
     /// Fetches all 'required' properties. Returns an error if any are missing in this Resource.
     pub fn check_required_props(&self, store: &impl Storelike) -> AtomicResult<()> {
         let classvec = self.get_classes(store)?;
@@ -186,6 +154,39 @@ impl Resource {
         let class_urls = Vec::from([String::from(class_url)]);
         resource.set_propval(crate::urls::IS_A.into(), class_urls.into(), store)?;
         Ok(resource)
+    }
+
+    /// Appends a Resource to a specific property through the commitbuilder.
+    /// Useful if you want to have compact Commits that add things to existing ResourceArrays.
+    pub fn push_propval(
+        &mut self,
+        property: &str,
+        value: SubResource,
+        must_be_unique: bool,
+        // TODO: Use Store to validate datatype
+        _store: &impl Storelike,
+    ) -> AtomicResult<()> {
+        let mut vec = match self.propvals.get(property) {
+            Some(some) => match some {
+                Value::ResourceArray(vec) => {
+                    if must_be_unique {
+                        let str_val = value.to_string();
+                        for i in vec {
+                            if i.to_string() == str_val {
+                                return Err("Value already exists".into());
+                            }
+                        }
+                    }
+                    vec.to_owned()
+                }
+                _other => return Err("Wrong datatype, expected ResourceArray".into()),
+            },
+            None => Vec::new(),
+        };
+        vec.push(value.clone());
+        self.propvals.insert(property.into(), vec.into());
+        self.commit.push_propval(property, value)?;
+        Ok(())
     }
 
     /// Remove a propval from a resource by property URL.
@@ -667,5 +668,33 @@ mod test {
 
         let found_prop = found_resource.get(&property).unwrap().clone();
         assert_eq!(found_prop.to_string(), value.to_string());
+    }
+
+    #[test]
+    fn push_propval() {
+        let store = init_store();
+        let property: String = urls::CHILDREN.into();
+        let append_value = "http://localhost/someURL";
+        let mut resource = Resource::new_generate_subject(&store);
+        resource
+            .push_propval(&property, append_value.into(), false, &store)
+            .unwrap();
+        let vec = resource.get(&property).unwrap().to_subjects(None).unwrap();
+        assert_eq!(
+            append_value,
+            vec.first().unwrap(),
+            "The first element should be the appended value"
+        );
+        let resp = resource.save_locally(&store).unwrap();
+        assert!(resp.commit_struct.push.is_some());
+
+        let new_val = resp
+            .resource_new
+            .unwrap()
+            .get(&property)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap();
+        assert_eq!(new_val.first().unwrap(), append_value);
     }
 }

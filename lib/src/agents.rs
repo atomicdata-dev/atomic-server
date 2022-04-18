@@ -27,12 +27,7 @@ impl Agent {
         }
         agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &self.public_key, store)?;
         // Agents must be read by anyone when validating their keys
-        agent.append_subjects(
-            crate::urls::READ,
-            vec![urls::PUBLIC_AGENT.into()],
-            true,
-            store,
-        )?;
+        agent.push_propval(crate::urls::READ, urls::PUBLIC_AGENT.into(), true, store)?;
         agent.set_propval_string(
             crate::urls::CREATED_AT.into(),
             &self.created_at.to_string(),

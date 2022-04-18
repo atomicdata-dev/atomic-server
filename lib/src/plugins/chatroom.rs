@@ -41,23 +41,36 @@ pub fn construct_chatroom(
         for_agent: for_agent.map(|s| s.to_string()),
     };
 
-    // Filter the ones that are not Messages
-    // let query_mesages = Query {
-    //     property: Some(urls::IS_A.into()),
-    //     value: Some(Value::AtomicUrl(urls::MESSAGE.into())),
-    //     limit: None,
-    //     start_val: None,
-    //     end_val: None,
-    //     offset: 0,
-    //     sort_by: None,
-    //     sort_desc: false,
-    //     include_external: false,
-    //     include_nested: false,
-    //     for_agent: for_agent.map(|s| s.to_string()),
-    // };
-
     let messages_unfiltered = store.query(&query_children)?.subjects;
 
     resource.set_propval(urls::MESSAGES.into(), messages_unfiltered.into(), store)?;
     Ok(resource.to_owned())
+}
+
+/// Update the ChatRoom with the new message, make sure this is sent to all Subscribers
+pub fn before_apply_commit(
+    store: &impl Storelike,
+    _commit: &crate::Commit,
+    resource_new: &Resource,
+) -> AtomicResult<()> {
+    // Get the related ChatRoom
+    let parent_subject = resource_new
+        .get(urls::PARENT)
+        .map_err(|_e| "Message must have a Parent!")?
+        .to_string();
+
+    // We need to push the Appended messages to all listeners of the ChatRoom.
+    // We do this by pushing the message, and saving the Commit.
+    // It is then sent to all subscribers.
+    let mut chat_room = store.get_resource(&parent_subject)?;
+
+    chat_room.push_propval(
+        urls::MESSAGES,
+        crate::values::SubResource::Resource(resource_new.clone()),
+        false,
+        store,
+    )?;
+
+    chat_room.save(store)?;
+    Ok(())
 }
