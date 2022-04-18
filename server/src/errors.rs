@@ -135,7 +135,6 @@ impl From<actix_web::Error> for AtomicServerError {
 
 impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
     fn from(error: atomic_lib::errors::AtomicError) -> Self {
-        println!("ERROR: {:?}", error);
         let error_type = match error.error_type {
             atomic_lib::errors::AtomicErrorType::NotFoundError => AppErrorType::NotFound,
             atomic_lib::errors::AtomicErrorType::UnauthorizedError => AppErrorType::Unauthorized,
