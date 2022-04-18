@@ -84,7 +84,6 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         commit_monitor_clone.do_send(crate::actor_messages::CommitMessage {
             commit_response: commit_response.clone(),
         });
-        tracing::info!("Sending commit to commit monitor");
     };
     store.set_handle_commit(Box::new(send_commit));
 

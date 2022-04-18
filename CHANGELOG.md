@@ -18,6 +18,9 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Use commits in populate and init
 - Fix bug when opening the same invite twice with the same agent
 - Update atomic-data-browser, deal with new commits, add chatrooms
+- Add `Store::set_handle_commit`. Changes how Commits are internally processed. Now, users of `atomic_lib` can pass a custom handler function. This can be used to listen to events. #380 #253
+- Added ChatRoom functionality. #373
+- Add `push` option to Commits, which allows for efficient manipulation of ResourceArrays. Remove `Resource::append_subjects` method in favor of `push_propvals` #289.
 
 ## [v0.31.1] - 2022-03-29
 

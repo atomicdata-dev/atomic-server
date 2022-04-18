@@ -5,8 +5,8 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, hierarchy, resources::PropVals, urls, Atom, Resource,
-    Storelike, Value,
+    datatype::DataType, errors::AtomicResult, hierarchy, resources::PropVals, urls,
+    values::SubResource, Atom, Resource, Storelike, Value,
 };
 
 /// Contains two resources. The first is the Resource representation of the applied Commits.
@@ -65,6 +65,9 @@ pub struct Commit {
     /// Base64 encoded signature of the JSON serialized Commit
     #[serde(rename = "https://atomicdata.dev/properties/signature")]
     pub signature: Option<String>,
+    /// List of Properties and Arrays to be appended to them
+    #[serde(rename = "https://atomicdata.dev/properties/push")]
+    pub push: Option<std::collections::HashMap<String, Value>>,
     /// The previously applied commit to this Resource.
     #[serde(rename = "https://atomicdata.dev/properties/previousCommit")]
     pub previous_commit: Option<String>,
@@ -182,36 +185,15 @@ impl Commit {
 
         // TODO: before_apply_commit hooks plugins
         // This is where users should extend commits
+        #[cfg(feature = "db")]
         for class in resource_new.get_classes(store)? {
             match class.subject.as_str() {
                 urls::COMMIT => return Err("Commits can not be edited or created directly.".into()),
                 urls::INVITE => {
-                    // Check if the creator has rights to invite people (= write) to the target resource
-                    let target = resource_new
-                        .get(urls::TARGET)
-                        .map_err(|_e| "Invite does not have required Target attribute")?;
-                    let target_resource = store.get_resource(&target.to_string())?;
-                    hierarchy::check_write(store, &target_resource, &self.signer).map_err(|e| {
-                        format!(
-                            "Creating Invite to {} failed. You do not have write rights to the target resource. {}",
-                            target, e
-                        )
-                    })?;
+                    crate::plugins::invite::before_apply_commit(store, self, &resource_new)?
                 }
                 urls::MESSAGE => {
-                    // Set a `created_at`
-                    // resource_new.set_propval(
-                    //     urls::CREATED_AT.into(),
-                    //     Value::Timestamp(crate::utils::now()),
-                    //     store,
-                    // )?;
-                    // Update the ChatRoom
-                    let parent_subject = resource_new
-                        .get(urls::PARENT)
-                        .map_err(|_e| "Message must have a Parent!")?
-                        .to_string();
-                    // What to do, what to do...
-                    // store.invalidate(&parent_subject)?;
+                    crate::plugins::chatroom::before_apply_commit(store, self, &resource_new)?
                 }
                 _other => {}
             };
@@ -331,6 +313,10 @@ impl Commit {
             Ok(found) => Some(found.to_nested()?.to_owned()),
             Err(_) => None,
         };
+        let push = match resource.get(urls::PUSH) {
+            Ok(found) => Some(found.to_nested()?.to_owned()),
+            Err(_) => None,
+        };
         let remove = match resource.get(urls::REMOVE) {
             Ok(found) => Some(found.to_subjects(None)?),
             Err(_) => None,
@@ -351,6 +337,7 @@ impl Commit {
             created_at,
             signer,
             set,
+            push,
             remove,
             destroy,
             previous_commit,
@@ -422,6 +409,9 @@ impl Commit {
         if let Some(signature) = self.signature {
             resource.set_propval(urls::SIGNATURE.into(), signature.into(), store)?;
         }
+        if let Some(push) = self.push {
+            resource.set_propval(urls::PUSH.into(), push.into(), store)?;
+        }
         Ok(resource)
     }
 
@@ -456,6 +446,8 @@ pub struct CommitBuilder {
     /// Overwrites existing values
     /// https://atomicdata.dev/properties/set
     set: std::collections::HashMap<String, Value>,
+    /// The set of PropVals that need to be appended to resource arrays.
+    push: std::collections::HashMap<String, Value>,
     /// The set of property URLs that need to be removed
     /// https://atomicdata.dev/properties/remove
     remove: HashSet<String>,
@@ -472,12 +464,31 @@ impl CommitBuilder {
     /// Start constructing a Commit.
     pub fn new(subject: String) -> Self {
         CommitBuilder {
+            push: HashMap::new(),
             subject,
             set: HashMap::new(),
             remove: HashSet::new(),
             destroy: false,
             previous_commit: None,
         }
+    }
+
+    /// Appends a URL or (nested anonymous) Resource to a ResourceArray.
+    pub fn push_propval(&mut self, property: &str, value: SubResource) -> AtomicResult<()> {
+        let mut vec = match self.push.get(property) {
+            Some(val) => match val {
+                Value::ResourceArray(resources) => resources.to_owned(),
+                other => {
+                    return Err(
+                        format!("Expected ResourceArray in push_propval, got {}", other).into(),
+                    )
+                }
+            },
+            None => Vec::new(),
+        };
+        vec.push(value);
+        self.push.insert(property.into(), Value::ResourceArray(vec));
+        Ok(())
     }
 
     /// Creates the Commit and signs it using a signature.
@@ -536,6 +547,7 @@ fn sign_at(
         created_at: sign_date,
         previous_commit: commitbuilder.previous_commit,
         signature: None,
+        push: Some(commitbuilder.push),
         url: None,
     };
     let stringified = commit
@@ -555,9 +567,9 @@ fn sign_at(
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
 #[tracing::instrument]
 pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
-    let private_key_bytes = base64::decode(private_key.to_string())
+    let private_key_bytes = base64::decode(private_key)
         .map_err(|e| format!("Failed decoding private key {}: {}", private_key, e))?;
-    let public_key_bytes = base64::decode(public_key.to_string())
+    let public_key_bytes = base64::decode(public_key)
         .map_err(|e| format!("Failed decoding public key {}: {}", public_key, e))?;
     let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(
         &private_key_bytes,
@@ -652,6 +664,7 @@ mod test {
             created_at: 1603638837,
             signer: String::from("https://localhost/author"),
             set: Some(set),
+            push: None,
             remove: Some(remove),
             previous_commit: None,
             destroy: Some(destroy),

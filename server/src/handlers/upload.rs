@@ -109,7 +109,10 @@ pub async fn upload_handler(
 
     // Add the files as `attachments` to the parent
     let mut parent = store.get_resource(&query.parent)?;
-    parent.append_subjects(urls::ATTACHMENTS, created_file_subjects, false, store)?;
+    // parent.append_subjects(urls::ATTACHMENTS, created_file_subjects, false, store)?;
+    for created in created_file_subjects {
+        parent.push_propval(urls::ATTACHMENTS, created.into(), false, store)?;
+    }
     commit_responses.push(parent.save(store)?);
 
     let mut builder = HttpResponse::Ok();

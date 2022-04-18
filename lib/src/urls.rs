@@ -34,6 +34,7 @@ pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
 // ... for Commits
 pub const SUBJECT: &str = "https://atomicdata.dev/properties/subject";
 pub const SET: &str = "https://atomicdata.dev/properties/set";
+pub const PUSH: &str = "https://atomicdata.dev/properties/push";
 pub const REMOVE: &str = "https://atomicdata.dev/properties/remove";
 pub const DESTROY: &str = "https://atomicdata.dev/properties/destroy";
 pub const SIGNER: &str = "https://atomicdata.dev/properties/signer";

@@ -37,14 +37,10 @@ pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 /// The Db is a persistent on-disk Atomic Data store.
 /// It's an implementation of [Storelike].
 /// It uses [sled::Tree]s as Key Value stores.
-/// It builds a value index for performant [Query]s.
 /// It stores [Resource]s as [PropVals]s by their subject as key.
-///
-/// ## Resources
-///
-/// ## Value Index
-///
-/// The Value index stores
+/// It builds a value index for performant [Query]s.
+/// It keeps track of Queries and updates their index when [Commit]s are applied.
+/// You can pass a custom `on_commit` function to run at Commit time.
 #[derive(Clone)]
 pub struct Db {
     /// The Key-Value store that contains all data.
@@ -120,7 +116,8 @@ impl Db {
         Ok(())
     }
 
-    /// Sets a function that is called by the store whenever a Commit is applied.
+    /// Sets a function that is called whenever a [Commit::apply] is called.
+    /// This can be used to listen to events.
     pub fn set_handle_commit(&mut self, on_commit: Box<dyn Fn(&CommitResponse) + Send + Sync>) {
         self.on_commit = Some(Arc::new(on_commit));
     }
