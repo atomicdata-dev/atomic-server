@@ -52,7 +52,7 @@ jobs:
           sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
       - uses: actions/checkout@v2
       - name: Install Rust and llvm-tools-preview
-        run: rustup toolchain install nightly --component llvm-tools-preview
+        run: rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate code coverage
