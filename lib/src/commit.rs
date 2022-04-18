@@ -268,13 +268,30 @@ impl Commit {
                 }
             }
         }
-        if let Some(remove) = self.remove.clone() {
-            for prop in remove.iter() {
-                resource.remove_propval(prop);
+        if let Some(push) = self.push.clone() {
+            for (prop, vec) in push.iter() {
+                let mut old_vec = match resource.get(prop) {
+                    Ok(val) => match val {
+                        Value::ResourceArray(res_arr) => res_arr.clone(),
+                        _other => return Err("Wrong datatype when pushing to array".into()),
+                    },
+                    Err(_) => Vec::new(),
+                };
+                let new_vec = match vec {
+                    Value::ResourceArray(res_arr) => res_arr.clone(),
+                    _other => return Err("Wrong datatype when pushing to array".into()),
+                };
+                old_vec.append(&mut new_vec.clone());
+                resource.set_propval_unsafe(prop.into(), old_vec.into());
                 if update_index {
-                    let val = resource_unedited.get(prop)?;
-                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    store.remove_atom_from_index(&atom, &resource_unedited)?;
+                    for added_resource in new_vec {
+                        let atom = Atom::new(
+                            resource.get_subject().clone(),
+                            prop.into(),
+                            added_resource.into(),
+                        );
+                        store.add_atom_to_index(&atom, &resource_unedited)?;
+                    }
                 }
             }
         }
@@ -410,7 +427,9 @@ impl Commit {
             resource.set_propval(urls::SIGNATURE.into(), signature.into(), store)?;
         }
         if let Some(push) = self.push {
-            resource.set_propval(urls::PUSH.into(), push.into(), store)?;
+            if !push.is_empty() {
+                resource.set_propval(urls::PUSH.into(), push.into(), store)?;
+            }
         }
         Ok(resource)
     }

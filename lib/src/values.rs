@@ -280,6 +280,16 @@ impl From<Vec<SubResource>> for Value {
     }
 }
 
+impl From<SubResource> for Value {
+    fn from(val: SubResource) -> Self {
+        match val {
+            SubResource::Resource(r) => r.into(),
+            SubResource::Nested(n) => n.into(),
+            SubResource::Subject(s) => s.into(),
+        }
+    }
+}
+
 impl From<PropVals> for Value {
     fn from(val: PropVals) -> Self {
         Value::NestedResource(SubResource::Nested(val))
