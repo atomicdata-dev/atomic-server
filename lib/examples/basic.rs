@@ -1,5 +1,5 @@
 // Should be the same as code in `lib.rs`
-
+use profile::memory_usage;
 fn main() {
     // Import the `Storelike` trait to get access to most functions
     use atomic_lib::Storelike;
@@ -46,10 +46,11 @@ fn main() {
             .to_string()
             == "the age of a person"
     );
-    // println!("All resources internal only - include_external: false");
-    // println!("{:#?}", store.all_resources(false));
+    let before = memory_usage().allocated;
+    println!("Before {:?}",before.to_string());
     println!("All resources - include_external: false");
     println!("{:#?}", store.all_resources(false).len());
+    println!("After {:?}",memory_usage().allocated.to_string());
     println!("All resources - include_external: true");
     println!("{:#?}", store.all_resources(true).len());
 }
