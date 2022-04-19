@@ -74,6 +74,7 @@ async fn main() -> errors::AtomicServerResult<()> {
                 .unwrap()
             {
                 std::fs::remove_dir_all(config.store_path).map(|e| format!("unable to remove directory: {:?}", e))?;
+                std::fs::remove_dir_all(config.search_index_path).map(|e| format!("unable to remove directory: {:?}", e))?;
                 println!("Done");
             } else {
                 println!("Ok, not removing anything.");
