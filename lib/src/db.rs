@@ -21,8 +21,10 @@ use self::{
     query_index::{
         atom_to_indexable_atoms, check_if_atom_matches_watched_query_filters, query_indexed,
         update_indexed_member, watch_collection, IndexAtom, QueryFilter, END_CHAR,
+    },
 };
 
+mod migrations;
 mod query_index;
 #[cfg(test)]
 pub mod test;
@@ -110,7 +112,7 @@ impl Db {
     #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {
         let resource_bin = bincode::serialize(propvals)?;
-        self.resources.insert(&subject.as_bytes(), resource_bin)?;
+        self.resources.insert(subject.as_bytes(), resource_bin)?;
         Ok(())
     }
 
@@ -120,7 +122,7 @@ impl Db {
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
         let propval_maybe = self
             .resources
-            .get(&subject.as_bytes())
+            .get(subject.as_bytes())
             .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
         match propval_maybe.as_ref() {
             Some(binpropval) => {
@@ -473,15 +475,14 @@ impl Storelike for Db {
             .expect("No self URL set, is required in DB");
         for item in self.resources.into_iter() {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject:String = String::from_utf8_lossy(&subject).to_string();
+            let subject: String = String::from_utf8_lossy(&subject).to_string();
             if !include_external && !subject.starts_with(&self_url) {
                 continue;
-            } else {
-                let propvals: PropVals = bincode::deserialize(&resource_bin)
-                    .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
-                let resource = Resource::from_propvals(propvals, subject);
-                resources.push(resource);
             }
+            let propvals: PropVals = bincode::deserialize(&resource_bin)
+                .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
+            let resource = Resource::from_propvals(propvals, subject);
+            resources.push(resource);
         }
         resources
     }

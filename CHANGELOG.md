@@ -5,8 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 
 ## UNRELEASED
 
-- **Warning**: Various default directories have moved (see #331). Most notably the `data` directory. The location depends on your OS. Run `show-config` to see where it will be stored now. If you have data in `~/.config/atomic/db`, move it to this new directory.
-- **Warning**: Search index will have to be rebuilt. Start with `--rebuild-index`.
+- **Warning**: Various default directories have moved (see #331). Most notably the `data` directory. The location depends on your OS. Run `show-config` to see where it will be stored now. If you have data in `~/.config/atomic/db`, move it to this new directory. Also, the search index will have to be rebuilt. Start with `--rebuild-index`.
 - Updated various dependencies, and made `cargo.toml` less restrictive.
 - Remove `async-std` calls from `upload.rs`
 - Added `reset` and `show-config` commands to `atomic-server`.
@@ -15,6 +14,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Get rid of `.unwrap` calls in `commit_monitor` #345
 - Make process management optional #324 #334
 - Auto-update desktop distributions using Tauri #158
+- Internal migration logic for inter-version compatibility of the database. Makes upgrading trivial. #102
 
 ## [v0.31.1] - 2022-03-29
 
