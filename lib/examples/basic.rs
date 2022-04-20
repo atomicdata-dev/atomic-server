@@ -1,10 +1,10 @@
 // Should be the same as code in `lib.rs`
-#[cfg(all(feature = "jemalloc", not(target_env = "msvc")))]
+#[cfg(all(not(target_env = "msvc")))]
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use profile::memory_usage;
 fn main() {
+    use profile::memory_usage;
     // Import the `Storelike` trait to get access to most functions
     use atomic_lib::Storelike;
     // Start with initializing the in-memory store
