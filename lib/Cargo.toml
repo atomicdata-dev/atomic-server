@@ -38,7 +38,7 @@ criterion = "0.3"
 iai = "0.1"
 lazy_static = "1"
 ntest = "0.7"
-profile = { git="https://github.com/AlexMikhalev/profile.git", features=["jemalloc"]}
+profile = { git="https://github.com/AlexMikhalev/profile.git", features=[ "jemalloc" ,"jemallocator"]}
 
 [features]
 config = ["directories", "toml"]
