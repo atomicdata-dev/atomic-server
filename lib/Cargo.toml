@@ -32,13 +32,13 @@ tracing = "0.1"
 ureq = "2"
 url = "2"
 urlencoding = "2"
-profile = { git="https://github.com/AlexMikhalev/profile.git",default-features = false }
 
 [dev-dependencies]
 criterion = "0.3"
 iai = "0.1"
 lazy_static = "1"
 ntest = "0.7"
+profile = { git="https://github.com/AlexMikhalev/profile.git", features=["jemalloc"]}
 
 [features]
 config = ["directories", "toml"]
