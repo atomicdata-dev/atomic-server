@@ -53,7 +53,7 @@ fn main() {
     let before = memory_usage().allocated;
     println!("Before {:?}",before.to_string());
     println!("All resources - include_external: false");
-    println!("{:#?}", store.all_resources(false));
+    println!("{:#?}", store.all_resources(false).len());
     println!("After {:?}",memory_usage().allocated.to_string());
     println!("All resources - include_external: true");
     println!("{:#?}", store.all_resources(true).len());
