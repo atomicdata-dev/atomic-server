@@ -252,6 +252,10 @@ impl Commit {
         update_index: bool,
     ) -> AtomicResult<Resource> {
         let resource_unedited = resource.clone();
+
+        let mut remove_atoms: Vec<Atom> = Vec::new();
+        let mut add_atoms: Vec<Atom> = Vec::new();
+
         if let Some(set) = self.set.clone() {
             for (prop, new_val) in set.iter() {
                 resource.set_propval(prop.into(), new_val.to_owned(), store)?;
@@ -262,9 +266,9 @@ impl Commit {
                     if let Ok(old_val) = resource_unedited.get(prop) {
                         let old_atom =
                             Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
-                        store.remove_atom_from_index(&old_atom, &resource_unedited)?;
+                        remove_atoms.push(old_atom);
                     }
-                    store.add_atom_to_index(&new_atom, &resource)?;
+                    add_atoms.push(new_atom);
                 }
             }
         }
@@ -290,7 +294,7 @@ impl Commit {
                             prop.into(),
                             added_resource.into(),
                         );
-                        store.add_atom_to_index(&atom, &resource_unedited)?;
+                        add_atoms.push(atom);
                     }
                 }
             }
@@ -298,9 +302,18 @@ impl Commit {
         // Remove all atoms from index if destroy
         if let Some(destroy) = self.destroy {
             if destroy {
-                for atom in resource.to_atoms()?.iter() {
-                    store.remove_atom_from_index(atom, &resource_unedited)?;
+                for atom in resource.to_atoms()?.into_iter() {
+                    remove_atoms.push(atom);
                 }
+            }
+        }
+
+        if update_index {
+            for atom in remove_atoms {
+                store.remove_atom_from_index(&atom, &resource_unedited)?;
+            }
+            for atom in add_atoms {
+                store.add_atom_to_index(&atom, &resource)?;
             }
         }
         Ok(resource)
