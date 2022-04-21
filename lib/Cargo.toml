@@ -35,7 +35,7 @@ urlencoding = "2"
 
 [dev-dependencies]
 criterion = "0.3"
-iai = "0.1"
+iai = { git="https://github.com/AlexMikhalev/iai.git", branch="cpu_profile"}
 lazy_static = "1"
 ntest = "0.7"
 profile = { git="https://github.com/AlexMikhalev/profile.git", features=[ "jemalloc"]}
