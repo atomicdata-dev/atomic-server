@@ -5,9 +5,9 @@ use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
-
+extern crate crossbeam_channel as channel;
+use threadpool::ThreadPool;
 use tracing::{instrument, trace};
-
 use crate::{
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
@@ -484,10 +484,17 @@ impl Storelike for Db {
         if include_external {
             prefix = "".as_bytes();
         }
+        let pool = ThreadPool::new(self.njobs());
         let resource_iter = self.resources.scan_prefix(prefix);
-        let resources = resource_iter
-            .map(|item| process_resource(item))
-            .collect::<Vec<Resource>>();
+        let (send, recv) = channel::bounded(0);
+        for item in resource_iter {
+            let (send, item)= (send.clone(),item.clone());
+            pool.execute(move || {
+                send.send(process_resource(item));
+                });
+            }
+            drop(send);
+        let resources=recv.try_iter().collect::<Vec<Resource>>();
         resources
     }
 
@@ -632,6 +639,179 @@ impl Storelike for Db {
                 Ok(vec)
             }
         }
+    }
+
+    fn add_resource(&self, resource: &Resource) -> AtomicResult<()> {
+        self.add_resource_opts(resource, true, true, true)
+    }
+
+    fn build_index(&self, include_external: bool) -> AtomicResult<()> {
+        for r in self.all_resources(include_external) {
+            let atoms = r.to_atoms()?;
+            for atom in atoms {
+                self.add_atom_to_index(&atom, &r)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn create_agent(&self, name: Option<&str>) -> AtomicResult<crate::agents::Agent> {
+        let agent = crate::agents::Agent::new(name, self)?;
+        self.add_resource(&agent.to_resource(self)?)?;
+        Ok(agent)
+    }
+
+    fn export(&self, include_external: bool) -> AtomicResult<String> {
+        let resources = self.all_resources(include_external);
+        let mut properties: Vec<Resource> = Vec::new();
+        let mut other_resources: Vec<Resource> = Vec::new();
+        for r in resources {
+            if let Ok(class) = r.get_main_class() {
+                if class == crate::urls::PROPERTY {
+                    properties.push(r);
+                    continue;
+                }
+            }
+            other_resources.push(r);
+        }
+        properties.append(&mut other_resources);
+        crate::serialize::resources_to_json_ad(&properties)
+    }
+
+    fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {
+        let resource: Resource =
+            crate::client::fetch_resource(subject, self, self.get_default_agent().ok())?;
+        self.add_resource_opts(&resource, true, true, true)?;
+        Ok(resource)
+    }
+
+    fn get_class(&self, subject: &str) -> AtomicResult<crate::schema::Class> {
+        let resource = self
+            .get_resource(subject)
+            .map_err(|e| format!("Failed getting class {}. {}", subject, e))?;
+        crate::schema::Class::from_resource(resource)
+    }
+
+    fn get_classes_for_subject(&self, subject: &str) -> AtomicResult<Vec<crate::schema::Class>> {
+        let classes = self.get_resource(subject)?.get_classes(self)?;
+        Ok(classes)
+    }
+
+    fn get_property(&self, subject: &str) -> AtomicResult<crate::schema::Property> {
+        let prop = self
+            .get_resource(subject)
+            .map_err(|e| format!("Failed getting property {}. {}", subject, e))?;
+        crate::schema::Property::from_resource(prop)
+    }
+
+    fn handle_not_found(&self, subject: &str, error: AtomicError) -> AtomicResult<Resource> {
+        if let Some(self_url) = self.get_self_url() {
+            if subject.starts_with(&self_url) {
+                return Err(AtomicError::not_found(format!(
+                    "Failed to retrieve locally: '{}'. {}",
+                    subject, error
+                )));
+            }
+        }
+        self.fetch_resource(subject)
+    }
+
+    fn import(&self, string: &str) -> AtomicResult<usize> {
+        let vec = crate::parse::parse_json_ad_array(string, self, true)
+            .map_err(|e| format!("Unable to import JSON-AD. {}", e))?;
+        let len = vec.len();
+        Ok(len)
+    }
+
+    fn get_path(
+        &self,
+        atomic_path: &str,
+        mapping: Option<&crate::mapping::Mapping>,
+        for_agent: Option<&str>,
+    ) -> AtomicResult<crate::storelike::PathReturn> {
+        // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
+        let path_items: Vec<&str> = atomic_path.split(' ').collect();
+        let first_item = String::from(path_items[0]);
+        let mut id_url = first_item;
+        if mapping.is_some() {
+            // For the first item, check the user mapping
+            id_url = mapping
+                .unwrap()
+                .try_mapping_or_url(&id_url)
+                .ok_or(&*format!("No url found for {}", path_items[0]))?;
+        }
+        if path_items.len() == 1 {
+            return Ok(crate::storelike::PathReturn::Subject(id_url));
+        }
+        // The URL of the next resource
+        let mut subject = id_url;
+        // Set the currently selectred resource parent, which starts as the root of the search
+        let mut resource = self.get_resource_extended(&subject, false, for_agent)?;
+        // During each of the iterations of the loop, the scope changes.
+        // Try using pathreturn...
+        let mut current: crate::storelike::PathReturn = crate::storelike::PathReturn::Subject(subject.clone());
+        // Loops over every item in the list, traverses the graph
+        // Skip the first one, for that is the subject (i.e. first parent) and not a property
+        for item in path_items[1..].iter().cloned() {
+            // In every iteration, the subject, property_url and current should be set.
+            // Ignore double spaces
+            if item.is_empty() {
+                continue;
+            }
+            // If the item is a number, assume its indexing some array
+            if let Ok(i) = item.parse::<u32>() {
+                match current {
+                    crate::storelike::PathReturn::Atom(atom) => {
+                        let vector = match resource.get(&atom.property)? {
+                            Value::ResourceArray(vec) => vec,
+                            _ => {
+                                return Err(
+                                    "Integers can only be used to traverse ResourceArrays.".into()
+                                )
+                            }
+                        };
+                        let url: String = vector
+                            .get(i as usize)
+                            .ok_or(format!(
+                                "Too high index {} for array with length {}, max is {}",
+                                i,
+                                vector.len(),
+                                vector.len() - 1
+                            ))?
+                            .to_string();
+                        subject = url;
+                        resource = self.get_resource_extended(&subject, false, for_agent)?;
+                        current = crate::storelike::PathReturn::Subject(subject.clone());
+                        continue;
+                    }
+                    crate::storelike::PathReturn::Subject(_) => {
+                        return Err("You can't do an index on a resource, only on arrays.".into())
+                    }
+                }
+            }
+            // Since the selector isn't an array index, we can assume it's a property URL
+            match current {
+                crate::storelike::PathReturn::Subject(_) => {}
+                crate::storelike::PathReturn::Atom(_) => {
+                    return Err("No more linked resources down this path.".into())
+                }
+            }
+            // Set the parent for the next loop equal to the next node.
+            // TODO: skip this step if the current iteration is the last one
+            let value = resource.get_shortname(item, self)?.clone();
+            let property = resource.resolve_shortname_to_property(item, self)?;
+            current = crate::storelike::PathReturn::Atom(Box::new(Atom::new(
+                subject.clone(),
+                property.subject,
+                value,
+            )))
+        }
+        Ok(current)
+    }
+
+    fn validate(&self) -> crate::validate::ValidationReport {
+        crate::validate::validate_store(self, false)
     }
 }
 

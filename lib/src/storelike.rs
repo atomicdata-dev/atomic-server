@@ -9,7 +9,7 @@ use crate::{
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_array};
 use crate::{mapping::Mapping, values::Value, Atom, Resource};
-
+use num_cpus;
 // A path can return one of many things
 pub enum PathReturn {
     Subject(String),
@@ -62,6 +62,10 @@ pub trait Storelike: Sized {
     /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
     /// WARNING: This could be very expensive!
     fn all_resources(&self, include_external: bool) -> ResourceCollection;
+    // get number of available jobs for number of CPUs
+    fn njobs(&self) -> usize{
+        num_cpus::get()
+    }
 
     /// Constructs the value index from all resources in the store. Could take a while.
     fn build_index(&self, include_external: bool) -> AtomicResult<()> {
