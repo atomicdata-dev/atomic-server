@@ -614,10 +614,12 @@ dependencies = [
  "base64",
  "bincode",
  "criterion",
+ "crossbeam-channel",
  "directories",
  "iai",
  "lazy_static",
  "ntest",
+ "num_cpus",
  "profile",
  "rand 0.8.5",
  "regex",
@@ -627,6 +629,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sled",
+ "threadpool",
  "toml",
  "tracing",
  "ureq 2.4.0",
@@ -5213,6 +5216,7 @@ dependencies = [
 ]
 
 [[package]]
+<<<<<<< master
 name = "thrift"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5226,6 +5230,8 @@ dependencies = [
 ]
 
 [[package]]
+=======
+>>>>>>> Cleaned multi-thread -200ms improvement, within noise threshold
 name = "tikv-jemalloc-ctl"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
