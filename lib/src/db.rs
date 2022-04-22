@@ -469,22 +469,25 @@ impl Storelike for Db {
 
     #[instrument(skip(self))]
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
-        let mut resources: ResourceCollection = Vec::new();
+        fn process_resource(item: Result<(sled::IVec, sled::IVec), sled::Error>) -> Resource {
+            let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
+            let subject = String::from_utf8_lossy(&subject).to_string();
+            let propvals: PropVals = bincode::deserialize(&resource_bin)
+                .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
+            let resource = Resource::from_propvals(propvals, subject);
+            resource
+        }
         let self_url = self
             .get_self_url()
             .expect("No self URL set, is required in DB");
-        for item in self.resources.into_iter() {
-            let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = String::from_utf8_lossy(&subject).to_string();
-            if !include_external && !subject.starts_with(&self_url) {
-                continue;
-            } else {
-                let propvals: PropVals = bincode::deserialize(&resource_bin)
-                    .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
-                let resource = Resource::from_propvals(propvals, subject);
-                resources.push(resource);
-            }
+        let mut prefix: &[u8] = self_url.as_bytes();
+        if include_external {
+            prefix = "".as_bytes();
         }
+        let resource_iter = self.resources.scan_prefix(prefix);
+        let resources = resource_iter
+            .map(|item| process_resource(item))
+            .collect::<Vec<Resource>>();
         resources
     }
 
