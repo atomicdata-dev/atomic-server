@@ -12,15 +12,25 @@
     "https://atomicdata.dev/properties/shortname": "messages"
   },
   {
+    "@id": "https://atomicdata.dev/properties/nextPage",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "Link to the next page in a collection",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/isDynamic": true,
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "next-page"
+  },
+  {
     "@id": "https://atomicdata.dev/classes/ChatRoom",
-    "https://atomicdata.dev/properties/description": "A place where users can post and view chat messages.\n\nThis is a dynamic resource, which means that its contents can be modified using query parameters.  ",
+    "https://atomicdata.dev/properties/description": "A place where users can post and view chat messages. The `messages` are calculated upon requesting the ChatRoom.\n\nYou can post [`Messages`](https://atomicdata.dev/classes/Message) in them by creating a Commit for the Message, and setting the [`parent`](https://atomicdata.dev/properties/parent) of the `Message` to the `ChatRoom`.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
     "https://atomicdata.dev/properties/recommends": [
-      "https://atomicdata.dev/properties/messages",
-      "https://atomicdata.dev/properties/description"
+      "https://atomicdata.dev/properties/messages"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name"
