@@ -329,9 +329,6 @@ impl Storelike for Db {
 
         let mut resource = self.get_resource(&removed_query_params)?;
 
-        // make sure the actual subject matches the one requested
-        resource.set_subject(subject.into());
-
         if let Some(agent) = for_agent {
             let _explanation = crate::hierarchy::check_read(self, &resource, agent)?;
         }
@@ -344,45 +341,48 @@ impl Storelike for Db {
                 crate::urls::COLLECTION => {
                     has_dynamic = true;
                     if !skip_dynamic {
-                        return crate::collections::construct_collection_from_params(
+                        resource = crate::collections::construct_collection_from_params(
                             self,
                             query_params,
                             &mut resource,
                             for_agent,
-                        );
+                        )?;
                     }
                 }
                 crate::urls::INVITE => {
                     has_dynamic = true;
                     if !skip_dynamic {
-                        return crate::plugins::invite::construct_invite_redirect(
+                        resource = crate::plugins::invite::construct_invite_redirect(
                             self,
                             query_params,
                             &mut resource,
                             for_agent,
-                        );
+                        )?;
                     }
                 }
                 crate::urls::DRIVE => {
                     has_dynamic = true;
                     if !skip_dynamic {
-                        return crate::hierarchy::add_children(self, &mut resource);
+                        resource = crate::hierarchy::add_children(self, &mut resource)?;
                     }
                 }
                 crate::urls::CHATROOM => {
                     has_dynamic = true;
                     if !skip_dynamic {
-                        return crate::plugins::chatroom::construct_chatroom(
+                        resource = crate::plugins::chatroom::construct_chatroom(
                             self,
-                            query_params,
+                            url.clone(),
                             &mut resource,
                             for_agent,
-                        );
+                        )?;
                     }
                 }
                 _ => {}
             }
         }
+
+        // make sure the actual subject matches the one requested - It should not be changed in the logic above
+        resource.set_subject(subject.into());
 
         // This lets clients know that the resource may have dynamic properties that are currently not included
         if has_dynamic && skip_dynamic {
@@ -457,17 +457,17 @@ impl Storelike for Db {
             });
         }
 
-        // If there is a sort value, we need to change the items to contain that sorted value, instead of the one matched in the TPF query
-        if let Some(sort) = &q.sort_by {
+        // If there is a sort value, we need to change the atoms to contain that sorted value, instead of the one matched in the TPF query
+        if let Some(sort_prop) = &q.sort_by {
             // We don't use the existing array, we clear it.
             atoms = Vec::new();
             for r in &resources {
                 // Users _can_ sort by optional properties! So we need a fallback defauil
                 let fallback_default = crate::Value::String(END_CHAR.into());
-                let sorted_val = r.get(sort).unwrap_or(&fallback_default);
+                let sorted_val = r.get(sort_prop).unwrap_or(&fallback_default);
                 let atom = Atom {
                     subject: r.get_subject().to_string(),
-                    property: sort.to_string(),
+                    property: sort_prop.to_string(),
                     value: sorted_val.to_owned(),
                 };
                 atoms.push(atom)
@@ -483,7 +483,7 @@ impl Storelike for Db {
 
         // Add the atoms to the query_index
         for atom in atoms {
-            update_indexed_member(self, &q_filter, &atom, false)?;
+            update_indexed_member(self, &q_filter, &atom.subject, &atom.value, false)?;
         }
 
         // Retry the same query!
