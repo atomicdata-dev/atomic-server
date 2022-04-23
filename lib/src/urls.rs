@@ -98,6 +98,7 @@ pub const DOWNLOAD_URL: &str = "https://atomicdata.dev/properties/downloadURL";
 pub const ATTACHMENTS: &str = "https://atomicdata.dev/properties/attachments";
 // ... for ChatRooms and Messages
 pub const MESSAGES: &str = "https://atomicdata.dev/properties/messages";
+pub const NEXT_PAGE: &str = "https://atomicdata.dev/properties/nextPage";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

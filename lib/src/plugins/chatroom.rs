@@ -8,40 +8,75 @@ use crate::{
     errors::AtomicResult,
     storelike::Query,
     urls::{self, PARENT},
-    Resource, Storelike, Value,
+    utils, Resource, Storelike, Value,
 };
 
 // Find the messages for the ChatRoom
-#[tracing::instrument(skip(store, _query_params))]
+#[tracing::instrument(skip(store))]
 pub fn construct_chatroom(
     store: &impl Storelike,
-    _query_params: url::form_urlencoded::Parse,
+    url: url::Url,
     resource: &mut Resource,
     for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
     // TODO: From range
-    // for (k, v) in query_params {
-    //     match k.as_ref() {
-    //         _ => {}
-    //     }
-    // }
+    let mut start_val = utils::now();
+    for (k, v) in url.query_pairs() {
+        match k.as_ref() {
+            "before-timestamp" => {
+                start_val = v.parse::<i64>()?;
+                println!("before-timestamp: {}", v);
+            }
+            _ => {}
+        }
+    }
+
+    println!("chatroom subject: {}", resource.get_subject().clone());
+
+    let page_limit = 5;
 
     // First, find all children
     let query_children = Query {
         property: Some(PARENT.into()),
         value: Some(Value::AtomicUrl(resource.get_subject().clone())),
-        limit: None,
+        limit: Some(page_limit + 1),
+        // limit: None,
+        // start_val: Some(Value::Timestamp(start_val)),
+        // start_val: Some(Value::Timestamp(1650543142827)),
         start_val: None,
-        end_val: None,
+        // end_val: None,
+        // end_val: Some(Value::Timestamp(1650543142827)),
+        end_val: Some(Value::Timestamp(start_val)),
         offset: 0,
         sort_by: Some(urls::CREATED_AT.into()),
-        sort_desc: false,
+        sort_desc: true,
         include_external: false,
-        include_nested: false,
+        include_nested: true,
         for_agent: for_agent.map(|s| s.to_string()),
     };
 
-    let messages_unfiltered = store.query(&query_children)?.subjects;
+    let mut messages_unfiltered = store.query(&query_children)?.resources;
+    // We expect messages to appear from old to new, but we searched
+    messages_unfiltered.reverse();
+
+    // An attempt at creating a `next_page` URL on the server. But to be honest, it's probably better to do this in the front-end.
+    if messages_unfiltered.len() > page_limit {
+        let last_subject = messages_unfiltered
+            .last()
+            .ok_or("There are more messages than the page limit")?
+            .get_subject();
+        let last_resource = store.get_resource(last_subject)?;
+        let last_timestamp = last_resource.get(urls::CREATED_AT)?;
+        let next_page_url = url::Url::parse_with_params(
+            resource.get_subject(),
+            &[("before-timestamp", last_timestamp.to_string())],
+        )?;
+        resource.set_propval(
+            urls::NEXT_PAGE.into(),
+            Value::AtomicUrl(next_page_url.to_string()),
+            store,
+        )?;
+    }
 
     resource.set_propval(urls::MESSAGES.into(), messages_unfiltered.into(), store)?;
     Ok(resource.to_owned())
