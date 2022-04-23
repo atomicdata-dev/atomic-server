@@ -297,11 +297,13 @@ impl Storelike for Db {
     ) -> AtomicResult<Resource> {
         trace!("get_resource_extended: {}", subject);
         // This might add a trailing slash
-        let mut url = url::Url::parse(subject)?;
-        let clone = url.clone();
-        let query_params = clone.query_pairs();
-        url.set_query(None);
-        let mut removed_query_params = url.to_string();
+        let url = url::Url::parse(subject)?;
+
+        let mut removed_query_params = {
+            let mut url_altered = url.clone();
+            url_altered.set_query(None);
+            url_altered.to_string()
+        };
 
         // Remove trailing slash
         if removed_query_params.ends_with('/') {
@@ -311,11 +313,11 @@ impl Storelike for Db {
         // Check if the subject matches one of the endpoints
         for endpoint in self.endpoints.iter() {
             if url.path().starts_with(&endpoint.path) {
-                // Not all Endpoitns have a hanlde function.
+                // Not all Endpoints have a handle function.
                 // If there is none, return the endpoint plainly.
                 let mut resource = if let Some(handle) = endpoint.handle {
                     // Call the handle function for the endpoint, if it exists.
-                    (handle)(clone.clone(), self, for_agent).map_err(|e| {
+                    (handle)(url, self, for_agent).map_err(|e| {
                         format!("Error handling {} Endpoint: {}", endpoint.shortname, e)
                     })?
                 } else {
@@ -343,7 +345,7 @@ impl Storelike for Db {
                     if !skip_dynamic {
                         resource = crate::collections::construct_collection_from_params(
                             self,
-                            query_params,
+                            url.query_pairs(),
                             &mut resource,
                             for_agent,
                         )?;
@@ -354,7 +356,7 @@ impl Storelike for Db {
                     if !skip_dynamic {
                         resource = crate::plugins::invite::construct_invite_redirect(
                             self,
-                            query_params,
+                            url.query_pairs(),
                             &mut resource,
                             for_agent,
                         )?;
