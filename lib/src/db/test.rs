@@ -86,7 +86,7 @@ fn populate_collections() {
 
 #[test]
 /// Check if the cache is working
-fn test_add_atom_to_index() {
+fn add_atom_to_index() {
     let store = Db::init_temp("add_atom_to_index").unwrap();
     let subject = urls::CLASS.into();
     let property: String = urls::PARENT.into();
@@ -247,6 +247,7 @@ fn queries() {
         "following tests might not make sense if count is less than limit"
     );
 
+    let prop_filter = urls::DESTINATION;
     let sort_by = urls::DESCRIPTION;
 
     for _x in 0..count {
@@ -274,8 +275,8 @@ fn queries() {
     }
 
     let mut q = Query {
-        property: Some(urls::DESTINATION.into()),
-        value: Some(demo_reference),
+        property: Some(prop_filter.into()),
+        value: Some(demo_reference.clone()),
         limit: Some(limit),
         start_val: None,
         end_val: None,
@@ -348,7 +349,7 @@ fn queries() {
     let res = store.query(&q).unwrap();
     assert!(
         res.resources[0].get_subject() != resource_changed_order.get_subject(),
-        "deleted resoruce still in results"
+        "deleted resource still in results"
     );
 
     q.sort_desc = true;
@@ -364,12 +365,35 @@ fn queries() {
     // TODO: Ideally, the count is authorized too. But doing that could be hard. (or expensive)
     // https://github.com/joepio/atomic-data-rust/issues/286
     // assert_eq!(res.count, 1, "authorized count");
+
+    println!("Filter by value, property and also Sort");
+    q.property = Some(prop_filter.into());
+    q.value = Some(demo_reference);
+    q.sort_by = Some(sort_by.into());
+    q.for_agent = None;
+    let res = store.query(&q).unwrap();
+    println!("res {:?}", res.subjects);
+    let first = res.resources[0].get(sort_by).unwrap().to_string();
+    let later = res.resources[limit - 1].get(sort_by).unwrap().to_string();
+    assert!(first > later, "sort by desc");
+
+    println!("Set a start value");
+    let middle_val = res.resources[limit / 2].get(sort_by).unwrap().to_string();
+    q.start_val = Some(Value::String(middle_val.clone()));
+    let res = store.query(&q).unwrap();
+    println!("res {:?}", res.subjects);
+
+    let first = res.resources[0].get(sort_by).unwrap().to_string();
+    assert!(
+        first > middle_val,
+        "start value not respected, found value larger than middle value of earlier query"
+    );
 }
 
 /// Check if `include_external` is respected.
 #[test]
 fn query_include_external() {
-    let store = &DB.lock().unwrap().clone();
+    let store = &Db::init_temp("query_include_external").unwrap();
 
     let mut q = Query {
         property: None,

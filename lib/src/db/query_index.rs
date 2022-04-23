@@ -51,6 +51,8 @@ pub const END_CHAR: &str = "\u{ffff}";
 #[tracing::instrument(skip(store))]
 /// Performs a query on the `members_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
 pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
+    // When there is no explicit start / end value passed, we use the very first and last
+    // lexicographic characters in existence to make the range practically encompass all values.
     let start = if let Some(val) = &q.start_val {
         val.clone()
     } else {
@@ -93,6 +95,8 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         if in_selection {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+
+            println!("read filter {:?} with val {}", _q_filter, _val);
 
             // If no external resources should be included, skip this one if it's an external resource
             if !q.include_external && !subject.starts_with(&self_url) {
@@ -140,6 +144,7 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
 #[tracing::instrument(skip(store))]
 /// Adds a QueryFilter to the `watched_queries`
 pub fn watch_collection(store: &Db, q_filter: &QueryFilter) -> AtomicResult<()> {
+    println!("Watching collection {:?}", q_filter);
     store
         .watched_queries
         .insert(bincode::serialize(q_filter)?, b"")?;
@@ -213,24 +218,44 @@ fn check_resource_query_filter_property(
     None
 }
 
+/// Checks if a new IndexAtom should be updated for a specific [QueryFilter]
+/// It's only true if the [Resource] is matched by the [QueryFilter], and the [Value] is relevant for the index.
+/// This also sometimes updates other keys, for in the case one changed Atom influences other Indexed Members.
+/// See https://github.com/joepio/atomic-data-rust/issues/395
 // This is probably the most complex function in the whole repo.
 // If things go wrong when making changes, add a test and fix stuff in the logic below.
-pub fn should_update(q_filter: &QueryFilter, index_atom: &IndexAtom, resource: &Resource) -> bool {
+pub fn should_update(
+    q_filter: &QueryFilter,
+    index_atom: &IndexAtom,
+    resource: &Resource,
+    delete: bool,
+    store: &Db,
+) -> AtomicResult<bool> {
     let resource_check = check_resource_query_filter_property(resource, q_filter);
     let matching_prop = if let Some(p) = resource_check {
         p
     } else {
-        return false;
+        return Ok(false);
     };
 
-    match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
+    if let Some(sort_prop) = &q_filter.sort_by {
+        // Sometimes, a removed atom should also invalidate other IndexAtoms, because the QueryFilter no longer matches.
+        // This only happens when there is a `sort_by` in the QueryFilter.
+        // We then make sure to also update the sort_by value.
+        if let Ok(sorted_val) = resource.get(sort_prop) {
+            update_indexed_member(store, q_filter, &index_atom.subject, sorted_val, delete)?;
+        }
+    }
+
+    let should: bool = match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
         // Whenever the atom matches with either the sorted or the filtered prop, we have to update
         (Some(filterprop), Some(filter_val), Some(sortprop)) => {
             if sortprop == &index_atom.property {
-                return true;
+                // Update the Key, which contains the sorted value
+                return Ok(true);
             }
             if filterprop == &index_atom.property && index_atom.value == filter_val.to_string() {
-                return true;
+                return Ok(true);
             }
             // If either one of these match
             let relevant_prop =
@@ -253,8 +278,9 @@ pub fn should_update(q_filter: &QueryFilter, index_atom: &IndexAtom, resource: &
                 || &index_atom.property == sort_by
         }
         // We should not create indexes for Collections that iterate over _all_ resources.
-        _ => todo!(),
-    }
+        (a, b, c) => todo!("This query filter is not supported yet! Please create an issue on Github for filter {:?} {:?} {:?}", a, b, c),
+    };
+    Ok(should)
 }
 
 /// This is called when an atom is added or deleted.
@@ -269,17 +295,17 @@ pub fn check_if_atom_matches_watched_query_filters(
     delete: bool,
     resource: &Resource,
 ) -> AtomicResult<()> {
-    for item in store.watched_queries.iter() {
-        if let Ok((k, _v)) = item {
+    for query in store.watched_queries.iter() {
+        // The keys store all the data
+        if let Ok((k, _v)) = query {
             let q_filter = bincode::deserialize::<QueryFilter>(&k)
                 .map_err(|e| format!("Could not deserialize QueryFilter: {}", e))?;
-            let should_update = should_update(&q_filter, index_atom, resource);
 
-            if should_update {
-                update_indexed_member(store, &q_filter, atom, delete)?;
+            if should_update(&q_filter, index_atom, resource, delete, store)? {
+                update_indexed_member(store, &q_filter, &atom.subject, &atom.value, delete)?;
             }
         } else {
-            return Err(format!("Can't deserialize collection index: {:?}", item).into());
+            return Err(format!("Can't deserialize collection index: {:?}", query).into());
         }
     }
     Ok(())
@@ -290,14 +316,15 @@ pub fn check_if_atom_matches_watched_query_filters(
 pub fn update_indexed_member(
     store: &Db,
     collection: &QueryFilter,
-    atom: &Atom,
+    subject: &str,
+    value: &Value,
     delete: bool,
 ) -> AtomicResult<()> {
     let key = create_query_index_key(
         collection,
         // Maybe here we should serialize the value a bit different - as a sortable string, where Arrays are sorted by their length.
-        Some(&atom.value),
-        Some(&atom.subject),
+        Some(value),
+        Some(subject),
     )?;
     if delete {
         store.members_index.remove(key)?;
@@ -382,8 +409,9 @@ pub fn value_to_reference_index_string(value: &Value) -> Option<Vec<String>> {
         Value::ResourceArray(_v) => value.to_subjects(None).unwrap_or_else(|_| vec![]),
         Value::AtomicUrl(v) => vec![v.into()],
         // We don't index nested resources for now
+        Value::Resource(_r) => return None,
         Value::NestedResource(_r) => return None,
-        // This might result in unnecassarily long strings, sometimes. We may want to shorten them later.
+        // This might result in unnecessarily long strings, sometimes. We may want to shorten them later.
         val => vec![val.to_string()],
     };
     Some(vals)
@@ -511,34 +539,42 @@ pub mod test {
 
         let resource_correct_class = Resource::new_instance(class, store).unwrap();
 
+        let subject: String = "https://example.com/someAgent".into();
+
         let index_atom = IndexAtom {
-            subject: "https://example.com/someAgent".into(),
+            subject,
             property: prop.clone(),
             value: class.to_string(),
         };
 
         // We should be able to find the resource by propval, val, and / or prop.
-        assert!(should_update(&qf_val, &index_atom, &resource_correct_class));
+        assert!(
+            should_update(&qf_val, &index_atom, &resource_correct_class, false, store).unwrap()
+        );
         assert!(should_update(
             &qf_prop_val,
             &index_atom,
-            &resource_correct_class
-        ));
-        assert!(should_update(
-            &qf_prop,
-            &index_atom,
-            &resource_correct_class
-        ));
+            &resource_correct_class,
+            false,
+            store
+        )
+        .unwrap());
+        assert!(
+            should_update(&qf_prop, &index_atom, &resource_correct_class, false, store).unwrap()
+        );
 
         // Test when a different value is passed
         let resource_wrong_class = Resource::new_instance(urls::PARAGRAPH, store).unwrap();
-        assert!(should_update(&qf_prop, &index_atom, &resource_wrong_class));
-        assert!(!should_update(&qf_val, &index_atom, &resource_wrong_class));
+        assert!(should_update(&qf_prop, &index_atom, &resource_wrong_class, false, store).unwrap());
+        assert!(!should_update(&qf_val, &index_atom, &resource_wrong_class, false, store).unwrap());
         assert!(!should_update(
             &qf_prop_val,
             &index_atom,
-            &resource_wrong_class
-        ));
+            &resource_wrong_class,
+            false,
+            store
+        )
+        .unwrap());
 
         let qf_prop_val_sort = QueryFilter {
             property: Some(prop.clone()),
@@ -551,7 +587,7 @@ pub mod test {
             sort_by: Some(urls::DESCRIPTION.to_string()),
         };
         let qf_val_sort = QueryFilter {
-            property: Some(prop.clone()),
+            property: Some(prop),
             value: Some(Value::AtomicUrl(class.to_string())),
             sort_by: Some(urls::DESCRIPTION.to_string()),
         };
@@ -560,17 +596,26 @@ pub mod test {
         assert!(should_update(
             &qf_prop_val_sort,
             &index_atom,
-            &resource_correct_class
-        ));
+            &resource_correct_class,
+            false,
+            store
+        )
+        .unwrap());
         assert!(should_update(
             &qf_prop_sort,
             &index_atom,
-            &resource_correct_class
-        ));
+            &resource_correct_class,
+            false,
+            store
+        )
+        .unwrap());
         assert!(should_update(
             &qf_val_sort,
             &index_atom,
-            &resource_correct_class
-        ));
+            &resource_correct_class,
+            false,
+            store
+        )
+        .unwrap());
     }
 }

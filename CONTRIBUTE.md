@@ -52,7 +52,8 @@ The `/.vscode` directory contains various tasks, recommended extensions, and som
 ```sh
 # Make sure nextest is installed
 cargo install nextest
-# This also makes sure that cli and server work, plus it test the db feature
+# Runs all tests
+# NOTE: run this from the root of the workspace, or else feature flags may be excluded
 cargo nextest run
 # Run specific test(s)
 cargo nextest run test_name_substring
