@@ -394,6 +394,17 @@ fn query_include_external() {
 }
 
 #[test]
+fn test_db_resources_all() {
+    let store = &DB.lock().unwrap().clone();
+    let res_no_include = store.all_resources(false).len();
+    let res_include = store.all_resources(true).len();
+    assert!(
+        res_include > res_no_include,
+        "Amount of results should be higher for include_external"
+    );
+}
+
+#[test]
 /// Changing these values actually correctly updates the index.
 fn index_invalidate_cache() {
     let store = &Db::init_temp("invalidate_cache").unwrap();
