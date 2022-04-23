@@ -31,21 +31,15 @@ pub fn construct_chatroom(
         }
     }
 
-    println!("chatroom subject: {}", resource.get_subject().clone());
-
-    let page_limit = 5;
+    let page_limit = 50;
 
     // First, find all children
     let query_children = Query {
         property: Some(PARENT.into()),
         value: Some(Value::AtomicUrl(resource.get_subject().clone())),
+        // We fetch one extra to see if there are more, so we can create a next-page URL
         limit: Some(page_limit + 1),
-        // limit: None,
-        // start_val: Some(Value::Timestamp(start_val)),
-        // start_val: Some(Value::Timestamp(1650543142827)),
         start_val: None,
-        // end_val: None,
-        // end_val: Some(Value::Timestamp(1650543142827)),
         end_val: Some(Value::Timestamp(start_val)),
         offset: 0,
         sort_by: Some(urls::CREATED_AT.into()),
@@ -56,8 +50,6 @@ pub fn construct_chatroom(
     };
 
     let mut messages_unfiltered = store.query(&query_children)?.resources;
-    // We expect messages to appear from old to new, but we searched
-    messages_unfiltered.reverse();
 
     // An attempt at creating a `next_page` URL on the server. But to be honest, it's probably better to do this in the front-end.
     if messages_unfiltered.len() > page_limit {
@@ -77,6 +69,9 @@ pub fn construct_chatroom(
             store,
         )?;
     }
+
+    // Clients expect messages to appear from old to new
+    messages_unfiltered.reverse();
 
     resource.set_propval(urls::MESSAGES.into(), messages_unfiltered.into(), store)?;
     Ok(resource.to_owned())
