@@ -8,7 +8,6 @@ use std::{
 
 use tracing::{instrument, trace};
 extern crate crossbeam_channel as channel;
-use threadpool::ThreadPool;
 use crate::{
     commit::CommitResponse,
     endpoints::{default_endpoints, Endpoint},
@@ -17,6 +16,7 @@ use crate::{
     storelike::{Query, QueryResult, ResourceCollection, Storelike},
     Atom, Resource, Value,
 };
+use threadpool::ThreadPool;
 
 use self::{
     migrations::migrate_maybe,
@@ -523,18 +523,18 @@ impl Storelike for Db {
         if include_external {
             prefix = "".as_bytes();
         }
-        let njobs=num_cpus::get();
+        let njobs = num_cpus::get();
         let pool = ThreadPool::new(njobs);
         let resource_iter = self.resources.scan_prefix(prefix);
         let (send, recv) = channel::bounded(0);
         for item in resource_iter {
-            let (send, item)= (send.clone(),item.clone());
+            let (send, item) = (send.clone(), item.clone());
             pool.execute(move || {
                 send.send(process_resource(item));
-                });
-            }
-            drop(send);
-        let resources=recv.try_iter().collect::<Vec<Resource>>();
+            });
+        }
+        drop(send);
+        let resources = recv.try_iter().collect::<Vec<Resource>>();
         resources
     }
 
