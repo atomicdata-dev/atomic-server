@@ -98,12 +98,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
                     s if s.starts_with("GET ") => {
                         let mut parts = s.split("GET ");
                         if let Some(_subject) = parts.nth(1) {
-                            ctx.text("GET not yet supported, see https://github.com/joepio/atomic-data-rust/issues/180")
+                            ctx.text("ERROR: GET not yet supported, see https://github.com/joepio/atomic-data-rust/issues/180")
                         }
                     }
                     other => {
                         tracing::warn!("Unmatched message: {}", other);
-                        ctx.text(format!("Server receieved unknown message: {}", other));
+                        ctx.text(format!("ERROR: Server received unknown message: {}", other));
                     }
                 };
             }
@@ -155,7 +155,7 @@ impl Handler<CommitMessage> for WebSocketConnection {
 
     fn handle(&mut self, msg: CommitMessage, ctx: &mut ws::WebsocketContext<Self>) {
         let resource = msg.commit_response.commit_resource;
-        tracing::info!(
+        tracing::debug!(
             "handle commit in web socket connection for resource {}",
             resource.get_subject()
         );
