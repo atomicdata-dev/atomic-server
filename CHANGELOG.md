@@ -16,6 +16,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Auto-update desktop distributions using Tauri #158
 - Internal migration logic for inter-version compatibility of the database. Makes upgrading trivial. #102
 - Use commits in populate and init
+- Fix bug when opening the same invite twice with the same agent
 
 ## [v0.31.1] - 2022-03-29
 

@@ -26,7 +26,13 @@ pub fn construct_invite_redirect(
         (None, Some(agent_url)) => agent_url,
         (Some(public_key), None) => {
             let new_agent = Agent::new_from_public_key(store, &public_key)?;
-            new_agent.to_resource(store)?.save_locally(store)?;
+            // Create an agent if there is none
+            match store.get_resource(&public_key) {
+                Ok(_found) => {}
+                Err(_) => {
+                    new_agent.to_resource(store)?.save_locally(store)?;
+                }
+            };
 
             // Always add write rights to the agent itself
             // A bit inefficient, since it re-fetches the agent from the store, but it's not that big of a cost
