@@ -136,6 +136,7 @@ pub struct ServerOpts {}
 
 /// Configuration for the server.
 /// These values are set when the server initializes, and do not change while running.
+/// These are constructed from [Opts], which in turn are constructed from CLI arguments and ENV variables.
 #[derive(Clone, Debug)]
 pub struct Config {
     /// Full domain + schema, e.g. `https://example.com`. Is either generated from `domain` and `schema`, or is the `custom_server_url`.

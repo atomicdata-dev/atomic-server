@@ -15,6 +15,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Make process management optional #324 #334
 - Auto-update desktop distributions using Tauri #158
 - Internal migration logic for inter-version compatibility of the database. Makes upgrading trivial. #102
+- Use commits in populate and init
 
 ## [v0.31.1] - 2022-03-29
 

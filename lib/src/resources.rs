@@ -312,6 +312,16 @@ impl Resource {
         Ok(commit_response)
     }
 
+    /// Overwrites the is_a (Class) of the Resource.
+    pub fn set_class(&mut self, is_a: &str, store: &impl Storelike) -> AtomicResult<()> {
+        self.set_propval(
+            crate::urls::IS_A.into(),
+            Value::ResourceArray([is_a.into()].into()),
+            store,
+        )?;
+        Ok(())
+    }
+
     /// Insert a Property/Value combination.
     /// Overwrites existing Property/Value.
     /// Validates the datatype.

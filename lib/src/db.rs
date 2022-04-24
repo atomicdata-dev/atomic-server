@@ -87,7 +87,7 @@ impl Db {
             watched_queries,
             endpoints: default_endpoints(),
         };
-        migrate_maybe(&store)?;
+        migrate_maybe(&store).map(|e| format!("Error during migration of database: {:?}", e))?;
         crate::populate::populate_base_models(&store)
             .map_err(|e| format!("Failed to populate base models. {}", e))?;
         Ok(store)
@@ -492,9 +492,11 @@ impl Storelike for Db {
         crate::populate::populate_default_store(self)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
         // This is a potentially expensive operation, but is needed to make TPF queries work with the models created in here
-        self.build_index(true)?;
+        self.build_index(true)
+            .map_err(|e| format!("Failed to build index. {}", e))?;
         crate::populate::create_drive(self)
-            .map_err(|e| format!("Failed to populate hierarcy. {}", e))?;
+            .map_err(|e| format!("Failed to create drive. {}", e))?;
+        crate::populate::set_drive_rights(self, true)?;
         crate::populate::populate_collections(self)
             .map_err(|e| format!("Failed to populate collections. {}", e))?;
         crate::populate::populate_endpoints(self)

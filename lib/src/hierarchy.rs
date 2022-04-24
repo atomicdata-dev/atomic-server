@@ -133,8 +133,8 @@ pub fn check_rights(
         };
         // resource has no parent and agent is not in Write array - check fails
         Err(crate::errors::AtomicError::unauthorized(format!(
-            "No right has been found for {} in this resource or its parents",
-            for_string
+            "No {} right has been found for {} in this resource or its parents",
+            right, for_string
         )))
     }
 }

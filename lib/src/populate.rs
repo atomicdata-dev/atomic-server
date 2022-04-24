@@ -154,8 +154,8 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
     let self_url = store
         .get_self_url()
         .ok_or("No self_url set, cannot populate store with Drive")?;
-    let mut drive = crate::Resource::new_instance(urls::DRIVE, store)?;
-    drive.set_subject(self_url);
+    let mut drive = store.get_resource_new(&self_url);
+    drive.set_class(urls::DRIVE, store)?;
     let server_url = url::Url::parse(store.get_server_url())?;
     drive.set_propval_string(
         urls::NAME.into(),
@@ -176,6 +176,7 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
         read_agents.push(urls::PUBLIC_AGENT.into());
     }
 
+    // TODO: update these
     drive.append_subjects(urls::WRITE, write_agents, true, store)?;
     drive.append_subjects(urls::READ, read_agents, true, store)?;
     if let Err(_no_description) = drive.get(urls::DESCRIPTION) {
