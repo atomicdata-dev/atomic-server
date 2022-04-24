@@ -17,6 +17,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Internal migration logic for inter-version compatibility of the database. Makes upgrading trivial. #102
 - Use commits in populate and init
 - Fix bug when opening the same invite twice with the same agent
+- Update atomic-data-browser, deal with new commits, add chatrooms
 
 ## [v0.31.1] - 2022-03-29
 

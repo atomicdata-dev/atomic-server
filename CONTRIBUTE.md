@@ -136,8 +136,9 @@ Before tagging a new version, make sure to update the `app_assets` folder:
 
 1. get [atomic-data-browser](https://github.com/joepio/atomic-data-browser) locally
 2. run `yarn build`
-3. copy the contents of `publish` to `app_assets`
-4. search and replace `./workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
+3. copy the contents of `publish` to `app_assets`: `cp -r publish/ ../../atomic-data-rust/server/app_assets/`
+4. Make sure not to commit all the files, manually check them
+5. search and replace `./app_assets/workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
 
 ## Publishing manually - doing the CI's work
 

@@ -40,3 +40,7 @@ Used in lists.
 
 Can appear inside a sentence of text, or inside a table.
 One of the smallest View Types.
+
+## Adding a new View
+
+Depending on the ViewType, make sure to add your new component to the respective `switch` statement in e.g. `ResourcePage` or `ResourceCard`.
