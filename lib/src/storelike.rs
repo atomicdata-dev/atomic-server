@@ -138,6 +138,14 @@ pub trait Storelike: Sized {
     /// If you're not sure what to use, use `get_resource_extended`.
     fn get_resource(&self, subject: &str) -> AtomicResult<Resource>;
 
+    /// Returns an existing resource, or creates a new one with the given Subject
+    fn get_resource_new(&self, subject: &str) -> Resource {
+        match self.get_resource(subject) {
+            Ok(r) => r,
+            Err(_) => Resource::new(subject.into()),
+        }
+    }
+
     /// Retrieves a Class from the store by subject URL and converts it into a Class useful for forms
     fn get_class(&self, subject: &str) -> AtomicResult<Class> {
         let resource = self

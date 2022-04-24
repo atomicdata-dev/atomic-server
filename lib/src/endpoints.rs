@@ -36,7 +36,7 @@ impl Endpoint {
     /// Converts Endpoint to resource. Does not save it.
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
         let subject = format!("{}{}", store.get_server_url(), self.path);
-        let mut resource = Resource::new(subject);
+        let mut resource = store.get_resource_new(&subject);
         resource.set_propval_string(urls::DESCRIPTION.into(), &self.description, store)?;
         resource.set_propval_string(urls::SHORTNAME.into(), &self.shortname, store)?;
         let is_a = [urls::ENDPOINT.to_string()].to_vec();

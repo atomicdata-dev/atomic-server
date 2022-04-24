@@ -46,8 +46,8 @@ impl CollectionBuilder {
     /// Note that this does not calculate any members, and it does not generate any pages.
     /// If that is what you need, use `.into_resource`
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
-        let mut resource = crate::Resource::new_instance(urls::COLLECTION, store)?;
-        resource.set_subject(self.subject.clone());
+        let mut resource = store.get_resource_new(&self.subject);
+        resource.set_class(urls::COLLECTION, store)?;
         if let Some(val) = &self.property {
             resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), val, store)?;
         }
@@ -388,7 +388,7 @@ pub fn construct_collection_from_params(
     collection.add_to_resource(resource, store)
 }
 
-/// Creates a resource in the Store for a Class, for example `/documents`.
+/// Creates a Collection resource in the Store for a Class, for example `/documents`.
 /// Does not save it, though.
 pub fn create_collection_resource_for_class(
     store: &impl Storelike,

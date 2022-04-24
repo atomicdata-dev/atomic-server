@@ -7,9 +7,11 @@ use atomic_lib::{
     Storelike,
 };
 
-/// Data object available to handlers and actors.
-/// Contains the store, configuration and addresses for Actix Actors.
-// This struct is cloned accross all threads, so make sure the fields are thread safe.
+/// The AppState contains all the relevant Context for the server.
+/// This data object is available to all handlers and actors.
+/// Contains the store, configuration and addresses for Actix Actors, such as for the [CommitMonitor].
+/// It is generated using [init], which takes a [Config].
+// This struct is cloned across all threads, so make sure the fields are thread safe.
 // A good option here is to use Actors for things that can change (e.g. commit_monitor)
 #[derive(Clone)]
 pub struct AppState {
@@ -51,23 +53,20 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     tracing::info!("Setting default agent");
     set_default_agent(&config, &store)?;
     if config.initialize {
-        tracing::info!("Running populate commands");
-        atomic_lib::populate::create_drive(&store)
-            .map_err(|e| format!("Failed to populate hierarchy. {}", e))?;
-        atomic_lib::populate::set_drive_rights(&store, true)
-            .map_err(|e| format!("Failed to set drive rights. {}", e))?;
-        atomic_lib::populate::populate_collections(&store)
-            .map_err(|e| format!("Failed to populate collections. {}", e))?;
-        atomic_lib::populate::populate_endpoints(&store)
-            .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
-        set_up_initial_invite(&store)?;
+        tracing::info!(
+            "Running initialization commands (first time startup, or you passed --initialize)"
+        );
+        store.populate()?;
+        set_up_initial_invite(&store)
+            .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
         tracing::info!("Setting rights to Drive {}", store.get_server_url());
     }
 
     // Initialize search constructs
     tracing::info!("Starting search service");
-    let search_state = SearchState::new(&config)?;
+    let search_state =
+        SearchState::new(&config).map_err(|e| format!("Failed to start search service: {}", e))?;
 
     // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
     tracing::info!("Starting commit monitor");
@@ -100,7 +99,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
                         // This means that the Agent from the Config file should be recreated, using its private key.
                         tracing::info!("Agent not retrievable, but config was found. Recreating Agent in new store.");
                         let recreated_agent = Agent::new_from_private_key(
-                            "root".into(),
+                            "server".into(),
                             store,
                             &agent_config.private_key,
                         );
@@ -116,7 +115,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
             }
         }
         Err(_no_config) => {
-            let agent = store.create_agent(Some("root"))?;
+            let agent = store.create_agent(Some("server"))?;
             let cfg = atomic_lib::config::Config {
                 agent: agent.subject.clone(),
                 server: config.server_url.clone(),
@@ -147,7 +146,8 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
 fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     let subject = format!("{}/setup", store.get_server_url());
     tracing::info!("Creating initial Invite at {}", subject);
-    let mut invite = atomic_lib::Resource::new_instance(atomic_lib::urls::INVITE, store)?;
+    let mut invite = store.get_resource_new(&subject);
+    invite.set_class(atomic_lib::urls::INVITE, store)?;
     invite.set_subject(subject);
     // This invite can be used only once
     invite.set_propval(

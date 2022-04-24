@@ -130,7 +130,7 @@ impl Commit {
         };
 
         // Make sure the one creating the commit had the same idea of what the current state is.
-        if opts.validate_previous_commit {
+        if !is_new && opts.validate_previous_commit {
             if let Ok(last_resource_val) = resource_old.get(urls::LAST_COMMIT) {
                 let prev_resource = last_resource_val.to_string();
 
@@ -138,8 +138,8 @@ impl Commit {
                     // TODO: try auto merge
                     if prev_resource != commit_prev {
                         return Err(format!(
-                            "previousCommit mismatch. Expected '{}' from Commit, but got in the Resource '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
-                            commit_prev, prev_resource,
+                            "previousCommit mismatch. Had lastCommit '{}' in Resource {}, but got in Commit '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
+                            prev_resource, subject_url, commit_prev,
                         )
                         .into());
                     }
@@ -189,7 +189,12 @@ impl Commit {
                         .get(urls::TARGET)
                         .map_err(|_e| "Invite does not have required Target attribute")?;
                     let target_resource = store.get_resource(&target.to_string())?;
-                    hierarchy::check_write(store, &target_resource, &self.signer)?;
+                    hierarchy::check_write(store, &target_resource, &self.signer).map_err(|e| {
+                        format!(
+                            "Creating Invite to {} failed. You do not have write rights to the target resource. {}",
+                            target, e
+                        )
+                    })?;
                 }
                 _other => {}
             };

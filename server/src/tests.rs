@@ -38,7 +38,7 @@ async fn server_tests() {
         "atomic-server",
         "--initialize",
         "--data-dir",
-        &format!("./.temp/{}", unique_string),
+        &format!("./.temp/{}/db", unique_string),
     ]);
 
     let config = config::build_config(opts)

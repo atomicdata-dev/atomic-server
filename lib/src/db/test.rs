@@ -57,7 +57,7 @@ fn basic() {
 
 #[test]
 fn populate_collections() {
-    let store = DB.lock().unwrap().clone();
+    let store = Db::init_temp("populate_collections").unwrap();
     let subjects: Vec<String> = store
         .all_resources(false)
         .into_iter()
@@ -80,12 +80,14 @@ fn populate_collections() {
         .to_bool()
         .unwrap();
     assert!(nested);
+    // Make sure it can be run multiple times
+    store.populate().unwrap();
 }
 
 #[test]
 /// Check if the cache is working
-fn add_atom_to_index() {
-    let store = DB.lock().unwrap().clone();
+fn test_add_atom_to_index() {
+    let store = Db::init_temp("add_atom_to_index").unwrap();
     let subject = urls::CLASS.into();
     let property: String = urls::PARENT.into();
     let value = Value::AtomicUrl(urls::AGENT.into());
@@ -207,7 +209,7 @@ fn destroy_resource_and_check_collection_and_commits() {
 
 #[test]
 fn get_extended_resource_pagination() {
-    let store = DB.lock().unwrap().clone();
+    let store = Db::init_temp("get_extended_resource_pagination").unwrap();
     let subject = format!("{}/commits?current_page=2", store.get_server_url());
     // Should throw, because page 2 is out of bounds for default page size
     let _wrong_resource = store
@@ -395,7 +397,7 @@ fn query_include_external() {
 
 #[test]
 fn test_db_resources_all() {
-    let store = &DB.lock().unwrap().clone();
+    let store = &Db::init_temp("resources_all").unwrap();
     let res_no_include = store.all_resources(false).len();
     let res_include = store.all_resources(true).len();
     assert!(

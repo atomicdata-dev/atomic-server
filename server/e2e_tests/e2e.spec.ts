@@ -157,7 +157,7 @@ test.describe('data-browser', async () => {
       await page.click('text=Accept as Test');
     }
     // Create a document
-    await page.click('button:has-text("collections")');
+    await page.click('a:has-text("collections")');
     await page.click('a:has-text("documents")');
     await page.click('[title="Create a new document"]');
     await page.click('[data-test="save"]');
