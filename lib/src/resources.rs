@@ -162,18 +162,19 @@ impl Resource {
         &mut self,
         property: &str,
         value: SubResource,
-        must_be_unique: bool,
+        skip_existing: bool,
         // TODO: Use Store to validate datatype
         _store: &impl Storelike,
     ) -> AtomicResult<()> {
         let mut vec = match self.propvals.get(property) {
             Some(some) => match some {
                 Value::ResourceArray(vec) => {
-                    if must_be_unique {
+                    if skip_existing {
                         let str_val = value.to_string();
                         for i in vec {
                             if i.to_string() == str_val {
-                                return Err("Value already exists".into());
+                                // Value already exists
+                                return Ok(());
                             }
                         }
                     }

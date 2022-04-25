@@ -142,7 +142,6 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
 #[tracing::instrument(skip(store))]
 /// Adds a QueryFilter to the `watched_queries`
 pub fn watch_collection(store: &Db, q_filter: &QueryFilter) -> AtomicResult<()> {
-    println!("Watching collection {:?}", q_filter);
     store
         .watched_queries
         .insert(bincode::serialize(q_filter)?, b"")?;
