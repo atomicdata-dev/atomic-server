@@ -9,14 +9,14 @@ use crate::{
     values::SubResource, Atom, Resource, Storelike, Value,
 };
 
-/// Contains two resources. The first is the Resource representation of the applied Commits.
-/// The second is the New resource, if it's not deleted.
-/// The third is the Old resource.
+/// The `resource_new`, `resource_old` and `commit_resource` fields are only created if the Commit is persisted.
+/// When the Db is only notifying other of changes (e.g. if a new Message was added to a ChatRoom), these fields are not created.
+/// When deleting a resource, the `resource_new` field is None.
 #[derive(Clone, Debug)]
 pub struct CommitResponse {
     pub commit_resource: Resource,
     pub resource_new: Option<Resource>,
-    pub resource_old: Resource,
+    pub resource_old: Option<Resource>,
     pub commit_struct: Commit,
 }
 
@@ -180,17 +180,22 @@ impl Commit {
             resource_new.check_required_props(store)?;
         }
 
-        // TODO: before_apply_commit hooks plugins
-        // This is where users should extend commits
+        // Set the `lastCommit` to the newly created Commit
+        resource_new.set_propval(
+            urls::LAST_COMMIT.to_string(),
+            Value::AtomicUrl(commit_resource.get_subject().into()),
+            store,
+        )?;
+
+        let _resource_new_classes = resource_new.get_classes(store)?;
+
+        // BEFORE APPLY COMMIT HANDLERS
         #[cfg(feature = "db")]
-        for class in resource_new.get_classes(store)? {
+        for class in &_resource_new_classes {
             match class.subject.as_str() {
                 urls::COMMIT => return Err("Commits can not be edited or created directly.".into()),
                 urls::INVITE => {
                     crate::plugins::invite::before_apply_commit(store, self, &resource_new)?
-                }
-                urls::MESSAGE => {
-                    crate::plugins::chatroom::before_apply_commit(store, self, &resource_new)?
                 }
                 _other => {}
             };
@@ -205,7 +210,7 @@ impl Commit {
                 store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
                 return Ok(CommitResponse {
                     resource_new: None,
-                    resource_old,
+                    resource_old: Some(resource_old),
                     commit_resource,
                     commit_struct: self.clone(),
                 });
@@ -215,26 +220,35 @@ impl Commit {
         // We apply the changes again, but this time also update the index
         self.apply_changes(resource_old.clone(), store, opts.update_index)?;
 
-        // Set the `lastCommit` to the newly created Commit
-        resource_new.set_propval(
-            urls::LAST_COMMIT.to_string(),
-            Value::AtomicUrl(commit_resource.get_subject().into()),
-            store,
-        )?;
-
         // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
         store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
 
         let commit_response = CommitResponse {
-            resource_new: Some(resource_new),
-            resource_old,
+            resource_new: Some(resource_new.clone()),
+            resource_old: Some(resource_old),
             commit_resource,
             commit_struct: self.clone(),
         };
 
         store.handle_commit(&commit_response);
+
+        // AFTER APPLY COMMIT HANDLERS
+        // Commit has been checked and saved.
+        // Here you can add side-effects, such as creating new Commits.
+        #[cfg(feature = "db")]
+        for class in _resource_new_classes {
+            match class.subject.as_str() {
+                urls::MESSAGE => crate::plugins::chatroom::after_apply_commit_message(
+                    store,
+                    self,
+                    &resource_new,
+                )?,
+                _other => {}
+            };
+        }
+
         Ok(commit_response)
     }
 
@@ -387,58 +401,53 @@ impl Commit {
         };
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
         resource.set_subject(commit_subject);
-        resource.set_propval(
+        resource.set_propval_unsafe(
             urls::SUBJECT.into(),
             Value::new(&self.subject, &DataType::AtomicUrl)?,
-            store,
-        )?;
+        );
         let classes = vec![urls::COMMIT.to_string()];
-        resource.set_propval(urls::IS_A.into(), classes.into(), store)?;
-        resource.set_propval(
+        resource.set_propval_unsafe(urls::IS_A.into(), classes.into());
+        resource.set_propval_unsafe(
             urls::CREATED_AT.into(),
             Value::new(&self.created_at.to_string(), &DataType::Timestamp)?,
-            store,
-        )?;
-        resource.set_propval(
+        );
+        resource.set_propval_unsafe(
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
-            store,
-        )?;
+        );
         if let Some(set) = self.set {
             let mut newset = PropVals::new();
             for (prop, val) in set {
                 newset.insert(prop, val);
             }
-            resource.set_propval(urls::SET.into(), newset.into(), store)?;
+            resource.set_propval_unsafe(urls::SET.into(), newset.into());
         };
         if let Some(remove) = self.remove {
             if !remove.is_empty() {
-                resource.set_propval(urls::REMOVE.into(), remove.into(), store)?;
+                resource.set_propval_unsafe(urls::REMOVE.into(), remove.into());
             }
         };
         if let Some(destroy) = self.destroy {
             if destroy {
-                resource.set_propval(urls::DESTROY.into(), true.into(), store)?;
+                resource.set_propval_unsafe(urls::DESTROY.into(), true.into());
             }
         }
         if let Some(previous_commit) = self.previous_commit {
-            resource.set_propval(
+            resource.set_propval_unsafe(
                 urls::PREVIOUS_COMMIT.into(),
                 Value::AtomicUrl(previous_commit),
-                store,
-            )?;
+            );
         }
-        resource.set_propval(
+        resource.set_propval_unsafe(
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
-            store,
-        )?;
+        );
         if let Some(signature) = self.signature {
-            resource.set_propval(urls::SIGNATURE.into(), signature.into(), store)?;
+            resource.set_propval_unsafe(urls::SIGNATURE.into(), signature.into());
         }
         if let Some(push) = self.push {
             if !push.is_empty() {
-                resource.set_propval(urls::PUSH.into(), push.into(), store)?;
+                resource.set_propval_unsafe(urls::PUSH.into(), push.into());
             }
         }
         Ok(resource)

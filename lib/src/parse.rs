@@ -32,7 +32,7 @@ fn json_ad_object_to_resource(
     store: &impl crate::Storelike,
 ) -> AtomicResult<Resource> {
     match parse_json_ad_map_to_propvals(json, store)? {
-        SubResource::Resource(r) => Ok(r),
+        SubResource::Resource(r) => Ok(*r),
         SubResource::Nested(_) => Err("It's a nested Resource, no @id found".into()),
         SubResource::Subject(_) => Err("It's a string, not a nested resource".into()),
     }
@@ -161,7 +161,7 @@ pub fn parse_json_ad_map_to_propvals(
     if let Some(subj) = { subject } {
         let mut r = Resource::new(subj);
         r.set_propvals_unsafe(propvals);
-        Ok(SubResource::Resource(r))
+        Ok(SubResource::Resource(r.into()))
     } else {
         Ok(SubResource::Nested(propvals))
     }
@@ -274,7 +274,7 @@ mod test {
         let parsed = parse_json_ad_resource(json, &store).unwrap();
         let serialized = parsed.to_json_ad().unwrap();
         println!("{}", serialized);
-        assert_eq!(json.replace(" ", ""), serialized.replace(" ", ""));
+        assert_eq!(json.replace(' ', ""), serialized.replace(' ', ""));
     }
 
     #[test]

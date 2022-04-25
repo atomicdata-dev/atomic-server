@@ -23,6 +23,17 @@
     "https://atomicdata.dev/properties/shortname": "next-page"
   },
   {
+    "@id": "https://atomicdata.dev/properties/replyTo",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Message",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "To which message this is responding.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "reply-to"
+  },
+  {
     "@id": "https://atomicdata.dev/classes/ChatRoom",
     "https://atomicdata.dev/properties/description": "A place where users can post and view chat messages. The `messages` are calculated upon requesting the ChatRoom.\n\nYou can post [`Messages`](https://atomicdata.dev/classes/Message) in them by creating a Commit for the Message, and setting the [`parent`](https://atomicdata.dev/properties/parent) of the `Message` to the `ChatRoom`.",
     "https://atomicdata.dev/properties/isA": [
