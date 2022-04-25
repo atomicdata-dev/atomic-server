@@ -5,6 +5,7 @@ They list a bunch of Messages.
 */
 
 use crate::{
+    commit::{CommitBuilder, CommitResponse},
     errors::AtomicResult,
     storelike::Query,
     urls::{self, PARENT},
@@ -74,29 +75,40 @@ pub fn construct_chatroom(
 }
 
 /// Update the ChatRoom with the new message, make sure this is sent to all Subscribers
-pub fn before_apply_commit(
+#[tracing::instrument(skip(store))]
+pub fn after_apply_commit_message(
     store: &impl Storelike,
     _commit: &crate::Commit,
     resource_new: &Resource,
 ) -> AtomicResult<()> {
-    // Get the related ChatRoom
-    let parent_subject = resource_new
-        .get(urls::PARENT)
-        .map_err(|_e| "Message must have a Parent!")?
-        .to_string();
+    // only update the ChatRoom for _new_ messages, not for edits
+    if _commit.previous_commit.is_none() {
+        // Get the related ChatRoom
+        let parent_subject = resource_new
+            .get(urls::PARENT)
+            .map_err(|_e| "Message must have a Parent!")?
+            .to_string();
 
-    // We need to push the Appended messages to all listeners of the ChatRoom.
-    // We do this by pushing the message, and saving the Commit.
-    // It is then sent to all subscribers.
-    let mut chat_room = store.get_resource(&parent_subject)?;
+        // We need to push the Appended messages to all listeners of the ChatRoom.
+        // We do this by creating a new Commit and sending that.
+        // We do not save the actual changes in the ChatRoom itself for performance reasons.
 
-    chat_room.push_propval(
-        urls::MESSAGES,
-        crate::values::SubResource::Resource(resource_new.clone()),
-        false,
-        store,
-    )?;
+        // We use the ChatRoom only for its `last_commit`
+        let chat_room = store.get_resource(&parent_subject)?;
 
-    chat_room.save(store)?;
+        let mut commit_builder = CommitBuilder::new(parent_subject);
+        let new_message = crate::values::SubResource::Resource(Box::new(resource_new.to_owned()));
+        commit_builder.push_propval(urls::MESSAGES, new_message)?;
+        let commit = commit_builder.sign(&store.get_default_agent()?, store, &chat_room)?;
+
+        let commit_response = CommitResponse {
+            commit_resource: commit.clone().into_resource(store)?,
+            resource_new: None,
+            resource_old: None,
+            commit_struct: commit,
+        };
+
+        store.handle_commit(&commit_response);
+    }
     Ok(())
 }

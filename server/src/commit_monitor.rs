@@ -100,17 +100,20 @@ impl CommitMonitor {
             tracing::debug!("No subscribers for {}", target);
         }
 
-        // Update the value index
-        msg.commit_response.commit_struct.apply_changes(
-            msg.commit_response.resource_old.clone(),
-            &self.store,
-            true,
-        )?;
+        // UPDATE THE VALUE INDEX
+        // This `apply_changes` is also called in `Commit::apply`,
+        // but that time the index is not updated because that would
+        // make the response far slower.
+        if let Some(old) = msg.commit_response.resource_old {
+            msg.commit_response
+                .commit_struct
+                .apply_changes(old, &self.store, true)?;
+        }
 
         // Add commit itself to the value index
-        for atom in msg.commit_response.commit_resource.to_atoms()? {
-            self.store
-                .add_atom_to_index(&atom, &msg.commit_response.commit_resource)?;
+        let commit_resource = msg.commit_response.commit_resource;
+        for atom in commit_resource.to_atoms()? {
+            self.store.add_atom_to_index(&atom, &commit_resource)?;
         }
 
         // Update the search index
