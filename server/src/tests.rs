@@ -41,9 +41,12 @@ async fn server_tests() {
         &format!("./.temp/{}/db", unique_string),
     ]);
 
-    let config = config::build_config(opts)
+    let mut config = config::build_config(opts)
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");
+    // This prevents folder access issues when running concurrent tests
+    config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+
     let appstate = crate::appstate::init(config.clone()).expect("failed init appstate");
     let data = Data::new(appstate.clone());
     let app = test::init_service(
