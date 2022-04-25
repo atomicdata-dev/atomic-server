@@ -1,5 +1,5 @@
 // Start logging / tracing. Creates a subscribers that logs to stdout. Also optionally creates a Chrome trace file.
-pub fn init_tracing(config: &crate::config::Config) -> tracing_chrome::FlushGuard {
+pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::FlushGuard> {
     // Enable logging, but hide most tantivy logs
     std::env::set_var(
         "RUST_LOG",
@@ -14,18 +14,17 @@ pub fn init_tracing(config: &crate::config::Config) -> tracing_chrome::FlushGuar
         .with(terminal_layer)
         .with(filter);
 
-    let (chrome_layer, flush_guard) = tracing_chrome::ChromeLayerBuilder::new()
-        .include_args(true)
-        .build();
-    if config.opts.trace_chrome {
-        tracing_registry.with(chrome_layer).init();
-    } else {
-        tracing_registry.init();
-    }
     if config.opts.trace_chrome {
         tracing::info!(
             "Enabling tracing for Chrome. Saving file (after run) to ./trace-timestamp.json",
         );
+        let (chrome_layer, flush_guard) = tracing_chrome::ChromeLayerBuilder::new()
+            .include_args(true)
+            .build();
+        tracing_registry.with(chrome_layer).init();
+        return Some(flush_guard);
+    } else {
+        tracing_registry.init();
     }
-    flush_guard
+    None
 }
