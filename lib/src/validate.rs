@@ -41,13 +41,13 @@ pub fn validate_store(
 
         let mut found_props: Vec<String> = Vec::new();
 
-        for (prop_url, value) in propvals.to_owned() {
+        for (prop_url, value) in propvals {
             atom_count += 1;
 
-            let property = match store.get_property(&prop_url) {
+            let property = match store.get_property(prop_url) {
                 Ok(prop) => prop,
                 Err(e) => {
-                    unfetchable_props.push((prop_url, e.to_string()));
+                    unfetchable_props.push((prop_url.clone(), e.to_string()));
                     break;
                 }
             };
@@ -56,7 +56,7 @@ pub fn validate_store(
             match crate::Value::new(&value.to_string(), &property.data_type) {
                 Ok(_) => {}
                 Err(e) => invalid_value.push((
-                    crate::Atom::new(subject.clone(), prop_url.clone(), value),
+                    crate::Atom::new(subject.clone(), prop_url.clone(), value.clone()),
                     e.to_string(),
                 )),
             };

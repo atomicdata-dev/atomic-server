@@ -62,7 +62,7 @@ pub async fn upload_handler(
             now(),
             sanitize_filename::sanitize(&filename)
                 // Spacebars lead to very annoying bugs in browsers
-                .replace(" ", "-")
+                .replace(' ', "-")
         );
 
         let mut file_path = appstate.config.uploads_path.clone();

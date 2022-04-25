@@ -22,12 +22,8 @@ pub fn construct_chatroom(
     // TODO: From range
     let mut start_val = utils::now();
     for (k, v) in url.query_pairs() {
-        match k.as_ref() {
-            "before-timestamp" => {
-                start_val = v.parse::<i64>()?;
-                println!("before-timestamp: {}", v);
-            }
-            _ => {}
+        if k.as_ref() == "before-timestamp" {
+            start_val = v.parse::<i64>()?;
         }
     }
 

@@ -25,6 +25,9 @@ use self::{
     },
 };
 
+// A function called by the Store when a Commit is accepted
+type HandleCommit = Box<dyn Fn(&CommitResponse) + Send + Sync>;
+
 mod migrations;
 mod query_index;
 #[cfg(test)]
@@ -63,7 +66,7 @@ pub struct Db {
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
-    on_commit: Option<Arc<Box<dyn Fn(&CommitResponse) + Send + Sync>>>,
+    on_commit: Option<Arc<HandleCommit>>,
 }
 
 impl Db {
@@ -118,7 +121,7 @@ impl Db {
 
     /// Sets a function that is called whenever a [Commit::apply] is called.
     /// This can be used to listen to events.
-    pub fn set_handle_commit(&mut self, on_commit: Box<dyn Fn(&CommitResponse) + Send + Sync>) {
+    pub fn set_handle_commit(&mut self, on_commit: HandleCommit) {
         self.on_commit = Some(Arc::new(on_commit));
     }
 
