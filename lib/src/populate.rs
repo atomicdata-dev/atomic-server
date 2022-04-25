@@ -179,9 +179,6 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
         drive.push_propval(urls::READ, urls::PUBLIC_AGENT.into(), true, store)?;
     }
 
-    // TODO: update these
-    drive.append_subjects(urls::WRITE, write_agents, true, store)?;
-    drive.append_subjects(urls::READ, read_agents, true, store)?;
     if let Err(_no_description) = drive.get(urls::DESCRIPTION) {
         drive.set_propval_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
 

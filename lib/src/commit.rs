@@ -98,7 +98,6 @@ impl Commit {
                 Some(sig) => sig,
                 None => return Err("No signature set".into()),
             };
-            // TODO: Check if commit.agent has the rights to update the resource
             let pubkey_b64 = store
                 .get_resource(&self.signer)?
                 .get(urls::PUBLIC_KEY)?
@@ -131,8 +130,6 @@ impl Commit {
                 Resource::new(self.subject.clone())
             }
         };
-
-        let resource_new = self.apply_changes(resource_old.clone(), store, false)?;
 
         // Make sure the one creating the commit had the same idea of what the current state is.
         if !is_new && opts.validate_previous_commit {
