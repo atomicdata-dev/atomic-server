@@ -11,9 +11,11 @@ const documentTitle = '[data-test="document-title"]';
 const sidebarDriveEdit = '[data-test="sidebar-drive-edit"]';
 const currentDriveTitle = '[data-test=current-drive-title]';
 const navbarCurrentUser = '[data-test="navbar-current-user"]';
+const publicReadRight =
+  '[data-test="right-public"] input[type="checkbox"] >> nth=0';
+
 const demoFileName = 'logo.svg';
 const demoFile = `../../${demoFileName}`;
-
 const serverUrl = 'http://localhost:9883';
 const frontEndUrl = serverUrl;
 
@@ -32,7 +34,7 @@ test.describe('data-browser', async () => {
     // TODO: this keeps hanging. How do I make sure something is _not_ visible?
     // await expect(page.locator('text=new resource')).not.toBeVisible();
     await page.click('[data-test="sidebar-toggle"]');
-    await expect(page.locator('text=new resource')).toBeVisible();
+    await expect(await page.locator('text=new resource')).toBeVisible();
   });
 
   test('switch Server URL', async ({ page }) => {
@@ -182,8 +184,7 @@ test.describe('data-browser', async () => {
     const teststring = `My test: ${timestamp}`;
     await page.fill('textarea', teststring);
     // commit editing paragraph
-    await page.waitForResponse(`${serverUrl}/commit`);
-    await expect(page.locator(`text=${teststring}`)).toBeVisible();
+    await expect(await page.locator(`text=${teststring}`)).toBeVisible();
 
     // multi-user
     const currentUrl = page.url();
@@ -220,13 +221,12 @@ test.describe('data-browser', async () => {
     await page.click(currentDriveTitle);
     await page.click('[data-test="context-menu"]');
     await page.click('button:has-text("share")');
-    const hasPublicRead = await page.isChecked(
-      'input[type="checkbox"] >> nth=0',
-    );
+    const hasPublicRead = await page.isChecked(publicReadRight);
     if (hasPublicRead) {
       // For some reason this doesn't work without waiting
       await page.waitForTimeout(400);
-      await page.click('input[type="checkbox"] >> nth=0');
+      // Cleanup, set to public read again
+      await page.click(publicReadRight);
       await page.click('button:has-text("Save")');
     }
 
@@ -237,18 +237,21 @@ test.describe('data-browser', async () => {
     await page2.goto(frontEndUrl);
     await openLocalhost(page2);
     await page2.click(currentDriveTitle);
-    await expect(page2.locator('text=Unauthorized')).toBeVisible();
+    await expect(await page2.locator('text=Unauthorized')).toBeVisible();
 
     // Create invite
     await page.click('button:has-text("Send invite")');
     context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.click('button:has-text("Create Invite")');
-    await expect(page.locator('text=Invite created and copied ')).toBeVisible();
+    await expect(
+      await page.locator('text=Invite created and copied '),
+    ).toBeVisible();
     const inviteUrl = await page.evaluate(() =>
       document
         .querySelector('[data-code-content]')
         .getAttribute('data-code-content'),
     );
+
     // const value = await page.evaluate(() =>
     //   document.querySelector('input').getAttribute('value'),
     // );
@@ -264,10 +267,14 @@ test.describe('data-browser', async () => {
       page2.locator('text=Welcome to your Atomic-Server'),
     ).toBeVisible();
 
-    // Set to public read again
-    expect(await page.isChecked('input[type="checkbox"] >> nth=0')).toBeFalsy();
-    await page.click('input[type="checkbox"] >> nth=0');
+    // Cleanup, set to public read again
+    // timeout Prevents weird race condition (see above)
+    await page.waitForTimeout(400);
+    expect(await page.isChecked(publicReadRight)).toBeFalsy();
+    await page.click(publicReadRight);
+    expect(await page.isChecked(publicReadRight)).toBeTruthy();
     await page.click('button:has-text("Save")');
+    await expect(await page.locator('text=Share settings saved')).toBeVisible();
   });
 
   test('upload, download', async ({ page, browser, context }) => {
@@ -281,20 +288,24 @@ test.describe('data-browser', async () => {
     ]);
     await fileChooser.setFiles(demoFile);
     await page.click(`[data-test]:has-text("${demoFileName}")`);
-    await expect(page.locator('[data-test="image-viewer"]')).toBeVisible();
+    await expect(
+      await page.locator('[data-test="image-viewer"]'),
+    ).toBeVisible();
   });
 });
 
 /** Signs in using an AtomicData.dev test user */
 async function signIn(page: Page) {
   await page.click('text=user settings');
-  await expect(page.locator('text=edit data and sign Commits')).toBeVisible();
+  await expect(
+    await page.locator('text=edit data and sign Commits'),
+  ).toBeVisible();
   // If there are any issues with this agent, try creating a new one https://atomicdata.dev/invites/1
   const test_agent =
     'eyJzdWJqZWN0IjoiaHR0cHM6Ly9hdG9taWNkYXRhLmRldi9hZ2VudHMvaElNWHFoR3VLSDRkM0QrV1BjYzAwUHVFbldFMEtlY21GWStWbWNVR2tEWT0iLCJwcml2YXRlS2V5IjoiZkx0SDAvY29VY1BleFluNC95NGxFemFKbUJmZTYxQ3lEekUwODJyMmdRQT0ifQ==';
   await page.click('#current-password');
   await page.fill('#current-password', test_agent);
-  await expect(page.locator('text=Edit profile')).toBeVisible();
+  await expect(await page.locator('text=Edit profile')).toBeVisible();
   await page.goBack();
 }
 
@@ -316,18 +327,20 @@ async function openAtomic(page: Page) {
   // Set AtomicData.dev as the server
   await page.click('[data-test="server-url-atomic"]');
   // Accept the invite, create an account if necessary
-  await expect(page.locator(currentDriveTitle)).toHaveText('atomicdata.dev');
+  await expect(await page.locator(currentDriveTitle)).toHaveText(
+    'atomicdata.dev',
+  );
 }
 
 async function editProfileAndCommit(page: Page) {
   await page.click('text=user settings');
   // Edit profile and save commit
   await page.click('text=Edit profile');
-  await expect(page.locator('text=add another property')).toBeVisible();
+  await expect(await page.locator('text=add another property')).toBeVisible();
   await page.fill(
     '[data-test="input-name"]',
     `Test user edited at ${new Date().toLocaleDateString()}`,
   );
   await page.click('[data-test="save"]');
-  await expect(page.locator('text=saved')).toBeVisible();
+  await expect(await page.locator('text=saved')).toBeVisible();
 }
