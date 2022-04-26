@@ -298,13 +298,9 @@ impl Storelike for Db {
         skip_dynamic: bool,
         for_agent: Option<&str>,
     ) -> AtomicResult<Resource> {
-        let url_span = tracing::span!(tracing::Level::DEBUG, "URL stuff").entered();
-
-        trace!("get_resource_extended: {}", subject);
+        let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
         // This might add a trailing slash
-        let url_parse_span = tracing::span!(tracing::Level::DEBUG, "URL parse").entered();
         let url = url::Url::parse(subject)?;
-        url_parse_span.exit();
 
         let mut removed_query_params = {
             let mut url_altered = url.clone();
@@ -319,7 +315,7 @@ impl Storelike for Db {
 
         url_span.exit();
 
-        let endpoint_span = tracing::span!(tracing::Level::DEBUG, "Endpoint").entered();
+        let endpoint_span = tracing::span!(tracing::Level::TRACE, "Endpoint").entered();
         // Check if the subject matches one of the endpoints
         for endpoint in self.endpoints.iter() {
             if url.path().starts_with(&endpoint.path) {
@@ -340,7 +336,7 @@ impl Storelike for Db {
         }
         endpoint_span.exit();
 
-        let dynamic_span = tracing::span!(tracing::Level::DEBUG, "Dynamic").entered();
+        let dynamic_span = tracing::span!(tracing::Level::TRACE, "Dynamic").entered();
         let mut resource = self.get_resource(&removed_query_params)?;
 
         if let Some(agent) = for_agent {
