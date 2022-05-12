@@ -158,7 +158,7 @@ impl Commit {
 
         if opts.validate_rights {
             if is_new {
-                hierarchy::check_write(store, &resource_new, &self.signer)?;
+                hierarchy::check_append(store, &resource_new, &self.signer)?;
             } else {
                 // Set a parent only if the rights checks are to be validated.
                 // If there is no explicit parent set on the previous resource, use a default.

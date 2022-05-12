@@ -1,5 +1,6 @@
 //! The Hierarchy model describes how Resources are structed in a tree-like shape.
-//! It dealt with authorization (read / write grants)
+//! It deals with authorization (read / write permissions, rights, grants)
+//! See
 
 use core::fmt;
 
@@ -7,8 +8,15 @@ use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
 
 #[derive(Debug)]
 pub enum Right {
+    /// Full read access to the resource and its children.
+    /// https://atomicdata.dev/properties/read
     Read,
+    /// Full edit, update, destroy access to the resource and its children.
+    /// https://atomicdata.dev/properties/write
     Write,
+    /// Create new children (append to tree)
+    /// https://atomicdata.dev/properties/append
+    Append,
 }
 
 impl fmt::Display for Right {
@@ -16,6 +24,7 @@ impl fmt::Display for Right {
         let str = match self {
             Right::Read => urls::READ,
             Right::Write => urls::WRITE,
+            Right::Append => urls::APPEND,
         };
         fmt.write_str(str)
     }
@@ -48,6 +57,7 @@ pub fn check_write(
     check_rights(store, resource, for_agent, Right::Write)
 }
 
+/// Does the Agent have the right to read / view the properties of the selected resource, or any of its parents?
 /// Throws if not allowed.
 /// Returns string with explanation if allowed.
 pub fn check_read(
@@ -56,6 +66,23 @@ pub fn check_read(
     for_agent: &str,
 ) -> AtomicResult<String> {
     check_rights(store, resource, for_agent, Right::Read)
+}
+
+/// Does the Agent have the right to _append_ to its parent?
+/// This checks the `append` rights, and if that fails, checks the `write` right.
+/// Throws if not allowed.
+/// Returns string with explanation if allowed.
+pub fn check_append(
+    store: &impl Storelike,
+    resource: &Resource,
+    for_agent: &str,
+) -> AtomicResult<String> {
+    let parent = resource.get_parent(store)?;
+    if let Ok(msg) = check_rights(store, &parent, for_agent, Right::Append) {
+        Ok(msg)
+    } else {
+        check_rights(store, resource, for_agent, Right::Write)
+    }
 }
 
 /// Recursively checks a Resource and its Parents for rights.
@@ -81,10 +108,11 @@ pub fn check_rights(
                 check_rights(store, &target, for_agent, right)
             }
             Right::Write => Err("Commits cannot be edited.".into()),
+            Right::Append => Err("Commits cannot have children, you cannot Append to them.".into()),
         };
     }
 
-    // Check if the resource's write rights explicitly refers to the agent or the public agent
+    // Check if the resource's rights explicitly refers to the agent or the public agent
     if let Ok(arr_val) = resource.get(&right.to_string()) {
         for s in arr_val.to_subjects(None)? {
             match s.as_str() {
@@ -97,7 +125,7 @@ pub fn check_rights(
                 agent => {
                     if agent == for_agent {
                         return Ok(format!(
-                            "Write right has been explicitly set in {}",
+                            "Right has been explicitly set in {}",
                             resource.get_subject()
                         ));
                     }
@@ -107,31 +135,15 @@ pub fn check_rights(
     }
 
     // Try the parents recursively
-    if let Ok(parent_val) = resource.get(urls::PARENT) {
-        match store.get_resource(&parent_val.to_string()) {
-            Ok(parent) => {
-                if resource.get_subject() == parent.get_subject() {
-                    return Err(crate::errors::AtomicError::unauthorized(format!(
-                        "There is a circular relationship in {} (parent = same resource).",
-                        resource.get_subject()
-                    )));
-                }
-                check_rights(store, &parent, for_agent, right)
-            }
-            Err(_err) => Err(crate::errors::AtomicError::unauthorized(format!(
-                "Parent of {} ({}) not found: {}",
-                resource.get_subject(),
-                parent_val,
-                _err
-            ))),
-        }
+    if let Ok(parent) = resource.get_parent(store) {
+        check_rights(store, &parent, for_agent, right)
     } else {
         let for_string = if for_agent == urls::PUBLIC_AGENT {
             "the Public Agent".to_string()
         } else {
             for_agent.to_string()
         };
-        // resource has no parent and agent is not in Write array - check fails
+        // resource has no parent and agent is not in rights array - check fails
         Err(crate::errors::AtomicError::unauthorized(format!(
             "No {} right has been found for {} in this resource or its parents",
             right, for_string
