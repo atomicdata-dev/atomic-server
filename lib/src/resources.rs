@@ -1,6 +1,7 @@
 //! A resource is a set of Atoms that share a URL
 
 use crate::commit::{CommitOpts, CommitResponse};
+use crate::urls;
 use crate::utils::random_string;
 use crate::values::{SubResource, Value};
 use crate::{commit::CommitBuilder, errors::AtomicResult};
@@ -92,6 +93,36 @@ impl Resource {
             Ok(val.to_subjects(None)?[0].clone())
         } else {
             Err(format!("Resource {} has no class", self.subject).into())
+        }
+    }
+
+    /// Returns the `Parent` of this Resource.
+    /// Throws in case of recursion
+    pub fn get_parent(&self, store: &impl Storelike) -> AtomicResult<Resource> {
+        match self.get(urls::PARENT) {
+            Ok(parent_val) => {
+                match store.get_resource(&parent_val.to_string()) {
+                    Ok(parent) => {
+                        if self.get_subject() == parent.get_subject() {
+                            return Err(format!(
+                                "There is a circular relationship in {} (parent = same resource).",
+                                self.get_subject()
+                            )
+                            .into());
+                        }
+                        // Check write right
+                        Ok(parent)
+                    }
+                    Err(_err) => Err(format!(
+                        "Parent of {} ({}) not found: {}",
+                        self.get_subject(),
+                        parent_val,
+                        _err
+                    )
+                    .into()),
+                }
+            }
+            Err(e) => Err(format!("Parent of {} not found: {}", self.get_subject(), e).into()),
         }
     }
 

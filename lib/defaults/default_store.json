@@ -106,6 +106,17 @@
         "https://atomicdata.dev/properties/shortname": "value"
     },
     {
+        "@id": "https://atomicdata.dev/properties/append",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/description": "The agents that create new child Resources for this one. This is more strict then [write](https://atomicdata.dev/properties/append), as it only allows for creating Resources that have the current one as their parent.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/shortname": "append"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/drives",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Drive",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",

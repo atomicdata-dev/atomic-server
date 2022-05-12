@@ -73,6 +73,7 @@ pub const SEARCH_PROPERTY: &str = "https://atomicdata.dev/properties/search/prop
 pub const PARENT: &str = "https://atomicdata.dev/properties/parent";
 pub const READ: &str = "https://atomicdata.dev/properties/read";
 pub const WRITE: &str = "https://atomicdata.dev/properties/write";
+pub const APPEND: &str = "https://atomicdata.dev/properties/append";
 pub const CHILDREN: &str = "https://atomicdata.dev/properties/children";
 // ... for Inivtations
 pub const DESTINATION: &str = "https://atomicdata.dev/properties/destination";

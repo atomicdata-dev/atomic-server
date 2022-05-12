@@ -1,4 +1,5 @@
 {
   // The linter in the CI is quite strict, so running `cargo fmt` on save is probably a good idea!
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "cSpell.enabled": false
 }

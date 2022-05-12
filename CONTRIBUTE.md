@@ -102,8 +102,10 @@ atomic-server --trace-chrome
 We have benchmarks in the `/lib/benchmarks` folder. Make sure there's a benchmark for the thing you're trying to optimize, run the benchmark, then make some changes to the code, then run the benchmark again. You should be able to see the difference in performance.
 
 ```sh
-# install
+# install criterion
 cargo install cargo-criterion
+# go to atomic-data-rust root folder - don't run benchmarks in `./lib`
+cd ..
 # run benchmark
 cargo criterion
 # or if that does not work

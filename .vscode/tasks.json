@@ -12,10 +12,7 @@
 				"--bin",
 				"atomic-server"
 			],
-			"group": {
-				"kind": "build",
-				"isDefault": true
-			},
+			"group": "build",
 			"problemMatcher": []
 		},
 		{
