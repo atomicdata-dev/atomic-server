@@ -21,6 +21,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add `Store::set_handle_commit`. Changes how Commits are internally processed. Now, users of `atomic_lib` can pass a custom handler function. This can be used to listen to events. #380 #253
 - Added ChatRoom functionality. #373
 - Add `push` option to Commits, which allows for efficient manipulation of ResourceArrays. Remove `Resource::append_subjects` method in favor of `push_propvals` #289.
+- Add `append` right, only allows creating children #381.
 - Fix logic for updating indexes. Sometimes atoms were ignored. #392 #395
 
 ## [v0.31.1] - 2022-03-29
