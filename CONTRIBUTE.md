@@ -137,11 +137,10 @@ drill -b benchmark.yml --stats
 
 Before tagging a new version, make sure to update the `app_assets` folder:
 
-1. get [atomic-data-browser](https://github.com/joepio/atomic-data-browser) locally
-2. run `yarn build`
-3. copy the contents of `publish` to `app_assets`: `cp -r publish/ ../../atomic-data-rust/server/app_assets/`
-4. Make sure not to commit all the files, manually check them
-5. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
+1. clone [atomic-data-browser](https://github.com/joepio/atomic-data-browser) in the folder above this one
+2. run `yarn build-server` in `atomic-data-browser`, which should
+3. Make sure not to commit all the files, manually check them
+4. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
 
 ## Publishing manually - doing the CI's work
 
