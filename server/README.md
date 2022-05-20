@@ -57,6 +57,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
   - [What is `rdf-search` mode?](#what-is-rdf-search-mode)
   - [Can I embed Atomic-Server in another application?](#can-i-embed-atomic-server-in-another-application)
+  - [Where is my data stored on my machine?](#where-is-my-data-stored-on-my-machine)
 
 ## When should you use this
 
@@ -261,3 +262,7 @@ Check out [the readme](./rdf-search.md).
 
 Yes. This is what I'm doing with the Tauri desktop distribution of Atomic-Server.
 Check out the [`desktop`](https://github.com/joepio/atomic-data-rust/tree/master/desktop) code for an example!
+
+### Where is my data stored on my machine?
+
+It depends on your operating system, because some data is _temporary_, others are _configuration files_, and so forth. Run `atomic-server show-config` to see the used paths. You can overwrite these if you want, see `--help`.
