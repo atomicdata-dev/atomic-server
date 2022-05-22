@@ -133,15 +133,15 @@ impl Commit {
 
         // Make sure the one creating the commit had the same idea of what the current state is.
         if !is_new && opts.validate_previous_commit {
-            if let Ok(last_resource_val) = resource_old.get(urls::LAST_COMMIT) {
-                let prev_resource = last_resource_val.to_string();
+            if let Ok(last_commit_val) = resource_old.get(urls::LAST_COMMIT) {
+                let last_commit = last_commit_val.to_string();
 
-                if let Some(commit_prev) = self.previous_commit.clone() {
+                if let Some(prev_commit) = self.previous_commit.clone() {
                     // TODO: try auto merge
-                    if prev_resource != commit_prev {
+                    if last_commit != prev_commit {
                         return Err(format!(
                             "previousCommit mismatch. Had lastCommit '{}' in Resource {}, but got in Commit '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
-                            prev_resource, subject_url, commit_prev,
+                            last_commit, subject_url, prev_commit,
                         )
                         .into());
                     }

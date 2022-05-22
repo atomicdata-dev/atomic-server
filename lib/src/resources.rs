@@ -307,7 +307,8 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
-            validate_previous_commit: true,
+            // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-data-rust/issues/412
+            validate_previous_commit: false,
             update_index: true,
         };
         let commit_response = commit.apply_opts(store, &opts)?;
@@ -333,7 +334,8 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
-            validate_previous_commit: true,
+            // https://github.com/atomicdata-dev/atomic-data-rust/issues/412
+            validate_previous_commit: false,
             update_index: true,
         };
         let commit_response = commit.apply_opts(store, &opts)?;
