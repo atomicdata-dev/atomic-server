@@ -8,7 +8,7 @@ use atomic_lib::{
     Resource, Storelike, Value,
 };
 use colored::Colorize;
-use promptly::prompt_opt;
+use dialoguer::Input;
 use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -133,27 +133,32 @@ fn prompt_field(
     match &property.data_type {
         DataType::String | DataType::Markdown => {
             let msg = format!("string{}", msg_appendix);
-            input = prompt_opt(&msg)?;
-            return Ok(input);
+            let str: String = Input::new().with_prompt(msg).interact_text()?;
+            match str.as_str() {
+                "" => (return Ok(None)),
+                string => {
+                    return Ok(Some(str));
+                }
+            }
         }
         DataType::Slug => {
             let msg = format!("slug{}", msg_appendix);
-            input = prompt_opt(&msg)?;
+            let str: String = Input::new().with_prompt(msg).interact_text()?;
             let re = Regex::new(atomic_lib::values::SLUG_REGEX)?;
-            match input {
-                Some(slug) => {
+            match str.as_str() {
+                "" => (return Ok(None)),
+                slug => {
                     if re.is_match(&*slug) {
-                        return Ok(Some(slug));
+                        return Ok(Some(slug.into()));
                     }
                     println!("Only letters, numbers and dashes - no spaces or special characters.");
                     return Ok(None);
                 }
-                None => (return Ok(None)),
             }
         }
         DataType::Integer => {
             let msg = format!("integer{}", msg_appendix);
-            let number: Option<u32> = prompt_opt(&msg)?;
+            let number: Option<u32> = Input::new().with_prompt(msg).allow_empty(true).interact()?;
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
