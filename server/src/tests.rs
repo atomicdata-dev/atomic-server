@@ -1,6 +1,6 @@
 //! This contains a minimal set of tests for the server.
 //! Most of the more rigorous testing is done in the end-to-end tests:
-//! https://github.com/joepio/atomic-data-browser/tree/main/data-browser/tests
+//! https://github.com/atomicdata-dev/atomic-data-browser/tree/main/data-browser/tests
 
 use crate::{appstate::AppState, config::Opts};
 

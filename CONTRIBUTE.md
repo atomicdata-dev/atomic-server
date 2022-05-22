@@ -35,7 +35,7 @@ Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 
 Since `atomic-server` is developed in conjunction with the typescript / react `atomic-data-browser` project, it might make sense to run both locally whilst developing.
 
-- Clone [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
+- Clone [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
 
@@ -137,7 +137,7 @@ drill -b benchmark.yml --stats
 
 Before tagging a new version, make sure to update the `app_assets` folder:
 
-1. clone [atomic-data-browser](https://github.com/joepio/atomic-data-browser) in the folder above this one
+1. clone [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser) in the folder above this one
 2. run `yarn build-server` in `atomic-data-browser`, which should
 3. Make sure not to commit all the files, manually check them
 4. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.

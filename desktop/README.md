@@ -15,7 +15,7 @@ cargo tauri build
 
 ## Running in development
 
-By default, the dev server points to `localhost:8080`, which is the server for [`atomic-data-browser`](https://github.com/joepio/atomic-data-browser/), which you'll probably want to run.
+By default, the dev server points to `localhost:8080`, which is the server for [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser/), which you'll probably want to run.
 If you only want to work on the _server side_ of things, you can remove `devPath` in `tauri.conf.json`.
 
 ## Limitations

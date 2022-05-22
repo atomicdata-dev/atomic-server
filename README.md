@@ -2,7 +2,7 @@
 
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/atomic)
+[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/atomicdata-dev/atomic-data-browser)
 
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 This repo consists of three components: A library, a server and a CLI.**
@@ -21,7 +21,7 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
 - ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html).
 - 🌐  **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
-- 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/joepio/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
+- 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
 - 💾  **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
 - 🔄  **Synchronization using websockets**: communicates state changes with a client.
 - 🧰  **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
@@ -58,9 +58,9 @@ Powers both `atomic-cli` and `atomic-server`.
 
 ## Also check out
 
-- [Atomic-Data-Browser](https://github.com/joepio/atomic-data-browser), an in-browser app for viewing and editing atomic data. Also contains a typescript / react front-end library. Will replace most of the html templating in this project.
+- [Atomic-Data-Browser](https://github.com/atomicdata-dev/atomic-data-browser), an in-browser app for viewing and editing atomic data. Also contains a typescript / react front-end library. Will replace most of the html templating in this project.
 - [Atomic-Data-Docs](https://github.com/ontola/atomic-data-docs), a book containing detailed documentation of Atomic Data.
-- [RayCast extension](https://www.raycast.com/joepio/atomic) for searching stuff
+- [RayCast extension](https://www.raycast.com/atomicdata-dev/atomic-data-browser) for searching stuff
 - [Click here to sign up to the Atomic Data Newsletter](http://eepurl.com/hHcRA1)
 - [The Atomic Data Docs](https://docs.atomicdata.dev/)
 

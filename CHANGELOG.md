@@ -297,7 +297,7 @@ Warning: existing databases will _not_ work with this version.
 
 Warning: existing Agents and Commits will no longer work. Be sure to create new ones.
 
-- Change Commit serialization to [match atomic-data-browser](https://github.com/joepio/atomic-data-browser/issues/3) implementation #98.
+- Change Commit serialization to [match atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser/issues/3) implementation #98.
 
 ## [v0.21.1]
 
