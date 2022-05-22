@@ -6,7 +6,7 @@ license = "MIT"
 name = "atomic_lib"
 readme = "README.md"
 repository = "https://github.com/joepio/atomic-data-rust"
-version = "0.31.1"
+version = "0.32.0"
 
 # Enables benchmarks to use the features, such as Db
 [[bench]]

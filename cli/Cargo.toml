@@ -6,10 +6,10 @@ license = "MIT"
 name = "atomic-cli"
 readme = "README.md"
 repository = "https://github.com/joepio/atomic-data-rust"
-version = "0.31.1"
+version = "0.32.0"
 
 [dependencies]
-atomic_lib = {version = "0.31", path = "../lib", features = ["config", "rdf"]}
+atomic_lib = {version = "0.32.0", path = "../lib", features = ["config", "rdf"]}
 clap = {version = "3", features = ["cargo"]}
 colored = "2"
 dirs = "4"
