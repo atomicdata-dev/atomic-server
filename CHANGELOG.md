@@ -3,10 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## UNRELEASED
+## [v0.32.0] - 2022-05-22
 
 - **Warning**: Various default directories have moved (see #331). Most notably the `data` directory. The location depends on your OS. Run `show-config` to see where it will be stored now. If you have data in `~/.config/atomic/db`, move it to this new directory. Also, the search index will have to be rebuilt. Start with `--rebuild-index`.
 - Updated various dependencies, and made `cargo.toml` less restrictive.
+- Handle `previousCommit`. This means that Commits should contain a reference to the latest Commit.
 - Remove `async-std` calls from `upload.rs`
 - Added `reset` and `show-config` commands to `atomic-server`.
 - Added `data-dir` flag
