@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [v0.31.1] - 2022-06-xx
+
+- Fix issue when creating invite for chatroom #413
+
 ## [v0.32.0] - 2022-05-22
 
 - **Warning**: Various default directories have moved (see #331). Most notably the `data` directory. The location depends on your OS. Run `show-config` to see where it will be stored now. If you have data in `~/.config/atomic/db`, move it to this new directory. Also, the search index will have to be rebuilt. Start with `--rebuild-index`.
