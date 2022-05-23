@@ -20,14 +20,13 @@ pub async fn post_commit(
     ) {
         return Err("Subject of commit should be sent to other domain - this store can not own this resource.".into());
     }
-    // We don't update the index, because that's a job for the CommitMonitor. That means it can be done async in a different thread, making this commit response way faster.
     let opts = CommitOpts {
         validate_schema: true,
         validate_signature: true,
         validate_timestamp: true,
         validate_rights: true,
         validate_previous_commit: true,
-        update_index: false,
+        update_index: true,
     };
     let commit_response = incoming_commit.apply_opts(store, &opts)?;
 
