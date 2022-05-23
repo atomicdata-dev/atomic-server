@@ -95,16 +95,27 @@ fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResu
         Some(&Value::AtomicUrl(subject.into())),
         false,
     )?;
-    let mut commit_resources = Vec::new();
+    let mut commits = Vec::new();
     for atom in commit_atoms {
-        // TODO: This will fail if a resource simply uses the SUBJECT url without being a valid Commit.
-        let commit = crate::Commit::from_resource(store.get_resource(&atom.subject)?)?;
-        commit_resources.push(commit)
+        let resource = store
+            .get_resource(&atom.subject)
+            .map_err(|e| format!("Unable to get commits for {}. {}", subject, e))?;
+        let mut is_commit = false;
+        // If users use the `subject` field for a non-commit, we prevent using it as a commit here.
+        for c in resource.get(urls::IS_A)?.to_subjects(None)?.iter() {
+            if c == urls::COMMIT {
+                is_commit = true
+            }
+        }
+        if is_commit {
+            let commit = crate::Commit::from_resource(resource)?;
+            commits.push(commit)
+        }
     }
     // Sort all commits by date
-    commit_resources.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    commits.sort_by(|a, b| a.created_at.cmp(&b.created_at));
 
-    Ok(commit_resources)
+    Ok(commits)
 }
 
 #[tracing::instrument(skip(store))]
