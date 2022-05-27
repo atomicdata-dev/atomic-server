@@ -154,7 +154,9 @@ impl Commit {
             }
         };
 
-        let mut resource_new = self.apply_changes(resource_old.clone(), store, false)?;
+        let mut resource_new = self
+            .apply_changes(resource_old.clone(), store, false)
+            .map_err(|e| format!("Error applying changes to Resource {}. {}", self.subject, e))?;
 
         if opts.validate_rights {
             if is_new {
@@ -269,7 +271,14 @@ impl Commit {
 
         if let Some(set) = self.set.clone() {
             for (prop, new_val) in set.iter() {
-                resource.set_propval(prop.into(), new_val.to_owned(), store)?;
+                resource
+                    .set_propval(prop.into(), new_val.to_owned(), store)
+                    .map_err(|e| {
+                        format!(
+                            "Failed to set property '{}' to '{}' in Commit. Error: {}",
+                            prop, new_val, e
+                        )
+                    })?;
 
                 if update_index {
                     let new_atom =

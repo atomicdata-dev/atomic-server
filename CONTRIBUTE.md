@@ -18,6 +18,8 @@ If you want to share some thoughts on the Atomic Data _specification_, please [d
 - [Debugging](#debugging)
 - [Performance monitoring / benchmarks](#performance-monitoring--benchmarks)
   - [Tracing](#tracing)
+    - [Tracing with OpenTelemetry](#tracing-with-opentelemetry)
+    - [Tracing with Chrome](#tracing-with-chrome)
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
@@ -88,14 +90,19 @@ For doing this, we have at least three tools: tracing, criterion and drill.
 
 ### Tracing
 
+There are two ways you can use `tracing` to get insights into performance.
+
+#### Tracing with OpenTelemetry
+
+- Run an OpenTelemetry compatible service, such as [Jaeger](https://www.jaegertracing.io/docs/1.34/getting-started/).
+- Run the server with `--trace opentelemetry`
+
+#### Tracing with Chrome
+
 - Use the `tracing::instrument` macro to make functions traceable. Check out the [tracing](https://docs.rs/tracing/latest/tracing/) docs for more info.
-- Run the server with the `--trace-chrome` flag.
+- Run the server with the `--trace chrome` flag.
 - Close the server. A `trace-{unix-timestamp}.json` file will be generated in the current directory.
 - Open this file with https://ui.perfetto.dev/ or `chrome://tracing`. This will show you a flamegraph that you can zoom into.
-
-```sh
-atomic-server --trace-chrome
-```
 
 ### Criterion benchmarks
 

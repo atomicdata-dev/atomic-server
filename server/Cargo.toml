@@ -45,6 +45,18 @@ urlencoding = "2"
 optional = true
 version = "0.8"
 
+[dependencies.tracing-opentelemetry]
+optional = true
+version = "0.17"
+
+[dependencies.opentelemetry]
+optional = true
+version = "0.17"
+
+[dependencies.opentelemetry-jaeger]
+optional = true
+version = "0.16"
+
 [dependencies.sysinfo]
 optional = true
 version = "0.23"
@@ -63,7 +75,7 @@ version = "0.32.0"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
-version = "3"
+version = "3.1.18"
 
 [dependencies.rustls]
 optional = true
@@ -85,9 +97,10 @@ version = "0.3"
 actix-rt = "2"
 
 [features]
-default = ["https"]
+default = ["https", "telemetry"]
 https = ["acme-lib", "rustls"]
 process-management = ["sysinfo"]
+telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger"]
 
 [lib]
 name = "atomic_server_lib"

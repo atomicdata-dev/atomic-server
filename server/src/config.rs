@@ -85,13 +85,31 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_SERVER_URL")]
     pub server_url: Option<String>,
 
-    /// How much logs you want. Choose from "warn", "info", "debug", "trace" (from few to many logs).
-    #[clap(long, default_value = "info", env = "RUST_LOG")]
-    pub log_level: String,
+    /// How much logs you want. Also influences what is sent to your trace service, if you've set one (e.g. OpenTelemetry)
+    #[clap(arg_enum, long, default_value = "info", env = "RUST_LOG")]
+    pub log_level: LogLevel,
 
-    /// Produces a trace log file in the current directory that can be opened with `chrome://tracing`
-    #[clap(long)]
-    pub trace_chrome: bool,
+    /// How you want to trace what's going on with the server. Useful for monitoring performance and errors in production.
+    #[clap(arg_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
+    pub trace: Tracing,
+}
+
+#[derive(clap::ArgEnum, Clone, Debug)]
+pub enum Tracing {
+    /// Log to STDOUT in your terminal
+    Stdout,
+    /// Create a file in the current directory with tracing data, that can be opened with the chrome://tracing/ URL
+    Chrome,
+    /// Log to a local OpenTelemetry service, using default ports
+    Opentelemetry,
+}
+
+#[derive(clap::ArgEnum, Clone, Debug)]
+pub enum LogLevel {
+    Warn,
+    Info,
+    Debug,
+    Trace,
 }
 
 #[derive(Parser, Clone, Debug)]
