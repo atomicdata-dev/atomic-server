@@ -6,6 +6,8 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## [v0.31.1] - 2022-06-xx
 
 - Fix issue when creating invite for chatroom #413
+- Add OpenTelemetry suport #416
+- Fix `remove` Commit command #417 (thanks @rasendubi!)
 
 ## [v0.32.0] - 2022-05-22
 
