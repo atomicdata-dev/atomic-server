@@ -269,6 +269,17 @@ impl Commit {
         let mut remove_atoms: Vec<Atom> = Vec::new();
         let mut add_atoms: Vec<Atom> = Vec::new();
 
+        if let Some(remove) = self.remove.clone() {
+            for prop in remove.iter() {
+                resource.remove_propval(prop);
+
+                if update_index {
+                    let val = resource.get(prop)?;
+                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                    remove_atoms.push(atom);
+                }
+            }
+        }
         if let Some(set) = self.set.clone() {
             for (prop, new_val) in set.iter() {
                 resource
