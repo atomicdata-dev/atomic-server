@@ -30,7 +30,7 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
             return Some(flush_guard);
         }
         crate::config::Tracing::Opentelemetry => {
-            #[cfg(feature = "opentelemetry")]
+            #[cfg(feature = "telemetry")]
             {
                 println!("Enabling tracing for OpenTelemetry");
                 let tracer = opentelemetry_jaeger::new_pipeline()
@@ -40,7 +40,7 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
                 let layer = tracing_opentelemetry::layer().with_tracer(tracer);
                 tracing_registry.with(layer).init();
             }
-            #[cfg(not(feature = "my_feature"))]
+            #[cfg(not(feature = "telemetry"))]
             {
                 tracing::warn!("OpenTelemetry tracing is not enabled, compile atomic-server with `--features opentelemetry` to enable");
             }
