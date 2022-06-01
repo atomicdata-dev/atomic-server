@@ -1,4 +1,5 @@
-//! A resource is a set of Atoms that share a URL
+//! A [Resource] is a set of [Atom]s that share a URL.
+//! Has methods for saving resources and getting properties inside them.
 
 use crate::commit::{CommitOpts, CommitResponse};
 use crate::urls;

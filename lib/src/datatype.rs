@@ -1,4 +1,4 @@
-//! Datatypes constrain values of Atoms
+//! [DataType]s constrain values of Atoms
 
 use crate::urls;
 use serde::{Deserialize, Serialize};
