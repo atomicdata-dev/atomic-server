@@ -35,6 +35,7 @@ They are used for performing custom queries, or calculating dynamic attributes.
 
 // Class Extenders
 pub mod chatroom;
+pub mod importer;
 pub mod invite;
 
 // Endpoints

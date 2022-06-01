@@ -16,6 +16,7 @@ pub const FILE: &str = "https://atomicdata.dev/classes/File";
 pub const CHATROOM: &str = "https://atomicdata.dev/classes/ChatRoom";
 pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
 pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
+pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -100,6 +101,9 @@ pub const ATTACHMENTS: &str = "https://atomicdata.dev/properties/attachments";
 // ... for ChatRooms and Messages
 pub const MESSAGES: &str = "https://atomicdata.dev/properties/messages";
 pub const NEXT_PAGE: &str = "https://atomicdata.dev/properties/nextPage";
+// ... for Importers
+pub const IMPORTER_URL: &str = "https://atomicdata.dev/properties/importer/url";
+pub const IMPORTER_JSON: &str = "https://atomicdata.dev/properties/importer/json";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

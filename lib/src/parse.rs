@@ -1,8 +1,8 @@
 //! Parsing / deserialization / decoding
 
 use crate::{
-    errors::AtomicResult, resources::PropVals, urls, values::SubResource, Resource, Storelike,
-    Value,
+    errors::AtomicResult, resources::PropVals, urls, utils::check_valid_url, values::SubResource,
+    Resource, Storelike, Value,
 };
 
 pub const JSON_AD_MIME: &str = "application/ad+json";
@@ -13,6 +13,12 @@ pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
 }
 
 use serde_json::Map;
+
+/// Options for parsing (JSON-AD) resources
+struct ParseOpts {
+    /// URL of the parent resource. Typically the Importer. If imported resources do not have an `@id`, we create new `@id` using the `localId` and the `parent`
+    pub parent: Option<String>,
+}
 
 /// Parse a single Json AD string, convert to Atoms
 /// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
@@ -115,6 +121,7 @@ pub fn parse_json_ad_map_to_propvals(
     for (prop, val) in json {
         if prop == "@id" {
             subject = if let serde_json::Value::String(s) = val {
+                check_valid_url(&s)?;
                 Some(s.to_string())
             } else {
                 return Err("@id must be a string".into());
@@ -314,5 +321,32 @@ mod test {
             "https://atomicdata.dev/classes/ThirdThing",
         ];
         assert_eq!(members, should_be);
+    }
+
+    #[test]
+    fn parse_local_id() {
+        let store = crate::Store::init().unwrap();
+
+        let json = r#"{
+            "@id": "https://atomicdata.dev/classes",
+            "https://atomicdata.dev/properties/collection/members": [
+              {
+                "@id": "https://atomicdata.dev/classes/FirstThing",
+                "https://atomicdata.dev/properties/description": "Named nested resource"
+              },
+              {
+                "https://atomicdata.dev/properties/description": "Anonymous nested resource"
+              },
+              "https://atomicdata.dev/classes/ThirdThing"
+            ]
+          }"#;
+
+        let importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
+
+        let parseOpts = ParseOpts {
+            parent: Some(importer.get_subject().into()),
+        };
+
+        let parsed = parse_json_ad_resource(json, &store).unwrap();
     }
 }
