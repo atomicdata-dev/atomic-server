@@ -78,7 +78,7 @@ pub async fn search_query(
                 ],
             );
             let full_query = if let Some(prop) = &params.property {
-                format!("{}:{}", prop, &q)
+                format!("property:{:?} AND {}", prop, &q)
             } else {
                 q
             };
