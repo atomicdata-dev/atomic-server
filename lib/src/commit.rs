@@ -254,7 +254,7 @@ impl Commit {
         Ok(commit_response)
     }
 
-    /// Updates the values in the Resource according to the `set`, `remove` and `destroy` attributes in the Commit.
+    /// Updates the values in the Resource according to the `set`, `remove`, `push`, and `destroy` attributes in the Commit.
     /// Optionally also updates the index in the Store.
     /// The Old Resource is only needed when `update_index` is true, and is used for checking
     #[tracing::instrument(skip(store))]
@@ -274,9 +274,16 @@ impl Commit {
                 resource.remove_propval(prop);
 
                 if update_index {
-                    let val = resource.get(prop)?;
-                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                    remove_atoms.push(atom);
+                    if let Ok(val) = resource_unedited.get(prop) {
+                        let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                        remove_atoms.push(atom);
+                    } else {
+                        // The property does not exist, so nothing to remove.
+                        //
+                        // This may happen if another concurrent commit has removed it first, or
+                        // client removed it without validating it exists. (Currently rust and
+                        // typescript clients do not validate that.)
+                    }
                 }
             }
         }
