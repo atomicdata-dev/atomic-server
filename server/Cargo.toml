@@ -57,6 +57,26 @@ version = "0.17"
 optional = true
 version = "0.16"
 
+[dependencies.opentelemetry-prometheus]
+optional = true
+version = "0.10"
+
+[dependencies.metrics-tracing-context]
+optional = true
+version = "0.11"
+
+[dependencies.metrics-exporter-prometheus]
+optional = true
+version = "0.10"
+
+[dependencies.metrics-util]
+optional = true
+version = "0.13"
+
+[dependencies.metrics]
+optional = true
+version = "0.19"
+
 [dependencies.sysinfo]
 optional = true
 version = "0.23"
@@ -100,7 +120,16 @@ actix-rt = "2"
 default = ["https", "telemetry"]
 https = ["acme-lib", "rustls"]
 process-management = ["sysinfo"]
-telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger"]
+telemetry = [
+  "tracing-opentelemetry",
+  "opentelemetry",
+  "opentelemetry-jaeger",
+  "opentelemetry-prometheus",
+  "metrics-tracing-context",
+  "metrics",
+  "metrics-exporter-prometheus",
+  "metrics-util",
+]
 
 [lib]
 name = "atomic_server_lib"

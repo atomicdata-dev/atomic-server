@@ -42,7 +42,32 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
             }
             #[cfg(not(feature = "telemetry"))]
             {
-                tracing::warn!("OpenTelemetry tracing is not enabled, compile atomic-server with `--features opentelemetry` to enable");
+                println!("OpenTelemetry tracing is not enabled, compile atomic-server with `--features opentelemetry` to enable");
+            }
+        }
+        crate::config::Tracing::Prometheus => {
+            #[cfg(feature = "telemetry")]
+            {
+                println!("Enabling tracing for prometheus");
+
+                metrics_exporter_prometheus::PrometheusBuilder::new()
+                    .install()
+                    .expect("failed to install prometheus exporter");
+
+                let tracing_registry =
+                    tracing_registry.with(metrics_tracing_context::MetricsLayer::new());
+                let exporter = opentelemetry_prometheus::exporter().init();
+
+                use metrics_tracing_context::TracingContextLayer;
+                use metrics_util::layers::Layer;
+
+                // let provider = exporter.provider().expect("Can't get prometheus provider");
+                let recorder = metrics_tracing_context::TracingContextLayer::all().layer(exporter);
+                metrics::set_boxed_recorder(Box::new(recorder)).unwrap();
+            }
+            #[cfg(not(feature = "telemetry"))]
+            {
+                println!("telemetry is not enabled, compile atomic-server with `--features opentelemetry` to enable");
             }
         }
     }

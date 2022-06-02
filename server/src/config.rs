@@ -102,6 +102,8 @@ pub enum Tracing {
     Chrome,
     /// Log to a local OpenTelemetry service, using default ports
     Opentelemetry,
+    /// Log stuff to Prometheus
+    Prometheus,
 }
 
 #[derive(clap::ArgEnum, Clone, Debug)]
