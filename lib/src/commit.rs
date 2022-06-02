@@ -275,7 +275,8 @@ impl Commit {
 
                 if update_index {
                     if let Ok(val) = resource_unedited.get(prop) {
-                        let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                        let atom =
+                            Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
                         remove_atoms.push(atom);
                     } else {
                         // The property does not exist, so nothing to remove.
