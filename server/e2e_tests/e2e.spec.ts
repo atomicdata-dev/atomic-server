@@ -16,6 +16,7 @@ const publicReadRight =
 
 const demoFileName = 'logo.svg';
 const demoFile = `../../${demoFileName}`;
+const demoInviteName = 'document demo';
 const serverUrl = 'http://localhost:9883';
 const frontEndUrl = serverUrl;
 
@@ -38,10 +39,10 @@ test.describe('data-browser', async () => {
   });
 
   test('switch Server URL', async ({ page }) => {
-    await expect(page.locator('text=demo invite')).not.toBeVisible();
+    await expect(page.locator(`text=${demoInviteName}`)).not.toBeVisible();
     await page.fill('[data-test="server-url-input"]', 'https://atomicdata.dev');
     await page.click('[data-test="server-url-save"]');
-    await expect(page.locator('text=demo invite')).toBeVisible();
+    await expect(page.locator(`text=${demoInviteName}`)).toBeVisible();
   });
 
   test('sign in with secret, edit profile, sign out', async ({ page }) => {
@@ -62,7 +63,7 @@ test.describe('data-browser', async () => {
   test('sign up with invite, edit, versions', async ({ page }) => {
     await openAtomic(page);
     // Use invite
-    await page.click('text=demo invite');
+    await page.click(`text=${demoInviteName}`);
     await page.click('text=Accept as new user');
     // The computer is so fast that the page does not work
     await expect(page.locator('text=User created!')).toBeVisible();
@@ -82,7 +83,7 @@ test.describe('data-browser', async () => {
   test('sign up and edit document atomicdata.dev', async ({ page }) => {
     await openAtomic(page);
     // Use invite
-    await page.click('text=demo invite (document)');
+    await page.click(`text=${demoInviteName}`);
     await page.click('text=Accept as new user');
     await expect(page.locator(documentTitle)).toBeVisible();
     await expect(page.locator(navbarCurrentUser)).toBeVisible();
@@ -327,9 +328,7 @@ async function openAtomic(page: Page) {
   // Set AtomicData.dev as the server
   await page.click('[data-test="server-url-atomic"]');
   // Accept the invite, create an account if necessary
-  await expect(await page.locator(currentDriveTitle)).toHaveText(
-    'atomicdata.dev',
-  );
+  await expect(await page.locator(currentDriveTitle)).toHaveText('Atomic Data');
 }
 
 async function editProfileAndCommit(page: Page) {
