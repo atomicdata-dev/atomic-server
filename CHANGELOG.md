@@ -3,11 +3,13 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## [v0.31.1] - 2022-06-xx
+## [v0.32.1] - 2022-06-xx
 
 - Fix issue when creating invite for chatroom #413
 - Add OpenTelemetry suport #416
 - Fix `remove` Commit command #417 (thanks @rasendubi!)
+- Update tauri
+- Speed up `all_resources` (thanks @AlexMikhalev!) #423
 
 ## [v0.32.0] - 2022-05-22
 
