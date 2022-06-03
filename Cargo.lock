@@ -2406,6 +2406,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2cdeb66e45e9f36bfad5bbdb4d2384e70936afbee843c6f6543f0c551ebb25"
 
 [[package]]
+name = "libayatana-appindicator"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0379d22a323947cb27b4dbe3b14fc1dcde07c9e9c3eca52ddf97ca0819c28cc4"
+dependencies = [
+ "glib",
+ "gtk",
+ "gtk-sys",
+ "log",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.126"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4582,6 +4594,7 @@ dependencies = [
  "instant",
  "jni 0.19.0",
  "lazy_static",
+ "libayatana-appindicator",
  "libc",
  "log",
  "ndk",
