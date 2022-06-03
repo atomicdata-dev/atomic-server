@@ -6,8 +6,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use tracing::{instrument, trace};
-extern crate crossbeam_channel as channel;
 use crate::{
     commit::CommitResponse,
     endpoints::{default_endpoints, Endpoint},
@@ -16,7 +14,7 @@ use crate::{
     storelike::{Query, QueryResult, ResourceCollection, Storelike},
     Atom, Resource, Value,
 };
-use threadpool::ThreadPool;
+use tracing::{instrument, trace};
 
 use self::{
     migrations::migrate_maybe,
@@ -506,15 +504,10 @@ impl Storelike for Db {
     fn all_resources(&self, include_external: bool) -> ResourceCollection {
         fn process_resource(item: Result<(sled::IVec, sled::IVec), sled::Error>) -> Resource {
             let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = String::from_utf8_lossy(&subject).to_string();
-            if !include_external && !subject.starts_with(&self_url) {
-                continue;
-            } else {
-                let propvals: PropVals = bincode::deserialize(&resource_bin)
-                    .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
-                let resource = Resource::from_propvals(propvals, subject);
-                resources.push(resource);
-            }
+            let subject = String::from_utf8_lossy(&subject).to_string();
+            let propvals: PropVals = bincode::deserialize(&resource_bin)
+                .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
+            Resource::from_propvals(propvals, subject)
         }
         let self_url = self
             .get_self_url()
@@ -524,13 +517,16 @@ impl Storelike for Db {
             prefix = "".as_bytes();
         }
         let njobs = num_cpus::get();
-        let pool = ThreadPool::new(njobs);
+        let pool = threadpool::ThreadPool::new(njobs);
         let resource_iter = self.resources.scan_prefix(prefix);
-        let (send, recv) = channel::bounded(0);
+        let (send, recv) = crossbeam_channel::bounded(0);
         for item in resource_iter {
             let (send, item) = (send.clone(), item.clone());
             pool.execute(move || {
-                send.send(process_resource(item));
+                let _err = send.send(process_resource(item));
+                if let Err(err) = _err {
+                    tracing::error!("Error sending resource in pool in all_resources: {}", err);
+                }
             });
         }
         drop(send);
