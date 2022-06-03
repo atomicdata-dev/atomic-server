@@ -516,6 +516,9 @@ impl Storelike for Db {
         if include_external {
             prefix = "".as_bytes();
         }
+        // Start parallel process to improve performance
+        // In the future, this will probably be handled with Tokio
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/424
         let njobs = num_cpus::get();
         let pool = threadpool::ThreadPool::new(njobs);
         let resource_iter = self.resources.scan_prefix(prefix);

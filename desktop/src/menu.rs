@@ -28,10 +28,10 @@ impl AddDefaultSubmenus for Menu {
   fn add_default_app_submenu(self, app_name: &str) -> Menu {
     let about = AboutMetadata::new()
       .authors(vec!["Joep Meindertsma".into()])
-      .copyright("MIT License".into())
-      .license("MIT".into())
-      .website("https://atomicdata.dev".into())
-      .website_label("atomicdata.dev".into());
+      .copyright("MIT License")
+      .license("MIT")
+      .website("https://atomicdata.dev")
+      .website_label("atomicdata.dev");
 
     #[cfg(target_os = "macos")]
     return self.add_submenu(Submenu::new(
