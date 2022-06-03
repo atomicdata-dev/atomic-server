@@ -316,7 +316,7 @@ impl From<Resource> for Value {
 
 impl From<Box<Resource>> for Value {
     fn from(val: Box<Resource>) -> Self {
-        Value::Resource((*val).into())
+        Value::Resource(*val)
     }
 }
 
