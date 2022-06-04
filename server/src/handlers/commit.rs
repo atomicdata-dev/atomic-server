@@ -25,7 +25,8 @@ pub async fn post_commit(
         validate_signature: true,
         validate_timestamp: true,
         validate_rights: true,
-        validate_previous_commit: true,
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/412
+        validate_previous_commit: false,
         update_index: true,
     };
     let commit_response = incoming_commit.apply_opts(store, &opts)?;
