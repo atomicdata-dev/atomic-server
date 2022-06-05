@@ -21,12 +21,11 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: install webkit2gtk and
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3 (ubuntu only)
+      - name: install deps for tauri
         if: matrix.platform == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev libayatana-appindicator3-dev
       - name: Get Changelog Entry
         id: changelog_reader
         uses: mindsers/changelog-reader-action@v2
