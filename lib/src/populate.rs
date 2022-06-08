@@ -6,6 +6,7 @@
 use crate::{
     datatype::DataType,
     errors::AtomicResult,
+    parse::ParseOpts,
     schema::{Class, Property},
     urls, Storelike, Value,
 };
@@ -194,10 +195,16 @@ Note that, by default, all resources are `public`. You can edit this by opening 
 /// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary)
 pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
     store
-        .import(include_str!("../defaults/default_store.json"))
+        .import(
+            include_str!("../defaults/default_store.json"),
+            ParseOpts::default(),
+        )
         .map_err(|e| format!("Failed to import default_store.json: {e}"))?;
     store
-        .import(include_str!("../defaults/chatroom.json"))
+        .import(
+            include_str!("../defaults/chatroom.json",),
+            ParseOpts::default(),
+        )
         .map_err(|e| format!("Failed to import chatroom.json: {e}"))?;
     Ok(())
 }

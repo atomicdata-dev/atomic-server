@@ -9,20 +9,39 @@ use crate::{errors::AtomicResult, urls, Resource, Storelike};
 pub fn construct_importer(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
-    invite_resource: &mut Resource,
+    resource: &mut Resource,
     for_agent: Option<&str>,
 ) -> AtomicResult<Resource> {
-    let requested_subject = invite_resource.get_subject().to_string();
+    let requested_subject = resource.get_subject().to_string();
     let mut url = None;
     let mut json = None;
     for (k, v) in query_params {
         match k.as_ref() {
-            "json" | urls::IMPORTER_URL => url = Some(v.to_string()),
-            "url" | urls::IMPORTER_JSON => json = Some(v.to_string()),
+            "json" | urls::IMPORTER_URL => json = Some(v.to_string()),
+            "url" | urls::IMPORTER_JSON => url = Some(v.to_string()),
             _ => {}
         }
     }
-    parse
 
-    Ok(redirect)
+    if let Some(fetch_url) = url {
+        json = Some(
+            crate::client::fetch_body(&fetch_url, crate::parse::JSON_AD_MIME, None)
+                .map_err(|e| format!("Error while fetching {}: {}", fetch_url, e))?,
+        );
+    }
+
+    let parse_opts = crate::parse::ParseOpts {
+        for_agent: for_agent.map(|s| s.to_string()),
+        parent: Some(requested_subject),
+        create_commits: true,
+        add: true,
+    };
+
+    if let Some(json_string) = json {
+        store.import(&json_string, parse_opts)?;
+    }
+
+    // TODO: generate list of imported resources
+
+    Ok(resource.clone())
 }

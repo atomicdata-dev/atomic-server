@@ -56,7 +56,9 @@ async fn main() -> errors::AtomicServerResult<()> {
             let path = std::path::Path::new(&o.path);
             let readstring = std::fs::read_to_string(path)?;
             let appstate = appstate::init(config.clone())?;
-            appstate.store.import(&readstring)?;
+            appstate
+                .store
+                .import(&readstring, atomic_lib::parse::ParseOpts::default())?;
 
             println!("Sucesfully imported {:?} to store.", o.path);
             Ok(())
