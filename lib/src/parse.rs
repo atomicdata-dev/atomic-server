@@ -15,9 +15,27 @@ pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
 use serde_json::Map;
 
 /// Options for parsing (JSON-AD) resources
-struct ParseOpts {
+#[derive(Debug, Clone)]
+pub struct ParseOpts {
     /// URL of the parent resource. Typically the Importer. If imported resources do not have an `@id`, we create new `@id` using the `localId` and the `parent`
     pub parent: Option<String>,
+    /// Who will perform the importing. If set to none, all possible commits will be signed by the default agent.
+    pub for_agent: Option<String>,
+    /// If true, will generate [crate::Commit]s for every single imported resource
+    pub create_commits: bool,
+    /// If the parsed resources should be added to the store.
+    pub add: bool,
+}
+
+impl std::default::Default for ParseOpts {
+    fn default() -> Self {
+        Self {
+            parent: None,
+            for_agent: None,
+            create_commits: false,
+            add: true,
+        }
+    }
 }
 
 /// Parse a single Json AD string, convert to Atoms
@@ -49,7 +67,7 @@ fn json_ad_object_to_resource(
 pub fn parse_json_ad_array(
     string: &str,
     store: &impl Storelike,
-    add: bool,
+    parse_opts: ParseOpts,
 ) -> AtomicResult<Vec<Resource>> {
     let parsed: serde_json::Value = serde_json::from_str(string)?;
     let mut vec = Vec::new();
@@ -60,7 +78,7 @@ pub fn parse_json_ad_array(
                     serde_json::Value::Object(obj) => {
                         let resource = json_ad_object_to_resource(obj, store)
                             .map_err(|e| format!("Unable to parse resource. {}", e))?;
-                        if add {
+                        if parse_opts.add {
                             store.add_resource_opts(&resource, true, true, true)?
                         };
                         vec.push(resource);
@@ -256,7 +274,7 @@ mod test {
         let serialized =
             crate::serialize::resources_to_json_ad(&store1.all_resources(true)).unwrap();
         let store2 = crate::Store::init().unwrap();
-        store2.import(&serialized).unwrap();
+        store2.import(&serialized, ParseOpts::default()).unwrap();
         let all1 = store1.all_resources(true);
         let all2 = store2.all_resources(true);
         assert_eq!(all1.len(), all2.len());
@@ -344,7 +362,10 @@ mod test {
         let importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
 
         let parseOpts = ParseOpts {
+            create_commits: true,
+            for_agent: None,
             parent: Some(importer.get_subject().into()),
+            add: true,
         };
 
         let parsed = parse_json_ad_resource(json, &store).unwrap();

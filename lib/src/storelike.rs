@@ -208,8 +208,8 @@ pub trait Storelike: Sized {
     }
 
     /// Imports a JSON-AD string, returns the amount of imported resources
-    fn import(&self, string: &str) -> AtomicResult<usize> {
-        let vec = parse_json_ad_array(string, self, true)
+    fn import(&self, string: &str, parse_opts: crate::parse::ParseOpts) -> AtomicResult<usize> {
+        let vec = parse_json_ad_array(string, self, parse_opts)
             .map_err(|e| format!("Unable to import JSON-AD. {}", e))?;
         let len = vec.len();
         Ok(len)
