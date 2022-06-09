@@ -8,6 +8,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Fix issue when creating invite for chatroom #413
 - Add OpenTelemetry suport #416
 - Fix `remove` Commit command #417 (thanks @rasendubi!)
+- Make tests less flaky by removing the `Store` in `Agent:to_resource` #430
 
 ## [v0.32.0] - 2022-05-22
 
