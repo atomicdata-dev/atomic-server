@@ -32,7 +32,7 @@ pub fn construct_invite_redirect(
             match store.get_resource(&public_key) {
                 Ok(_found) => {}
                 Err(_) => {
-                    new_agent.to_resource(store)?.save_locally(store)?;
+                    new_agent.to_resource()?.save_locally(store)?;
                 }
             };
 

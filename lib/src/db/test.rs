@@ -146,7 +146,7 @@ fn destroy_resource_and_check_collection_and_commits() {
     // Create a new agent, check if it is added to the new Agents collection as a Member.
     let mut resource = crate::agents::Agent::new(None, &store)
         .unwrap()
-        .to_resource(&store)
+        .to_resource()
         .unwrap();
     let _res = resource.save_locally(&store).unwrap();
     let agents_collection_2 = store

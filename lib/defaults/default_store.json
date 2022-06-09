@@ -67,7 +67,6 @@
         "@id": "https://atomicdata.dev/properties/isDynamic",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
         "https://atomicdata.dev/properties/description": "If this is true, a Property is calculated server side and should therefore not appear in forms.",
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
