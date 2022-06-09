@@ -2,7 +2,7 @@
 //! Agents are actors (such as users) that can edit content.
 //! https://docs.atomicdata.dev/commits/concepts.html
 
-use crate::{errors::AtomicResult, urls, Resource, Storelike};
+use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
 
 #[derive(Clone, Debug)]
 pub struct Agent {
@@ -19,21 +19,24 @@ pub struct Agent {
 impl Agent {
     /// Converts Agent to Resource.
     /// Does not include private key, only public.
-    pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        let mut agent = Resource::new_instance(urls::AGENT, store)?;
-        agent.set_subject(self.subject.clone());
+    pub fn to_resource(&self) -> AtomicResult<Resource> {
+        let mut resource = Resource::new(self.subject.clone());
+        resource.set_class(urls::AGENT)?;
+        resource.set_subject(self.subject.clone());
         if let Some(name) = &self.name {
-            agent.set_propval_string(crate::urls::NAME.into(), name, store)?;
+            resource.set_propval_unsafe(crate::urls::NAME.into(), Value::String(name.into()));
         }
-        agent.set_propval_string(crate::urls::PUBLIC_KEY.into(), &self.public_key, store)?;
+        resource.set_propval_unsafe(
+            crate::urls::PUBLIC_KEY.into(),
+            Value::String(self.public_key.clone()),
+        );
         // Agents must be read by anyone when validating their keys
-        agent.push_propval(crate::urls::READ, urls::PUBLIC_AGENT.into(), true, store)?;
-        agent.set_propval_string(
+        resource.push_propval(crate::urls::READ, urls::PUBLIC_AGENT.into(), true)?;
+        resource.set_propval_unsafe(
             crate::urls::CREATED_AT.into(),
-            &self.created_at.to_string(),
-            store,
-        )?;
-        Ok(agent)
+            Value::Timestamp(self.created_at),
+        );
+        Ok(resource)
     }
 
     /// Creates a new Agent, generates a new Keypair.

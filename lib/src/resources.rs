@@ -194,8 +194,6 @@ impl Resource {
         property: &str,
         value: SubResource,
         skip_existing: bool,
-        // TODO: Use Store to validate datatype
-        _store: &impl Storelike,
     ) -> AtomicResult<()> {
         let mut vec = match self.propvals.get(property) {
             Some(some) => match some {
@@ -348,12 +346,11 @@ impl Resource {
     }
 
     /// Overwrites the is_a (Class) of the Resource.
-    pub fn set_class(&mut self, is_a: &str, store: &impl Storelike) -> AtomicResult<()> {
-        self.set_propval(
+    pub fn set_class(&mut self, is_a: &str) -> AtomicResult<()> {
+        self.set_propval_unsafe(
             crate::urls::IS_A.into(),
             Value::ResourceArray([is_a.into()].into()),
-            store,
-        )?;
+        );
         Ok(())
     }
 
@@ -711,7 +708,7 @@ mod test {
         let append_value = "http://localhost/someURL";
         let mut resource = Resource::new_generate_subject(&store);
         resource
-            .push_propval(&property, append_value.into(), false, &store)
+            .push_propval(&property, append_value.into(), false)
             .unwrap();
         let vec = resource.get(&property).unwrap().to_subjects(None).unwrap();
         assert_eq!(

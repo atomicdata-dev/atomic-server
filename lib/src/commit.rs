@@ -752,9 +752,7 @@ mod test {
             &agent.subject,
             "http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="
         );
-        store
-            .add_resource(&agent.to_resource(&store).unwrap())
-            .unwrap();
+        store.add_resource(&agent.to_resource().unwrap()).unwrap();
         let subject = "https://localhost/new_thing";
         let mut commitbuilder = crate::commit::CommitBuilder::new(subject.into());
         let property1 = crate::urls::DESCRIPTION;
@@ -785,6 +783,7 @@ mod test {
 
     fn invalid_subjects() {
         let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
         let resource = Resource::new("https://localhost/test_resource".into());
 

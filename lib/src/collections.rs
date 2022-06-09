@@ -47,7 +47,7 @@ impl CollectionBuilder {
     /// If that is what you need, use `.into_resource`
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<crate::Resource> {
         let mut resource = store.get_resource_new(&self.subject);
-        resource.set_class(urls::COLLECTION, store)?;
+        resource.set_class(urls::COLLECTION)?;
         if let Some(val) = &self.property {
             resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), val, store)?;
         }

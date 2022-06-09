@@ -101,7 +101,7 @@ pub trait Storelike: Sized {
     /// Does not create a Commit - the recommended way is to use `agent.to_resource().save_locally()`.
     fn create_agent(&self, name: Option<&str>) -> AtomicResult<crate::agents::Agent> {
         let agent = Agent::new(name, self)?;
-        self.add_resource(&agent.to_resource(self)?)?;
+        self.add_resource(&agent.to_resource()?)?;
         Ok(agent)
     }
 
