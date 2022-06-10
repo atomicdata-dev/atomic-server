@@ -342,32 +342,30 @@ mod test {
     }
 
     #[test]
-    fn parse_local_id() {
+    fn import_resource_with_localid() {
         let store = crate::Store::init().unwrap();
 
+        let local_id = "my-local-id";
+
         let json = r#"{
-            "@id": "https://atomicdata.dev/classes",
-            "https://atomicdata.dev/properties/collection/members": [
-              {
-                "@id": "https://atomicdata.dev/classes/FirstThing",
-                "https://atomicdata.dev/properties/description": "Named nested resource"
-              },
-              {
-                "https://atomicdata.dev/properties/description": "Anonymous nested resource"
-              },
-              "https://atomicdata.dev/classes/ThirdThing"
-            ]
+            "https://atomicdata.dev/properties/localId": "my-local-id",
+            "https://atomicdata.dev/properties/name": "My resource",
           }"#;
 
         let importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
 
-        let parseOpts = ParseOpts {
+        let parse_opts = ParseOpts {
             create_commits: true,
             for_agent: None,
             parent: Some(importer.get_subject().into()),
             add: true,
         };
 
-        let parsed = parse_json_ad_resource(json, &store).unwrap();
+        store.import(json, parse_opts).unwrap();
+
+        let imported_subject = format!("{}/{}", importer.get_subject(), local_id);
+
+        let found = store.get_resource(&imported_subject).unwrap();
+        assert_eq!(found.get(urls::NAME).unwrap().to_string(), local_id);
     }
 }
