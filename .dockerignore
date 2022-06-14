@@ -3,4 +3,5 @@ Dockerfile
 .dockerignore
 .env
 .git
+**/.temp
 .gitignore
