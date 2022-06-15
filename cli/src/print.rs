@@ -48,7 +48,7 @@ pub fn pretty_print_resource(resource: &Resource, store: &impl Storelike) -> Ato
         output.push_str(&*format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),
-            val.to_string()
+            val
         ));
     }
     Ok(output)
