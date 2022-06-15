@@ -40,8 +40,8 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
 /// Lets the user enter an instance of an Atomic Class through multiple prompts.
 /// Adds the Resource to the store, and writes to disk.
 /// Returns the Resource, its URL and its Bookmark.
-fn prompt_instance<'a>(
-    context: &'a Context,
+fn prompt_instance(
+    context: &Context,
     class: &Class,
     preferred_shortname: Option<String>,
 ) -> CLIResult<(Resource, Option<String>)> {
@@ -224,7 +224,7 @@ fn prompt_field(
                     let string_items = string.split(' ');
                     let mut urls: Vec<String> = Vec::new();
                     let length = string_items.clone().count();
-                    for item in string_items.into_iter() {
+                    for item in string_items {
                         let mapping_match = context
                             .mapping
                             .lock()

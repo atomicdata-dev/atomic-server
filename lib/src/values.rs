@@ -23,7 +23,7 @@ pub enum Value {
     /// Unix Epoch datetime in milliseconds
     Timestamp(i64),
     NestedResource(SubResource),
-    Resource(Resource),
+    Resource(Box<Resource>),
     Boolean(bool),
     Unsupported(UnsupportedValue),
 }
@@ -310,7 +310,7 @@ impl From<f64> for Value {
 
 impl From<Resource> for Value {
     fn from(val: Resource) -> Self {
-        Value::Resource(val)
+        Value::Resource(Box::new(val))
     }
 }
 
