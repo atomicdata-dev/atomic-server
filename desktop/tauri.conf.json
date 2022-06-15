@@ -5,7 +5,7 @@
   },
   "build": {
     "distDir": "dist",
-    "devPath": "http://localhost:8080",
+    "devPath": "http://localhost:3000",
     "beforeDevCommand": "",
     "beforeBuildCommand": ""
   },
@@ -28,13 +28,11 @@
       "shortDescription": "Atomic Server is a graph database with an easy to use GUI. Model, share and create Atomic Data.",
       "longDescription": "Atomic Server is a graph database with an easy to use GUI. Model, share and create Atomic Data.",
       "deb": {
-        "depends": [],
-        "useBootstrapper": false
+        "depends": []
       },
       "macOS": {
         "frameworks": [],
         "minimumSystemVersion": "",
-        "useBootstrapper": false,
         "exceptionDomain": "",
         "signingIdentity": null,
         "entitlements": null
@@ -68,7 +66,7 @@
       }
     ],
     "systemTray": {
-      "iconPath": "icons/icon.png",
+      "iconPath": "desktop/icons/icon.png",
       "iconAsTemplate": false
     },
     "security": {

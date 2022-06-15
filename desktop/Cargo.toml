@@ -6,12 +6,12 @@ edition = "2021"
 license = "MIT"
 name = "atomic-server-tauri"
 repository = "https://github.com/joepio/atomic-data-rust"
-version = "0.32.0"
+version = "0.32.1"
 
 [build-dependencies]
 [build-dependencies.tauri-build]
 features = []
-version = "1.0.0-rc.5"
+version = "1.0.0-rc.13"
 
 [dependencies]
 actix-rt = "2.6.0"
@@ -21,7 +21,7 @@ serde_json = "1.0"
 # We don't need HTTPS for desktop usage
 default-features = false
 path = "../server"
-version = "0.32.0"
+version = "0.32.1"
 
 [dependencies.serde]
 features = ["derive"]
@@ -29,7 +29,7 @@ version = "1.0"
 
 [dependencies.tauri]
 features = ["api-all", "system-tray", "updater"]
-version = "1.0.0-rc.6"
+version = "1.0.0-rc.14"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
