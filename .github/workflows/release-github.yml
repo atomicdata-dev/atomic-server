@@ -62,7 +62,7 @@ jobs:
         with:
           version: ${{ steps.tag_name.outputs.current_version }}
           path: CHANGELOG.md
-      - uses: tauri-apps/tauri-action@ecbab6a4d4b0deee6a67d644c9b73ed53c5aa739
+      - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # TODO: https://github.com/joepio/atomic-data-rust/issues/237
