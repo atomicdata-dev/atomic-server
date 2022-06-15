@@ -1,5 +1,7 @@
 name: Release github docker crates
 
+permissions: write-all
+
 on:
   push:
     tags:
