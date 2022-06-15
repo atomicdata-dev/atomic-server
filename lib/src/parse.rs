@@ -259,6 +259,7 @@ mod test {
     #[test]
     fn parse_nested_resource_map_roundtrip() {
         let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
 
         let json = r#"{
             "@id": "https://atomicdata.dev/thingWithNestedMaps",
@@ -280,6 +281,7 @@ mod test {
     #[test]
     fn parse_nested_resource_array() {
         let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
 
         let json = r#"{
             "@id": "https://atomicdata.dev/classes",
