@@ -11,7 +11,7 @@ version = "0.32.1"
 [build-dependencies]
 [build-dependencies.tauri-build]
 features = []
-version = "1.0.0-rc.13"
+version = "1"
 
 [dependencies]
 actix-rt = "2.6.0"
@@ -29,7 +29,7 @@ version = "1.0"
 
 [dependencies.tauri]
 features = ["api-all", "system-tray", "updater"]
-version = "1.0.0-rc.14"
+version = "1"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
