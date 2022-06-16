@@ -5,7 +5,7 @@ Desktop release for Atomic-Server.
 
 ```sh
 # install tauri
-cargo install tauri-cli # or cargo install tauri-cli --locked --version ^1.0.0-rc
+cargo install tauri-cli
 # make sure that `atomic-data-browser` is running on port 3000 (see ## Running in development)
 # run dev server
 cargo tauri dev

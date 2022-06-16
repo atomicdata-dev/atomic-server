@@ -66,7 +66,7 @@
       }
     ],
     "systemTray": {
-      "iconPath": "desktop/icons/icon.png",
+      "iconPath": "icons/icon.png",
       "iconAsTemplate": false
     },
     "security": {

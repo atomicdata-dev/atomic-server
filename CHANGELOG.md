@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [v0.32.2] - 2022-06-16
+
+- Upgrade to stable tauri
+
 ## [v0.32.1] - 2022-06-15
 
 - Fix issue when creating invite for chatroom #413
