@@ -6,6 +6,9 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## [v0.32.2] - 2022-06-16
 
 - Upgrade to stable tauri
+- Update JS bundle:
+  - Fix Dropdown input bug
+  - Fix autogrow textarea bug
 
 ## [v0.32.1] - 2022-06-15
 
@@ -13,9 +16,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add OpenTelemetry suport #416
 - Fix `remove` Commit command #417 (thanks @rasendubi!)
 - Make tests less flaky by removing the `Store` in `Agent:to_resource` #430
-- Update JS bundle:
-  - Fix Dropdown input bug
-  - Fix autogrow textarea bug
+- Update JS bundle
 
 ## [v0.32.0] - 2022-05-22
 
