@@ -1,12 +1,14 @@
 # Guide for Atomic Data Rust contributors
 
 First things first: I'm glad you're reading this!
+Join our [Discord](https://discord.gg/a72Rv2P) to chat with other people in the Atomic Data community.
 If you encounter any issues, add them to the [Github issue tracker](https://github.com/joepio/atomic-data-rust/issues).
 Same goes for feature requests.
 PR's are welcome, too!
-And join our [Discord](https://discord.gg/a72Rv2P)!
-I'd love to help you out to understand this codebase.
+Note that opening a PR means agreeing that your code becomes distributed under the MIT license.
+
 If you want to share some thoughts on the Atomic Data _specification_, please [drop an issue in the Atomic Data docs repo](https://github.com/ontola/atomic-data/issues).
+Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to learn more about our plans and the history of the project.
 
 ## Table of contents
 
