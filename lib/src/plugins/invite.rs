@@ -29,7 +29,7 @@ pub fn construct_invite_redirect(
         (Some(public_key), None) => {
             let new_agent = Agent::new_from_public_key(store, &public_key)?;
             // Create an agent if there is none
-            match store.get_resource(&public_key) {
+            match store.get_resource(&new_agent.subject) {
                 Ok(_found) => {}
                 Err(_) => {
                     new_agent.to_resource()?.save_locally(store)?;
