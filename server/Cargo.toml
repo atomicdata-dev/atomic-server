@@ -15,11 +15,11 @@ path = "src/bin.rs"
 static-files = "0.2"
 
 [dependencies]
-actix = "=0.12.0"
+actix = ">= 0.12, < 0.14"
 actix-cors = "0.6"
 actix-files = "0.6"
 actix-multipart = "0.4"
-actix-web-actors = "=4.0.0"
+actix-web-actors = "4"
 chrono = "0.4"
 dialoguer = "0.10"
 directories = ">= 2, < 5"
@@ -63,7 +63,7 @@ version = "0.23"
 
 [dependencies.actix-web]
 features = ["rustls"]
-version = "4.0"
+version = "4"
 
 [dependencies.actix-web-static-files]
 version = "4"
