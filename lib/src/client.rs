@@ -2,7 +2,10 @@
 use url::Url;
 
 use crate::{
-    agents::Agent, commit::sign_message, errors::AtomicResult, parse::parse_json_ad_resource,
+    agents::Agent,
+    commit::sign_message,
+    errors::AtomicResult,
+    parse::{parse_json_ad_resource, ParseOpts},
     Resource, Storelike,
 };
 
@@ -17,7 +20,7 @@ pub fn fetch_resource(
     for_agent: Option<Agent>,
 ) -> AtomicResult<Resource> {
     let body = fetch_body(subject, crate::parse::JSON_AD_MIME, for_agent)?;
-    let resource = parse_json_ad_resource(&body, store)
+    let resource = parse_json_ad_resource(&body, store, &ParseOpts::default())
         .map_err(|e| format!("Error parsing body of {}. {}", subject, e))?;
     Ok(resource)
 }
@@ -98,7 +101,7 @@ pub fn fetch_tpf(
         "application/ad+json",
         store.get_default_agent().ok(),
     )?;
-    crate::parse::parse_json_ad_array(&body, store, crate::parse::ParseOpts::default())
+    crate::parse::parse_json_ad_array(&body, store, &ParseOpts::default())
 }
 
 /// Posts a Commit to the endpoint of the Subject from the Commit
