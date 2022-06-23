@@ -58,7 +58,7 @@ async fn main() -> errors::AtomicServerResult<()> {
             let appstate = appstate::init(config.clone())?;
             appstate
                 .store
-                .import(&readstring, atomic_lib::parse::ParseOpts::default())?;
+                .import(&readstring, &atomic_lib::parse::ParseOpts::default())?;
 
             println!("Sucesfully imported {:?} to store.", o.path);
             Ok(())

@@ -528,6 +528,16 @@
         "https://atomicdata.dev/properties/shortname": "last-commit"
     },
     {
+        "@id": "https://atomicdata.dev/properties/localId",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "A `localId` is used to derive the Subject (`@id`, the URL) of an imported Resource. This is useful when some data owner has Atomic Data but does not have the technology to host all Resources at their respective URLs. [See docs](https://docs.atomicdata.dev/create-json-ad.html#preventing-duplication-with-localid).",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "local-id"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/paymentPointer",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "Payment Pointers are a standardized identifier for payment accounts. In the same way that an email address provides an identifier for a mailbox in the email ecosystem a payment pointer is used by an account holder to share the details of their account with a counter-party.\n\nSee https://paymentpointers.org/\n\nE.g. `$ilp.uphold.com/WBQrZEphkFxj`",
@@ -803,6 +813,18 @@
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
         "https://atomicdata.dev/properties/shortname": "file"
+    },
+    {
+        "@id": "https://atomicdata.dev/classes/Importer",
+        "https://atomicdata.dev/properties/description": "An Importer helps with importing data from external sources. You can post JSON-AD bodies to it, or give it a URL of a JSON-AD resource, and it will import the data into Atomic Data.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/endpoint/parameters": [
+            "https://atomicdata.dev/properties/importer/json"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+        "https://atomicdata.dev/properties/shortname": "invite"
     },
     {
         "@id": "https://atomicdata.dev/classes/Invite",

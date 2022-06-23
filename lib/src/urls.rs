@@ -104,6 +104,7 @@ pub const NEXT_PAGE: &str = "https://atomicdata.dev/properties/nextPage";
 // ... for Importers
 pub const IMPORTER_URL: &str = "https://atomicdata.dev/properties/importer/url";
 pub const IMPORTER_JSON: &str = "https://atomicdata.dev/properties/importer/json";
+pub const LOCAL_ID: &str = "https://atomicdata.dev/properties/localId";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";

@@ -38,7 +38,7 @@ pub fn construct_importer(
     };
 
     if let Some(json_string) = json {
-        store.import(&json_string, parse_opts)?;
+        store.import(&json_string, &parse_opts)?;
     }
 
     // TODO: generate list of imported resources
