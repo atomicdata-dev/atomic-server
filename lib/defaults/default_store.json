@@ -936,5 +936,14 @@
         "https://atomicdata.dev/properties/description": "This abstract Agent represents all potential users or visitors. If you want a Resource to be publicly available or editable, use this in your [read](https://atomicdata.dev/properties/read) or [write](https://atomicdata.dev/properties/read) property.",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/agents",
         "https://atomicdata.dev/properties/shortname": "public-agent"
+    },
+    {
+        "@id": "https://atomicdata.dev/datatypes/uri",
+        "https://atomicdata.dev/properties/description": "A Uniform Resource Identifier (URI) is a unique sequence of characters that identifies a logical or physical resource used by web technologies",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Datatype"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/datatypes",
+        "https://atomicdata.dev/properties/shortname": "uri"
     }
 ]
