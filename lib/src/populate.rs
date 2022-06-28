@@ -57,8 +57,8 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             data_type: DataType::AtomicUrl,
             shortname: "classtype".into(),
             description:
-                "The class-type indicates that the Atomic URL should be an instance of this class."
-                    .into(),
+                "The class-type indicates that the Atomic URL should be an instance of this class.\n\nThis can be used inside [`Property`](https://atomicdata.dev/classes/Property) instances where the [`datatype`](https://atomicdata.dev/properties/datatype) is either [`Resource`](https://atomicdata.dev/datatypes/resource) or [`ResourceArray`](https://atomicdata.dev/datatypes/resourceArray).\n\nSo for example if we have a `Property` called `friend`, the `classType` can be `Person`."
+               .into(),
             subject: urls::CLASSTYPE_PROP.into(),
             allows_only: None,
         },
