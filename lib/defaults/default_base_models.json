@@ -50,7 +50,7 @@
     "@id": "https://atomicdata.dev/properties/classtype",
     "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
-    "https://atomicdata.dev/properties/description": "The class-type indicates that the Atomic URL should be an instance of this class.",
+    "https://atomicdata.dev/properties/description": "The class-type indicates that the Atomic URL should be an instance of this class.\n\nThis can be used inside [`Property`](https://atomicdata.dev/classes/Property) instances where the [`datatype`](https://atomicdata.dev/properties/datatype) is either [`Resource`](https://atomicdata.dev/datatypes/resource) or [`ResourceArray`](https://atomicdata.dev/datatypes/resourceArray).\n\nSo for example if we have a `Property` called `friend`, the `classType` can be `Person`.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
