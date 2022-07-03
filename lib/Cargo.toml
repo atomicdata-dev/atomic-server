@@ -38,6 +38,8 @@ criterion = "0.3"
 iai = "0.1"
 lazy_static = "1"
 ntest = "0.7"
+fluvio = "0.12"
+async-std = { version = "1", features = ["attributes"] }
 
 [features]
 config = ["directories", "toml"]
