@@ -146,7 +146,13 @@ pub fn parse_json_ad_map_to_propvals(
                             let propvals = parse_json_ad_map_to_propvals(map, store)?;
                             newvec.push(propvals)
                         }
-                        _err => return Err("Found non-string item in resource array.".into()),
+                        _err => {
+                            return Err(("Found \"".to_owned()
+                                + &_err.to_string()
+                                + "\" in resource array: "
+                                + &prop)
+                                .into())
+                        }
                     }
                 }
                 Value::ResourceArray(newvec)
