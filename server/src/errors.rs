@@ -1,4 +1,5 @@
 use actix_web::{error::ResponseError, http::StatusCode, HttpResponse};
+use atomic_lib::{parse::JSON_AD_MIME, urls, Resource, Value};
 use serde::Serialize;
 use std::error::Error;
 
@@ -18,6 +19,8 @@ pub enum AppErrorType {
 pub struct AtomicServerError {
     pub message: String,
     pub error_type: AppErrorType,
+    /// If the error comes from Atomic-Lib, it can contain its own properties + values set in a Resource.
+    pub error_resource: Option<Resource>,
 }
 
 impl AtomicServerError {}
@@ -38,9 +41,25 @@ impl ResponseError for AtomicServerError {
         }
     }
     fn error_response(&self) -> HttpResponse {
-        let body = self.message.clone();
-        tracing::info!("Error reponse {}: {}", self.status_code(), self.message);
-        HttpResponse::build(self.status_code()).body(body)
+        // Creates a JSON-AD resource representing the Error.
+        let r = match &self.error_resource {
+            Some(r) => r.to_owned(),
+            None => {
+                let mut r = Resource::new("subject".into());
+                r.set_class(urls::ERROR);
+                r.set_propval_unsafe(
+                    urls::DESCRIPTION.into(),
+                    Value::String(self.message.clone()),
+                );
+                r
+            }
+        };
+
+        let body = r.to_json_ad().unwrap();
+        tracing::info!("Error response");
+        HttpResponse::build(self.status_code())
+            .content_type(JSON_AD_MIME)
+            .body(body)
     }
 }
 
@@ -51,88 +70,8 @@ impl std::fmt::Display for AtomicServerError {
 }
 
 // Error conversions
-impl From<&str> for AtomicServerError {
-    fn from(message: &str) -> Self {
-        AtomicServerError {
-            message: message.into(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
 
-impl From<String> for AtomicServerError {
-    fn from(message: String) -> Self {
-        AtomicServerError {
-            message,
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-impl From<std::boxed::Box<dyn std::error::Error>> for AtomicServerError {
-    fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-impl<T> From<std::sync::PoisonError<T>> for AtomicServerError {
-    fn from(error: std::sync::PoisonError<T>) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-impl From<std::io::Error> for AtomicServerError {
-    fn from(error: std::io::Error) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-impl From<tantivy::directory::error::OpenDirectoryError> for AtomicServerError {
-    fn from(error: tantivy::directory::error::OpenDirectoryError) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-impl From<tantivy::TantivyError> for AtomicServerError {
-    fn from(error: tantivy::TantivyError) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-#[cfg(feature = "https")]
-impl From<acme_lib::Error> for AtomicServerError {
-    fn from(error: acme_lib::Error) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
-impl From<actix_web::Error> for AtomicServerError {
-    fn from(error: actix_web::Error) -> Self {
-        AtomicServerError {
-            message: error.to_string(),
-            error_type: AppErrorType::Other,
-        }
-    }
-}
-
+// This is probably the most common and most important type of error
 impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
     fn from(error: atomic_lib::errors::AtomicError) -> Self {
         let error_type = match error.error_type {
@@ -143,6 +82,98 @@ impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
         AtomicServerError {
             message: error.to_string(),
             error_type,
+            error_resource: Some(error.into_resource("subject".into())),
+        }
+    }
+}
+
+impl From<&str> for AtomicServerError {
+    fn from(message: &str) -> Self {
+        AtomicServerError {
+            message: message.into(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<String> for AtomicServerError {
+    fn from(message: String) -> Self {
+        AtomicServerError {
+            message,
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<std::boxed::Box<dyn std::error::Error>> for AtomicServerError {
+    fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl<T> From<std::sync::PoisonError<T>> for AtomicServerError {
+    fn from(error: std::sync::PoisonError<T>) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<std::io::Error> for AtomicServerError {
+    fn from(error: std::io::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<tantivy::directory::error::OpenDirectoryError> for AtomicServerError {
+    fn from(error: tantivy::directory::error::OpenDirectoryError) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<tantivy::TantivyError> for AtomicServerError {
+    fn from(error: tantivy::TantivyError) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+#[cfg(feature = "https")]
+impl From<acme_lib::Error> for AtomicServerError {
+    fn from(error: acme_lib::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<actix_web::Error> for AtomicServerError {
+    fn from(error: actix_web::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
         }
     }
 }

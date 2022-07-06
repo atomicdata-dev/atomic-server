@@ -2,7 +2,7 @@
 
 use crate::{
     errors::AtomicResult, resources::PropVals, urls, utils::check_valid_url, values::SubResource,
-    Resource, Storelike, Value,
+    AtomicError, Resource, Storelike, Value,
 };
 
 pub const JSON_AD_MIME: &str = "application/ad+json";
@@ -142,15 +142,31 @@ pub fn parse_json_ad_map_to_propvals(
     for (prop, val) in json {
         if prop == "@id" {
             subject = if let serde_json::Value::String(s) = val {
-                check_valid_url(&s)?;
+                check_valid_url(&s).map_err(|e| {
+                    AtomicError::parse_error(
+                        &format!("Unable to parse @id {s}: {e}"),
+                        subject.as_deref(),
+                        Some(&prop),
+                    )
+                })?;
                 Some(s.to_string())
             } else {
-                return Err("@id must be a string".into());
+                return Err(AtomicError::parse_error(
+                    "@id must be a string",
+                    subject.as_deref(),
+                    Some(&prop),
+                ));
             };
             continue;
         }
         let atomic_val = match val {
-            serde_json::Value::Null => return Err("Null not allowed in JSON-AD".into()),
+            serde_json::Value::Null => {
+                return Err(AtomicError::parse_error(
+                    "Null not allowed in JSON-AD",
+                    subject.as_deref(),
+                    Some(&prop),
+                ));
+            }
             serde_json::Value::Bool(bool) => Value::Boolean(bool),
             serde_json::Value::Number(num) => {
                 let property = store.get_property(&prop)?;
@@ -161,11 +177,28 @@ pub fn parse_json_ad_map_to_propvals(
             serde_json::Value::String(str) => {
                 // LocalIDs are mapped to @ids by appending the `localId` to the `importer`'s `parent`.
                 if str == urls::LOCAL_ID {
-                    let parent = parse_opts.parent.as_ref().ok_or("Encountered `localId`, which means we need a `parent` in the parsing options.")?;
+                    let parent = parse_opts.parent.as_ref()
+                        .ok_or_else(|| AtomicError::parse_error(
+                            "Encountered `localId`, which means we need a `parent` in the parsing options.",
+                            subject.as_deref(),
+                            Some(&prop),
+                        ))?;
                     subject = Some(generate_id_from_local_id(parent, &str));
                 }
-                let property = store.get_property(&prop)?;
-                Value::new(&str.to_string(), &property.data_type)?
+                let property = store.get_property(&prop).map_err(|e| {
+                    AtomicError::parse_error(
+                        &format!("Unable to find property {prop}: {e}"),
+                        subject.as_deref(),
+                        Some(&prop),
+                    )
+                })?;
+                Value::new(&str.to_string(), &property.data_type).map_err(|e| {
+                    AtomicError::parse_error(
+                        &format!("Unable to parse value for prop {prop}: {e}. Value: {str}"),
+                        subject.as_deref(),
+                        Some(&prop),
+                    )
+                })?
             }
             // In Atomic Data, all arrays are Resource Arrays which are serialized JSON things.
             // Maybe this step could be simplified? Just serialize to string?
@@ -179,12 +212,12 @@ pub fn parse_json_ad_map_to_propvals(
                             let propvals = parse_json_ad_map_to_propvals(map, store, parse_opts)?;
                             newvec.push(propvals)
                         }
-                        _err => {
-                            return Err(("Found \"".to_owned()
-                                + &_err.to_string()
-                                + "\" in resource array: "
-                                + &prop)
-                                .into())
+                        err => {
+                            return Err(AtomicError::parse_error(
+                                &format!("Found non-string item in resource array: {err}."),
+                                subject.as_deref(),
+                                Some(&prop),
+                            ))
                         }
                     }
                 }

@@ -447,10 +447,10 @@ impl Storelike for Db {
                     Ok(resource) => {
                         resources.push(resource);
                     }
-                    Err(e) => match e.error_type {
+                    Err(e) => match &e.error_type {
                         crate::AtomicErrorType::NotFoundError => {}
                         crate::AtomicErrorType::UnauthorizedError => {}
-                        crate::AtomicErrorType::OtherError => {
+                        _err => {
                             return Err(
                                 format!("Error when getting resource in collection: {}", e).into()
                             )

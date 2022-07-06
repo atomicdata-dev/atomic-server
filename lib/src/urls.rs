@@ -17,6 +17,7 @@ pub const CHATROOM: &str = "https://atomicdata.dev/classes/ChatRoom";
 pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
 pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
 pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
+pub const ERROR: &str = "https://atomicdata.dev/classes/Error";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";

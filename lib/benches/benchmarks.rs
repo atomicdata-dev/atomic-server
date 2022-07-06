@@ -5,8 +5,6 @@
 use atomic_lib::utils::random_string;
 use atomic_lib::*;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
 
 fn random_atom() -> Atom {
     Atom::new(
