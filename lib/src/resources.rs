@@ -347,12 +347,11 @@ impl Resource {
     }
 
     /// Overwrites the is_a (Class) of the Resource.
-    pub fn set_class(&mut self, is_a: &str) -> AtomicResult<()> {
+    pub fn set_class(&mut self, is_a: &str) {
         self.set_propval_unsafe(
             crate::urls::IS_A.into(),
             Value::ResourceArray([is_a.into()].into()),
         );
-        Ok(())
     }
 
     /// Insert a Property/Value combination.

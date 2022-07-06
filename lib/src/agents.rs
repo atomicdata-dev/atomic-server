@@ -21,7 +21,7 @@ impl Agent {
     /// Does not include private key, only public.
     pub fn to_resource(&self) -> AtomicResult<Resource> {
         let mut resource = Resource::new(self.subject.clone());
-        resource.set_class(urls::AGENT)?;
+        resource.set_class(urls::AGENT);
         resource.set_subject(self.subject.clone());
         if let Some(name) = &self.name {
             resource.set_propval_unsafe(crate::urls::NAME.into(), Value::String(name.into()));

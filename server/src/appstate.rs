@@ -158,7 +158,7 @@ fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     let subject = format!("{}/setup", store.get_server_url());
     tracing::info!("Creating initial Invite at {}", subject);
     let mut invite = store.get_resource_new(&subject);
-    invite.set_class(atomic_lib::urls::INVITE)?;
+    invite.set_class(atomic_lib::urls::INVITE);
     invite.set_subject(subject);
     // This invite can be used only once
     invite.set_propval(

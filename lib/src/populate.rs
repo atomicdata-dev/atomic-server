@@ -156,7 +156,7 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
         .get_self_url()
         .ok_or("No self_url set, cannot populate store with Drive")?;
     let mut drive = store.get_resource_new(&self_url);
-    drive.set_class(urls::DRIVE)?;
+    drive.set_class(urls::DRIVE);
     let server_url = url::Url::parse(store.get_server_url())?;
     drive.set_propval_string(
         urls::NAME.into(),
