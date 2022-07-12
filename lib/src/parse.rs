@@ -99,6 +99,11 @@ pub fn parse_json_ad_array(
         ),
         _other => return Err("Root JSON element must be an object or array.".into()),
     }
+    if parse_opts.add {
+        for r in &vec {
+            store.add_resource_opts(r, true, true, true)?
+        }
+    };
     Ok(vec)
 }
 
@@ -159,6 +164,7 @@ pub fn parse_json_ad_map_to_propvals(
             };
             continue;
         }
+
         let atomic_val = match val {
             serde_json::Value::Null => {
                 return Err(AtomicError::parse_error(
@@ -176,7 +182,7 @@ pub fn parse_json_ad_map_to_propvals(
             }
             serde_json::Value::String(str) => {
                 // LocalIDs are mapped to @ids by appending the `localId` to the `importer`'s `parent`.
-                if str == urls::LOCAL_ID {
+                if prop == urls::LOCAL_ID {
                     let parent = parse_opts.parent.as_ref()
                         .ok_or_else(|| AtomicError::parse_error(
                             "Encountered `localId`, which means we need a `parent` in the parsing options.",
@@ -390,6 +396,8 @@ mod test {
     fn import_resource_with_localid() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
+        let agent = store.create_agent(None).unwrap();
+        store.set_default_agent(agent);
 
         let local_id = "my-local-id";
 
@@ -398,7 +406,8 @@ mod test {
             "https://atomicdata.dev/properties/name": "My resource"
           }"#;
 
-        let importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
+        let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
+        importer.save_locally(&store).unwrap();
 
         let parse_opts = ParseOpts {
             create_commits: true,
@@ -412,6 +421,7 @@ mod test {
         let imported_subject = generate_id_from_local_id(importer.get_subject(), local_id);
 
         let found = store.get_resource(&imported_subject).unwrap();
-        assert_eq!(found.get(urls::NAME).unwrap().to_string(), local_id);
+        assert_eq!(found.get(urls::NAME).unwrap().to_string(), "My resource");
+        assert_eq!(found.get(urls::LOCAL_ID).unwrap().to_string(), local_id);
     }
 }
