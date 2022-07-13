@@ -793,13 +793,13 @@ mod test {
             let _ = commitbuiler.sign(&agent, &store, &resource).unwrap_err();
         }
         {
-            let subject = "https://invalid.com?q=invalid";
+            let subject = "https://localhost/?q=invalid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
             commit.apply_opts(&store, &OPTS).unwrap_err();
         }
         {
-            let subject = "https://valid.com/valid";
+            let subject = "https://localhost/valid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
             commit.apply_opts(&store, &OPTS).unwrap();
