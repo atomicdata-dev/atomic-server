@@ -1,8 +1,8 @@
 //! Parsing / deserialization / decoding
 
 use crate::{
-    errors::AtomicResult, resources::PropVals, urls, utils::check_valid_url, values::SubResource,
-    AtomicError, Resource, Storelike, Value,
+    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, utils::check_valid_url,
+    values::SubResource, AtomicError, Resource, Storelike, Value,
 };
 
 pub const JSON_AD_MIME: &str = "application/ad+json";
@@ -17,8 +17,9 @@ use serde_json::Map;
 /// Options for parsing (JSON-AD) resources
 #[derive(Debug, Clone)]
 pub struct ParseOpts {
-    /// URL of the parent resource. Typically the Importer. If imported resources do not have an `@id`, we create new `@id` using the `localId` and the `parent`
-    pub parent: Option<String>,
+    /// URL of the parent / Importer. This is where all the imported data will be placed under, hierarchically.
+    /// If imported resources do not have an `@id`, we create new `@id` using the `localId` and the `parent`.
+    pub importer: Option<String>,
     /// Who will perform the importing. If set to none, all possible commits will be signed by the default agent.
     pub for_agent: Option<String>,
     /// If true, will generate [crate::Commit]s for every single imported resource
@@ -30,7 +31,7 @@ pub struct ParseOpts {
 impl std::default::Default for ParseOpts {
     fn default() -> Self {
         Self {
-            parent: None,
+            importer: None,
             for_agent: None,
             create_commits: false,
             add: true,
@@ -39,7 +40,8 @@ impl std::default::Default for ParseOpts {
 }
 
 /// Parse a single Json AD string, convert to Atoms
-/// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
+/// WARNING: Does not match all props to datatypes (in Nested Resources),
+/// so it could result in invalid data, if the input data does not match the required datatypes.
 #[tracing::instrument(skip(store))]
 pub fn parse_json_ad_resource(
     string: &str,
@@ -71,7 +73,8 @@ pub fn parse_json_ad_array(
     store: &impl Storelike,
     parse_opts: &ParseOpts,
 ) -> AtomicResult<Vec<Resource>> {
-    let parsed: serde_json::Value = serde_json::from_str(string)?;
+    let parsed: serde_json::Value = serde_json::from_str(string)
+        .map_err(|e| AtomicError::parse_error(&format!("JSON Parsing error: {}", e), None, None))?;
     let mut vec = Vec::new();
     match parsed {
         serde_json::Value::Array(arr) => {
@@ -108,7 +111,8 @@ pub fn parse_json_ad_array(
 }
 
 /// Parse a single Json AD string that represents an incoming Commit.
-/// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data, if the input data does not match the required datatypes.
+/// WARNING: Does not match all props to datatypes (in Nested Resources), so it could result in invalid data,
+/// if the input data does not match the required datatypes.
 #[tracing::instrument(skip(store))]
 pub fn parse_json_ad_commit_resource(
     string: &str,
@@ -143,7 +147,23 @@ pub fn parse_json_ad_map_to_propvals(
     parse_opts: &ParseOpts,
 ) -> AtomicResult<SubResource> {
     let mut propvals = PropVals::new();
-    let mut subject = None;
+    let mut subject: Option<String> = None;
+
+    // Converts a string to a URL (subject), check for localid
+    let try_to_subject = |s: &str, prop: &str| -> AtomicResult<String> {
+        if check_valid_url(s).is_ok() {
+            Ok(s.into())
+        } else if let Some(importer) = &parse_opts.importer {
+            Ok(generate_id_from_local_id(importer, s))
+        } else {
+            Err(AtomicError::parse_error(
+                &format!("Unable to parse string as URL: {}", s),
+                None,
+                Some(prop),
+            ))
+        }
+    };
+
     for (prop, val) in json {
         if prop == "@id" {
             subject = if let serde_json::Value::String(s) = val {
@@ -154,7 +174,7 @@ pub fn parse_json_ad_map_to_propvals(
                         Some(&prop),
                     )
                 })?;
-                Some(s.to_string())
+                Some(s)
             } else {
                 return Err(AtomicError::parse_error(
                     "@id must be a string",
@@ -183,7 +203,7 @@ pub fn parse_json_ad_map_to_propvals(
             serde_json::Value::String(str) => {
                 // LocalIDs are mapped to @ids by appending the `localId` to the `importer`'s `parent`.
                 if prop == urls::LOCAL_ID {
-                    let parent = parse_opts.parent.as_ref()
+                    let parent = parse_opts.importer.as_ref()
                         .ok_or_else(|| AtomicError::parse_error(
                             "Encountered `localId`, which means we need a `parent` in the parsing options.",
                             subject.as_deref(),
@@ -198,13 +218,21 @@ pub fn parse_json_ad_map_to_propvals(
                         Some(&prop),
                     )
                 })?;
-                Value::new(&str.to_string(), &property.data_type).map_err(|e| {
-                    AtomicError::parse_error(
-                        &format!("Unable to parse value for prop {prop}: {e}. Value: {str}"),
-                        subject.as_deref(),
-                        Some(&prop),
-                    )
-                })?
+
+                match property.data_type {
+                    DataType::AtomicUrl => {
+                        // If the value is not a valid URL, and we have an importer, we can generate_id_from_local_id
+                        let url = try_to_subject(&str, &prop)?;
+                        Value::new(&url, &property.data_type)?
+                    }
+                    other => Value::new(&str.to_string(), &other).map_err(|e| {
+                        AtomicError::parse_error(
+                            &format!("Unable to parse value for prop {prop}: {e}. Value: {str}"),
+                            subject.as_deref(),
+                            Some(&prop),
+                        )
+                    })?,
+                }
             }
             // In Atomic Data, all arrays are Resource Arrays which are serialized JSON things.
             // Maybe this step could be simplified? Just serialize to string?
@@ -212,7 +240,10 @@ pub fn parse_json_ad_map_to_propvals(
                 let mut newvec: Vec<SubResource> = Vec::new();
                 for v in arr {
                     match v {
-                        serde_json::Value::String(str) => newvec.push(SubResource::Subject(str)),
+                        serde_json::Value::String(str) => {
+                            let url = try_to_subject(&str, &prop)?;
+                            newvec.push(SubResource::Subject(url))
+                        }
                         // If it's an Object, it can be either an anonymous or a full resource.
                         serde_json::Value::Object(map) => {
                             let propvals = parse_json_ad_map_to_propvals(map, store, parse_opts)?;
@@ -412,7 +443,7 @@ mod test {
         let parse_opts = ParseOpts {
             create_commits: true,
             for_agent: None,
-            parent: Some(importer.get_subject().into()),
+            importer: Some(importer.get_subject().into()),
             add: true,
         };
 
@@ -423,5 +454,57 @@ mod test {
         let found = store.get_resource(&imported_subject).unwrap();
         assert_eq!(found.get(urls::NAME).unwrap().to_string(), "My resource");
         assert_eq!(found.get(urls::LOCAL_ID).unwrap().to_string(), local_id);
+    }
+
+    #[test]
+    fn import_resources_localid_references() {
+        let store = crate::Store::init().unwrap();
+        store.populate().unwrap();
+        let agent = store.create_agent(None).unwrap();
+        store.set_default_agent(agent);
+
+        let json = r#"[
+        {
+            "https://atomicdata.dev/properties/localId": "reference",
+            "https://atomicdata.dev/properties/name": "My referenced resource"
+        },
+        {
+            "https://atomicdata.dev/properties/localId": "my-local-id",
+            "https://atomicdata.dev/properties/name": "My resource that refers",
+            "https://atomicdata.dev/properties/parent": "reference",
+            "https://atomicdata.dev/properties/write": ["reference"]
+        }
+        ]"#;
+
+        let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
+        importer.save_locally(&store).unwrap();
+
+        let parse_opts = ParseOpts {
+            create_commits: true,
+            for_agent: None,
+            importer: Some(importer.get_subject().into()),
+            add: true,
+        };
+
+        store.import(json, &parse_opts).unwrap();
+
+        let reference_subject = generate_id_from_local_id(importer.get_subject(), "reference");
+        let my_subject = generate_id_from_local_id(importer.get_subject(), "my-local-id");
+        let found = store.get_resource(&my_subject).unwrap();
+
+        assert_eq!(
+            found.get(urls::PARENT).unwrap().to_string(),
+            reference_subject
+        );
+        assert_eq!(
+            found
+                .get(urls::WRITE)
+                .unwrap()
+                .to_subjects(None)
+                .unwrap()
+                .first()
+                .unwrap(),
+            &reference_subject
+        );
     }
 }
