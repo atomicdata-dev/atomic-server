@@ -546,7 +546,7 @@ mod test {
         let member_count = collections_collection
             .get(urls::COLLECTION_MEMBER_COUNT)
             .unwrap();
-        println!("Member Count is {}", member_count.to_string());
+        println!("Member Count is {}", member_count);
         assert!(
             member_count.to_int().unwrap() > 10,
             "Member count is too small"

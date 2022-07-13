@@ -37,8 +37,9 @@ impl Timer {
     /// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Server-Timing
     pub fn to_header(&self) -> String {
         let mut out = String::new();
+        use std::fmt::Write;
         for timing in self.timings.iter() {
-            out.push_str(&format!("{};dur={}, ", timing.name, timing.duration));
+            _ = write!(out, "{};dur={}, ", timing.name, timing.duration);
         }
         out
     }
