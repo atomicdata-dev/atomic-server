@@ -554,6 +554,8 @@ mod test {
     }
 
     #[test]
+    #[ignore]
+    // TODO: This currently only tests atomicdata.dev, should test local resources. These need to be rewritten
     fn get_collection_params() {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
