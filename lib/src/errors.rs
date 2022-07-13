@@ -64,12 +64,13 @@ impl AtomicError {
         subject: Option<&str>,
         property: Option<&str>,
     ) -> AtomicError {
+        use std::fmt::Write;
         let mut msg = "Error parsing JSON-AD".to_string();
         if let Some(prop) = property {
-            msg.push_str(&format!(" with property {prop}"));
+            let _ = write!(msg, " with property {prop}");
         }
         if let Some(subject) = subject {
-            msg.push_str(&format!(" of subject {subject}"));
+            let _ = write!(msg, " of subject {subject} ");
         }
         msg.push_str(message);
 

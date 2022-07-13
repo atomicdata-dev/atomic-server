@@ -32,7 +32,7 @@ pub fn construct_importer(
 
     let parse_opts = crate::parse::ParseOpts {
         for_agent: for_agent.map(|s| s.to_string()),
-        parent: Some(requested_subject),
+        importer: Some(requested_subject),
         create_commits: true,
         add: true,
     };
