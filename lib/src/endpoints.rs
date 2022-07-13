@@ -6,6 +6,7 @@
 use crate::{
     errors::AtomicResult,
     plugins::{
+        bookmark::bookmark_endpoint,
         files::upload_endpoint,
         path::path_endpoint,
         search::search_endpoint,
@@ -58,5 +59,6 @@ pub fn default_endpoints() -> Vec<Endpoint> {
         path_endpoint(),
         search_endpoint(),
         upload_endpoint(),
+        bookmark_endpoint(),
     ]
 }

@@ -18,6 +18,7 @@ pub const PARAGRAPH: &str = "https://atomicdata.dev/classes/elements/Paragraph";
 pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
 pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
 pub const ERROR: &str = "https://atomicdata.dev/classes/Error";
+pub const BOOKMARK: &str = "https://atomicdata.dev/class/Bookmark";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -71,6 +72,9 @@ pub const PATH: &str = "https://atomicdata.dev/properties/path";
 pub const SEARCH_QUERY: &str = "https://atomicdata.dev/properties/search/query";
 pub const SEARCH_LIMIT: &str = "https://atomicdata.dev/properties/search/limit";
 pub const SEARCH_PROPERTY: &str = "https://atomicdata.dev/properties/search/property";
+pub const URL: &str = "https://atomicdata.dev/property/url";
+pub const PREVIEW: &str = "https://atomicdata.dev/property/preview";
+
 // ... for Hierarchy / Drive
 pub const PARENT: &str = "https://atomicdata.dev/properties/parent";
 pub const READ: &str = "https://atomicdata.dev/properties/read";

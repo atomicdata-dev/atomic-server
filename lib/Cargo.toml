@@ -32,6 +32,9 @@ tracing = "0.1"
 ureq = "2"
 url = "2"
 urlencoding = "2"
+html2md = "0.2.13"
+kuchiki = "0.8.1"
+lol_html = "0.3.1"
 
 [dev-dependencies]
 criterion = "0.3"
