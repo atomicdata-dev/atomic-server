@@ -17,7 +17,7 @@ However, they are designed in such a way that they have a limited scope and a cl
 
 There are two ways of extending / modifying a Resource.
 Endpoints are great for APIs that have a fixed route, and Class Extenders are great for APIs that don't have a fixed route.
-Endpoints are easier to generate from Rust, and will be available when the second a server is Running.
+Endpoints are easier to generate from Rust, and will be available the second a server is Running.
 
 ### Endpoints
 
@@ -43,3 +43,4 @@ pub mod files;
 pub mod path;
 pub mod search;
 pub mod versioning;
+pub mod bookmark;
