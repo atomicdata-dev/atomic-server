@@ -19,7 +19,8 @@ pub struct Config {
 /// Returns the default path for the config file: `~/.config/atomic`
 pub fn default_config_dir_path() -> AtomicResult<PathBuf> {
     if let Some(dirs) = directories::UserDirs::new() {
-        return Ok(dirs.home_dir().into());
+        let atomic_config_dir = dirs.home_dir().join(".config/atomic");
+        return Ok(atomic_config_dir);
     }
     Err("No default config dir can be found, as no Home directory can be found on this operating system".into())
 }
