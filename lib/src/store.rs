@@ -90,7 +90,11 @@ impl Storelike for Store {
     fn get_server_url(&self) -> &str {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/joepio/atomic/issues/6
-        "http://localhost"
+        "local:store"
+    }
+
+    fn get_self_url(&self) -> Option<String> {
+        Some(self.get_server_url().into())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {

@@ -24,7 +24,15 @@ mod tests;
 mod trace;
 
 #[actix_web::main]
-async fn main() -> errors::AtomicServerResult<()> {
+async fn main() -> () {
+    if let Err(e) = main_wrapped().await {
+        use colored::Colorize;
+        eprintln!("{}: {}", "Error".red(), e.message);
+        std::process::exit(1);
+    }
+}
+
+async fn main_wrapped() -> errors::AtomicServerResult<()> {
     // Parse CLI commands, env vars
     let config = config::build_config(config::read_opts())
         .map_err(|e| format!("Initialization failed: {}", e))?;
@@ -47,20 +55,30 @@ async fn main() -> errors::AtomicServerResult<()> {
                 .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
             let mut file = File::create(&path)
                 .map_err(|e| format!("Failed to write file to {:?}. {}", path, e))?;
-            use std::io::Write;
             write!(file, "{}", outstr)?;
             println!("Succesfully exported data to {}", path.to_str().unwrap());
             Ok(())
         }
         Some(config::Command::Import(o)) => {
-            let path = std::path::Path::new(&o.path);
-            let readstring = std::fs::read_to_string(path)?;
-            let appstate = appstate::init(config.clone())?;
-            appstate
-                .store
-                .import(&readstring, &atomic_lib::parse::ParseOpts::default())?;
+            let readstring = if let Some(path) = &o.file {
+                let path = std::path::Path::new(path);
+                std::fs::read_to_string(path)?
+            } else if let Some(stdin) = &o.stdin {
+                stdin.into()
+            } else {
+                return Err("No input specified".into());
+            };
 
-            println!("Sucesfully imported {:?} to store.", o.path);
+            let appstate = appstate::init(config.clone())?;
+            let parse_opts = atomic_lib::parse::ParseOpts {
+                importer: o.parent.clone(),
+                for_agent: Some(appstate.store.get_default_agent()?),
+                create_commits: true,
+                add: true,
+            };
+            appstate.store.import(&readstring, &parse_opts)?;
+
+            println!("Sucesfully imported {:?} to store.", o.file);
             Ok(())
         }
         Some(config::Command::ShowConfig) => {
@@ -69,18 +87,18 @@ async fn main() -> errors::AtomicServerResult<()> {
         }
         Some(config::Command::Reset) => {
             if dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-                .with_prompt(
-                    format!("Warning!! Do you really want to remove all data from your atomic-server? This will delete {:?}", &config.store_path),
-                )
-                .interact()
-                .unwrap()
-            {
-                std::fs::remove_dir_all(config.store_path).map(|e| format!("unable to remove directory: {:?}", e))?;
-                std::fs::remove_dir_all(config.search_index_path).map(|e| format!("unable to remove directory: {:?}", e))?;
-                println!("Done");
-            } else {
-                println!("Ok, not removing anything.");
-            }
+        .with_prompt(
+            format!("Warning!! Do you really want to remove all data from your atomic-server? This will delete {:?}", &config.store_path),
+        )
+        .interact()
+        .unwrap()
+    {
+        std::fs::remove_dir_all(config.store_path).map(|e| format!("unable to remove directory: {:?}", e))?;
+        std::fs::remove_dir_all(config.search_index_path).map(|e| format!("unable to remove directory: {:?}", e))?;
+        println!("Done");
+    } else {
+        println!("Ok, not removing anything.");
+    }
             Ok(())
         }
         Some(config::Command::SetupEnv) => {

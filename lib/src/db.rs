@@ -370,6 +370,17 @@ impl Storelike for Db {
                         )?;
                     }
                 }
+                crate::urls::IMPORTER => {
+                    has_dynamic = true;
+                    if !skip_dynamic {
+                        resource = crate::plugins::importer::construct_importer(
+                            self,
+                            url.query_pairs(),
+                            &mut resource,
+                            for_agent,
+                        )?;
+                    }
+                }
                 crate::urls::DRIVE => {
                     has_dynamic = true;
                     if !skip_dynamic {

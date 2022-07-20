@@ -3,6 +3,13 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [UNRELEASED]
+
+- Added JSON-AD Importer
+- Improve CLI errors for Atomic-Server #465
+- Fix default config directory, set it again to `~/.config/atomic`. This accidentally was `~` since v0.32.0.
+- Fix flaky query test #468
+
 ## [v0.32.2] - 2022-06-20
 
 - Upgrade to stable tauri #451
