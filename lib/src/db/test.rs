@@ -249,6 +249,7 @@ fn queries() {
 
     let prop_filter = urls::DESTINATION;
     let sort_by = urls::DESCRIPTION;
+    let mut subject_to_delete = "".to_string();
 
     for _x in 0..count {
         let mut demo_resource = Resource::new_generate_subject(store);
@@ -257,6 +258,8 @@ fn queries() {
             demo_resource
                 .set_propval(urls::READ.into(), vec![urls::PUBLIC_AGENT].into(), store)
                 .unwrap();
+        } else if _x == 2 {
+            subject_to_delete = demo_resource.get_subject().to_string();
         }
         demo_resource
             .set_propval(urls::DESTINATION.into(), demo_reference.clone(), store)
@@ -333,7 +336,7 @@ fn queries() {
         prev_resource = r.clone();
     }
 
-    let mut resource_changed_order = resource_changed_order_opt.unwrap();
+    let resource_changed_order = resource_changed_order_opt.unwrap();
 
     assert_eq!(res.count, count, "count changed after updating one value");
 
@@ -345,10 +348,11 @@ fn queries() {
         "order did not change after updating resource"
     );
 
-    resource_changed_order.destroy(store).unwrap();
+    let mut delete_resource = store.get_resource(&subject_to_delete).unwrap();
+    delete_resource.destroy(store).unwrap();
     let res = store.query(&q).unwrap();
     assert!(
-        res.resources[0].get_subject() != resource_changed_order.get_subject(),
+        !res.subjects.contains(&subject_to_delete),
         "deleted resource still in results"
     );
 
@@ -358,6 +362,8 @@ fn queries() {
     let later = res.resources[limit - 1].get(sort_by).unwrap().to_string();
     assert!(first > later, "sort by desc");
 
+    // We set the limit to 2 to make sure Query always returns the 1 out of 10 resources that has public rights.
+    q.limit = Some(2);
     q.for_agent = Some(urls::PUBLIC_AGENT.into());
     let res = store.query(&q).unwrap();
     assert_eq!(res.subjects.len(), 1, "authorized subjects");
@@ -371,6 +377,7 @@ fn queries() {
     q.value = Some(demo_reference);
     q.sort_by = Some(sort_by.into());
     q.for_agent = None;
+    q.limit = Some(limit);
     let res = store.query(&q).unwrap();
     println!("res {:?}", res.subjects);
     let first = res.resources[0].get(sort_by).unwrap().to_string();
