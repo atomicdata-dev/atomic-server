@@ -39,6 +39,8 @@ async fn server_tests() {
         "--initialize",
         "--data-dir",
         &format!("./.temp/{}/db", unique_string),
+        "--config-dir",
+        &format!("./.temp/{}/config", unique_string),
     ]);
 
     let mut config = config::build_config(opts)
@@ -157,3 +159,28 @@ fn get_body(resp: ServiceResponse) -> String {
     let bytes = boxbody.try_into_bytes().unwrap();
     String::from_utf8(bytes.as_ref().into()).unwrap()
 }
+
+use assert_cmd::Command;
+
+// CLI tests
+
+#[test]
+fn wrong_command() {
+    let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
+    cmd.args(&["non-existent-command"]).assert().failure();
+}
+
+#[test]
+fn help() {
+    let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
+    cmd.args(&["help"]).assert().success();
+}
+
+// #[test]
+// fn import_file() {
+//     let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
+//     cmd.current_dir(".").unwrap();
+//     cmd.args(&["import", "--file", "./lib/test_files/local_id.json"])
+//         .assert()
+//         .success();
+// }

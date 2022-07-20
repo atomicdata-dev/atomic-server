@@ -19,10 +19,14 @@ use serde_json::Map;
 pub struct ParseOpts {
     /// URL of the parent / Importer. This is where all the imported data will be placed under, hierarchically.
     /// If imported resources do not have an `@id`, we create new `@id` using the `localId` and the `parent`.
+    /// If the importer resources already have a `parent` set, we'll use that one.
     pub importer: Option<String>,
     /// Who will perform the importing. If set to none, all possible commits will be signed by the default agent.
-    pub for_agent: Option<String>,
-    /// If true, will generate [crate::Commit]s for every single imported resource
+    /// Note that this Agent needs a private key to sign the commits.
+    pub for_agent: Option<crate::agents::Agent>,
+    /// If true, will generate and save [crate::Commit]s for every single imported resource.
+    /// These will be signed by the default Agent
+    /// WARNING: `add` will need to be set to true for this to work.
     pub create_commits: bool,
     /// If the parsed resources should be added to the store.
     pub add: bool,
@@ -59,16 +63,17 @@ fn json_ad_object_to_resource(
     store: &impl crate::Storelike,
     parse_opts: &ParseOpts,
 ) -> AtomicResult<Resource> {
-    match parse_json_ad_map_to_propvals(json, store, parse_opts)? {
+    match parse_json_ad_map_to_resource(json, store, parse_opts)? {
         SubResource::Resource(r) => Ok(*r),
         SubResource::Nested(_) => Err("It's a nested Resource, no @id found".into()),
         SubResource::Subject(_) => Err("It's a string, not a nested resource".into()),
     }
 }
 
-/// Parses JSON-AD strings to resources, adds them to the store
+/// Parses JSON-AD string.
+/// Accepts an array containing multiple objects, or one single object.
 #[tracing::instrument(skip(store))]
-pub fn parse_json_ad_array(
+pub fn parse_json_ad_string(
     string: &str,
     store: &impl Storelike,
     parse_opts: &ParseOpts,
@@ -83,9 +88,6 @@ pub fn parse_json_ad_array(
                     serde_json::Value::Object(obj) => {
                         let resource = json_ad_object_to_resource(obj, store, parse_opts)
                             .map_err(|e| format!("Unable to parse resource in array. {}", e))?;
-                        if parse_opts.add {
-                            store.add_resource_opts(&resource, true, true, true)?
-                        };
                         vec.push(resource);
                     }
                     wrong => {
@@ -102,11 +104,6 @@ pub fn parse_json_ad_array(
         ),
         _other => return Err("Root JSON element must be an object or array.".into()),
     }
-    if parse_opts.add {
-        for r in &vec {
-            store.add_resource_opts(r, true, true, true)?
-        }
-    };
     Ok(vec)
 }
 
@@ -125,7 +122,7 @@ pub fn parse_json_ad_commit_resource(
         .to_string();
     let subject = format!("{}/commits/{}", store.get_server_url(), signature);
     let mut resource = Resource::new(subject);
-    let propvals = match parse_json_ad_map_to_propvals(json, store, &ParseOpts::default())? {
+    let propvals = match parse_json_ad_map_to_resource(json, store, &ParseOpts::default())? {
         SubResource::Resource(r) => r.into_propvals(),
         SubResource::Nested(pv) => pv,
         SubResource::Subject(_) => {
@@ -140,8 +137,9 @@ pub fn parse_json_ad_commit_resource(
 
 /// Parse a single Json AD string, convert to Atoms
 /// Does not match all props to datatypes, so it could result in invalid data.
+/// Adds to the store if `add` is true.
 #[tracing::instrument(skip(store))]
-pub fn parse_json_ad_map_to_propvals(
+fn parse_json_ad_map_to_resource(
     json: Map<String, serde_json::Value>,
     store: &impl crate::Storelike,
     parse_opts: &ParseOpts,
@@ -246,7 +244,7 @@ pub fn parse_json_ad_map_to_propvals(
                         }
                         // If it's an Object, it can be either an anonymous or a full resource.
                         serde_json::Value::Object(map) => {
-                            let propvals = parse_json_ad_map_to_propvals(map, store, parse_opts)?;
+                            let propvals = parse_json_ad_map_to_resource(map, store, parse_opts)?;
                             newvec.push(propvals)
                         }
                         err => {
@@ -261,15 +259,26 @@ pub fn parse_json_ad_map_to_propvals(
                 Value::ResourceArray(newvec)
             }
             serde_json::Value::Object(map) => {
-                Value::NestedResource(parse_json_ad_map_to_propvals(map, store, parse_opts)?)
+                Value::NestedResource(parse_json_ad_map_to_resource(map, store, parse_opts)?)
             }
         };
         // Some of these values are _not correctly matched_ to the datatype.
         propvals.insert(prop, atomic_val);
     }
+    // if there is no parent set, we set it to the Importer
+    if let Some(importer) = &parse_opts.importer {
+        if !propvals.contains_key(urls::PARENT) {
+            propvals.insert(urls::PARENT.into(), Value::AtomicUrl(importer.into()));
+        }
+    }
     if let Some(subj) = { subject } {
         let mut r = Resource::new(subj);
         r.set_propvals_unsafe(propvals);
+        // Logic for saving the Resourcez
+        if parse_opts.add {
+            // WARNING: this does not check if the
+            store.add_resource(&r)?;
+        }
         Ok(SubResource::Resource(r.into()))
     } else {
         Ok(SubResource::Nested(propvals))
@@ -438,6 +447,7 @@ mod test {
           }"#;
 
         let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
+        println!("{}", importer.get_subject());
         importer.save_locally(&store).unwrap();
 
         let parse_opts = ParseOpts {
@@ -452,6 +462,7 @@ mod test {
         let imported_subject = generate_id_from_local_id(importer.get_subject(), local_id);
 
         let found = store.get_resource(&imported_subject).unwrap();
+        println!("{:?}", found);
         assert_eq!(found.get(urls::NAME).unwrap().to_string(), "My resource");
         assert_eq!(found.get(urls::LOCAL_ID).unwrap().to_string(), local_id);
     }
@@ -463,19 +474,6 @@ mod test {
         let agent = store.create_agent(None).unwrap();
         store.set_default_agent(agent);
 
-        let json = r#"[
-        {
-            "https://atomicdata.dev/properties/localId": "reference",
-            "https://atomicdata.dev/properties/name": "My referenced resource"
-        },
-        {
-            "https://atomicdata.dev/properties/localId": "my-local-id",
-            "https://atomicdata.dev/properties/name": "My resource that refers",
-            "https://atomicdata.dev/properties/parent": "reference",
-            "https://atomicdata.dev/properties/write": ["reference"]
-        }
-        ]"#;
-
         let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
         importer.save_locally(&store).unwrap();
 
@@ -486,15 +484,22 @@ mod test {
             add: true,
         };
 
-        store.import(json, &parse_opts).unwrap();
+        store
+            .import(include_str!("../test_files/local_id.json"), &parse_opts)
+            .unwrap();
 
         let reference_subject = generate_id_from_local_id(importer.get_subject(), "reference");
         let my_subject = generate_id_from_local_id(importer.get_subject(), "my-local-id");
         let found = store.get_resource(&my_subject).unwrap();
+        let found_ref = store.get_resource(&reference_subject).unwrap();
 
         assert_eq!(
             found.get(urls::PARENT).unwrap().to_string(),
             reference_subject
+        );
+        assert_eq!(
+            &found_ref.get(urls::PARENT).unwrap().to_string(),
+            importer.get_subject()
         );
         assert_eq!(
             found

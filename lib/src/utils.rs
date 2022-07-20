@@ -21,7 +21,7 @@ pub fn server_url(url: &str) -> AtomicResult<String> {
 
 /// Throws an error if the URL is not a valid URL
 pub fn check_valid_url(url: &str) -> AtomicResult<()> {
-    if !url.starts_with("http") {
+    if !url.starts_with("http") && !url.starts_with("local:") {
         return Err(format!("Url does not start with http: {}", url).into());
     }
     Ok(())

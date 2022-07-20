@@ -117,8 +117,8 @@ pub enum Command {
     /// Create and save a JSON-AD backup of the store.
     #[clap(name = "export")]
     Export(ExportOpts),
-    /// Import a JSON-AD backup to the store. Overwrites existing Resources with same @id.
-    #[clap(name = "import")]
+    /// Import a JSON-AD file or stream to the store. Overwrites existing Resources with same @id.
+    #[clap(name = "import", trailing_var_arg = true)]
     Import(ImportOpts),
     /// Creates a `.env` file in your current directory that shows various options that you can set.
     #[clap(name = "setup-env")]
@@ -143,9 +143,17 @@ pub struct ExportOpts {
 
 #[derive(Parser, Clone, Debug)]
 pub struct ImportOpts {
-    /// Where the file that should be imported is.
-    #[clap(short)]
-    pub path: PathBuf,
+    /// Path of the file to be imported.
+    #[clap(long)]
+    pub file: Option<PathBuf>,
+    /// The URL of the  Importer (parent) Resource to be used.
+    /// This will set the hierarchical location of the imported items.
+    /// Passing a parent Importer is required when importing resources that only have a LocalId.
+    #[clap(long)]
+    pub parent: Option<String>,
+    /// JSON-AD string, can be piped
+    #[clap(multiple_values = true)]
+    pub stdin: Option<String>,
 }
 
 /// Start atomic-server, oi mate

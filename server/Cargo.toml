@@ -21,6 +21,7 @@ actix-files = "0.6"
 actix-multipart = "0.4"
 actix-web-actors = "4"
 chrono = "0.4"
+colored = "2"
 dialoguer = "0.10"
 directories = ">= 2, < 5"
 dotenv = "0.15"
@@ -95,6 +96,7 @@ version = "0.3"
 
 [dev-dependencies]
 actix-rt = "2"
+assert_cmd = "2"
 
 [features]
 default = ["https", "telemetry"]

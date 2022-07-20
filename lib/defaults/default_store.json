@@ -824,7 +824,7 @@
             "https://atomicdata.dev/properties/importer/json"
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
-        "https://atomicdata.dev/properties/shortname": "invite"
+        "https://atomicdata.dev/properties/shortname": "importer"
     },
     {
         "@id": "https://atomicdata.dev/classes/Invite",

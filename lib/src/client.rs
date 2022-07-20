@@ -101,7 +101,7 @@ pub fn fetch_tpf(
         "application/ad+json",
         store.get_default_agent().ok(),
     )?;
-    crate::parse::parse_json_ad_array(&body, store, &ParseOpts::default())
+    crate::parse::parse_json_ad_string(&body, store, &ParseOpts::default())
 }
 
 /// Posts a Commit to the endpoint of the Subject from the Commit
