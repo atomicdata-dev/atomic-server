@@ -8,6 +8,14 @@
       "name": "cargo run",
       "command": "cargo run",
       "runAtStart": true
+    },
+    "docker run": {
+      "name": "docker run",
+      "command": "docker run"
+    },
+    "docker run .": {
+      "name": "docker run .",
+      "command": "docker run ."
     }
   }
 }
