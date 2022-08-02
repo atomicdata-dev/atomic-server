@@ -44,6 +44,10 @@ impl Handler<Subscribe> for CommitMonitor {
     )]
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Context<Self>) {
         // check if the agent has the rights to subscribe to this resource
+        if !msg.subject.starts_with(&self.store.get_self_url().unwrap()) {
+            tracing::warn!("can't subscribe to external resource");
+            return;
+        }
         match self.store.get_resource(&msg.subject) {
             Ok(resource) => {
                 match atomic_lib::hierarchy::check_read(&self.store, &resource, &msg.agent) {
@@ -68,8 +72,8 @@ impl Handler<Subscribe> for CommitMonitor {
                 }
             }
             Err(e) => {
-                tracing::debug!(
-                    "Unsubscribe failed for {} by {}: {}",
+                tracing::warn!(
+                    "Subscribe failed for {} by {}: {}",
                     &msg.subject,
                     msg.agent,
                     e
