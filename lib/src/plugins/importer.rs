@@ -43,8 +43,6 @@ pub fn construct_importer(
         store.import(&json_string, &parse_opts)?;
     }
 
-    // TODO: generate list of imported resources
-
     let q = Query {
         property: Some(urls::PARENT.into()),
         value: Some(requested_subject.into()),

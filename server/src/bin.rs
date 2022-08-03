@@ -1,4 +1,4 @@
-use atomic_lib::Storelike;
+use atomic_lib::{urls, Storelike};
 use std::{fs::File, io::Write};
 
 mod actor_messages;
@@ -60,18 +60,19 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             Ok(())
         }
         Some(config::Command::Import(o)) => {
-            let readstring = if let Some(path) = &o.file {
-                let path = std::path::Path::new(path);
+            let readstring = {
+                let path = std::path::Path::new(&o.file);
                 std::fs::read_to_string(path)?
-            } else if let Some(stdin) = &o.stdin {
-                stdin.into()
-            } else {
-                return Err("No input specified".into());
             };
 
             let appstate = appstate::init(config.clone())?;
+            let importer_subject = if let Some(i) = &o.parent {
+                i.into()
+            } else {
+                urls::path_import(&appstate.store.get_self_url().expect("No self url"))
+            };
             let parse_opts = atomic_lib::parse::ParseOpts {
-                importer: o.parent.clone(),
+                importer: Some(importer_subject),
                 for_agent: Some(appstate.store.get_default_agent()?),
                 create_commits: true,
                 add: true,
