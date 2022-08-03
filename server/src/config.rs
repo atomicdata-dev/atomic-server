@@ -145,15 +145,12 @@ pub struct ExportOpts {
 pub struct ImportOpts {
     /// Path of the file to be imported.
     #[clap(long)]
-    pub file: Option<PathBuf>,
+    pub file: PathBuf,
     /// The URL of the  Importer (parent) Resource to be used.
     /// This will set the hierarchical location of the imported items.
-    /// Passing a parent Importer is required when importing resources that only have a LocalId.
+    /// If not passed, the default Importer `/import` will be used.
     #[clap(long)]
     pub parent: Option<String>,
-    /// JSON-AD string, can be piped
-    #[clap(multiple_values = true)]
-    pub stdin: Option<String>,
 }
 
 /// Start atomic-server, oi mate

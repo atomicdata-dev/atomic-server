@@ -8,7 +8,7 @@ use crate::{
     errors::AtomicResult,
     parse::ParseOpts,
     schema::{Class, Property},
-    urls, Storelike, Value,
+    urls, Resource, Storelike, Value,
 };
 
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.
@@ -245,5 +245,20 @@ pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
         )?;
         resource.save_locally(store)?;
     }
+    Ok(())
+}
+
+#[cfg(feature = "db")]
+/// Adds default Endpoints (versioning) to the Db.
+/// Makes sure they are fetchable
+pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
+    let base = store
+        .get_self_url()
+        .ok_or("No self URL in this Store - required for populating importer")?;
+    let mut importer = Resource::new(urls::path_import(&base));
+    importer.set_class(urls::IMPORTER);
+    importer.set_propval(urls::PARENT.into(), Value::AtomicUrl(base), store)?;
+    importer.set_propval(urls::NAME.into(), Value::String("Import".into()), store)?;
+    importer.save_locally(store)?;
     Ok(())
 }

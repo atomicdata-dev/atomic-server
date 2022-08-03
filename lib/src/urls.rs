@@ -125,3 +125,7 @@ pub const DELETE: &str = "https://atomicdata.dev/methods/delete";
 
 // Instances
 pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
+
+pub fn path_import(base: &str) -> String {
+    format!("{}/import", base)
+}
