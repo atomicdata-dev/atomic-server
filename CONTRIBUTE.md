@@ -55,7 +55,7 @@ The `/.vscode` directory contains various tasks, recommended extensions, and som
 
 ```sh
 # Make sure nextest is installed
-cargo install nextest
+cargo install cargo-nextest
 # Runs all tests
 # NOTE: run this from the root of the workspace, or else feature flags may be excluded
 cargo nextest run
