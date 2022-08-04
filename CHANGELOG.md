@@ -6,6 +6,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 ## [UNRELEASED]
 
 - Added JSON-AD Importer
+- Update Atomic-Data-Browser
 - Improve CLI errors for Atomic-Server #465
 - Fix default config directory, set it again to `~/.config/atomic`. This accidentally was `~` since v0.32.0.
 - Fix flaky query test #468
