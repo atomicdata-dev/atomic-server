@@ -31,15 +31,20 @@ pub fn construct_importer(
     }
 
     let parse_opts = crate::parse::ParseOpts {
+        for_agent: for_agent.map(|a| a.to_string()),
+        importer: Some(requested_subject.clone()),
+        // TODO: allow users to set this to true using a query param
+        overwrite_outside: false,
         // We sign the importer Commits with the default agent,
         // not the one performing the import, because we don't have their private key.
-        for_agent: Some(store.get_default_agent()?),
-        importer: Some(requested_subject.clone()),
-        create_commits: true,
-        add: true,
+        signer: Some(store.get_default_agent()?),
+        save: crate::parse::SaveOpts::Commit,
     };
 
     if let Some(json_string) = json {
+        if for_agent.is_none() {
+            return Err("No agent specified for importer".to_string().into());
+        }
         store.import(&json_string, &parse_opts)?;
     }
 

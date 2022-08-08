@@ -37,6 +37,8 @@ pub struct CommitOpts {
     pub validate_previous_commit: bool,
     /// Updates the indexes in the Store. Is a bit more costly.
     pub update_index: bool,
+    /// For who the right checks will be perormed. If empty, the signer of the Commit will be used.
+    pub validate_for_agent: Option<String>,
 }
 
 /// A Commit is a set of changes to a Resource.
@@ -159,8 +161,9 @@ impl Commit {
             .map_err(|e| format!("Error applying changes to Resource {}. {}", self.subject, e))?;
 
         if opts.validate_rights {
+            let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&self.signer);
             if is_new {
-                hierarchy::check_append(store, &resource_new, &self.signer)?;
+                hierarchy::check_append(store, &resource_new, validate_for)?;
             } else {
                 // Set a parent only if the rights checks are to be validated.
                 // If there is no explicit parent set on the previous resource, use a default.
@@ -174,7 +177,7 @@ impl Commit {
                     )?;
                 }
                 // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
-                hierarchy::check_write(store, &resource_old, &self.signer)?;
+                hierarchy::check_write(store, &resource_old, validate_for)?;
             }
         };
         // Check if all required props are there
@@ -367,6 +370,7 @@ impl Commit {
             validate_timestamp: false,
             validate_rights: false,
             validate_previous_commit: false,
+            validate_for_agent: None,
             update_index: false,
         };
         self.apply_opts(store, &opts)
@@ -675,6 +679,7 @@ mod test {
             validate_timestamp: true,
             validate_previous_commit: true,
             validate_rights: false,
+            validate_for_agent: None,
             update_index: true,
         };
     }
