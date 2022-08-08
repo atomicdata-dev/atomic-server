@@ -73,9 +73,10 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             };
             let parse_opts = atomic_lib::parse::ParseOpts {
                 importer: Some(importer_subject),
-                for_agent: Some(appstate.store.get_default_agent()?),
-                create_commits: true,
-                add: true,
+                for_agent: None,
+                overwrite_outside: true,
+                save: atomic_lib::parse::SaveOpts::Commit,
+                signer: Some(appstate.store.get_default_agent()?),
             };
             appstate.store.import(&readstring, &parse_opts)?;
 

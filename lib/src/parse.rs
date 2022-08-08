@@ -1,8 +1,8 @@
 //! Parsing / deserialization / decoding
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, resources::PropVals, urls, utils::check_valid_url,
-    values::SubResource, AtomicError, Resource, Storelike, Value,
+    commit::CommitOpts, datatype::DataType, errors::AtomicResult, resources::PropVals, urls,
+    utils::check_valid_url, values::SubResource, AtomicError, Resource, Storelike, Value,
 };
 
 pub const JSON_AD_MIME: &str = "application/ad+json";
@@ -14,31 +14,53 @@ pub fn parse_json_array(string: &str) -> AtomicResult<Vec<String>> {
 
 use serde_json::Map;
 
-/// Options for parsing (JSON-AD) resources
+/// Options for parsing (JSON-AD) resources.
+/// Many of these are related to rights, as parsing often implies overwriting / setting resources.
 #[derive(Debug, Clone)]
 pub struct ParseOpts {
     /// URL of the parent / Importer. This is where all the imported data will be placed under, hierarchically.
     /// If imported resources do not have an `@id`, we create new `@id` using the `localId` and the `parent`.
     /// If the importer resources already have a `parent` set, we'll use that one.
     pub importer: Option<String>,
+    /// Who's rights will be checked when creating the imported resources.
+    /// Is only used when `save` is set to [SaveOpts::Commit].
+    /// If [None] is passed, all resources will be
+    pub for_agent: Option<String>,
     /// Who will perform the importing. If set to none, all possible commits will be signed by the default agent.
     /// Note that this Agent needs a private key to sign the commits.
-    pub for_agent: Option<crate::agents::Agent>,
-    /// If true, will generate and save [crate::Commit]s for every single imported resource.
-    /// These will be signed by the default Agent
-    /// WARNING: `add` will need to be set to true for this to work.
-    pub create_commits: bool,
-    /// If the parsed resources should be added to the store.
-    pub add: bool,
+    /// Is only used when `save` is set to `Commit`.
+    pub signer: Option<crate::agents::Agent>,
+    /// How you want to save the Resources, if you want to add Commits for every Resource.
+    pub save: SaveOpts,
+    /// Overwrites existing resources with the same `@id`, even if they are not children of the `importer`.
+    /// This can be a dangerous value if true, because it can overwrite _all_ resources where the `for_agen` has write rights.
+    /// Only parse items from sources that you trust!
+    pub overwrite_outside: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum SaveOpts {
+    /// Don't save the parsed resources to the store.
+    /// No authorization checks will be performed.
+    DontSave,
+    /// Save the parsed resources to the store, but don't create Commits for every change.
+    /// Removes existing properties that are not present in the imported resource.
+    /// Does not perform authorization checks.
+    Save,
+    /// Create Commits for every change.
+    /// Does not remove existing properties.
+    /// Performs authorization cheks (if enabled)
+    Commit,
 }
 
 impl std::default::Default for ParseOpts {
     fn default() -> Self {
         Self {
+            signer: None,
             importer: None,
             for_agent: None,
-            create_commits: false,
-            add: true,
+            overwrite_outside: true,
+            save: SaveOpts::Save,
         }
     }
 }
@@ -272,14 +294,57 @@ fn parse_json_ad_map_to_resource(
         }
     }
     if let Some(subj) = { subject } {
-        let mut r = Resource::new(subj);
-        r.set_propvals_unsafe(propvals);
-        // Logic for saving the Resourcez
-        if parse_opts.add {
-            // WARNING: this does not check if the
-            store.add_resource(&r)?;
-        }
-        Ok(SubResource::Resource(r.into()))
+        let r = match &parse_opts.save {
+            SaveOpts::DontSave => {
+                let mut r = Resource::new(subj);
+                r.set_propvals_unsafe(propvals);
+                r
+            }
+            SaveOpts::Save => {
+                let mut r = Resource::new(subj);
+                r.set_propvals_unsafe(propvals);
+                store.add_resource(&r)?;
+                r
+            }
+            SaveOpts::Commit => {
+                let mut r = if let Ok(orig) = store.get_resource(&subj) {
+                    // If the resource already exists, and overwrites outside are not permitted, and it does not have the importer as parent...
+                    // Then we throw!
+                    // Because this would enable malicious users to overwrite resources that they shouldn't.
+                    if !parse_opts.overwrite_outside {
+                        let importer = parse_opts.importer.as_deref().unwrap();
+                        if !orig.has_parent(store, importer) {
+                            Err(
+                                "Cannot overwrite resource outside of importer! Enable `overwrite_outside`",
+                            )?
+                        }
+                    };
+                    orig
+                } else {
+                    Resource::new(subj)
+                };
+                for (prop, val) in propvals {
+                    r.set_propval(prop, val, store)?;
+                }
+                let signer = parse_opts
+                    .signer
+                    .clone()
+                    .ok_or("No agent to sign Commit with. Either pass a `for_agent` or ")?;
+                let commit = r.get_commit_builder().clone().sign(&signer, store, &r)?;
+                let opts = CommitOpts {
+                    validate_schema: true,
+                    validate_signature: true,
+                    validate_timestamp: false,
+                    validate_rights: parse_opts.for_agent.is_some(),
+                    validate_previous_commit: false,
+                    validate_for_agent: parse_opts.for_agent.clone(),
+                    update_index: true,
+                };
+
+                commit.apply_opts(store, &opts)?.resource_new.unwrap()
+            }
+        };
+        Ok(r.into())
     } else {
         Ok(SubResource::Nested(propvals))
     }
@@ -432,12 +497,19 @@ mod test {
         assert_eq!(members, should_be);
     }
 
-    #[test]
-    fn import_resource_with_localid() {
+    fn create_store_and_importer() -> (crate::Store, String) {
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = store.create_agent(None).unwrap();
         store.set_default_agent(agent);
+        let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
+        importer.save_locally(&store).unwrap();
+        (store, importer.get_subject().into())
+    }
+
+    #[test]
+    fn import_resource_with_localid() {
+        let (store, importer) = create_store_and_importer();
 
         let local_id = "my-local-id";
 
@@ -446,20 +518,17 @@ mod test {
             "https://atomicdata.dev/properties/name": "My resource"
           }"#;
 
-        let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
-        println!("{}", importer.get_subject());
-        importer.save_locally(&store).unwrap();
-
         let parse_opts = ParseOpts {
-            create_commits: true,
+            save: SaveOpts::Commit,
+            signer: Some(store.get_default_agent().unwrap()),
             for_agent: None,
-            importer: Some(importer.get_subject().into()),
-            add: true,
+            overwrite_outside: false,
+            importer: Some(importer.clone()),
         };
 
         store.import(json, &parse_opts).unwrap();
 
-        let imported_subject = generate_id_from_local_id(importer.get_subject(), local_id);
+        let imported_subject = generate_id_from_local_id(&importer, local_id);
 
         let found = store.get_resource(&imported_subject).unwrap();
         println!("{:?}", found);
@@ -469,27 +538,22 @@ mod test {
 
     #[test]
     fn import_resources_localid_references() {
-        let store = crate::Store::init().unwrap();
-        store.populate().unwrap();
-        let agent = store.create_agent(None).unwrap();
-        store.set_default_agent(agent);
-
-        let mut importer = Resource::new_instance(urls::IMPORTER, &store).unwrap();
-        importer.save_locally(&store).unwrap();
+        let (store, importer) = create_store_and_importer();
 
         let parse_opts = ParseOpts {
-            create_commits: true,
+            save: SaveOpts::Commit,
             for_agent: None,
-            importer: Some(importer.get_subject().into()),
-            add: true,
+            signer: Some(store.get_default_agent().unwrap()),
+            overwrite_outside: false,
+            importer: Some(importer.clone()),
         };
 
         store
             .import(include_str!("../test_files/local_id.json"), &parse_opts)
             .unwrap();
 
-        let reference_subject = generate_id_from_local_id(importer.get_subject(), "reference");
-        let my_subject = generate_id_from_local_id(importer.get_subject(), "my-local-id");
+        let reference_subject = generate_id_from_local_id(&importer, "reference");
+        let my_subject = generate_id_from_local_id(&importer, "my-local-id");
         let found = store.get_resource(&my_subject).unwrap();
         let found_ref = store.get_resource(&reference_subject).unwrap();
 
@@ -497,10 +561,7 @@ mod test {
             found.get(urls::PARENT).unwrap().to_string(),
             reference_subject
         );
-        assert_eq!(
-            &found_ref.get(urls::PARENT).unwrap().to_string(),
-            importer.get_subject()
-        );
+        assert_eq!(&found_ref.get(urls::PARENT).unwrap().to_string(), &importer);
         assert_eq!(
             found
                 .get(urls::WRITE)
@@ -511,5 +572,45 @@ mod test {
                 .unwrap(),
             &reference_subject
         );
+    }
+
+    #[test]
+    fn import_resource_malicious() {
+        let (store, importer) = create_store_and_importer();
+
+        // Try to overwrite the main drive with some malicious data
+        let agent = store.get_default_agent().unwrap();
+        let mut resource = Resource::new_generate_subject(&store);
+        resource
+            .set_propval(
+                urls::WRITE.into(),
+                vec![agent.subject.clone()].into(),
+                &store,
+            )
+            .unwrap();
+        resource.save_locally(&store).unwrap();
+
+        let json = format!(
+            r#"{{
+            "@id": "{}",
+            "https://atomicdata.dev/properties/write": ["https://some-malicious-actor"]
+        }}"#,
+            resource.get_subject()
+        );
+
+        let mut parse_opts = ParseOpts {
+            save: SaveOpts::Commit,
+            signer: Some(agent.clone()),
+            for_agent: Some(agent.subject),
+            overwrite_outside: false,
+            importer: Some(importer),
+        };
+
+        // We can't allow this to happen, so we expect an error
+        store.import(&json, &parse_opts).unwrap_err();
+
+        // If we explicitly allow overwriting resources outside scope, we should be able to import it
+        parse_opts.overwrite_outside = true;
+        store.import(&json, &parse_opts).unwrap();
     }
 }

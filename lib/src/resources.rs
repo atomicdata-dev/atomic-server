@@ -144,6 +144,21 @@ impl Resource {
         &self.subject
     }
 
+    /// checks if a resouce has a specific parent. iterates over all parents.
+    pub fn has_parent(&self, store: &impl Storelike, parent: &str) -> bool {
+        let mut mut_res = self.to_owned();
+        loop {
+            if let Ok(found_parent) = mut_res.get_parent(store) {
+                if found_parent.get_subject() == parent {
+                    return true;
+                }
+                mut_res = found_parent;
+            } else {
+                return false;
+            }
+        }
+    }
+
     /// Returns all PropVals.
     pub fn into_propvals(self) -> PropVals {
         self.propvals
@@ -306,6 +321,7 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_for_agent: Some(agent.subject),
             // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-data-rust/issues/412
             validate_previous_commit: false,
             update_index: true,
@@ -333,6 +349,7 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_for_agent: Some(agent.subject),
             // https://github.com/atomicdata-dev/atomic-data-rust/issues/412
             validate_previous_commit: false,
             update_index: true,
@@ -629,6 +646,7 @@ mod test {
                     validate_timestamp: true,
                     validate_rights: false,
                     validate_previous_commit: true,
+                    validate_for_agent: None,
                     update_index: true,
                 },
             )
