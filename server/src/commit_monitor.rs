@@ -11,7 +11,7 @@ use crate::{
 };
 use actix::{
     prelude::{Actor, Context, Handler},
-    Addr,
+    ActorStreamExt, Addr, ContextFutureSpawner,
 };
 use atomic_lib::{Db, Storelike};
 use chrono::Local;
@@ -26,11 +26,23 @@ pub struct CommitMonitor {
     search_state: SearchState,
     config: Config,
     last_search_commit: chrono::DateTime<Local>,
+    run_expensive_next_tick: bool,
 }
+
+const EXPENSIVE_SEARCH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
 
 // Since his Actor only starts once, there is no need to handle its lifecycle
 impl Actor for CommitMonitor {
     type Context = Context<Self>;
+
+    fn started(&mut self, ctx: &mut Context<Self>) {
+        tracing::debug!("CommitMonitor started");
+
+        // spawn an interval stream into our context
+        actix::utils::IntervalFunc::new(EXPENSIVE_SEARCH_INTERVAL, Self::tick)
+            .finish()
+            .spawn(ctx);
+    }
 }
 
 impl Handler<Subscribe> for CommitMonitor {
@@ -111,22 +123,29 @@ impl CommitMonitor {
             };
             // Add new resource to search index
             crate::search::add_resource(&self.search_state, resource)?;
-
-            // TODO: This is not ideal, as it does not _delay_ the search index update, but it prevents it.
-            // Current implementation should work just fine in most scenario's.
-            let commit_duration = chrono::Duration::seconds(15);
-            let now = chrono::Local::now();
-            let since_last_commit = now - self.last_search_commit;
-            if since_last_commit > commit_duration {
-                // This is a slow operation!
-                // Commit the changset to the search index.
-                self.search_state.writer.write()?.commit()?;
-                self.last_search_commit = now;
-            }
+            self.run_expensive_next_tick = true;
         } else {
             // If there is no new resource, it must have been deleted, so let's remove it from the search index.
             crate::search::remove_resource(&self.search_state, &target)?;
         }
+        Ok(())
+    }
+
+    /// Runs every X seconds to perform expensive operations.
+    fn tick(&mut self, _ctx: &mut Context<Self>) {
+        if self.run_expensive_next_tick {
+            _ = self
+                .update_expensive()
+                .map_err(|e| tracing::error!("{}", e.to_string()));
+        }
+    }
+
+    /// Run expensive updates that should not be run after every single Commit
+    fn update_expensive(&mut self) -> AtomicServerResult<()> {
+        tracing::debug!("Update expensive");
+        self.search_state.writer.write()?.commit()?;
+        self.last_search_commit = chrono::Local::now();
+        self.run_expensive_next_tick = false;
         Ok(())
     }
 }
@@ -161,6 +180,7 @@ pub fn create_commit_monitor(
             store,
             search_state,
             config,
+            run_expensive_next_tick: false,
             last_search_commit: chrono::Local::now(),
         }
     })
