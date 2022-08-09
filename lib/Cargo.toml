@@ -19,6 +19,9 @@ name = "benchmarks"
 base64 = "0.13"
 bincode = {version = "1", optional = true}
 directories = {version = ">= 2, < 5", optional = true}
+html2md = {version = "0.2.13", optional = true}
+kuchiki = {version = "0.8.1", optional = true}
+lol_html = {version = "0.3.1", optional = true}
 rand = {version = "0.8"}
 regex = "1"
 ring = "0.16"
@@ -32,15 +35,6 @@ tracing = "0.1"
 ureq = "2"
 url = "2"
 urlencoding = "2"
-html2md = "0.2.13"
-kuchiki = "0.8.1"
-lol_html = "0.3.1"
-
-[dependencies.uuid]
-version = "1.1.2"
-features = [
-    "v4",
-]
 
 [dev-dependencies]
 criterion = "0.3"
@@ -51,4 +45,5 @@ ntest = "0.7"
 [features]
 config = ["directories", "toml"]
 db = ["sled", "bincode"]
+html = ["kuchiki", "lol_html", "html2md"]
 rdf = ["rio_api", "rio_turtle"]
