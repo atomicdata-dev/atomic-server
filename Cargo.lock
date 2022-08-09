@@ -555,7 +555,6 @@ dependencies = [
  "ureq 2.4.0",
  "url",
  "urlencoding",
- "uuid 1.1.2",
 ]
 
 [[package]]

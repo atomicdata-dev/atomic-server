@@ -39,8 +39,9 @@ pub mod importer;
 pub mod invite;
 
 // Endpoints
+#[cfg(feature = "html")]
+pub mod bookmark;
 pub mod files;
 pub mod path;
 pub mod search;
 pub mod versioning;
-pub mod bookmark;

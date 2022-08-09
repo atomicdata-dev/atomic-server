@@ -1,9 +1,13 @@
+/**
+Parse HTML documents and extract metadata.
+Convert articles to Markdown strings.
+ */
 use kuchiki::{traits::TendrilSink, NodeRef};
 use lol_html::{element, rewrite_str, text, ElementContentHandlers, RewriteStrSettings, Selector};
+use rand::Rng;
 use std::{borrow::Cow, collections::HashMap, string::FromUtf8Error};
 use url::Url;
 use urlencoding::encode;
-use uuid::Uuid;
 
 use crate::{
     client::fetch_body, endpoints::Endpoint, errors::AtomicResult, urls, values::Value,
@@ -49,12 +53,12 @@ fn handle_bookmark_request(
     let mut name = name.unwrap();
 
     let mut resource = Resource::new(url.to_string());
-    resource.set_class(urls::BOOKMARK.into())?;
-    resource.set_propval_string(urls::URL.into(), &path.clone(), store)?;
+    resource.set_class(urls::BOOKMARK)?;
+    resource.set_propval_string(urls::URL.into(), &path, store)?;
 
     // Fetch the data and create a parser from it.
     let content = fetch_data(&path)?;
-    let mut parser = Parser::from_html(&path, &content);
+    let mut parser = Parser::from_html(&path, &content)?;
 
     // Extract the title from the HTML
     if let Some(title) = parser.get_title() {
@@ -64,18 +68,12 @@ fn handle_bookmark_request(
     resource.set_propval_string(urls::NAME.into(), &name, store)?;
 
     // Clean and transform the HTML to markdown.
-    if let Ok(cleaned_html) = parser.clean_document() {
-        let md = html2md::parse_html(&cleaned_html);
+    let cleaned_html = parser.clean_document()?;
+    let md = html2md::parse_html(&cleaned_html);
 
-        resource.set_propval(urls::PREVIEW.into(), Value::Markdown(md), store)?;
+    resource.set_propval(urls::PREVIEW.into(), Value::Markdown(md), store)?;
 
-        Ok(resource)
-    } else {
-        Err(AtomicError {
-            message: "Could not parse HTML".to_string(),
-            error_type: AtomicErrorType::OtherError,
-        })
-    }
+    Ok(resource)
 }
 
 fn fetch_data(url: &str) -> AtomicResult<String> {
@@ -99,14 +97,14 @@ struct Parser {
 }
 
 impl Parser {
-    pub fn from_html(url: &str, html: &str) -> Parser {
-        Parser {
-            url: Url::parse(url).unwrap(),
+    pub fn from_html(url: &str, html: &str) -> AtomicResult<Parser> {
+        Ok(Parser {
+            url: Url::parse(url)?,
             internal_html: html.to_string(),
             root_element: "body".to_string(),
             anchor_text_buffer: std::rc::Rc::new(std::cell::RefCell::new(String::new())),
             svg_map: HashMap::new(),
-        }
+        })
     }
 
     pub fn serialize(node: NodeRef) -> Result<String, FromUtf8Error> {
@@ -115,38 +113,36 @@ impl Parser {
             println!("{}", e);
         }
 
-        let result = String::from_utf8(stream);
-
-        return result;
+        String::from_utf8(stream)
     }
 
     pub fn get_title(&self) -> Option<String> {
         let document = kuchiki::parse_html().one(self.internal_html.clone());
 
         if let Ok(title_element) = document.select_first("title") {
-            return Some(title_element.text_contents());
+            Some(title_element.text_contents())
         } else {
-            return None;
+            None
         }
     }
 
-    pub fn clean_document(&mut self) -> Result<String, AtomicError> {
+    pub fn clean_document(&mut self) -> AtomicResult<String> {
         self.select_best_node()?;
         self.index_svgs()?;
         self.process_html()?;
 
-        return Ok(self.internal_html.clone());
+        Ok(self.internal_html.clone())
     }
 
     fn resolve_url(&self, url: &str) -> String {
-        if let Err(_) = Url::parse(&url) {
-            return self.url.join(&url).unwrap().as_str().to_string();
+        if Url::parse(url).is_err() {
+            return self.url.join(url).unwrap().as_str().to_string();
         }
 
         url.to_string()
     }
 
-    fn select_best_node(&mut self) -> Result<(), AtomicError> {
+    fn select_best_node(&mut self) -> AtomicResult<()> {
         const BEST_SCENARIO_SELECTORS: [&str; 3] = ["article", "main", r#"div[role="main"]"#];
 
         let document = kuchiki::parse_html().one(self.internal_html.clone());
@@ -185,7 +181,11 @@ impl Parser {
         let document = kuchiki::parse_html().one(self.internal_html.clone());
 
         for node in document.select("svg").unwrap() {
-            let id = Uuid::new_v4().to_string();
+            let id: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(30)
+                .map(char::from)
+                .collect();
 
             let svg = Parser::serialize(node.clone().as_node().clone()).unwrap();
 
@@ -276,7 +276,7 @@ impl Parser {
         })];
     }
 
-    fn resolve_relative_path_handler<'h>(&'h self) -> Handler<'h, 'h> {
+    fn resolve_relative_path_handler(&self) -> Handler {
         return vec![element!("*[src], *[href]", |el| {
             if el.has_attribute("src") {
                 let src = el.get_attribute("src").unwrap();
@@ -292,7 +292,7 @@ impl Parser {
         })];
     }
 
-    fn convert_svg_to_image_handler<'h>(&'h self) -> Handler<'h, 'h> {
+    fn convert_svg_to_image_handler(&self) -> Handler {
         return vec![element!("svg", |el| {
             let id = el.get_attribute("id").unwrap();
             let svg = self.svg_map.get(&id).unwrap();
@@ -309,7 +309,7 @@ impl Parser {
         })];
     }
 
-    fn simplify_link_text_handler<'h>(&self) -> Handler<'h, 'h> {
+    fn simplify_link_text_handler(&self) -> Handler {
         return vec![element!("a *", |el| {
             let tag_name = el.tag_name().to_lowercase();
             if tag_name != "img" && tag_name != "picture" {
@@ -320,32 +320,34 @@ impl Parser {
         })];
     }
 
-    fn transform_figures_handler<'h>(&self) -> Handler<'h, 'h> {
+    fn transform_figures_handler(&self) -> Handler {
         return vec![element!("figure", |el| {
             el.remove_and_keep_content();
             Ok(())
         })];
     }
 
-    fn transform_figcaptions_handler<'h>(&self) -> Handler<'h, 'h> {
+    fn transform_figcaptions_handler(&self) -> Handler {
         return vec![element!("figcaption", |el| {
             el.set_tag_name("P").unwrap();
             Ok(())
         })];
     }
 
-    fn trim_link_text_handler<'h>(&'h self) -> Handler<'h, 'h> {
+    fn trim_link_text_handler(&self) -> Handler {
         return vec![
             element!("a", |el| {
                 self.anchor_text_buffer.borrow_mut().clear();
                 let buffer = self.anchor_text_buffer.clone();
-                let href = el.get_attribute("href").unwrap_or("link".to_string());
+                let href = el
+                    .get_attribute("href")
+                    .unwrap_or_else(|| "link".to_string());
 
                 el.on_end_tag(move |end| {
                     let s = buffer.borrow();
                     let mut text = s.as_str().trim();
 
-                    if text.len() == 0 {
+                    if text.is_empty() {
                         text = &href;
                     }
 
@@ -375,7 +377,7 @@ mod tests {
     #[test]
     fn test_select_best_element() {
         let html = r#"<html><body><header><nav>navigation</nav></header><iframe></iframe><article><header>article header</header><p>lor em ip sum<p/></article></body></html>"#;
-        let mut parser = super::Parser::from_html("https://bla.com", html);
+        let mut parser = super::Parser::from_html("https://bla.com", html).unwrap();
 
         let parsed_html = parser.clean_document().unwrap();
         let md = html2md::parse_html(&parsed_html);
@@ -386,7 +388,7 @@ mod tests {
     #[test]
     fn test_resolve_relative_paths() {
         let html = r#"<article><p>The <a href="/animals/chicken.html">chicken</a> is an animal</p></article>"#;
-        let mut parser = super::Parser::from_html("https://bla.com", html);
+        let mut parser = super::Parser::from_html("https://bla.com", html).unwrap();
 
         let parsed_html = parser.clean_document().unwrap();
         let md = html2md::parse_html(&parsed_html);
@@ -400,7 +402,7 @@ mod tests {
     #[test]
     fn test_clean_link() {
         let html = r#"<html><body><a href="https://bla.com"><div>Het is</div><div>taco tijd</div></a></body></html>"#;
-        let mut parser = super::Parser::from_html("https://bla.com", html);
+        let mut parser = super::Parser::from_html("https://bla.com", html).unwrap();
 
         let parsed_html = parser.clean_document().unwrap();
         let md = html2md::parse_html(&parsed_html);
@@ -411,7 +413,7 @@ mod tests {
     #[test]
     fn parse_images() {
         let html = r#"<html><body><img alt="Netflix" height="369" src="https://tweakers.net/i/Imo-YDw3aJMOUg7-aMw2OC0lk6Q=/656x/filters:strip\_icc():strip\_exif()/i/2004517792.jpeg?f=imagenormal" width="656"></body></html>"#;
-        let mut parser = super::Parser::from_html("https://bla.com", html);
+        let mut parser = super::Parser::from_html("https://bla.com", html).unwrap();
 
         let parsed_html = parser.clean_document().unwrap();
         let md = html2md::parse_html(&parsed_html);
@@ -426,7 +428,7 @@ mod tests {
     fn convert_svg() {
         let html =
             r#"<html><body><svg><path d="M 10 10 H 90 V 90 H 10 L 10 10"/></svg></body></html>"#;
-        let mut parser = super::Parser::from_html("https://bla.com", html);
+        let mut parser = super::Parser::from_html("https://bla.com", html).unwrap();
 
         let parsed_html = parser.clean_document().unwrap();
         let md = html2md::parse_html(&parsed_html);
