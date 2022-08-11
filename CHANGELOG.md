@@ -12,6 +12,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Fix flaky query test #468
 - Don't subscribe to external resources #470
 - Improve frequency search indexing #473
+- Add HTML importer / bookmarks endpoint #432
 
 ## [v0.32.2] - 2022-06-20
 
