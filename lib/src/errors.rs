@@ -31,7 +31,11 @@ pub enum AtomicErrorType {
     OtherError,
 }
 
-impl std::error::Error for AtomicError {}
+impl std::error::Error for AtomicError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
 
 impl AtomicError {
     #[allow(dead_code)]
@@ -114,8 +118,6 @@ impl From<String> for AtomicError {
     }
 }
 
-// The following feel very redundant. Can this be simplified?
-
 impl From<std::boxed::Box<dyn std::error::Error>> for AtomicError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         AtomicError {
@@ -125,6 +127,7 @@ impl From<std::boxed::Box<dyn std::error::Error>> for AtomicError {
     }
 }
 
+// The following feel very redundant. Can this be simplified?
 impl<T> From<std::sync::PoisonError<T>> for AtomicError {
     fn from(error: std::sync::PoisonError<T>) -> Self {
         AtomicError {
