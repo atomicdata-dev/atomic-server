@@ -18,7 +18,7 @@ type Handler<'s, 'h> = Vec<(Cow<'s, Selector>, ElementContentHandlers<'h>)>;
 
 pub fn bookmark_endpoint() -> Endpoint {
     Endpoint {
-        path: "/fetchbookmark".to_string(),
+        path: urls::PATH_FETCH_BOOKMARK.into(),
         params: [urls::URL.to_string(), urls::NAME.to_string()].into(),
         description: "The website will be fetched and parsed by the server. The data will then be added as a markdown document that is fully indexed.".to_string(),
         shortname: "bookmark".to_string(),
@@ -45,15 +45,13 @@ fn handle_bookmark_request(
         };
     }
 
-    if path.is_none() || name.is_none() {
-        return bookmark_endpoint().to_resource(store);
-    }
-
-    let path = path.unwrap();
-    let mut name = name.unwrap();
+    let (mut name, path) = match (name, path) {
+        (Some(name), Some(path)) => (name, path),
+        _ => return bookmark_endpoint().to_resource(store),
+    };
 
     let mut resource = Resource::new(url.to_string());
-    resource.set_class(urls::BOOKMARK)?;
+    resource.set_class(urls::BOOKMARK);
     resource.set_propval_string(urls::URL.into(), &path, store)?;
 
     // Fetch the data and create a parser from it.
@@ -149,9 +147,9 @@ impl Parser {
 
         let mut best_node = document
             .select("body")
-            .unwrap()
+            .map_err(|_| "Can't find <body> tag")?
             .next()
-            .unwrap()
+            .ok_or("Can't find element next to <body> tag")?
             .as_node()
             .clone();
 
@@ -180,14 +178,17 @@ impl Parser {
     fn index_svgs(&mut self) -> Result<(), AtomicError> {
         let document = kuchiki::parse_html().one(self.internal_html.clone());
 
-        for node in document.select("svg").unwrap() {
+        for node in document
+            .select("svg")
+            .map_err(|_| "Can't find <svg> tags")?
+        {
             let id: String = rand::thread_rng()
                 .sample_iter(&rand::distributions::Alphanumeric)
                 .take(30)
                 .map(char::from)
                 .collect();
 
-            let svg = Parser::serialize(node.clone().as_node().clone()).unwrap();
+            let svg = Parser::serialize(node.clone().as_node().clone())?;
 
             // Tag the element with an ID so the rewriter can find it later.
             node.attributes
@@ -278,13 +279,11 @@ impl Parser {
 
     fn resolve_relative_path_handler(&self) -> Handler {
         return vec![element!("*[src], *[href]", |el| {
-            if el.has_attribute("src") {
-                let src = el.get_attribute("src").unwrap();
+            if let Some(src) = el.get_attribute("src") {
                 el.set_attribute("src", &self.resolve_url(&src))?;
             }
 
-            if el.has_attribute("href") {
-                let href = el.get_attribute("href").unwrap();
+            if let Some(href) = el.get_attribute("href") {
                 el.set_attribute("href", &self.resolve_url(&href))?;
             }
 
@@ -294,8 +293,8 @@ impl Parser {
 
     fn convert_svg_to_image_handler(&self) -> Handler {
         return vec![element!("svg", |el| {
-            let id = el.get_attribute("id").unwrap();
-            let svg = self.svg_map.get(&id).unwrap();
+            let id = el.get_attribute("id").ok_or("no id in SVG")?;
+            let svg = self.svg_map.get(&id).ok_or("no SVG found with id")?;
 
             el.set_tag_name("img")?;
             el.remove_attribute("height");
@@ -329,7 +328,7 @@ impl Parser {
 
     fn transform_figcaptions_handler(&self) -> Handler {
         return vec![element!("figcaption", |el| {
-            el.set_tag_name("P").unwrap();
+            el.set_tag_name("P")?;
             Ok(())
         })];
     }
