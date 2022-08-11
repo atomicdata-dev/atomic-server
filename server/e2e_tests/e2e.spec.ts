@@ -87,12 +87,15 @@ test.describe('data-browser', async () => {
     await page.click('text=Accept as new user');
     await expect(page.locator(documentTitle)).toBeVisible();
     await expect(page.locator(navbarCurrentUser)).toBeVisible();
+    // We need the initial enter because removing the top line isn't working ATM
+    await page.keyboard.press('Enter');
     const teststring = `Testline ${timestamp}`;
     await page.fill('[data-test="element-input"]', teststring);
-    // await page.keyboard.type(teststring);
-    await page.keyboard.press('Enter');
     // This next line can be flaky, maybe the text disappears because it's overwritten?
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
+    // Remove the text again for cleanup
+    await page.keyboard.press('Alt+Backspace');
+    await expect(page.locator(`text=${teststring}`)).not.toBeVisible();
     const docTitle = `Document Title ${timestamp}`;
     await page.fill(documentTitle, docTitle);
     await page.click(documentTitle, { delay: 200 });
@@ -302,8 +305,8 @@ test.describe('data-browser', async () => {
     await openLocalhost(page);
 
     // Create a new bookmark
-    await page.locator('text=new resource').click();
-    await expect(page).toHaveURL(`${serverUrl}/app/new`);
+    await page.locator('button:has-text("class")').click();
+    await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
     await page.locator('button:has-text("bookmark")').click();
 
     // Fetch `example.com
@@ -319,8 +322,8 @@ test.describe('data-browser', async () => {
     await signIn(page);
     // Create new class from new resource menu
     await page.locator('text=new resource').click();
-    await expect(page).toHaveURL(`${serverUrl}/app/new`);
-    await page.locator('text=new class').click();
+    await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
+    await page.locator('button:has-text("class")').click();
     await page
       .locator('[title="Add an item to this list"] >> nth=0')
       .first()
@@ -343,8 +346,10 @@ test.describe('data-browser', async () => {
       .fill('This is a test prop');
     await page.locator('dialog footer >> text=Save').click();
 
-    expect(page.locator('[data-test="input-recommends"] >> nth=0')).toHaveValue(
-      'test-prop',
+    expect(
+      await page.locator(
+        '[data-test="input-recommends"] >> nth=0 >> "test-prop"',
+      ),
     );
   });
 });
