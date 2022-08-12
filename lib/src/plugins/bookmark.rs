@@ -67,9 +67,13 @@ fn handle_bookmark_request(
 
     // Clean and transform the HTML to markdown.
     let cleaned_html = parser.clean_document()?;
+    print!("cleaned_html: {}", cleaned_html);
     let md = html2md::parse_html(&cleaned_html);
+    // Remove empty characters.
+    // https://github.com/atomicdata-dev/atomic-data-rust/issues/474
+    let md = regex::Regex::new(r#"\s{2,}"#).unwrap().replace_all(&md, "");
 
-    resource.set_propval(urls::PREVIEW.into(), Value::Markdown(md), store)?;
+    resource.set_propval(urls::PREVIEW.into(), Value::Markdown(md.into()), store)?;
 
     Ok(resource)
 }
