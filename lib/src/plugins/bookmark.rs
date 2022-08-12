@@ -67,7 +67,6 @@ fn handle_bookmark_request(
 
     // Clean and transform the HTML to markdown.
     let cleaned_html = parser.clean_document()?;
-    print!("cleaned_html: {}", cleaned_html);
     let md = html2md::parse_html(&cleaned_html);
     // Remove empty characters.
     // https://github.com/atomicdata-dev/atomic-data-rust/issues/474
@@ -223,6 +222,7 @@ impl Parser {
                     self.remove_unwanted_elements_handler(),
                     self.transform_figures_handler(),
                     self.transform_figcaptions_handler(),
+                    self.unfold_sup_elements_handler(),
                     self.resolve_relative_path_handler(),
                     self.simplify_link_text_handler(),
                     self.trim_link_text_handler(),
@@ -333,6 +333,13 @@ impl Parser {
     fn transform_figcaptions_handler(&self) -> Handler {
         return vec![element!("figcaption", |el| {
             el.set_tag_name("P")?;
+            Ok(())
+        })];
+    }
+
+    fn unfold_sup_elements_handler(&self) -> Handler {
+        return vec![element!("sup", |el| {
+            el.remove_and_keep_content();
             Ok(())
         })];
     }
