@@ -305,17 +305,16 @@ test.describe('data-browser', async () => {
     await openLocalhost(page);
 
     // Create a new bookmark
-    await page.locator('button:has-text("class")').click();
-    await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
+    await page.locator('text=new resource').click();
     await page.locator('button:has-text("bookmark")').click();
 
     // Fetch `example.com
-    const input = page.locator('[placeholder="https\\:\\/\\/example\\.com"]');
+    const input = await page.locator('[placeholder="https\\:\\/\\/example\\.com"]');
     await input.click();
     await input.fill('https://example.com');
     await page.locator('footer >> text=Ok').click();
 
-    await expect(page.locator('text=This domain is ')).toBeVisible();
+    await expect(await page.locator('text=This domain is ')).toBeVisible();
   });
 
   test('dialog', async ({ page }) => {
