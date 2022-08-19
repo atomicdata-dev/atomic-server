@@ -71,7 +71,7 @@ impl AtomicError {
         use std::fmt::Write;
         let mut msg = "Error parsing JSON-AD".to_string();
         if let Some(prop) = property {
-            let _ = write!(msg, " with property {prop}");
+            let _ = write!(msg, " with property {prop} ");
         }
         if let Some(subject) = subject {
             let _ = write!(msg, " of subject {subject} ");
