@@ -672,6 +672,18 @@
         "https://atomicdata.dev/properties/shortname": "subject"
     },
     {
+        "@id": "https://atomicdata.dev/properties/tags",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Tag",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+        "https://atomicdata.dev/properties/description": "List of tags / categories / themes. Useful for categorizing posts.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "https://atomicdata.dev/commits/fS0krtm1wDk0lodH0psnUKmBHBMKLuxnjkd7E7QbkzDk/irQ43gNW3lWxkwQj58ZNg6rUAUMDGJrLy1X3cHwBQ==",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "tags"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/write",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
@@ -681,6 +693,22 @@
             "https://atomicdata.dev/classes/Property"
         ],
         "https://atomicdata.dev/properties/shortname": "write"
+    },
+    {
+        "@id": "https://atomicdata.dev/classes/Article",
+        "https://atomicdata.dev/properties/description": "A written article / blogpost / blog. \n\nUse the `name` as a Title, and the `description` for the content of the Blogpost (in markdown).",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+        "https://atomicdata.dev/properties/recommends": [
+            "https://atomicdata.dev/properties/tags"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+            "https://atomicdata.dev/properties/description",
+            "https://atomicdata.dev/properties/name"
+        ],
+        "https://atomicdata.dev/properties/shortname": "article"
     },
     {
         "@id": "https://atomicdata.dev/classes/Atom",
@@ -862,6 +890,21 @@
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
         "https://atomicdata.dev/properties/shortname": "redirect"
+    },
+    {
+        "@id": "https://atomicdata.dev/classes/Tag",
+        "https://atomicdata.dev/properties/description": "A single tag / theme / category. This is used for categorizing information using the [tags](https://atomicdata.dev/properties/tags) property",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Class"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+        "https://atomicdata.dev/properties/recommends": [
+            "https://atomicdata.dev/properties/description"
+        ],
+        "https://atomicdata.dev/properties/requires": [
+            "https://atomicdata.dev/properties/name"
+        ],
+        "https://atomicdata.dev/properties/shortname": "tag"
     },
     {
         "@id": "https://atomicdata.dev/datatypes/atomicURL",
