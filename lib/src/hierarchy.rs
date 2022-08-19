@@ -1,10 +1,10 @@
-//! The Hierarchy model describes how Resources are structed in a tree-like shape.
+//! The Hierarchy model describes how Resources are structured in a tree-like shape.
 //! It deals with authorization (read / write permissions, rights, grants)
 //! See
 
 use core::fmt;
 
-use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
+use crate::{errors::AtomicResult, urls, AtomicError, Resource, Storelike, Value};
 
 #[derive(Debug)]
 pub enum Right {
@@ -77,7 +77,23 @@ pub fn check_append(
     resource: &Resource,
     for_agent: &str,
 ) -> AtomicResult<String> {
-    let parent = resource.get_parent(store)?;
+    let parent = if let Ok(parent) = resource.get_parent(store) {
+        parent
+    } else {
+        if resource
+            .get_classes(store)?
+            .iter()
+            .map(|c| c.subject.clone())
+            .collect::<String>()
+            .contains(urls::DRIVE)
+        {
+            return Ok(String::from("Drive without a parent can be created"));
+        }
+        return Err(AtomicError::unauthorized(format!(
+            "No parent found for {}",
+            resource.get_subject()
+        )));
+    };
     if let Ok(msg) = check_rights(store, &parent, for_agent, Right::Append) {
         Ok(msg)
     } else {
