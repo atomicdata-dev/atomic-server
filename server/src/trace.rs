@@ -1,4 +1,6 @@
-// Start logging / tracing. Creates a subscribers that logs to stdout. Also optionally creates a Chrome trace file.
+/// Start logging / tracing. Creates a subscribers that logs to stdout.
+/// Also optionally creates a Chrome trace file. Starts OpenTelemetry if configured.
+/// Returns a [tracing_chrome::FlushGuard] that should be dropped when the server is no longer needed.
 pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::FlushGuard> {
     // Enable logging, but hide most tantivy logs
     let log_level = match config.opts.log_level {
