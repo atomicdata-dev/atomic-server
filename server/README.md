@@ -5,7 +5,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/atomicdata-dev/atomic-data-browser)
 
-_Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
+_Status: alpha. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
