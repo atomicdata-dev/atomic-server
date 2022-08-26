@@ -56,8 +56,8 @@ pub async fn search_query(
     if let Some(q) = params.q.clone() {
         // If any of these substrings appear, the user wants an exact / advanced search
         let dont_fuzz_strings = vec!["*", "AND", "OR", "[", "\"", ":", "+", "-", " "];
-        for dont_fuzz in dont_fuzz_strings {
-            if q.contains(dont_fuzz) {
+        for substr in dont_fuzz_strings {
+            if q.contains(substr) {
                 should_fuzzy = false
             }
         }
@@ -82,10 +82,9 @@ pub async fn search_query(
             } else {
                 q
             };
-            let tantivy_query = query_parser
+            query_parser
                 .parse_query(&full_query)
-                .map_err(|e| format!("Error parsing query {}", e))?;
-            tantivy_query
+                .map_err(|e| format!("Error parsing query {}", e))?
         };
 
         // With this first limit, we go for a greater number - as the user may not have the rights to the first ones!
