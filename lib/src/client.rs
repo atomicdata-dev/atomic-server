@@ -47,8 +47,8 @@ pub fn get_authentication_headers(url: &str, agent: &Agent) -> AtomicResult<Vec<
 
 /// Fetches a URL, returns its body.
 /// Uses the store's Agent agent (if set) to sign the request.
+#[tracing::instrument(level = "info")]
 pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> AtomicResult<String> {
-    println!("fetching body of {}", url);
     if !url.starts_with("http") {
         return Err(format!("Could not fetch url '{}', must start with http.", url).into());
     }
