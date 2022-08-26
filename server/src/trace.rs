@@ -11,10 +11,23 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
     };
     std::env::set_var("RUST_LOG", format!("{},tantivy=warn", log_level));
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
     // Start tracing
     // STDOUT log
     let filter = tracing_subscriber::EnvFilter::from_default_env();
-    let tracing_registry = tracing_subscriber::registry().with(filter);
+    let tracing_registry = tracing_subscriber::registry()
+        .with(filter)
+        .with(sentry_tracing::layer());
+
+    #[cfg(feature = "sentry")]
+    {
+        // Init Sentry for remote error logging
+        let _guard = sentry::init(sentry::ClientOptions {
+            // Set this a to lower value in production
+            traces_sample_rate: 1.0,
+            ..sentry::ClientOptions::default()
+        });
+    }
 
     match config.opts.trace {
         crate::config::Tracing::Stdout => {

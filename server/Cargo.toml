@@ -94,6 +94,14 @@ version = "1"
 features = ["env-filter"]
 version = "0.3"
 
+[dependencies.sentry]
+optional = true
+version = "0.27"
+
+[dependencies.sentry-tracing]
+optional = true
+version = "0.27"
+
 [dev-dependencies]
 actix-rt = "2"
 assert_cmd = "2"
@@ -102,7 +110,7 @@ assert_cmd = "2"
 default = ["https", "telemetry"]
 https = ["acme-lib", "rustls"]
 process-management = ["sysinfo"]
-telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger"]
+telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger", "sentry", "sentry-tracing"]
 
 [lib]
 name = "atomic_server_lib"
