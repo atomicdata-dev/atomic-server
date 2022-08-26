@@ -14,6 +14,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Improve frequency search indexing #473
 - Add HTML importer / bookmarks endpoint #432
 - Allow new `Drive` resources without a parent
+- Refactor end-to-end tests
 
 ## [v0.32.2] - 2022-06-20
 

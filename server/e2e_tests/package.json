@@ -4,9 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "playwright test 'e2e.spec.ts'",
-    "test-debug": "PWDEBUG=1 playwright test 'e2e.spec.ts'",
-    "test-query": "PWDEBUG=1 playwright test 'e2e.spec.ts' -g"
+    "test": "playwright test 'e2e-generated.spec.ts'",
+    "test-debug": "PWDEBUG=1 playwright test 'e2e-generated.spec.ts'",
+    "test-query": "PWDEBUG=1 playwright test 'e2e-generated.spec.ts' -g"
   },
   "author": "",
   "license": "ISC",
