@@ -75,7 +75,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
             Ok(()) => {}
             Err(e) => {
                 ctx.text(format!("ERROR {e}"));
-                tracing::error!("{}", e);
+                tracing::error!("Handling WebSocket message: {}", e);
                 ctx.stop();
             }
         }

@@ -180,7 +180,7 @@ pub async fn search_query(
                     }
                 }
                 Err(_e) => {
-                    tracing::info!("Skipping search result: {} : {}", s, _e);
+                    tracing::debug!("Skipping search result: {} : {}", s, _e);
                     continue;
                 }
             }
