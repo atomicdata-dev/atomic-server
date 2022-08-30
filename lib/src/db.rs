@@ -42,8 +42,9 @@ pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 /// It uses [sled::Tree]s as Key Value stores.
 /// It stores [Resource]s as [PropVals]s by their subject as key.
 /// It builds a value index for performant [Query]s.
-/// It keeps track of Queries and updates their index when [Commit]s are applied.
+/// It keeps track of Queries and updates their index when [crate::Commit]s are applied.
 /// You can pass a custom `on_commit` function to run at Commit time.
+/// `Db` should be easily, cheaply clone-able, as users of this library could have one `Db` per connection.
 #[derive(Clone)]
 pub struct Db {
     /// The Key-Value store that contains all data.
@@ -53,7 +54,7 @@ pub struct Db {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
-    /// Index for all AtommicURLs, indexed by their Value. Used to speed up TPF queries. See [key_for_reference_index]
+    /// Index for all AtomicURLs, indexed by their Value. Used to speed up TPF queries. See [key_for_reference_index]
     reference_index: sled::Tree,
     /// Stores the members of Collections, easily sortable.
     /// See [collections_index]

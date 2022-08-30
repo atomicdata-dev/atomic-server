@@ -4,15 +4,21 @@ use crate::{commit::check_timestamp, errors::AtomicResult, Storelike};
 
 /// Set of values extracted from the request.
 /// Most are coming from headers.
+#[derive(serde::Deserialize)]
 pub struct AuthValues {
     // x-atomic-public-key
+    #[serde(rename = "https://atomicdata.dev/properties/auth/publicKey")]
     pub public_key: String,
     // x-atomic-timestamp
+    #[serde(rename = "https://atomicdata.dev/properties/auth/timestamp")]
     pub timestamp: i64,
     // x-atomic-signature
     // Base64 encoded public key from `subject_url timestamp`
+    #[serde(rename = "https://atomicdata.dev/properties/auth/signature")]
     pub signature: String,
+    #[serde(rename = "https://atomicdata.dev/properties/auth/requestedSubject")]
     pub requested_subject: String,
+    #[serde(rename = "https://atomicdata.dev/properties/auth/agent")]
     pub agent_subject: String,
 }
 
@@ -35,11 +41,11 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
     Ok(())
 }
 
-/// Get the Agent's subject from headers
+/// Get the Agent's subject from [AuthValues]
 /// Checks if the auth headers are correct, whether signature matches the public key, whether the timestamp is valid.
 /// by default, returns the public agent
 #[tracing::instrument(skip_all)]
-pub fn get_agent_from_headers_and_check(
+pub fn get_agent_from_auth_values_and_check(
     auth_header_values: Option<AuthValues>,
     store: &impl Storelike,
 ) -> AtomicResult<String> {
