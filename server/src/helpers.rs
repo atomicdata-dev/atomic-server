@@ -69,7 +69,7 @@ pub fn get_client_agent(
     }
     // Authentication check. If the user has no headers, continue with the Public Agent.
     let auth_header_values = get_auth_headers(headers, requested_subject)?;
-    let for_agent = atomic_lib::authentication::get_agent_from_headers_and_check(
+    let for_agent = atomic_lib::authentication::get_agent_from_auth_values_and_check(
         auth_header_values,
         &appstate.store,
     )

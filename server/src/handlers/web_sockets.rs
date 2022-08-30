@@ -1,6 +1,11 @@
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
+use atomic_lib::{
+    authentication::{get_agent_from_auth_values_and_check, AuthValues},
+    errors::AtomicResult,
+    Db, Storelike,
+};
 use std::time::{Duration, Instant};
 
 use crate::{
@@ -17,14 +22,19 @@ pub async fn web_socket_handler(
 ) -> AtomicServerResult<HttpResponse> {
     // Authentication check. If the user has no headers, continue with the Public Agent.
     let auth_header_values = get_auth_headers(req.headers(), "ws".into())?;
-    let for_agent = atomic_lib::authentication::get_agent_from_headers_and_check(
+    let for_agent = atomic_lib::authentication::get_agent_from_auth_values_and_check(
         auth_header_values,
         &appstate.store,
     )?;
     tracing::debug!("Starting websocket for {}", for_agent);
 
     let result = ws::start(
-        WebSocketConnection::new(appstate.commit_monitor.clone(), for_agent),
+        WebSocketConnection::new(
+            appstate.commit_monitor.clone(),
+            for_agent,
+            // We need to make sure this is easily clone-able
+            appstate.store.clone(),
+        ),
         &req,
         stream,
     )?;
@@ -48,6 +58,7 @@ pub struct WebSocketConnection {
     /// The Agent who is connected.
     /// If it's not specified, it's the Public Agent.
     agent: String,
+    store: Db,
 }
 
 impl Actor for WebSocketConnection {
@@ -60,71 +71,147 @@ impl Actor for WebSocketConnection {
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        match msg {
-            Ok(ws::Message::Ping(msg)) => {
-                self.hb = Instant::now();
-                ctx.pong(&msg);
-            }
-            Ok(ws::Message::Pong(_)) => {
-                self.hb = Instant::now();
-            }
-            // TODO: Check if it's a subscribe / unsubscribe / commit message
-            Ok(ws::Message::Text(bytes)) => {
-                let text = bytes.to_string();
-                tracing::debug!("Incoming websocket text message: {:?}", text);
-                match text.as_str() {
-                    s if s.starts_with("SUBSCRIBE ") => {
-                        let mut parts = s.split("SUBSCRIBE ");
-                        if let Some(subject) = parts.nth(1) {
-                            self.commit_monitor_addr
-                                .do_send(crate::actor_messages::Subscribe {
-                                    addr: ctx.address(),
-                                    subject: subject.to_string(),
-                                    agent: self.agent.clone(),
-                                });
-                            self.subscribed.insert(subject.into());
-                        } else {
-                            ctx.text("ERROR: SUBSCRIBE without subject")
-                        }
-                    }
-                    s if s.starts_with("UNSUBSCRIBE ") => {
-                        let mut parts = s.split("UNSUBSCRIBE ");
-                        if let Some(subject) = parts.nth(1) {
-                            self.subscribed.remove(subject);
-                        } else {
-                            ctx.text("ERROR: UNSUBSCRIBE without subject")
-                        }
-                    }
-                    s if s.starts_with("GET ") => {
-                        let mut parts = s.split("GET ");
-                        if let Some(_subject) = parts.nth(1) {
-                            ctx.text("ERROR: GET not yet supported, see https://github.com/joepio/atomic-data-rust/issues/180")
-                        }
-                    }
-                    other => {
-                        tracing::warn!("Unmatched message: {}", other);
-                        ctx.text(format!("ERROR: Server received unknown message: {}", other));
-                    }
-                };
-            }
-            Ok(ws::Message::Binary(_bin)) => ctx.text("ERROR: Binary not supported"),
-            Ok(ws::Message::Close(reason)) => {
-                ctx.close(reason);
+        match handle_ws_message(msg, ctx, self) {
+            Ok(()) => {}
+            Err(e) => {
+                ctx.text(format!("ERROR {e}"));
+                tracing::error!("{}", e);
                 ctx.stop();
             }
-            _ => ctx.stop(),
+        }
+    }
+}
+
+fn handle_ws_message(
+    msg: Result<ws::Message, ws::ProtocolError>,
+    ctx: &mut ws::WebsocketContext<WebSocketConnection>,
+    conn: &mut WebSocketConnection,
+) -> AtomicResult<()> {
+    match msg {
+        Ok(ws::Message::Ping(msg)) => {
+            conn.hb = Instant::now();
+            ctx.pong(&msg);
+            Ok(())
+        }
+        Ok(ws::Message::Pong(_)) => {
+            conn.hb = Instant::now();
+            Ok(())
+        }
+        // TODO: Check if it's a subscribe / unsubscribe / commit message
+        Ok(ws::Message::Text(bytes)) => {
+            let text = bytes.to_string();
+            tracing::debug!("Incoming websocket text message: {:?}", text);
+            match text.as_str() {
+                s if s.starts_with("SUBSCRIBE ") => {
+                    let mut parts = s.split("SUBSCRIBE ");
+                    if let Some(subject) = parts.nth(1) {
+                        conn.commit_monitor_addr
+                            .do_send(crate::actor_messages::Subscribe {
+                                addr: ctx.address(),
+                                subject: subject.to_string(),
+                                agent: conn.agent.clone(),
+                            });
+                        conn.subscribed.insert(subject.into());
+                        Ok(())
+                    } else {
+                        Err("SUBSCRIBE needs a subject".into())
+                    }
+                }
+                s if s.starts_with("UNSUBSCRIBE ") => {
+                    let mut parts = s.split("UNSUBSCRIBE ");
+                    if let Some(subject) = parts.nth(1) {
+                        conn.subscribed.remove(subject);
+                        Ok(())
+                    } else {
+                        Err("UNSUBSCRIBE needs a subject".into())
+                    }
+                }
+                s if s.starts_with("GET ") => {
+                    let mut parts = s.split("GET ");
+                    if let Some(subject) = parts.nth(1) {
+                        match conn
+                            .store
+                            .get_resource_extended(subject, false, Some(&conn.agent))
+                        {
+                            Ok(r) => {
+                                let serialized =
+                                    r.to_json_ad().expect("Can't serialize Resource to JSON-AD");
+                                ctx.text(format!("RESOURCE {serialized}"));
+                                Ok(())
+                            }
+                            Err(e) => {
+                                let r = e.into_resource(subject.into());
+                                let serialized_err =
+                                    r.to_json_ad().expect("Can't serialize Resource to JSON-AD");
+                                ctx.text(format!("RESOURCE: {serialized_err}"));
+                                Ok(())
+                            }
+                        }
+                    } else {
+                        Err("GET needs a subject".into())
+                    }
+                }
+                s if s.starts_with("AUTHENTICATE ") => {
+                    let mut parts = s.split("AUTHENTICATE ");
+                    if let Some(json) = parts.nth(1) {
+                        let auth_header_values: AuthValues = match serde_json::from_str(json) {
+                            Ok(auth) => auth,
+                            Err(err) => {
+                                return Err(format!("Invalid AUTHENTICATE JSON: {}", err).into())
+                            }
+                        };
+                        match get_agent_from_auth_values_and_check(
+                            Some(auth_header_values),
+                            // How will we get a Store here?
+                            &conn.store,
+                        ) {
+                            Ok(a) => {
+                                conn.agent = a.clone();
+                                tracing::info!("Authenticated websocket for {}", a);
+                                Ok(())
+                            }
+                            Err(e) => Err(format!("Authentication failed: {}", e).into()),
+                        }
+                    } else {
+                        Err("AUTHENTICATE needs a JSON object".into())
+                    }
+                }
+                other => {
+                    tracing::warn!("Unknown websocket message: {}", other);
+                    Err(format!("Unknown message: {}", other).into())
+                }
+            }
+        }
+        Ok(ws::Message::Binary(_bin)) => Err("ERROR: Binary not supported".into()),
+        Ok(ws::Message::Close(reason)) => {
+            ctx.close(reason);
+            ctx.stop();
+            Ok(())
+        }
+        _ => {
+            ctx.stop();
+            Ok(())
         }
     }
 }
 
 impl WebSocketConnection {
-    fn new(commit_monitor_addr: Addr<CommitMonitor>, agent: String) -> Self {
+    fn new(commit_monitor_addr: Addr<CommitMonitor>, agent: String, store: Db) -> Self {
+        let size = std::mem::size_of::<Db>();
+        if size > 10000 {
+            tracing::warn!(
+                "Cloned Store is over 10kB, this will hurt performance: {:?} bytes",
+                size
+            );
+        }
+
         Self {
             hb: Instant::now(),
             // Maybe this should be stored only in the CommitMonitor, and not here.
             subscribed: std::collections::HashSet::new(),
             commit_monitor_addr,
             agent,
+            store,
         }
     }
 

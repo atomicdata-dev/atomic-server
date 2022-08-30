@@ -17,13 +17,13 @@ use crate::{urls, Resource, Value};
 /// The default Error type for all Atomic Lib Errors.
 pub type AtomicResult<T> = std::result::Result<T, AtomicError>;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct AtomicError {
     pub message: String,
     pub error_type: AtomicErrorType,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AtomicErrorType {
     NotFoundError,
     UnauthorizedError,
