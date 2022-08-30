@@ -72,26 +72,6 @@ test.describe('data-browser', async () => {
     await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
   });
 
-  test('sign up with invite, edit, versions', async ({ page }) => {
-    await openAtomic(page);
-    // Use invite
-    await page.click(`text=${demoInviteName}`);
-    await page.click('text=Accept as new user');
-    // The computer is so fast that the page does not work
-    await expect(page.locator('text=User created!')).toBeVisible();
-    // Click the toast notification
-    await page.click('text=User Settings');
-
-    await editProfileAndCommit(page);
-
-    // Versions
-    await page.click('[data-test="context-menu"]');
-    await page.click('text=versions');
-    await expect(page.locator('text=Versions of')).toBeVisible();
-    // TODO: fix versioning!
-    // await page.click('text=atomicdata.dev/versioning?');
-  });
-
   test('sign up and edit document atomicdata.dev', async ({ page }) => {
     await openAtomic(page);
     // Use invite
@@ -99,6 +79,8 @@ test.describe('data-browser', async () => {
     await page.click('text=Accept as new user');
     await expect(page.locator(editableTitle)).toBeVisible();
     await expect(page.locator(navbarCurrentUser)).toBeVisible();
+    // Check if we can edit our profile
+    await editProfileAndCommit(page);
     // We need the initial enter because removing the top line isn't working ATM
     await page.keyboard.press('Enter');
     const teststring = `Testline ${timestamp}`;
