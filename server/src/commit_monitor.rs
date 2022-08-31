@@ -84,7 +84,7 @@ impl Handler<Subscribe> for CommitMonitor {
                 }
             }
             Err(e) => {
-                tracing::warn!(
+                tracing::debug!(
                     "Subscribe failed for {} by {}: {}",
                     &msg.subject,
                     msg.agent,
