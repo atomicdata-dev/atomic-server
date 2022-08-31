@@ -1,3 +1,11 @@
+/*!
+## WebSockets
+
+For every Connection to `/ws`, the [web_socket_handler] creates a [WebSocketConnection].
+This keeps track of the Agent and handles messages.
+
+For information about the protocol, see https://docs.atomicdata.dev/websockets.html
+ */
 use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
@@ -44,9 +52,6 @@ pub async fn web_socket_handler(
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
 const CLIENT_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// This connection is used for relaying relevant Commits to the client.
-/// The client sends SUBSCRIBE messages to the server to indicate which Resources it is interested in
-// TODO: Add the Agent that opened the websocket, if provided
 pub struct WebSocketConnection {
     /// Client must send ping at least once per 10 seconds (CLIENT_TIMEOUT),
     /// otherwise we drop connection.
@@ -71,13 +76,10 @@ impl Actor for WebSocketConnection {
 
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnection {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        match handle_ws_message(msg, ctx, self) {
-            Ok(()) => {}
-            Err(e) => {
-                ctx.text(format!("ERROR {e}"));
-                tracing::error!("Handling WebSocket message: {}", e);
-                ctx.stop();
-            }
+        if let Err(e) = handle_ws_message(msg, ctx, self) {
+            ctx.text(format!("ERROR {e}"));
+            tracing::error!("Handling WebSocket message: {}", e);
+            ctx.stop();
         }
     }
 }
@@ -143,7 +145,7 @@ fn handle_ws_message(
                                 let r = e.into_resource(subject.into());
                                 let serialized_err =
                                     r.to_json_ad().expect("Can't serialize Resource to JSON-AD");
-                                ctx.text(format!("RESOURCE: {serialized_err}"));
+                                ctx.text(format!("RESOURCE {serialized_err}"));
                                 Ok(())
                             }
                         }
