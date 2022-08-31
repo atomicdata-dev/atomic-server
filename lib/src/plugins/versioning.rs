@@ -1,3 +1,5 @@
+use tracing::log::warn;
+
 use crate::{
     collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, AtomicError,
     Commit, Resource, Storelike, Value,
@@ -97,9 +99,13 @@ fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResu
     )?;
     let mut commits = Vec::new();
     for atom in commit_atoms {
-        let resource = store
-            .get_resource(&atom.subject)
-            .map_err(|e| format!("Unable to get commits for {}. {}", subject, e))?;
+        let resource = if let Ok(r) = store.get_resource(&atom.subject) {
+            r
+        } else {
+            // https://github.com/atomicdata-dev/atomic-data-rust/issues/488
+            warn!("Could not find commit for {} , skipping", atom.subject);
+            continue;
+        };
         let mut is_commit = false;
         // If users use the `subject` field for a non-commit, we prevent using it as a commit here.
         for c in resource.get(urls::IS_A)?.to_subjects(None)?.iter() {
