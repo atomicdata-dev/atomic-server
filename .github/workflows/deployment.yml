@@ -40,5 +40,7 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # a local .env contains setup parameters, such as IP and ports
-          script: ~/atomic-server export && systemctl restart atomic
+          # TODO: fix backup, see
+          # https://github.com/atomicdata-dev/atomic-data-rust/issues/487
+          # script: systemctl restart atomic && ~/atomic-server export && systemctl restart atomic
+          script: systemctl restart atomic
