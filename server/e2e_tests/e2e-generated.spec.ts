@@ -28,9 +28,10 @@ const editableTitle = '[data-test="editable-title"]';
 const sidebarDriveEdit = '[data-test="sidebar-drive-edit"]';
 const sideBarNewResource = '[data-test="sidebar-new-resource"]';
 const currentDriveTitle = '[data-test=current-drive-title]';
-const navbarCurrentUser = '[data-test="navbar-current-user"]';
 const publicReadRight =
   '[data-test="right-public"] input[type="checkbox"] >> nth=0';
+const contextMenu = '[data-test="context-menu"]';
+const addressBar = '[data-test="address-bar"]';
 
 test.describe('data-browser', async () => {
   test.beforeEach(async ({ page }) => {
@@ -59,7 +60,6 @@ test.describe('data-browser', async () => {
 
   test('sign in with secret, edit profile, sign out', async ({ page }) => {
     await signIn(page);
-    await expect(page.locator(navbarCurrentUser)).toBeVisible();
     await editProfileAndCommit(page);
 
     // Sign out
@@ -68,7 +68,6 @@ test.describe('data-browser', async () => {
       d.accept();
     });
     await page.click('[data-test="sign-out"]');
-    await expect(page.locator(navbarCurrentUser)).not.toBeVisible();
     await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
   });
 
@@ -78,9 +77,6 @@ test.describe('data-browser', async () => {
     await page.click(`text=${demoInviteName}`);
     await page.click('text=Accept as new user');
     await expect(page.locator(editableTitle)).toBeVisible();
-    await expect(page.locator(navbarCurrentUser)).toBeVisible();
-    // Check if we can edit our profile
-    await editProfileAndCommit(page);
     // We need the initial enter because removing the top line isn't working ATM
     await page.keyboard.press('Enter');
     const teststring = `Testline ${timestamp}`;
@@ -95,10 +91,12 @@ test.describe('data-browser', async () => {
     await page.fill(editableTitle, docTitle);
     // Not sure if this test is needed - it fails now.
     // await expect(page.locator(documentTitle)).toBeFocused();
+    // Check if we can edit our profile
+    await editProfileAndCommit(page);
   });
 
   test('search', async ({ page }) => {
-    await page.fill('[data-test="address-bar"]', 'setup');
+    await page.fill(addressBar, 'setup');
     await page.click('text=setup');
     await expect(page.locator('text=Use this Invite')).toBeVisible();
   });
@@ -106,10 +104,7 @@ test.describe('data-browser', async () => {
   test('collections & data view', async ({ page }) => {
     await openAtomic(page);
     // collections, pagination, sorting
-    await page.fill(
-      '[data-test="address-bar"]',
-      'https://atomicdata.dev/properties',
-    );
+    await openSubject(page, 'https://atomicdata.dev/properties');
     await page.click(
       '[data-test="sort-https://atomicdata.dev/properties/description"]',
     );
@@ -122,10 +117,10 @@ test.describe('data-browser', async () => {
     await expect(page.locator(secondPageText)).toBeVisible();
 
     // context menu, keyboard & data view
-    await page.click('[data-test="context-menu"]');
+    await page.click(contextMenu);
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
-    await expect(page.locator('text=Fetch as')).toBeVisible();
+    await expect(page.locator('text=JSON-AD')).toBeVisible();
     await page.click('[data-test="fetch-json-ad"]');
     await expect(
       page.locator(
@@ -151,7 +146,7 @@ test.describe('data-browser', async () => {
     await expect(page.locator('text=/setup')).toBeVisible();
     // Don't click on setup - this will take you to a different domain, not to the dev build!
     // await page.click('text=/setup');
-    await page.fill('[data-test="address-bar"]', `${serverUrl}/setup`);
+    await openSubject(page, `${serverUrl}/setup`);
     await signIn(page);
     if (initialTest) {
       await expect(page.locator('text=Accept as')).toBeVisible();
@@ -220,24 +215,18 @@ test.describe('data-browser', async () => {
     await signIn(page);
     const { driveURL, driveTitle } = await newDrive(page);
     await page.click(currentDriveTitle);
-    await page.click('[data-test="context-menu"]');
+    await page.click(contextMenu);
     await page.click('button:has-text("share")');
-    const hasPublicRead = await page.isChecked(publicReadRight);
-    if (hasPublicRead) {
-      // For some reason this doesn't work without waiting
-      await page.waitForTimeout(400);
-      // Cleanup, set to public read again
-      await page.click(publicReadRight);
-      await page.click('button:has-text("Save")');
-    }
+    await expect(await page.isChecked(publicReadRight)).toBe(false);
 
     // Initialize unauthorized page for reader
     const context2 = await browser.newContext();
     const page2 = await context2.newPage();
     await page2.setViewportSize({ width: 1000, height: 400 });
-    await page2.goto(driveURL);
-    await openLocalhost(page2);
-    await page2.click(currentDriveTitle);
+    await page2.goto(frontEndUrl);
+    await openSubject(page2, driveURL);
+    // TODO set current drive by opening the URL
+    await expect(page2.locator('text=Unauthorized')).toBeVisible();
     await expect(await page2.locator('text=Unauthorized')).toBeVisible();
 
     // Create invite
@@ -257,16 +246,9 @@ test.describe('data-browser', async () => {
     // Open invite
     await openSubject(page2, inviteUrl!);
     await page2.click('button:has-text("Accept")');
+    // We sometimes need a refresh, because the front-end already tried to open the invite and saw an `unauthorized`
+    await page2.reload({ waitUntil: 'networkidle' });
     await expect(page2.locator(`text=${driveTitle}`)).toBeVisible();
-
-    // Cleanup, set to public read again
-    // timeout Prevents weird race condition (see above)
-    await page.waitForTimeout(400);
-    expect(await page.isChecked(publicReadRight)).toBeFalsy();
-    await page.click(publicReadRight);
-    expect(await page.isChecked(publicReadRight)).toBeTruthy();
-    await page.click('button:has-text("Save")');
-    await expect(await page.locator('text=Share settings saved')).toBeVisible();
   });
 
   test('upload, download', async ({ page }) => {
@@ -373,19 +355,26 @@ async function newDrive(page: Page) {
   await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
   await page.locator('button:has-text("drive")').click();
   await page.waitForNavigation();
-  const driveURL = await page
-    .locator('[data-test="address-bar"]')
-    .getAttribute('value');
+  const driveURL = await getCurrentSubject(page);
   await expect(driveURL).toContain('localhost');
   const driveTitle = `testdrive-${timestamp}`;
-  await page.click('[data-test="editable-title"]');
-  await page.fill('[data-test="editable-title"]', driveTitle);
+  await page.click(editableTitle);
+  await page.fill(editableTitle, driveTitle);
   return { driveURL: driveURL as string, driveTitle };
 }
 
 /** Set localhost as current server */
 async function openSubject(page: Page, subject: string) {
-  await page.fill('[data-test="address-bar"]', subject);
+  await page.fill(addressBar, subject);
+}
+
+async function getCurrentSubject(page: Page) {
+  return page.locator(addressBar).getAttribute('value');
+}
+
+async function openDrive(page: Page, driveURL: string) {
+  await openSubject(page, driveURL);
+  await page.click('text=Set as current drive');
 }
 
 /** Set atomicdata.dev as current server */
@@ -407,5 +396,5 @@ async function editProfileAndCommit(page: Page) {
   await page.click('[data-test="save"]');
   await expect(await page.locator('text=saved')).toBeVisible();
   await page.waitForURL(/\/app\/show/);
-  await expect(await page.locator(`text=${username}`)).toBeVisible();
+  await expect(await page.locator(`text=${username}`).first()).toBeVisible();
 }
