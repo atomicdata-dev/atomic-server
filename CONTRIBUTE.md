@@ -42,6 +42,7 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 - Clone [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
+- use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `yarn build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
 
 ## IDE setup (VSCode)
 
