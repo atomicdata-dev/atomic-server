@@ -15,6 +15,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add HTML importer / bookmarks endpoint #432
 - Allow new `Drive` resources without a parent
 - Refactor end-to-end tests
+- Use WebSockets for fetching resources and authentication. Faster than HTTP! #485
 
 ## [v0.32.2] - 2022-06-20
 
