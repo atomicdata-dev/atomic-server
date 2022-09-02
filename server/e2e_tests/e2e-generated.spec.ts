@@ -1,7 +1,7 @@
 // This file is copied from `atomic-data-browser` to `atomic-data-server` when `yarn build-server` is run.
 // This is why the `testConfig` is imported.
 
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, Browser } from '@playwright/test';
 import { testConfig } from './test-config';
 
 export interface TestConfig {
@@ -23,7 +23,7 @@ const {
   initialTest,
 } = testConfig;
 
-const timestamp = new Date().toLocaleTimeString();
+const timestamp = () => new Date().toLocaleTimeString();
 const editableTitle = '[data-test="editable-title"]';
 const sidebarDriveEdit = '[data-test="sidebar-drive-edit"]';
 const sideBarNewResource = '[data-test="sidebar-new-resource"]';
@@ -79,14 +79,14 @@ test.describe('data-browser', async () => {
     await expect(page.locator(editableTitle)).toBeVisible();
     // We need the initial enter because removing the top line isn't working ATM
     await page.keyboard.press('Enter');
-    const teststring = `Testline ${timestamp}`;
+    const teststring = `Testline ${timestamp()}`;
     await page.fill('[data-test="element-input"]', teststring);
     // This next line can be flaky, maybe the text disappears because it's overwritten?
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
     // Remove the text again for cleanup
     await page.keyboard.press('Alt+Backspace');
     await expect(page.locator(`text=${teststring}`)).not.toBeVisible();
-    const docTitle = `Document Title ${timestamp}`;
+    const docTitle = `Document Title ${timestamp()}`;
     await page.click(editableTitle, { delay: 200 });
     await page.fill(editableTitle, docTitle);
     // Not sure if this test is needed - it fails now.
@@ -154,14 +154,13 @@ test.describe('data-browser', async () => {
       await page.click('text=Accept as Test');
     }
     // Create a document
-    await page.click(sideBarNewResource);
-    await page.click('button:has-text("document")');
+    await newResource('document', page);
     // commit for saving initial document
     await page.waitForResponse(`${serverUrl}/commit`);
     // commit for initializing the first element (paragraph)
     await page.waitForResponse(`${serverUrl}/commit`);
     await page.click(editableTitle);
-    const title = `Nice title ${timestamp}`;
+    const title = `Nice title ${timestamp()}`;
     // These keys make sure the onChange handler is properly called
     await page.keyboard.press('Space');
     await page.keyboard.press('Backspace');
@@ -175,7 +174,7 @@ test.describe('data-browser', async () => {
     // await expect(await page.title()).toEqual(title);
     await page.press(editableTitle, 'Enter');
     // await page.waitForTimeout(500);
-    const teststring = `My test: ${timestamp}`;
+    const teststring = `My test: ${timestamp()}`;
     await page.fill('textarea', teststring);
     // commit editing paragraph
     await expect(await page.locator(`text=${teststring}`)).toBeVisible();
@@ -265,14 +264,44 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
   });
 
+  test('chatroom', async ({ page, browser }) => {
+    await signIn(page);
+    await newDrive(page);
+    await newResource('chatroom', page);
+    await page.locator('text=New ChatRoom');
+    const teststring = `My test: ${timestamp()}`;
+    await page.fill('[data-test="message-input"]', teststring);
+    const chatRoomUrl = page.url();
+    const page2 = await openNewSubjectWindow(browser, chatRoomUrl);
+    await page.keyboard.press('Enter');
+    await expect(await page.locator(`text=${teststring}`)).toBeVisible();
+
+    await page.click(contextMenu);
+    await page.click('text=share');
+    await page.locator(publicReadRight).click();
+    await page.click('text=save');
+
+    // Second user
+    await signIn(page2);
+    await expect(await page2.locator(`text=${teststring}`)).toBeVisible();
+    const teststring2 = `My reply: ${timestamp()}`;
+    await page2.fill('[data-test="message-input"]', teststring2);
+    await page2.keyboard.press('Enter');
+    // Both pages should see then new chat message
+    await expect(await page.locator(`text=${teststring2}`)).toBeVisible();
+    // TODO: get rid of this reload! It should not be necessary
+    // For some reason the page does not see the new message
+    await page2.reload();
+    await expect(await page2.locator(`text=${teststring2}`)).toBeVisible();
+  });
+
   test('bookmark', async ({ page }) => {
     await signIn(page);
     await openLocalhost(page);
     await newDrive(page);
 
     // Create a new bookmark
-    await page.locator(sideBarNewResource).click();
-    await page.locator('button:has-text("bookmark")').click();
+    await newResource('bookmark', page);
 
     // Fetch `example.com
     const input = page.locator('[placeholder="https\\:\\/\\/example\\.com"]');
@@ -287,9 +316,7 @@ test.describe('data-browser', async () => {
     await signIn(page);
     await newDrive(page);
     // Create new class from new resource menu
-    await page.locator(sideBarNewResource).click();
-    await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
-    await page.locator('button:has-text("class")').click();
+    await newResource('class', page);
     await page
       .locator('[title="Add an item to this list"] >> nth=0')
       .first()
@@ -352,11 +379,10 @@ async function newDrive(page: Page) {
   await page.locator('text=new resource').click();
   await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
   await page.locator('button:has-text("drive")').click();
-  await page.waitForNavigation();
-  await page.locator('drive crated');
+  await expect(await page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   await expect(driveURL).toContain('localhost');
-  const driveTitle = `testdrive-${timestamp}`;
+  const driveTitle = `testdrive-${timestamp()}`;
   await page.click(editableTitle);
   await page.fill(editableTitle, driveTitle);
   return { driveURL: driveURL as string, driveTitle };
@@ -391,4 +417,24 @@ async function editProfileAndCommit(page: Page) {
   await expect(await page.locator('text=saved')).toBeVisible();
   await page.waitForURL(/\/app\/show/);
   await expect(await page.locator(`text=${username}`).first()).toBeVisible();
+}
+
+/** Create a new Resource in the current Drive */
+async function newResource(klass: string, page: Page) {
+  await page.locator(sideBarNewResource).click();
+  await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
+  await page.locator(`button:has-text("${klass}")`).click();
+}
+
+/** Opens a new browser page (for) */
+async function openNewSubjectWindow(browser: Browser, url: string) {
+  const context2 = await browser.newContext();
+  const page2 = await context2.newPage();
+  await page2.goto(url);
+  await page2.setViewportSize({ width: 1000, height: 400 });
+  // We still need to manually set the current drive.
+  // This only happens in tests, not in production
+  await openLocalhost(page2);
+  await page2.goto(url);
+  return page2;
 }
