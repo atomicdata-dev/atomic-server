@@ -154,9 +154,8 @@ test.describe('data-browser', async () => {
       await page.click('text=Accept as Test');
     }
     // Create a document
-    await page.click('a:has-text("collections")');
-    await page.click('a:has-text("documents")');
-    await page.click('[title="Create a new document"]');
+    await page.click(sideBarNewResource);
+    await page.click('button:has-text("document")');
     // commit for saving initial document
     await page.waitForResponse(`${serverUrl}/commit`);
     // commit for initializing the first element (paragraph)
@@ -166,7 +165,7 @@ test.describe('data-browser', async () => {
     // These keys make sure the onChange handler is properly called
     await page.keyboard.press('Space');
     await page.keyboard.press('Backspace');
-    await page.waitForTimeout(100);
+    // await page.waitForTimeout(100);
     // await page.fill(documentTitle, title);
     await page.keyboard.type(title);
 
@@ -175,7 +174,7 @@ test.describe('data-browser', async () => {
     // await page.click('[data-test="document-edit"]');
     // await expect(await page.title()).toEqual(title);
     await page.press(editableTitle, 'Enter');
-    await page.waitForTimeout(500);
+    // await page.waitForTimeout(500);
     const teststring = `My test: ${timestamp}`;
     await page.fill('textarea', teststring);
     // commit editing paragraph
@@ -189,7 +188,7 @@ test.describe('data-browser', async () => {
     await page2.setViewportSize({ width: 1000, height: 400 });
     await openLocalhost(page2);
     await page2.goto(currentUrl);
-    await expect(page2.locator(`text=${teststring}`)).toBeVisible();
+    await expect(await page2.locator(`text=${teststring}`)).toBeVisible();
     await expect(await page2.title()).toEqual(title);
 
     // Add a new line on first page, check if it appears on the second
@@ -199,7 +198,7 @@ test.describe('data-browser', async () => {
     const syncText = 'New paragraph';
     await page.keyboard.type(syncText);
     // If this fails to show up, websockets aren't working properly
-    await expect(page2.locator(`text=${syncText}`)).toBeVisible();
+    await expect(await page2.locator(`text=${syncText}`)).toBeVisible();
   });
 
   /**
@@ -226,7 +225,6 @@ test.describe('data-browser', async () => {
     await page2.goto(frontEndUrl);
     await openSubject(page2, driveURL);
     // TODO set current drive by opening the URL
-    await expect(page2.locator('text=Unauthorized')).toBeVisible();
     await expect(await page2.locator('text=Unauthorized')).toBeVisible();
 
     // Create invite
@@ -245,10 +243,10 @@ test.describe('data-browser', async () => {
     expect(inviteUrl).not.toBeNull();
     // Open invite
     await openSubject(page2, inviteUrl!);
-    await page2.click('button:has-text("Accept")');
     // We sometimes need a refresh, because the front-end already tried to open the invite and saw an `unauthorized`
+    await page2.click('button:has-text("Accept")');
     await page2.reload({ waitUntil: 'networkidle' });
-    await expect(page2.locator(`text=${driveTitle}`)).toBeVisible();
+    await expect(await page2.locator(`text=${driveTitle}`)).toBeVisible();
   });
 
   test('upload, download', async ({ page }) => {
@@ -355,6 +353,7 @@ async function newDrive(page: Page) {
   await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
   await page.locator('button:has-text("drive")').click();
   await page.waitForNavigation();
+  await page.locator('drive crated');
   const driveURL = await getCurrentSubject(page);
   await expect(driveURL).toContain('localhost');
   const driveTitle = `testdrive-${timestamp}`;
@@ -372,11 +371,6 @@ async function getCurrentSubject(page: Page) {
   return page.locator(addressBar).getAttribute('value');
 }
 
-async function openDrive(page: Page, driveURL: string) {
-  await openSubject(page, driveURL);
-  await page.click('text=Set as current drive');
-}
-
 /** Set atomicdata.dev as current server */
 async function openAtomic(page: Page) {
   await page.click(sidebarDriveEdit);
@@ -386,9 +380,9 @@ async function openAtomic(page: Page) {
   await expect(await page.locator(currentDriveTitle)).toHaveText('Atomic Data');
 }
 
+/** Opens the users' profile, sets a username */
 async function editProfileAndCommit(page: Page) {
   await page.click('text=user settings');
-  // Edit profile and save commit
   await page.click('text=Edit profile');
   await expect(await page.locator('text=add another property')).toBeVisible();
   const username = `Test user edited at ${new Date().toLocaleDateString()}`;
