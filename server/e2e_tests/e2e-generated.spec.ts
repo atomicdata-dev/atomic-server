@@ -181,10 +181,7 @@ test.describe('data-browser', async () => {
 
     // multi-user
     const currentUrl = page.url();
-    const context2 = await browser.newContext();
-    const page2 = await context2.newPage();
-    await page2.goto(currentUrl);
-    await page2.setViewportSize({ width: 1000, height: 400 });
+    const page2 = await openNewSubjectWindow(browser, currentUrl);
     await openLocalhost(page2);
     await page2.goto(currentUrl);
     await expect(await page2.locator(`text=${teststring}`)).toBeVisible();
@@ -238,14 +235,13 @@ test.describe('data-browser', async () => {
         ?.querySelector('[data-code-content]')
         ?.getAttribute('data-code-content'),
     );
-
     expect(inviteUrl).not.toBeNull();
+
     // Open invite
-    await openSubject(page2, inviteUrl!);
-    // We sometimes need a refresh, because the front-end already tried to open the invite and saw an `unauthorized`
-    await page2.click('button:has-text("Accept")');
-    await page2.reload({ waitUntil: 'networkidle' });
-    await expect(await page2.locator(`text=${driveTitle}`)).toBeVisible();
+    const page3 = await openNewSubjectWindow(browser, inviteUrl as string);
+    await page3.click('button:has-text("Accept")');
+    await page3.reload({ waitUntil: 'networkidle' });
+    await expect(await page3.locator(`text=${driveTitle}`)).toBeVisible();
   });
 
   test('upload, download', async ({ page }) => {
