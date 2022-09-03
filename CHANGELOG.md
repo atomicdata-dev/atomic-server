@@ -3,9 +3,11 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
-## [UNRELEASED]
+## [v0.33.0] - 2022-09-03
 
+- Use WebSockets for fetching resources and authentication. Faster than HTTP! #485
 - Added JSON-AD Importer
+- Add HTML Bookmarks features
 - Update Atomic-Data-Browser
 - Improve CLI errors for Atomic-Server #465
 - Fix default config directory, set it again to `~/.config/atomic`. This accidentally was `~` since v0.32.0.
@@ -15,7 +17,6 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 - Add HTML importer / bookmarks endpoint #432
 - Allow new `Drive` resources without a parent
 - Refactor end-to-end tests
-- Use WebSockets for fetching resources and authentication. Faster than HTTP! #485
 
 ## [v0.32.2] - 2022-06-20
 
