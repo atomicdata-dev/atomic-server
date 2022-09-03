@@ -457,7 +457,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-cli"
-version = "0.32.1"
+version = "0.33.0"
 dependencies = [
  "assert_cmd",
  "atomic_lib",
@@ -471,7 +471,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.32.1"
+version = "0.33.0"
 dependencies = [
  "acme-lib",
  "actix",
@@ -518,7 +518,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server-tauri"
-version = "0.32.1"
+version = "0.33.0"
 dependencies = [
  "actix-rt",
  "atomic-server",
@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.32.1"
+version = "0.33.0"
 dependencies = [
  "base64",
  "bincode",
@@ -5298,7 +5298,7 @@ version = "1.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ee73e6e4924fe940354b8d4d98cad5231175d615cd855b758adc658c0aac6a0"
 dependencies = [
- "cfg-if 1.0.0",
+ "cfg-if 0.1.10",
  "static_assertions",
 ]
 
