@@ -369,7 +369,9 @@ pub fn construct_collection_from_params(
             "page_size" => page_size = v.parse::<usize>()?,
             "include_nested" => include_nested = v.parse::<bool>()?,
             "include_external" => include_external = v.parse::<bool>()?,
-            _ => {}
+            e => {
+                return Err(format!("Invalid query param: {}", e).into());
+            }
         };
     }
     let collection_builder = crate::collections::CollectionBuilder {
