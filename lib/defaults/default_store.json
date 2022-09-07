@@ -118,9 +118,9 @@
     {
         "@id": "https://atomicdata.dev/properties/drives",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Drive",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
-        "https://atomicdata.dev/properties/description": "The set of Drives that the user often will want to access.",
+        "https://atomicdata.dev/properties/description": "The set of Drives that the user often will want to access. Note that this list does not necessarily imply any read / write rights. This list is used to show a dropdown for Users to quickly switch between their Drives / workspaces.",
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
