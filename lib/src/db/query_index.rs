@@ -220,7 +220,7 @@ fn check_resource_query_filter_property(
 /// Checks if a new IndexAtom should be updated for a specific [QueryFilter]
 /// It's only true if the [Resource] is matched by the [QueryFilter], and the [Value] is relevant for the index.
 /// This also sometimes updates other keys, for in the case one changed Atom influences other Indexed Members.
-/// See https://github.com/joepio/atomic-data-rust/issues/395
+/// See https://github.com/atomicdata-dev/atomic-data-rust/issues/395
 // This is probably the most complex function in the whole repo.
 // If things go wrong when making changes, add a test and fix stuff in the logic below.
 pub fn should_update(
@@ -242,7 +242,12 @@ pub fn should_update(
         // This only happens when there is a `sort_by` in the QueryFilter.
         // We then make sure to also update the sort_by value.
         if let Ok(sorted_val) = resource.get(sort_prop) {
+            // Note that updating here is a bit too agressive. It will update the index every time an atom comes by that matches the QueryFilter, even if the value is unchanged.
             update_indexed_member(store, q_filter, &index_atom.subject, sorted_val, delete)?;
+            if &index_atom.property != sort_prop {
+                // We've just updated the index for this atom, so there is no need to update the value above.
+                return Ok(false);
+            }
         }
     }
 
