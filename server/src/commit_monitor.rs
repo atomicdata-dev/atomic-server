@@ -134,9 +134,12 @@ impl CommitMonitor {
     /// Runs every X seconds to perform expensive operations.
     fn tick(&mut self, _ctx: &mut Context<Self>) {
         if self.run_expensive_next_tick {
-            _ = self
-                .update_expensive()
-                .map_err(|e| tracing::error!("{}", e.to_string()));
+            _ = self.update_expensive().map_err(|e| {
+                tracing::error!(
+                    "Error during expensive update in Commit Monitor: {}",
+                    e.to_string()
+                )
+            });
         }
     }
 

@@ -78,7 +78,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WebSocketConnecti
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
         if let Err(e) = handle_ws_message(msg, ctx, self) {
             ctx.text(format!("ERROR {e}"));
-            tracing::error!("Handling WebSocket message: {}", e);
+            tracing::error!("Error handling WebSocket message: {}", e);
             ctx.stop();
         }
     }
@@ -169,7 +169,7 @@ fn handle_ws_message(
                         ) {
                             Ok(a) => {
                                 conn.agent = a.clone();
-                                tracing::info!("Authenticated websocket for {}", a);
+                                tracing::debug!("Authenticated websocket for {}", a);
                                 Ok(())
                             }
                             Err(e) => Err(format!("Authentication failed: {}", e).into()),

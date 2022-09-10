@@ -54,7 +54,7 @@ pub async fn tpf(
         }
         ContentType::Json | ContentType::Html | ContentType::JsonLd => {
             // TODO
-            tracing::error!("This Content-Type is not implemented");
+            tracing::warn!("This Content-Type is not implemented");
             Ok(builder.body("This Content-Type is not implemented"))
         }
         ContentType::Turtle | ContentType::NTriples => {

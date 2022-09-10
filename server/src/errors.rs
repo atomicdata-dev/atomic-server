@@ -14,8 +14,6 @@ pub enum AppErrorType {
 }
 
 // More strict error type, supports HTTP responses
-// Needs a lot of work, though
-#[derive(Debug)]
 pub struct AtomicServerError {
     pub message: String,
     pub error_type: AppErrorType,
@@ -24,6 +22,13 @@ pub struct AtomicServerError {
 }
 
 impl AtomicServerError {}
+
+impl std::fmt::Debug for AtomicServerError {
+    // The derive impl is too verbose, as it includes the full `error_resource`.
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
 
 #[derive(Serialize)]
 pub struct AppErrorResponse {
@@ -56,7 +61,7 @@ impl ResponseError for AtomicServerError {
         };
 
         let body = r.to_json_ad().unwrap();
-        tracing::info!("Error response");
+        tracing::info!("Error response: {}", self.message);
         HttpResponse::build(self.status_code())
             .content_type(JSON_AD_MIME)
             .body(body)
