@@ -672,6 +672,17 @@
         "https://atomicdata.dev/properties/shortname": "subject"
     },
     {
+        "@id": "https://atomicdata.dev/properties/subresources",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+        "https://atomicdata.dev/properties/description": "A list of resources (usually its children) that appear under this resource in a hierarchy.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/lastCommit": "https://atomicdata.dev/commits/VB3gtWMkysTX5hKjbYjIM1hfVGPywT3pEPL8c7NwaUAJID6RzptGRPzmix8aKKDeb8Pj1WFv0UPV0YVPxcduBg==",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "sub-resources"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/tags",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Tag",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
@@ -791,6 +802,7 @@
             "https://atomicdata.dev/properties/read",
             "https://atomicdata.dev/properties/children",
             "https://atomicdata.dev/properties/description",
+            "https://atomicdata.dev/properties/subresources",
             "https://atomicdata.dev/properties/write"
         ],
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
