@@ -1,6 +1,7 @@
 /**
 Parse HTML documents and extract metadata.
 Convert articles to Markdown strings.
+Removes navigation elements and sidebars if possible, so we get a `reader` like view.
  */
 use kuchiki::{traits::TendrilSink, NodeRef};
 use lol_html::{element, rewrite_str, text, ElementContentHandlers, RewriteStrSettings, Selector};
@@ -20,7 +21,7 @@ pub fn bookmark_endpoint() -> Endpoint {
     Endpoint {
         path: urls::PATH_FETCH_BOOKMARK.into(),
         params: [urls::URL.to_string(), urls::NAME.to_string()].into(),
-        description: "The website will be fetched and parsed by the server. The data will then be added as a markdown document that is fully indexed.".to_string(),
+        description: "The website will be fetched and parsed. The main content of the page is identified, and the rest is stripped. Returns the Markdown.".to_string(),
         shortname: "bookmark".to_string(),
         handle: Some(handle_bookmark_request),
     }
@@ -80,18 +81,17 @@ fn handle_bookmark_request(
 fn fetch_data(url: &str) -> AtomicResult<String> {
     match fetch_body(url, "text/html", None) {
         Ok(response) => Ok(response),
-        Err(e) => {
-            return Err(AtomicError {
-                message: format!("Error fetching data: {}", e),
-                error_type: crate::AtomicErrorType::OtherError,
-            })
-        }
+        Err(e) => Err(AtomicError {
+            message: format!("Error fetching data: {}", e),
+            error_type: crate::AtomicErrorType::OtherError,
+        }),
     }
 }
 
 struct Parser {
     url: Url,
     internal_html: String,
+    /// The root element used to parse the rest of the Document from. Defaults to body, but can be more specific if possible.
     root_element: String,
     anchor_text_buffer: std::rc::Rc<std::cell::RefCell<String>>,
     svg_map: HashMap<String, String>,
@@ -143,6 +143,7 @@ impl Parser {
         url.to_string()
     }
 
+    /// Finds the DOM node that is most likely to contain the article content.
     fn select_best_node(&mut self) -> AtomicResult<()> {
         const BEST_SCENARIO_SELECTORS: [&str; 3] = ["article", "main", r#"div[role="main"]"#];
 
@@ -247,10 +248,10 @@ impl Parser {
     }
 
     fn unpack_noscript_handler<'h, 's>(&self) -> Handler<'s, 'h> {
-        return vec![element!("noscript", |el| {
+        vec![element!("noscript", |el| {
             el.remove_and_keep_content();
             Ok(())
-        })];
+        })]
     }
 
     fn remove_unwanted_elements_handler<'h, 's>(&self) -> Handler<'s, 'h> {
@@ -261,14 +262,14 @@ impl Parser {
             elements + ", header"
         };
 
-        return vec![element!(selector, |el| {
+        vec![element!(selector, |el| {
             el.remove();
             Ok(())
-        })];
+        })]
     }
 
     fn strip_image_dimensions_handler<'h, 's>(&self) -> Handler<'s, 'h> {
-        return vec![element!("img", |el| {
+        vec![element!("img", |el| {
             if el.has_attribute("width") {
                 el.remove_attribute("width");
             }
@@ -278,11 +279,11 @@ impl Parser {
             }
 
             Ok(())
-        })];
+        })]
     }
 
     fn resolve_relative_path_handler(&self) -> Handler {
-        return vec![element!("*[src], *[href]", |el| {
+        vec![element!("*[src], *[href]", |el| {
             if let Some(src) = el.get_attribute("src") {
                 el.set_attribute("src", &self.resolve_url(&src))?;
             }
@@ -292,11 +293,11 @@ impl Parser {
             }
 
             Ok(())
-        })];
+        })]
     }
 
     fn convert_svg_to_image_handler(&self) -> Handler {
-        return vec![element!("svg", |el| {
+        vec![element!("svg", |el| {
             let id = el.get_attribute("id").ok_or("no id in SVG")?;
             let svg = self.svg_map.get(&id).ok_or("no SVG found with id")?;
 
@@ -309,43 +310,43 @@ impl Parser {
             el.set_attribute("src", &format!("data:image/svg+xml;utf8,{}", &svg))?;
             el.set_inner_content("", lol_html::html_content::ContentType::Html);
             Ok(())
-        })];
+        })]
     }
 
     fn simplify_link_text_handler(&self) -> Handler {
-        return vec![element!("a *", |el| {
+        vec![element!("a *", |el| {
             let tag_name = el.tag_name().to_lowercase();
             if tag_name != "img" && tag_name != "picture" {
                 el.remove_and_keep_content();
             }
 
             Ok(())
-        })];
+        })]
     }
 
     fn transform_figures_handler(&self) -> Handler {
-        return vec![element!("figure", |el| {
+        vec![element!("figure", |el| {
             el.remove_and_keep_content();
             Ok(())
-        })];
+        })]
     }
 
     fn transform_figcaptions_handler(&self) -> Handler {
-        return vec![element!("figcaption", |el| {
+        vec![element!("figcaption", |el| {
             el.set_tag_name("P")?;
             Ok(())
-        })];
+        })]
     }
 
     fn unfold_sup_elements_handler(&self) -> Handler {
-        return vec![element!("sup", |el| {
+        vec![element!("sup", |el| {
             el.remove_and_keep_content();
             Ok(())
-        })];
+        })]
     }
 
     fn trim_link_text_handler(&self) -> Handler {
-        return vec![
+        vec![
             element!("a", |el| {
                 self.anchor_text_buffer.borrow_mut().clear();
                 let buffer = self.anchor_text_buffer.clone();
@@ -378,7 +379,7 @@ impl Parser {
                 chunk.remove();
                 Ok(())
             }),
-        ];
+        ]
     }
 }
 
