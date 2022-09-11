@@ -199,7 +199,7 @@ impl Parser {
                 .borrow_mut()
                 .insert("id".to_string(), id.clone());
 
-            self.svg_map.insert(id, encode(&svg).into_owned());
+            self.svg_map.insert(id, encode(&svg).into());
         }
 
         match Parser::serialize(document) {
