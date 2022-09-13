@@ -3,6 +3,10 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 
+## [UNRELEASED]
+
+- Change how the sidebar resources are created
+
 ## [v0.33.0] - 2022-09-03
 
 - Use WebSockets for fetching resources and authentication. Faster than HTTP! #485

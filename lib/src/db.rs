@@ -549,6 +549,8 @@ impl Storelike for Db {
             .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
         crate::populate::populate_importer(self)
             .map_err(|e| format!("Failed to populate importer. {}", e))?;
+        crate::populate::populate_sidebar_items(self)
+            .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
         Ok(())
     }
 

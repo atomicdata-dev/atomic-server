@@ -262,3 +262,19 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
     importer.save_locally(store)?;
     Ok(())
 }
+
+#[cfg(feature = "db")]
+/// Adds items to the SideBar as subresources.
+/// Useful for helping a new user get started.
+pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
+    let base = store.get_self_url().ok_or("No self_url")?;
+    let mut drive = store.get_resource(&base)?;
+    let arr = vec![
+        format!("{}/setup", base),
+        format!("{}/import", base),
+        format!("{}/collections", base),
+    ];
+    drive.set_propval(urls::SUBRESOURCES.into(), arr.into(), store)?;
+    drive.save_locally(store)?;
+    Ok(())
+}
