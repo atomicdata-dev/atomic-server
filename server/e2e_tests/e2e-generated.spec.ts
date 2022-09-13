@@ -148,7 +148,7 @@ test.describe('data-browser', async () => {
       await openSubject(page, `${serverUrl}/setup`);
       await expect(page.locator('text=Accept as')).toBeVisible();
       // await page.click('[data-test="accept-existing"]');
-      await page.click('text=Accept as Test');
+      await page.click('text=Accept as');
     } else {
       // eslint-disable-next-line no-console
       console.log('Skipping `/setup` test...');
@@ -361,26 +361,30 @@ test.describe('data-browser', async () => {
     await expect(
       page.locator('[data-test="sidebar"] >> text=:9883/importer'),
     ).toBeVisible();
-    await page.click(editableTitle);
+
+    async function setTitle(title: string) {
+      await page.click(editableTitle);
+      await page.fill(editableTitle, title);
+      await page.waitForTimeout(300);
+    }
+
     const d0 = 'depth 0';
-    await page.fill(editableTitle, d0);
+    await setTitle(d0);
 
     // Create a subresource, and later check it in the sidebar
     await page.locator(`[data-test="sidebar"] >> text=${d0}`).hover();
     await page.locator('[data-test="add-subresource"]').click();
     await page.click(`button:has-text("${klass}")`);
-    await page.click(editableTitle);
     const d1 = 'depth 1';
-    await page.fill(editableTitle, d1);
+    await setTitle(d1);
+
     // Not sure why we need this, I'd prefer to wait for commits...
-    await page.waitForTimeout(100);
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
     ).toBeVisible();
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d0}`),
     ).toBeVisible();
-    await page.waitForTimeout(100);
     await page.reload();
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
