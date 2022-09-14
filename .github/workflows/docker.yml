@@ -2,6 +2,11 @@ name: Build docker image
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'master'
+    tags:
+      - 'v*'
 
 jobs:
   push_to_registry:
@@ -19,16 +24,16 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@98669ae865ea3cffbcbaa878cf57c20bbf1c6c38
+        uses: docker/metadata-action@v4
         with:
           images: joepmeneer/atomic-server
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           push: true
-          use: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
-          # platforms: linux/amd64,linux/arm64,linux/arm/v7
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6
           tags: joepmeneer/atomic-server:rust-alpine
           labels: ${{ steps.meta.outputs.labels }}
