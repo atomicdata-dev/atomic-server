@@ -10,6 +10,7 @@ _Status: alpha. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
 
+<!-- We re-use this table in various places, such as ../README.md and in the docs repo. Consider this the source. -->
 - 🚀  **Fast** (1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
@@ -80,11 +81,20 @@ You can run `atomic-server` in four ways:
 
 - From a published [binary](https://github.com/joepio/atomic/releases) (probably the quickest)
 - Using docker
+- Install a desktop build (macOS only as of now)
 - Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
 - Manually from source
 
 When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration).
 If you want to run this locally as a developer / contributor, check out [the Contributors guide](../CONTRIBUTE.md).
+
+## Install desktop build (macOS only)
+
+We automatically build `.dmg` installers for MacOS. You can download them from the [releases page](https://github.com/atomicdata-dev/atomic-data-rust/releases).
+
+### Run pre-compiled binary
+
+Get the binaries from the [releases page](https://github.com/atomicdata-dev/atomic-data-rust/releases) and copy them to your `bin` folder.
 
 ### Install using cargo
 
@@ -100,9 +110,8 @@ atomic-server
 
 ### Run using docker
 
-The `dockerfile` is located in the project root, above this `server` folder.
-
 - Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+The `dockerfile` is located in the project root, above this `server` folder.
 - If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
 
