@@ -132,6 +132,12 @@ cargo install drill
 drill -b benchmark.yml --stats
 ```
 
+## SResponsible disclosure / Coordinated Vulnerability Disclosure
+
+If you encounter serious security risks, please refrain from posting these publicly in the issue tracker.
+We could minimize the impact by first patching the issue, publishing the patch, and then (after 30 days) disclose the bug.
+So please first send an e-mail to joep@ontola.io describing the issue, and then we will work on fixing it as soon as possible.
+
 ## Releases, Versioning and Tagging
 
 - We use Github Actions for building, testing and creating releases.
@@ -143,7 +149,7 @@ drill -b benchmark.yml --stats
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 - After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
 
-## Including JS app_assets
+### Including JS app_assets
 
 Before tagging a new version, make sure to update the `app_assets` folder:
 
@@ -152,17 +158,17 @@ Before tagging a new version, make sure to update the `app_assets` folder:
 3. Make sure not to commit all the files, manually check them
 4. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
 
-## Publishing manually - doing the CI's work
+### Publishing manually - doing the CI's work
 
 If the CI scripts for some reason do not do their job (buildin releases, docker file, publishing to cargo), you can follow these instructions:
 
-### Building and publishing binaries
+#### Building and publishing binaries
 
 1. `cargo build --release`
 2. `cargo tauri build` (on every OS!)
 3. Create a release on github, add the binaries and tauri builds
 
-### Publishing to Cargo
+#### Publishing to Cargo
 
 1. Update the versions in cargo.toml files using Semantic Versioning.
 1. run `cargo publish` in `lib`, than you can run the same in `cli` and `server`
@@ -171,7 +177,7 @@ OR
 
 1. Install `cargo install cargo-release` and run `cargo release patch`
 
-### Publishing server to Docker
+#### Publishing server to Docker
 
 DockerHub has been setup to track the `master` branch, but it does not tag builds other than `latest`.
 
@@ -183,7 +189,7 @@ or:
 
 1. build and publish various builds (warning: building to ARM takes long!): `docker buildx build --platform linux/amd64,linux/arm64 . -t joepmeneer/atomic-server:v0.20.4 -t joepmeneer/atomic-server:latest --push`. Note that including the armv7 platform `linux/arm/v7` currently fails.
 
-### Deploying to atomicdata.dev
+#### Deploying to atomicdata.dev
 
 1. Run the [`deploy` Github action](https://github.com/joepio/atomic-data-rust/actions/workflows/deployment.yml)
 
@@ -202,7 +208,7 @@ journalctl -u atomic.service
 journalctl -u atomic.service --since "1 hour ago" -f
 ```
 
-## Publishing atomic-cli to WAPM
+#### Publishing atomic-cli to WAPM
 
 1. Install `wasmer` and `cargo-wasi`.
 1. `cd cli`
