@@ -247,7 +247,9 @@ test.describe('data-browser', async () => {
     const page3 = await openNewSubjectWindow(browser, inviteUrl as string);
     await page3.click('button:has-text("Accept")');
     await page3.reload({ waitUntil: 'networkidle' });
-    await expect(await page3.locator(`text=${driveTitle}`)).toBeVisible();
+    await expect(
+      await page3.locator(`text=${driveTitle}`).first(),
+    ).toBeVisible();
   });
 
   test('upload, download', async ({ page }) => {
