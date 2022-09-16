@@ -37,9 +37,7 @@ test.describe('data-browser', async () => {
   test.beforeEach(async ({ page }) => {
     // Open the server
     await page.goto(frontEndUrl);
-    await page.setViewportSize({ width: 1200, height: 800 });
-    await page.click(sidebarDriveEdit);
-    await openLocalhost(page);
+    await expect(page.locator(sideBarNewResource)).toBeVisible();
   });
 
   test('sidebar mobile', async ({ page }) => {
@@ -53,6 +51,7 @@ test.describe('data-browser', async () => {
 
   test('switch Server URL', async ({ page }) => {
     await expect(page.locator(`text=${demoInviteName}`)).not.toBeVisible();
+    await page.click(sidebarDriveEdit);
     await page.fill('[data-test="server-url-input"]', 'https://atomicdata.dev');
     await page.click('[data-test="server-url-save"]');
     await expect(page.locator(`text=${demoInviteName}`)).toBeVisible();
@@ -191,8 +190,6 @@ test.describe('data-browser', async () => {
     // multi-user
     const currentUrl = page.url();
     const page2 = await openNewSubjectWindow(browser, currentUrl);
-    await openLocalhost(page2);
-    await page2.goto(currentUrl);
     await expect(await page2.locator(`text=${teststring}`)).toBeVisible();
     await expect(await page2.title()).toEqual(title);
 
@@ -309,7 +306,6 @@ test.describe('data-browser', async () => {
 
   test('bookmark', async ({ page }) => {
     await signIn(page);
-    await openLocalhost(page);
     await newDrive(page);
 
     // Create a new bookmark
@@ -444,23 +440,15 @@ async function signIn(page: Page) {
   await page.goBack();
 }
 
-/** Set localhost as current server */
-async function openLocalhost(page: Page) {
-  await page.click(sidebarDriveEdit);
-  await page.click('[data-test="server-url-localhost"]');
-  // This fails when the user is not authorized
-  // await expect(page.locator(currentDriveTitle)).toHaveText('localhost');
-}
-
 /**
  * Create a new drive, go to it, and set it as the current drive. Returns URL of
  * drive and its name
  */
 async function newDrive(page: Page) {
   // Create new drive to prevent polluting the main drive
-  await page.locator(sideBarNewResource).click();
-  await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
-  await page.locator('button:has-text("drive")').click();
+  await page.locator(sidebarDriveEdit).click();
+  await expect(page).toHaveURL(`${frontEndUrl}/app/server`);
+  await page.locator('button:has-text("Create new drive")').click();
   await expect(await page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   await expect(driveURL).toContain('localhost');
@@ -525,10 +513,6 @@ async function openNewSubjectWindow(browser: Browser, url: string) {
   const page2 = await context2.newPage();
   await page2.goto(url);
   await page2.setViewportSize({ width: 1000, height: 400 });
-  // We still need to manually set the current drive.
-  // This only happens in tests, not in production
-  await openLocalhost(page2);
-  await page2.goto(url);
 
   return page2;
 }
