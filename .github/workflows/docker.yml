@@ -2,6 +2,9 @@ name: Build docker image
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: [main]
+    types: [completed]
   push:
     branches:
       - 'master'
@@ -11,6 +14,7 @@ on:
 jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo

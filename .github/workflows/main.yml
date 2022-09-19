@@ -138,4 +138,4 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/debug/atomic-server &
-      - run: cd server/e2e_tests/ && pnpm install && pnpm test --retries=3
+      - run: cd server/e2e_tests/ && pnpm install && pnpm test
