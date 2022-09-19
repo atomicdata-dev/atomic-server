@@ -39,10 +39,10 @@ Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 
 Since `atomic-server` is developed in conjunction with the typescript / react `atomic-data-browser` project, it might make sense to run both locally whilst developing.
 
-- Clone [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser) and run it (see readme.md, basically: `yarn start`)
+- Clone [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser) and run it (see readme.md, basically: `pnpm start`)
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
-- use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `yarn build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
+- use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `pmpm build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
 
 ## IDE setup (VSCode)
 
@@ -154,7 +154,7 @@ So please first send an e-mail to joep@ontola.io describing the issue, and then 
 Before tagging a new version, make sure to update the `app_assets` folder:
 
 1. clone [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser) in the folder above this one
-2. run `yarn build-server` in `atomic-data-browser`, which should
+2. run `pmpm build-server` in `atomic-data-browser`, which should
 3. Make sure not to commit all the files, manually check them
 4. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
 
