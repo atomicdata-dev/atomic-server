@@ -109,8 +109,8 @@ test.describe('data-browser', async () => {
       '[data-test="sort-https://atomicdata.dev/properties/description"]',
     );
     // These values can change as new Properties are added to atomicdata.dev
-    const firstPageText = 'text=append';
-    const secondPageText = 'text=download-url';
+    const firstPageText = 'text=A base64';
+    const secondPageText = 'text=include-nested';
     await expect(page.locator(firstPageText)).toBeVisible();
     await page.click('[data-test="next-page"]');
     await expect(page.locator(firstPageText)).not.toBeVisible();
