@@ -2,6 +2,6 @@ The end-to-end tests are maintained by the `atomic-data-browser` repo and period
 
 ## How to run
 
-- install playwright dependencies `npx playwright install`
 - run your server `cargo run`
-- `npm run test`
+- `pnpm install`
+- `pnpm test`
