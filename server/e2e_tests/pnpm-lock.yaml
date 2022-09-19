@@ -2,9 +2,11 @@ lockfileVersion: 5.4
 
 specifiers:
   '@playwright/test': ^1.19.2
+  playwright: ^1.25.2
 
 devDependencies:
   '@playwright/test': 1.25.2
+  playwright: 1.25.2
 
 packages:
 
@@ -25,4 +27,13 @@ packages:
     resolution: {integrity: sha512-0yTbUE9lIddkEpLHL3u8PoCL+pWiZtj5A/j3U7YoNjcmKKDGBnCrgHJMzwd2J5vy6l28q4ki3JIuz7McLHhl1A==}
     engines: {node: '>=14'}
     hasBin: true
+    dev: true
+
+  /playwright/1.25.2:
+    resolution: {integrity: sha512-RwMB5SFRV/8wSfK+tK8ycpqdzORvoqUNz9DUeRfSgZFrZej5uuBl9wFjWcc+OkXFEtaPmx1acAVGG7hA4IJ1kg==}
+    engines: {node: '>=14'}
+    hasBin: true
+    requiresBuild: true
+    dependencies:
+      playwright-core: 1.25.2
     dev: true
