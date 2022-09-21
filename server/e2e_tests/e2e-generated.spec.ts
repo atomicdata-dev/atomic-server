@@ -343,6 +343,10 @@ test.describe('data-browser', async () => {
     await page.click('[data-test="input-usages-left"]');
     await page.keyboard.type('asdf' + '1');
     await expect(page.locator('text=asdf')).not.toBeVisible();
+    // Dropdown select
+    await page.click('[data-test="input-recommends-add-resource"]');
+    await page.locator('text=append').click();
+    await expect(page.locator('text=https://atomicdata.dev')).not.toBeVisible();
   });
 
   test('sidebar subresource', async ({ page }) => {
@@ -407,6 +411,8 @@ test.describe('data-browser', async () => {
     // Create new Property using dialog
     await page.locator('text=Create property: test-prop').click();
     await expect(page.locator('h1:has-text("new property")')).toBeVisible();
+    await page.locator('[data-test="input-datatype"]').click();
+    // click twice, first click is buggy, it closes the dropdown from earlier
     await page.locator('[data-test="input-datatype"]').click();
     await page
       .locator(

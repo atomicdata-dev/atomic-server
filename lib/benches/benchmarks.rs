@@ -21,7 +21,7 @@ fn random_resource(atom: &Atom) -> Resource {
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    let store = atomic_lib::Db::init_temp("bench").unwrap();
+    let store = Db::init_temp("bench").unwrap();
 
     c.bench_function("add_atom_to_index", |b| {
         b.iter(|| {

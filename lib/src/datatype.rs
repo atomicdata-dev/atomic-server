@@ -4,7 +4,7 @@ use crate::urls;
 use serde::{Deserialize, Serialize};
 use std::{fmt, string::ParseError};
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub enum DataType {
     /// Either a full Resource, a link to a resource (subject) or a Nested Anonymous Resource
     AtomicUrl,

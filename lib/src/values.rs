@@ -89,7 +89,7 @@ impl Value {
             DataType::Markdown => Ok(Value::Markdown(value.into())),
             DataType::Slug => {
                 let re = Regex::new(SLUG_REGEX).unwrap();
-                if re.is_match(&*value) {
+                if re.is_match(value) {
                     return Ok(Value::Slug(value.into()));
                 }
                 Err(format!(
@@ -104,7 +104,7 @@ impl Value {
             }
             DataType::ResourceArray => {
                 let vector: Vec<String> = crate::parse::parse_json_array(value).map_err(|e| {
-                    return format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e);
+                    format!("Could not deserialize ResourceArray: {}. Should be a JSON array of strings. {}", &value, e)
                 })?;
                 let mut new_vec = Vec::new();
                 for i in vector {
@@ -114,7 +114,7 @@ impl Value {
             }
             DataType::Date => {
                 let re = Regex::new(DATE_REGEX).unwrap();
-                if re.is_match(&*value) {
+                if re.is_match(value) {
                     return Ok(Value::Date(value.into()));
                 }
                 Err(format!("Not a valid date: {}. Needs to be YYYY-MM-DD.", value).into())
@@ -122,7 +122,7 @@ impl Value {
             DataType::Timestamp => {
                 let val: i64 = value
                     .parse()
-                    .map_err(|e| return format!("Not a valid Timestamp: {}. {}", value, e))?;
+                    .map_err(|e| format!("Not a valid Timestamp: {}. {}", value, e))?;
                 Ok(Value::Timestamp(val))
             }
             DataType::Unsupported(unsup_url) => Ok(Value::Unsupported(UnsupportedValue {
@@ -376,10 +376,7 @@ impl fmt::Display for SubResource {
             SubResource::Nested(pv) => {
                 let serialized = crate::serialize::propvals_to_json_ad_map(pv, None)
                     .unwrap_or_else(|_e| {
-                        return serde_json::Value::String(format!(
-                            "Could not serialize {:?} : {}",
-                            pv, _e
-                        ));
+                        serde_json::Value::String(format!("Could not serialize {:?} : {}", pv, _e))
                     });
                 s.push_str(&serialized.to_string());
             }
