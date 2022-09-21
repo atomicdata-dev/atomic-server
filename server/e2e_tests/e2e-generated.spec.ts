@@ -69,6 +69,8 @@ test.describe('data-browser', async () => {
     await page.click('text=user settings');
     await page.click('[data-test="sign-out"]');
     await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
+    await page.reload();
+    await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
   });
 
   test('sign up and edit document atomicdata.dev', async ({ page }) => {
