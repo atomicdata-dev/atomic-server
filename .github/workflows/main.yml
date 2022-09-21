@@ -1,7 +1,5 @@
 on: [push, workflow_dispatch]
 
-name: Lint & test
-
 jobs:
   check:
     name: Check
