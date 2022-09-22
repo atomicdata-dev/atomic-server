@@ -77,26 +77,33 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 
 ## Installation & getting started
 
-You can run `atomic-server` in four ways:
+You can run `atomic-server` in five ways:
 
-- From a published [binary](https://github.com/joepio/atomic/releases) (probably the quickest)
-- Using docker
-- Install a desktop build (macOS only as of now)
-- Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
-- Manually from source
+1. Using docker (probably the quickest): `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+2. Install a desktop build (macOS only as of now)
+3. From a published [binary](https://github.com/joepio/atomic/releases) 
+4. Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
+5. Manually from source
 
 When you're running `atomic-server`, go to [Initial setup and configuration](#Initial-setup-and-configuration).
 If you want to run this locally as a developer / contributor, check out [the Contributors guide](../CONTRIBUTE.md).
 
-## Install desktop build (macOS only)
+### 1. Run using docker
+
+- Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+The `dockerfile` is located in the project root, above this `server` folder.
+- If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
+- If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
+
+### 2. Install desktop build (macOS only)
 
 We automatically build `.dmg` installers for MacOS. You can download them from the [releases page](https://github.com/atomicdata-dev/atomic-data-rust/releases).
 
-### Run pre-compiled binary
+### 3. Run pre-compiled binary
 
 Get the binaries from the [releases page](https://github.com/atomicdata-dev/atomic-data-rust/releases) and copy them to your `bin` folder.
 
-### Install using cargo
+### 4. Install using cargo
 
 ```sh
 # Install from source using cargo, and add it to your path
@@ -108,14 +115,7 @@ atomic-server --help
 atomic-server
 ```
 
-### Run using docker
-
-- Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
-The `dockerfile` is located in the project root, above this `server` folder.
-- If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
-- If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
-
-### Run from source
+### 5. Compile from source
 
 ```sh
 git clone git@github.com:joepio/atomic-data-rust.git
@@ -123,7 +123,7 @@ cd atomic-data-rust/server
 cargo run
 ```
 
-### Troubleshooting compiling from source:
+If things go wrong while compiling from source:
 
 ```sh
 # If cc-linker, pkg-config or libssl-dev is not installed, make sure to install them
