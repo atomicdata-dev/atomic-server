@@ -59,10 +59,9 @@ Powers both `atomic-cli` and `atomic-server`.
 ## Also check out
 
 - [Atomic-Data-Browser](https://github.com/atomicdata-dev/atomic-data-browser), an in-browser app for viewing and editing atomic data. Also contains a typescript / react front-end library. Will replace most of the html templating in this project.
-- [Atomic-Data-Docs](https://github.com/ontola/atomic-data-docs), a book containing detailed documentation of Atomic Data.
+- [The Docs](https://github.com/ontola/atomic-data-docs), a book containing detailed documentation of Atomic Data.
 - [RayCast extension](https://www.raycast.com/atomicdata-dev/atomic-data-browser) for searching stuff
-- [Click here to sign up to the Atomic Data Newsletter](http://eepurl.com/hHcRA1)
-- [The Atomic Data Docs](https://docs.atomicdata.dev/)
+- [Newsletter](http://eepurl.com/hHcRA1)
 
 ## Contribute
 
