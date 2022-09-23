@@ -62,6 +62,7 @@ Powers both `atomic-cli` and `atomic-server`.
 - [The Docs](https://github.com/ontola/atomic-data-docs), a book containing detailed documentation of Atomic Data.
 - [RayCast extension](https://www.raycast.com/atomicdata-dev/atomic-data-browser) for searching stuff
 - [Newsletter](http://eepurl.com/hHcRA1)
+- [Discord](discord-url]
 
 ## Contribute
 
