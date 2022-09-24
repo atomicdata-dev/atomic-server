@@ -32,6 +32,7 @@ const publicReadRight =
   '[data-test="right-public"] input[type="checkbox"] >> nth=0';
 const contextMenu = '[data-test="context-menu"]';
 const addressBar = '[data-test="address-bar"]';
+const defaultDevServer = 'http://localhost:9883';
 
 test.describe('data-browser', async () => {
   test.beforeEach(async ({ page }) => {
@@ -573,7 +574,10 @@ async function openNewSubjectWindow(browser: Browser, url: string) {
   const context2 = await browser.newContext();
   const page = await context2.newPage();
   await page.goto(frontEndUrl);
-  await changeDrive(serverUrl, page);
+  // Only when we run on `localhost` we don't need to change drive during tests
+  if (serverUrl !== defaultDevServer) {
+    await changeDrive(serverUrl, page);
+  }
   await openSubject(page, url);
   await page.setViewportSize({ width: 1000, height: 400 });
 
