@@ -480,7 +480,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "acme-lib",
  "actix",
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "atomic-server-tauri"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "actix-rt",
  "atomic-server",
@@ -539,7 +539,7 @@ dependencies = [
 
 [[package]]
 name = "atomic_lib"
-version = "0.33.0"
+version = "0.33.1"
 dependencies = [
  "base64",
  "bincode",
