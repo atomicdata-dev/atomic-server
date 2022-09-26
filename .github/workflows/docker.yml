@@ -14,7 +14,8 @@ on:
 jobs:
   push_to_registry:
     name: Push Docker image to Docker Hub
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    # See https://github.com/atomicdata-dev/atomic-data-rust/issues/499
+    # if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
