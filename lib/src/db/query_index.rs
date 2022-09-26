@@ -130,7 +130,7 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         // We iterate over every single resource, even if we don't perform any computation on the items.
         // This helps with pagination, but it comes at a serious performance cost. We might need to change how this works later on.
         // Also, this count does not take into account the `include_external` filter.
-        // https://github.com/joepio/atomic-data-rust/issues/290
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/290
         count = i + 1;
     }
 
@@ -500,7 +500,7 @@ pub mod test {
         assert!(start_none < num_1);
         assert!(num_1 < num_2);
         // TODO: Fix sorting numbers
-        // https://github.com/joepio/atomic-data-rust/issues/287
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/287
         // assert!(num_2 < num_10);
         // assert!(num_10 < num_1000);
         assert!(num_1000 < a_downcase);

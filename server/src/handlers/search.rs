@@ -89,7 +89,7 @@ pub async fn search_query(
 
         // With this first limit, we go for a greater number - as the user may not have the rights to the first ones!
         // We filter these results later.
-        // https://github.com/joepio/atomic-data-rust/issues/279.
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
         let initial_results_limit = 100;
 
         // execute the query
@@ -167,8 +167,8 @@ pub async fn search_query(
 
         // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
         // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
-        // https://github.com/joepio/atomic-data-rust/issues/279
-        // https://github.com/joepio/atomic-data-rust/issues/280
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/279
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/280
         let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
         for s in subjects {
             match store.get_resource_extended(&s, true, for_agent.as_deref()) {

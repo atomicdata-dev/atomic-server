@@ -1,7 +1,7 @@
 /*!
 Atomic-Server is mostly desgigned to run as a binary, but it can be embedded in other projects, too.
 It is currently used as an embedded server in the Tauri distribution of Atomic Server.
-See https://github.com/joepio/atomic-data-rust/tree/master/src-tauri
+See https://github.com/atomicdata-dev/atomic-data-rust/tree/master/src-tauri
 */
 mod actor_messages;
 mod appstate;

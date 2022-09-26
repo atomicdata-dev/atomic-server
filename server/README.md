@@ -37,10 +37,11 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 - [When should you use this](#when-should-you-use-this)
 - [When _not_ to use this](#when-not-to-use-this)
 - [Installation & getting started](#installation--getting-started)
-  - [Install using cargo](#install-using-cargo)
-  - [Run using docker](#run-using-docker)
-  - [Run from source](#run-from-source)
-  - [Troubleshooting compiling from source:](#troubleshooting-compiling-from-source)
+  - [1. Run using docker](#1-run-using-docker)
+  - [2. Install desktop build (macOS only)](#2-install-desktop-build-macos-only)
+  - [3. Run pre-compiled binary](#3-run-pre-compiled-binary)
+  - [4. Install using cargo](#4-install-using-cargo)
+  - [5. Compile from source](#5-compile-from-source)
 - [Initial setup and configuration](#initial-setup-and-configuration)
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
   - [HTTPS Setup on a VPS (static IP required)](#https-setup-on-a-vps-static-ip-required)
@@ -81,7 +82,7 @@ You can run `atomic-server` in five ways:
 
 1. Using docker (probably the quickest): `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
 2. Install a desktop build (macOS only as of now)
-3. From a published [binary](https://github.com/joepio/atomic/releases) 
+3. From a published [binary](https://github.com/atomicdata-dev/atomic-data-rust/releases)
 4. Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
 5. Manually from source
 
@@ -118,7 +119,7 @@ atomic-server
 ### 5. Compile from source
 
 ```sh
-git clone git@github.com:joepio/atomic-data-rust.git
+git clone git@github.com:atomicdata-dev/atomic-data-rust.git
 cd atomic-data-rust/server
 cargo run
 ```
@@ -172,7 +173,7 @@ They are stored in your `.config/atomic/` dir.
 There are three ways to interact with this server:
 
 - **GUI**: Use the [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser) JS frontend by visiting `localhost:9883`.
-- **API**: We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml). Check out [./_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the Atomic Data Docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
+- **API**: We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/atomicdata-dev/atomic-data-rust/master/server/openapi.yml). Check out [./_requests.http](./example_requests.http) for various HTTP requests to the server. Also, [read the Atomic Data Docs](https://docs.atomicdata.dev/). You can also try the [react boilerplate](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223) to build your own front-end app using [@tomic/lib](https://www.npmjs.com/package/@tomic/lib) and [@tomic/react](https://www.npmjs.com/package/@tomic/react).
 - **CLI**: The [`atomic-cli`](https://crates.io/crates/atomic-cli/0.24.2) terminal app
 
 ### Using Atomic-Server with the browser GUI
@@ -205,7 +206,7 @@ Try checking out the other features in the menu bar, and check out the `collecti
 
 `atomic-cli` is a useful terminal tool for interacting with `atomic-server`.
 It makes it easy to query and edit Atomic Data from the command line.
-[Check it out](https://github.com/joepio/atomic/tree/master/cli).
+[Check it out](https://github.com/atomicdata-dev/atomic-data-rust/tree/master/cli).
 
 ### API
 
@@ -223,7 +224,7 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
 Check out [./example_requests.http](/example_requests.http) for more things that you can do.
-We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/joepio/atomic-data-rust/master/server/openapi.yml).
+We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/atomicdata-dev/atomic-data-rust/master/server/openapi.yml).
 Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more about Collections, Commits, JSON-AD and other concepts used here.
 
 ## FAQ & Troubleshooting
@@ -270,7 +271,7 @@ Check out [the readme](./rdf-search.md).
 ### Can I embed Atomic-Server in another application?
 
 Yes. This is what I'm doing with the Tauri desktop distribution of Atomic-Server.
-Check out the [`desktop`](https://github.com/joepio/atomic-data-rust/tree/master/desktop) code for an example!
+Check out the [`desktop`](https://github.com/atomicdata-dev/atomic-data-rust/tree/master/desktop) code for an example!
 
 ### Where is my data stored on my machine?
 

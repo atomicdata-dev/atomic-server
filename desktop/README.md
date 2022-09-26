@@ -1,7 +1,7 @@
 # Atomic-Server Desktop (powered by Tauri)
 
 Desktop release for Atomic-Server.
-[Tauri] takes care of native installers, app icons, system tray icons, menu items, self-update ([issue](https://github.com/joepio/atomic-data-rust/issues/158)) and more.
+[Tauri] takes care of native installers, app icons, system tray icons, menu items, self-update ([issue](https://github.com/atomicdata-dev/atomic-data-rust/issues/158)) and more.
 
 ```sh
 # install tauri

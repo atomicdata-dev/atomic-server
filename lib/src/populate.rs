@@ -15,7 +15,7 @@ use crate::{
 /// This is necessary to prevent a loop where Property X (like the `shortname` Property)
 /// cannot be added, because it's Property Y (like `description`) has to be fetched before it can be added,
 /// which in turn has property Property X (`shortname`) which needs to be fetched before.
-/// https://github.com/joepio/atomic/issues/60
+/// https://github.com/atomicdata-dev/atomic-data-rust/issues/60
 pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     // Start with adding the most fundamental properties - the properties for Properties
 

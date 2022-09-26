@@ -1,18 +1,18 @@
 [package]
-name = "atomic"
-version = "0.15.0"
 description = "Create, share, fetch and model linked Atomic Data!"
 license = "MIT"
-repository = "https://github.com/joepio/atomic-data-rust"
+name = "atomic"
+repository = "https://github.com/atomicdata-dev/atomic-data-rust"
+version = "0.15.0"
 
 [[module]]
+abi = "wasi"
 name = "atomic"
 source = "../target/wasm32-wasi/release/atomic-cli.wasm"
-abi = "wasi"
 
 [module.interfaces]
 wasi = "0.0.0-unstable"
 
 [[command]]
-name = "atomic"
 module = "atomic-cli.wasm"
+name = "atomic"

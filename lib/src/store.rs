@@ -89,7 +89,7 @@ impl Storelike for Store {
 
     fn get_server_url(&self) -> &str {
         // TODO Should be implemented later when companion functionality is here
-        // https://github.com/joepio/atomic/issues/6
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/6
         "local:store"
     }
 

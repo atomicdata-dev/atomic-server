@@ -5,7 +5,7 @@ description = "Create, share and model Atomic Data with this graph database serv
 edition = "2021"
 license = "MIT"
 name = "atomic-server"
-repository = "https://github.com/joepio/atomic-data-rust"
+repository = "https://github.com/atomicdata-dev/atomic-data-rust"
 version = "0.33.1"
 [[bin]]
 name = "atomic-server"

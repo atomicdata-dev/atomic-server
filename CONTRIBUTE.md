@@ -2,7 +2,7 @@
 
 First things first: I'm glad you're reading this!
 Join our [Discord](https://discord.gg/a72Rv2P) to chat with other people in the Atomic Data community.
-If you encounter any issues, add them to the [Github issue tracker](https://github.com/joepio/atomic-data-rust/issues).
+If you encounter any issues, add them to the [Github issue tracker](https://github.com/atomicdata-dev/atomic-data-rust/issues).
 Same goes for feature requests.
 PR's are welcome, too!
 Note that opening a PR means agreeing that your code becomes distributed under the MIT license.
@@ -74,7 +74,7 @@ npm run test-query {testname}
 
 ## Code coverage
 
-- Visible at https://app.codecov.io/gh/joepio/atomic-data-rust/
+- Visible at https://app.codecov.io/gh/atomicdata-dev/atomic-data-rust/
 - Checked in CI
 
 ```sh
@@ -199,7 +199,7 @@ or:
 
 #### Deploying to atomicdata.dev
 
-1. Run the [`deploy` Github action](https://github.com/joepio/atomic-data-rust/actions/workflows/deployment.yml)
+1. Run the [`deploy` Github action](https://github.com/atomicdata-dev/atomic-data-rust/actions/workflows/deployment.yml)
 
 or do it manually:
 

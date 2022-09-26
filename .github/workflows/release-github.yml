@@ -68,7 +68,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          # TODO: https://github.com/joepio/atomic-data-rust/issues/237
+          # TODO: https://github.com/atomicdata-dev/atomic-data-rust/issues/237
           # ENABLE_CODE_SIGNING: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           # APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

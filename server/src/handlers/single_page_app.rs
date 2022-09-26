@@ -14,7 +14,7 @@ pub async fn single_page(
     let resp = HttpResponse::Ok()
         .content_type("text/html")
         // This prevents the browser from displaying the JSON response upon re-opening a closed tab
-        // https://github.com/joepio/atomic-data-rust/issues/137
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/137
         .insert_header((
             "Cache-Control",
             "no-store, no-cache, must-revalidate, private",

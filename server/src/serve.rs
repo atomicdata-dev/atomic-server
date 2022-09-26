@@ -34,7 +34,7 @@ fn rebuild_index(appstate: &crate::appstate::AppState) -> AtomicServerResult<()>
 
 /// Start the server
 pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
-    println!("Atomic-server {} \nUse --help for instructions. Visit https://docs.atomicdata.dev and https://github.com/joepio/atomic-data-rust for more info.", env!("CARGO_PKG_VERSION"));
+    println!("Atomic-server {} \nUse --help for instructions. Visit https://docs.atomicdata.dev and https://github.com/atomicdata-dev/atomic-data-rust for more info.", env!("CARGO_PKG_VERSION"));
     let tracing_chrome_flush_guard = crate::trace::init_tracing(&config);
 
     // Setup the database and more

@@ -458,7 +458,7 @@ impl Resource {
 
     /// Changes the subject of the Resource.
     /// Does not 'move' the Resource
-    /// See https://github.com/joepio/atomic/issues/44
+    /// See https://github.com/atomicdata-dev/atomic-data-rust/issues/44
     pub fn set_subject(&mut self, url: String) {
         self.commit.set_subject(url.clone());
         self.subject = url;
