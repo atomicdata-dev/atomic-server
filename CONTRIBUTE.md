@@ -24,14 +24,15 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
     - [Tracing with Chrome](#tracing-with-chrome)
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
+- [Responsible disclosure / Coordinated Vulnerability Disclosure](#responsible-disclosure--coordinated-vulnerability-disclosure)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
-- [Including JS app_assets](#including-js-app_assets)
-- [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
-  - [Building and publishing binaries](#building-and-publishing-binaries)
-  - [Publishing to Cargo](#publishing-to-cargo)
-  - [Publishing server to Docker](#publishing-server-to-docker)
-  - [Deploying to atomicdata.dev](#deploying-to-atomicdatadev)
-- [Publishing atomic-cli to WAPM](#publishing-atomic-cli-to-wapm)
+  - [Including JS app_assets](#including-js-app_assets)
+  - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
+    - [Building and publishing binaries](#building-and-publishing-binaries)
+    - [Publishing to Cargo](#publishing-to-cargo)
+    - [Publishing server to Docker](#publishing-server-to-docker)
+    - [Deploying to atomicdata.dev](#deploying-to-atomicdatadev)
+    - [Publishing atomic-cli to WAPM](#publishing-atomic-cli-to-wapm)
 
 ## Running locally
 
@@ -132,7 +133,7 @@ cargo install drill
 drill -b benchmark.yml --stats
 ```
 
-## SResponsible disclosure / Coordinated Vulnerability Disclosure
+## Responsible disclosure / Coordinated Vulnerability Disclosure
 
 If you encounter serious security risks, please refrain from posting these publicly in the issue tracker.
 We could minimize the impact by first patching the issue, publishing the patch, and then (after 30 days) disclose the bug.
@@ -140,14 +141,21 @@ So please first send an e-mail to joep@ontola.io describing the issue, and then 
 
 ## Releases, Versioning and Tagging
 
-- We use Github Actions for building, testing and creating releases.
-- Use `cargo workspaces version patch --force *` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
-- Update the `tauri.conf.json` manually
-- Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.
-- The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
-- We use [semver](https://semver.org/), and are still quite far from 1.0.0.
-- The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
-- After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
+1. Update the `tauri.conf.json` manually to the new version.
+2. Commit changes
+3. Make sure all tests run properly
+4. Use `cargo workspaces version patch` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
+
+The following should be triggered automatically:
+
+  - Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.
+  - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
+
+Note:
+
+  - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
+  - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
+  - After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
 
 ### Including JS app_assets
 
