@@ -9,7 +9,7 @@ use crate::{
     parse::ParseOpts,
     schema::{Class, Property},
     storelike::Query,
-    urls, Storelike, Value,
+    urls, Resource, Storelike, Value,
 };
 
 const DEFAULT_ONTOLOGY_PATH: &str = "defaultOntology";
@@ -153,17 +153,43 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Creates a Drive resource at the base URL. Does not set rights. Use set_drive_rights for that.
-pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
-    let self_url = store
-        .get_self_url()
-        .ok_or("No self_url set, cannot populate store with Drive")?;
-    let mut drive = store.get_resource_new(&self_url);
+/// Creates a Drive resource at the base URL if no name is passed.
+#[tracing::instrument(skip(store), level = "info")]
+pub fn create_drive(
+    store: &impl Storelike,
+    drive_name: Option<&str>,
+    for_agent: &str,
+    public_read: bool,
+) -> AtomicResult<Resource> {
+    let mut self_url = if let Some(url) = store.get_self_url() {
+        url.to_owned()
+    } else {
+        return Err("No self URL set. Cannot create drive.".into());
+    };
+    let drive_subject: String = if let Some(name) = drive_name {
+        // Let's make a subdomain
+        let host = self_url.host().expect("No host in server_url");
+        let subdomain_host = format!("{}.{}", name, host);
+        self_url.set_host(Some(&subdomain_host))?;
+        self_url.to_string()
+    } else {
+        self_url.to_string()
+    };
+
+    let mut drive = if drive_name.is_some() {
+        if store.get_resource(&drive_subject).is_ok() {
+            return Err("Drive URL is already taken".into());
+        }
+        Resource::new(drive_subject)
+    } else {
+        // Only for the base URL (of no drive name is passed), we should not check if the drive exists.
+        // This is because we use `create_drive` in the `--initialize` command.
+        store.get_resource_new(&drive_subject)
+    };
     drive.set_class(urls::DRIVE);
-    let server_url = url::Url::parse(store.get_server_url())?;
     drive.set_string(
         urls::NAME.into(),
-        server_url.host_str().ok_or("Can't use current base URL")?,
+        drive_name.unwrap_or_else(|| self_url.host_str().unwrap()),
         store,
     )?;
     drive.save_locally(store)?;
@@ -236,8 +262,10 @@ To use the data in your web apps checkout our client libraries: [@tomic/lib](htt
 Use [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologies inside your code.
 "#, store.get_server_url(), &format!("{}/{}", drive.get_subject(), DEFAULT_ONTOLOGY_PATH)), store)?;
     }
+
     drive.save_locally(store)?;
-    Ok(())
+
+    Ok(drive)
 }
 
 /// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary)
@@ -312,7 +340,11 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
         .ok_or("No self URL in this Store - required for populating importer")?;
     let mut importer = crate::Resource::new(urls::construct_path_import(&base));
     importer.set_class(urls::IMPORTER);
-    importer.set(urls::PARENT.into(), Value::AtomicUrl(base), store)?;
+    importer.set(
+        urls::PARENT.into(),
+        Value::AtomicUrl(base.to_string()),
+        store,
+    )?;
     importer.set(urls::NAME.into(), Value::String("Import".into()), store)?;
     importer.save_locally(store)?;
     Ok(())
@@ -323,7 +355,7 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
 /// Useful for helping a new user get started.
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     let base = store.get_self_url().ok_or("No self_url")?;
-    let mut drive = store.get_resource(&base)?;
+    let mut drive = store.get_resource(base.as_str())?;
     let arr = vec![
         format!("{}/setup", base),
         format!("{}/import", base),

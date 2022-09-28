@@ -1,6 +1,8 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
+use url::Url;
+
 use crate::agents::Agent;
 use crate::storelike::QueryResult;
 use crate::Value;
@@ -15,6 +17,10 @@ pub struct Store {
     // The store currently holds two stores - that is not ideal
     hashmap: Arc<Mutex<HashMap<String, Resource>>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+}
+
+lazy_static::lazy_static! {
+    static ref LOCAL_STORE_URL: Url = Url::parse("local:store").unwrap();
 }
 
 impl Store {
@@ -158,14 +164,14 @@ impl Storelike for Store {
         Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &Url {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/atomicdata-dev/atomic-server/issues/6
-        "local:store"
+        &LOCAL_STORE_URL
     }
 
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&Url> {
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<Agent> {
