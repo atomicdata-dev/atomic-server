@@ -424,7 +424,7 @@ pub fn create_collection_resource_for_class(
 
     // Let the Collections collection be the top level item
     let parent = if class.subject == urls::COLLECTION {
-        drive
+        drive.to_string()
     } else {
         format!("{}/collections", drive)
     };

@@ -70,7 +70,7 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             let importer_subject = if let Some(i) = &import_opts.parent {
                 i.into()
             } else {
-                urls::construct_path_import(&appstate.store.get_self_url().expect("No self url"))
+                urls::construct_path_import(appstate.store.get_self_url().expect("No self url"))
             };
             let parse_opts = atomic_lib::parse::ParseOpts {
                 importer: Some(importer_subject),

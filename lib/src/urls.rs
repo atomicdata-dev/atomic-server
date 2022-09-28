@@ -1,5 +1,7 @@
 //! Contains some of the most important Atomic Data URLs.
 
+use url::Url;
+
 // Classes
 pub const CLASS: &str = "https://atomicdata.dev/classes/Class";
 pub const PROPERTY: &str = "https://atomicdata.dev/classes/Property";
@@ -139,7 +141,7 @@ pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
 pub const SUDO_AGENT: &str = "sudo:agent";
 
 // Paths
-pub fn construct_path_import(base: &str) -> String {
+pub fn construct_path_import(base: &Url) -> String {
     format!("{base}{PATH_IMPORT}")
 }
 

@@ -13,7 +13,8 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use tracing::{info, instrument};
+use tracing::instrument;
+use url::Url;
 
 use crate::{
     agents::ForAgent,
@@ -76,7 +77,7 @@ pub struct Db {
     /// A list of all the Collections currently being used. Is used to update `query_index`.
     watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
-    server_url: String,
+    server_url: Url,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
@@ -193,6 +194,7 @@ impl Db {
     }
 
     fn map_sled_item_to_resource(
+        &self,
         item: Result<(sled::IVec, sled::IVec), sled::Error>,
         self_url: String,
         include_external: bool,
@@ -200,7 +202,7 @@ impl Db {
         let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
         let subject: String = String::from_utf8_lossy(&subject).to_string();
 
-        if !include_external && !subject.starts_with(&self_url) {
+        if !include_external && self.is_external_subject(&subject).ok()? {
             return None;
         }
 
@@ -308,14 +310,14 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &Url {
         &self.server_url
     }
 
-    // Since the DB is often also the server, this should make sense.
-    // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&Url> {
+        // Since the DB is often also the server, this should make sense.
+        // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -479,7 +481,7 @@ impl Storelike for Db {
         // Maybe make this optional?
         q_filter.watch(self)?;
 
-        info!(filter = ?q_filter, "Building query index");
+        tracing::info!(filter = ?q_filter, "Building query index");
 
         let atoms: IndexIterator = match (&q.property, q.value.as_ref()) {
             (Some(prop), val) => find_in_prop_val_sub_index(self, prop, val),
@@ -523,7 +525,7 @@ impl Storelike for Db {
             .expect("No self URL set, is required in DB");
 
         let result = self.resources.into_iter().filter_map(move |item| {
-            Db::map_sled_item_to_resource(item, self_url.clone(), include_external)
+            Db::map_sled_item_to_resource(self, item, self_url.to_string(), include_external)
         });
 
         Box::new(result)
@@ -577,6 +579,7 @@ impl Storelike for Db {
 
     fn populate(&self) -> AtomicResult<()> {
         crate::populate::populate_all(self)
+        crate::populate::create_drive(self, None, &default_agent.subject, true)
     }
 
     #[instrument(skip(self))]

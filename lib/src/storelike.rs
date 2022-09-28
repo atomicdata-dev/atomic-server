@@ -1,5 +1,7 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
+use url::Url;
+
 use crate::{
     agents::{Agent, ForAgent},
     commit::CommitResponse,
@@ -86,12 +88,12 @@ pub trait Storelike: Sized {
     /// E.g. `https://example.com`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_server_url(&self) -> &str;
+    fn get_server_url(&self) -> &Url;
 
     /// Returns the root URL where this instance of the store is hosted.
     /// Should return `None` if this is simply a client and not a server.
     /// E.g. `https://example.com`
-    fn get_self_url(&self) -> Option<String> {
+    fn get_self_url(&self) -> Option<&Url> {
         None
     }
 
@@ -199,15 +201,15 @@ pub trait Storelike: Sized {
     fn handle_commit(&self, _commit_response: &CommitResponse) {}
 
     fn handle_not_found(&self, subject: &str, error: AtomicError) -> AtomicResult<Resource> {
-        if let Some(self_url) = self.get_self_url() {
-            if subject.starts_with(&self_url) {
-                return Err(AtomicError::not_found(format!(
-                    "Failed to retrieve locally: '{}'. {}",
-                    subject, error
-                )));
-            }
+        // This does not work for subdomains
+        if self.is_external_subject(subject)? {
+            self.fetch_resource(subject)
+        } else {
+            Err(AtomicError::not_found(format!(
+                "Failed to retrieve locally: '{}'. {}",
+                subject, error
+            )))
         }
-        self.fetch_resource(subject)
     }
 
     /// Imports a JSON-AD string, returns the amount of imported resources.
@@ -215,6 +217,30 @@ pub trait Storelike: Sized {
         let vec = parse_json_ad_string(string, self, parse_opts)?;
         let len = vec.len();
         Ok(len)
+    }
+
+    /// Checks if the URL of some resource is owned by some external store.
+    /// If true, then the Subject points to a different server.
+    /// If you're using `Storelike` on something that does not persist (e.g. a client app),
+    /// the answer should always be `true`.
+    fn is_external_subject(&self, subject: &str) -> AtomicResult<bool> {
+        if let Some(self_url) = self.get_self_url() {
+            if subject.starts_with(&self_url.as_str()) {
+                return Ok(false);
+            } else {
+                let subject_url = url::Url::parse(subject)?;
+                let subject_host = subject_url.host().ok_or_else(|| {
+                    AtomicError::not_found(format!("Subject URL has no host: {}", subject))
+                })?;
+                let self_host = self_url.host().ok_or_else(|| {
+                    AtomicError::not_found(format!("Self URL has no host: {}", self_url))
+                })?;
+                if subject_host == self_host {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Removes a resource from the store. Errors if not present.

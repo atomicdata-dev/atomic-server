@@ -15,6 +15,10 @@ pub struct Store {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
 }
 
+lazy_static::lazy_static! {
+    static ref LOCAL_STORE_URL: Url = Url::parse("local:store").unwrap();
+}
+
 impl Store {
     /// Creates an empty Store.
     /// Run `.populate()` to get useful standard models loaded into your store.
@@ -173,14 +177,14 @@ impl Storelike for Store {
         Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &Url {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/atomicdata-dev/atomic-data-rust/issues/6
-        "local:store"
+        &LOCAL_STORE_URL
     }
 
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&Url> {
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {

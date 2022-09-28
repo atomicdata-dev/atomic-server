@@ -178,7 +178,7 @@ impl Commit {
                     let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
                     resource_old.set_propval(
                         urls::PARENT.into(),
-                        Value::AtomicUrl(default_parent),
+                        Value::AtomicUrl(default_parent.to_string()),
                         store,
                     )?;
                 }
