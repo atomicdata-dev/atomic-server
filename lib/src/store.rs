@@ -15,8 +15,11 @@ pub struct Store {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
 }
 
+/// The URL used for stores that are not accessible on the web.
+pub const LOCAL_STORE_URL_STR: &str = "local:store";
+
 lazy_static::lazy_static! {
-    static ref LOCAL_STORE_URL: Url = Url::parse("local:store").unwrap();
+    static ref LOCAL_STORE_URL: Url = Url::parse(LOCAL_STORE_URL_STR).unwrap();
 }
 
 impl Store {

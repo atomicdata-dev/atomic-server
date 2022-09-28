@@ -8,6 +8,7 @@ use crate::{
     errors::AtomicError,
     hierarchy,
     schema::{Class, Property},
+    store::LOCAL_STORE_URL_STR,
     urls,
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_string};
@@ -225,6 +226,9 @@ pub trait Storelike: Sized {
     /// the answer should always be `true`.
     fn is_external_subject(&self, subject: &str) -> AtomicResult<bool> {
         if let Some(self_url) = self.get_self_url() {
+            if self_url.as_str() == LOCAL_STORE_URL_STR {
+                return Ok(true);
+            }
             if subject.starts_with(&self_url.as_str()) {
                 return Ok(false);
             } else {
