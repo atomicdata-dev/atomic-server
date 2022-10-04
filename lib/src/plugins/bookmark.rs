@@ -46,7 +46,7 @@ fn handle_bookmark_request(
         };
     }
 
-    let (mut name, path) = match (name, path) {
+    let (name, path) = match (name, path) {
         (Some(name), Some(path)) => (name, path),
         _ => return bookmark_endpoint().to_resource(store),
     };
@@ -59,12 +59,22 @@ fn handle_bookmark_request(
     let content = fetch_data(&path)?;
     let mut parser = Parser::from_html(&path, &content)?;
 
-    // Extract the title from the HTML
-    if let Some(title) = parser.get_title() {
-        name = title;
+    // Extract the title, description and preview image from the HTML
+    let site_meta = parser.get_meta();
+
+    if let Some(title) = site_meta.title {
+        resource.set_propval_string(urls::NAME.into(), &title, store)?;
+    } else {
+        resource.set_propval_string(urls::NAME.into(), &name, store)?;
     }
 
-    resource.set_propval_string(urls::NAME.into(), &name, store)?;
+    if let Some(description) = site_meta.description {
+        resource.set_propval_string(urls::DESCRIPTION.into(), &description, store)?;
+    }
+
+    if let Some(image) = site_meta.image {
+        resource.set_propval_string(urls::IMAGE_URL.into(), &image, store)?;
+    }
 
     // Clean and transform the HTML to markdown.
     let cleaned_html = parser.clean_document()?;
@@ -97,6 +107,12 @@ struct Parser {
     svg_map: HashMap<String, String>,
 }
 
+struct SiteMeta {
+    title: Option<String>,
+    description: Option<String>,
+    image: Option<String>,
+}
+
 impl Parser {
     pub fn from_html(url: &str, html: &str) -> AtomicResult<Parser> {
         Ok(Parser {
@@ -117,13 +133,46 @@ impl Parser {
         String::from_utf8(stream)
     }
 
-    pub fn get_title(&self) -> Option<String> {
+    pub fn get_meta(&self) -> SiteMeta {
         let document = kuchiki::parse_html().one(self.internal_html.clone());
+        let mut title = None;
+        let mut description = None;
+        let mut image = None;
 
         if let Ok(title_element) = document.select_first("title") {
-            Some(title_element.text_contents())
-        } else {
-            None
+            title = Some(title_element.text_contents());
+        }
+
+        if let Ok(description_element) =
+            document.select_first("meta[name='description'], meta[property='og:description']")
+        {
+            description = Some(
+                description_element
+                    .attributes
+                    .borrow()
+                    .get("content")
+                    .unwrap_or("")
+                    .to_string(),
+            );
+        }
+
+        if let Ok(image_element) =
+            document.select_first("meta[property='og:image'], meta[name='twitter:image']")
+        {
+            image = Some(
+                image_element
+                    .attributes
+                    .borrow()
+                    .get("content")
+                    .unwrap_or("")
+                    .to_string(),
+            );
+        }
+
+        SiteMeta {
+            title,
+            description,
+            image,
         }
     }
 
@@ -433,6 +482,18 @@ mod tests {
             md,
             r#"![Netflix](https://tweakers.net/i/Imo-YDw3aJMOUg7-aMw2OC0lk6Q=/656x/filters:strip\_icc():strip\_exif()/i/2004517792.jpeg?f=imagenormal)"#
         );
+    }
+
+    #[test]
+    fn extract_meta_content() {
+        let html = r#"<html><head><title>Programmer Facts</title><meta name="description" content="The F in testing stands for Fun" /><meta property="og:image" content="https://example.com" /></head><body></body></html>"#;
+        let parser = super::Parser::from_html("https://bla.com", html).unwrap();
+
+        let meta = parser.get_meta();
+
+        assert_eq!(meta.title.unwrap(), "Programmer Facts");
+        assert_eq!(meta.description.unwrap(), "The F in testing stands for Fun");
+        assert_eq!(meta.image.unwrap(), "https://example.com");
     }
 
     #[test]
