@@ -148,5 +148,5 @@ jobs:
         working-directory: ./server/e2e_tests/
         run: |
           pnpm install
-          pnpm run playwright-install
+          pnpm run install-playwright
           pnpm run test
