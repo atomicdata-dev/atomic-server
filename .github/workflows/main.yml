@@ -144,5 +144,5 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/debug/atomic-server &
-      - run: cd server/e2e_tests/ && pnpm install && pnpx playwright install
+      - run: cd server/e2e_tests/ && pnpm install && pnpm playwright-install
       - run: cd server/e2e_tests/ && pnpm test
