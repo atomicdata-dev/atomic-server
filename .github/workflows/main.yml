@@ -144,5 +144,9 @@ jobs:
           command: build
           args: --locked
       - run: nohup ./target/debug/atomic-server &
-      - run: cd server/e2e_tests/ && pnpm install && pnpm playwright-install
-      - run: cd server/e2e_tests/ && pnpm test
+      - name: Setup and run end-to-end tests
+        working-directory: ./server/e2e_tests/
+        run: |
+          pnpm install
+          pnpm run playwright-install
+          pnpm run test
