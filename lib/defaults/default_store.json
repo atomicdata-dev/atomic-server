@@ -116,6 +116,57 @@
         "https://atomicdata.dev/properties/shortname": "append"
     },
     {
+        "@id": "https://atomicdata.dev/properties/auth/agent",
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Agent",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/description": "The Agent making the signature.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "agent"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/auth/requestedSubject",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "The URL of the requested resource.\n\n- If we're authenticating a WebSocket, we use the wss address as the requestedSubject. (e.g. `wss://example.com/ws`)\n- If we're authenticating a Cookie, we use the origin of the server (e.g. `https://example.com`)\n- If we're authentication a single HTTP request, use the same URL as the GET address (e.g. `https://example.com/myResource`)\n",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "requested-subject"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/auth/publicKey",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "The base64 serialized ED25519 public key of the agent setting the signature.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "public-key"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/auth/signedAt",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+        "https://atomicdata.dev/properties/description": "When the signature was created",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev",
+        "https://atomicdata.dev/properties/shortname": "signed-at"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/auth/signature",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "A base64 serialized signature of the string `{requestedSubject} {timestamp}`, using the `privateKey` of the Agent, using ed25519 encryption.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev",
+        "https://atomicdata.dev/properties/shortname": "signature"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/drives",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Drive",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
