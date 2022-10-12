@@ -35,6 +35,7 @@ pub async fn single_page(
             "Cache-Control",
             "no-store, no-cache, must-revalidate, private",
         ))
+        .append_header(("Vary", "Accept"))
         .body(body);
 
     Ok(resp)

@@ -92,7 +92,7 @@ impl CollectionBuilder {
         store: &impl Storelike,
     ) -> CollectionBuilder {
         CollectionBuilder {
-            subject: format!("{}/{}", store.get_server_url(), path),
+            subject: store.get_server_url().clone().set_path(path).to_string(),
             property: Some(urls::IS_A.into()),
             value: Some(class_url.into()),
             sort_by: None,
@@ -426,7 +426,9 @@ pub fn create_collection_resource_for_class(
     let parent = if class.subject == urls::COLLECTION {
         drive.to_string()
     } else {
-        format!("{}/collections", drive)
+        drive
+            .set_route(crate::atomic_url::Routes::Collections)
+            .to_string()
     };
 
     collection_resource.set_propval_string(urls::PARENT.into(), &parent, store)?;
@@ -533,7 +535,7 @@ mod test {
         println!("{:?}", subjects);
         let collections_collection = store
             .get_resource_extended(
-                &format!("{}/collections", store.get_server_url()),
+                &format!("{}collections", store.get_server_url()),
                 false,
                 &ForAgent::Public,
             )

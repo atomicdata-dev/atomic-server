@@ -82,23 +82,29 @@ impl Agent {
     pub fn new(name: Option<&str>, store: &impl Storelike) -> AtomicResult<Agent> {
         let keypair = generate_keypair()?;
 
-        Ok(Agent::new_from_private_key(name, store, &keypair.private))
+        Agent::new_from_private_key(name, store, &keypair.private)
     }
 
     pub fn new_from_private_key(
         name: Option<&str>,
         store: &impl Storelike,
         private_key: &str,
-    ) -> Agent {
+    ) -> AtomicResult<Agent> {
         let keypair = generate_public_key(private_key);
+        println!("server url: {}", store.get_server_url());
+        let subject = store
+            .get_server_url()
+            .url()
+            .join(&format!("agents/{}", &keypair.public))?
+            .to_string();
 
-        Agent {
+        Ok(Agent {
             private_key: Some(keypair.private),
-            public_key: keypair.public.clone(),
-            subject: format!("{}/agents/{}", store.get_server_url(), keypair.public),
+            public_key: keypair.public,
+            subject,
             name: name.map(|x| x.to_owned()),
             created_at: crate::utils::now(),
-        }
+        })
     }
 
     pub fn new_from_public_key(store: &impl Storelike, public_key: &str) -> AtomicResult<Agent> {

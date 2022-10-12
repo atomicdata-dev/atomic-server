@@ -1,9 +1,8 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
-use url::Url;
-
 use crate::{
     agents::{Agent, ForAgent},
+    atomic_url::AtomicUrl,
     commit::CommitResponse,
     errors::AtomicError,
     hierarchy,
@@ -86,15 +85,15 @@ pub trait Storelike: Sized {
     }
 
     /// Returns the base URL where the default store is.
-    /// E.g. `https://example.com`
+    /// E.g. `https://example.com/`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_server_url(&self) -> &Url;
+    fn get_server_url(&self) -> &AtomicUrl;
 
     /// Returns the root URL where this instance of the store is hosted.
     /// Should return `None` if this is simply a client and not a server.
-    /// E.g. `https://example.com`
-    fn get_self_url(&self) -> Option<&Url> {
+    /// E.g. `https://example.com.`
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
         None
     }
 
@@ -180,11 +179,11 @@ pub trait Storelike: Sized {
         Property::from_resource(prop)
     }
 
-    /// Get's the resource, parses the Query parameters and calculates dynamic properties.
+    /// Gets the resource, parses the Query parameters and calculates dynamic properties.
     /// Defaults to get_resource if store doesn't support extended resources
     /// If `for_agent` is None, no authorization checks will be done, and all resources will return.
-    /// If you want public only resurces, pass `Some(crate::authentication::public_agent)` as the agent.
-    /// - *skip_dynamic* Does not calculte dynamic properties. Adds an `incomplete=true` property if the resource should have been dynamic.
+    /// If you want public only resources, pass `Some(crate::authentication::public_agent)` as the agent.
+    /// - *skip_dynamic* Does not calculate dynamic properties. Adds an `incomplete=true` property if the resource should have been dynamic.
     fn get_resource_extended(
         &self,
         subject: &str,
@@ -201,14 +200,14 @@ pub trait Storelike: Sized {
     /// Implement this if you want to have custom handlers for Commits.
     fn handle_commit(&self, _commit_response: &CommitResponse) {}
 
-    fn handle_not_found(&self, subject: &str, error: AtomicError) -> AtomicResult<Resource> {
+    fn handle_not_found(&self, subject: &str, _error: AtomicError) -> AtomicResult<Resource> {
         // This does not work for subdomains
         if self.is_external_subject(subject)? {
             self.fetch_resource(subject)
         } else {
             Err(AtomicError::not_found(format!(
-                "Failed to retrieve locally: '{}'. {}",
-                subject, error
+                "Subject is not stored on this server: '{}'",
+                subject
             )))
         }
     }
@@ -229,13 +228,14 @@ pub trait Storelike: Sized {
             if self_url.as_str() == LOCAL_STORE_URL_STR {
                 return Ok(true);
             }
-            if subject.starts_with(&self_url.as_str()) {
+            if subject.starts_with(self_url.as_str()) {
                 return Ok(false);
             } else {
                 let subject_url = url::Url::parse(subject)?;
                 let subject_host = subject_url.host().ok_or_else(|| {
                     AtomicError::not_found(format!("Subject URL has no host: {}", subject))
                 })?;
+                let self_url = self_url.url();
                 let self_host = self_url.host().ok_or_else(|| {
                     AtomicError::not_found(format!("Self URL has no host: {}", self_url))
                 })?;

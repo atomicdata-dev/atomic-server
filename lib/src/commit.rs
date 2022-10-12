@@ -435,12 +435,21 @@ impl Commit {
     #[tracing::instrument(skip(store))]
     pub fn into_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
         let commit_subject = match self.signature.as_ref() {
-            Some(sig) => format!("{}/commits/{}", store.get_server_url(), sig),
+            Some(sig) => store
+                .get_server_url()
+                .set_route(Routes::Commits)
+                .append(sig)
+                .to_string(),
             None => {
                 let now = crate::utils::now();
-                format!("{}/commitsUnsigned/{}", store.get_server_url(), now)
+                store
+                    .get_server_url()
+                    .set_route(Routes::CommitsUnsigned)
+                    .append(&now.to_string())
+                    .to_string()
             }
         };
+        println!("commit subject: {}", commit_subject);
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
         resource.set_subject(commit_subject);
         resource.set_propval_unsafe(
@@ -761,10 +770,10 @@ mod test {
         let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        let agent = Agent::new_from_private_key(None, &store, private_key);
+        let agent = Agent::new_from_private_key(None, &store, private_key).unwrap();
         assert_eq!(
             &agent.subject,
-            "local:store/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="
+            "http://noresolve.localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="
         );
         store.add_resource(&agent.to_resource().unwrap()).unwrap();
         let subject = "https://localhost/new_thing";
@@ -779,8 +788,8 @@ mod test {
         let signature = commit.signature.clone().unwrap();
         let serialized = commit.serialize_deterministically_json_ad(&store).unwrap();
 
-        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"local:store/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
-        assert_eq!(signature, "JOGRyp1NCulc0RNuuNozgIagQPRoZy0Y5+mbSpHY2DKiN3vqUNYLjXbAPYT6Cga6vSG9zztEIa/ZcbQPo7wgBg==");
+        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"http://noresolve.localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
+        assert_eq!(signature, "CZbjUJW/tokEKSZTCFjEHWbWqGW+jyhZWYs82K9wt0SArxu9xGg+D3IniAlygQp0F3KcI4Z876th3/X3fJIVAQ==");
     }
 
     #[test]

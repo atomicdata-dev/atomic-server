@@ -79,11 +79,18 @@ pub async fn search_query(
 
     // Create a valid atomic data resource.
     // You'd think there would be a simpler way of getting the requested URL...
-    let subject = format!(
-        "{}{}",
-        store.get_self_url().ok_or("No base URL set")?,
-        req.uri().path_and_query().ok_or("Add a query param")?
-    );
+    // See https://github.com/actix/actix-web/issues/2895
+    let subject: String = store
+        .get_self_url()
+        .ok_or("No base URL set")?
+        .url()
+        .join(
+            req.uri()
+                .path_and_query()
+                .ok_or("Add a query param")?
+                .as_str(),
+        )?
+        .to_string();
 
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());

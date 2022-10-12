@@ -41,6 +41,8 @@ jobs:
         with:
           command: nextest
           args: run --all-features --retries 3
+      # https://github.com/nextest-rs/nextest/issues/16
+      - run: cargo test --doc
 
   coverage:
     name: Code coverage

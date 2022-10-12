@@ -59,6 +59,7 @@ assert!(fetched_new_resource.get_shortname("description", &store).unwrap().to_st
 */
 
 pub mod agents;
+pub mod atomic_url;
 pub mod atoms;
 pub mod authentication;
 pub mod client;
@@ -90,6 +91,7 @@ pub mod utils;
 pub mod validate;
 pub mod values;
 
+pub use atomic_url::AtomicUrl;
 pub use atoms::Atom;
 pub use commit::Commit;
 #[cfg(feature = "db")]
