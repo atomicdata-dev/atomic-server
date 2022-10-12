@@ -86,7 +86,7 @@ impl Mapping {
         let mut file_string: String = String::new();
         for (key, url) in self.hashmap.clone().iter() {
             let map = format!("{}={}\n", key, url);
-            file_string.push_str(&*map);
+            file_string.push_str(&map);
         }
         fs::create_dir_all(path.parent().expect("Cannot create above root"))
             .expect("Unable to create dirs");

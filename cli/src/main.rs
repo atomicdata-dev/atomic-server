@@ -109,7 +109,7 @@ fn main() -> AtomicResult<()> {
                 )
                 .arg(Arg::new("as")
                     .long("as")
-                    .possible_values(&SERIALIZE_OPTIONS)
+                    .possible_values(SERIALIZE_OPTIONS)
                     .default_value("pretty")
                     .help("Serialization format")
                     .takes_value(true)
@@ -138,7 +138,7 @@ fn main() -> AtomicResult<()> {
                 )
                 .arg(Arg::new("as")
                     .long("as")
-                    .possible_values(&SERIALIZE_OPTIONS)
+                    .possible_values(SERIALIZE_OPTIONS)
                     .default_value("pretty")
                     .help("Serialization format")
                     .takes_value(true)
@@ -282,7 +282,7 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
 fn list(context: &mut Context) {
     let mut string = String::new();
     for (shortname, url) in context.mapping.lock().unwrap().clone().into_iter() {
-        string.push_str(&*format!(
+        string.push_str(&format!(
             "{0: <15}{1: <10} \n",
             shortname.blue().bold(),
             url

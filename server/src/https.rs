@@ -12,8 +12,10 @@ use std::{
     path::PathBuf,
 };
 
+use crate::errors::AtomicServerResult;
+
 /// Starts an HTTP Actix server for HTTPS certificate initialization
-pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Error> {
+pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerResult<()> {
     let address = format!("{}:{}", config.opts.ip, config.opts.port);
     tracing::warn!("Server temporarily running in HTTP mode at {}, running Let's Encrypt Certificate initialization...", address);
 
@@ -34,10 +36,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> Result<(), Erro
                 )
             });
 
-            let running_server = init_server
-                .bind(&address_clone)
-                .expect(&*format!("Cannot bind to endpoint {}", &address_clone))
-                .run();
+            let running_server = init_server.bind(&address_clone)?.run();
 
             tx.send(running_server.handle()).unwrap();
 
@@ -100,7 +99,7 @@ pub fn request_cert(config: &crate::config::Config) -> Result<(), Error> {
     let acc = dir.account(&email)?;
 
     // Order a new TLS certificate for a domain.
-    let mut ord_new = acc.new_order(&*config.opts.domain, &[])?;
+    let mut ord_new = acc.new_order(&config.opts.domain, &[])?;
 
     // If the ownership of the domain(s) have already been
     // authorized in a previous order, you might be able to
@@ -227,7 +226,8 @@ fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
 fn set_certs_created_at_file(config: &crate::config::Config) {
     let now_string = chrono::Utc::now();
     let path = certs_created_at_path(config);
-    fs::write(&path, now_string.to_string()).expect(&*format!("Unable to write {:?}", &path));
+    fs::write(&path, now_string.to_string())
+        .unwrap_or_else(|_| panic!("Unable to write {:?}", &path));
 }
 
 /// Checks if the certificates need to be renewed.
@@ -239,9 +239,9 @@ pub fn should_renew_certs_check(config: &crate::config::Config) -> bool {
     let path = certs_created_at_path(config);
 
     let created_at = std::fs::read_to_string(&path)
-        .expect(&*format!("Unable to read {:?}", &path))
+        .unwrap_or_else(|_| panic!("Unable to read {:?}", &path))
         .parse::<chrono::DateTime<chrono::Utc>>()
-        .expect(&*format!("failed to parse {:?}", &path));
+        .unwrap_or_else(|_| panic!("failed to parse {:?}", &path));
     let certs_age: chrono::Duration = chrono::Utc::now() - created_at;
     // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX.
     let expired = certs_age > chrono::Duration::weeks(4);

@@ -12,7 +12,7 @@ use urlencoding::encode;
 
 use crate::{
     client::fetch_body, endpoints::Endpoint, errors::AtomicResult, urls, values::Value,
-    AtomicError, AtomicErrorType, Resource, Storelike,
+    AtomicError, Resource, Storelike,
 };
 
 type Handler<'s, 'h> = Vec<(Cow<'s, Selector>, ElementContentHandlers<'h>)>;
@@ -89,13 +89,7 @@ fn handle_bookmark_request(
 }
 
 fn fetch_data(url: &str) -> AtomicResult<String> {
-    match fetch_body(url, "text/html", None) {
-        Ok(response) => Ok(response),
-        Err(e) => Err(AtomicError {
-            message: format!("Error fetching data: {}", e),
-            error_type: crate::AtomicErrorType::OtherError,
-        }),
-    }
+    fetch_body(url, "text/html", None).map_err(|e| format!("Fetching failed: {}", e).into())
 }
 
 struct Parser {
@@ -216,16 +210,9 @@ impl Parser {
             }
         }
 
-        match Parser::serialize(best_node) {
-            Ok(result) => {
-                self.internal_html = result;
-                Ok(())
-            }
-            Err(e) => Err(AtomicError {
-                message: format!("Error serializing node: {}", e),
-                error_type: AtomicErrorType::OtherError,
-            }),
-        }
+        let serialized = Parser::serialize(best_node)?;
+        self.internal_html = serialized;
+        Ok(())
     }
 
     fn index_svgs(&mut self) -> Result<(), AtomicError> {
@@ -251,20 +238,13 @@ impl Parser {
             self.svg_map.insert(id, encode(&svg).into());
         }
 
-        match Parser::serialize(document) {
-            Ok(result) => {
-                self.internal_html = result;
-                Ok(())
-            }
-            Err(e) => Err(AtomicError {
-                message: format!("Error serializing node: {}", e),
-                error_type: AtomicErrorType::OtherError,
-            }),
-        }
+        let serialized = Parser::serialize(document)?;
+        self.internal_html = serialized;
+        Ok(())
     }
 
     fn process_html(&mut self) -> Result<(), AtomicError> {
-        match rewrite_str(
+        let result = rewrite_str(
             &self.internal_html,
             RewriteStrSettings {
                 element_content_handlers: vec![
@@ -284,16 +264,10 @@ impl Parser {
                 .collect(),
                 ..RewriteStrSettings::default()
             },
-        ) {
-            Ok(result) => {
-                self.internal_html = result;
-                Ok(())
-            }
-            Err(e) => Err(AtomicError {
-                message: format!("Error removing unwanted elements: {}", e),
-                error_type: AtomicErrorType::OtherError,
-            }),
-        }
+        )
+        .map_err(|e| format!("Error removing unwanted elements: {}", e))?;
+        self.internal_html = result;
+        Ok(())
     }
 
     fn unpack_noscript_handler<'h, 's>(&self) -> Handler<'s, 'h> {

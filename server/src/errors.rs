@@ -18,7 +18,7 @@ pub struct AtomicServerError {
     pub message: String,
     pub error_type: AppErrorType,
     /// If the error comes from Atomic-Lib, it can contain its own properties + values set in a Resource.
-    pub error_resource: Option<Resource>,
+    pub error_resource: Option<Box<Resource>>,
 }
 
 impl AtomicServerError {}
@@ -56,7 +56,7 @@ impl ResponseError for AtomicServerError {
                     urls::DESCRIPTION.into(),
                     Value::String(self.message.clone()),
                 );
-                r
+                Box::new(r)
             }
         };
 
@@ -84,10 +84,14 @@ impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
             atomic_lib::errors::AtomicErrorType::UnauthorizedError => AppErrorType::Unauthorized,
             _ => AppErrorType::Other,
         };
+        let subject = error
+            .subject
+            .clone()
+            .unwrap_or_else(|| "unknown_subject".into());
         AtomicServerError {
             message: error.to_string(),
             error_type,
-            error_resource: Some(error.into_resource("subject".into())),
+            error_resource: Some(Box::new(error.into_resource(subject))),
         }
     }
 }

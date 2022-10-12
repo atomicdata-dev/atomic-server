@@ -142,13 +142,13 @@ fn prompt_field(
             let re = Regex::new(atomic_lib::values::SLUG_REGEX)?;
             match input {
                 Some(slug) => {
-                    if re.is_match(&*slug) {
+                    if re.is_match(&slug) {
                         return Ok(Some(slug));
                     }
                     println!("Only letters, numbers and dashes - no spaces or special characters.");
                     return Ok(None);
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
         DataType::Integer => {
@@ -158,7 +158,7 @@ fn prompt_field(
                 Some(nr) => {
                     input = Some(nr.to_string());
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
         DataType::Float => {
@@ -168,7 +168,7 @@ fn prompt_field(
                 Some(nr) => {
                     input = Some(nr.to_string());
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
         DataType::Date => {
@@ -177,14 +177,14 @@ fn prompt_field(
             let re = Regex::new(atomic_lib::values::DATE_REGEX).unwrap();
             match date {
                 Some(date_val) => {
-                    if re.is_match(&*date_val) {
+                    if re.is_match(&date_val) {
                         input = Some(date_val);
                         return Ok(input);
                     }
                     println!("Not a valid date.");
                     return Ok(None);
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
         DataType::AtomicUrl => loop {
@@ -264,7 +264,7 @@ fn prompt_field(
                 Some(nr) => {
                     input = Some(nr.to_string());
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
         DataType::Unsupported(unsup) => {
@@ -277,7 +277,7 @@ fn prompt_field(
                 Some(nr) => {
                     input = Some(nr);
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
         DataType::Boolean => {
@@ -290,7 +290,7 @@ fn prompt_field(
                     }
                     return Ok(Some("false".to_string()));
                 }
-                None => (return Ok(None)),
+                None => return Ok(None),
             }
         }
     };

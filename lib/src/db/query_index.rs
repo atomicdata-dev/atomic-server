@@ -150,44 +150,6 @@ pub fn watch_collection(store: &Db, q_filter: &QueryFilter) -> AtomicResult<()> 
     Ok(())
 }
 
-/// Initialize the index for Collections
-// TODO: This is probably no the most reliable way of finding the collections to watch.
-// I suppose we should add these dynamically when a Collection is being requested.
-#[tracing::instrument(skip(store))]
-pub fn create_watched_collections(store: &Db) -> AtomicResult<()> {
-    let collections_url = format!("{}/collections", store.server_url);
-    let collections_resource = store.get_resource_extended(&collections_url, false, None)?;
-    for member_subject in collections_resource
-        .get(crate::urls::COLLECTION_MEMBERS)?
-        .to_subjects(None)?
-    {
-        let collection = store.get_resource_extended(&member_subject, false, None)?;
-        let value = if let Ok(val) = collection.get(crate::urls::COLLECTION_VALUE) {
-            // TODO: check the datatype. Now we assume it's a string
-            Some(val.clone())
-        } else {
-            None
-        };
-        let property = if let Ok(val) = collection.get(crate::urls::COLLECTION_PROPERTY) {
-            Some(val.to_string())
-        } else {
-            None
-        };
-        let sort_by = if let Ok(val) = collection.get(crate::urls::COLLECTION_SORT_BY) {
-            Some(val.to_string())
-        } else {
-            None
-        };
-        let q_filter = QueryFilter {
-            property,
-            value,
-            sort_by,
-        };
-        watch_collection(store, &q_filter)?;
-    }
-    Ok(())
-}
-
 /// Checks if the resource will match with a QueryFilter.
 /// Does any value or property or sort value match?
 /// Returns the matching property, if found.
