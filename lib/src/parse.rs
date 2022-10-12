@@ -152,7 +152,7 @@ pub fn parse_json_ad_commit_resource(
         .get(urls::SUBJECT)
         .ok_or("No subject field in Commit.")?
         .to_string();
-    let subject = format!("{}/commits/{}", store.get_server_url(), signature);
+    let subject = format!("{}commits/{}", store.get_server_url(), signature);
     let mut resource = Resource::new(subject);
     let propvals = match parse_json_ad_map_to_resource(json, store, &ParseOpts::default())? {
         SubResource::Resource(r) => r.into_propvals(),

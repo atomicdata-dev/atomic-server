@@ -161,17 +161,18 @@ pub fn create_drive(
     for_agent: &str,
     public_read: bool,
 ) -> AtomicResult<Resource> {
-    let mut self_url = if let Some(url) = store.get_self_url() {
+    let self_url = if let Some(url) = store.get_self_url() {
         url.to_owned()
     } else {
         return Err("No self URL set. Cannot create drive.".into());
     };
     let drive_subject: String = if let Some(name) = drive_name {
         // Let's make a subdomain
-        let host = self_url.host().expect("No host in server_url");
+        let mut url = self_url.url();
+        let host = url.host().expect("No host in server_url");
         let subdomain_host = format!("{}.{}", name, host);
-        self_url.set_host(Some(&subdomain_host))?;
-        self_url.to_string()
+        url.set_host(Some(&subdomain_host))?;
+        url.to_string()
     } else {
         self_url.to_string()
     };
@@ -317,13 +318,15 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 /// Adds default Endpoints (versioning) to the Db.
 /// Makes sure they are fetchable
 pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
+    use crate::atomic_url::Routes;
+
     let endpoints = crate::endpoints::default_endpoints();
-    let endpoints_collection = format!("{}/endpoints", store.get_server_url());
+    let endpoints_collection = store.get_server_url().set_route(Routes::Endpoints);
     for endpoint in endpoints {
         let mut resource = endpoint.to_resource(store)?;
         resource.set(
             urls::PARENT.into(),
-            Value::AtomicUrl(endpoints_collection.clone()),
+            Value::AtomicUrl(endpoints_collection.to_string()),
             store,
         )?;
         resource.save_locally(store)?;
@@ -357,9 +360,9 @@ pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     let base = store.get_self_url().ok_or("No self_url")?;
     let mut drive = store.get_resource(base.as_str())?;
     let arr = vec![
-        format!("{}/setup", base),
-        format!("{}/import", base),
-        format!("{}/collections", base),
+        base.set_route(crate::atomic_url::Routes::Setup),
+        base.set_route(crate::atomic_url::Routes::Import),
+        base.set_route(crate::atomic_url::Routes::Collections),
     ];
     for item in arr {
         drive.push(urls::SUBRESOURCES, item.into(), true)?;

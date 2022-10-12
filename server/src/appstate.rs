@@ -4,6 +4,7 @@ use crate::{
 };
 use atomic_lib::{
     agents::{generate_public_key, Agent},
+    atomic_url::Routes,
     commit::CommitResponse,
     Storelike,
 };
@@ -119,7 +120,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
                             "server".into(),
                             store,
                             &agent_config.private_key,
-                        );
+                        )?;
                         store.add_resource(&recreated_agent.to_resource()?)?;
                         agent_config
                     } else {
@@ -161,7 +162,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
 
 /// Creates the first Invitation that is opened by the user on the Home page.
 fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
-    let subject = format!("{}/setup", store.get_server_url());
+    let subject = store.get_server_url().set_route(Routes::Setup).to_string();
     tracing::info!("Creating initial Invite at {}", subject);
     let mut invite = store.get_resource_new(&subject);
     invite.set_class(atomic_lib::urls::INVITE);
