@@ -21,6 +21,7 @@ pub type AtomicResult<T> = std::result::Result<T, AtomicError>;
 pub struct AtomicError {
     pub message: String,
     pub error_type: AtomicErrorType,
+    pub subject: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -44,6 +45,7 @@ impl AtomicError {
         AtomicError {
             message: format!("Resource not found. {}", message),
             error_type: AtomicErrorType::NotFoundError,
+            subject: None,
         }
     }
 
@@ -52,6 +54,7 @@ impl AtomicError {
         AtomicError {
             message: format!("Unauthorized. {}", message),
             error_type: AtomicErrorType::UnauthorizedError,
+            subject: None,
         }
     }
 
@@ -60,6 +63,7 @@ impl AtomicError {
         AtomicError {
             message,
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 
@@ -80,6 +84,7 @@ impl AtomicError {
 
         AtomicError {
             message: msg,
+            subject: None,
             error_type: AtomicErrorType::ParseErrror,
         }
     }
@@ -105,6 +110,7 @@ impl From<&str> for AtomicError {
         AtomicError {
             message: message.into(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -113,6 +119,7 @@ impl From<String> for AtomicError {
     fn from(message: String) -> Self {
         AtomicError {
             message,
+            subject: None,
             error_type: AtomicErrorType::OtherError,
         }
     }
@@ -122,6 +129,7 @@ impl From<std::boxed::Box<dyn std::error::Error>> for AtomicError {
     fn from(error: std::boxed::Box<dyn std::error::Error>) -> Self {
         AtomicError {
             message: error.to_string(),
+            subject: None,
             error_type: AtomicErrorType::OtherError,
         }
     }
@@ -133,6 +141,7 @@ impl<T> From<std::sync::PoisonError<T>> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -141,6 +150,7 @@ impl From<std::io::Error> for AtomicError {
     fn from(error: std::io::Error) -> Self {
         AtomicError {
             message: error.to_string(),
+            subject: None,
             error_type: AtomicErrorType::OtherError,
         }
     }
@@ -151,6 +161,7 @@ impl From<url::ParseError> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -160,6 +171,7 @@ impl From<serde_json::Error> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -169,6 +181,7 @@ impl From<std::string::FromUtf8Error> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -178,6 +191,7 @@ impl From<ParseFloatError> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -186,6 +200,7 @@ impl From<ParseIntError> for AtomicError {
     fn from(error: ParseIntError) -> Self {
         AtomicError {
             message: error.to_string(),
+            subject: None,
             error_type: AtomicErrorType::OtherError,
         }
     }
@@ -196,6 +211,7 @@ impl From<DecodeError> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -204,6 +220,7 @@ impl From<ParseBoolError> for AtomicError {
     fn from(error: ParseBoolError) -> Self {
         AtomicError {
             message: error.to_string(),
+            subject: None,
             error_type: AtomicErrorType::OtherError,
         }
     }
@@ -214,6 +231,7 @@ impl From<Infallible> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -224,6 +242,7 @@ impl From<sled::Error> for AtomicError {
         AtomicError {
             message: error.to_string(),
             error_type: AtomicErrorType::OtherError,
+            subject: None,
         }
     }
 }
@@ -233,6 +252,7 @@ impl From<Box<bincode::ErrorKind>> for AtomicError {
     fn from(error: Box<bincode::ErrorKind>) -> Self {
         AtomicError {
             message: error.to_string(),
+            subject: None,
             error_type: AtomicErrorType::OtherError,
         }
     }

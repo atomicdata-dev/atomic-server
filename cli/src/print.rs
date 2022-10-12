@@ -16,13 +16,13 @@ pub const SERIALIZE_OPTIONS: [&str; 7] =
 pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
     let format = if let Some(preferred_format) = argmatches.value_of("as") {
         match preferred_format {
-            "pretty" => (Format::Pretty),
-            "json" => (Format::Json),
-            "jsonld" => (Format::JsonLd),
-            "jsonad" => (Format::JsonAd),
-            "nt" => (Format::NTriples),
-            "turtle" => (Format::NTriples),
-            "n3" => (Format::NTriples),
+            "pretty" => Format::Pretty,
+            "json" => Format::Json,
+            "jsonld" => Format::JsonLd,
+            "jsonad" => Format::JsonAd,
+            "nt" => Format::NTriples,
+            "turtle" => Format::NTriples,
+            "n3" => Format::NTriples,
             format => {
                 return Err(
                     format!("As {} not supported. Try {:?}", format, SERIALIZE_OPTIONS).into(),
@@ -38,14 +38,14 @@ pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
 /// Prints a resource for the terminal with readble formatting and colors
 pub fn pretty_print_resource(resource: &Resource, store: &impl Storelike) -> AtomicResult<String> {
     let mut output = String::new();
-    output.push_str(&*format!(
+    output.push_str(&format!(
         "{0: <15}{1: <10} \n",
         "subject".blue().bold(),
         resource.get_subject()
     ));
     for (prop_url, val) in resource.get_propvals() {
         let prop_shortname = store.get_property(prop_url)?.shortname;
-        output.push_str(&*format!(
+        output.push_str(&format!(
             "{0: <15}{1: <10} \n",
             prop_shortname.blue().bold(),
             val

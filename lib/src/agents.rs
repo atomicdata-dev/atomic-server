@@ -93,8 +93,8 @@ fn generate_keypair() -> AtomicResult<Pair> {
         .map_err(|e| format!("Error generating keypair {}", e))
         .unwrap();
     Ok(Pair {
-        private: base64::encode(&seed),
-        public: base64::encode(&key_pair.public_key()),
+        private: base64::encode(seed),
+        public: base64::encode(key_pair.public_key()),
     })
 }
 

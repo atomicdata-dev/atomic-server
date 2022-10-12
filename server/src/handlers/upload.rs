@@ -60,7 +60,7 @@ pub async fn upload_handler(
         let file_id = format!(
             "{}-{}",
             now(),
-            sanitize_filename::sanitize(&filename)
+            sanitize_filename::sanitize(filename)
                 // Spacebars lead to very annoying bugs in browsers
                 .replace(' ', "-")
         );

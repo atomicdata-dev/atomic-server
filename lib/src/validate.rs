@@ -125,16 +125,16 @@ impl std::fmt::Display for ValidationReport {
             return Ok(());
         }
         for (subject, error) in &self.unfetchable {
-            fmt.write_str(&*format!("Cannot fetch Resource {}: {} \n", subject, error))?;
+            fmt.write_str(&format!("Cannot fetch Resource {}: {} \n", subject, error))?;
         }
         for (subject, error) in &self.unfetchable_classes {
-            fmt.write_str(&*format!("Cannot fetch Class {}: {} \n", subject, error))?;
+            fmt.write_str(&format!("Cannot fetch Class {}: {} \n", subject, error))?;
         }
         for (subject, error) in &self.unfetchable_props {
-            fmt.write_str(&*format!("Cannot fetch Property {}: {} \n", subject, error))?;
+            fmt.write_str(&format!("Cannot fetch Property {}: {} \n", subject, error))?;
         }
         for (atom, error) in &self.invalid_value {
-            fmt.write_str(&*format!("Invalid value {:?}: {} \n", atom, error))?;
+            fmt.write_str(&format!("Invalid value {:?}: {} \n", atom, error))?;
         }
         Ok(())
     }

@@ -562,7 +562,7 @@ impl Storelike for Db {
                 let remove_atom = crate::Atom::new(subject.into(), prop.clone(), val.clone());
                 self.remove_atom_from_index(&remove_atom, &resource)?;
             }
-            let _found = self.resources.remove(&subject.as_bytes())?;
+            let _found = self.resources.remove(subject.as_bytes())?;
         } else {
             return Err(format!(
                 "Resource {} could not be deleted, because it was not found in the store.",
@@ -695,7 +695,7 @@ fn add_atom_to_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResu
 fn delete_atom_from_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
     store
         .reference_index
-        .remove(&key_for_reference_index(index_atom).as_bytes())?;
+        .remove(key_for_reference_index(index_atom).as_bytes())?;
     Ok(())
 }
 
