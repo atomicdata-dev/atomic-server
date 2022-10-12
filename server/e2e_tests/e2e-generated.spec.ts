@@ -327,9 +327,37 @@ test.describe('data-browser', async () => {
     const input = page.locator('[placeholder="https\\:\\/\\/example\\.com"]');
     await input.click();
     await input.fill('https://example.com');
-    await page.locator('footer >> text=Ok').click();
+    await page.locator('dialog[open] >> footer >> text=Ok').click();
 
     await expect(page.locator('text=This domain is ')).toBeVisible();
+  });
+
+  test('folder', async ({ page }) => {
+    await signIn(page);
+    await newDrive(page);
+
+    // Create a new folder
+    await newResource('folder', page);
+
+    // Fetch `example.com
+    const input = page.locator('[placeholder="New Folder"]');
+    await input.click();
+    await input.fill('RAM Downloads');
+    await page.locator('dialog[open] >> footer >> text=Ok').click();
+
+    await expect(page.locator('h1:text("Ram Downloads")')).toBeVisible();
+
+    await page.click('text=New Resource');
+    await page.click('button:has-text("Document")');
+    await page.locator(editableTitle).click();
+    await page.keyboard.type('RAM Downloading Strategies');
+    await page.keyboard.press('Enter');
+    await page.click('[data-test="sidebar"] >> text=RAM Downloads');
+    await expect(
+      page.locator(
+        '[data-test="folder-list"] >> text=RAM Downloading Strategies',
+      ),
+    ).toBeVisible();
   });
 
   test('drive switcher', async ({ page }) => {
