@@ -119,7 +119,7 @@ impl Commit {
                 .verify(stringified_commit.as_bytes(), &signature_bytes)
                 .map_err(|_e| {
                     format!(
-                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: {}",
+                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: '{}'",
                         stringified_commit,
                     )
                 })?;
@@ -449,7 +449,6 @@ impl Commit {
                     .to_string()
             }
         };
-        println!("commit subject: {}", commit_subject);
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
         resource.set_subject(commit_subject);
         resource.set_propval_unsafe(

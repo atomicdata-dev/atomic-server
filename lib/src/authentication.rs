@@ -40,7 +40,7 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
                 .verify(message.as_bytes(), &signature_bytes)
                 .map_err(|_e| {
                     format!(
-                        "Incorrect signature for auth headers. This could be due to an error during signing or serialization of the commit. Compare this to the serialized message in the client: {}",
+                        "Incorrect signature for auth headers. This could be due to an error during signing or serialization of the commit. Compare this to the serialized message in the client: '{}'",
                         message,
                     )
                 })?;

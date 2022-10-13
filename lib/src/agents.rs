@@ -91,7 +91,6 @@ impl Agent {
         private_key: &str,
     ) -> AtomicResult<Agent> {
         let keypair = generate_public_key(private_key);
-        println!("server url: {}", store.get_server_url());
         let subject = store
             .get_server_url()
             .url()

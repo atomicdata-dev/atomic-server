@@ -263,7 +263,6 @@ impl Storelike for Db {
         update_index: bool,
         overwrite_existing: bool,
     ) -> AtomicResult<()> {
-        println!("add_resource_opts {}", resource.get_subject());
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
         let existing = self.get_propvals(resource.get_subject()).ok();
