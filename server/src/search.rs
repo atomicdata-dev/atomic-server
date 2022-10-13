@@ -1,7 +1,6 @@
 //! Full-text search, powered by Tantivy.
 //! A folder for the index is stored in the config.
 //! You can see the Endpoint on `http://localhost/search`
-
 use atomic_lib::Db;
 use atomic_lib::Resource;
 use atomic_lib::Storelike;
@@ -19,6 +18,7 @@ pub struct Fields {
     pub subject: Field,
     pub property: Field,
     pub value: Field,
+    pub hierarchy: Field,
 }
 
 /// Contains the index and the schema. for search
@@ -60,6 +60,7 @@ pub fn build_schema() -> AtomicServerResult<tantivy::schema::Schema> {
     schema_builder.add_text_field("subject", TEXT | STORED);
     schema_builder.add_text_field("property", TEXT | STORED);
     schema_builder.add_text_field("value", TEXT | STORED);
+    schema_builder.add_facet_field("hierarchy", STORED);
     let schema = schema_builder.build();
     Ok(schema)
 }
@@ -98,11 +99,16 @@ pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
         .schema
         .get_field("value")
         .ok_or("No 'value' in the schema")?;
+    let hierarchy = appstate
+        .schema
+        .get_field("hierarchy")
+        .ok_or("No 'hierarchy' in the schema")?;
 
     Ok(Fields {
         subject,
         property,
         value,
+        hierarchy,
     })
 }
 
@@ -115,7 +121,7 @@ pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServer
         if resource.get_subject().contains("/commits/") {
             continue;
         }
-        add_resource(search_state, &resource)?;
+        add_resource(search_state, &resource, store)?;
     }
     search_state.writer.write()?.commit()?;
     Ok(())
@@ -124,11 +130,17 @@ pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServer
 /// Adds a single resource to the search index, but does _not_ commit!
 /// Does not index outgoing links, or resourcesArrays
 /// `appstate.search_index_writer.write()?.commit()?;`
-#[tracing::instrument(skip(appstate))]
-pub fn add_resource(appstate: &SearchState, resource: &Resource) -> AtomicServerResult<()> {
+#[tracing::instrument(skip(appstate, store))]
+pub fn add_resource(
+    appstate: &SearchState,
+    resource: &Resource,
+    store: &Db,
+) -> AtomicServerResult<()> {
     let fields = get_schema_fields(appstate)?;
     let subject = resource.get_subject();
     let writer = appstate.writer.read()?;
+    let hierarchy = resource_to_facet(resource, store)?;
+
     for (prop, val) in resource.get_propvals() {
         match val {
             atomic_lib::Value::AtomicUrl(_) | atomic_lib::Value::ResourceArray(_) => continue,
@@ -138,6 +150,7 @@ pub fn add_resource(appstate: &SearchState, resource: &Resource) -> AtomicServer
                     subject.into(),
                     prop.into(),
                     val.to_string(),
+                    Some(hierarchy.clone()),
                     &fields,
                 )?;
             }
@@ -146,9 +159,9 @@ pub fn add_resource(appstate: &SearchState, resource: &Resource) -> AtomicServer
     Ok(())
 }
 
-// / Removes a single resource from the search index, but does _not_ commit!
-// / Does not index outgoing links, or resourcesArrays
-// / `appstate.search_index_writer.write()?.commit()?;`
+/// Removes a single resource from the search index, but does _not_ commit!
+/// Does not index outgoing links, or resourcesArrays
+/// `appstate.search_index_writer.write()?.commit()?;`
 #[tracing::instrument(skip(search_state))]
 pub fn remove_resource(search_state: &SearchState, subject: &str) -> AtomicServerResult<()> {
     let fields = get_schema_fields(search_state)?;
@@ -166,12 +179,18 @@ pub fn add_triple(
     subject: String,
     property: String,
     value: String,
+    hierarchy: Option<Facet>,
     fields: &Fields,
 ) -> AtomicServerResult<()> {
     let mut doc = Document::default();
     doc.add_text(fields.property, property);
     doc.add_text(fields.value, value);
     doc.add_text(fields.subject, subject);
+
+    if let Some(hierarchy) = hierarchy {
+        doc.add_facet(fields.hierarchy, hierarchy);
+    }
+
     writer.add_document(doc)?;
     Ok(())
 }
@@ -182,4 +201,83 @@ pub fn get_reader(index: &tantivy::Index) -> AtomicServerResult<tantivy::IndexRe
         .reader_builder()
         .reload_policy(ReloadPolicy::OnCommit)
         .try_into()?)
+}
+
+pub fn subject_to_facet(subject: String) -> AtomicServerResult<Facet> {
+    Facet::from_encoded(subject.into_bytes())
+        .map_err(|e| format!("Failed to create facet from subject. Error: {}", e).into())
+}
+
+pub fn resource_to_facet(resource: &Resource, store: &Db) -> AtomicServerResult<Facet> {
+    let mut parent_tree = resource.get_parent_tree(store)?;
+    parent_tree.reverse();
+
+    let mut hierarchy_bytes: Vec<u8> = Vec::new();
+
+    for (index, parent) in parent_tree.iter().enumerate() {
+        let facet = subject_to_facet(parent.get_subject().to_string())?;
+
+        if index != 0 {
+            hierarchy_bytes.push(0u8);
+        }
+
+        hierarchy_bytes.append(&mut facet.encoded_str().to_string().into_bytes());
+    }
+    let leaf_facet = subject_to_facet(resource.get_subject().to_string())?;
+
+    if !hierarchy_bytes.is_empty() {
+        hierarchy_bytes.push(0u8);
+    }
+
+    hierarchy_bytes.append(&mut leaf_facet.encoded_str().to_string().into_bytes());
+
+    let result = Facet::from_encoded(hierarchy_bytes)
+        .map_err(|e| format!("Failed to convert resource to facet, Error: {}", e))
+        .unwrap();
+
+    Ok(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use atomic_lib::{urls, Resource, Storelike};
+
+    use super::resource_to_facet;
+    #[test]
+    fn facet_contains_subfacet() {
+        let store = atomic_lib::Db::init_temp("populate_collections").unwrap();
+        let mut prev_subject: Option<String> = None;
+        let mut resources = Vec::new();
+
+        for index in [0, 1, 2].iter() {
+            let subject = format!("http://example.com/{}", index);
+
+            let mut resource = Resource::new(subject.clone());
+            if let Some(prev_subject) = prev_subject.clone() {
+                resource
+                    .set_propval_string(urls::PARENT.into(), &prev_subject, &store)
+                    .unwrap();
+            }
+
+            prev_subject = Some(subject.clone());
+
+            store.add_resource(&resource).unwrap();
+            resources.push(resource);
+        }
+
+        let parent_tree = resources[2].get_parent_tree(&store).unwrap();
+        assert_eq!(parent_tree.len(), 2);
+
+        let index_facet = resource_to_facet(&resources[2], &store).unwrap();
+
+        let query_facet_direct_parent = resource_to_facet(&resources[1], &store).unwrap();
+        let query_facet_root = resource_to_facet(&resources[0], &store).unwrap();
+
+        // println!("Index: {:?}", index_facet);
+        // println!("query direct: {:?}", query_facet_direct_parent);
+        // println!("query root: {:?}", query_facet_root);
+
+        assert!(query_facet_direct_parent.is_prefix_of(&index_facet));
+        assert!(query_facet_root.is_prefix_of(&index_facet));
+    }
 }

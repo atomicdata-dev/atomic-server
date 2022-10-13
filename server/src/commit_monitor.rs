@@ -122,7 +122,7 @@ impl CommitMonitor {
                 crate::search::remove_resource(&self.search_state, &target)?;
             };
             // Add new resource to search index
-            crate::search::add_resource(&self.search_state, resource)?;
+            crate::search::add_resource(&self.search_state, resource, &self.store)?;
             self.run_expensive_next_tick = true;
         } else {
             // If there is no new resource, it must have been deleted, so let's remove it from the search index.

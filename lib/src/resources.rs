@@ -127,6 +127,19 @@ impl Resource {
         }
     }
 
+    /// Walks the parent tree upwards until there is no parent, then returns them as a vector.
+    pub fn get_parent_tree(&self, store: &impl Storelike) -> AtomicResult<Vec<Resource>> {
+        let mut parents: Vec<Resource> = Vec::new();
+        let mut current = self.clone();
+
+        while let Ok(parent) = current.get_parent(store) {
+            parents.push(parent.clone());
+            current = parent;
+        }
+
+        Ok(parents)
+    }
+
     /// Returns all PropVals.
     /// Useful if you want to iterate over all Atoms / Properties.
     pub fn get_propvals(&self) -> &PropVals {

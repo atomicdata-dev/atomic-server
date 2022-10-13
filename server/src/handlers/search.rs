@@ -4,9 +4,15 @@
 //! Tantivy requires a strict schema, whereas Atomic is dynamic.
 //! We deal with this discrepency by
 
-use crate::{appstate::AppState, errors::AtomicServerResult};
+use std::collections::HashSet;
+
+use crate::{
+    appstate::AppState,
+    errors::{AtomicServerError, AtomicServerResult},
+    search::{resource_to_facet, Fields},
+};
 use actix_web::{web, HttpResponse};
-use atomic_lib::{urls, Resource, Storelike};
+use atomic_lib::{errors::AtomicResult, urls, Db, Resource, Storelike};
 use serde::Deserialize;
 use tantivy::{collector::TopDocs, query::QueryParser};
 
@@ -20,6 +26,8 @@ pub struct SearchQuery {
     pub limit: Option<usize>,
     /// Filter by Property URL
     pub property: Option<String>,
+    /// Only include resources that have this resource as its ancestor
+    pub parent: Option<String>,
 }
 
 /// Parses a search query and responds with a list of resources
@@ -43,109 +51,44 @@ pub async fn search_query(
         default_limit
     };
 
-    let mut should_fuzzy = true;
-    if params.property.is_some() {
-        // Fuzzy searching is not possible when filtering by property
-        should_fuzzy = false;
-    }
+    // With this first limit, we go for a greater number - as the user may not have the rights to the first ones!
+    // We filter these results later.
+    // https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
+    let initial_results_limit = 100;
 
-    let mut subjects: Vec<String> = Vec::new();
-    // These are not used at this moment, but would be quite useful in RDF context.
-    let mut atoms: Vec<StringAtom> = Vec::new();
+    let mut query_list: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+
+    if let Some(parent) = params.parent.clone() {
+        let query = build_parent_query(parent, &fields, store)?;
+
+        query_list.push((tantivy::query::Occur::Must, Box::new(query)));
+    }
 
     if let Some(q) = params.q.clone() {
-        // If any of these substrings appear, the user wants an exact / advanced search
-        let dont_fuzz_strings = vec!["*", "AND", "OR", "[", "\"", ":", "+", "-", " "];
-        for substr in dont_fuzz_strings {
-            if q.contains(substr) {
-                should_fuzzy = false
-            }
-        }
+        let fuzzy = should_fuzzy(&params.property, &q);
 
-        let query: Box<dyn tantivy::query::Query> = if should_fuzzy {
-            let term = tantivy::Term::from_field_text(fields.value, &q);
-            let query = tantivy::query::FuzzyTermQuery::new_prefix(term, 1, true);
-            Box::new(query)
+        let query = if fuzzy {
+            build_fuzzy_query(&fields, &q)?
         } else {
-            // construct the query
-            let query_parser = QueryParser::for_index(
+            build_query(
+                &fields,
+                &q,
+                params.property.clone(),
                 &appstate.search_state.index,
-                vec![
-                    fields.subject,
-                    // I don't think we need to search in the property
-                    // fields.property,
-                    fields.value,
-                ],
-            );
-            let full_query = if let Some(prop) = &params.property {
-                format!("property:{:?} AND {}", prop, &q)
-            } else {
-                q
-            };
-            query_parser
-                .parse_query(&full_query)
-                .map_err(|e| format!("Error parsing query {}", e))?
+            )?
         };
 
-        // With this first limit, we go for a greater number - as the user may not have the rights to the first ones!
-        // We filter these results later.
-        // https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
-        let initial_results_limit = 100;
-
-        // execute the query
-        let top_docs = searcher
-            .search(&query, &TopDocs::with_limit(initial_results_limit))
-            .map_err(|e| format!("Error with creating search results: {} ", e))?;
-
-        // convert found documents to resources
-        for (_score, doc_address) in top_docs {
-            let retrieved_doc = searcher.doc(doc_address)?;
-            let subject_val = retrieved_doc.get_first(fields.subject).ok_or("No 'subject' in search doc found. This is required when indexing. Run with --rebuild-index")?;
-            let prop_val = retrieved_doc.get_first(fields.property).ok_or("No 'property' in search doc found. This is required when indexing. Run with --rebuild-index")?;
-            let value_val = retrieved_doc.get_first(fields.value).ok_or("No 'value' in search doc found. This is required when indexing. Run with --rebuild-index")?;
-            let subject = match subject_val {
-                tantivy::schema::Value::Str(s) => s.to_string(),
-                _else => {
-                    return Err(format!(
-                        "Search schema error: Subject is not a string! Doc: {:?}",
-                        retrieved_doc
-                    )
-                    .into())
-                }
-            };
-            let property = match prop_val {
-                tantivy::schema::Value::Str(s) => s.to_string(),
-                _else => {
-                    return Err(format!(
-                        "Search schema error: Property is not a string! Doc: {:?}",
-                        retrieved_doc
-                    )
-                    .into())
-                }
-            };
-            let value = match value_val {
-                tantivy::schema::Value::Str(s) => s.to_string(),
-                _else => {
-                    return Err(format!(
-                        "Search schema error: Value is not a string! Doc: {:?}",
-                        retrieved_doc
-                    )
-                    .into())
-                }
-            };
-            if subjects.contains(&subject) {
-                continue;
-            } else {
-                subjects.push(subject.clone());
-                let atom = StringAtom {
-                    subject,
-                    property,
-                    value,
-                };
-                atoms.push(atom);
-            }
-        }
+        query_list.push((tantivy::query::Occur::Must, query));
     }
+
+    let query = tantivy::query::BooleanQuery::new(query_list);
+
+    // execute the query
+    let top_docs = searcher
+        .search(&query, &TopDocs::with_limit(initial_results_limit))
+        .map_err(|e| format!("Error with creating search results: {} ", e))?;
+
+    let (subjects, _atoms) = docs_to_resources(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
     // You'd think there would be a simpler way of getting the requested URL...
@@ -213,7 +156,7 @@ pub async fn search_index_rdf(
                 get_inner_value(t.object),
             ) {
                 (Some(s), Some(p), Some(o)) => {
-                    crate::search::add_triple(&writer, s, p, o, &fields).ok();
+                    crate::search::add_triple(&writer, s, p, o, None, &fields).ok();
                 }
                 _ => return Ok(()),
             };
@@ -244,9 +187,125 @@ fn get_inner_value(t: Term) -> Option<String> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, std::hash::Hash, Eq, PartialEq)]
 pub struct StringAtom {
     pub subject: String,
     pub property: String,
     pub value: String,
+}
+
+fn should_fuzzy(property: &Option<String>, q: &str) -> bool {
+    if property.is_some() {
+        // Fuzzy searching is not possible when filtering by property
+        return false;
+    }
+
+    // If any of these substrings appear, the user wants an exact / advanced search
+    let dont_fuzz_strings = vec!["*", "AND", "OR", "[", "\"", ":", "+", "-", " "];
+    for substr in dont_fuzz_strings {
+        if q.contains(substr) {
+            return false;
+        }
+    }
+
+    true
+}
+
+fn build_fuzzy_query(fields: &Fields, q: &str) -> AtomicResult<Box<dyn tantivy::query::Query>> {
+    let term = tantivy::Term::from_field_text(fields.value, q);
+    let query = tantivy::query::FuzzyTermQuery::new_prefix(term, 1, true);
+
+    Ok(Box::new(query))
+}
+
+fn build_query(
+    fields: &Fields,
+    q: &str,
+    property: Option<String>,
+    index: &tantivy::Index,
+) -> AtomicResult<Box<dyn tantivy::query::Query>> {
+    // construct the query
+    let query_parser = QueryParser::for_index(
+        index,
+        vec![
+            fields.subject,
+            // I don't think we need to search in the property
+            // fields.property,
+            fields.value,
+        ],
+    );
+
+    let query_text = if let Some(prop) = property {
+        format!("property:{:?} AND {}", prop, &q)
+    } else {
+        q.to_string()
+    };
+
+    let query = query_parser
+        .parse_query(&query_text)
+        .map_err(|e| format!("Error parsing query {}", e))?;
+
+    Ok(query)
+}
+
+fn build_parent_query(
+    subject: String,
+    fields: &Fields,
+    store: &Db,
+) -> AtomicServerResult<tantivy::query::TermQuery> {
+    let resource = store.get_resource(subject.as_str())?;
+    let facet = resource_to_facet(&resource, store)?;
+
+    let term = tantivy::Term::from_facet(fields.hierarchy, &facet);
+
+    Ok(tantivy::query::TermQuery::new(
+        term,
+        tantivy::schema::IndexRecordOption::Basic,
+    ))
+}
+
+fn unpack_value(
+    value: &tantivy::schema::Value,
+    document: &tantivy::Document,
+    name: String,
+) -> Result<String, AtomicServerError> {
+    match value {
+        tantivy::schema::Value::Str(s) => Ok(s.to_string()),
+        _else => Err(format!(
+            "Search schema error: {} is not a string! Doc: {:?}",
+            name, document
+        )
+        .into()),
+    }
+}
+
+fn docs_to_resources(
+    docs: Vec<(f32, tantivy::DocAddress)>,
+    fields: &Fields,
+    searcher: &tantivy::LeasedItem<tantivy::Searcher>,
+) -> Result<(Vec<String>, Vec<StringAtom>), AtomicServerError> {
+    let mut subjects: HashSet<String> = HashSet::new();
+    // These are not used at this moment, but would be quite useful in RDF context.
+    let mut atoms: HashSet<StringAtom> = HashSet::new();
+
+    // convert found documents to resources
+    for (_score, doc_address) in docs {
+        let retrieved_doc = searcher.doc(doc_address)?;
+        let subject_val = retrieved_doc.get_first(fields.subject).ok_or("No 'subject' in search doc found. This is required when indexing. Run with --rebuild-index")?;
+        let prop_val = retrieved_doc.get_first(fields.property).ok_or("No 'property' in search doc found. This is required when indexing. Run with --rebuild-index")?;
+        let value_val = retrieved_doc.get_first(fields.value).ok_or("No 'value' in search doc found. This is required when indexing. Run with --rebuild-index")?;
+
+        let subject = unpack_value(subject_val, &retrieved_doc, "Subject".to_string())?;
+        let property = unpack_value(prop_val, &retrieved_doc, "Property".to_string())?;
+        let value = unpack_value(value_val, &retrieved_doc, "Value".to_string())?;
+
+        subjects.insert(subject.clone());
+        atoms.insert(StringAtom {
+            subject,
+            property,
+            value,
+        });
+    }
+
+    Ok((subjects.into_iter().collect(), atoms.into_iter().collect()))
 }
