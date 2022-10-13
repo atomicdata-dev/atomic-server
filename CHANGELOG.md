@@ -6,6 +6,7 @@ Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHAN
 
 ## Unreleased
 
+- Add parent parameter to search endpoint which scopes a search to only the decendants of the given resource.
 - Bookmark endpoint now also retrieves `og:image` and `og:description` #510
 
 ## [v0.33.1] - 2022-09-25
@@ -291,7 +292,7 @@ You can still build from source by cloning the repo.
 
 ## [v0.23.3]
 
-- Added import / export to server and lib  #121
+- Added import / export to server and lib #121
 - Added basic cli functionality with Clap to server #125
 - Added multi-resource JSON-AD array parsing #123
 - Use JSON-LD as default store #79
