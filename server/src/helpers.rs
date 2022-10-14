@@ -1,8 +1,11 @@
 //! Functions useful in the server
 
-use actix_web::http::header::HeaderMap;
+use actix_web::cookie::Cookie;
+use actix_web::http::header::{HeaderMap, HeaderValue};
 use atomic_lib::authentication::AuthValues;
+use percent_encoding::percent_decode_str;
 
+use crate::errors::{AppErrorType, AtomicServerError};
 use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
 
 // Returns None if the string is empty.
@@ -56,6 +59,44 @@ pub fn get_auth_headers(
     }
 }
 
+pub fn get_auth_from_cookie(
+    map: &HeaderMap,
+    requested_subject: &String,
+) -> Option<AtomicServerResult<Option<AuthValues>>> {
+    let encoded_session = session_cookie_from_header(map.get("Cookie")?)?;
+
+    let session = base64::decode(encoded_session).ok()?;
+    let session_str = std::str::from_utf8(&session).ok()?;
+    let values: Result<AuthValues, AtomicServerError> =
+        serde_json::from_str(session_str).map_err(|_| AtomicServerError {
+            message: "Malformed authentication resource".to_string(),
+            error_type: AppErrorType::Unauthorized,
+            error_resource: None,
+        });
+
+    if let Ok(auth_values) = values {
+        if auth_values.requested_subject.eq(requested_subject) {
+            return Some(Err(AtomicServerError {
+                message: "Wrong requested subject".to_string(),
+                error_type: AppErrorType::Unauthorized,
+                error_resource: None,
+            }));
+        }
+
+        Some(Ok(Some(auth_values)))
+    } else {
+        Some(Err(values.err().unwrap()))
+    }
+}
+
+pub fn get_auth(
+    map: &HeaderMap,
+    requested_subject: String,
+) -> AtomicServerResult<Option<AuthValues>> {
+    let cookie_result = get_auth_from_cookie(map, &requested_subject);
+    cookie_result.unwrap_or_else(|| get_auth_headers(map, requested_subject))
+}
+
 /// Checks for authentication headers and returns Some agent's subject if everything is well.
 /// Skips these checks in public_mode and returns Ok(None).
 #[tracing::instrument(skip(appstate))]
@@ -68,7 +109,7 @@ pub fn get_client_agent(
         return Ok(None);
     }
     // Authentication check. If the user has no headers, continue with the Public Agent.
-    let auth_header_values = get_auth_headers(headers, requested_subject)?;
+    let auth_header_values = get_auth(headers, requested_subject)?;
     let for_agent = atomic_lib::authentication::get_agent_from_auth_values_and_check(
         auth_header_values,
         &appstate.store,
@@ -92,5 +133,19 @@ pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
         };
         return Some((content_type, path));
     }
+    None
+}
+
+fn session_cookie_from_header(header: &HeaderValue) -> Option<String> {
+    let cookies: Vec<&str> = header.to_str().ok()?.split(';').collect();
+
+    for encoded_cookie in cookies {
+        let cookie = Cookie::parse(encoded_cookie).ok()?;
+        if cookie.name() == "atomic_session" {
+            let decoded = percent_decode_str(cookie.value()).decode_utf8().ok()?;
+            return Some(String::from(decoded));
+        }
+    }
+
     None
 }
