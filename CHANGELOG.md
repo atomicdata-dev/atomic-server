@@ -9,6 +9,7 @@ Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHAN
 - Add parent parameter to search endpoint which scopes a search to only the descendants of the given resource. #226
 - Bookmark endpoint now also retrieves `og:image` and `og:description` #510
 - Give server agent rights to edit all resources, fix issue with accepting invites in private drives #521
+- Add cookie based authentication #512
 
 ## [v0.33.1] - 2022-09-25
 
