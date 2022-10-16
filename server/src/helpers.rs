@@ -297,3 +297,32 @@ mod test {
         assert_eq!(out.requested_subject, subject);
     }
 }
+
+/// Extracts the full URL from the request, connection and the store.
+// You'd think there would be a simpler way of getting the requested URL...
+// See https://github.com/actix/actix-web/issues/2895
+pub fn get_subject(
+    req: &actix_web::HttpRequest,
+    conn: &actix_web::dev::ConnectionInfo,
+    appstate: &AppState,
+) -> AtomicServerResult<String> {
+    let domain = &appstate.config.opts.domain;
+    let host = conn.host();
+    let subdomain = if let Some(index) = host.find(domain) {
+        if index == 0 {
+            None
+        } else {
+            Some(host[0..index - 1].to_string())
+        }
+    } else {
+        panic!("Wrong domain! A requested URL did not contain the host for this domain. This should not be able to happen.");
+    };
+
+    let mut subject_url = appstate.store.get_server_url().clone();
+    if let Some(sd) = subdomain {
+        subject_url.set_subdomain(Some(&sd))?;
+    }
+    let server_without_last_slash = subject_url.to_string().trim_end_matches('/').to_string();
+    let subject = format!("{}{}", server_without_last_slash, &req.uri().to_string());
+    Ok(subject)
+}
