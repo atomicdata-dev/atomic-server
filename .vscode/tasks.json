@@ -26,9 +26,9 @@
 			"group": "test"
 		},
 		{
-			"label": "test end-to-end / E2E (npm playwright)",
+			"label": "test end-to-end / E2E (pnpm playwright)",
 			"type": "shell",
-			"command": "cd server/e2e_tests/ && npm i && npm run test",
+			"command": "cd server/e2e_tests/ && pnpm i && pnpm run test",
 			"group": "test"
 		},
 		{
