@@ -112,7 +112,11 @@ impl Agent {
         Ok(Agent {
             private_key: None,
             public_key: public_key.into(),
-            subject: format!("{}/agents/{}", store.get_server_url(), public_key),
+            subject: store
+                .get_server_url()
+                .clone()
+                .set_path(&format!("agents/{}", public_key))
+                .to_string(),
             name: None,
             created_at: crate::utils::now(),
         })

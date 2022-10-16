@@ -111,6 +111,7 @@ impl AtomicUrl {
         Ok(self)
     }
 
+    /// Removes existing path, sets the new one. Escapes special characters
     pub fn set_path(&mut self, path: &str) -> &Self {
         self.url.set_path(path);
         self
