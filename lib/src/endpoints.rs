@@ -58,7 +58,11 @@ pub struct PostEndpoint {
 impl Endpoint {
     /// Converts Endpoint to resource. Does not save it.
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        let subject = format!("{}{}", store.get_server_url(), self.path);
+        let subject = store
+            .get_server_url()
+            .clone()
+            .set_path(&self.path)
+            .to_string();
         let mut resource = store.get_resource_new(&subject);
         resource.set_propval_string(urls::DESCRIPTION.into(), &self.description, store)?;
         resource.set_propval_string(urls::SHORTNAME.into(), &self.shortname, store)?;
@@ -71,6 +75,14 @@ impl Endpoint {
             store,
         )?;
         Ok(resource)
+    }
+}
+
+impl std::fmt::Debug for Endpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Endpoint")
+            .field("path", &self.path)
+            .finish()
     }
 }
 
