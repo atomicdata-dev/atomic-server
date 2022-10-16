@@ -55,7 +55,7 @@ test.describe('data-browser', async () => {
 
     // Sometimes we run the test server on a different port, but we should
     // only change the drive if it is non-default.
-    if (serverUrl !== 'http://localhost:9883') {
+    if (serverUrl !== defaultDevServer) {
       await changeDrive(serverUrl, page);
     }
 
@@ -440,7 +440,7 @@ test.describe('data-browser', async () => {
   test('configure drive page', async ({ page }) => {
     await signIn(page);
     await openDriveMenu(page);
-    await expect(page.locator(currentDriveTitle)).toHaveText('localhost');
+    await expect(page.locator(currentDriveTitle)).toHaveText('Main drive');
 
     // temp disable this, because of trailing slash in base URL
     // await page.click(':text("https://atomicdata.dev") + button:text("Select")');
