@@ -33,6 +33,8 @@ const publicReadRight =
 const contextMenu = '[data-test="context-menu"]';
 const addressBar = '[data-test="address-bar"]';
 const defaultDevServer = 'http://localhost:9883';
+// Depends on server index throttle time, `commit_monitor.rs`
+const REBUILD_INDEX_TIME = 6000;
 
 test.describe('data-browser', async () => {
   test.beforeEach(async ({ page }) => {
@@ -108,6 +110,59 @@ test.describe('data-browser', async () => {
     await page.fill(addressBar, 'setup');
     await page.click('text=setup');
     await expect(page.locator('text=Use this Invite')).toBeVisible();
+  });
+
+  test('scoped search', async ({ page }) => {
+    await signIn(page);
+    await newDrive(page);
+
+    // Create folder called 'Not This folder'
+    await page.locator('[data-test="sidebar-new-resource"]').click();
+    await page.locator('button:has-text("folder")').click();
+    await page.locator('[placeholder="New Folder"]').fill('Not This Folder');
+    await page.locator('text=Ok').nth(1).click();
+
+    // Create document called 'Avocado Salad'
+    await page.locator('button:has-text("New Resource")').click();
+    await page.locator('button:has-text("document")').click();
+    await page.waitForResponse(`${serverUrl}/commit`);
+    // commit for initializing the first element (paragraph)
+    await page.waitForResponse(`${serverUrl}/commit`);
+    await editTitle('Avocado Salad', page);
+
+    await page.locator('[data-test="sidebar-new-resource"]').click();
+
+    // Create folder called 'This folder'
+    await page.locator('button:has-text("folder")').click();
+    await page.locator('[placeholder="New Folder"]').fill('This Folder');
+    await page.locator('text=Ok').nth(1).click();
+
+    // Create document called 'Avocado Salad'
+    await page.locator('button:has-text("New Resource")').click();
+    await page.locator('button:has-text("document")').click();
+    await page.waitForResponse(`${serverUrl}/commit`);
+    // commit for initializing the first element (paragraph)
+    await page.waitForResponse(`${serverUrl}/commit`);
+    await editTitle('Avocado Cake', page);
+
+    await clickSidebarItem('This Folder', page);
+
+    // Set search scope to 'This folder'
+
+    await page.waitForTimeout(REBUILD_INDEX_TIME);
+    await page.locator('button[title="Search in This Folder"]').click();
+    // Search for 'Avocado'
+    await page.locator('[data-test="address-bar"]').type('Avocado');
+    await expect(page.locator('h2:text("Avocado Cake")')).toBeVisible();
+    await expect(page.locator('h2:text("Avocado Salad")')).not.toBeVisible();
+
+    // Remove scope
+    await page.locator('button[title="Clear scope"]').click();
+
+    await expect(page.locator('h2:text("Avocado Cake")').first()).toBeVisible();
+    await expect(
+      page.locator('h2:text("Avocado Salad")').first(),
+    ).toBeVisible();
   });
 
   test('collections & data view', async ({ page }) => {
@@ -623,4 +678,17 @@ async function changeDrive(subject: string, page: Page) {
   await page.fill('[data-test="server-url-input"]', subject);
   await page.click('[data-test="server-url-save"]');
   await expect(page.locator('text=Create new resource')).toBeVisible();
+}
+
+async function editTitle(title: string, page: Page) {
+  await page.locator(editableTitle).click();
+  // These keys make sure the onChange handler is properly called
+  await page.keyboard.press('Space');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.type(title);
+  await page.waitForResponse(`${serverUrl}/commit`);
+}
+
+async function clickSidebarItem(text: string, page: Page) {
+  await page.click(`[data-test="sidebar"] >> text="${text}"`);
 }
