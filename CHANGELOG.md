@@ -6,7 +6,7 @@ Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHAN
 
 ## Unreleased
 
-- Add parent parameter to search endpoint which scopes a search to only the decendants of the given resource.
+- Add parent parameter to search endpoint which scopes a search to only the descendants of the given resource. #226
 - Bookmark endpoint now also retrieves `og:image` and `og:description` #510
 
 ## [v0.33.1] - 2022-09-25

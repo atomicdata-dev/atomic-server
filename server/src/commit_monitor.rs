@@ -29,7 +29,8 @@ pub struct CommitMonitor {
     run_expensive_next_tick: bool,
 }
 
-const EXPENSIVE_SEARCH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(15);
+// Only runs expensive index operation (tantivy) once every x seconds
+const REBUILD_INDEX_TIME: std::time::Duration = std::time::Duration::from_secs(5);
 
 // Since his Actor only starts once, there is no need to handle its lifecycle
 impl Actor for CommitMonitor {
@@ -39,7 +40,7 @@ impl Actor for CommitMonitor {
         tracing::debug!("CommitMonitor started");
 
         // spawn an interval stream into our context
-        actix::utils::IntervalFunc::new(EXPENSIVE_SEARCH_INTERVAL, Self::tick)
+        actix::utils::IntervalFunc::new(REBUILD_INDEX_TIME, Self::tick)
             .finish()
             .spawn(ctx);
     }
