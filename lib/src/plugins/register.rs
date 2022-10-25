@@ -1,6 +1,13 @@
 //! Creates a new Drive and optionally also an Agent.
 
-use crate::{agents::Agent, endpoints::Endpoint, errors::AtomicResult, urls, Resource, Storelike};
+use crate::{
+    agents::Agent,
+    endpoints::Endpoint,
+    errors::AtomicResult,
+    urls::{self, PUBLIC_AGENT},
+    values::SubResource,
+    Resource, Storelike,
+};
 
 pub fn register_endpoint() -> Endpoint {
     Endpoint {
@@ -41,13 +48,16 @@ pub fn construct_register_redirect(
         return Err("No name provided".into());
     };
 
-    let mut new_agent = None;
-
     let drive_creator_agent: String = if let Some(key) = pub_key {
-        let new = Agent::new_from_public_key(store, &key)?.subject;
-        new_agent = Some(new.clone());
-        new
+        let mut new = Agent::new_from_public_key(store, &key)?;
+        new.name = Some(name.clone());
+        let net_agent_subject = new.subject.to_string();
+        new.to_resource()?.save(store)?;
+        net_agent_subject
     } else if let Some(agent) = for_agent {
+        if agent == PUBLIC_AGENT {
+            return Err("No `public-key` provided.".into());
+        }
         agent.to_string()
     } else {
         return Err("No `public-key` provided".into());
@@ -56,16 +66,23 @@ pub fn construct_register_redirect(
     // Create the new Drive
     let drive = crate::populate::create_drive(store, Some(&name), &drive_creator_agent, false)?;
 
+    // Add the drive to the Agent's list of drives
+    let mut agent = store.get_resource(&drive_creator_agent)?;
+    agent.push_propval(
+        urls::DRIVES,
+        SubResource::Subject(drive.get_subject().into()),
+        true,
+    )?;
+    agent.save_locally(store)?;
+
     // Construct the Redirect Resource, which might provide the Client with a Subject for his Agent.
     let mut redirect = Resource::new_instance(urls::REDIRECT, store)?;
     redirect.set_propval_string(urls::DESTINATION.into(), drive.get_subject(), store)?;
-    if let Some(agent) = new_agent {
-        redirect.set_propval(
-            urls::REDIRECT_AGENT.into(),
-            crate::Value::AtomicUrl(agent),
-            store,
-        )?;
-    }
+    redirect.set_propval(
+        urls::REDIRECT_AGENT.into(),
+        crate::Value::AtomicUrl(drive_creator_agent),
+        store,
+    )?;
     // The front-end requires the @id to be the same as requested
     redirect.set_subject(requested_subject);
     Ok(redirect)

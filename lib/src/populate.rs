@@ -175,9 +175,9 @@ pub fn create_drive(
         self_url.to_string()
     };
 
-    let mut drive = if drive_name.is_some() {
+    let mut drive = if let Some(drive_name_some) = drive_name {
         if store.get_resource(&drive_subject).is_ok() {
-            return Err("Drive URL is already taken".into());
+            return Err(format!("Name '{}' is already taken", drive_name_some).into());
         }
         Resource::new(drive_subject)
     } else {
