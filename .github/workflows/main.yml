@@ -150,3 +150,9 @@ jobs:
           pnpm install
           pnpm run install-playwright
           pnpm run test
+      - name: Upload test artifacts
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: test-results
+          path: ./server/e2e_tests/test-results/
