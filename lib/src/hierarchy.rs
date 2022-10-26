@@ -114,6 +114,11 @@ pub fn check_rights(
     if resource.get_subject() == for_agent {
         return Ok("Agents can always edit themselves or their children.".into());
     }
+    if let Ok(server_agent) = store.get_default_agent() {
+        if server_agent.subject == for_agent {
+            return Ok("Server agent has root access, and can edit anything.".into());
+        }
+    }
 
     // Handle Commits.
     if let Ok(commit_subject) = resource.get(urls::SUBJECT) {
