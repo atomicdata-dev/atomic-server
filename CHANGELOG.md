@@ -10,6 +10,7 @@ Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHAN
 - Bookmark endpoint now also retrieves `og:image` and `og:description` #510
 - Give server agent rights to edit all resources, fix issue with accepting invites in private drives #521
 - Add cookie based authentication #512
+- `Store::all_resources` returns `Iterator` instead of `Vec` #522 #487
 
 ## [v0.33.1] - 2022-09-25
 
