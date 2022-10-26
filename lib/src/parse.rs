@@ -427,13 +427,14 @@ mod test {
         use crate::Storelike;
         let store1 = crate::Store::init().unwrap();
         store1.populate().unwrap();
-        let serialized =
-            crate::serialize::resources_to_json_ad(&store1.all_resources(true)).unwrap();
         let store2 = crate::Store::init().unwrap();
+        let all1: Vec<Resource> = store1.all_resources(true).collect();
+        let serialized = crate::serialize::resources_to_json_ad(&all1).unwrap();
+
         store2.import(&serialized, &ParseOpts::default()).unwrap();
-        let all1 = store1.all_resources(true);
-        let all2 = store2.all_resources(true);
-        assert_eq!(all1.len(), all2.len());
+        let all2_count = store2.all_resources(true).count();
+
+        assert_eq!(all1.len(), all2_count);
         let found_shortname = store2
             .get_resource(urls::CLASS)
             .unwrap()

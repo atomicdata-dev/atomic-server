@@ -52,7 +52,9 @@ fn basic() {
     // Should throw an error, because resource is deleted
     store.get_propvals(crate::urls::CLASS).unwrap_err();
 
-    assert!(store.all_resources(false).len() < store.all_resources(true).len());
+    let all_local_resources = store.all_resources(false).count();
+    let all_resources = store.all_resources(true).count();
+    assert!(all_local_resources < all_resources);
 }
 
 #[test]
@@ -429,8 +431,8 @@ fn query_include_external() {
 #[test]
 fn test_db_resources_all() {
     let store = &Db::init_temp("resources_all").unwrap();
-    let res_no_include = store.all_resources(false).len();
-    let res_include = store.all_resources(true).len();
+    let res_no_include = store.all_resources(false).count();
+    let res_include = store.all_resources(true).count();
     assert!(
         res_include > res_no_include,
         "Amount of results should be higher for include_external"

@@ -59,10 +59,9 @@ pub trait Storelike: Sized {
         overwrite_existing: bool,
     ) -> AtomicResult<()>;
 
-    /// Returns a collection with all resources in the store.
+    /// Returns an iterator that iterates over all resources in the store.
     /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
-    /// WARNING: This could be very expensive!
-    fn all_resources(&self, include_external: bool) -> ResourceCollection;
+    fn all_resources(&self, include_external: bool) -> Box<dyn Iterator<Item = Resource>>;
 
     /// Constructs the value index from all resources in the store. Could take a while.
     fn build_index(&self, include_external: bool) -> AtomicResult<()> {
