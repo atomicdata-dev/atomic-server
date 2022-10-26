@@ -1,10 +1,7 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
-use crate::{
-    atoms::Atom,
-    storelike::{ResourceCollection, Storelike},
-};
+use crate::{atoms::Atom, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
@@ -79,12 +76,15 @@ impl Storelike for Store {
     }
 
     // TODO: Fix this for local stores, include external does not make sense here
-    fn all_resources(&self, _include_external: bool) -> ResourceCollection {
-        let mut all = Vec::new();
-        for (_subject, resource) in self.hashmap.lock().unwrap().clone().into_iter() {
-            all.push(resource)
-        }
-        all
+    fn all_resources(&self, _include_external: bool) -> Box<dyn Iterator<Item = Resource>> {
+        Box::new(
+            self.hashmap
+                .lock()
+                .unwrap()
+                .clone()
+                .into_iter()
+                .map(|(_subject, resource)| resource),
+        )
     }
 
     fn get_server_url(&self) -> &str {

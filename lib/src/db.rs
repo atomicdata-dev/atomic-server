@@ -13,7 +13,7 @@ use crate::{
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
-    storelike::{Query, QueryResult, ResourceCollection, Storelike},
+    storelike::{Query, QueryResult, Storelike},
     Atom, Resource, Value,
 };
 
@@ -163,6 +163,24 @@ impl Db {
         self.members_index.clear()?;
         self.watched_queries.clear()?;
         Ok(())
+    }
+
+    fn map_sled_item_to_resource(
+        item: Result<(sled::IVec, sled::IVec), sled::Error>,
+        self_url: String,
+        include_external: bool,
+    ) -> Option<Resource> {
+        let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
+        let subject: String = String::from_utf8_lossy(&subject).to_string();
+
+        if !include_external && !subject.starts_with(&self_url) {
+            return None;
+        }
+
+        let propvals: PropVals = bincode::deserialize(&resource_bin)
+            .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
+
+        Some(Resource::from_propvals(propvals, subject))
     }
 }
 
@@ -514,23 +532,19 @@ impl Storelike for Db {
     }
 
     #[instrument(skip(self))]
-    fn all_resources(&self, include_external: bool) -> ResourceCollection {
-        let mut resources: ResourceCollection = Vec::new();
+    fn all_resources(
+        &self,
+        include_external: bool,
+    ) -> Box<dyn std::iter::Iterator<Item = Resource>> {
         let self_url = self
             .get_self_url()
             .expect("No self URL set, is required in DB");
-        for item in self.resources.into_iter() {
-            let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
-            let subject: String = String::from_utf8_lossy(&subject).to_string();
-            if !include_external && !subject.starts_with(&self_url) {
-                continue;
-            }
-            let propvals: PropVals = bincode::deserialize(&resource_bin)
-                .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
-            let resource = Resource::from_propvals(propvals, subject);
-            resources.push(resource);
-        }
-        resources
+
+        let result = self.resources.into_iter().filter_map(move |item| {
+            Db::map_sled_item_to_resource(item, self_url.clone(), include_external)
+        });
+
+        Box::new(result)
     }
 
     fn populate(&self) -> AtomicResult<()> {
