@@ -330,9 +330,9 @@ test.describe('data-browser', async () => {
     ]);
     await fileChooser.setFiles(demoFile);
     await page.click(`[data-test]:has-text("${demoFileName}")`);
-    await expect(
-      await page.locator('[data-test="image-viewer"]'),
-    ).toBeVisible();
+    const image = await page.locator('[data-test="image-viewer"]');
+    await expect(image).toBeVisible();
+    await expect(image).toHaveScreenshot({ maxDiffPixelRatio: 0.1 });
   });
 
   test('chatroom', async ({ page, browser }) => {
