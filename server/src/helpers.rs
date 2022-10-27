@@ -4,6 +4,7 @@ use actix_web::cookie::Cookie;
 use actix_web::http::header::{HeaderMap, HeaderValue};
 use atomic_lib::authentication::AuthValues;
 use percent_encoding::percent_decode_str;
+use std::str::FromStr;
 
 use crate::errors::{AppErrorType, AtomicServerError};
 use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
@@ -62,39 +63,60 @@ pub fn get_auth_headers(
 pub fn get_auth_from_cookie(
     map: &HeaderMap,
     requested_subject: &String,
-) -> Option<AtomicServerResult<Option<AuthValues>>> {
-    let encoded_session = session_cookie_from_header(map.get("Cookie")?)?;
+) -> AtomicServerResult<Option<AuthValues>> {
+    let encoded_session = match map.get("Cookie") {
+        Some(cookies) => session_cookie_from_header(cookies),
+        None => return Ok(None),
+    };
 
-    let session = base64::decode(encoded_session).ok()?;
-    let session_str = std::str::from_utf8(&session).ok()?;
-    let values: Result<AuthValues, AtomicServerError> =
+    let session = match encoded_session {
+        Some(s) => base64::decode(s).map_err(|_| AtomicServerError {
+            message: "Malformed authentication resource".to_string(),
+            error_type: AppErrorType::Unauthorized,
+            error_resource: None,
+        }),
+        None => return Ok(None),
+    }?;
+
+    let session_str = std::str::from_utf8(&session).map_err(|_| AtomicServerError {
+        message: "Malformed authentication resource".to_string(),
+        error_type: AppErrorType::Unauthorized,
+        error_resource: None,
+    })?;
+    let auth_values: AuthValues =
         serde_json::from_str(session_str).map_err(|_| AtomicServerError {
             message: "Malformed authentication resource".to_string(),
             error_type: AppErrorType::Unauthorized,
             error_resource: None,
+        })?;
+
+    if auth_values.requested_subject.ne(requested_subject) {
+        return Err(AtomicServerError {
+            message: format!(
+                "Wrong requested subject, expected {} was {}",
+                requested_subject, auth_values.requested_subject
+            ),
+            error_type: AppErrorType::Unauthorized,
+            error_resource: None,
         });
-
-    if let Ok(auth_values) = values {
-        if auth_values.requested_subject.eq(requested_subject) {
-            return Some(Err(AtomicServerError {
-                message: "Wrong requested subject".to_string(),
-                error_type: AppErrorType::Unauthorized,
-                error_resource: None,
-            }));
-        }
-
-        Some(Ok(Some(auth_values)))
-    } else {
-        Some(Err(values.err().unwrap()))
     }
+
+    Ok(Some(auth_values))
 }
 
 pub fn get_auth(
     map: &HeaderMap,
     requested_subject: String,
 ) -> AtomicServerResult<Option<AuthValues>> {
-    let cookie_result = get_auth_from_cookie(map, &requested_subject);
-    cookie_result.unwrap_or_else(|| get_auth_headers(map, requested_subject))
+    let from_header = match get_auth_headers(map, requested_subject.clone()) {
+        Ok(res) => res,
+        Err(err) => return Err(err),
+    };
+
+    match from_header {
+        Some(v) => Ok(Some(v)),
+        None => get_auth_from_cookie(map, &requested_subject),
+    }
 }
 
 /// Checks for authentication headers and returns Some agent's subject if everything is well.
