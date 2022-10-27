@@ -11,6 +11,8 @@ Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHAN
 - Give server agent rights to edit all resources, fix issue with accepting invites in private drives #521
 - Add cookie based authentication #512
 - `Store::all_resources` returns `Iterator` instead of `Vec` #522 #487
+- Change authentication order #525
+- Fix cookie subject check #525
 
 ## [v0.33.1] - 2022-09-25
 
