@@ -2,6 +2,7 @@
 
 use actix_web::cookie::Cookie;
 use actix_web::http::header::{HeaderMap, HeaderValue};
+use actix_web::http::Uri;
 use atomic_lib::authentication::AuthValues;
 use percent_encoding::percent_decode_str;
 use std::str::FromStr;
@@ -60,6 +61,16 @@ pub fn get_auth_headers(
     }
 }
 
+fn origin(url: &str) -> String {
+    let parsed = Uri::from_str(url).unwrap();
+
+    format!(
+        "{}://{}",
+        parsed.scheme_str().unwrap(),
+        parsed.authority().unwrap()
+    )
+}
+
 pub fn get_auth_from_cookie(
     map: &HeaderMap,
     requested_subject: &String,
@@ -90,7 +101,10 @@ pub fn get_auth_from_cookie(
             error_resource: None,
         })?;
 
-    if auth_values.requested_subject.ne(requested_subject) {
+    let subject_invalid = auth_values.requested_subject.ne(requested_subject)
+        && auth_values.requested_subject.ne(&origin(requested_subject));
+
+    if subject_invalid {
         return Err(AtomicServerError {
             message: format!(
                 "Wrong requested subject, expected {} was {}",
