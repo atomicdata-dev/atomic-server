@@ -4,6 +4,10 @@ List of changes for this repo, including `atomic-cli`, `atomic-server` and `atom
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
 
+## UNRELEASED
+
+- Improved error handling for HTTPS initialization #530
+
 ## [v0.34.0] - 2022-10-31
 
 - Add parent parameter to search endpoint which scopes a search to only the descendants of the given resource. #226

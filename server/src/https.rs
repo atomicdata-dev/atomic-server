@@ -38,13 +38,14 @@ pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerRes
 
             let running_server = init_server.bind(&address_clone)?.run();
 
-            tx.send(running_server.handle()).unwrap();
+            tx.send(running_server.handle())
+                .expect("Error sending handle during HTTPS init");
 
             running_server.await
         })
     });
 
-    let handle = rx.recv().unwrap();
+    let handle = rx.recv().expect("Error receiving handle during HTTPS init");
 
     let agent = ureq::builder()
         .timeout(std::time::Duration::from_secs(2))
@@ -197,27 +198,35 @@ pub fn get_https_config(config: &crate::config::Config) -> Result<rustls::Server
     // rustls::NoClientAuth::new()
     let cert_file =
         &mut BufReader::new(File::open(config.cert_path.clone()).expect("No HTTPS TLS key found."));
-    let key_file = &mut BufReader::new(File::open(&config.key_path).unwrap());
+    let key_file =
+        &mut BufReader::new(File::open(&config.key_path).expect("Could not open config key path"));
     let mut cert_chain = Vec::new();
 
-    for bytes in certs(cert_file).unwrap() {
+    for bytes in certs(cert_file)? {
         let certificate = rustls::Certificate(bytes);
         cert_chain.push(certificate);
     }
-    // let first_cert = cert_chain.first().unwrap().to_owned();
-    let mut keys = pkcs8_private_keys(key_file).unwrap();
+    let mut keys = pkcs8_private_keys(key_file)?;
     if keys.is_empty() {
         panic!("No key found. Consider deleting the `.https` directory and restart to create new keys.")
     }
-    let a = https_config
+    Ok(https_config
         .with_single_cert(cert_chain, rustls::PrivateKey(keys.remove(0)))
-        .unwrap();
-    Ok(a)
+        .expect("Unable to create HTTPS config from certificates"))
 }
 
 fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
     // ~/.config/atomic/https
-    let mut path = config.cert_path.parent().unwrap().to_path_buf();
+    let mut path = config
+        .cert_path
+        .parent()
+        .unwrap_or_else(|| {
+            panic!(
+                "Cannot open parent dit of HTTPS certs {:?}",
+                config.cert_path
+            )
+        })
+        .to_path_buf();
     path.push("certs_created_at");
     path
 }
