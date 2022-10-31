@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/atomicdata-dev/atomic-data-rust"
-version = "0.33.1"
+version = "0.34.0"
 [[bin]]
 name = "atomic-server"
 path = "src/bin.rs"
@@ -74,7 +74,7 @@ version = "4"
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf", "html"]
 path = "../lib"
-version = "0.33.1"
+version = "0.34.0"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
