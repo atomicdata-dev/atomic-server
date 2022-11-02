@@ -512,20 +512,20 @@ impl Resource {
     }
 
     #[instrument(skip_all)]
-    pub fn to_atoms(&self) -> AtomicResult<Vec<Atom>> {
+    pub fn to_atoms(&self) -> Vec<Atom> {
         let mut atoms: Vec<Atom> = Vec::new();
         for (property, value) in self.propvals.iter() {
             let atom = Atom::new(self.subject.to_string(), property.clone(), value.clone());
             atoms.push(atom);
         }
-        Ok(atoms)
+        atoms
     }
 
     #[instrument(skip_all)]
     #[cfg(feature = "rdf")]
     /// Serializes the Resource to the RDF N-Triples format.
     pub fn to_n_triples(&self, store: &impl Storelike) -> AtomicResult<String> {
-        crate::serialize::atoms_to_ntriples(self.to_atoms()?, store)
+        crate::serialize::atoms_to_ntriples(self.to_atoms(), store)
     }
 }
 

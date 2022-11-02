@@ -64,7 +64,7 @@ pub fn print_resource(
         Format::Json => resource.to_json(&context.store)?,
         Format::JsonLd => resource.to_json_ld(&context.store)?,
         Format::JsonAd => resource.to_json_ad()?,
-        Format::NTriples => serialize::atoms_to_ntriples(resource.to_atoms()?, &context.store)?,
+        Format::NTriples => serialize::atoms_to_ntriples(resource.to_atoms(), &context.store)?,
         Format::Pretty => pretty_print_resource(resource, &context.store)?,
     };
     println!("{}", out);

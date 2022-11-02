@@ -66,13 +66,18 @@ pub trait Storelike: Sized {
     /// Constructs the value index from all resources in the store. Could take a while.
     fn build_index(&self, include_external: bool) -> AtomicResult<()> {
         for r in self.all_resources(include_external) {
-            let atoms = r.to_atoms()?;
-            for atom in atoms {
+            for atom in r.to_atoms() {
                 self.add_atom_to_index(&atom, &r)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
             }
         }
         Ok(())
+    }
+
+    /// Returns a single [Value] from a [Resource]
+    fn get_value(&self, subject: &str, property: &str) -> AtomicResult<Value> {
+        self.get_resource(subject)
+            .and_then(|r| r.get(property).map(|v| v.clone()))
     }
 
     /// Returns the base URL where the default store is.
@@ -294,7 +299,7 @@ pub trait Storelike: Sized {
                         find_in_resource(&resource);
                         Ok(vec)
                     } else {
-                        resource.to_atoms()
+                        Ok(resource.to_atoms())
                     }
                 }
                 Err(_) => Ok(vec),
@@ -503,7 +508,7 @@ pub struct Query {
     pub include_external: bool,
     /// Whether to include full Resources in the result, if not, will add empty vector here.
     pub include_nested: bool,
-    /// For which Agent the query is executed. Pass `None`if you want to skip permission checks.
+    /// For which Agent the query is executed. Pass `None` if you want to skip permission checks.
     pub for_agent: Option<String>,
 }
 

@@ -1,18 +1,22 @@
-//! The Collections Cache is used to speed up queries.
-//! It sorts Members by their Value, so we can quickly paginate and sort.
+//! The QueryIndex is used to speed up queries by persisting filtered, sorted collections.
 //! It relies on lexicographic ordering of keys, which Sled utilizes using `scan_prefix` queries.
 
 use crate::{
+    atoms::IndexAtom,
     errors::AtomicResult,
     storelike::{Query, QueryResult},
-    values::query_value_compare,
+    values::{query_value_compare, SortableValue},
     Atom, Db, Resource, Storelike, Value,
 };
 use serde::{Deserialize, Serialize};
 
+/// Returned by functions that iterate over [IndexAtom]s
+pub type IndexIterator = Box<dyn Iterator<Item = AtomicResult<IndexAtom>>>;
+
 /// A subset of a full [Query].
 /// Represents a sorted filter on the Store.
 /// A Value in the `watched_collections`.
+/// Used as keys in the query_index.
 /// These are used to check whether collections have to be updated when values have changed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryFilter {
@@ -22,6 +26,26 @@ pub struct QueryFilter {
     pub value: Option<Value>,
     /// The property by which the collection is sorted
     pub sort_by: Option<String>,
+}
+
+impl QueryFilter {
+    #[tracing::instrument(skip(store))]
+    /// Adds the QueryFilter to the `watched_queries` of the store.
+    /// This means that whenever the store is updated (when a [Commit](crate::Commit) is added), the QueryFilter is checked.
+    pub fn watch(&self, store: &Db) -> AtomicResult<()> {
+        store
+            .watched_queries
+            .insert(bincode::serialize(self)?, b"")?;
+        Ok(())
+    }
+
+    /// Check if this [QueryFilter] is being indexed
+    pub fn is_watched(&self, store: &Db) -> bool {
+        store
+            .watched_queries
+            .contains_key(&bincode::serialize(self).unwrap())
+            .unwrap_or(false)
+    }
 }
 
 impl From<&Query> for QueryFilter {
@@ -34,22 +58,15 @@ impl From<&Query> for QueryFilter {
     }
 }
 
-/// Differs from a Regular Atom, since the value here is always a string,
-/// and in the case of ResourceArrays, only a _single_ subject is used for each atom.
-/// One IndexAtom for every member of the ResourceArray is created.
-#[derive(Debug, Clone)]
-pub struct IndexAtom {
-    pub subject: String,
-    pub property: String,
-    pub value: String,
-}
-
 /// Last character in lexicographic ordering
 pub const FIRST_CHAR: &str = "\u{0000}";
 pub const END_CHAR: &str = "\u{ffff}";
+/// We can only store one bytearray as a key in Sled.
+/// We separate the various items in it using this bit that's illegal in UTF-8.
+pub const SEPARATION_BIT: u8 = 0xff;
 
 #[tracing::instrument(skip(store))]
-/// Performs a query on the `members_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
+/// Performs a query on the `query_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
 pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     // When there is no explicit start / end value passed, we use the very first and last
     // lexicographic characters in existence to make the range practically encompass all values.
@@ -63,14 +80,14 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
     } else {
         Value::String(END_CHAR.into())
     };
-    let start_key = create_query_index_key(&q.into(), Some(&start), None)?;
-    let end_key = create_query_index_key(&q.into(), Some(&end), None)?;
+    let start_key = create_query_index_key(&q.into(), Some(&start.to_sortable_string()), None)?;
+    let end_key = create_query_index_key(&q.into(), Some(&end.to_sortable_string()), None)?;
 
     let iter: Box<dyn Iterator<Item = std::result::Result<(sled::IVec, sled::IVec), sled::Error>>> =
         if q.sort_desc {
-            Box::new(store.members_index.range(start_key..end_key).rev())
+            Box::new(store.query_index.range(start_key..end_key).rev())
         } else {
-            Box::new(store.members_index.range(start_key..end_key))
+            Box::new(store.query_index.range(start_key..end_key))
         };
 
     let mut subjects: Vec<String> = vec![];
@@ -95,6 +112,7 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         if in_selection {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+            println!("Found subject: {} with val :{_val}", subject);
 
             // If no external resources should be included, skip this one if it's an external resource
             if !q.include_external && !subject.starts_with(&self_url) {
@@ -139,15 +157,6 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         resources,
         subjects,
     })
-}
-
-#[tracing::instrument(skip(store))]
-/// Adds a QueryFilter to the `watched_queries`
-pub fn watch_collection(store: &Db, q_filter: &QueryFilter) -> AtomicResult<()> {
-    store
-        .watched_queries
-        .insert(bincode::serialize(q_filter)?, b"")?;
-    Ok(())
 }
 
 /// Checks if the resource will match with a QueryFilter.
@@ -205,7 +214,13 @@ pub fn should_update(
         // We then make sure to also update the sort_by value.
         if let Ok(sorted_val) = resource.get(sort_prop) {
             // Note that updating here is a bit too agressive. It will update the index every time an atom comes by that matches the QueryFilter, even if the value is unchanged.
-            update_indexed_member(store, q_filter, &index_atom.subject, sorted_val, delete)?;
+            update_indexed_member(
+                store,
+                q_filter,
+                &index_atom.subject,
+                &sorted_val.to_sortable_string(),
+                delete,
+            )?;
             if &index_atom.property != sort_prop {
                 // We've just updated the index for this atom, so there is no need to update the value above.
                 return Ok(false);
@@ -220,14 +235,14 @@ pub fn should_update(
                 // Update the Key, which contains the sorted value
                 return Ok(true);
             }
-            if filterprop == &index_atom.property && index_atom.value == filter_val.to_string() {
+            if filterprop == &index_atom.property && index_atom.ref_value == filter_val.to_string() {
                 return Ok(true);
             }
             // If either one of these match
             let relevant_prop =
                 filterprop == &index_atom.property || sortprop == &index_atom.property;
             // And the value matches, we have to update
-            relevant_prop && filter_val.to_string() == index_atom.value
+            relevant_prop && filter_val.to_string() == index_atom.ref_value
         }
         (Some(filter_prop), Some(_filter_val), None) => filter_prop == &index_atom.property,
         (Some(filter_prop), None, Some(sort_by)) => {
@@ -235,10 +250,10 @@ pub fn should_update(
         }
         (Some(filter_prop), None, None) => filter_prop == &index_atom.property,
         (None, Some(filter_val), None) => {
-            filter_val.to_string() == index_atom.value || matching_prop == index_atom.property
+            filter_val.to_string() == index_atom.ref_value || matching_prop == index_atom.property
         }
         (None, Some(filter_val), Some(sort_by)) => {
-            filter_val.to_string() == index_atom.value
+            filter_val.to_string() == index_atom.ref_value
                 || matching_prop == index_atom.property
                 || &matching_prop == sort_by
                 || &index_atom.property == sort_by
@@ -268,7 +283,13 @@ pub fn check_if_atom_matches_watched_query_filters(
                 .map_err(|e| format!("Could not deserialize QueryFilter: {}", e))?;
 
             if should_update(&q_filter, index_atom, resource, delete, store)? {
-                update_indexed_member(store, &q_filter, &atom.subject, &atom.value, delete)?;
+                update_indexed_member(
+                    store,
+                    &q_filter,
+                    &atom.subject,
+                    &atom.value.to_sortable_string(),
+                    delete,
+                )?;
             }
         } else {
             return Err(format!("Can't deserialize collection index: {:?}", query).into());
@@ -283,7 +304,7 @@ pub fn update_indexed_member(
     store: &Db,
     collection: &QueryFilter,
     subject: &str,
-    value: &Value,
+    value: &SortableValue,
     delete: bool,
 ) -> AtomicResult<()> {
     let key = create_query_index_key(
@@ -293,18 +314,15 @@ pub fn update_indexed_member(
         Some(subject),
     )?;
     if delete {
-        store.members_index.remove(key)?;
+        store.query_index.remove(key)?;
     } else {
-        store.members_index.insert(key, b"")?;
+        store.query_index.insert(key, b"")?;
     }
     Ok(())
 }
 
-/// We can only store one bytearray as a key in Sled.
-/// We separate the various items in it using this bit that's illegal in UTF-8.
-const SEPARATION_BIT: u8 = 0xff;
-
-/// Maximum string length for values in the members_index. Should be long enough to contain pretty long URLs, but not very long documents.
+/// Maximum string length for values in the query_index. Should be long enough to contain pretty long URLs, but not very long documents.
+// Consider moving this to [Value::to_sortable_string]
 pub const MAX_LEN: usize = 120;
 
 /// Creates a key for a collection + value combination.
@@ -312,18 +330,18 @@ pub const MAX_LEN: usize = 120;
 #[tracing::instrument()]
 pub fn create_query_index_key(
     query_filter: &QueryFilter,
-    value: Option<&Value>,
+    value: Option<&SortableValue>,
     subject: Option<&str>,
 ) -> AtomicResult<Vec<u8>> {
     let mut q_filter_bytes: Vec<u8> = bincode::serialize(query_filter)?;
     q_filter_bytes.push(SEPARATION_BIT);
 
     let mut value_bytes: Vec<u8> = if let Some(val) = value {
-        let val_string = val.to_sortable_string();
+        let val_string = val;
         let shorter = if val_string.len() > MAX_LEN {
             &val_string[0..MAX_LEN]
         } else {
-            &val_string
+            val_string
         };
         let lowercase = shorter.to_lowercase();
         lowercase.as_bytes().to_vec()
@@ -332,6 +350,7 @@ pub fn create_query_index_key(
     };
     value_bytes.push(SEPARATION_BIT);
 
+    println!("Create key subject {:?} value {:?}", subject, value);
     let subject_bytes = if let Some(sub) = subject {
         sub.as_bytes().to_vec()
     } else {
@@ -364,41 +383,8 @@ pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, 
     } else {
         return Err("Can't parse subject in members_key".into());
     };
+    println!("Parsed key: {:?} {:?} {:?}", q_filter, value, subject);
     Ok((q_filter, value, subject))
-}
-
-/// Converts one Value to a bunch of indexable items.
-/// Returns None for unsupported types.
-pub fn value_to_reference_index_string(value: &Value) -> Option<Vec<String>> {
-    let vals = match value {
-        // This results in wrong indexing, as some subjects will be numbers.
-        Value::ResourceArray(_v) => value.to_subjects(None).unwrap_or_else(|_| vec![]),
-        Value::AtomicUrl(v) => vec![v.into()],
-        // We don't index nested resources for now
-        Value::Resource(_r) => return None,
-        Value::NestedResource(_r) => return None,
-        // This might result in unnecessarily long strings, sometimes. We may want to shorten them later.
-        val => vec![val.to_string()],
-    };
-    Some(vals)
-}
-
-/// Converts one Atom to a series of stringified values that can be indexed.
-#[tracing::instrument(skip(atom))]
-pub fn atom_to_indexable_atoms(atom: &Atom) -> AtomicResult<Vec<IndexAtom>> {
-    let index_atoms = match value_to_reference_index_string(&atom.value) {
-        Some(v) => v,
-        None => return Ok(vec![]),
-    };
-    let index_atoms = index_atoms
-        .into_iter()
-        .map(|v| IndexAtom {
-            value: v,
-            subject: atom.subject.clone(),
-            property: atom.property.clone(),
-        })
-        .collect();
-    Ok(index_atoms)
 }
 
 #[cfg(test)]
@@ -430,7 +416,9 @@ pub mod test {
                 sort_by: None,
             };
             let subject = "https://example.com/subject";
-            let key = create_query_index_key(&collection, Some(val), Some(subject)).unwrap();
+            let key =
+                create_query_index_key(&collection, Some(&val.to_sortable_string()), Some(subject))
+                    .unwrap();
             let (col, val_out, sub_out) = parse_collection_members_key(&key).unwrap();
             assert_eq!(col.property, collection.property);
             assert_eq!(val_check.to_string(), val_out);
@@ -447,17 +435,44 @@ pub mod test {
         };
 
         let start_none = create_query_index_key(&q, None, None).unwrap();
-        let num_1 = create_query_index_key(&q, Some(&Value::Float(1.0)), None).unwrap();
-        let num_2 = create_query_index_key(&q, Some(&Value::Float(2.0)), None).unwrap();
+        let num_1 = create_query_index_key(&q, Some(&Value::Float(1.0).to_sortable_string()), None)
+            .unwrap();
+        let num_2 = create_query_index_key(&q, Some(&Value::Float(2.0).to_sortable_string()), None)
+            .unwrap();
         // let num_10 = create_query_index_key(&q, Some(&Value::Float(10.0)), None).unwrap();
-        let num_1000 = create_query_index_key(&q, Some(&Value::Float(1000.0)), None).unwrap();
-        let start_str = create_query_index_key(&q, Some(&Value::String("1".into())), None).unwrap();
-        let a_downcase =
-            create_query_index_key(&q, Some(&Value::String("a".into())), None).unwrap();
-        let b_upcase = create_query_index_key(&q, Some(&Value::String("B".into())), None).unwrap();
-        let mid3 =
-            create_query_index_key(&q, Some(&Value::String("hi there".into())), None).unwrap();
-        let end = create_query_index_key(&q, Some(&Value::String(END_CHAR.into())), None).unwrap();
+        let num_1000 =
+            create_query_index_key(&q, Some(&Value::Float(1000.0).to_sortable_string()), None)
+                .unwrap();
+        let start_str = create_query_index_key(
+            &q,
+            Some(&Value::String("1".into()).to_sortable_string()),
+            None,
+        )
+        .unwrap();
+        let a_downcase = create_query_index_key(
+            &q,
+            Some(&Value::String("a".into()).to_sortable_string()),
+            None,
+        )
+        .unwrap();
+        let b_upcase = create_query_index_key(
+            &q,
+            Some(&Value::String("B".into()).to_sortable_string()),
+            None,
+        )
+        .unwrap();
+        let mid3 = create_query_index_key(
+            &q,
+            Some(&Value::String("hi there".into()).to_sortable_string()),
+            None,
+        )
+        .unwrap();
+        let end = create_query_index_key(
+            &q,
+            Some(&Value::String(END_CHAR.into()).to_sortable_string()),
+            None,
+        )
+        .unwrap();
 
         assert!(start_none < num_1);
         assert!(num_1 < num_2);
@@ -510,7 +525,8 @@ pub mod test {
         let index_atom = IndexAtom {
             subject,
             property: prop.clone(),
-            value: class.to_string(),
+            ref_value: class.to_string(),
+            sort_value: class.to_string(),
         };
 
         // We should be able to find the resource by propval, val, and / or prop.

@@ -216,13 +216,36 @@ impl Value {
     }
 
     /// Returns a Lexicographically sortable string representation of the value
-    pub fn to_sortable_string(&self) -> String {
+    pub fn to_sortable_string(&self) -> SortableValue {
         match self {
             Value::ResourceArray(arr) => arr.len().to_string(),
             other => other.to_string(),
         }
     }
+
+    /// Converts one Value to a bunch of indexable items.
+    /// Returns None for unsupported types.
+    pub fn to_reference_index_strings(&self) -> Option<Vec<ReferenceString>> {
+        let vals = match self {
+            // TODO: This results in wrong indexing, as some subjects will be numbers.
+            Value::ResourceArray(_v) => self.to_subjects(None).unwrap_or_else(|_| vec![]),
+            Value::AtomicUrl(v) => vec![v.into()],
+            // TODO We don't index nested resources for now
+            Value::Resource(_r) => return None,
+            Value::NestedResource(_r) => return None,
+            // This might result in unnecessarily long strings, sometimes. We may want to shorten them later.
+            val => vec![val.to_string()],
+        };
+        Some(vals)
+    }
 }
+
+/// A value that is meant for checking reference indexes.
+/// short. Vectors of subjects are turned into individual ReferenceStrings.
+pub type ReferenceString = String;
+
+/// String Value representing a lexicographically sortable string.
+pub type SortableValue = String;
 
 /// Check if the value `q_val` is present in `val`
 pub fn query_value_compare(val: &Value, q_val: &Value) -> bool {

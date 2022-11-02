@@ -1,4 +1,4 @@
-use tracing::log::warn;
+use tracing::warn;
 
 use crate::{
     collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, AtomicError,
