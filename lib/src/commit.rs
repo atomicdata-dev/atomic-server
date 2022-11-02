@@ -344,7 +344,7 @@ impl Commit {
         // Remove all atoms from index if destroy
         if let Some(destroy) = self.destroy {
             if destroy {
-                for atom in resource.to_atoms()?.into_iter() {
+                for atom in resource.to_atoms().into_iter() {
                     remove_atoms.push(atom);
                 }
             }
@@ -352,10 +352,14 @@ impl Commit {
 
         if update_index {
             for atom in remove_atoms {
-                store.remove_atom_from_index(&atom, &resource_unedited)?;
+                store
+                    .remove_atom_from_index(&atom, &resource_unedited)
+                    .map_err(|e| format!("Error removing atom from index: {e}  Atom: {e}"))?
             }
             for atom in add_atoms {
-                store.add_atom_to_index(&atom, &resource)?;
+                store
+                    .add_atom_to_index(&atom, &resource)
+                    .map_err(|e| format!("Error adding atom to index: {e}  Atom: {e}"))?;
             }
         }
         Ok(resource)

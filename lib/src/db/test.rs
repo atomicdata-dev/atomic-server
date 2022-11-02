@@ -1,4 +1,4 @@
-use crate::urls;
+use crate::{urls, Value};
 
 use super::*;
 use ntest::timeout;
@@ -84,34 +84,6 @@ fn populate_collections() {
     assert!(nested);
     // Make sure it can be run multiple times
     store.populate().unwrap();
-}
-
-#[test]
-/// Check if the cache is working
-fn add_atom_to_index() {
-    let store = Db::init_temp("add_atom_to_index").unwrap();
-    let subject = urls::CLASS.into();
-    let property: String = urls::PARENT.into();
-    let value = Value::AtomicUrl(urls::AGENT.into());
-    // This atom should normally not exist - Agent is not the parent of Class.
-    let atom = Atom::new(subject, property.clone(), value.clone());
-    store
-        .add_atom_to_index(&atom, &Resource::new("ds".into()))
-        .unwrap();
-    let found_no_external = store
-        .tpf(None, Some(&property), Some(&value), false)
-        .unwrap();
-    // Don't find the atom if no_external is true.
-    assert_eq!(
-        found_no_external.len(),
-        0,
-        "found items - should ignore external items"
-    );
-    let found_external = store
-        .tpf(None, Some(&property), Some(&value), true)
-        .unwrap();
-    // If we see the atom, it's in the index.
-    assert_eq!(found_external.len(), 1);
 }
 
 #[test]
@@ -302,7 +274,7 @@ fn queries() {
     q.property = None;
     q.value = Some(demo_val);
     let res = store.query(&q).unwrap();
-    assert_eq!(res.count, count, "literal value");
+    assert_eq!(res.count, count, "literal value, no property filter");
 
     q.offset = 9;
     let res = store.query(&q).unwrap();
@@ -315,6 +287,7 @@ fn queries() {
     assert_eq!(res.resources.len(), limit, "nested resources");
 
     q.sort_by = Some(sort_by.into());
+    println!("!!!!!!!           !!!!!!!!   SORT STUFF");
     let mut res = store.query(&q).unwrap();
     let mut prev_resource = res.resources[0].clone();
     // For one resource, we will change the order by changing its value
@@ -474,7 +447,7 @@ fn index_invalidate_cache() {
 }
 
 /// Generates a bunch of resources, changes the value for one of them, checks if the order has changed correctly.
-/// new_val should be lexicograhically _smaller_ than old_val.
+/// new_val should be lexicographically _smaller_ than old_val.
 fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, new_val: Value) {
     println!("cache_invalidation test for {}", property_url);
     let count = 10;

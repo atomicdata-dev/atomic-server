@@ -402,7 +402,7 @@ mod test {
         store.populate().unwrap();
         let subject = crate::urls::DESCRIPTION;
         let resource = store.get_resource(subject).unwrap();
-        let atoms = resource.to_atoms().unwrap();
+        let atoms = resource.to_atoms();
         let serialized = atoms_to_ntriples(atoms, &store).unwrap();
         let _out = r#"
         <https://atomicdata.dev/properties/description> <https://atomicdata.dev/properties/description> "A textual description of the thing."^^<https://atomicdata.dev/datatypes/markdown> .

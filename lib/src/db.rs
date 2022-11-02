@@ -1,37 +1,47 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
+mod migrations;
+mod prop_val_sub_index;
+mod query_index;
+#[cfg(test)]
+pub mod test;
+mod val_prop_sub_index;
+
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
-use tracing::{instrument, trace};
+use tracing::{info, instrument};
 
 use crate::{
+    atoms::IndexAtom,
     commit::CommitResponse,
+    db::val_prop_sub_index::find_in_val_prop_sub_index,
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
     storelike::{Query, QueryResult, Storelike},
-    Atom, Resource, Value,
+    values::SortableValue,
+    Atom, Resource,
 };
 
 use self::{
     migrations::migrate_maybe,
-    query_index::{
-        atom_to_indexable_atoms, check_if_atom_matches_watched_query_filters, query_indexed,
-        update_indexed_member, watch_collection, IndexAtom, QueryFilter, END_CHAR,
+    prop_val_sub_index::{
+        add_atom_to_prop_val_sub_index, find_in_prop_val_sub_index,
+        remove_atom_from_prop_val_sub_index,
     },
+    query_index::{
+        check_if_atom_matches_watched_query_filters, query_indexed, update_indexed_member,
+        IndexIterator, QueryFilter,
+    },
+    val_prop_sub_index::{add_atom_to_reference_index, remove_atom_from_reference_index},
 };
 
 // A function called by the Store when a Commit is accepted
 type HandleCommit = Box<dyn Fn(&CommitResponse) + Send + Sync>;
-
-mod migrations;
-mod query_index;
-#[cfg(test)]
-pub mod test;
 
 /// Inside the reference_index, each value is mapped to this type.
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
@@ -54,13 +64,15 @@ pub struct Db {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
-    /// Index for all AtomicURLs, indexed by their Value. Used to speed up TPF queries. See [key_for_reference_index]
+    /// Index of all Atoms, sorted by {Value}-{Property}-{Subject}.
+    /// See [reference_index]
     reference_index: sled::Tree,
+    /// Index sorted by property + value.
+    /// Used for TPF queries where the property is known.
+    prop_val_sub_index: sled::Tree,
     /// Stores the members of Collections, easily sortable.
-    /// See [collections_index]
-    members_index: sled::Tree,
-    /// A list of all the Collections currently being used. Is used to update `members_index`.
-    /// See [collections_index]
+    query_index: sled::Tree,
+    /// A list of all the Collections currently being used. Is used to update `query_index`.
     watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
     server_url: String,
@@ -78,14 +90,16 @@ impl Db {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
         let resources = db.open_tree("resources_v1").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
         let reference_index = db.open_tree("reference_index")?;
-        let members_index = db.open_tree("members_index")?;
+        let query_index = db.open_tree("members_index")?;
+        let prop_val_sub_index = db.open_tree("prop_val_sub_index")?;
         let watched_queries = db.open_tree("watched_queries")?;
         let store = Db {
             db,
             default_agent: Arc::new(Mutex::new(None)),
             resources,
             reference_index,
-            members_index,
+            query_index,
+            prop_val_sub_index,
             server_url,
             watched_queries,
             endpoints: default_endpoints(),
@@ -110,6 +124,22 @@ impl Db {
         store.set_default_agent(agent);
         store.populate()?;
         Ok(store)
+    }
+
+    #[instrument(skip(self))]
+    fn all_index_atoms(&self, include_external: bool) -> IndexIterator {
+        Box::new(
+            self.all_resources(include_external)
+                .flat_map(|resource| {
+                    let index_atoms: Vec<IndexAtom> = resource
+                        .to_atoms()
+                        .iter()
+                        .flat_map(|atom| atom.to_indexable_atoms())
+                        .collect();
+                    index_atoms
+                })
+                .map(Ok),
+        )
     }
 
     /// Internal method for fetching Resource data.
@@ -152,15 +182,11 @@ impl Db {
         }
     }
 
-    /// Returns true if the index has been built.
-    pub fn has_index(&self) -> bool {
-        !self.reference_index.is_empty()
-    }
-
     /// Removes all values from the indexes.
     pub fn clear_index(&self) -> AtomicResult<()> {
         self.reference_index.clear()?;
-        self.members_index.clear()?;
+        self.prop_val_sub_index.clear()?;
+        self.query_index.clear()?;
         self.watched_queries.clear()?;
         Ok(())
     }
@@ -216,9 +242,9 @@ impl Storelike for Db {
 
     #[instrument(skip(self))]
     fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        for index_atom in atom_to_indexable_atoms(atom)? {
-            // It's OK if this overwrites a value
+        for index_atom in atom.to_indexable_atoms() {
             add_atom_to_reference_index(&index_atom, self)?;
+            add_atom_to_prop_val_sub_index(&index_atom, self)?;
             // Also update the query index to keep collections performant
             check_if_atom_matches_watched_query_filters(self, &index_atom, atom, false, resource)
                 .map_err(|e| {
@@ -261,7 +287,7 @@ impl Storelike for Db {
                         })?;
                 }
             }
-            for a in resource.to_atoms()? {
+            for a in resource.to_atoms() {
                 self.add_atom_to_index(&a, resource)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
             }
@@ -271,8 +297,9 @@ impl Storelike for Db {
 
     #[instrument(skip(self))]
     fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        for index_atom in atom_to_indexable_atoms(atom)? {
-            delete_atom_from_reference_index(&index_atom, self)?;
+        for index_atom in atom.to_indexable_atoms() {
+            remove_atom_from_reference_index(&index_atom, self)?;
+            remove_atom_from_prop_val_sub_index(&index_atom, self)?;
 
             check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)
                 .map_err(|e| format!("Checking atom went wrong: {}", e))?;
@@ -447,84 +474,41 @@ impl Storelike for Db {
     /// Tries `query_cache`, which you should implement yourself.
     #[instrument(skip(self))]
     fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
+        let q_filter: QueryFilter = q.into();
         if let Ok(res) = query_indexed(self, q) {
-            if res.count > 0 {
+            if res.count > 0 || q_filter.is_watched(self) {
                 // Yay, we have a cache hit!
-                // We don't have to perform a (more expansive) TPF query + sorting
+                // We don't have to create the indexes, so we can return early.
                 return Ok(res);
             }
         }
 
-        // No cache hit, perform the query
-        let mut atoms = self.tpf(
-            None,
-            q.property.as_deref(),
-            q.value.as_ref(),
-            // We filter later on, not here
-            true,
-        )?;
-        let count = atoms.len();
-
-        let mut subjects = Vec::new();
-        let mut resources = Vec::new();
-        for atom in atoms.iter() {
-            // These nested resources are not fully calculated - they will be presented as -is
-            subjects.push(atom.subject.clone());
-            // We need the Resources if we want to sort by a non-subject value
-            if q.include_nested || q.sort_by.is_some() {
-                // We skip checking for Agent, because we don't return these results directly anyway
-                match self.get_resource_extended(&atom.subject, true, None) {
-                    Ok(resource) => {
-                        resources.push(resource);
-                    }
-                    Err(e) => match &e.error_type {
-                        crate::AtomicErrorType::NotFoundError => {}
-                        crate::AtomicErrorType::UnauthorizedError => {}
-                        _err => {
-                            return Err(
-                                format!("Error when getting resource in collection: {}", e).into()
-                            )
-                        }
-                    },
-                }
-            }
-        }
-
-        if atoms.is_empty() {
-            return Ok(QueryResult {
-                subjects: vec![],
-                resources: vec![],
-                count,
-            });
-        }
-
-        // If there is a sort value, we need to change the atoms to contain that sorted value, instead of the one matched in the TPF query
-        if let Some(sort_prop) = &q.sort_by {
-            // We don't use the existing array, we clear it.
-            atoms = Vec::new();
-            for r in &resources {
-                // Users _can_ sort by optional properties! So we need a fallback defauil
-                let fallback_default = crate::Value::String(END_CHAR.into());
-                let sorted_val = r.get(sort_prop).unwrap_or(&fallback_default);
-                let atom = Atom {
-                    subject: r.get_subject().to_string(),
-                    property: sort_prop.to_string(),
-                    value: sorted_val.to_owned(),
-                };
-                atoms.push(atom)
-            }
-            // Now we sort by the value that the user wants to sort by
-            atoms.sort_by(|a, b| a.value.to_string().cmp(&b.value.to_string()));
-        }
-
-        let q_filter: QueryFilter = q.into();
-
         // Maybe make this optional?
-        watch_collection(self, &q_filter)?;
+        q_filter.watch(self)?;
 
-        // Add the atoms to the query_index
-        for atom in atoms {
-            update_indexed_member(self, &q_filter, &atom.subject, &atom.value, false)?;
+        info!(filter = ?q_filter, "Building query index");
+
+        let atoms: IndexIterator = match (&q.property, q.value.as_ref()) {
+            (Some(prop), val) => find_in_prop_val_sub_index(self, prop, val),
+            (None, None) => self.all_index_atoms(q.include_external),
+            (None, Some(val)) => find_in_val_prop_sub_index(self, val, None),
+        };
+
+        for a in atoms {
+            let atom = a?;
+            let sort_val: SortableValue = if let Some(sort) = &q_filter.sort_by {
+                if &atom.property == sort {
+                    atom.sort_value
+                } else {
+                    // Find the sort value in the store
+                    let sort_atom = self.get_value(&atom.subject, sort)?;
+                    sort_atom.to_sortable_string()
+                }
+            } else {
+                atom.sort_value
+            };
+
+            update_indexed_member(self, &q_filter, &atom.subject, &sort_val, false)?;
         }
 
         // Retry the same query!
@@ -590,149 +574,10 @@ impl Storelike for Db {
     fn set_default_agent(&self, agent: crate::agents::Agent) {
         self.default_agent.lock().unwrap().replace(agent);
     }
-
-    // TPF implementation that used the index_value cache, far more performant than the StoreLike implementation
-    #[instrument(skip(self))]
-    fn tpf(
-        &self,
-        q_subject: Option<&str>,
-        q_property: Option<&str>,
-        q_value: Option<&Value>,
-        // Whether resources from outside the store should be searched through
-        include_external: bool,
-    ) -> AtomicResult<Vec<Atom>> {
-        trace!("tpf");
-        let mut vec: Vec<Atom> = Vec::new();
-
-        let hassub = q_subject.is_some();
-        let hasprop = q_property.is_some();
-        let hasval = q_value.is_some();
-
-        // Simply return all the atoms
-        if !hassub && !hasprop && !hasval {
-            for resource in self.all_resources(include_external) {
-                for (property, value) in resource.get_propvals() {
-                    vec.push(Atom::new(
-                        resource.get_subject().clone(),
-                        property.clone(),
-                        value.clone(),
-                    ))
-                }
-            }
-            return Ok(vec);
-        }
-
-        // If the value is a resourcearray, check if it is inside
-        let val_equals = |val: &str| {
-            let q = q_value.unwrap().to_sortable_string();
-            val == q || {
-                if val.starts_with('[') {
-                    match crate::parse::parse_json_array(val) {
-                        Ok(vec) => return vec.contains(&q),
-                        Err(_) => return val == q,
-                    }
-                }
-                false
-            }
-        };
-
-        // Find atoms matching the TPF query in a single resource
-        let mut find_in_resource = |resource: &Resource| {
-            let subj = resource.get_subject();
-            for (prop, val) in resource.get_propvals().iter() {
-                if hasprop && q_property.as_ref().unwrap() == prop {
-                    if hasval {
-                        if val_equals(&val.to_string()) {
-                            vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
-                        }
-                        break;
-                    } else {
-                        vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
-                    }
-                    break;
-                } else if hasval && !hasprop && val_equals(&val.to_string()) {
-                    vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
-                }
-            }
-        };
-
-        match q_subject {
-            Some(sub) => match self.get_resource(sub) {
-                Ok(resource) => {
-                    if hasprop | hasval {
-                        find_in_resource(&resource);
-                        Ok(vec)
-                    } else {
-                        resource.to_atoms()
-                    }
-                }
-                Err(_) => Ok(vec),
-            },
-            None => {
-                if hasval {
-                    let key_prefix = if hasprop {
-                        format!("{}\n{}\n", q_value.unwrap(), q_property.unwrap())
-                    } else {
-                        format!("{}\n", q_value.unwrap())
-                    };
-                    for item in self.reference_index.scan_prefix(key_prefix) {
-                        let (k, _v) = item?;
-                        let key_string = String::from_utf8(k.to_vec())?;
-                        // WARNING: Converts all Atoms to Strings, the datatype is lost here
-                        let atom = key_to_atom(&key_string)?;
-                        // NOTE: This means we'll include random values that start with the current server URL, including paragraphs for example.
-                        if include_external || atom.subject.starts_with(self.get_server_url()) {
-                            vec.push(atom)
-                        }
-                    }
-                    return Ok(vec);
-                }
-                // TODO: Add an index for searching only by property
-                for resource in self.all_resources(include_external) {
-                    find_in_resource(&resource);
-                }
-                Ok(vec)
-            }
-        }
-    }
-}
-
-#[instrument(skip(store))]
-fn add_atom_to_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
-    let _existing = store
-        .reference_index
-        .insert(key_for_reference_index(index_atom).as_bytes(), b"")?;
-    Ok(())
-}
-
-#[instrument(skip(store))]
-fn delete_atom_from_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
-    store
-        .reference_index
-        .remove(key_for_reference_index(index_atom).as_bytes())?;
-    Ok(())
-}
-
-/// Constructs the Key for the index_value cache.
-fn key_for_reference_index(atom: &IndexAtom) -> String {
-    format!("{}\n{}\n{}", atom.value, atom.property, atom.subject)
-}
-
-/// Parses a Value index key string, converts it into an atom. Note that the Value of the atom will allways be a single AtomicURL here.
-fn key_to_atom(key: &str) -> AtomicResult<Atom> {
-    let mut parts = key.split('\n');
-    let val = parts.next().ok_or("Invalid key for value index")?;
-    let prop = parts.next().ok_or("Invalid key for value index")?;
-    let subj = parts.next().ok_or("Invalid key for value index")?;
-    Ok(Atom::new(
-        subj.into(),
-        prop.into(),
-        Value::AtomicUrl(val.into()),
-    ))
 }
 
 fn corrupt_db_message(subject: &str) -> String {
-    format!("Could not deserialize item {} from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.", subject)
+    format!("Could not deserialize item {} from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export your data and import your data again.", subject)
 }
 
-const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export / serialize your data and import your data again.";
+const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export your data and import your data again.";

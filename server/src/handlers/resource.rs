@@ -76,7 +76,7 @@ pub async fn handle_get_resource(
         ContentType::JsonAd => resource.to_json_ad()?,
         ContentType::Html => resource.to_json_ad()?,
         ContentType::Turtle | ContentType::NTriples => {
-            let atoms = resource.to_atoms()?;
+            let atoms = resource.to_atoms();
             atomic_lib::serialize::atoms_to_ntriples(atoms, store)?
         }
     };
