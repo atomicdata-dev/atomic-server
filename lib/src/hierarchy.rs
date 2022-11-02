@@ -151,15 +151,16 @@ pub fn check_rights(
     if let Ok(parent) = resource.get_parent(store) {
         check_rights(store, &parent, for_agent, right)
     } else {
-        let for_string = if for_agent == urls::PUBLIC_AGENT {
-            "the Public Agent".to_string()
-        } else {
-            for_agent.to_string()
-        };
+        if for_agent == urls::PUBLIC_AGENT {
+            // resource has no parent and agent is not in rights array - check fails
+            return Err(crate::errors::AtomicError::unauthorized(
+                "This resource is not publicly visible. Try signing in".to_string(),
+            ));
+        }
         // resource has no parent and agent is not in rights array - check fails
         Err(crate::errors::AtomicError::unauthorized(format!(
             "No {} right has been found for {} in this resource or its parents",
-            right, for_string
+            right, for_agent
         )))
     }
 }
