@@ -377,7 +377,7 @@ impl Query {
             sort_by: None,
             sort_desc: false,
             include_external: false,
-            include_nested: false,
+            include_nested: true,
             for_agent: None,
         }
     }
@@ -396,6 +396,12 @@ impl Query {
         q.property = Some(urls::IS_A.into());
         q.value = Some(Value::AtomicUrl(class.to_string()));
         q
+    }
+}
+
+impl Default for Query {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
