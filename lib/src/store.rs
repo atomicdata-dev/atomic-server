@@ -2,14 +2,9 @@
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
 use crate::storelike::QueryResult;
-use crate::Value;
-use crate::{atoms::Atom, storelike::Storelike};
-use crate::{
-    atomic_url::AtomicUrl,
-    atoms::Atom,
-    storelike::{ResourceCollection, Storelike},
-};
+use crate::{atomic_url::AtomicUrl, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
+use crate::{Atom, Value};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes

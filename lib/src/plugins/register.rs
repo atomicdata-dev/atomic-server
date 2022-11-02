@@ -19,6 +19,7 @@ pub fn register_endpoint() -> Endpoint {
       description: "Allows new users to easily, in one request, make both an Agent and a Drive. This drive will be created at the subdomain of `name`.".to_string(),
       shortname: "register".to_string(),
       handle: Some(construct_register_redirect),
+      handle_post: None,
   }
 }
 

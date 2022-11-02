@@ -6,6 +6,7 @@ use urls::{SET, SIGNER};
 
 use crate::{
     agents::{decode_base64, encode_base64},
+    atomic_url::Routes,
     datatype::DataType,
     errors::AtomicResult,
     hierarchy,

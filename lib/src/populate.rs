@@ -292,12 +292,10 @@ pub fn populate_all(store: &crate::Db) -> AtomicResult<()> {
     // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
     populate_default_store(store)
         .map_err(|e| format!("Failed to populate default store. {}", e))?;
-    create_drive(self, None, &default_agent.subject, true)
+    create_drive(store, None, &store.get_default_agent()?.subject, true)
         .map_err(|e| format!("Failed to create drive. {}", e))?;
-    set_drive_rights(store, true)?;
     populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
     populate_endpoints(store).map_err(|e| format!("Failed to populate endpoints. {}", e))?;
-    populate_importer(store).map_err(|e| format!("Failed to populate importer. {}", e))?;
     populate_sidebar_items(store)
         .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
     Ok(())
