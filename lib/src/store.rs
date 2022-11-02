@@ -1,6 +1,8 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
+use crate::storelike::QueryResult;
+use crate::Value;
 use crate::{atoms::Atom, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
@@ -23,6 +25,97 @@ impl Store {
         };
         crate::populate::populate_base_models(&store)?;
         Ok(store)
+    }
+
+    /// Triple Pattern Fragments interface.
+    /// Use this for most queries, e.g. finding all items with some property / value combination.
+    /// Returns an empty array if nothing is found.
+    ///
+    /// # Example
+    ///
+    /// For example, if I want to view all Resources that are instances of the class "Property", I'd do:
+    ///
+    /// ```
+    /// use atomic_lib::Storelike;
+    /// let mut store = atomic_lib::Store::init().unwrap();
+    /// store.populate();
+    /// let atoms = store.tpf(
+    ///     None,
+    ///     Some("https://atomicdata.dev/properties/isA"),
+    ///     Some(&atomic_lib::Value::AtomicUrl("https://atomicdata.dev/classes/Class".into())),
+    ///     true
+    /// ).unwrap();
+    /// assert!(atoms.len() > 11)
+    /// ```
+    // Very costly, slow implementation.
+    // Does not assume any indexing.
+    fn tpf(
+        &self,
+        q_subject: Option<&str>,
+        q_property: Option<&str>,
+        q_value: Option<&Value>,
+        // Whether resources from outside the store should be searched through
+        include_external: bool,
+    ) -> AtomicResult<Vec<Atom>> {
+        let mut vec: Vec<Atom> = Vec::new();
+
+        let hassub = q_subject.is_some();
+        let hasprop = q_property.is_some();
+        let hasval = q_value.is_some();
+
+        // Simply return all the atoms
+        if !hassub && !hasprop && !hasval {
+            for resource in self.all_resources(include_external) {
+                for (property, value) in resource.get_propvals() {
+                    vec.push(Atom::new(
+                        resource.get_subject().clone(),
+                        property.clone(),
+                        value.clone(),
+                    ))
+                }
+            }
+            return Ok(vec);
+        }
+
+        // Find atoms matching the TPF query in a single resource
+        let mut find_in_resource = |resource: &Resource| {
+            let subj = resource.get_subject();
+            for (prop, val) in resource.get_propvals().iter() {
+                if hasprop && q_property.as_ref().unwrap() == prop {
+                    if hasval {
+                        if val.contains_value(q_value.unwrap()) {
+                            vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
+                        }
+                        break;
+                    } else {
+                        vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
+                    }
+                    break;
+                } else if hasval && !hasprop && val.contains_value(q_value.unwrap()) {
+                    vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
+                }
+            }
+        };
+
+        match q_subject {
+            Some(sub) => match self.get_resource(sub) {
+                Ok(resource) => {
+                    if hasprop | hasval {
+                        find_in_resource(&resource);
+                        Ok(vec)
+                    } else {
+                        Ok(resource.to_atoms())
+                    }
+                }
+                Err(_) => Ok(vec),
+            },
+            None => {
+                for resource in self.all_resources(include_external) {
+                    find_in_resource(&resource);
+                }
+                Ok(vec)
+            }
+        }
     }
 }
 
@@ -125,6 +218,62 @@ impl Storelike for Store {
 
     fn set_default_agent(&self, agent: crate::agents::Agent) {
         self.default_agent.lock().unwrap().replace(agent);
+    }
+
+    fn query(&self, q: &crate::storelike::Query) -> AtomicResult<crate::storelike::QueryResult> {
+        let atoms = self.tpf(
+            None,
+            q.property.as_deref(),
+            q.value.as_ref(),
+            q.include_external,
+        )?;
+
+        // Remove duplicate subjects
+        let mut subjects_deduplicated: Vec<String> = atoms
+            .iter()
+            .map(|atom| atom.subject.clone())
+            .collect::<std::collections::HashSet<String>>()
+            .into_iter()
+            .collect();
+
+        // Sort by subject, better than no sorting
+        subjects_deduplicated.sort();
+
+        // WARNING: Entering expensive loop!
+        // This is needed for sorting, authorization and including nested resources.
+        // It could be skipped if there is no authorization and sorting requirement.
+        let mut resources = Vec::new();
+        for subject in subjects_deduplicated.iter() {
+            // These nested resources are not fully calculated - they will be presented as -is
+            match self.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+                Ok(resource) => {
+                    resources.push(resource);
+                }
+                Err(e) => match &e.error_type {
+                    crate::AtomicErrorType::NotFoundError => {}
+                    crate::AtomicErrorType::UnauthorizedError => {}
+                    _other => {
+                        return Err(
+                            format!("Error when getting resource in collection: {}", e).into()
+                        )
+                    }
+                },
+            }
+        }
+
+        if let Some(sort) = &q.sort_by {
+            resources = crate::collections::sort_resources(resources, sort, q.sort_desc);
+        }
+        let mut subjects = Vec::new();
+        for r in resources.iter() {
+            subjects.push(r.get_subject().clone())
+        }
+
+        Ok(QueryResult {
+            count: atoms.len(),
+            subjects,
+            resources,
+        })
     }
 }
 

@@ -8,6 +8,7 @@ use crate::{
     errors::AtomicResult,
     parse::ParseOpts,
     schema::{Class, Property},
+    storelike::Query,
     urls, Resource, Storelike, Value,
 };
 
@@ -212,18 +213,13 @@ pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
 /// Generates some nice collections for classes, such as `/agent` and `/collection`.
 /// Requires a `self_url` to be set in the store.
 pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
-    let classes_atoms = store.tpf(
-        None,
-        Some("https://atomicdata.dev/properties/isA"),
-        Some(&Value::AtomicUrl(
-            "https://atomicdata.dev/classes/Class".into(),
-        )),
-        true,
-    )?;
+    let mut query = Query::new_class(urls::CLASS);
+    query.include_external = true;
+    let result = store.query(&query)?;
 
-    for atom in classes_atoms {
+    for subject in result.subjects {
         let mut collection =
-            crate::collections::create_collection_resource_for_class(store, &atom.subject)?;
+            crate::collections::create_collection_resource_for_class(store, &subject)?;
         collection.save_locally(store)?;
     }
 

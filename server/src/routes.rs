@@ -37,7 +37,6 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 .guard(actix_web::guard::Method(Method::POST))
                 .to(handlers::upload::upload_handler),
         )
-        .service(web::resource("/tpf").to(handlers::tpf::tpf))
         .service(
             web::resource("/commit")
                 .guard(actix_web::guard::Method(Method::POST))

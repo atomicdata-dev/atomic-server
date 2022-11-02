@@ -6,7 +6,7 @@ use crate::{
     errors::AtomicError,
     hierarchy,
     schema::{Class, Property},
-    values::query_value_compare,
+    urls,
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_string};
 use crate::{mapping::Mapping, values::Value, Atom, Resource};
@@ -222,97 +222,6 @@ pub trait Storelike: Sized {
     /// Removes a resource from the store. Errors if not present.
     fn remove_resource(&self, subject: &str) -> AtomicResult<()>;
 
-    /// Triple Pattern Fragments interface.
-    /// Use this for most queries, e.g. finding all items with some property / value combination.
-    /// Returns an empty array if nothing is found.
-    ///
-    /// # Example
-    ///
-    /// For example, if I want to view all Resources that are instances of the class "Property", I'd do:
-    ///
-    /// ```
-    /// use atomic_lib::Storelike;
-    /// let mut store = atomic_lib::Store::init().unwrap();
-    /// store.populate();
-    /// let atoms = store.tpf(
-    ///     None,
-    ///     Some("https://atomicdata.dev/properties/isA"),
-    ///     Some(&atomic_lib::Value::AtomicUrl("https://atomicdata.dev/classes/Class".into())),
-    ///     true
-    /// ).unwrap();
-    /// assert!(atoms.len() > 11)
-    /// ```
-    // Very costly, slow implementation.
-    // Does not assume any indexing.
-    fn tpf(
-        &self,
-        q_subject: Option<&str>,
-        q_property: Option<&str>,
-        q_value: Option<&Value>,
-        // Whether resources from outside the store should be searched through
-        include_external: bool,
-    ) -> AtomicResult<Vec<Atom>> {
-        let mut vec: Vec<Atom> = Vec::new();
-
-        let hassub = q_subject.is_some();
-        let hasprop = q_property.is_some();
-        let hasval = q_value.is_some();
-
-        // Simply return all the atoms
-        if !hassub && !hasprop && !hasval {
-            for resource in self.all_resources(include_external) {
-                for (property, value) in resource.get_propvals() {
-                    vec.push(Atom::new(
-                        resource.get_subject().clone(),
-                        property.clone(),
-                        value.clone(),
-                    ))
-                }
-            }
-            return Ok(vec);
-        }
-
-        // Find atoms matching the TPF query in a single resource
-        let mut find_in_resource = |resource: &Resource| {
-            let subj = resource.get_subject();
-            for (prop, val) in resource.get_propvals().iter() {
-                if hasprop && q_property.as_ref().unwrap() == prop {
-                    if hasval {
-                        if query_value_compare(val, q_value.unwrap()) {
-                            vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
-                        }
-                        break;
-                    } else {
-                        vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
-                    }
-                    break;
-                } else if hasval && !hasprop && query_value_compare(val, q_value.unwrap()) {
-                    vec.push(Atom::new(subj.into(), prop.into(), val.clone()))
-                }
-            }
-        };
-
-        match q_subject {
-            Some(sub) => match self.get_resource(sub) {
-                Ok(resource) => {
-                    if hasprop | hasval {
-                        find_in_resource(&resource);
-                        Ok(vec)
-                    } else {
-                        Ok(resource.to_atoms())
-                    }
-                }
-                Err(_) => Ok(vec),
-            },
-            None => {
-                for resource in self.all_resources(include_external) {
-                    find_in_resource(&resource);
-                }
-                Ok(vec)
-            }
-        }
-    }
-
     /// Accepts an Atomic Path string, returns the result value (resource or property value)
     /// E.g. `https://example.com description` or `thing isa 0`
     /// https://docs.atomicdata.dev/core/paths.html
@@ -413,63 +322,7 @@ pub trait Storelike: Sized {
     }
 
     /// Search the Store, returns the matching subjects.
-    /// The second returned vector should be filled if query.include_resources is true.
-    /// Tries `query_cache`, which you should implement yourself.
-    fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
-        let atoms = self.tpf(
-            None,
-            q.property.as_deref(),
-            q.value.as_ref(),
-            q.include_external,
-        )?;
-
-        // Remove duplicate subjects
-        let mut subjects_deduplicated: Vec<String> = atoms
-            .iter()
-            .map(|atom| atom.subject.clone())
-            .collect::<std::collections::HashSet<String>>()
-            .into_iter()
-            .collect();
-
-        // Sort by subject, better than no sorting
-        subjects_deduplicated.sort();
-
-        // WARNING: Entering expensive loop!
-        // This is needed for sorting, authorization and including nested resources.
-        // It could be skipped if there is no authorization and sorting requirement.
-        let mut resources = Vec::new();
-        for subject in subjects_deduplicated.iter() {
-            // These nested resources are not fully calculated - they will be presented as -is
-            match self.get_resource_extended(subject, true, q.for_agent.as_deref()) {
-                Ok(resource) => {
-                    resources.push(resource);
-                }
-                Err(e) => match &e.error_type {
-                    crate::AtomicErrorType::NotFoundError => {}
-                    crate::AtomicErrorType::UnauthorizedError => {}
-                    _other => {
-                        return Err(
-                            format!("Error when getting resource in collection: {}", e).into()
-                        )
-                    }
-                },
-            }
-        }
-
-        if let Some(sort) = &q.sort_by {
-            resources = crate::collections::sort_resources(resources, sort, q.sort_desc);
-        }
-        let mut subjects = Vec::new();
-        for r in resources.iter() {
-            subjects.push(r.get_subject().clone())
-        }
-
-        Ok(QueryResult {
-            count: atoms.len(),
-            subjects,
-            resources,
-        })
-    }
+    fn query(&self, q: &Query) -> AtomicResult<QueryResult>;
 
     /// Removes an Atom from the PropSubjectMap.
     fn remove_atom_from_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
@@ -510,6 +363,40 @@ pub struct Query {
     pub include_nested: bool,
     /// For which Agent the query is executed. Pass `None` if you want to skip permission checks.
     pub for_agent: Option<String>,
+}
+
+impl Query {
+    pub fn new() -> Self {
+        Query {
+            property: None,
+            value: None,
+            limit: None,
+            start_val: None,
+            end_val: None,
+            offset: 0,
+            sort_by: None,
+            sort_desc: false,
+            include_external: false,
+            include_nested: false,
+            for_agent: None,
+        }
+    }
+
+    /// Search for a property-value combination
+    pub fn new_prop_val(prop: &str, val: &str) -> Self {
+        let mut q = Self::new();
+        q.property = Some(prop.to_string());
+        q.value = Some(Value::String(val.to_string()));
+        q
+    }
+
+    /// Search for instances of some Class
+    pub fn new_class(class: &str) -> Self {
+        let mut q = Self::new();
+        q.property = Some(urls::IS_A.into());
+        q.value = Some(Value::AtomicUrl(class.to_string()));
+        q
+    }
 }
 
 pub struct QueryResult {

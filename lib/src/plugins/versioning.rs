@@ -1,8 +1,8 @@
 use tracing::warn;
 
 use crate::{
-    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, urls, AtomicError,
-    Commit, Resource, Storelike, Value,
+    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, storelike::Query,
+    urls, AtomicError, Commit, Resource, Storelike,
 };
 
 pub fn version_endpoint() -> Endpoint {
@@ -91,37 +91,16 @@ fn handle_all_versions_request(
 /// Searches the local store for all commits with this subject, returns sorted from old to new.
 #[tracing::instrument(skip(store))]
 fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResult<Vec<Commit>> {
-    let commit_atoms = store.tpf(
-        None,
-        Some(urls::SUBJECT),
-        Some(&Value::AtomicUrl(subject.into())),
-        false,
-    )?;
-    let mut commits = Vec::new();
-    for atom in commit_atoms {
-        let resource = if let Ok(r) = store.get_resource(&atom.subject) {
-            r
-        } else {
-            // https://github.com/atomicdata-dev/atomic-data-rust/issues/488
-            warn!("Could not find commit for {} , skipping", atom.subject);
-            continue;
-        };
-        let mut is_commit = false;
-        // If users use the `subject` field for a non-commit, we prevent using it as a commit here.
-        for c in resource.get(urls::IS_A)?.to_subjects(None)?.iter() {
-            if c == urls::COMMIT {
-                is_commit = true
-            }
-        }
-        if is_commit {
-            let commit = crate::Commit::from_resource(resource)?;
-            commits.push(commit)
-        }
-    }
-    // Sort all commits by date
-    commits.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+    let mut q = Query::new_prop_val(urls::SUBJECT, subject);
+    q.sort_by = Some(urls::CREATED_AT.into());
+    let result = store.query(&q)?;
+    let filtered: Vec<Commit> = result
+        .resources
+        .iter()
+        .filter_map(|r| crate::Commit::from_resource(r.clone()).ok())
+        .collect();
 
-    Ok(commits)
+    Ok(filtered)
 }
 
 #[tracing::instrument(skip(store))]

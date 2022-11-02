@@ -53,6 +53,18 @@ pub const SLUG_REGEX: &str = r"^[a-z0-9]+(?:-[a-z0-9]+)*$";
 pub const DATE_REGEX: &str = r"^\d{4}\-(0[1-9]|1[012])\-(0[1-9]|[12][0-9]|3[01])$";
 
 impl Value {
+    /// Check if the value `q_val` is present in `val`
+    pub fn contains_value(&self, q_val: &Value) -> bool {
+        let query_value = q_val.to_string();
+        match self {
+            Value::ResourceArray(_vec) => {
+                let subs = self.to_subjects(None).unwrap_or_default();
+                subs.iter().any(|v| v == &query_value)
+            }
+            other => other.to_string() == query_value,
+        }
+    }
+
     /// Returns the datatype for the value
     pub fn datatype(&self) -> DataType {
         match self {
@@ -246,18 +258,6 @@ pub type ReferenceString = String;
 
 /// String Value representing a lexicographically sortable string.
 pub type SortableValue = String;
-
-/// Check if the value `q_val` is present in `val`
-pub fn query_value_compare(val: &Value, q_val: &Value) -> bool {
-    let query_value = q_val.to_string();
-    match val {
-        Value::ResourceArray(_vec) => {
-            let subs = val.to_subjects(None).unwrap_or_default();
-            subs.iter().any(|v| v == &query_value)
-        }
-        other => other.to_string() == query_value,
-    }
-}
 
 impl From<String> for Value {
     fn from(val: String) -> Self {

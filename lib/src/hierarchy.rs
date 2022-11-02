@@ -4,7 +4,7 @@
 
 use core::fmt;
 
-use crate::{errors::AtomicResult, urls, AtomicError, Resource, Storelike, Value};
+use crate::{errors::AtomicResult, storelike::Query, urls, AtomicError, Resource, Storelike};
 
 #[derive(Debug)]
 pub enum Right {
@@ -32,16 +32,8 @@ impl fmt::Display for Right {
 
 /// Looks for children relations, adds to the resource. Performs a TPF query, might be expensive.
 pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicResult<Resource> {
-    let atoms = store.tpf(
-        None,
-        Some(urls::PARENT),
-        Some(&Value::AtomicUrl(resource.get_subject().into())),
-        false,
-    )?;
-    let mut children: Vec<String> = Vec::new();
-    for atom in atoms {
-        children.push(atom.subject)
-    }
+    let results = store.query(&Query::new_prop_val(urls::PARENT, resource.get_subject()))?;
+    let mut children = results.subjects;
     children.sort();
     resource.set_propval(urls::CHILDREN.into(), children.into(), store)?;
     Ok(resource.to_owned())

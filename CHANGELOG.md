@@ -6,7 +6,7 @@ Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHAN
 
 ## UNRELEASED
 
-- Improve query performance, refactor indexes #529
+- Improve query performance, refactor indexes. The `.tpf` API is deprecated in favor of the more powerful `.query`. #529
 - Improved error handling for HTTPS initialization #530
 
 ## [v0.34.0] - 2022-10-31
