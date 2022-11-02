@@ -121,7 +121,7 @@ impl Parser {
     pub fn serialize(node: NodeRef) -> Result<String, FromUtf8Error> {
         let mut stream = Vec::new();
         if let Err(e) = node.serialize(&mut stream) {
-            println!("{}", e);
+            tracing::error!("Serialize error: {}", e);
         }
 
         String::from_utf8(stream)

@@ -10,21 +10,6 @@ use std::str::FromStr;
 use crate::errors::{AppErrorType, AtomicServerError};
 use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
 
-// Returns None if the string is empty.
-// Useful for parsing form inputs.
-pub fn empty_to_nothing(string: Option<String>) -> Option<String> {
-    match string.as_ref() {
-        Some(st) => {
-            if st.is_empty() {
-                None
-            } else {
-                string
-            }
-        }
-        None => None,
-    }
-}
-
 /// Returns the authentication headers from the request
 #[tracing::instrument(skip_all)]
 pub fn get_auth_headers(

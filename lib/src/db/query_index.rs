@@ -5,7 +5,7 @@ use crate::{
     atoms::IndexAtom,
     errors::AtomicResult,
     storelike::{Query, QueryResult},
-    values::{query_value_compare, SortableValue},
+    values::SortableValue,
     Atom, Db, Resource, Storelike, Value,
 };
 use serde::{Deserialize, Serialize};
@@ -112,7 +112,6 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         if in_selection {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
-            println!("Found subject: {} with val :{_val}", subject);
 
             // If no external resources should be included, skip this one if it's an external resource
             if !q.include_external && !subject.starts_with(&self_url) {
@@ -179,7 +178,7 @@ fn check_resource_query_filter_property(
         }
     } else if let Some(filter_val) = &q_filter.value {
         for (prop, val) in resource.get_propvals() {
-            if query_value_compare(val, filter_val) {
+            if val.contains_value(filter_val) {
                 return Some(prop.to_string());
             }
         }
@@ -350,7 +349,6 @@ pub fn create_query_index_key(
     };
     value_bytes.push(SEPARATION_BIT);
 
-    println!("Create key subject {:?} value {:?}", subject, value);
     let subject_bytes = if let Some(sub) = subject {
         sub.as_bytes().to_vec()
     } else {
@@ -383,7 +381,6 @@ pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, 
     } else {
         return Err("Can't parse subject in members_key".into());
     };
-    println!("Parsed key: {:?} {:?} {:?}", q_filter, value, subject);
     Ok((q_filter, value, subject))
 }
 
