@@ -12,7 +12,7 @@ Therefore, we need migrations to convert the old schema to the new one.
 - Update the Tree key used in [Db::init]
  */
 
-use crate::{errors::AtomicResult, Db};
+use crate::{errors::AtomicResult, Db, Storelike};
 
 /// Checks the current version(s) of the internal Store, and performs migrations if needed.
 pub fn migrate_maybe(store: &Db) -> AtomicResult<()> {
@@ -20,6 +20,7 @@ pub fn migrate_maybe(store: &Db) -> AtomicResult<()> {
         match String::from_utf8_lossy(&tree).as_ref() {
             // Add migrations for outdated Trees to this list
             "resources" => v0_to_v1(store)?,
+            "reference_index" => ref_v0_to_v1(store)?,
             _other => {}
         }
     }
@@ -69,5 +70,14 @@ fn v0_to_v1(store: &Db) -> AtomicResult<()> {
     );
 
     tracing::warn!("Finished migration of {} resources", count);
+    Ok(())
+}
+
+/// Add `prop_val_sub` index
+fn ref_v0_to_v1(store: &Db) -> AtomicResult<()> {
+    tracing::warn!("Rebuilding indexes...");
+    store.db.drop_tree("reference_index")?;
+    store.build_index(true)?;
+    tracing::warn!("Rebuilding index finished!");
     Ok(())
 }
