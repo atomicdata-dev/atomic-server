@@ -15,7 +15,6 @@ use std::{
 };
 
 use tracing::instrument;
-use url::Url;
 
 use crate::{
     agents::ForAgent,
@@ -107,7 +106,7 @@ impl Db {
             reference_index,
             query_index,
             prop_val_sub_index,
-            server_url,
+            server_url: AtomicUrl::try_from(server_url)?,
             watched_queries,
             endpoints: default_endpoints(),
             on_commit: None,
@@ -196,7 +195,6 @@ impl Db {
     }
 
     fn map_sled_item_to_resource(
-        &self,
         item: Result<(sled::IVec, sled::IVec), sled::Error>,
         self_url: String,
         include_external: bool,
@@ -204,7 +202,10 @@ impl Db {
         let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
         let subject: String = String::from_utf8_lossy(&subject).to_string();
 
-        if !include_external && self.is_external_subject(&subject).ok()? {
+        // if !include_external && self.is_external_subject(&subject).ok()? {
+        //     return None;
+        // }
+        if !include_external && !subject.starts_with(&self_url) {
             return None;
         }
 
@@ -593,10 +594,11 @@ impl Storelike for Db {
     ) -> Box<dyn std::iter::Iterator<Item = Resource>> {
         let self_url = self
             .get_self_url()
-            .expect("No self URL set, is required in DB");
+            .expect("No self URL set, is required in DB")
+            .to_string();
 
         let result = self.resources.into_iter().filter_map(move |item| {
-            Db::map_sled_item_to_resource(self, item, self_url.to_string(), include_external)
+            Db::map_sled_item_to_resource(item, self_url.clone(), include_external)
         });
 
         Box::new(result)
@@ -650,7 +652,6 @@ impl Storelike for Db {
 
     fn populate(&self) -> AtomicResult<()> {
         crate::populate::populate_all(self)
-        crate::populate::create_drive(self, None, &default_agent.subject, true)
     }
 
     #[instrument(skip(self))]
