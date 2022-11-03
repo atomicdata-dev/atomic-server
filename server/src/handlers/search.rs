@@ -218,6 +218,7 @@ fn build_fuzzy_query(fields: &Fields, q: &str) -> AtomicResult<Box<dyn tantivy::
     Ok(Box::new(query))
 }
 
+#[tracing::instrument(skip(index))]
 fn build_query(
     fields: &Fields,
     q: &str,
@@ -248,6 +249,7 @@ fn build_query(
     Ok(query)
 }
 
+#[tracing::instrument(skip(store))]
 fn build_parent_query(
     subject: String,
     fields: &Fields,
@@ -279,6 +281,7 @@ fn unpack_value(
     }
 }
 
+#[tracing::instrument(skip(searcher, docs))]
 fn docs_to_resources(
     docs: Vec<(f32, tantivy::DocAddress)>,
     fields: &Fields,

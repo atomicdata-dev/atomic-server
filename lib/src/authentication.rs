@@ -1,6 +1,6 @@
 //! Check signatures in authentication headers, find the correct agent. Authorization is done in Hierarchies
 
-use crate::{commit::check_timestamp, errors::AtomicResult, Storelike};
+use crate::{commit::check_timestamp, errors::AtomicResult, urls, Storelike};
 
 /// Set of values extracted from the request.
 /// Most are coming from headers.
@@ -24,6 +24,7 @@ pub struct AuthValues {
 
 /// Checks if the signature is valid for this timestamp.
 /// Does not check if the agent has rights to access the subject.
+#[tracing::instrument(skip_all)]
 pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicResult<()> {
     let agent_pubkey = base64::decode(&auth_header.public_key)?;
     let message = format!("{} {}", subject, &auth_header.timestamp);
@@ -57,8 +58,7 @@ pub fn get_agent_from_auth_values_and_check(
         // check if the timestamp is valid
         check_timestamp(auth_vals.timestamp)?;
         // check if the public key belongs to the agent
-        let agent = store.get_resource(&auth_vals.agent_subject)?;
-        let found_public_key = agent.get(crate::urls::PUBLIC_KEY)?;
+        let found_public_key = store.get_value(&auth_vals.agent_subject, urls::PUBLIC_KEY)?;
         if found_public_key.to_string() != auth_vals.public_key {
             return Err(
                 "The public key in the auth headers does not match the public key in the agent"

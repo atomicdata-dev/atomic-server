@@ -50,15 +50,15 @@ version = "0.8"
 
 [dependencies.tracing-opentelemetry]
 optional = true
-version = "0.17"
+version = "0.18.0"
 
 [dependencies.opentelemetry]
 optional = true
-version = "0.17"
+version = "0.18.0"
 
 [dependencies.opentelemetry-jaeger]
 optional = true
-version = "0.16"
+version = "0.17.0"
 
 [dependencies.sysinfo]
 optional = true

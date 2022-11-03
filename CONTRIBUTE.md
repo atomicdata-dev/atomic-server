@@ -20,7 +20,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 - [Debugging](#debugging)
 - [Performance monitoring / benchmarks](#performance-monitoring--benchmarks)
   - [Tracing](#tracing)
-    - [Tracing with OpenTelemetry](#tracing-with-opentelemetry)
+    - [Tracing with OpenTelemetry (and Jaeger)](#tracing-with-opentelemetry-and-jaeger)
     - [Tracing with Chrome](#tracing-with-chrome)
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
@@ -96,10 +96,24 @@ For doing this, we have at least three tools: tracing, criterion and drill.
 
 There are two ways you can use `tracing` to get insights into performance.
 
-#### Tracing with OpenTelemetry
+#### Tracing with OpenTelemetry (and Jaeger)
 
-- Run an OpenTelemetry compatible service, such as [Jaeger](https://www.jaegertracing.io/docs/1.34/getting-started/).
-- Run the server with `--trace opentelemetry`
+- Run the server with `--trace opentelemetry` and add `--log-level trace` to inspect more events
+- Run an OpenTelemetry compatible service, such as [Jaeger](https://www.jaegertracing.io/docs/1.34/getting-started/). See `docker run` command below or use the vscode task.
+- Visit jaeger: `http://localhost:16686`
+
+```sh
+docker run -d --name jaeger \
+  -e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
+  -p 5775:5775/udp \
+  -p 6831:6831/udp \
+  -p 6832:6832/udp \
+  -p 5778:5778 \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  -p 9411:9411 \
+  jaegertracing/all-in-one:1.6
+```
 
 #### Tracing with Chrome
 

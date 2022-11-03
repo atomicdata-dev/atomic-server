@@ -14,6 +14,7 @@ use crate::errors::AtomicServerResult;
 
 /// The actual Schema used for search.
 /// It mimics a single Atom (or Triple).
+#[derive(Debug)]
 pub struct Fields {
     pub subject: Field,
     pub property: Field,

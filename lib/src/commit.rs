@@ -661,6 +661,7 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
 
 /// Checks if the Commit has been created in the future or if it is expired.
+#[tracing::instrument(skip_all)]
 pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
     let now = crate::utils::now();
     if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {

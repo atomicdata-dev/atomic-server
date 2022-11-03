@@ -34,8 +34,8 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
         crate::config::Tracing::Opentelemetry => {
             #[cfg(feature = "telemetry")]
             {
-                println!("Enabling tracing for OpenTelemetry");
-                let tracer = opentelemetry_jaeger::new_pipeline()
+                println!("Enabling tracing for OpenTelemetry and Jaeger");
+                let tracer = opentelemetry_jaeger::new_agent_pipeline()
                     .with_service_name("atomic-server")
                     .install_simple()
                     .expect("Error initializing Jaeger exporter");
