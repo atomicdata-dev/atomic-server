@@ -117,7 +117,7 @@ pub enum Command {
     /// Create and save a JSON-AD backup of the store.
     #[clap(name = "export")]
     Export(ExportOpts),
-    /// Import a JSON-AD file or stream to the store. Overwrites existing Resources with same @id.
+    /// Import a JSON-AD file or stream to the store. By default creates Commits for all changes, maintaining version history. Use --force to allow importing other types of files.
     #[clap(name = "import", trailing_var_arg = true)]
     Import(ImportOpts),
     /// Creates a `.env` file in your current directory that shows various options that you can set.
@@ -151,6 +151,9 @@ pub struct ImportOpts {
     /// If not passed, the default Importer `/import` will be used.
     #[clap(long)]
     pub parent: Option<String>,
+    /// Skip checks, allows for importing things like Commits.
+    #[clap(long)]
+    pub force: bool,
 }
 
 /// Start atomic-server, oi mate
