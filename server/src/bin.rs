@@ -59,14 +59,14 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             println!("Succesfully exported data to {}", path.to_str().unwrap());
             Ok(())
         }
-        Some(config::Command::Import(o)) => {
+        Some(config::Command::Import(import_opts)) => {
             let readstring = {
-                let path = std::path::Path::new(&o.file);
+                let path = std::path::Path::new(&import_opts.file);
                 std::fs::read_to_string(path)?
             };
 
             let appstate = appstate::init(config.clone())?;
-            let importer_subject = if let Some(i) = &o.parent {
+            let importer_subject = if let Some(i) = &import_opts.parent {
                 i.into()
             } else {
                 urls::construct_path_import(&appstate.store.get_self_url().expect("No self url"))
@@ -75,13 +75,18 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                 importer: Some(importer_subject),
                 for_agent: None,
                 overwrite_outside: true,
-                save: atomic_lib::parse::SaveOpts::Commit,
+                save: if import_opts.force {
+                    atomic_lib::parse::SaveOpts::Save
+                } else {
+                    atomic_lib::parse::SaveOpts::Commit
+                },
                 signer: Some(appstate.store.get_default_agent()?),
             };
+            println!("Importing...");
             appstate.store.import(&readstring, &parse_opts)?;
 
-            println!("Sucesfully imported {:?} to store.", o.file);
-            Ok(())
+            println!("Sucesfully imported {:?} to store.", import_opts.file);
+            std::process::exit(0);
         }
         Some(config::Command::ShowConfig) => {
             println!("{:#?}", config);
@@ -89,18 +94,18 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
         }
         Some(config::Command::Reset) => {
             if dialoguer::Confirm::with_theme(&dialoguer::theme::ColorfulTheme::default())
-        .with_prompt(
-            format!("Warning!! Do you really want to remove all data from your atomic-server? This will delete {:?}", &config.store_path),
-        )
-        .interact()
-        .unwrap()
-    {
-        std::fs::remove_dir_all(config.store_path).map(|e| format!("unable to remove directory: {:?}", e))?;
-        std::fs::remove_dir_all(config.search_index_path).map(|e| format!("unable to remove directory: {:?}", e))?;
-        println!("Done");
-    } else {
-        println!("Ok, not removing anything.");
-    }
+            .with_prompt(
+                format!("Warning!! Do you really want to remove all data from your atomic-server? This will delete {:?}", &config.store_path),
+            )
+            .interact()
+            .unwrap()
+            {
+                std::fs::remove_dir_all(config.store_path).map(|e| format!("unable to remove directory: {:?}", e))?;
+                std::fs::remove_dir_all(config.search_index_path).map(|e| format!("unable to remove directory: {:?}", e))?;
+                println!("Done");
+            } else {
+                println!("Ok, not removing anything.");
+            }
             Ok(())
         }
         Some(config::Command::SetupEnv) => {
