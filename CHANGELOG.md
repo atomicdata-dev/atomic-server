@@ -70,9 +70,12 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Refactor `Endpoint` handlers, uses a Context now #592
 - Re-build store + invite when adjusting server url #607
 - Use local atomic-server for properties and classes, improves atomic-server #604
+- Add multi-tenancy support. Users can create their own `Drives` on subdomains. #288
+- Add `/register` Endpoint #489 #254
+- Refactor URLs. `store.self_url()` returns an `AtomicUrl`, which provides methods to easily add paths, find subdomains and more.
+- Add support for subdomains, use a Wildcard TLS certificate #502
 
 ## [v0.34.1] - 2023-02-11
-
 - Improve query performance, refactor indexes. The `.tpf` API is deprecated in favor of the more powerful `.query`. #529
 - Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency, add DNS verification for TLS option with `--https-dns` #192
 - Improved error handling for HTTPS initialization #530
