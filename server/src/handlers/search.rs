@@ -14,7 +14,12 @@ use crate::{
 use actix_web::{web, HttpResponse};
 use atomic_lib::{errors::AtomicResult, urls, Db, Resource, Storelike};
 use serde::Deserialize;
-use tantivy::{collector::TopDocs, query::QueryParser};
+use tantivy::{
+    collector::TopDocs,
+    query::{BooleanQuery, BoostQuery, QueryParser},
+};
+
+type Queries = Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)>;
 
 #[derive(Deserialize, Debug)]
 pub struct SearchQuery {
@@ -28,6 +33,8 @@ pub struct SearchQuery {
     pub property: Option<String>,
     /// Only include resources that have this resource as its ancestor
     pub parent: Option<String>,
+    /// Filter based on props
+    pub filter: Option<String>,
 }
 
 /// Parses a search query and responds with a list of resources
@@ -56,7 +63,7 @@ pub async fn search_query(
     // https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
     let initial_results_limit = 100;
 
-    let mut query_list: Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)> = Vec::new();
+    let mut query_list: Queries = Vec::new();
 
     if let Some(parent) = params.parent.clone() {
         let query = build_parent_query(parent, &fields, store)?;
@@ -65,23 +72,21 @@ pub async fn search_query(
     }
 
     if let Some(q) = params.q.clone() {
-        let fuzzy = should_fuzzy(&params.property, &q);
+        let fuzzy_query = build_fuzzy_query(&fields, &q);
 
-        let query = if fuzzy {
-            build_fuzzy_query(&fields, &q)?
-        } else {
-            build_query(
-                &fields,
-                &q,
-                params.property.clone(),
-                &appstate.search_state.index,
-            )?
-        };
-
-        query_list.push((tantivy::query::Occur::Must, query));
+        query_list.push((tantivy::query::Occur::Must, Box::new(fuzzy_query)));
     }
 
-    let query = tantivy::query::BooleanQuery::new(query_list);
+    if let Some(filter) = params.filter.clone() {
+        let exact_query = BoostQuery::new(
+            build_query(&fields, &filter, &appstate.search_state.index)?,
+            20.0,
+        );
+
+        query_list.push((tantivy::query::Occur::Must, Box::new(exact_query)));
+    }
+
+    let query = BooleanQuery::new(query_list);
 
     // execute the query
     let top_docs = searcher
@@ -125,6 +130,7 @@ pub async fn search_query(
         }
     }
     results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
+
     let mut builder = HttpResponse::Ok();
     // TODO: support other serialization options
     Ok(builder.body(results_resource.to_json_ad()?))
@@ -137,53 +143,33 @@ pub struct StringAtom {
     pub value: String,
 }
 
-fn should_fuzzy(property: &Option<String>, q: &str) -> bool {
-    if property.is_some() {
-        // Fuzzy searching is not possible when filtering by property
-        return false;
-    }
+fn build_fuzzy_query(fields: &Fields, q: &str) -> impl tantivy::query::Query {
+    let title_term = tantivy::Term::from_field_text(fields.title, q);
+    let description_term = tantivy::Term::from_field_text(fields.description, q);
+    let title_query = tantivy::query::FuzzyTermQuery::new_prefix(title_term, 1, true);
+    let description_query = tantivy::query::FuzzyTermQuery::new_prefix(description_term, 1, true);
 
-    // If any of these substrings appear, the user wants an exact / advanced search
-    let dont_fuzz_strings = vec!["*", "AND", "OR", "[", "\"", ":", "+", "-", " "];
-    for substr in dont_fuzz_strings {
-        if q.contains(substr) {
-            return false;
-        }
-    }
+    let queries: Queries = vec![
+        (
+            tantivy::query::Occur::Should,
+            Box::new(BoostQuery::new(Box::new(title_query), 2.0)),
+        ),
+        (tantivy::query::Occur::Should, Box::new(description_query)),
+    ];
 
-    true
-}
-
-fn build_fuzzy_query(fields: &Fields, q: &str) -> AtomicResult<Box<dyn tantivy::query::Query>> {
-    let term = tantivy::Term::from_field_text(fields.value, q);
-    let query = tantivy::query::FuzzyTermQuery::new_prefix(term, 1, true);
-
-    Ok(Box::new(query))
+    BooleanQuery::from(queries)
 }
 
 #[tracing::instrument(skip(index))]
 fn build_query(
     fields: &Fields,
     q: &str,
-    property: Option<String>,
     index: &tantivy::Index,
 ) -> AtomicResult<Box<dyn tantivy::query::Query>> {
     // construct the query
-    let query_parser = QueryParser::for_index(
-        index,
-        vec![
-            fields.subject,
-            // I don't think we need to search in the property
-            // fields.property,
-            fields.value,
-        ],
-    );
+    let query_parser = QueryParser::for_index(index, vec![fields.propvals]);
 
-    let query_text = if let Some(prop) = property {
-        format!("property:{:?} AND {}", prop, &q)
-    } else {
-        q.to_string()
-    };
+    let query_text = q.to_string();
 
     let query = query_parser
         .parse_query(&query_text)

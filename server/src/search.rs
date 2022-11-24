@@ -17,8 +17,9 @@ use crate::errors::AtomicServerResult;
 #[derive(Debug)]
 pub struct Fields {
     pub subject: Field,
-    pub property: Field,
-    pub value: Field,
+    pub title: Field,
+    pub description: Field,
+    pub propvals: Field,
     pub hierarchy: Field,
 }
 
@@ -59,8 +60,9 @@ pub fn build_schema() -> AtomicServerResult<tantivy::schema::Schema> {
     let mut schema_builder = Schema::builder();
     // The STORED flag makes the index store the full values. Can be useful.
     schema_builder.add_text_field("subject", TEXT | STORED);
-    schema_builder.add_text_field("property", TEXT | STORED);
-    schema_builder.add_text_field("value", TEXT | STORED);
+    schema_builder.add_text_field("title", TEXT | STORED);
+    schema_builder.add_text_field("description", TEXT | STORED);
+    schema_builder.add_json_field("propvals", STORED | TEXT);
     schema_builder.add_facet_field("hierarchy", STORED);
     let schema = schema_builder.build();
     Ok(schema)
@@ -92,14 +94,18 @@ pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
         .schema
         .get_field("subject")
         .ok_or("No 'subject' in the schema")?;
-    let property = appstate
+    let title = appstate
         .schema
-        .get_field("property")
-        .ok_or("No 'property' in the schema")?;
-    let value = appstate
+        .get_field("title")
+        .ok_or("No 'title' in the schema")?;
+    let description = appstate
         .schema
-        .get_field("value")
-        .ok_or("No 'value' in the schema")?;
+        .get_field("description")
+        .ok_or("No 'description' in the schema")?;
+    let propvals = appstate
+        .schema
+        .get_field("propvals")
+        .ok_or("No 'propvals' in the schema")?;
     let hierarchy = appstate
         .schema
         .get_field("hierarchy")
@@ -107,8 +113,9 @@ pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
 
     Ok(Fields {
         subject,
-        property,
-        value,
+        title,
+        description,
+        propvals,
         hierarchy,
     })
 }
@@ -143,23 +150,32 @@ pub fn add_resource(
     let fields = get_schema_fields(appstate)?;
     let subject = resource.get_subject();
     let writer = appstate.writer.read()?;
-    let hierarchy = resource_to_facet(resource, store)?;
 
-    for (prop, val) in resource.get_propvals() {
-        match val {
-            atomic_lib::Value::AtomicUrl(_) | atomic_lib::Value::ResourceArray(_) => continue,
-            _ => {
-                add_triple(
-                    &writer,
-                    subject.into(),
-                    prop.into(),
-                    val.to_string(),
-                    Some(hierarchy.clone()),
-                    &fields,
-                )?;
-            }
-        };
-    }
+    let mut doc = Document::default();
+    doc.add_json_object(
+        fields.propvals,
+        serde_json::from_str(&resource.to_json(store)?).map_err(|e| {
+            format!(
+                "Failed to convert resource to json for search indexing. Subject: {}. Error: {}",
+                subject, e
+            )
+        })?,
+    );
+
+    doc.add_text(fields.subject, subject);
+    doc.add_text(fields.title, get_resource_title(resource));
+
+    if let Ok(atomic_lib::Value::Markdown(description)) =
+        resource.get(atomic_lib::urls::DESCRIPTION)
+    {
+        doc.add_text(fields.description, description);
+    };
+
+    let hierarchy = resource_to_facet(resource, store)?;
+    doc.add_facet(fields.hierarchy, hierarchy);
+
+    writer.add_document(doc)?;
+
     Ok(())
 }
 
@@ -172,30 +188,6 @@ pub fn remove_resource(search_state: &SearchState, subject: &str) -> AtomicServe
     let writer = search_state.writer.read()?;
     let term = tantivy::Term::from_field_text(fields.subject, subject);
     writer.delete_term(term);
-    Ok(())
-}
-
-/// Adds a single atom or triple to the search index, but does _not_ commit!
-/// `appstate.search_index_writer.write()?.commit()?;`
-#[tracing::instrument(skip(writer, fields))]
-pub fn add_triple(
-    writer: &IndexWriter,
-    subject: String,
-    property: String,
-    value: String,
-    hierarchy: Option<Facet>,
-    fields: &Fields,
-) -> AtomicServerResult<()> {
-    let mut doc = Document::default();
-    doc.add_text(fields.property, property);
-    doc.add_text(fields.value, value);
-    doc.add_text(fields.subject, subject);
-
-    if let Some(hierarchy) = hierarchy {
-        doc.add_facet(fields.hierarchy, hierarchy);
-    }
-
-    writer.add_document(doc)?;
     Ok(())
 }
 
@@ -240,6 +232,24 @@ pub fn resource_to_facet(resource: &Resource, store: &Db) -> AtomicServerResult<
         .unwrap();
 
     Ok(result)
+}
+
+fn get_resource_title(resource: &Resource) -> String {
+    let title = if let Ok(name) = resource.get(atomic_lib::urls::NAME) {
+        name.clone()
+    } else if let Ok(shortname) = resource.get(atomic_lib::urls::SHORTNAME) {
+        shortname.clone()
+    } else if let Ok(filename) = resource.get(atomic_lib::urls::FILENAME) {
+        filename.clone()
+    } else {
+        atomic_lib::Value::String(resource.get_subject().to_string())
+    };
+
+    match title {
+        atomic_lib::Value::String(s) => s,
+        atomic_lib::Value::Slug(s) => s,
+        _ => resource.get_subject().to_string(),
+    }
 }
 
 #[cfg(test)]

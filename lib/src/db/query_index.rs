@@ -117,7 +117,6 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         if in_selection {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
-
             // If no external resources should be included, skip this one if it's an external resource
             if !q.include_external && !subject.starts_with(&self_url) {
                 continue;
@@ -133,14 +132,19 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
                         subjects.push(subject.into())
                     }
                     Err(e) => match &e.error_type {
-                        crate::AtomicErrorType::NotFoundError => {}
-                        crate::AtomicErrorType::UnauthorizedError => {}
+                        crate::AtomicErrorType::NotFoundError => {
+                            println!("Not found: {}", subject)
+                        }
+                        crate::AtomicErrorType::UnauthorizedError => {
+                            println!("Unauthorized: {}", subject)
+                        }
                         _other => {
+                            println!("Other error: {}", subject);
                             return Err(format!(
                                 "Error when getting resource in collection: {}",
                                 &e
                             )
-                            .into())
+                            .into());
                         }
                     },
                 }
