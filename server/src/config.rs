@@ -76,6 +76,7 @@ pub struct Opts {
     pub data_dir: Option<PathBuf>,
 
     /// CAUTION: Skip authentication checks, making all data publicly readable. Improves performance.
+
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,
 
@@ -91,6 +92,18 @@ pub struct Opts {
     /// Combine with `log_level` to get more or less data (`trace` is the most verbose)
     #[clap(value_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
     pub trace: Tracing,
+
+    /// Add this if you want so send e-mails (e.g. on user registration)
+    #[clap(long, env = "ATOMIC_SMTP_HOST")]
+    pub smpt_host: Option<String>,
+
+    /// Useful for debugging e-mails during development, or if your SMTP server has an unconventional port number.
+    #[clap(long, env = "ATOMIC_SMTP_PORT", default_value = "25")]
+    pub smpt_port: u16,
+
+    /// If you want to parse options from a specific .env file. By default reads the `./.env` file.
+    #[clap(long)]
+    pub env_file: Option<PathBuf>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -197,7 +210,14 @@ pub fn read_opts() -> Opts {
     dotenv().ok();
 
     // Parse CLI options, .env values, set defaults
-    Opts::parse()
+    let mut opts = Opts::parse();
+    if let Some(env_path) = &opts.env_file {
+        dotenv::from_path(env_path)
+            .unwrap_or_else(|_| panic!("Env file not found: {} ", env_path.display()));
+        // Parse the opts again so the CLI opts override the .env file
+        opts = Opts::parse();
+    }
+    opts
 }
 
 /// Creates the server config, reads .env values and sets defaults
