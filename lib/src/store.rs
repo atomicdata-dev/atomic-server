@@ -1,8 +1,6 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
-use url::Url;
-
 use crate::agents::Agent;
 use crate::storelike::QueryResult;
 use crate::{atomic_url::AtomicUrl, storelike::Storelike};
@@ -189,11 +187,7 @@ impl Storelike for Store {
         if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
             return Ok(resource.clone());
         }
-        self.handle_not_found(
-            subject,
-            "Not found in HashMap.".into(),
-            self.get_default_agent().ok().as_ref(),
-        )
+        self.handle_not_found(subject, "Not found in HashMap.".into())
     }
 
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {

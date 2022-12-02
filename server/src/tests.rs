@@ -51,7 +51,9 @@ async fn server_tests() {
     // This prevents folder access issues when running concurrent tests
     config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
 
-    let appstate = crate::appstate::init(config.clone()).expect("failed init appstate");
+    let appstate = crate::appstate::init(config.clone())
+        .await
+        .expect("failed to init appstate");
     let data = Data::new(appstate.clone());
     let app = test::init_service(
         App::new()

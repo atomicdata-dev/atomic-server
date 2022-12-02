@@ -16,6 +16,23 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "watch atomic-server (cargo watch)",
+			"type": "shell",
+			"command": "~/.cargo/bin/cargo-watch",
+			"args": [
+				"--",
+				"cargo",
+				"run",
+				"--bin",
+				"atomic-server",
+				"--",
+				"--env-file",
+				"server/.env",
+			],
+			"group": "build",
+			"problemMatcher": []
+		},
+		{
 			"label": "test atomic-server (cargo nextest run)",
 			"type": "shell",
 			"command": "~/.cargo/bin/cargo",
