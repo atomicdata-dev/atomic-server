@@ -15,6 +15,9 @@ harness = false
 name = "benchmarks"
 # path = "benches/benchmarks.rs"
 
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 base64 = "0.21"
 bincode = {version = "1", optional = true}
@@ -36,6 +39,10 @@ tracing = "0.1"
 ureq = "2"
 url = "2"
 urlencoding = "2"
+mail-send = {version= "0.2", optional = true}
+async-mutex = {version = "1.4.0", optional = true}
+tokio = {version = "1.22.0", optional = true, features = ["full"] }
+jwt-simple = {version = "0.11.2", optional = true}
 
 [dev-dependencies]
 criterion = "0.4"
@@ -45,6 +52,6 @@ ntest = "0.9"
 
 [features]
 config = ["directories", "toml"]
-db = ["sled", "bincode"]
+db = ["sled", "bincode", "mail-send", "tokio", "async-mutex", "jwt-simple"]
 html = ["kuchiki", "lol_html", "html2md"]
 rdf = ["rio_api", "rio_turtle"]

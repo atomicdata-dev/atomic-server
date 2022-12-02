@@ -1,5 +1,6 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
+//! See [Db]
 
 mod migrations;
 mod prop_val_sub_index;
@@ -10,9 +11,11 @@ mod val_prop_sub_index;
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
+use async_mutex::Mutex;
+use mail_send::{Connected, Transport};
 use tracing::instrument;
 
 use crate::{
@@ -21,6 +24,7 @@ use crate::{
     atoms::IndexAtom,
     commit::CommitResponse,
     db::{query_index::NO_VALUE, val_prop_sub_index::find_in_val_prop_sub_index},
+    email::{self, MailMessage},
     endpoints::{default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -49,21 +53,22 @@ type HandleCommit = Box<dyn Fn(&CommitResponse) + Send + Sync>;
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
 pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 
-/// The Db is a persistent on-disk Atomic Data store.
+/// A persistent on-disk Atomic Data store.
 /// It's an implementation of [Storelike].
 /// It uses [sled::Tree]s as Key Value stores.
 /// It stores [Resource]s as [PropVals]s by their subject as key.
 /// It builds a value index for performant [Query]s.
 /// It keeps track of Queries and updates their index when [crate::Commit]s are applied.
-/// You can pass a custom `on_commit` function to run at Commit time.
 /// `Db` should be easily, cheaply clone-able, as users of this library could have one `Db` per connection.
+/// Note that [plugins](crate::plugins) can add their own endpoints to the [Db],
+/// and can use [tokio::spawn] to start concurrent tasks.
 #[derive(Clone)]
 pub struct Db {
     /// The Key-Value store that contains all data.
     /// Resources can be found using their Subject.
     /// Try not to use this directly, but use the Trees.
     db: sled::Db,
-    default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+    default_agent: Arc<std::sync::Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
     /// Index of all Atoms, sorted by {Value}-{Property}-{Subject}.
@@ -81,7 +86,9 @@ pub struct Db {
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
-    on_commit: Option<Arc<HandleCommit>>,
+    handle_commit: Option<Arc<HandleCommit>>,
+    /// Email SMTP client for sending email.
+    smtp_client: Option<Arc<Mutex<Transport<'static, Connected>>>>,
 }
 
 impl Db {
@@ -97,7 +104,7 @@ impl Db {
         let watched_queries = db.open_tree("watched_queries")?;
         let store = Db {
             db,
-            default_agent: Arc::new(Mutex::new(None)),
+            default_agent: Arc::new(std::sync::Mutex::new(None)),
             resources,
             reference_index,
             query_index,
@@ -105,7 +112,8 @@ impl Db {
             server_url: AtomicUrl::try_from(server_url)?,
             watched_queries,
             endpoints: default_endpoints(),
-            on_commit: None,
+            handle_commit: None,
+            smtp_client: None,
         };
         migrate_maybe(&store).map(|e| format!("Error during migration of database: {:?}", e))?;
         crate::populate::populate_base_models(&store)
@@ -152,7 +160,7 @@ impl Db {
     /// Sets a function that is called whenever a [Commit::apply] is called.
     /// This can be used to listen to events.
     pub fn set_handle_commit(&mut self, on_commit: HandleCommit) {
-        self.on_commit = Some(Arc::new(on_commit));
+        self.handle_commit = Some(Arc::new(on_commit));
     }
 
     /// Finds resource by Subject, return PropVals HashMap
@@ -209,6 +217,37 @@ impl Db {
             .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
 
         Some(Resource::from_propvals(propvals, subject))
+    }
+
+    /// Adds an [Endpoint] to the store. This means adding a route with custom behavior.
+    pub fn register_endpoint(&mut self, endpoint: Endpoint) {
+        self.endpoints.push(endpoint);
+    }
+
+    /// Registers an SMTP client to the store, allowing the store to send emails.
+    pub async fn set_smtp_config(
+        &mut self,
+        smtp_config: crate::email::SmtpConfig,
+    ) -> AtomicResult<()> {
+        self.smtp_client = Some(Arc::new(Mutex::new(
+            crate::email::get_smtp_client(smtp_config).await?,
+        )));
+        Ok(())
+    }
+
+    pub async fn send_email(&self, message: MailMessage) -> AtomicResult<()> {
+        let mut client = self
+            .smtp_client
+            .as_ref()
+            .ok_or_else(|| {
+                AtomicError::other_error(
+                    "No SMTP client configured. Please call set_smtp_config first.".into(),
+                )
+            })?
+            .lock()
+            .await;
+        email::send_mail(&mut client, message).await?;
+        Ok(())
     }
 }
 
@@ -453,7 +492,7 @@ impl Storelike for Db {
     }
 
     fn handle_commit(&self, commit_response: &CommitResponse) {
-        if let Some(fun) = &self.on_commit {
+        if let Some(fun) = &self.handle_commit {
             fun(commit_response);
         }
     }
@@ -475,7 +514,7 @@ impl Storelike for Db {
         // Maybe make this optional?
         q_filter.watch(self)?;
 
-        tracing::info!(filter = ?q_filter, "Building query index");
+        tracing::debug!(filter = ?q_filter, "Building query index");
 
         let atoms: IndexIterator = match (&q.property, q.value.as_ref()) {
             (Some(prop), val) => find_in_prop_val_sub_index(self, prop, val),

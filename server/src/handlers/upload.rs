@@ -36,14 +36,8 @@ pub async fn upload_handler(
     let store = &appstate.store;
     let parent = store.get_resource(&query.parent)?;
     let subject = get_subject(&req, &conn, &appstate)?;
-    if let Some(agent) = get_client_agent(req.headers(), &appstate, subject)? {
-        check_write(store, &parent, &agent)?;
-    } else {
-        return Err(AtomicError::unauthorized(
-            "No authorization headers present. These are required when uploading files.".into(),
-        )
-        .into());
-    }
+    let for_agent = get_client_agent(req.headers(), &appstate, subject)?;
+    check_write(store, &parent, &for_agent)?;
 
     let mut created_resources: Vec<Resource> = Vec::new();
     let mut commit_responses: Vec<CommitResponse> = Vec::new();

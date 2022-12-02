@@ -274,13 +274,13 @@ pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     let base = store.get_self_url().ok_or("No self_url")?;
     let mut drive = store.get_resource(base.as_str())?;
-    let arr = vec![
+    let sidebar_items = vec![
         base.set_route(crate::atomic_url::Routes::Setup),
         base.set_route(crate::atomic_url::Routes::Import),
         base.set_route(crate::atomic_url::Routes::Collections),
     ];
-    for item in arr {
-        drive.push_propval(urls::SUBRESOURCES, item.into(), true)?;
+    for item in sidebar_items {
+        drive.push_propval(urls::SUBRESOURCES, item.to_string().into(), true)?;
     }
     drive.save_locally(store)?;
     Ok(())

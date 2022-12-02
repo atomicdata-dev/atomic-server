@@ -6,6 +6,7 @@ use atomic_lib::{
     agents::{generate_public_key, Agent},
     atomic_url::Routes,
     commit::CommitResponse,
+    email::SmtpConfig,
     Storelike,
 };
 
@@ -29,7 +30,7 @@ pub struct AppState {
 /// Creates the AppState (the server's context available in Handlers).
 /// Initializes or opens a store on disk.
 /// Creates a new agent, if necessary.
-pub fn init(config: Config) -> AtomicServerResult<AppState> {
+pub async fn init(config: Config) -> AtomicServerResult<AppState> {
     tracing::info!("Initializing AppState");
 
     // Check if atomic-server is already running somewhere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
@@ -43,6 +44,16 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
 
     tracing::info!("Opening database at {:?}", &config.store_path);
     let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+
+    if let Some(host) = &config.opts.smpt_host {
+        store
+            .set_smtp_config(SmtpConfig {
+                host: host.clone(),
+                port: config.opts.smpt_port,
+            })
+            .await?;
+    };
+
     if config.initialize {
         tracing::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)

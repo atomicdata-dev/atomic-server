@@ -75,7 +75,7 @@ fn v0_to_v1(store: &Db) -> AtomicResult<()> {
 
 /// Add `prop_val_sub` index
 fn ref_v0_to_v1(store: &Db) -> AtomicResult<()> {
-    tracing::warn!("Rebuilding indexes...");
+    tracing::warn!("Rebuilding indexes due to migrating to new version...");
     store.db.drop_tree("reference_index")?;
     store.build_index(true)?;
     tracing::warn!("Rebuilding index finished!");

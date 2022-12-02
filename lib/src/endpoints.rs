@@ -32,6 +32,7 @@ pub struct HandlePostContext<'a> {
     pub body: Vec<u8>,
 }
 /// An API endpoint at some path which accepts requests and returns some Resource.
+/// Add them by calling [Db::register_endpoint]
 #[derive(Clone)]
 pub struct Endpoint {
     /// The part behind the server domain, e.g. '/versions' or '/collections'. Include the slash.
@@ -94,6 +95,7 @@ pub fn default_endpoints() -> Vec<Endpoint> {
         plugins::search::search_endpoint(),
         plugins::files::upload_endpoint(),
         plugins::register::register_endpoint(),
+        plugins::register::confirm_email_endpoint(),
         #[cfg(feature = "html")]
         plugins::bookmark::bookmark_endpoint(),
         plugins::importer::import_endpoint(),

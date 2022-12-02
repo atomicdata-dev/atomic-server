@@ -10,6 +10,7 @@ use atomic_lib::Storelike;
 use percent_encoding::percent_decode_str;
 use std::str::FromStr;
 
+use crate::content_types::ContentType;
 use crate::errors::{AppErrorType, AtomicServerError};
 use crate::{appstate::AppState, errors::AtomicServerResult};
 

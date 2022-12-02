@@ -1,5 +1,7 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
+use tracing::info;
+
 use crate::{
     agents::{Agent, ForAgent},
     atomic_url::AtomicUrl,
@@ -239,6 +241,7 @@ pub trait Storelike: Sized {
                 let self_host = self_url.host().ok_or_else(|| {
                     AtomicError::not_found(format!("Self URL has no host: {}", self_url))
                 })?;
+                info!("Comparing hosts: {} and {}", subject_host, self_host);
                 if subject_host == self_host {
                     return Ok(false);
                 }

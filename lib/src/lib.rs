@@ -1,25 +1,31 @@
 /*!
 `atomic_lib` helps you to get, store, serialize, parse and validate Atomic Data.
+It's primarily used for powering [Atomic-Server](https://github.com/atomicdata-dev/atomic-data-rust).
+Many of the features are optional, which helps us keep the default size small.
 
 See the [Atomic Data Docs](https://docs.atomicdata.dev) for more information.
 
 ## Features
 
 - Two stores for Atomic Data:
+  - **On disk** [Db], powered by Sled. Indexes filtered queries. (requires `db` feature)
   - **In-memory** [Store] for getting / setting data. Useful for client applications.
-  - **On disk** [Db], powered by Sled. Useful for applications that persist Atomic Data, such as [`atomic-server`](https://crates.io/crates/atomic-server).
-- [serialize] and [parse] tools for [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), plain JSON, RDF, Turtle, N-Triples and JSON-LD.
+- [parse] and import tools for [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html)
+- [serialize] tools for JSON-AD, plain JSON, RDF, Turtle, N-Triples and JSON-LD.
 - [Resource] with getters, setters and a `.save` function that creates Commits.
 - [Value] converts Atomic Data to Rust native types
-- Validate [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
-- [Commit]s (transactions / delta's / changes / updates / versioning / history).
-- [plugins] system (although not very mature)
+- [Commit]s (transactions / delta's / changes / updates / versioning / history). Supports many checks, such as Schema, Authorization and more.
 - [collections] (pagination, sorting, filtering)
-- Querying (using triple pattern fragments) (see [storelike::Query])
-- [plugins::invite] for sharing
+- Queries (see [storelike::Query])
 - [hierarchy] for authorization
 - [crate::endpoints::Endpoint] for custom API endpoints
-- [config::Config] files.
+- [config::Config] files. (requires `config` feature)
+- [endpoints] which allow easily adding routes with custom features
+- [plugins] system basics. Not very mature, as we still need the code in this repo. (all plugins require `db` feature)
+- [plugins::invite] for sharing URLs that grant rights
+- [plugins::chatroom] for slack-like group chats.
+- [plugins::bookmark] for fetching HTML pages, converting them to markdown, and storing them as Atomic Data (requires `html` feature)
+- [plugins::versioning] for constructing previous versions of resources, powered by [Commit]s.
 
 ## Getting started
 
@@ -71,6 +77,8 @@ pub mod datatype;
 #[cfg(feature = "db")]
 pub mod db;
 #[cfg(feature = "db")]
+pub mod email;
+#[cfg(feature = "db")]
 pub mod endpoints;
 pub mod errors;
 pub mod hierarchy;
@@ -86,6 +94,8 @@ pub mod store;
 pub mod storelike;
 #[cfg(test)]
 mod test_utils;
+#[cfg(feature = "db")]
+pub mod token;
 pub mod urls;
 pub mod utils;
 pub mod validate;

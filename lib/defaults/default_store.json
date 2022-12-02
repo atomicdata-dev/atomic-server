@@ -503,6 +503,16 @@
         "https://atomicdata.dev/properties/shortname": "overwrite-outside"
     },
     {
+        "@id": "https://atomicdata.dev/properties/email",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "Primary email address ",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "email"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/incomplete",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",

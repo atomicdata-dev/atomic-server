@@ -202,6 +202,7 @@ impl Commit {
         let _resource_new_classes = resource_new.get_classes(store)?;
 
         // BEFORE APPLY COMMIT HANDLERS
+        // TODO: These should be handled by actual plugins
         #[cfg(feature = "db")]
         for class in &_resource_new_classes {
             match class.subject.as_str() {
