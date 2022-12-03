@@ -213,16 +213,14 @@ pub fn should_update(
         // We then make sure to also update the sort_by value.
         if let Ok(sorted_val) = resource.get(sort_prop) {
             // Note that updating here is a bit too agressive. It will update the index every time an atom comes by that matches the QueryFilter, even if the value is unchanged.
-            update_indexed_member(
-                store,
-                q_filter,
-                &index_atom.subject,
-                &sorted_val.to_sortable_string(),
-                delete,
-            )?;
-            if &index_atom.property != sort_prop {
-                // We've just updated the index for this atom, so there is no need to update the value above.
-                return Ok(false);
+            if &index_atom.property == sort_prop {
+                update_indexed_member(
+                    store,
+                    q_filter,
+                    &index_atom.subject,
+                    &sorted_val.to_sortable_string(),
+                    delete,
+                )?;
             }
         }
     }
