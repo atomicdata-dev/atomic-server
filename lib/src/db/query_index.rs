@@ -197,8 +197,6 @@ pub fn should_update(
     q_filter: &QueryFilter,
     index_atom: &IndexAtom,
     resource: &Resource,
-    delete: bool,
-    store: &Db,
 ) -> AtomicResult<bool> {
     let resource_check = check_resource_query_filter_property(resource, q_filter);
     let matching_prop = if let Some(p) = resource_check {
@@ -206,24 +204,6 @@ pub fn should_update(
     } else {
         return Ok(false);
     };
-
-    if let Some(sort_prop) = &q_filter.sort_by {
-        // Sometimes, a removed atom should also invalidate other IndexAtoms, because the QueryFilter no longer matches.
-        // This only happens when there is a `sort_by` in the QueryFilter.
-        // We then make sure to also update the sort_by value.
-        if let Ok(sorted_val) = resource.get(sort_prop) {
-            // Note that updating here is a bit too agressive. It will update the index every time an atom comes by that matches the QueryFilter, even if the value is unchanged.
-            if &index_atom.property == sort_prop {
-                update_indexed_member(
-                    store,
-                    q_filter,
-                    &index_atom.subject,
-                    &sorted_val.to_sortable_string(),
-                    delete,
-                )?;
-            }
-        }
-    }
 
     let should: bool = match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
         // Whenever the atom matches with either the sorted or the filtered prop, we have to update
@@ -279,7 +259,7 @@ pub fn check_if_atom_matches_watched_query_filters(
             let q_filter = bincode::deserialize::<QueryFilter>(&k)
                 .map_err(|e| format!("Could not deserialize QueryFilter: {}", e))?;
 
-            if should_update(&q_filter, index_atom, resource, delete, store)? {
+            if should_update(&q_filter, index_atom, resource)? {
                 update_indexed_member(
                     store,
                     &q_filter,
@@ -525,33 +505,15 @@ pub mod test {
         };
 
         // We should be able to find the resource by propval, val, and / or prop.
-        assert!(
-            should_update(&qf_val, &index_atom, &resource_correct_class, false, store).unwrap()
-        );
-        assert!(should_update(
-            &qf_prop_val,
-            &index_atom,
-            &resource_correct_class,
-            false,
-            store
-        )
-        .unwrap());
-        assert!(
-            should_update(&qf_prop, &index_atom, &resource_correct_class, false, store).unwrap()
-        );
+        assert!(should_update(&qf_val, &index_atom, &resource_correct_class).unwrap());
+        assert!(should_update(&qf_prop_val, &index_atom, &resource_correct_class,).unwrap());
+        assert!(should_update(&qf_prop, &index_atom, &resource_correct_class).unwrap());
 
         // Test when a different value is passed
         let resource_wrong_class = Resource::new_instance(urls::PARAGRAPH, store).unwrap();
-        assert!(should_update(&qf_prop, &index_atom, &resource_wrong_class, false, store).unwrap());
-        assert!(!should_update(&qf_val, &index_atom, &resource_wrong_class, false, store).unwrap());
-        assert!(!should_update(
-            &qf_prop_val,
-            &index_atom,
-            &resource_wrong_class,
-            false,
-            store
-        )
-        .unwrap());
+        assert!(should_update(&qf_prop, &index_atom, &resource_wrong_class).unwrap());
+        assert!(!should_update(&qf_val, &index_atom, &resource_wrong_class).unwrap());
+        assert!(!should_update(&qf_prop_val, &index_atom, &resource_wrong_class,).unwrap());
 
         let qf_prop_val_sort = QueryFilter {
             property: Some(prop.clone()),
@@ -570,29 +532,8 @@ pub mod test {
         };
 
         // We should update with a sort_by attribute
-        assert!(should_update(
-            &qf_prop_val_sort,
-            &index_atom,
-            &resource_correct_class,
-            false,
-            store
-        )
-        .unwrap());
-        assert!(should_update(
-            &qf_prop_sort,
-            &index_atom,
-            &resource_correct_class,
-            false,
-            store
-        )
-        .unwrap());
-        assert!(should_update(
-            &qf_val_sort,
-            &index_atom,
-            &resource_correct_class,
-            false,
-            store
-        )
-        .unwrap());
+        assert!(should_update(&qf_prop_val_sort, &index_atom, &resource_correct_class,).unwrap());
+        assert!(should_update(&qf_prop_sort, &index_atom, &resource_correct_class,).unwrap());
+        assert!(should_update(&qf_val_sort, &index_atom, &resource_correct_class,).unwrap());
     }
 }
