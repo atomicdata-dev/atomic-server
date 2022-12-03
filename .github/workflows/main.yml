@@ -7,7 +7,7 @@ jobs:
     steps:
       - run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev libayatana-appindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0  libayatana-appindicator3-dev
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -26,7 +26,7 @@ jobs:
     steps:
       - run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev libayatana-appindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0  libayatana-appindicator3-dev
       - uses: actions/checkout@v2
       - uses: taiki-e/install-action@nextest
       - uses: actions-rs/toolchain@v1
@@ -47,7 +47,7 @@ jobs:
     steps:
       - run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev libayatana-appindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0  libayatana-appindicator3-dev
       - uses: actions/checkout@v2
       - name: Install Rust and llvm-tools-preview
         run: rustup component add llvm-tools-preview --toolchain stable-x86_64-unknown-linux-gnu
@@ -68,7 +68,7 @@ jobs:
     steps:
       - run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0 libayatana-appindicator3-dev
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -89,7 +89,7 @@ jobs:
     steps:
       - run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev libayatana-appindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0 libayatana-appindicator3-dev
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -109,7 +109,7 @@ jobs:
     steps:
       - run: |
           sudo apt-get update
-          sudo apt-get install -y webkit2gtk-4.0 libappindicator3-dev libayatana-appindicator3-dev
+          sudo apt-get install -y webkit2gtk-4.0  libayatana-appindicator3-dev
 
       - uses: pnpm/action-setup@v2.0.1
         name: Install pnpm
