@@ -449,6 +449,11 @@ fn index_invalidate_cache() {
 /// Generates a bunch of resources, changes the value for one of them, checks if the order has changed correctly.
 /// new_val should be lexicographically _smaller_ than old_val.
 fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, new_val: Value) {
+    let irrelevant_property_url = urls::DESCRIPTION;
+    assert_ne!(
+        property_url, irrelevant_property_url,
+        "property_url should be different from urls::DESCRIPTION"
+    );
     println!("cache_invalidation test for {}", property_url);
     let count = 10;
     let limit = 5;
@@ -457,13 +462,22 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
         "the following tests might not make sense if count is less than limit"
     );
 
-    for _x in 0..count {
-        let mut demo_resource = Resource::new_generate_subject(store);
-        demo_resource
-            .set_propval(property_url.into(), old_val.clone(), store)
-            .unwrap();
-        demo_resource.save(store).unwrap();
-    }
+    let mut resources: Vec<Resource> = (0..count)
+        .into_iter()
+        .map(|_num| {
+            let mut demo_resource = Resource::new_generate_subject(store);
+            demo_resource
+                .set_propval(property_url.into(), old_val.clone(), store)
+                .unwrap();
+            // We're only using this value to remove it later on
+            demo_resource
+                .set_propval_string(irrelevant_property_url.into(), "value", store)
+                .unwrap();
+            demo_resource.save(store).unwrap();
+            demo_resource
+        })
+        .collect();
+    assert_eq!(resources.len(), count, "resources created wrong number");
 
     let q = Query {
         property: Some(property_url.into()),
@@ -506,5 +520,17 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
         res.subjects.first().unwrap(),
         resource_changed_order.get_subject(),
         "Updated resource is not the first Result of the new query"
+    );
+
+    // Remove one of the properties
+    resources[1].remove_propval(irrelevant_property_url);
+    resources[1].save(store).unwrap();
+
+    let res = store
+        .query(&q)
+        .expect("No hits found after removing unrelated value");
+    assert_eq!(
+        res.count, count,
+        "count changed after updating irrelevant value"
     );
 }
