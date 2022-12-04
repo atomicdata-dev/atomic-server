@@ -450,9 +450,16 @@ fn index_invalidate_cache() {
 /// new_val should be lexicographically _smaller_ than old_val.
 fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, new_val: Value) {
     let irrelevant_property_url = urls::DESCRIPTION;
+    let filter_prop = urls::DATATYPE_PROP;
+    let filter_val = Value::AtomicUrl(urls::DATATYPE_CLASS.into());
     assert_ne!(
         property_url, irrelevant_property_url,
         "property_url should be different from urls::DESCRIPTION"
+    );
+    assert_ne!(
+        property_url,
+        filter_prop.to_string(),
+        "property_url should be different from urls::REDIRECT"
     );
     println!("cache_invalidation test for {}", property_url);
     let count = 10;
@@ -469,6 +476,9 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
             demo_resource
                 .set_propval(property_url.into(), old_val.clone(), store)
                 .unwrap();
+            demo_resource
+                .set_propval(filter_prop.to_string(), filter_val.clone(), store)
+                .unwrap();
             // We're only using this value to remove it later on
             demo_resource
                 .set_propval_string(irrelevant_property_url.into(), "value", store)
@@ -480,8 +490,8 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
     assert_eq!(resources.len(), count, "resources created wrong number");
 
     let q = Query {
-        property: Some(property_url.into()),
-        value: None,
+        property: Some(filter_prop.into()),
+        value: Some(filter_val),
         limit: Some(limit),
         start_val: None,
         end_val: None,
@@ -522,15 +532,28 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
         "Updated resource is not the first Result of the new query"
     );
 
-    // Remove one of the properties
+    // Remove one of the properties, not relevant to the query.
+    // This should not impact the results
     resources[1].remove_propval(irrelevant_property_url);
     resources[1].save(store).unwrap();
-
     let res = store
         .query(&q)
         .expect("No hits found after removing unrelated value");
     assert_eq!(
         res.count, count,
         "count changed after updating irrelevant value"
+    );
+
+    // Modify the filtered property.
+    // This should remove the item from the results.
+    resources[1].remove_propval(filter_prop);
+    resources[1].save(store).unwrap();
+    let res = store
+        .query(&q)
+        .expect("No hits found after changing filter value");
+    assert_eq!(
+        res.count,
+        count - 1,
+        "Modifying the filtered value did not remove the item from the results"
     );
 }
