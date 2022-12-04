@@ -18,7 +18,7 @@ use tracing::{info, instrument};
 use crate::{
     atoms::IndexAtom,
     commit::CommitResponse,
-    db::val_prop_sub_index::find_in_val_prop_sub_index,
+    db::{query_index::NO_VALUE, val_prop_sub_index::find_in_val_prop_sub_index},
     endpoints::{default_endpoints, Endpoint},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -506,7 +506,7 @@ impl Storelike for Db {
                         Ok(val) => val.to_sortable_string(),
                         // If we try sorting on a value that does not exist,
                         // we'll use an empty string as the sortable value.
-                        Err(_) => "".to_string(),
+                        Err(_) => NO_VALUE.to_string(),
                     }
                 }
             } else {
