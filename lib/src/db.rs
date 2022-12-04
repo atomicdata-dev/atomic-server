@@ -496,13 +496,18 @@ impl Storelike for Db {
 
         for a in atoms {
             let atom = a?;
+            // Get the SortableValue either from the Atom or the Resource.
             let sort_val: SortableValue = if let Some(sort) = &q_filter.sort_by {
                 if &atom.property == sort {
                     atom.sort_value
                 } else {
                     // Find the sort value in the store
-                    let sort_atom = self.get_value(&atom.subject, sort)?;
-                    sort_atom.to_sortable_string()
+                    match self.get_value(&atom.subject, sort) {
+                        Ok(val) => val.to_sortable_string(),
+                        // If we try sorting on a value that does not exist,
+                        // we'll use an empty string as the sortable value.
+                        Err(_) => "".to_string(),
+                    }
                 }
             } else {
                 atom.sort_value
