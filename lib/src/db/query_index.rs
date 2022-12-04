@@ -33,6 +33,9 @@ impl QueryFilter {
     /// Adds the QueryFilter to the `watched_queries` of the store.
     /// This means that whenever the store is updated (when a [Commit](crate::Commit) is added), the QueryFilter is checked.
     pub fn watch(&self, store: &Db) -> AtomicResult<()> {
+        if self.property.is_none() && self.value.is_none() {
+            return Err("Cannot watch a query without a property or value. These types of queries are not implemented. See https://github.com/atomicdata-dev/atomic-data-rust/issues/548 ".into());
+        };
         store
             .watched_queries
             .insert(bincode::serialize(self)?, b"")?;
@@ -43,7 +46,7 @@ impl QueryFilter {
     pub fn is_watched(&self, store: &Db) -> bool {
         store
             .watched_queries
-            .contains_key(&bincode::serialize(self).unwrap())
+            .contains_key(bincode::serialize(self).unwrap())
             .unwrap_or(false)
     }
 }
@@ -64,6 +67,8 @@ pub const END_CHAR: &str = "\u{ffff}";
 /// We can only store one bytearray as a key in Sled.
 /// We separate the various items in it using this bit that's illegal in UTF-8.
 pub const SEPARATION_BIT: u8 = 0xff;
+/// If we want to sort by a value that is no longer there, we use this special value.
+pub const NO_VALUE: &str = "";
 
 #[tracing::instrument(skip(store))]
 /// Performs a query on the `query_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
@@ -162,24 +167,24 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
 /// Does any value or property or sort value match?
 /// Returns the matching property, if found.
 /// E.g. if a Resource
-fn check_resource_query_filter_property(
-    resource: &Resource,
-    q_filter: &QueryFilter,
-) -> Option<String> {
+fn find_matching_propval<'a>(
+    resource: &'a Resource,
+    q_filter: &'a QueryFilter,
+) -> Option<&'a String> {
     if let Some(property) = &q_filter.property {
-        if let Ok(matched_propval) = resource.get(property) {
+        if let Ok(matched_val) = resource.get(property) {
             if let Some(filter_val) = &q_filter.value {
-                if matched_propval.to_string() == filter_val.to_string() {
-                    return Some(property.to_string());
+                if matched_val.to_string() == filter_val.to_string() {
+                    return Some(property);
                 }
             } else {
-                return Some(property.to_string());
+                return Some(property);
             }
         }
     } else if let Some(filter_val) = &q_filter.value {
         for (prop, val) in resource.get_propvals() {
             if val.contains_value(filter_val) {
-                return Some(prop.to_string());
+                return Some(prop);
             }
         }
         return None;
@@ -188,57 +193,82 @@ fn check_resource_query_filter_property(
 }
 
 /// Checks if a new IndexAtom should be updated for a specific [QueryFilter]
-/// It's only true if the [Resource] is matched by the [QueryFilter], and the [Value] is relevant for the index.
-/// This also sometimes updates other keys, for in the case one changed Atom influences other Indexed Members.
-/// See https://github.com/atomicdata-dev/atomic-data-rust/issues/395
+/// Returns which property should be updated, if any.
 // This is probably the most complex function in the whole repo.
 // If things go wrong when making changes, add a test and fix stuff in the logic below.
-pub fn should_update(
-    q_filter: &QueryFilter,
-    index_atom: &IndexAtom,
+pub fn should_update_property<'a>(
+    q_filter: &'a QueryFilter,
+    index_atom: &'a IndexAtom,
     resource: &Resource,
-) -> AtomicResult<bool> {
-    let resource_check = check_resource_query_filter_property(resource, q_filter);
-    let matching_prop = if let Some(p) = resource_check {
-        p
-    } else {
-        return Ok(false);
+) -> Option<&'a String> {
+    // First we'll check if the resource matches the QueryFilter.
+    // We'll need the `matching_val` for updating the index when a value changes that influences other indexed members.
+    // For example, if we have a Query for children of a particular folder, sorted by name,
+    // and we move one of the children to a different folder, we'll need to make sure that the index is updated containing the name of the child.
+    // This name is not part of the `index_atom` itself, as the name wasn't updated.
+    // So here we not only make sure that the QueryFilter actually matches the resource,
+    // But we also return which prop & val we matched on, so we can update the index with the correct value.
+    // See https://github.com/atomicdata-dev/atomic-data-rust/issues/395
+    let matching_prop = match find_matching_propval(resource, q_filter) {
+        Some(a) => a,
+        // if the resource doesn't match the filter, we don't need to update the index
+        None => return None,
     };
 
-    let should: bool = match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
+    // Now we know that our new Resource is a member for this QueryFilter.
+    // But we don't know whether this specific IndexAtom is relevant for the index of this QueryFilter.
+    // There are three possibilities:
+    // 1. The Atom is not relevant for the index, and we don't need to update the index.
+    // 2. The Atom is directly relevant for the index, and we need to update the index using the value of the IndexAtom.
+    // 3. The Atom is indirectly relevant for the index. This only happens if there is a `sort_by`.
+    //    The Atom influences if the QueryFilter hits, and we need to construct a Key in the index with
+    //    a value from another Property.
+    match (&q_filter.property, &q_filter.value, &q_filter.sort_by) {
         // Whenever the atom matches with either the sorted or the filtered prop, we have to update
-        (Some(filterprop), Some(filter_val), Some(sortprop)) => {
-            if sortprop == &index_atom.property {
-                // Update the Key, which contains the sorted value
-                return Ok(true);
+        (Some(_filterprop), Some(_filter_val), Some(sortprop)) => {
+            if sortprop == &index_atom.property || matching_prop == &index_atom.property {
+                // Update the Key, which contains the sorted prop & value.
+                return Some(sortprop);
             }
-            if filterprop == &index_atom.property && index_atom.ref_value == filter_val.to_string() {
-                return Ok(true);
+            None
+        }
+        (Some(_filterprop), None, Some(sortprop)) => {
+            if sortprop == &index_atom.property || matching_prop == &index_atom.property {
+                return Some(sortprop);
             }
-            // If either one of these match
-            let relevant_prop =
-                filterprop == &index_atom.property || sortprop == &index_atom.property;
-            // And the value matches, we have to update
-            relevant_prop && filter_val.to_string() == index_atom.ref_value
+            None
         }
-        (Some(filter_prop), Some(_filter_val), None) => filter_prop == &index_atom.property,
-        (Some(filter_prop), None, Some(sort_by)) => {
-            filter_prop == &index_atom.property || sort_by == &index_atom.property
+        (Some(filter_prop), Some(_filter_val), None) => {
+            if filter_prop == &index_atom.property {
+                // Update the Key, which contains the filtered value
+                return Some(filter_prop);
+            }
+            None
         }
-        (Some(filter_prop), None, None) => filter_prop == &index_atom.property,
+        (Some(filter_prop), None, None) => {
+            if filter_prop == &index_atom.property {
+                return Some(filter_prop);
+            }
+            None
+        }
         (None, Some(filter_val), None) => {
-            filter_val.to_string() == index_atom.ref_value || matching_prop == index_atom.property
+            if filter_val.to_string() == index_atom.ref_value {
+                return Some(&index_atom.property);
+            }
+            None
         }
         (None, Some(filter_val), Some(sort_by)) => {
-            filter_val.to_string() == index_atom.ref_value
-                || matching_prop == index_atom.property
-                || &matching_prop == sort_by
-                || &index_atom.property == sort_by
+            if filter_val.to_string() == index_atom.ref_value || &index_atom.property == sort_by {
+                return Some(sort_by);
+            }
+            None
         }
-        // We should not create indexes for Collections that iterate over _all_ resources.
-        (a, b, c) => todo!("This query filter is not supported yet! Please create an issue on Github for filter {:?} {:?} {:?}", a, b, c),
-    };
-    Ok(should)
+        // TODO: Consider if we should allow the following indexes this.
+        // See https://github.com/atomicdata-dev/atomic-data-rust/issues/548
+        // When changing these, also update [QueryFilter::watch]
+        (None, None, None) => None,
+        (None, None, Some(_)) => None,
+    }
 }
 
 /// This is called when an atom is added or deleted.
@@ -259,14 +289,12 @@ pub fn check_if_atom_matches_watched_query_filters(
             let q_filter = bincode::deserialize::<QueryFilter>(&k)
                 .map_err(|e| format!("Could not deserialize QueryFilter: {}", e))?;
 
-            if should_update(&q_filter, index_atom, resource)? {
-                update_indexed_member(
-                    store,
-                    &q_filter,
-                    &atom.subject,
-                    &atom.value.to_sortable_string(),
-                    delete,
-                )?;
+            if let Some(prop) = should_update_property(&q_filter, index_atom, resource) {
+                let update_val = match resource.get(prop) {
+                    Ok(val) => val.to_sortable_string(),
+                    Err(_e) => NO_VALUE.to_string(),
+                };
+                update_indexed_member(store, &q_filter, &atom.subject, &update_val, delete)?;
             }
         } else {
             return Err(format!("Can't deserialize collection index: {:?}", query).into());
@@ -505,15 +533,17 @@ pub mod test {
         };
 
         // We should be able to find the resource by propval, val, and / or prop.
-        assert!(should_update(&qf_val, &index_atom, &resource_correct_class).unwrap());
-        assert!(should_update(&qf_prop_val, &index_atom, &resource_correct_class,).unwrap());
-        assert!(should_update(&qf_prop, &index_atom, &resource_correct_class).unwrap());
+        assert!(should_update_property(&qf_val, &index_atom, &resource_correct_class).is_some());
+        assert!(
+            should_update_property(&qf_prop_val, &index_atom, &resource_correct_class,).is_some()
+        );
+        assert!(should_update_property(&qf_prop, &index_atom, &resource_correct_class).is_some());
 
         // Test when a different value is passed
         let resource_wrong_class = Resource::new_instance(urls::PARAGRAPH, store).unwrap();
-        assert!(should_update(&qf_prop, &index_atom, &resource_wrong_class).unwrap());
-        assert!(!should_update(&qf_val, &index_atom, &resource_wrong_class).unwrap());
-        assert!(!should_update(&qf_prop_val, &index_atom, &resource_wrong_class,).unwrap());
+        assert!(should_update_property(&qf_prop, &index_atom, &resource_wrong_class).is_some());
+        assert!(should_update_property(&qf_val, &index_atom, &resource_wrong_class).is_none());
+        assert!(should_update_property(&qf_prop_val, &index_atom, &resource_wrong_class).is_none());
 
         let qf_prop_val_sort = QueryFilter {
             property: Some(prop.clone()),
@@ -532,8 +562,15 @@ pub mod test {
         };
 
         // We should update with a sort_by attribute
-        assert!(should_update(&qf_prop_val_sort, &index_atom, &resource_correct_class,).unwrap());
-        assert!(should_update(&qf_prop_sort, &index_atom, &resource_correct_class,).unwrap());
-        assert!(should_update(&qf_val_sort, &index_atom, &resource_correct_class,).unwrap());
+        assert!(
+            should_update_property(&qf_prop_val_sort, &index_atom, &resource_correct_class,)
+                .is_some()
+        );
+        assert!(
+            should_update_property(&qf_prop_sort, &index_atom, &resource_correct_class,).is_some()
+        );
+        assert!(
+            should_update_property(&qf_val_sort, &index_atom, &resource_correct_class,).is_some()
+        );
     }
 }

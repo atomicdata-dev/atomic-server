@@ -378,7 +378,7 @@ fn query_include_external() {
     let store = &Db::init_temp("query_include_external").unwrap();
 
     let mut q = Query {
-        property: None,
+        property: Some(urls::DESCRIPTION.into()),
         value: None,
         limit: None,
         start_val: None,
