@@ -13,7 +13,7 @@ pub async fn post_commit(
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
     let incoming_commit = Commit::from_resource(incoming_commit_resource)?;
-    if store.is_external_subject(&incoming_commit.subject)? {
+if store.is_external_subject(&incoming_commit.subject)? {
         return Err("Subject of commit is external, and should be sent to its origin domain. This store can not own this resource. See https://github.com/atomicdata-dev/atomic-data-rust/issues/509".into());
     }
     let opts = CommitOpts {

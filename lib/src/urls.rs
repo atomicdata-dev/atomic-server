@@ -148,3 +148,7 @@ pub const PATH_TPF: &str = "/tpf";
 pub const PATH_PATH: &str = "/path";
 pub const PATH_COMMITS: &str = "/commits";
 pub const PATH_ENDPOINTS: &str = "/endpoints";
+pub const PATH_REGISTER: &str = "/register";
+pub const PATH_CONFIRM_EMAIL: &str = "/confirm-email";
+pub const PATH_RESET_PUBKEY: &str = "/reset-public-key";
+pub const PATH_CONFIRM_RESET: &str = "/confirm-reset-public-key";

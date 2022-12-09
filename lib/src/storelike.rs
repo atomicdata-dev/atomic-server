@@ -233,6 +233,7 @@ pub trait Storelike: Sized {
             if subject.starts_with(self_url.as_str()) {
                 return Ok(false);
             } else {
+                // Is it a subdomain of the self_url?
                 let subject_url = url::Url::parse(subject)?;
                 let subject_host = subject_url.host().ok_or_else(|| {
                     AtomicError::not_found(format!("Subject URL has no host: {}", subject))
@@ -241,8 +242,20 @@ pub trait Storelike: Sized {
                 let self_host = self_url.host().ok_or_else(|| {
                     AtomicError::not_found(format!("Self URL has no host: {}", self_url))
                 })?;
-                info!("Comparing hosts: {} and {}", subject_host, self_host);
-                if subject_host == self_host {
+                // remove the subdomain from subject, if any.
+                // The server can have multiple subdomains
+                let subject_host_string = subject_host.to_string();
+                let subject_host_parts = subject_host_string.split('.').collect::<Vec<&str>>();
+
+                // Check if the last part of the host is equal
+                let Some(subject_host_stripped) = subject_host_parts.last() else {
+                    return Ok(false)
+                };
+                info!(
+                    "Comparing hosts: {} and {}",
+                    subject_host_stripped, self_host
+                );
+                if subject_host_stripped == &self_host.to_string() {
                     return Ok(false);
                 }
             }
