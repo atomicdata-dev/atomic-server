@@ -4,7 +4,7 @@
 
 use base64::{engine::general_purpose, Engine};
 
-use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
+use crate::{errors::AtomicResult, urls, Query, Resource, Storelike, Value};
 
 /// None represents no right checks will be performed, effectively SUDO mode.
 #[derive(Clone, Debug, PartialEq)]
@@ -76,6 +76,41 @@ impl Agent {
             Value::Timestamp(self.created_at),
         );
         Ok(resource)
+    }
+
+    pub fn from_email(email: &str, store: &impl Storelike) -> AtomicResult<Self> {
+        let mut query = Query::new();
+        query.property = Some(urls::EMAIL.into());
+        query.value = Some(Value::String(email.to_string()));
+        let response = store.query(&query)?;
+        if response.resources.is_empty() {
+            return Err(format!("Agent with Email {} not found", email).into());
+        }
+        if response.resources.len() > 1 {
+            return Err(format!(
+                "Email {} is not unique, {} agents have this email",
+                email, response.count
+            )
+            .into());
+        }
+        let resource = response.resources.first().unwrap();
+        Agent::from_resource(resource.clone())
+    }
+
+    pub fn from_resource(resource: Resource) -> AtomicResult<Self> {
+        let name = if let Ok(name) = resource.get(urls::NAME) {
+            Some(name.to_string())
+        } else {
+            None
+        };
+
+        return Ok(Self {
+            created_at: resource.get(urls::CREATED_AT)?.to_int()?,
+            name,
+            public_key: resource.get(urls::PUBLIC_KEY)?.to_string(),
+            private_key: None,
+            subject: resource.get_subject().into(),
+        });
     }
 
     /// Creates a new Agent, generates a new Keypair.

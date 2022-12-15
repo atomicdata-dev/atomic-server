@@ -1,6 +1,6 @@
 //! [EmailAddress] with validation, [MailMessage] with sending, and [get_smtp_client] for setting up mail.
 
-use crate::{errors::AtomicResult, storelike::Query, urls, Storelike};
+use crate::{errors::AtomicResult, urls, Query, Storelike};
 use mail_send::{mail_builder::MessageBuilder, Connected, Transport};
 use serde::{Deserialize, Serialize};
 use tracing::info;

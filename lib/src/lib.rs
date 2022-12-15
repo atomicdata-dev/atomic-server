@@ -16,7 +16,7 @@ See the [Atomic Data Docs](https://docs.atomicdata.dev) for more information.
 - [Value] converts Atomic Data to Rust native types
 - [Commit]s (transactions / delta's / changes / updates / versioning / history). Supports many checks, such as Schema, Authorization and more.
 - [collections] (pagination, sorting, filtering)
-- Queries (see [storelike::Query])
+- Queries (see [query::Query])
 - [hierarchy] for authorization
 - [crate::endpoints::Endpoint] for custom API endpoints
 - [config::Config] files. (requires `config` feature)
@@ -87,6 +87,7 @@ pub mod parse;
 #[cfg(feature = "db")]
 pub mod plugins;
 pub mod populate;
+pub mod query;
 pub mod resources;
 pub mod schema;
 pub mod serialize;
@@ -108,6 +109,7 @@ pub use commit::Commit;
 pub use db::Db;
 pub use errors::AtomicError;
 pub use errors::AtomicErrorType;
+pub use query::Query;
 pub use resources::Resource;
 pub use store::Store;
 pub use storelike::Storelike;

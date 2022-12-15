@@ -48,6 +48,7 @@ pub const PREVIOUS_COMMIT: &str = "https://atomicdata.dev/properties/previousCom
 pub const LAST_COMMIT: &str = "https://atomicdata.dev/properties/lastCommit";
 // ... for Agents
 pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
+pub const ACTIVE_KEYS: &str = "https://atomicdata.dev/properties/activeKeys";
 pub const NAME: &str = "https://atomicdata.dev/properties/name";
 pub const DRIVES: &str = "https://atomicdata.dev/properties/drives";
 pub const EMAIL: &str = "https://atomicdata.dev/properties/email";
@@ -150,5 +151,5 @@ pub const PATH_COMMITS: &str = "/commits";
 pub const PATH_ENDPOINTS: &str = "/endpoints";
 pub const PATH_REGISTER: &str = "/register";
 pub const PATH_CONFIRM_EMAIL: &str = "/confirm-email";
-pub const PATH_RESET_PUBKEY: &str = "/reset-public-key";
-pub const PATH_CONFIRM_RESET: &str = "/confirm-reset-public-key";
+pub const PATH_ADD_PUBKEY: &str = "/add-public-key";
+pub const PATH_CONFIRM_PUBKEY: &str = "/confirm-add-public-key";

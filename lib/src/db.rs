@@ -27,10 +27,11 @@ use crate::{
     email::{self, MailMessage},
     endpoints::{default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
+    query::QueryResult,
     resources::PropVals,
-    storelike::{Query, QueryResult, Storelike},
+    storelike::Storelike,
     values::SortableValue,
-    Atom, Resource,
+    Atom, Query, Resource,
 };
 
 use self::{

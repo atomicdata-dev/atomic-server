@@ -8,8 +8,7 @@ use crate::{
     errors::AtomicResult,
     parse::ParseOpts,
     schema::{Class, Property},
-    storelike::Query,
-    urls, Resource, Storelike, Value,
+    urls, Query, Resource, Storelike, Value,
 };
 
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.

@@ -1,7 +1,7 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
-use crate::storelike::QueryResult;
+use crate::query::QueryResult;
 use crate::{atomic_url::AtomicUrl, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
 use crate::{Atom, Value};
@@ -221,7 +221,7 @@ impl Storelike for Store {
         self.default_agent.lock().unwrap().replace(agent);
     }
 
-    fn query(&self, q: &crate::storelike::Query) -> AtomicResult<crate::storelike::QueryResult> {
+    fn query(&self, q: &crate::Query) -> AtomicResult<crate::query::QueryResult> {
         let atoms = self.tpf(
             None,
             q.property.as_deref(),

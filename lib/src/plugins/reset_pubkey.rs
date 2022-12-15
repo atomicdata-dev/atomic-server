@@ -1,70 +1,130 @@
 /*!
-Reset email
+Sends users a link to add a new public key to their account.
+Useful when a users loses their private key.
 */
 
-use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Db, Resource};
+use serde::{Deserialize, Serialize};
 
-pub fn request_email_pubkey_reset() -> Endpoint {
+use crate::{
+    agents::Agent,
+    email::{EmailAddress, MailAction, MailMessage},
+    endpoints::{Endpoint, HandleGetContext},
+    errors::AtomicResult,
+    plugins::utils::return_success,
+    urls, Resource, Storelike,
+};
+
+pub fn request_email_add_pubkey() -> Endpoint {
     Endpoint {
-        path: urls::PATH_RESET_PUBKEY.to_string(),
+        path: urls::PATH_ADD_PUBKEY.to_string(),
         params: [urls::TOKEN.to_string(), urls::INVITE_PUBKEY.to_string()].into(),
-        description: "Requests an email to set a new PublicKey to an Agent.".to_string(),
+        description: "Requests an email to add a new PublicKey to an Agent.".to_string(),
         shortname: "request-pubkey-reset".to_string(),
-        handle: Some(construct_reset_pubkey),
+        handle: Some(handle_request_email_pubkey),
+        handle_post: None,
     }
 }
 
-pub fn confirm_pubkey_reset() -> Endpoint {
+pub fn confirm_add_pubkey() -> Endpoint {
     Endpoint {
-        path: urls::PATH_CONFIRM_RESET.to_string(),
+        path: urls::PATH_CONFIRM_PUBKEY.to_string(),
         params: [urls::TOKEN.to_string(), urls::INVITE_PUBKEY.to_string()].into(),
-        description: "Requests an email to set a new PublicKey to an Agent.".to_string(),
+        description: "Confirms a token to add a new Public Key.".to_string(),
         shortname: "request-pubkey-reset".to_string(),
-        handle: Some(construct_confirm_reset_pubkey),
+        handle: Some(handle_confirm_add_pubkey),
+        handle_post: None,
     }
 }
 
-#[tracing::instrument(skip(store))]
-pub fn construct_confirm_reset_pubkey(
-    url: url::Url,
-    store: &Db,
-    for_agent: Option<&str>,
-) -> AtomicResult<Resource> {
+#[derive(Debug, Serialize, Deserialize)]
+struct AddPubkeyToken {
+    agent: String,
+}
+
+pub fn handle_request_email_pubkey(context: HandleGetContext) -> AtomicResult<Resource> {
+    let HandleGetContext {
+        subject,
+        store,
+        for_agent: _,
+    } = context;
+    let mut email_option: Option<EmailAddress> = None;
+    for (k, v) in subject.query_pairs() {
+        match k.as_ref() {
+            "email" => email_option = Some(EmailAddress::new(v.to_string())?),
+            _ => {}
+        }
+    }
+    // by default just return the Endpoint
+    let Some(email) = email_option else {
+        return request_email_add_pubkey().to_resource(store);
+    };
+
+    // Find the agent by their email
+    let agent = Agent::from_email(&email.to_string(), store)?;
+
+    // send the user an e-mail to confirm sign up
+    let store_clone = store.clone();
+    let confirmation_token_struct = AddPubkeyToken {
+        agent: agent.subject,
+    };
+    let token = crate::token::sign_claim(store, confirmation_token_struct)?;
+    let mut confirm_url = store
+        .get_server_url()
+        .clone()
+        .set_path(urls::PATH_CONFIRM_PUBKEY)
+        .url();
+    confirm_url.set_query(Some(&format!("token={}", token)));
+    let message = MailMessage {
+        to: email,
+        subject: "Add a new Passphrase to your account".to_string(),
+        body: "You've requested adding a new Passphrase. Click the link below to do so!"
+            .to_string(),
+        action: Some(MailAction {
+            name: "Add new Passphrase to account".to_string(),
+            url: confirm_url.into(),
+        }),
+    };
+    // async, because mails are slow
+    tokio::spawn(async move {
+        store_clone
+            .send_email(message)
+            .await
+            .unwrap_or_else(|e| tracing::error!("Error sending email: {}", e));
+    });
+
+    return_success()
+}
+
+#[tracing::instrument]
+pub fn handle_confirm_add_pubkey(context: HandleGetContext) -> AtomicResult<Resource> {
+    let HandleGetContext {
+        subject,
+        store,
+        for_agent: _,
+    } = context;
     let mut token_opt: Option<String> = None;
     let mut pubkey_option = None;
 
-    println!("url: {:?}", url);
-    for (k, v) in url.query_pairs() {
+    for (k, v) in subject.query_pairs() {
         match k.as_ref() {
             "token" | urls::TOKEN => token_opt = Some(v.to_string()),
             "public-key" | urls::INVITE_PUBKEY => pubkey_option = Some(v.to_string()),
             _ => {}
         }
     }
-    let Some(token) = token_opt else {
-        return confirm_pubkey_reset().to_resource(store);
-    };
     let pubkey = pubkey_option.ok_or("No public-key provided")?;
 
+    let Some(token) = token_opt else {
+        return confirm_add_pubkey().to_resource(store);
+    };
+
     // Parse and verify the JWT token
-    let confirmation = crate::token::verify_claim::<MailConfirmation>(store, &token)?.custom;
+    let confirmation = crate::token::verify_claim::<AddPubkeyToken>(store, &token)?.custom;
 
-    // Add the drive to the Agent's list of drives
-    let mut agent = store.get_resource(&drive_creator_agent)?;
-    agent.push_propval(
-        urls::USED_PUBKEYS.into(),
-        SubResource::Subject(drive.get_subject().into()),
-        true,
-    )?;
-    agent.save_locally(store)?;
+    // Add the key to the agent
+    let mut agent = store.get_resource(&confirmation.agent)?;
+    agent.push_propval(urls::ACTIVE_KEYS, pubkey.into(), true)?;
+    agent.save(store)?;
 
-    // Construct the Redirect Resource, which might provide the Client with a Subject for his Agent.
-    let mut redirect = Resource::new_instance(urls::REDIRECT, store)?;
-    redirect.set_propval_string(urls::DESTINATION.into(), drive.get_subject(), store)?;
-    redirect.set_propval(
-        urls::REDIRECT_AGENT.into(),
-        crate::Value::AtomicUrl(drive_creator_agent),
-        store,
-    )?;
-    Ok(redirect)
+    return_success()
 }

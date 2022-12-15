@@ -12,6 +12,8 @@ use crate::{
     Resource, Storelike, Value,
 };
 
+use super::utils::return_success;
+
 pub fn register_endpoint() -> Endpoint {
     Endpoint {
       path: urls::PATH_REGISTER.to_string(),
@@ -21,8 +23,8 @@ pub fn register_endpoint() -> Endpoint {
       ].into(),
       description: "Allows new users to easily, in one request, make both an Agent and a Drive. This drive will be created at the subdomain of `name`.".to_string(),
       shortname: "register".to_string(),
-      handle: Some(construct_register_redirect),
       handle_post: None,
+      handle: Some(handle_register_name_and_email),
   }
 }
 
@@ -43,12 +45,17 @@ struct MailConfirmation {
     pub name: String,
 }
 
-#[tracing::instrument()]
-pub fn construct_register_redirect(context: HandleGetContext) -> AtomicResult<Resource> {
+#[tracing::instrument]
+pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult<Resource> {
+    let HandleGetContext {
+        subject,
+        store: _,
+        for_agent: _,
+    } = context;
     let mut name_option = None;
     let mut email_option: Option<EmailAddress> = None;
     let store = context.store;
-    for (k, v) in context.subject.query_pairs() {
+    for (k, v) in subject.query_pairs() {
         match k.as_ref() {
             "name" | urls::NAME => name_option = Some(v.to_string()),
             "email" => email_option = Some(EmailAddress::new(v.to_string())?),
@@ -93,14 +100,7 @@ pub fn construct_register_redirect(context: HandleGetContext) -> AtomicResult<Re
             .unwrap_or_else(|e| tracing::error!("Error sending email: {}", e));
     });
 
-    // Here we probably want to return some sort of SuccesMessage page.
-    // Not sure what that should be.
-    let mut resource = Resource::new_generate_subject(store);
-    resource.set_propval_string(urls::DESCRIPTION.into(), "success", store)?;
-
-    // resource.set_propval(urls::, value, store)
-
-    Ok(resource)
+    return_success()
 }
 
 #[tracing::instrument()]
