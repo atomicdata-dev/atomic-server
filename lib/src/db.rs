@@ -27,10 +27,11 @@ use crate::{
     email::{self, MailMessage},
     endpoints::{default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
+    query::QueryResult,
     resources::PropVals,
-    storelike::{Query, QueryResult, Storelike},
+    storelike::Storelike,
     values::SortableValue,
-    Atom, Resource,
+    Atom, Query, Resource,
 };
 
 use self::{
@@ -254,10 +255,6 @@ impl Db {
     }
 
     fn query_basic(&self, q: &Query) -> AtomicResult<QueryResult> {
-        let self_url = self
-            .get_self_url()
-            .ok_or("No self_url set, required for Queries")?;
-
         let mut subjects: Vec<String> = vec![];
         let mut resources: Vec<Resource> = vec![];
         let mut total_count = 0;

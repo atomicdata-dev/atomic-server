@@ -8,8 +8,7 @@ use crate::{
     errors::AtomicResult,
     parse::ParseOpts,
     schema::{Class, Property},
-    storelike::Query,
-    urls, Resource, Storelike, Value,
+    urls, Query, Resource, Storelike, Value,
 };
 
 const DEFAULT_ONTOLOGY_PATH: &str = "defaultOntology";
@@ -307,7 +306,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
     for subject in result.subjects {
         let mut collection =
-            crate::collections::create_collection_resource_for_class(store, &subject)?;
+            crate::collections::create_collection_resource_for_class(store, &subject.to_string())?;
         collection.save_locally(store)?;
     }
 

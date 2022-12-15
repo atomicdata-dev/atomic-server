@@ -2,10 +2,10 @@
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
 use crate::agents::Agent;
-use crate::storelike::QueryResult;
+use crate::query::QueryResult;
 use crate::{atomic_url::AtomicUrl, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
-use crate::{Atom, Value};
+use crate::{Atom, Query, Value};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -17,12 +17,8 @@ pub struct Store {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
 }
 
-/// The URL used for stores that are not accessible on the web.
-// I'd prefer this to a non-HTTP URI, but that causes parsing issues when we combine it with some paths (at least with Commits)
-pub const LOCAL_STORE_URL_STR: &str = "http://noresolve.localhost";
-
 lazy_static::lazy_static! {
-    static ref LOCAL_STORE_URL: AtomicUrl = AtomicUrl::try_from(LOCAL_STORE_URL_STR).unwrap();
+    static ref LOCAL_STORE_URL: AtomicUrl = AtomicUrl::try_from(crate::urls::LOCAL_STORE).unwrap();
 }
 
 impl Store {
@@ -206,7 +202,7 @@ impl Storelike for Store {
         self.default_agent.lock().unwrap().replace(agent);
     }
 
-    fn query(&self, q: &crate::storelike::Query) -> AtomicResult<crate::storelike::QueryResult> {
+    fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
         let atoms = self.tpf(
             None,
             q.property.as_deref(),
