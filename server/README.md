@@ -168,6 +168,22 @@ Read the logs, watch for errors.
 HTTPS certificates are automatically renewed when the server is restarted, and the certs are 4 weeks or older.
 They are stored in your `.config/atomic/` dir.
 
+#### HTTPS Setup using external HTTPS proxy
+
+Atomic-server has built-in HTTPS support using letsencrypt, but there are usecases for using external TLS source (e.g. Traeffik / Nginx / Ingress).
+
+To do this, users need to set these ENVS:
+
+```ini
+ATOMIC_DOMAIN=example.com
+# We'll use this regular HTTP port, not the HTTPS one
+ATOMIC_PORT=80
+# Disable built-in letsencrypt
+ATOMIC_HTTPS=false
+# Since Atomic-server is no longer aware of the existence of the external HTTPS service, we need to set the full URL here:
+ATOMIC_SERVER_URL=https://example.com
+```
+
 ## Usage
 
 There are three ways to interact with this server:
