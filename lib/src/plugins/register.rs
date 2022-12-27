@@ -80,7 +80,7 @@ pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult
     let mut confirm_url = store
         .get_server_url()
         .clone()
-        .set_path("confirmEmail")
+        .set_path(urls::PATH_CONFIRM_EMAIL)
         .url();
     confirm_url.set_query(Some(&format!("token={}", token)));
     let message = MailMessage {
