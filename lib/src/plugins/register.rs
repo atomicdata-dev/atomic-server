@@ -45,6 +45,33 @@ struct MailConfirmation {
     pub name: String,
 }
 
+#[derive(Debug, Clone)]
+struct UserName {
+    pub name: String,
+}
+
+impl UserName {
+    /// Throws error if email address is already taken
+    pub fn check_used(name: &str, store: &impl Storelike) -> AtomicResult<Self> {
+        let mut drive_url = store
+            .get_self_url()
+            .ok_or("No self url, cant check name")?
+            .clone();
+        drive_url.set_subdomain(Some(name))?;
+
+        match store.get_resource(&drive_url.to_string()) {
+            Ok(_) => Err("Name already used".into()),
+            Err(_) => Ok(Self { name: name.into() }),
+        }
+    }
+}
+
+impl std::fmt::Display for UserName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
 #[tracing::instrument]
 pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult<Resource> {
     let HandleGetContext {
@@ -57,7 +84,7 @@ pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult
     let store = context.store;
     for (k, v) in subject.query_pairs() {
         match k.as_ref() {
-            "name" | urls::NAME => name_option = Some(v.to_string()),
+            "name" | urls::NAME => name_option = Some(UserName::check_used(&v, store)?),
             "email" => email_option = Some(EmailAddress::new(v.to_string())?),
             _ => {}
         }
@@ -68,13 +95,14 @@ pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult
     };
 
     let name = name_option.ok_or("No name provided")?;
+    let _validate_name = Value::new(&name.to_string(), &crate::datatype::DataType::Slug)?;
     let email = email_option.ok_or("No email provided")?.check_used(store)?;
 
     // send the user an e-mail to confirm sign up
     let store_clone = store.clone();
     let confirmation_token_struct = MailConfirmation {
         email: email.clone(),
-        name: name.clone(),
+        name: name.to_string(),
     };
     let token = crate::token::sign_claim(store, confirmation_token_struct)?;
     let mut confirm_url = store

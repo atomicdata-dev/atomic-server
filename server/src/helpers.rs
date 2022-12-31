@@ -69,6 +69,7 @@ fn origin(url: &str) -> String {
     )
 }
 
+/// Checks if the origin in the Cookie matches the requested subject.
 pub fn get_auth_from_cookie(
     headers: &HeaderMap,
     requested_subject: &str,
