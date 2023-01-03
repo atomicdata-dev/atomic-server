@@ -789,7 +789,6 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
-        "https://atomicdata.dev/properties/lastCommit": "https://atomicdata.dev/commits/VB3gtWMkysTX5hKjbYjIM1hfVGPywT3pEPL8c7NwaUAJID6RzptGRPzmix8aKKDeb8Pj1WFv0UPV0YVPxcduBg==",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "sub-resources"
     },
@@ -801,9 +800,18 @@
         "https://atomicdata.dev/properties/isA": [
             "https://atomicdata.dev/classes/Property"
         ],
-        "https://atomicdata.dev/properties/lastCommit": "https://atomicdata.dev/commits/fS0krtm1wDk0lodH0psnUKmBHBMKLuxnjkd7E7QbkzDk/irQ43gNW3lWxkwQj58ZNg6rUAUMDGJrLy1X3cHwBQ==",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/shortname": "tags"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/token",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "A server-generated string that should not mean anything to the client. It could be a JWT token, or something else.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "token"
     },
     {
         "@id": "https://atomicdata.dev/properties/write",

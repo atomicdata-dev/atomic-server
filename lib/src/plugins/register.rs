@@ -109,6 +109,7 @@ pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult
         .get_server_url()
         .clone()
         .set_path(urls::PATH_CONFIRM_EMAIL)
+        // .set_subdomain(Some(&name.to_string()))?
         .url();
     confirm_url.set_query(Some(&format!("token={}", token)));
     let message = MailMessage {

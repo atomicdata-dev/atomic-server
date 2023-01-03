@@ -253,7 +253,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
     use crate::atomic_url::Routes;
 
-    let endpoints = crate::endpoints::default_endpoints();
+    let endpoints = crate::plugins::default_endpoints();
     let endpoints_collection = store.get_server_url().set_route(Routes::Endpoints);
     for endpoint in endpoints {
         let mut resource = endpoint.to_resource(store)?;
