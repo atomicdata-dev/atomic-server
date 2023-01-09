@@ -44,8 +44,8 @@ pub struct Opts {
     #[clap(long, default_value = "9884", env = "ATOMIC_PORT_HTTPS")]
     pub port_https: u32,
 
-    /// The IP address of the server. Set to 0.0.0.0 if you want this to be available to other devices on your network.
-    #[clap(long, default_value = "0.0.0.0", env = "ATOMIC_IP")]
+    /// The IP address of the server. Set to :: if you want this to be available to other devices on your network.
+    #[clap(long, default_value = "::", env = "ATOMIC_IP")]
     pub ip: IpAddr,
 
     /// Use HTTPS instead of HTTP.
