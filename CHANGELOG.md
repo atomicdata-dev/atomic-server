@@ -3,6 +3,7 @@
 List of changes for this repo, including `atomic-cli`, `atomic-server` and `atomic-lib`.
 By far most changes relate to `atomic-server`, so if not specified, assume the changes are relevant only for the server.
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
+See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
 ## UNRELEASED
 

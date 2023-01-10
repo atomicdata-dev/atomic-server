@@ -11,7 +11,8 @@ This repo consists of three components: A library, a server and a CLI.**
 
 [![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
 
-_Status: Beta. [Breaking changes](CHANGELOG.md) are expected until 1.0._
+_Status: Beta. [Status](server/STATUS.md) specifies which features are stable. [Breaking changes](CHANGELOG.md) are expected until 1.0._
+
 
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
