@@ -1,6 +1,6 @@
 # Atomic-Server status & Feature stability
 
-If you're contemplating to use Atomic-Server in a prodcution environment, you'll want to know to what extend you could rely on this project. 
+If you're contemplating to use Atomic-Server in a production environment, you'll want to know to what extent you could rely on this project. 
 Some features are prone to change, whilst others are already fully working as intended.
 This document describes the current status of Atomic-Server, and specifically which features are stable, and which are not.
 
