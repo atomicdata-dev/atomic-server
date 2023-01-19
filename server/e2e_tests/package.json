@@ -10,9 +10,9 @@
     "test-query": "PWDEBUG=1 playwright test 'e2e-generated.spec.ts' -g"
   },
   "author": "",
+  "type": "module",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.27.0",
-    "playwright": "^1.27.0"
+    "@playwright/test": "^1.29.2"
   }
 }

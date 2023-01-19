@@ -11,6 +11,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Improved error handling for HTTPS initialization #530
 - Add `--force` to `atomic-server import` #536
 - Fix index issue happening when deleting a single property in a sorted collection #545
+- Update JS assets & playwright
 
 ## [v0.34.0] - 2022-10-31
 

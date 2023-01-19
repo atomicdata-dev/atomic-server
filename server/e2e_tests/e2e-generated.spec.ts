@@ -1,8 +1,9 @@
 // This file is copied from `atomic-data-browser` to `atomic-data-server` when `pnpm build-server` is run.
 // This is why the `testConfig` is imported.
 
-import { test, expect, Page, Browser } from '@playwright/test';
-import { testConfig } from './test-config';
+import { test, expect } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
+import { testConfig } from './test-config.js';
 
 export interface TestConfig {
   demoFileName: string;
@@ -42,13 +43,16 @@ test.describe('data-browser', async () => {
     if (!serverUrl) {
       throw new Error('serverUrl is not set');
     }
+
     // Open the server
     await page.goto(frontEndUrl);
+
     // Sometimes we run the test server on a different port, but we should
     // only change the drive if it is non-default.
     if (serverUrl !== 'http://localhost:9883') {
       await changeDrive(serverUrl, page);
     }
+
     await expect(page.locator(currentDriveTitle)).toBeVisible();
   });
 
@@ -107,10 +111,11 @@ test.describe('data-browser', async () => {
     await editProfileAndCommit(page);
   });
 
-  test('search', async ({ page }) => {
-    await page.fill(addressBar, 'setup');
-    await page.click('text=setup');
-    await expect(page.locator('text=Use this Invite')).toBeVisible();
+  test('text search', async ({ page }) => {
+    await page.fill(addressBar, 'welcome');
+    await expect(page.locator('text=Welcome to your')).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('text=resources:')).toBeVisible();
   });
 
   test('scoped search', async ({ page }) => {
@@ -329,8 +334,8 @@ test.describe('data-browser', async () => {
       page.click('button:has-text("Upload file")'),
     ]);
     await fileChooser.setFiles(demoFile);
-    await page.click(`[data-test]:has-text("${demoFileName}")`);
-    const image = await page.locator('[data-test="image-viewer"]');
+    await page.click(`[data-test="file-pill"]:has-text("${demoFileName}")`);
+    const image = page.locator('[data-test="image-viewer"]');
     await expect(image).toBeVisible();
     await expect(image).toHaveScreenshot({ maxDiffPixelRatio: 0.1 });
   });
@@ -382,10 +387,10 @@ test.describe('data-browser', async () => {
     // Fetch `example.com
     const input = page.locator('[placeholder="https\\:\\/\\/example\\.com"]');
     await input.click();
-    await input.fill('https://example.com');
+    await input.fill('https://ontola.io');
     await page.locator(currentDialogOkButton).click();
 
-    await expect(page.locator('text=This domain is ')).toBeVisible();
+    await expect(page.locator(':text-is("Full-service")')).toBeVisible();
   });
 
   test('folder', async ({ page }) => {
@@ -520,7 +525,6 @@ test.describe('data-browser', async () => {
     const d1 = 'depth1';
     await setTitle(d1);
 
-    // Not sure why we need this, I'd prefer to wait for commits...
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
     ).toBeVisible();
@@ -658,10 +662,12 @@ async function openNewSubjectWindow(browser: Browser, url: string) {
   const context2 = await browser.newContext();
   const page = await context2.newPage();
   await page.goto(frontEndUrl);
+
   // Only when we run on `localhost` we don't need to change drive during tests
   if (serverUrl !== defaultDevServer) {
     await changeDrive(serverUrl, page);
   }
+
   await openSubject(page, url);
   await page.setViewportSize({ width: 1000, height: 400 });
 
