@@ -51,18 +51,9 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         store.build_index(true)?;
         tracing::info!("Building index finished!");
     }
+
     tracing::info!("Setting default agent");
     set_default_agent(&config, &store)?;
-    if config.initialize {
-        tracing::info!(
-            "Running initialization commands (first time startup, or you passed --initialize)"
-        );
-        store.populate()?;
-        set_up_initial_invite(&store)
-            .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
-        // This means that editing the .env does _not_ grant you the rights to edit the Drive.
-        tracing::info!("Setting rights to Drive {}", store.get_server_url());
-    }
 
     // Initialize search constructs
     tracing::info!("Starting search service");
@@ -86,6 +77,18 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         });
     };
     store.set_handle_commit(Box::new(send_commit));
+
+    if config.initialize {
+        tracing::info!(
+            "Running initialization commands (first time startup, or you passed --initialize)"
+        );
+        store.populate()?;
+
+        set_up_initial_invite(&store)
+            .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
+        // This means that editing the .env does _not_ grant you the rights to edit the Drive.
+        tracing::info!("Setting rights to Drive {}", store.get_server_url());
+    }
 
     Ok(AppState {
         store,

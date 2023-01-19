@@ -26,9 +26,7 @@ fn rebuild_index(appstate: &crate::appstate::AppState) -> AtomicServerResult<()>
         .write()
         .expect("Could not get a lock on search writer")
         .delete_all_documents()?;
-    tracing::info!("Building search index...");
     crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
-    tracing::info!("Search index finished!");
     Ok(())
 }
 
