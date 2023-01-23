@@ -46,6 +46,8 @@ pub struct CommitOpts {
     pub update_index: bool,
     /// For who the right checks will be perormed. If empty, the signer of the Commit will be used.
     pub validate_for_agent: Option<String>,
+    /// Checks if the URL of the parent is present in its Parent URL.
+    pub validate_subject_url_parent: bool,
 }
 
 /// A Commit is a set of changes to a Resource.
@@ -166,6 +168,20 @@ impl Commit {
         let mut resource_new = self
             .apply_changes(resource_old.clone(), store, false)
             .map_err(|e| format!("Error applying changes to Resource {}. {}", self.subject, e))?;
+
+        // For new subjects, make sure that the parent of the resource is part of the URL of the new subject.
+        if is_new && opts.validate_subject_url_parent {
+            if let Ok(parent) = resource_new.get(urls::PARENT) {
+                let parent_str = parent.to_string();
+                if !self.subject.starts_with(&parent_str) {
+                    return Err(format!(
+                        "The parent '{}' is not part of the URL of the new subject '{}'.",
+                        parent_str, self.subject
+                    )
+                    .into());
+                }
+            }
+        }
 
         if opts.validate_rights {
             let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&self.signer);
@@ -381,6 +397,7 @@ impl Commit {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_subject_url_parent: false,
             validate_previous_commit: false,
             validate_for_agent: None,
             update_index: false,
@@ -699,6 +716,7 @@ mod test {
             validate_previous_commit: true,
             validate_rights: false,
             validate_for_agent: None,
+            validate_subject_url_parent: true,
             update_index: true,
         };
     }

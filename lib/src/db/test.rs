@@ -192,7 +192,7 @@ fn destroy_resource_and_check_collection_and_commits() {
 fn get_extended_resource_pagination() {
     let store = Db::init_temp("get_extended_resource_pagination").unwrap();
     let subject = format!(
-        "{}commits?current_page=2&page_size=99999",
+        "{}collections/commits?current_page=2&page_size=99999",
         store.get_server_url()
     );
     let for_agent = &ForAgent::Public;
@@ -212,7 +212,7 @@ fn get_extended_resource_pagination() {
         .unwrap()
         .to_int()
         .unwrap();
-    assert_eq!(cur_page, 2);
+    assert_eq!(cur_page, num);
     assert_eq!(resource.get_subject(), &subject_with_page_size);
 }
 

@@ -1,17 +1,17 @@
 [
   {
-    "https://atomicdata.dev/properties/localId": "reference",
+    "https://atomicdata.dev/properties/localId": "parent",
     "https://atomicdata.dev/properties/write": [
-      "my-local-id"
+      "parent/my-local-id"
     ],
     "https://atomicdata.dev/properties/name": "My referenced resource"
   },
   {
-    "https://atomicdata.dev/properties/localId": "my-local-id",
+    "https://atomicdata.dev/properties/localId": "parent/my-local-id",
     "https://atomicdata.dev/properties/name": "My resource that refers",
-    "https://atomicdata.dev/properties/parent": "reference",
+    "https://atomicdata.dev/properties/parent": "parent",
     "https://atomicdata.dev/properties/write": [
-      "reference"
+      "parent"
     ]
   }
 ]
