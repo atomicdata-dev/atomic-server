@@ -299,7 +299,11 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
 
     // This logic could be a bit too complicated, but I'm not sure on how to make this simpler.
     let server_url = if let Some(addr) = opts.server_url.clone() {
-        addr
+        if addr.ends_with('/') {
+            return Err("The Server URL should not end with a trailing slash.".into());
+        } else {
+            addr
+        }
     } else if opts.https && opts.port_https == 443 || !opts.https && opts.port == 80 {
         format!("{}://{}", schema, opts.domain)
     } else {
