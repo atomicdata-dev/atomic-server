@@ -7,7 +7,7 @@ use atomic_lib::{
     atomic_url::Routes,
     commit::CommitResponse,
     email::SmtpConfig,
-    Storelike,
+    Db, Storelike,
 };
 
 /// The AppState contains all the relevant Context for the server.
@@ -27,6 +27,15 @@ pub struct AppState {
     pub search_state: SearchState,
 }
 
+/// Initializes the Store and sets the default agent.
+pub fn init_store(config: &Config) -> AtomicServerResult<Db> {
+    let store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+
+    tracing::info!("Setting default agent");
+    set_default_agent(config, &store)?;
+    Ok(store)
+}
+
 /// Creates the AppState (the server's context available in Handlers).
 /// Initializes or opens a store on disk.
 /// Creates a new agent, if necessary.
@@ -42,7 +51,7 @@ pub async fn init(config: Config) -> AtomicServerResult<AppState> {
     }
 
     tracing::info!("Opening database at {:?}", &config.store_path);
-    let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+    let mut store = init_store(&config)?;
 
     if let Some(host) = &config.opts.smpt_host {
         store
@@ -59,9 +68,6 @@ pub async fn init(config: Config) -> AtomicServerResult<AppState> {
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
     }
-
-    tracing::info!("Setting default agent");
-    set_default_agent(&config, &store)?;
 
     // Initialize search constructs
     tracing::info!("Starting search service");
