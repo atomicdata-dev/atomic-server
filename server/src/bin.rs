@@ -30,6 +30,7 @@ async fn main() -> () {
         eprintln!("{}: {}", "Error".red(), e.message);
         std::process::exit(1);
     }
+    std::process::exit(0);
 }
 
 async fn main_wrapped() -> errors::AtomicServerResult<()> {
@@ -86,7 +87,7 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             appstate.store.import(&readstring, &parse_opts)?;
 
             println!("Sucesfully imported {:?} to store.", import_opts.file);
-            std::process::exit(0);
+            Ok(())
         }
         Some(config::Command::ShowConfig) => {
             println!("{:#?}", config);
