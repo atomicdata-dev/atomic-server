@@ -50,8 +50,8 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                     pt
                 }
             };
-            let appstate = appstate::init(config.clone()).await?;
-            let outstr = appstate.store.export(!e.only_internal)?;
+            let store = appstate::init_store(&config)?;
+            let outstr = store.export(!e.only_internal)?;
             std::fs::create_dir_all(path.parent().unwrap())
                 .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
             let mut file = File::create(&path)
@@ -66,12 +66,11 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                 std::fs::read_to_string(path)?
             };
 
-            let appstate = appstate::init(config.clone()).await?;
+            let store = appstate::init_store(&config)?;
             let importer_subject = if let Some(i) = &import_opts.parent {
                 i.into()
             } else {
-                appstate
-                    .store
+                store
                     .get_self_url()
                     .expect("No self URL")
                     .set_route(Routes::Import)
@@ -86,10 +85,10 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                 } else {
                     atomic_lib::parse::SaveOpts::Commit
                 },
-                signer: Some(appstate.store.get_default_agent()?),
+                signer: Some(store.get_default_agent()?),
             };
             println!("Importing...");
-            appstate.store.import(&readstring, &parse_opts)?;
+            store.import(&readstring, &parse_opts)?;
 
             println!("Sucesfully imported {:?} to store.", import_opts.file);
             Ok(())
