@@ -65,8 +65,8 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_CONFIG_DIR")]
     pub config_dir: Option<PathBuf>,
 
-    /// Path for atomic data store folder.
-    #[clap(long, env = "ATOMIC_STORE_DIR")]
+    /// Path for atomic data store folder. Contains your Store, uploaded files and more. Default value depends on your OS.
+    #[clap(long, env = "ATOMIC_DATA_DIR")]
     pub data_dir: Option<PathBuf>,
 
     /// CAUTION: Makes data publicly readable on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/atomicdata-dev/atomic-data-rust/blob/master/server/rdf-search.md
@@ -170,15 +170,15 @@ pub struct Config {
     /// CLI + ENV options
     pub opts: Opts,
     // ===  PATHS  ===
-    /// Path for atomic data config `~/.config/atomic/`. Used to construct most other paths.
+    /// Path for atomic data config. Used to construct most other paths.
     pub config_dir: PathBuf,
-    /// Path where TLS key should be stored for HTTPS. (defaults to `~/.config/atomic/https/key.pem`)
+    /// Path where TLS key should be stored for HTTPS.
     pub key_path: PathBuf,
-    /// Path where TLS certificate should be stored for HTTPS. (defaults to `~/.config/atomic/https/cert.pem`)
+    /// Path where TLS certificate should be stored for HTTPS.
     pub cert_path: PathBuf,
-    /// Path where TLS certificates should be stored for HTTPS. (defaults to `~/.config/atomic/https`)
+    /// Path where TLS certificates should be stored for HTTPS.
     pub https_path: PathBuf,
-    /// Path where config.toml is located, which contains info about the Agent (defaults to `~/.config/atomic/config.toml`)
+    /// Path where config.toml is located, which contains info about the Agent
     pub config_file_path: PathBuf,
     /// Path where the public static files folder is located
     pub static_path: PathBuf,
@@ -186,7 +186,7 @@ pub struct Config {
     pub store_path: PathBuf,
     /// Path to where the uploaded files are stored.
     pub uploads_path: PathBuf,
-    /// Path to where the search index for tantivy full text search is located  (defaults to `~/.config/atomic/search_index`)
+    /// Path to where the search index for tantivy full text search is located
     pub search_index_path: PathBuf,
     /// If true, the initialization scripts will be ran (create first Drive, Agent, indexing, etc)
     pub initialize: bool,
@@ -208,7 +208,6 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
         .expect("Could not find Project directories on your OS");
 
     // Persistent user data
-
     let data_dir = opts
         .data_dir
         .clone()

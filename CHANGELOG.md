@@ -14,6 +14,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Update JS assets & playwright
 - Fix initial indexing bug #560
 - Fix errors on succesful export / import #565
+- Fix envs for store path, change `ATOMIC_STORE_DIR` to `ATOMIC_DATA_DIR` #567
 
 ## [v0.34.0] - 2022-10-31
 
