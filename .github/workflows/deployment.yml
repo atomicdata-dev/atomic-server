@@ -12,6 +12,7 @@ jobs:
       # - name: install dependencies
       #   run: sudo apt-get install libgtk-3-dev libsoup2.4
       - uses: actions/checkout@v2
+      - run: openssl version
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -22,7 +23,7 @@ jobs:
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
       - name: Transfer binary rsync
-        uses: easingthemes/ssh-deploy@main
+        uses: easingthemes/ssh-deploy@v3
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
