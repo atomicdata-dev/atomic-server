@@ -22,7 +22,7 @@ jobs:
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
       - name: Transfer binary rsync
-        uses: easingthemes/ssh-deploy@main
+        uses: easingthemes/ssh-deploy@v3
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
