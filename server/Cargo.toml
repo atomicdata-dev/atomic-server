@@ -102,7 +102,8 @@ assert_cmd = "2"
 
 [features]
 default = ["https", "telemetry"]
-https = ["acme-lib", "rustls"]
+https = ["rustls"]
+https_init = ["acme-lib"]
 process-management = ["sysinfo"]
 telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger"]
 
