@@ -16,6 +16,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          target: x86_64-unknown-linux-musl
       - uses: actions-rs/cargo@v1
         with:
           command: build
@@ -30,6 +31,8 @@ jobs:
           SOURCE: "target/release/atomic-server"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
+          # Set filename to unique ID
+          # TARGET: ~/atomic-server-${{ env.RELEASE_VERSION }}
           TARGET: ~/
       # - name: Export data
       #   run: ~/atomic-server --export
@@ -44,4 +47,4 @@ jobs:
           # TODO: fix backup, see
           # https://github.com/atomicdata-dev/atomic-data-rust/issues/487
           # script: systemctl restart atomic && ~/atomic-server export && systemctl restart atomic
-          script: systemctl restart atomic
+          script: systemctl stop atomic && ~/atomic-server export &&
