@@ -7,11 +7,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # I don't want to keep
-      # https://github.com/atomicdata-dev/atomic-data-rust/issues/230
-      # - name: install dependencies
-      #   run: sudo apt-get install libgtk-3-dev libsoup2.4
       - uses: actions/checkout@v2
+      - name: Set name of atomic-server for this version
+        run: echo "ATOMIC_BINARY=~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
       - run: openssl version
       - uses: actions-rs/toolchain@v1
         with:
@@ -33,11 +31,7 @@ jobs:
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           # Set filename to unique ID
           # TARGET: ~/atomic-server-${{ env.RELEASE_VERSION }}
-          TARGET: ~/
-      # - name: Export data
-      #   run: ~/atomic-server --export
-      # - name: Run new server
-      #   run: ~/atomic-server &> log-${{ GITHUB_REF#refs/*/ }}
+          TARGET: ${ATOMIC_BINARY}
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
@@ -47,4 +41,4 @@ jobs:
           # TODO: fix backup, see
           # https://github.com/atomicdata-dev/atomic-data-rust/issues/487
           # script: systemctl restart atomic && ~/atomic-server export && systemctl restart atomic
-          script: systemctl stop atomic && ~/atomic-server export &&
+          script: systemctl stop atomic && ${ATOMIC_BINARY} export && systemctl start atomic
