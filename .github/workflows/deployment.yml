@@ -7,10 +7,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      # I don't want to keep
-      # https://github.com/atomicdata-dev/atomic-data-rust/issues/230
-      # - name: install dependencies
-      #   run: sudo apt-get install libgtk-3-dev libsoup2.4
       - uses: actions/checkout@v2
       - run: openssl version
       - uses: actions-rs/toolchain@v1
@@ -19,6 +15,7 @@ jobs:
           target: x86_64-unknown-linux-musl
       - uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: build
           args: --release --package atomic-server --target x86_64-unknown-linux-musl
       - name: Set env
@@ -28,23 +25,19 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
-          SOURCE: "target/release/atomic-server"
+          SOURCE: "target/x86_64-unknown-linux-musl/release/atomic-server"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          # Set filename to unique ID
-          # TARGET: ~/atomic-server-${{ env.RELEASE_VERSION }}
           TARGET: ~/
-      # - name: Export data
-      #   run: ~/atomic-server --export
-      # - name: Run new server
-      #   run: ~/atomic-server &> log-${{ GITHUB_REF#refs/*/ }}
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # TODO: fix backup, see
-          # https://github.com/atomicdata-dev/atomic-data-rust/issues/487
-          # script: systemctl restart atomic && ~/atomic-server export && systemctl restart atomic
-          script: systemctl stop atomic && ~/atomic-server export &&
+          script: |
+            cp ~/atomic-server ~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')
+            systemctl stop atomic
+            ./atomic-server export &&
+            systemctl start atomic
+            systemctl status atomic
