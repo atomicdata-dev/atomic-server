@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set name of atomic-server for this version
+      - name: Set name of atomic-server for this version, used as a backup binary
         run: echo "ATOMIC_BINARY=~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
       - run: openssl version
       - uses: actions-rs/toolchain@v1
@@ -30,16 +30,11 @@ jobs:
           SOURCE: "target/release/atomic-server"
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          # Set filename to unique ID
-          # TARGET: ~/atomic-server-${{ env.RELEASE_VERSION }}
-          TARGET: ${ATOMIC_BINARY}
+          TARGET: ~/
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # TODO: fix backup, see
-          # https://github.com/atomicdata-dev/atomic-data-rust/issues/487
-          # script: systemctl restart atomic && ~/atomic-server export && systemctl restart atomic
-          script: systemctl stop atomic && ${ATOMIC_BINARY} export && systemctl start atomic
+          script: cp ./atomic-server ${ATOMIC_BINARY} && systemctl stop atomic && ./atomic-server export && systemctl start atomic
