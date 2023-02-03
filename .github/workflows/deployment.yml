@@ -17,6 +17,7 @@ jobs:
           target: x86_64-unknown-linux-musl
       - uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: build
           args: --release --package atomic-server --target x86_64-unknown-linux-musl
       - name: Set env
