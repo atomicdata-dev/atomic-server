@@ -37,7 +37,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cp ~/atomic-server ~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')
-            systemctl stop atomic-server
+            systemctl stop atomic
             ./atomic-server export &&
-            systemctl start atomic-server
-            systemctl status atomic-server
+            systemctl start atomic
+            systemctl status atomic
