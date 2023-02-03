@@ -19,7 +19,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --package atomic-server
+          args: --release --package atomic-server --target x86_64-unknown-linux-musl
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
       - name: Transfer binary rsync
