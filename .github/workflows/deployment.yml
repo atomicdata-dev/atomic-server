@@ -8,8 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set name of atomic-server for this version, used as a backup binary
-        run: echo "ATOMIC_BINARY=~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')" >> $GITHUB_ENV
       - run: openssl version
       - uses: actions-rs/toolchain@v1
         with:
@@ -37,4 +35,9 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: cp ./atomic-server ${ATOMIC_BINARY} && systemctl stop atomic && ./atomic-server export && systemctl start atomic
+          script: |
+            cp ~/atomic-server ~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')
+            systemctl stop atomic-server
+            ./atomic-server export &&
+            systemctl start atomic-server
+            systemctl status atomic-server
