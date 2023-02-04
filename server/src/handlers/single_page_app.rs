@@ -8,15 +8,14 @@ use actix_web::HttpResponse;
 #[tracing::instrument(skip(appstate))]
 pub async fn single_page(
     appstate: actix_web::web::Data<AppState>,
+    path: actix_web::web::Path<String>,
 ) -> AtomicServerResult<HttpResponse> {
     let template = include_str!("../../app_assets/index.html");
-    // TODO Get the agent
-    // let subject = urls::AGENT;
-    let subject = "http://localhost:9883/Folder/ltg0aypur9d";
+    let subject = format!("{}/{}", appstate.store.get_server_url(), path);
     let meta_tags: MetaTags = if let Ok(resource) =
         appstate
             .store
-            .get_resource_extended(subject, true, Some(urls::PUBLIC_AGENT))
+            .get_resource_extended(&subject, true, Some(urls::PUBLIC_AGENT))
     {
         resource.into()
     } else {
@@ -69,6 +68,7 @@ impl From<Resource> for MetaTags {
             "/default_social_preview.jpg".to_string()
         };
         let json = if let Ok(serialized) = r.to_json_ad() {
+            // TODO: also fetch the parents for extra fast first renders.
             Some(serialized)
         } else {
             None

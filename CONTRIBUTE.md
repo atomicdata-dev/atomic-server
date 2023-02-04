@@ -26,7 +26,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
   - [Drill](#drill)
 - [Responsible disclosure / Coordinated Vulnerability Disclosure](#responsible-disclosure--coordinated-vulnerability-disclosure)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
-  - [Including JS app_assets](#including-js-app_assets)
+  - [Including JS app\_assets](#including-js-app_assets)
   - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
     - [Building and publishing binaries](#building-and-publishing-binaries)
     - [Publishing to Cargo](#publishing-to-cargo)
@@ -175,10 +175,11 @@ Note:
 
 Before tagging a new version, make sure to update the `app_assets` folder:
 
-1. clone [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser) in the folder above this one
-2. run `pmpm build-server` in `atomic-data-browser`, which should
-3. Make sure not to commit all the files, manually check them
-4. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
+1. Go up one directory from `atomic-data-rust` => `cd ..`
+2. In here, clone [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser)
+3. Run `./build-server.sh` to compile assets and copy them to your `app_assets` directory
+4. Make sure not to commit all the files, manually check them
+5. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
 
 ### Publishing manually - doing the CI's work
 
