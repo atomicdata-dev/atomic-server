@@ -36,7 +36,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 - [Table of contents](#table-of-contents)
 - [When should you use this](#when-should-you-use-this)
 - [When _not_ to use this](#when-not-to-use-this)
-- [Installation & getting started](#installation--getting-started)
+- [Installation \& getting started](#installation--getting-started)
   - [1. Run using docker](#1-run-using-docker)
   - [2. Install desktop build (macOS only)](#2-install-desktop-build-macos-only)
   - [3. Run pre-compiled binary](#3-run-pre-compiled-binary)
@@ -45,11 +45,12 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 - [Initial setup and configuration](#initial-setup-and-configuration)
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
   - [HTTPS Setup on a VPS (static IP required)](#https-setup-on-a-vps-static-ip-required)
+    - [HTTPS Setup using external HTTPS proxy](#https-setup-using-external-https-proxy)
 - [Usage](#usage)
   - [Using Atomic-Server with the browser GUI](#using-atomic-server-with-the-browser-gui)
   - [Use `atomic-cli` as client](#use-atomic-cli-as-client)
   - [API](#api)
-- [FAQ & Troubleshooting](#faq--troubleshooting)
+- [FAQ \& Troubleshooting](#faq--troubleshooting)
   - [Can / should I create backups?](#can--should-i-create-backups)
   - [I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?](#i-lost-the-key--secret-to-my-root-agent-and-the-setup-invite-is-no-longer-usable-what-now)
   - [How do I migrate my data to a new domain?](#how-do-i-migrate-my-data-to-a-new-domain)
@@ -57,7 +58,6 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [How do I make my data private, yet available online?](#how-do-i-make-my-data-private-yet-available-online)
   - [Items are missing in my Collections / Search results](#items-are-missing-in-my-collections--search-results)
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
-  - [What is `rdf-search` mode?](#what-is-rdf-search-mode)
   - [Can I embed Atomic-Server in another application?](#can-i-embed-atomic-server-in-another-application)
   - [Where is my data stored on my machine?](#where-is-my-data-stored-on-my-machine)
 
@@ -278,11 +278,6 @@ Also, if you can, recreate and describe the indexing issue in the issue tracker,
 ### I get a `failed to retrieve` error when opening
 
 Try re-initializing atomic server `atomic-server --initialize`.
-
-### What is `rdf-search` mode?
-
-This turns `atomic-server` into a full-text search server that indexed RDF Turtle documents.
-Check out [the readme](./rdf-search.md).
 
 ### Can I embed Atomic-Server in another application?
 

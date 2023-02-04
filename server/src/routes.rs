@@ -1,7 +1,7 @@
 //! Contains routing logic, sends the client to the correct handler.
 //! We should try to minimize what happens in here, since most logic should be defined in Atomic Data - not in the server itself.
 
-use crate::{config::Config, content_types, handlers};
+use crate::{content_types, handlers};
 use actix_web::{guard, http::Method, web};
 use actix_web_static_files::ResourceFiles;
 
@@ -15,7 +15,7 @@ include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
-pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
+pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         .service(web::resource("/download/{path:[^{}]+}").to(handlers::download::handle_download))
         // This `generate` imports the static files from the `app_assets` folder
@@ -45,14 +45,6 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
                 .guard(guard::Method(Method::GET))
                 .to(handlers::search::search_query),
         );
-    if config.opts.rdf_search {
-        tracing::info!("RDF search enabled. You can POST to /search to index RDF documents.");
-        app.service(
-            web::resource("/search")
-                .guard(guard::Method(Method::POST))
-                .to(handlers::search::search_index_rdf),
-        );
-    }
     app.service(web::resource(ANY).to(handlers::resource::handle_get_resource))
         // Also allow the home resource (not matched by the previous one)
         .service(web::resource("/").to(handlers::resource::handle_get_resource));

@@ -52,7 +52,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             .wrap(tracing_actix_web::TracingLogger::default())
             .wrap(middleware::Compress::default())
             // Here are the actual handlers / endpoints
-            .configure(|app| crate::routes::config_routes(app, &appstate.config))
+            .configure(crate::routes::config_routes)
             .default_service(web::to(|| {
                 tracing::error!("Wrong route, should not happen with normal requests");
                 actix_web::HttpResponse::NotFound()

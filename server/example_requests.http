@@ -22,16 +22,6 @@ Accept: application/ld+json
 GET http://localhost:9883/search?q=Foo&include=true HTTP/1.1
 Accept: application/ld+json
 
-### Index at (RDF) document for search
-POST http://localhost:9883/search HTTP/1.1
-Content-Type: text/turtle
-
-@prefix schema: <http://schema.org/> .
-    <http://example.com/foo> a schema:Person ;
-        schema:name  "Foo" .
-    <http://example.com/bar> a schema:Person ;
-        schema:name  "asdfsajhdfgbasdf" .
-
 ### Send a Commit
 ### The hard part here is setting the correct signature.
 ### Use a library (@tomic/lib for JS, and atomic_lib for Rust).

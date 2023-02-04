@@ -88,7 +88,7 @@ pub async fn search_query(
         .search(&query, &TopDocs::with_limit(initial_results_limit))
         .map_err(|e| format!("Error with creating search results: {} ", e))?;
 
-    let (subjects, _atoms) = docs_to_resources(top_docs, &fields, &searcher)?;
+    let subjects = docs_to_resources(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
     // You'd think there would be a simpler way of getting the requested URL...
@@ -101,90 +101,33 @@ pub async fn search_query(
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());
 
-    if appstate.config.opts.rdf_search {
-        // Always return all subjects in `--rdf-search` mode, don't do authentication
-        results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), subjects.into(), store)?;
-    } else {
-        // Default case: return full resources, do authentication
-        let mut resources: Vec<Resource> = Vec::new();
+    // Default case: return full resources, do authentication
+    let mut resources: Vec<Resource> = Vec::new();
 
-        // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
-        // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
-        // https://github.com/atomicdata-dev/atomic-data-rust/issues/279
-        // https://github.com/atomicdata-dev/atomic-data-rust/issues/280
-        let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
-        for s in subjects {
-            match store.get_resource_extended(&s, true, for_agent.as_deref()) {
-                Ok(r) => {
-                    if resources.len() < limit {
-                        resources.push(r);
-                    } else {
-                        break;
-                    }
-                }
-                Err(_e) => {
-                    tracing::debug!("Skipping search result: {} : {}", s, _e);
-                    continue;
+    // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
+    // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
+    // https://github.com/atomicdata-dev/atomic-data-rust/issues/279
+    // https://github.com/atomicdata-dev/atomic-data-rust/issues/280
+    let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
+    for s in subjects {
+        match store.get_resource_extended(&s, true, for_agent.as_deref()) {
+            Ok(r) => {
+                if resources.len() < limit {
+                    resources.push(r);
+                } else {
+                    break;
                 }
             }
+            Err(_e) => {
+                tracing::debug!("Skipping search result: {} : {}", s, _e);
+                continue;
+            }
         }
-        results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
     }
+    results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
     let mut builder = HttpResponse::Ok();
     // TODO: support other serialization options
     Ok(builder.body(results_resource.to_json_ad()?))
-}
-
-/// Posts an N-Triples RDF document to index the triples in search
-#[tracing::instrument(skip(appstate))]
-pub async fn search_index_rdf(
-    appstate: web::Data<AppState>,
-    body: String,
-) -> AtomicServerResult<HttpResponse> {
-    // Parse Turtle
-    use rio_api::parser::TriplesParser;
-    use rio_turtle::{TurtleError, TurtleParser};
-
-    let mut writer = appstate.search_state.writer.write()?;
-    let fields = crate::search::get_schema_fields(&appstate.search_state)?;
-
-    TurtleParser::new(body.as_ref(), None)
-        .parse_all(&mut |t| {
-            match (
-                get_inner_value(t.subject.into()),
-                get_inner_value(t.predicate.into()),
-                get_inner_value(t.object),
-            ) {
-                (Some(s), Some(p), Some(o)) => {
-                    crate::search::add_triple(&writer, s, p, o, None, &fields).ok();
-                }
-                _ => return Ok(()),
-            };
-            Ok(()) as Result<(), TurtleError>
-        })
-        .map_err(|e| format!("Error parsing turtle: {}", e))?;
-
-    // Store the changes to the writer
-    writer.commit()?;
-    let mut builder = HttpResponse::Ok();
-    Ok(builder.body("Added turtle to store"))
-}
-
-// Returns the innver value of a Term in an RDF triple. If it's a blanknode or triple inside a triple, it will return None.
-use rio_api::model::Term;
-fn get_inner_value(t: Term) -> Option<String> {
-    match t {
-        Term::Literal(lit) => match lit {
-            rio_api::model::Literal::Simple { value } => Some(value.into()),
-            rio_api::model::Literal::LanguageTaggedString { value, language: _ } => {
-                Some(value.into())
-            }
-            rio_api::model::Literal::Typed { value, datatype: _ } => Some(value.into()),
-        },
-        Term::NamedNode(nn) => Some(nn.iri.into()),
-        Term::BlankNode(_bn) => None,
-        Term::Triple(_) => None,
-    }
 }
 
 #[derive(Debug, std::hash::Hash, Eq, PartialEq)]
@@ -286,29 +229,18 @@ fn docs_to_resources(
     docs: Vec<(f32, tantivy::DocAddress)>,
     fields: &Fields,
     searcher: &tantivy::LeasedItem<tantivy::Searcher>,
-) -> Result<(Vec<String>, Vec<StringAtom>), AtomicServerError> {
+) -> Result<Vec<String>, AtomicServerError> {
     let mut subjects: HashSet<String> = HashSet::new();
-    // These are not used at this moment, but would be quite useful in RDF context.
-    let mut atoms: HashSet<StringAtom> = HashSet::new();
 
     // convert found documents to resources
     for (_score, doc_address) in docs {
         let retrieved_doc = searcher.doc(doc_address)?;
         let subject_val = retrieved_doc.get_first(fields.subject).ok_or("No 'subject' in search doc found. This is required when indexing. Run with --rebuild-index")?;
-        let prop_val = retrieved_doc.get_first(fields.property).ok_or("No 'property' in search doc found. This is required when indexing. Run with --rebuild-index")?;
-        let value_val = retrieved_doc.get_first(fields.value).ok_or("No 'value' in search doc found. This is required when indexing. Run with --rebuild-index")?;
 
         let subject = unpack_value(subject_val, &retrieved_doc, "Subject".to_string())?;
-        let property = unpack_value(prop_val, &retrieved_doc, "Property".to_string())?;
-        let value = unpack_value(value_val, &retrieved_doc, "Value".to_string())?;
 
         subjects.insert(subject.clone());
-        atoms.insert(StringAtom {
-            subject,
-            property,
-            value,
-        });
     }
 
-    Ok((subjects.into_iter().collect(), atoms.into_iter().collect()))
+    Ok(subjects.into_iter().collect())
 }

@@ -69,10 +69,6 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_DATA_DIR")]
     pub data_dir: Option<PathBuf>,
 
-    /// CAUTION: Makes data publicly readable on the `/search` endpoint. When enabled, it allows POSTing to the /search endpoint and returns search results as single triples, without performing authentication checks. See https://github.com/atomicdata-dev/atomic-data-rust/blob/master/server/rdf-search.md
-    #[clap(long, env = "ATOMIC_RDF_SEARCH")]
-    pub rdf_search: bool,
-
     /// By default, Atomic-Server keeps previous versions of resources indexed in Search. When enabling this flag, previous versions of resources are removed from the search index when their values are updated.
     #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
     pub remove_previous_search: bool,
