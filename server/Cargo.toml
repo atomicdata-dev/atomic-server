@@ -69,6 +69,7 @@ features = ["rustls"]
 version = "4"
 
 [dependencies.actix-web-static-files]
+git = "https://github.com/joepio/actix-web-static-files/"
 version = "4"
 
 [dependencies.atomic_lib]
