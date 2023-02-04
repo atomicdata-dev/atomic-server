@@ -34,7 +34,7 @@ fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
 #[actix_rt::test]
 async fn server_tests() {
     let unique_string = atomic_lib::utils::random_string(10);
-    let opts = Opts::parse_from(&[
+    let opts = Opts::parse_from([
         "atomic-server",
         "--initialize",
         "--data-dir",
@@ -54,7 +54,7 @@ async fn server_tests() {
     let app = test::init_service(
         App::new()
             .app_data(data)
-            .configure(|app| crate::routes::config_routes(app, &appstate.config)),
+            .configure(crate::routes::config_routes),
     )
     .await;
     let store = &appstate.store;
