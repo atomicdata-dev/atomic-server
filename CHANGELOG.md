@@ -15,6 +15,9 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Fix initial indexing bug #560
 - Fix errors on succesful export / import #565
 - Fix envs for store path, change `ATOMIC_STORE_DIR` to `ATOMIC_DATA_DIR` #567
+- Refactor static file asset hosting #578
+- Meta tags server side #577
+- Include JSON-AD in initial response, speed up first render #511
 
 ## [v0.34.0] - 2022-10-31
 

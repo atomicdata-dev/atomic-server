@@ -21,7 +21,7 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         // .service(web::resource("/sw.js").to(handlers::service_worker::service_worker))
         .service(web::resource("/download/{path:[^{}]+}").to(handlers::download::handle_download))
-        .service(ResourceFiles::new("/app_assets", generated))
+        .service(ResourceFiles::new("/", generated).do_use_guard())
         // Catch all (non-download) HTML requests and send them to the single page app
         .service(
             web::resource(ANY)
