@@ -123,7 +123,6 @@ pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServer
         .filter(|resource| !resource.get_subject().contains("/commits/"));
 
     for resource in resources {
-        println!("Indexing {}", resource.get_subject());
         add_resource(search_state, &resource, store)?;
     }
 

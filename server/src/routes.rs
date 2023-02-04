@@ -1,32 +1,30 @@
 //! Contains routing logic, sends the client to the correct handler.
 //! We should try to minimize what happens in here, since most logic should be defined in Atomic Data - not in the server itself.
 
-use actix_web::{http::Method, web};
-
 use crate::{config::Config, content_types, handlers};
+use actix_web::{guard, http::Method, web};
+use actix_web_static_files::ResourceFiles;
 
 /// Should match all routes
 const ANY: &str = "{tail:.*}";
 
-use actix_web_static_files::ResourceFiles;
-// Includes the `static_import` folder files, used for hosting front-end components.
+// Includes the `app_assets` folder files, used for hosting
+// front-end JS bundles, service workers, css, icons and other static files
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 /// Set up the Actix server routes. This defines which paths are used.
 // Keep in mind that the order of these matters. An early, greedy route will take
 // precedence over a later route.
 pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
-    let generated = generate();
-
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
-        // .service(web::resource("/sw.js").to(handlers::service_worker::service_worker))
         .service(web::resource("/download/{path:[^{}]+}").to(handlers::download::handle_download))
-        .service(ResourceFiles::new("/", generated).do_use_guard())
+        // This `generate` imports the static files from the `app_assets` folder
+        .service(ResourceFiles::new("/", generate()).do_use_guard())
         // Catch all (non-download) HTML requests and send them to the single page app
         .service(
             web::resource(ANY)
-                .guard(actix_web::guard::Method(Method::GET))
-                .guard(actix_web::guard::fn_guard(|guard_ctx| {
+                .guard(guard::Method(Method::GET))
+                .guard(guard::fn_guard(|guard_ctx| {
                     content_types::get_accept(guard_ctx.head().headers())
                         == content_types::ContentType::Html
                 }))
@@ -34,24 +32,24 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig, config: &Config) {
         )
         .service(
             web::resource("/upload")
-                .guard(actix_web::guard::Method(Method::POST))
+                .guard(guard::Method(Method::POST))
                 .to(handlers::upload::upload_handler),
         )
         .service(
             web::resource("/commit")
-                .guard(actix_web::guard::Method(Method::POST))
+                .guard(guard::Method(Method::POST))
                 .to(handlers::commit::post_commit),
         )
         .service(
             web::resource("/search")
-                .guard(actix_web::guard::Method(Method::GET))
+                .guard(guard::Method(Method::GET))
                 .to(handlers::search::search_query),
         );
     if config.opts.rdf_search {
         tracing::info!("RDF search enabled. You can POST to /search to index RDF documents.");
         app.service(
             web::resource("/search")
-                .guard(actix_web::guard::Method(Method::POST))
+                .guard(guard::Method(Method::POST))
                 .to(handlers::search::search_index_rdf),
         );
     }
