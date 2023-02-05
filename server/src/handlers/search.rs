@@ -5,6 +5,7 @@
 use crate::{
     appstate::AppState,
     errors::{AtomicServerError, AtomicServerResult},
+    helpers::get_subject,
     search::{resource_to_facet, Fields},
 };
 use actix_web::{web, HttpResponse};
@@ -50,6 +51,7 @@ pub async fn search_query(
     appstate: web::Data<AppState>,
     params: web::Query<SearchQuery>,
     req: actix_web::HttpRequest,
+    conn: actix_web::dev::ConnectionInfo,
 ) -> AtomicServerResult<HttpResponse> {
     let mut timer = Timer::new();
     let store = &appstate.store;
@@ -78,19 +80,7 @@ pub async fn search_query(
     let subjects = docs_to_subjects(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
-    // You'd think there would be a simpler way of getting the requested URL...
-    // See https://github.com/actix/actix-web/issues/2895
-    let subject: String = store
-        .get_self_url()
-        .ok_or("No base URL set")?
-        .url()
-        .join(
-            req.uri()
-                .path_and_query()
-                .ok_or("Add a query param")?
-                .as_str(),
-        )?
-        .to_string();
+    let subject: String = get_subject(&req, &conn, &appstate)?;
 
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());
