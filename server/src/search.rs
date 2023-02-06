@@ -130,7 +130,13 @@ pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServer
         .filter(|resource| !resource.get_subject().contains("/commits/"));
 
     for resource in resources {
-        add_resource(search_state, &resource, store)?;
+        add_resource(search_state, &resource, store).map_err(|e| {
+            format!(
+                "Failed to add resource to search index: {}. Error: {}",
+                resource.get_subject(),
+                e
+            )
+        })?
     }
 
     search_state.writer.write()?.commit()?;
@@ -154,7 +160,7 @@ pub fn add_resource(
     let mut doc = Document::default();
     doc.add_json_object(
         fields.propvals,
-        serde_json::from_str(&resource.to_json(store)?).map_err(|e| {
+        serde_json::from_str(&resource.to_json_ad()?).map_err(|e| {
             format!(
                 "Failed to convert resource to json for search indexing. Subject: {}. Error: {}",
                 subject, e
