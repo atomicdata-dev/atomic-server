@@ -13,8 +13,6 @@ mod handlers;
 mod helpers;
 #[cfg(feature = "https")]
 mod https;
-#[cfg(feature = "https_init")]
-mod https_init;
 mod jsonerrors;
 #[cfg(feature = "process-management")]
 mod process;

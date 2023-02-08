@@ -53,7 +53,7 @@ If you want to build `atomic-server` for some other target (e.g. building for li
 ```sh
 cargo install cross
 # make sure docker is running!
-cross build --target x86_64-unknown-linux-musl
+cross build --target x86_64-unknown-linux-musl --bin atomic-server --release
 ```
 
 ## IDE setup (VSCode)
@@ -230,7 +230,7 @@ or:
 or do it manually:
 
 1. `cd server`
-1. `cargo build --release --target x86_64-unknown-linux-gnu`
+1. `cargo build --release --target x86_64-unknown-linux-musl --bin atomic-server` (if it fails, use cross, see above)
 1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.{version}`
 1. `ssh atomic` (@joepio manages server)
 2. `service atomic restart`

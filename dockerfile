@@ -1,8 +1,6 @@
 FROM frolvlad/alpine-rust as builder
 WORKDIR /app
 COPY . .
-RUN apk add --no-cache openssl
-RUN apk add --no-cache openssl-dev
 RUN cargo build --release --bin atomic-server
 
 # We only need a small runtime for this step, but make sure glibc is installed
