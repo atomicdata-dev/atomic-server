@@ -318,7 +318,7 @@ dependencies = [
 [[package]]
 name = "actix-web-static-files"
 version = "4.0.0"
-source = "git+https://github.com/joepio/actix-web-static-files/#aff6057463278adc26ed07eb80613b0618b3a78f"
+source = "git+https://github.com/joepio/actix-web-static-files/?rev=3b4b2e3b204ba5f628bb240ecc490edd9cd7f88d#3b4b2e3b204ba5f628bb240ecc490edd9cd7f88d"
 dependencies = [
  "actix-web",
  "derive_more",

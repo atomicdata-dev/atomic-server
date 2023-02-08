@@ -69,7 +69,9 @@ features = ["rustls"]
 version = "4"
 
 [dependencies.actix-web-static-files]
+# https://github.com/kilork/actix-web-static-files/pull/55#pullrequestreview-1286027898
 git = "https://github.com/joepio/actix-web-static-files/"
+rev = "3b4b2e3b204ba5f628bb240ecc490edd9cd7f88d"
 version = "4"
 
 [dependencies.atomic_lib]
