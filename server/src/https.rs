@@ -157,6 +157,10 @@ pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerRes
 }
 
 async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> {
+    let use_wildcard = false;
+
+    fs::create_dir_all(PathBuf::from(&config.https_path))?;
+
     // Create a new account. This will generate a fresh ECDSA key for you.
     // Alternatively, restore an account from serialized credentials by
     // using `Account::from_credentials()`.
@@ -176,7 +180,7 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
 
     let account = instant_acme::Account::create(
         &instant_acme::NewAccount {
-            contact: &[&email],
+            contact: &[&format!("mailto:{}", email)],
             terms_of_service_agreed: true,
             only_return_existing: false,
         },
@@ -189,7 +193,11 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
     // Note that this only needs an `&Account`, so the library will let you
     // process multiple orders in parallel for a single account.
 
-    let identifier = instant_acme::Identifier::Dns(config.opts.domain.clone());
+    let mut domain = config.opts.domain.clone();
+    if use_wildcard {
+        domain = format!("*.{}", domain);
+    }
+    let identifier = instant_acme::Identifier::Dns(domain);
     let (mut order, state) = account
         .new_order(&instant_acme::NewOrder {
             identifiers: &[identifier],
@@ -214,8 +222,8 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
         let challenge = authz
             .challenges
             .iter()
-            .find(|c| c.r#type == instant_acme::ChallengeType::Http01)
-            .ok_or("no Http01 challenge found")?;
+            .find(|c| c.r#type == instant_acme::ChallengeType::Dns01)
+            .ok_or("no Dns01 challenge found")?;
 
         let instant_acme::Identifier::Dns(identifier) = &authz.identifier;
 
