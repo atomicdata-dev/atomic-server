@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - master
+      -	"#567-staging-ci"
 
 jobs:
   uses: ./.github/workflows/deployment.yml
