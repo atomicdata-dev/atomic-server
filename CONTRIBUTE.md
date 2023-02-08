@@ -14,6 +14,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
+- [Cross compilation](#cross-compilation)
 - [IDE setup (VSCode)](#ide-setup-vscode)
 - [Testing](#testing)
 - [Code coverage](#code-coverage)
@@ -44,6 +45,16 @@ Since `atomic-server` is developed in conjunction with the typescript / react `a
 - Visit `https://localhost:8080` (default)
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `pmpm build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
+
+## Cross compilation
+
+If you want to build `atomic-server` for some other target (e.g. building for linux from macOS), you can use the `cross` crate.
+
+```sh
+cargo install cross
+# make sure docker is running!
+cross build --target x86_64-unknown-linux-musl
+```
 
 ## IDE setup (VSCode)
 

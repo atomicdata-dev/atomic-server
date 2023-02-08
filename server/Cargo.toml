@@ -44,9 +44,13 @@ tracing-log = "0.1"
 ureq = "2"
 urlencoding = "2"
 
-[dependencies.acme-lib]
+[dependencies.instant-acme]
 optional = true
-version = "0.8"
+version = "0.1"
+
+[dependencies.rcgen]
+optional = true
+version = "0.10"
 
 [dependencies.tracing-opentelemetry]
 optional = true
@@ -105,8 +109,7 @@ assert_cmd = "2"
 
 [features]
 default = ["https", "telemetry"]
-https = ["rustls"]
-https_init = ["acme-lib"]
+https = ["rustls", "instant-acme", "rcgen"]
 process-management = ["sysinfo"]
 telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger"]
 
