@@ -1,7 +1,7 @@
-name: Deployment
+name: Deployment (re-use)
 
 on:
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   deploy:

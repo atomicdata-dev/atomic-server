@@ -1,0 +1,10 @@
+name: Deployment Staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+
+jobs:
+  uses: ./.github/workflows/deployment.yml
