@@ -1,10 +1,23 @@
-name: Deployment
+name: Deployment (re-use)
 
 on:
-  workflow_dispatch:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      remote_host:
+        required: true
+        type: string
+    secrets:
+      REMOTE_USER:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: true
 
 jobs:
   deploy:
+    environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -25,13 +38,13 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
           SOURCE: "target/x86_64-unknown-linux-musl/release/atomic-server"
-          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
+          REMOTE_HOST: ${{ inputs.remote_host }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.REMOTE_HOST }}
+          host: ${{ inputs.remote_host }}
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |

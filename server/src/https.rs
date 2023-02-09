@@ -151,7 +151,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerRes
     request_cert(config)
         .await
         .map_err(|e| format!("Certification init failed: {}", e))?;
-    tracing::warn!("HTTPS TLS Cert init sucesful! Stopping HTTP server, starting HTTPS...");
+    tracing::warn!("HTTPS TLS Cert init successful! Stopping HTTP server, starting HTTPS...");
     handle.stop(true).await;
     Ok(())
 }

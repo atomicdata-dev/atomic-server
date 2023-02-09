@@ -1,0 +1,14 @@
+name: Deployment Staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'develop'
+jobs:
+  deploy-staging:
+    uses: './.github/workflows/deployment.yml'
+    with:
+      environment: staging
+      remote_host: staging.atomicdata.dev
+    secrets: inherit
