@@ -46,6 +46,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [Running using a tunneling service (easy mode)](#running-using-a-tunneling-service-easy-mode)
   - [HTTPS Setup on a VPS (static IP required)](#https-setup-on-a-vps-static-ip-required)
     - [HTTPS Setup using external HTTPS proxy](#https-setup-using-external-https-proxy)
+  - [Using `systemd` to run Atomic-Server as a service](#using-systemd-to-run-atomic-server-as-a-service)
 - [Usage](#usage)
   - [Using Atomic-Server with the browser GUI](#using-atomic-server-with-the-browser-gui)
   - [Use `atomic-cli` as client](#use-atomic-cli-as-client)
@@ -184,6 +185,48 @@ ATOMIC_HTTPS=false
 ATOMIC_SERVER_URL=https://example.com
 ```
 
+### Using `systemd` to run Atomic-Server as a service
+
+In Unix operating systems, you can use `systemd` to manage a
+
+Create a service:
+
+```sh
+vim /etc/systemd/system/atomic.service
+```
+
+Paste this:
+```
+[Unit]
+Description=Atomic-Server
+#After=network.targetdd
+StartLimitIntervalSec=0[Service]
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/root/atomic-server
+WorkingDirectory=/root/
+EnvironmentFil=/root/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+# start service
+systemctl start atomic
+# check status
+systemctl status atomic
+# restart
+systemctl restart atomic
+# logs
+journalctl -u atomic.service
+# logs, since one hour, follow
+journalctl -u atomic.service --since "1 hour ago" -f
+```
 ## Usage
 
 There are three ways to interact with this server:

@@ -20,6 +20,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Include JSON-AD in initial response, speed up first render #511
 - Remove feature to index external RDF files and search them #579
 - Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency #192
+- Add staging environment #588
+- Add systemd instructions to readme #271
 
 ## [v0.34.0] - 2022-10-31
 
