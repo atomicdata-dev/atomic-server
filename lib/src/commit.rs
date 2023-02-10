@@ -165,6 +165,7 @@ impl Commit {
             }
         };
 
+        // We apply the changes and create a new resource, but don't index it yet.
         let mut resource_new = self
             .apply_changes(resource_old.clone(), store, false)
             .map_err(|e| format!("Error applying changes to Resource {}. {}", self.subject, e))?;
@@ -175,7 +176,7 @@ impl Commit {
                 let parent_str = parent.to_string();
                 if !self.subject.starts_with(&parent_str) {
                     return Err(format!(
-                        "The parent '{}' is not part of the URL of the new subject '{}'.",
+                        "You cannot create a new Resource with this subject, because the parent '{}' is not part of the URL of the new subject '{}'.",
                         parent_str, self.subject
                     )
                     .into());
