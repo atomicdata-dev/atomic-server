@@ -13,7 +13,7 @@ use crate::{
 /// Checks the datatypes for the Values.
 /// Ignores all atoms where the subject is different.
 /// WARNING: Calls store methods, and is called by store methods, might get stuck in a loop!
-#[tracing::instrument(skip(store))]
+#[tracing::instrument(skip(store), level = "info")]
 pub fn fetch_resource(
     subject: &str,
     store: &impl Storelike,
@@ -63,7 +63,7 @@ pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> At
         .get(url)
         .set("Accept", content_type)
         .call()
-        .map_err(|e| format!("Error when fetching {} : {}", url, e))?;
+        .map_err(|e| format!("Error when server tried fetching {} : {}", url, e))?;
     let status = resp.status();
     let body = resp
         .into_string()

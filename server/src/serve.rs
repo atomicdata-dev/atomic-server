@@ -72,8 +72,8 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             {
                 // If there is no certificate file, or the certs are too old, start HTTPS initialization
                 {
-                    if crate::https::should_renew_certs_check(&config) {
-                        crate::https::cert_init_server(&config).await?;
+                    if crate::https::should_renew_certs_check(&config)? {
+                        crate::https::request_cert(&config).await?;
                     }
                 }
                 let https_config = crate::https::get_https_config(&config)

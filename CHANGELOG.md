@@ -19,7 +19,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Meta tags server side #577
 - Include JSON-AD in initial response, speed up first render #511
 - Remove feature to index external RDF files and search them #579
-- Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency #192
+- Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency, add DNS verification for TLS option with `--https-dns` #192
 - Add staging environment #588
 - Add systemd instructions to readme #271
 

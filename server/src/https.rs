@@ -1,4 +1,8 @@
-//! Everything required for getting HTTPS config from storage.
+//! Everything required for setting up HTTPS / TLS.
+//! Instantiate a server for HTTP-01 check with letsencrypt,
+//! checks if certificates are not outdated,
+//! persists files on disk.
+
 use std::{
     fs::{self, File},
     io::BufReader,
@@ -6,7 +10,7 @@ use std::{
 };
 
 use crate::errors::AtomicServerResult;
-// RUSTLS
+/// Create RUSTLS server config from certificates in config dir
 pub fn get_https_config(
     config: &crate::config::Config,
 ) -> AtomicServerResult<rustls::ServerConfig> {
@@ -35,13 +39,12 @@ pub fn get_https_config(
 }
 
 pub fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
-    // ~/.config/atomic/https
     let mut path = config
         .cert_path
         .parent()
         .unwrap_or_else(|| {
             panic!(
-                "Cannot open parent dit of HTTPS certs {:?}",
+                "Cannot open parent dir of HTTPS certs {:?}",
                 config.cert_path
             )
         })
@@ -51,7 +54,7 @@ pub fn certs_created_at_path(config: &crate::config::Config) -> PathBuf {
 }
 
 /// Adds a file to the .https folder to indicate age of certificates
-pub fn set_certs_created_at_file(config: &crate::config::Config) {
+fn set_certs_created_at_file(config: &crate::config::Config) {
     let now_string = chrono::Utc::now();
     let path = certs_created_at_path(config);
     fs::write(&path, now_string.to_string())
@@ -60,40 +63,44 @@ pub fn set_certs_created_at_file(config: &crate::config::Config) {
 
 /// Checks if the certificates need to be renewed.
 /// Will be true if there are no certs yet.
-pub fn should_renew_certs_check(config: &crate::config::Config) -> bool {
+pub fn should_renew_certs_check(config: &crate::config::Config) -> AtomicServerResult<bool> {
     if std::fs::File::open(&config.cert_path).is_err() {
-        return true;
+        return Ok(true);
     }
     let path = certs_created_at_path(config);
 
     let created_at = std::fs::read_to_string(&path)
-        .unwrap_or_else(|_| panic!("Unable to read {:?}", &path))
+        .map_err(|_| format!("Unable to read {:?}", &path))?
         .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap_or_else(|_| panic!("failed to parse {:?}", &path));
+        .map_err(|_| format!("failed to parse {:?}", &path))?;
     let certs_age: chrono::Duration = chrono::Utc::now() - created_at;
     // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX.
     let expired = certs_age > chrono::Duration::weeks(4);
     if expired {
-        tracing::warn!("HTTPS Certificates expired, requesting new ones...")
+        warn!("HTTPS Certificates expired, requesting new ones...")
         // This is where I might need to remove the `.https/` folder, but it seems like it's not necessary
     };
-    expired
+    Ok(expired)
 }
 
-use actix_web::{App, HttpServer};
-use instant_acme::OrderStatus;
-use tracing::info;
+use actix_web::{dev::ServerHandle, App, HttpServer};
+use instant_acme::{KeyAuthorization, OrderStatus};
+use tracing::{info, log::warn};
 
 use std::sync::mpsc;
 
 /// Starts an HTTP Actix server for HTTPS certificate initialization
-pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerResult<()> {
+async fn cert_init_server(
+    config: &crate::config::Config,
+    challenge: &instant_acme::Challenge,
+    key_auth: &KeyAuthorization,
+) -> AtomicServerResult<ServerHandle> {
     let address = format!("{}:{}", config.opts.ip, config.opts.port);
-    tracing::warn!("Server temporarily running in HTTP mode at {}, running Let's Encrypt Certificate initialization...", address);
+    warn!("Server temporarily running in HTTP mode at {}, running Let's Encrypt Certificate initialization...", address);
 
     if config.opts.port != 80 {
-        tracing::warn!(
-            "HTTP port is {}, not 80. Should be 80 in most cases during LetsEncrypt setup.",
+        warn!(
+            "HTTP port is {}, not 80. Should be 80 in most cases during LetsEncrypt setup. If you've correctly forwarded it, you can ignore this warning.",
             config.opts.port
         );
     }
@@ -102,9 +109,14 @@ pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerRes
     well_known_folder.push("well-known");
     fs::create_dir_all(&well_known_folder)?;
 
-    let (tx, rx) = mpsc::channel();
+    let mut challenge_path = well_known_folder.clone();
+    challenge_path.push("acme-challenge");
+    fs::create_dir_all(&challenge_path)?;
+    challenge_path.push(&challenge.token);
+    // let challenge_file_content = format!("{}.{}", challenge.token, key_auth.as_str());
+    fs::write(challenge_path, &key_auth.as_str())?;
 
-    let address_clone = address.clone();
+    let (tx, rx) = mpsc::channel();
 
     std::thread::spawn(move || {
         actix_web::rt::System::new().block_on(async move {
@@ -115,7 +127,7 @@ pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerRes
                 )
             });
 
-            let running_server = init_server.bind(&address_clone)?.run();
+            let running_server = init_server.bind(&address)?.run();
 
             tx.send(running_server.handle())
                 .expect("Error sending handle during HTTPS init.");
@@ -128,44 +140,44 @@ pub async fn cert_init_server(config: &crate::config::Config) -> AtomicServerRes
         .recv()
         .map_err(|e| format!("Error receiving handle during HTTPS init. {}", e))?;
 
+    let well_known_url = format!(
+        "http://{}/.well-known/acme-challenge/{}",
+        &config.opts.domain, &challenge.token
+    );
+
+    // wait for a few secs
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    info!("Testing availability of {}", &well_known_url);
+
     let agent = ureq::builder()
         .timeout(std::time::Duration::from_secs(2))
         .build();
-
-    let well_known_url = format!("http://{}/.well-known/", &config.opts.domain);
-    tracing::info!("Testing availability of {}", &well_known_url);
-    let resp = agent.get(&well_known_url).call().map_err(|e| {
-        format!(
-            "Unable to send request for Let's Encrypt initialization. {}",
-            e
-        )
-    })?;
+    let resp = agent
+        .get(&well_known_url)
+        // .get("https://docs.certifytheweb.com/docs/http-validation/")
+        .call()
+        .map_err(|e| format!("Unable to Test local server. {}", e))?;
     if resp.status() != 200 {
-        return Err(
-            "Server for HTTP initialization not available, returning a non-200 status code".into(),
-        );
+        warn!("Unable to Test local server. Status: {}", resp.status());
     } else {
-        tracing::info!("Server for HTTP initialization running correctly");
+        info!("Server for HTTP initialization running correctly");
     }
-
-    request_cert(config)
-        .await
-        .map_err(|e| format!("Certification init failed: {}", e))?;
-    tracing::warn!("HTTPS TLS Cert init successful! Stopping HTTP server, starting HTTPS...");
-    handle.stop(true).await;
-    Ok(())
+    Ok(handle)
 }
 
-async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> {
-    let use_wildcard = false;
-
-    fs::create_dir_all(PathBuf::from(&config.https_path))?;
+/// Sends a request to LetsEncrypt to create a certificate
+pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> {
+    let challenge_type = if config.opts.https_dns {
+        instant_acme::ChallengeType::Dns01
+    } else {
+        instant_acme::ChallengeType::Http01
+    };
 
     // Create a new account. This will generate a fresh ECDSA key for you.
     // Alternatively, restore an account from serialized credentials by
     // using `Account::from_credentials()`.
 
-    let url = if config.opts.development {
+    let lets_encrypt_url = if config.opts.development {
         instant_acme::LetsEncrypt::Staging.url()
     } else {
         instant_acme::LetsEncrypt::Production.url()
@@ -184,7 +196,7 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
             terms_of_service_agreed: true,
             only_return_existing: false,
         },
-        url,
+        lets_encrypt_url,
     )
     .await
     .map_err(|e| format!("Failed to create account: {}", e))?;
@@ -194,7 +206,8 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
     // process multiple orders in parallel for a single account.
 
     let mut domain = config.opts.domain.clone();
-    if use_wildcard {
+    if config.opts.https_dns {
+        // Set a wildcard subdomain. Not possible with Http-01 challenge, only Dns-01.
         domain = format!("*.{}", domain);
     }
     let identifier = instant_acme::Identifier::Dns(domain);
@@ -205,13 +218,16 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
         .await
         .unwrap();
 
-    tracing::info!("order state: {:#?}", state);
     assert!(matches!(state.status, instant_acme::OrderStatus::Pending));
 
     // Pick the desired challenge type and prepare the response.
 
     let authorizations = order.authorizations(&state.authorizations).await.unwrap();
     let mut challenges = Vec::with_capacity(authorizations.len());
+
+    // if we have H11p01 challenges, we need to start a server to handle them, and eventually turn that off again
+    let mut handle: Option<ServerHandle> = None;
+
     for authz in &authorizations {
         match authz.status {
             instant_acme::AuthorizationStatus::Pending => {}
@@ -222,18 +238,29 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
         let challenge = authz
             .challenges
             .iter()
-            .find(|c| c.r#type == instant_acme::ChallengeType::Dns01)
+            .find(|c| c.r#type == challenge_type)
             .ok_or("no Dns01 challenge found")?;
 
         let instant_acme::Identifier::Dns(identifier) = &authz.identifier;
 
-        println!("Please set the following DNS record then press any key:");
-        println!(
-            "_acme-challenge.{} IN TXT {}",
-            identifier,
-            order.key_authorization(challenge).dns_value()
-        );
-        std::io::stdin().read_line(&mut String::new()).unwrap();
+        let key_auth = order.key_authorization(challenge);
+        match challenge_type {
+            instant_acme::ChallengeType::Http01 => {
+                handle = Some(cert_init_server(config, challenge, &key_auth).await?);
+            }
+            instant_acme::ChallengeType::Dns01 => {
+                // For DNS challenges, we need the user to set a TXT record.
+
+                println!("Please set the following DNS record then press any key:");
+                println!(
+                    "_acme-challenge.{} IN TXT {}",
+                    identifier,
+                    key_auth.dns_value()
+                );
+                std::io::stdin().read_line(&mut String::new()).unwrap();
+            }
+            instant_acme::ChallengeType::TlsAlpn01 => todo!("TLS-ALPN-01 is not supported"),
+        }
 
         challenges.push((identifier, &challenge.url));
     }
@@ -246,27 +273,30 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
     // Exponentially back off until the order becomes ready or invalid.
     let mut tries = 1u8;
     let mut delay = std::time::Duration::from_millis(250);
+    let url = authorizations.get(0).expect("Authorizations is empty");
     let state = loop {
         actix::clock::sleep(delay).await;
         let state = order.state().await.unwrap();
         if let instant_acme::OrderStatus::Ready | instant_acme::OrderStatus::Invalid = state.status
         {
-            tracing::info!("order state: {:#?}", state);
+            info!("order state: {:#?}", state);
             break state;
         }
 
         delay *= 2;
         tries += 1;
-        match tries < 5 {
-            true => info!(?state, tries, "order is not ready, waiting {delay:?}"),
+        match tries < 100 {
+            true => info!("order is not ready, waiting {delay:?}"),
             false => {
-                return Err("order is not ready".into());
+                return Err(
+                    format!("order is not ready. For details, see the url: {url:?}").into(),
+                );
             }
         }
     };
 
     if state.status == OrderStatus::Invalid {
-        return Err("order is invalid".into());
+        return Err(format!("order is invalid, check {url:?}").into());
     }
 
     let mut names = Vec::with_capacity(challenges.len());
@@ -279,21 +309,40 @@ async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> 
 
     let mut params = rcgen::CertificateParams::new(names.clone());
     params.distinguished_name = rcgen::DistinguishedName::new();
-    let cert = rcgen::Certificate::from_params(params).unwrap();
+    let cert = rcgen::Certificate::from_params(params).map_err(|e| e.to_string())?;
     let csr = cert.serialize_request_der().map_err(|e| e.to_string())?;
 
     // Finalize the order and print certificate chain, private key and account credentials.
 
-    let cert_chain_pem = order.finalize(&csr, &state.finalize).await.unwrap();
+    let cert_chain_pem = order
+        .finalize(&csr, &state.finalize)
+        .await
+        .map_err(|e| e.to_string())?;
     info!("certficate chain:\n\n{}", cert_chain_pem,);
     info!("private key:\n\n{}", cert.serialize_private_key_pem());
     info!(
         "account credentials:\n\n{}",
-        serde_json::to_string_pretty(&account.credentials()).unwrap()
+        serde_json::to_string_pretty(&account.credentials()).map_err(|e| e.to_string())?
     );
-    fs::write(&config.cert_path, cert_chain_pem).expect("Unable to write cert file");
-    fs::write(&config.key_path, cert.serialize_private_key_pem())
-        .expect("Unable to write key file");
+    write_certs(config, cert_chain_pem, cert)?;
+
+    if let Some(hnd) = handle {
+        warn!("HTTPS TLS Cert init successful! Stopping temporary HTTP server, starting HTTPS...");
+        hnd.stop(true).await;
+    }
+
+    Ok(())
+}
+
+fn write_certs(
+    config: &crate::config::Config,
+    cert_chain_pem: String,
+    cert: rcgen::Certificate,
+) -> AtomicServerResult<()> {
+    info!("Writing TLS certificates to {:?}", config.https_path);
+    fs::create_dir_all(PathBuf::from(&config.https_path))?;
+    fs::write(&config.cert_path, cert_chain_pem)?;
+    fs::write(&config.key_path, cert.serialize_private_key_pem())?;
     set_certs_created_at_file(config);
 
     Ok(())

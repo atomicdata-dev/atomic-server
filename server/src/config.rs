@@ -31,17 +31,18 @@ pub struct Opts {
     #[clap(long, default_value = "localhost", env = "ATOMIC_DOMAIN")]
     pub domain: String,
 
-    /// The contact mail address for Let's Encrypt HTTPS setup
-    #[clap(long, env = "ATOMIC_EMAIL")]
-    pub email: Option<String>,
-
     // 9.883 is decimal for the `⚛` character.
     /// The port where the HTTP app is available. Set to 80 if you want this to be available on the network.
     #[clap(short, long, default_value = "9883", env = "ATOMIC_PORT")]
     pub port: u32,
 
-    /// The port where the HTTPS app is available. Sert to 443 if you want this to be available on the network.
-    #[clap(long, default_value = "9884", env = "ATOMIC_PORT_HTTPS")]
+    /// The port where the HTTPS app is available. Set to 443 if you want this to be available on the network.
+    #[clap(
+        long,
+        default_value = "9884",
+        env = "ATOMIC_PORT_HTTPS",
+        requires = "https"
+    )]
     pub port_https: u32,
 
     /// The IP address of the server. Set to :: if you want this to be available to other devices on your network.
@@ -49,9 +50,17 @@ pub struct Opts {
     pub ip: IpAddr,
 
     /// Use HTTPS instead of HTTP.
-    /// Will get certificates from LetsEncrypt.
+    /// Will get certificates from LetsEncrypt fully automated.
     #[clap(long, env = "ATOMIC_HTTPS")]
     pub https: bool,
+
+    /// Initializes DNS-01 challenge for LetsEncrypt. Use this if you want to use subdomains.
+    #[clap(long, env = "ATOMIC_HTTPS_DNS", requires = "https")]
+    pub https_dns: bool,
+
+    /// The contact mail address for Let's Encrypt HTTPS setup
+    #[clap(long, env = "ATOMIC_EMAIL")]
+    pub email: Option<String>,
 
     /// Endpoint where the front-end assets are hosted
     #[clap(long, default_value = "/app_assets", env = "ATOMIC_ASSET_URL")]
@@ -86,6 +95,7 @@ pub struct Opts {
     pub log_level: LogLevel,
 
     /// How you want to trace what's going on with the server. Useful for monitoring performance and errors in production.
+    /// Combine with `log_level` to get more or less data (`trace` is the most verbose)
     #[clap(arg_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
     pub trace: Tracing,
 }
