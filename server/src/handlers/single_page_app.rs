@@ -100,7 +100,10 @@ impl Default for MetaTags {
 
 impl Display for MetaTags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let description = escape_html(&self.description);
+        let description = escape_html(&self.description)
+            .chars()
+            .take(250)
+            .collect::<String>();
         let image = &self.image;
         let title = escape_html(&self.title);
 
@@ -116,6 +119,8 @@ impl Display for MetaTags {
 <meta property=\"twitter:image\" content=\"{image}\">"
         )?;
         if let Some(json_unsafe) = &self.json {
+            // If we would serialize plain JSON in HTML,
+            // users might escape the HTML tag and execute arbitrary code.
             let json_base64 = base64::encode(json_unsafe);
             write!(
                 f,
