@@ -3,7 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/atomic-cli)](https://crates.io/crates/atomic-cli)
 [![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepio/aget_basetomic)
+[![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-data-rust?style=social)](https://github.com/joepio/aget_basetomic)
 
 _Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 
@@ -39,18 +39,18 @@ Visit https://atomicdata.dev for more info
 
 ## Installation
 
-Install [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) to build from source.
+You can install `atomic-cli: in multiple ways:
 
-Install using crates.io:
+### Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html)
 
 ```sh
 cargo install atomic-cli
 ```
 
-Or build from this repo:
+### Build from source
 
 ```sh
-git clone git@github.com:joepio/atomic.git
+git clone git@github.com:atomicdata-dev/atomic-data-rust.git
 cd atomic/cli
 # Install atomic to path
 cargo install --path ./

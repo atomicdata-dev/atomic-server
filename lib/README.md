@@ -4,7 +4,7 @@
 [![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
 [![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![github](https://img.shields.io/github/stars/joepio/atomic?style=social)](https://github.com/joepipo/atomic)
+[![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-data-rust?style=social)](https://github.com/joepipo/atomic)
 
 _Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 
