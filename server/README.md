@@ -11,7 +11,7 @@ _Status: alpha. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 Demo on [atomicdata.dev](https://atomicdata.dev)**
 
 <!-- We re-use this table in various places, such as ../README.md and in the docs repo. Consider this the source. -->
-- 🚀  **Fast** (1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
+- 🚀  **Fast** (less than 1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
 - ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html).
@@ -26,6 +26,7 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 - 📲  **Invite and sharing system** with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 - 📂  **File management**: Upload, download and preview attachments.
 - 🖥️  **Desktop app**: Easy desktop installation, with status bar icon, powered by [tauri](https://github.com/tauri-apps/tauri/).
+- 📚  **Libraries**: [Javascript / Typescript](https://www.npmjs.com/package/@tomic/lib), [React](https://www.npmjs.com/package/@tomic/react), [Svelte](https://www.npmjs.com/package/@tomic/svelte)
 
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib) and [more](Cargo.toml).
 
@@ -64,18 +65,19 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 
 ## When should you use this
 
-- You want a powerful, lightweight, fast and easy to use **CMS** with editors, modelling capabilities and an intuitive API
+- You want a powerful, lightweight, fast and easy to use **CMS or database** with live updates, editors, modelling capabilities and an intuitive API
+- You want to build a webapplication, and like working with using [React](https://github.com/atomicdata-dev/atomic-data-browser) or [Svelte](https://github.com/atomicdata-dev/atomic-svelte).
 - You want to make (high-value) **datasets as easily accessible as possible**
 - You want to specify and share a **common vocabulary** / ontology / schema for some specific domain or dataset. Example classes [here](https://atomicdata.dev/classes).
 - You want to use and **share linked data**, but don't want to deal with most of [the complexities of RDF](https://docs.atomicdata.dev/interoperability/rdf.html), SPARQL, Triple Stores, Named Graphs and Blank Nodes.
 - You are interested in **re-decentralizing the web** or want want to work with tech that improves data ownership and interoperability.
-- You like living on the edge (this application is not production ready)
 
 ## When _not_ to use this
 
-- If you need **stability**, look further (for now). This is beta sofware and is prone to change.
-- You're dealing with **sensitive / private data**. The authorization mechanisms are relatively new and not rigorously tested.
-- **Complex query requirements**. Check out NEO4j, Apache Jena or maybe TerminusDB.
+- High-throughput **numerical data / numerical analysis**. Atomic-Server does not have aggregate queries.
+- If you need **high stability**, look further (for now). This is beta sofware and can change.
+- You're dealing with **very sensitive / private data**. The built-in authorization mechanisms are relatively new and not rigorously tested. The database itself is not encrypted.
+- **Complex query requirements**. We have queries with filters and features for path traversal, but it may fall short. Check out NEO4j, Apache Jena or maybe TerminusDB.
 
 ## Installation & getting started
 
@@ -187,15 +189,17 @@ ATOMIC_SERVER_URL=https://example.com
 
 ### Using `systemd` to run Atomic-Server as a service
 
-In Unix operating systems, you can use `systemd` to manage a
+In Linux operating systems, you can use `systemd` to manage running processes.
+You can configure it to restart automatically, and collect logs with `journalctl`.
 
 Create a service:
 
 ```sh
-vim /etc/systemd/system/atomic.service
+nano /etc/systemd/system/atomic.service
 ```
 
-Paste this:
+Add this to its contents, make changes if needed:
+
 ```
 [Unit]
 Description=Atomic-Server
@@ -216,15 +220,11 @@ WantedBy=multi-user.target
 ```
 
 ```sh
-# start service
+# start / status / restart commands:
 systemctl start atomic
-# check status
 systemctl status atomic
-# restart
 systemctl restart atomic
-# logs
-journalctl -u atomic.service
-# logs, since one hour, follow
+# show recent logs, follow them on screen
 journalctl -u atomic.service --since "1 hour ago" -f
 ```
 ## Usage

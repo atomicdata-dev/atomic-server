@@ -17,7 +17,7 @@ _Status: Beta. [Status](server/STATUS.md) specifies which features are stable. [
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
 
-- 🚀  **Fast** (1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
+- 🚀  **Fast** (less than 1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
 - ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html).
@@ -32,7 +32,7 @@ Demo on [atomicdata.dev](https://atomicdata.dev)**
 - 📲  **Invite and sharing system** with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
 - 📂  **File management**: Upload, download and preview attachments.
 - 🖥️  **Desktop app**: Easy desktop installation, with status bar icon, powered by [tauri](https://github.com/tauri-apps/tauri/).
-
+- 📚  **Libraries**: [Javascript / Typescript](https://www.npmjs.com/package/@tomic/lib), [React](https://www.npmjs.com/package/@tomic/react), [Svelte](https://www.npmjs.com/package/@tomic/svelte)
 Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib) and [more](Cargo.toml).
 [→ Read more](server/README.md)
 
