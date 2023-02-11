@@ -5,9 +5,10 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
-## UNRELEASED
+## [v0.34.1] - 2023-02-11
 
 - Improve query performance, refactor indexes. The `.tpf` API is deprecated in favor of the more powerful `.query`. #529
+- Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency, add DNS verification for TLS option with `--https-dns` #192
 - Improved error handling for HTTPS initialization #530
 - Add `--force` to `atomic-server import` #536
 - Fix index issue happening when deleting a single property in a sorted collection #545
@@ -19,7 +20,6 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Meta tags server side #577
 - Include JSON-AD in initial response, speed up first render #511
 - Remove feature to index external RDF files and search them #579
-- Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency, add DNS verification for TLS option with `--https-dns` #192
 - Add staging environment #588
 - Add systemd instructions to readme #271
 
