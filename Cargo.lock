@@ -503,6 +503,7 @@ dependencies = [
  "sanitize-filename",
  "serde",
  "serde_json",
+ "simple-server-timing-header",
  "static-files",
  "sysinfo",
  "tantivy",
@@ -4402,6 +4403,12 @@ checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "simple-server-timing-header"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "24aab667798e13dcf1f91ada5af3a9c58fc17e3b251cf3ca81466176096630c9"
 
 [[package]]
 name = "siphasher"

@@ -22,5 +22,4 @@ pub mod serve;
 mod search;
 #[cfg(test)]
 mod tests;
-mod timer;
 mod trace;

@@ -43,6 +43,7 @@ tracing-chrome = "0.6"
 tracing-log = "0.1"
 ureq = "2"
 urlencoding = "2"
+simple-server-timing-header = "0.1.0"
 
 [dependencies.instant-acme]
 optional = true

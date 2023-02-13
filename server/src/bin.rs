@@ -17,7 +17,6 @@ mod jsonerrors;
 mod process;
 mod routes;
 pub mod serve;
-mod timer;
 // #[cfg(feature = "search")]
 mod search;
 #[cfg(test)]
