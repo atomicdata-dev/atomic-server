@@ -58,16 +58,16 @@ fn origin(url: &str) -> String {
 
 pub fn get_auth_from_cookie(
     map: &HeaderMap,
-    requested_subject: &String,
+    requested_subject: &str,
 ) -> AtomicServerResult<Option<AuthValues>> {
     let encoded_session = match map.get("Cookie") {
-        Some(cookies) => session_cookie_from_header(cookies),
+        Some(cookies) => session_cookie_from_header(cookies)?,
         None => return Ok(None),
     };
 
     let session = match encoded_session {
         Some(s) => base64::decode(s).map_err(|_| AtomicServerError {
-            message: "Malformed authentication resource".to_string(),
+            message: "Malformed authentication resource - unable to decode base64".to_string(),
             error_type: AppErrorType::Unauthorized,
             error_resource: None,
         }),
@@ -75,13 +75,16 @@ pub fn get_auth_from_cookie(
     }?;
 
     let session_str = std::str::from_utf8(&session).map_err(|_| AtomicServerError {
-        message: "Malformed authentication resource".to_string(),
+        message: "Malformed authentication resource - unable to parse from utf_8".to_string(),
         error_type: AppErrorType::Unauthorized,
         error_resource: None,
     })?;
     let auth_values: AuthValues =
-        serde_json::from_str(session_str).map_err(|_| AtomicServerError {
-            message: "Malformed authentication resource".to_string(),
+        serde_json::from_str(session_str).map_err(|e| AtomicServerError {
+            message: format!(
+                "Malformed authentication resource when parsing AuthValues JSON: {}",
+                e
+            ),
             error_type: AppErrorType::Unauthorized,
             error_resource: None,
         })?;
@@ -157,16 +160,39 @@ pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
     None
 }
 
-fn session_cookie_from_header(header: &HeaderValue) -> Option<String> {
-    let cookies: Vec<&str> = header.to_str().ok()?.split(';').collect();
+fn session_cookie_from_header(header: &HeaderValue) -> AtomicServerResult<Option<String>> {
+    let cookies: Vec<&str> = header
+        .to_str()
+        .map_err(|_| "Can't convert header value to string")?
+        .split(';')
+        .collect();
 
     for encoded_cookie in cookies {
-        let cookie = Cookie::parse(encoded_cookie).ok()?;
+        let cookie = Cookie::parse(encoded_cookie).map_err(|_| "Can't parse cookie")?;
         if cookie.name() == "atomic_session" {
-            let decoded = percent_decode_str(cookie.value()).decode_utf8().ok()?;
-            return Some(String::from(decoded));
+            let decoded = percent_decode_str(cookie.value())
+                .decode_utf8()
+                .map_err(|_| "Can't decode cookie string")?;
+            return Ok(Some(String::from(decoded)));
         }
     }
 
-    None
+    Ok(None)
+}
+
+#[test]
+fn parse_cookie() {
+    let example = "atomic_session=eyJodHRwczovL2F0b21pY2RhdGEuZGV2L3Byb3BlcnRpZXMvYXV0aC9hZ2VudCI6Imh0dHA6Ly9sb2NhbGhvc3Q6OTg4My9hZ2VudHMvaGVua2llcGVuayIsImh0dHBzOi8vYXRvbWljZGF0YS5kZXYvcHJvcGVydGllcy9hdXRoL3JlcXVlc3RlZFN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMiLCJodHRwczovL2F0b21pY2RhdGEuZGV2L3Byb3BlcnRpZXMvYXV0aC9wdWJsaWNLZXkiOiJLM3hsa0UxQmFIVXNnRzlYT0h4MVZaVUQ1TGs3ODJua09UcDVHNFN0SDdBPSIsImh0dHBzOi8vYXRvbWljZGF0YS5kZXYvcHJvcGVydGllcy9hdXRoL3RpbWVzdGFtcCI6MTY3NjI4MTU1NjEyNCwiaHR0cHM6Ly9hdG9taWNkYXRhLmRldi9wcm9wZXJ0aWVzL2F1dGgvc2lnbmF0dXJlIjoiMlprdFFWNTNkMVhNUWp4YklSN1pYRkhCMExGT2hHcVlpVlEyRENWc3BkZHVuL3ZHRkhJN3lqdU5jRitIMmpLa0Y0L0R4amEraHdTeUJlZ2ZvTWlxQ1E9PSJ9";
+
+    let mut headermap = HeaderMap::new();
+    headermap.insert(
+        "Cookie".try_into().unwrap(),
+        HeaderValue::from_str(example).unwrap(),
+    );
+    let subject = "http://localhost:9883";
+    let out = get_auth_from_cookie(&headermap, subject)
+        .expect("Should not return err")
+        .expect("Should contain cookie");
+
+    assert_eq!(out.requested_subject, subject);
 }
