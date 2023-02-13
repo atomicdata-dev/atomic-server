@@ -7,6 +7,7 @@ pub fn path_endpoint() -> Endpoint {
         description: "An Atomic Path is a string that starts with the URL of some Atomic Resource, followed by one or multiple other Property URLs or Property Shortnames. It resolves to one specific Resource or Value. At this moment, Values are not yet supported.".to_string(),
         shortname: "path".to_string(),
         handle: Some(handle_path_request),
+        handle_post: None,
     }
 }
 

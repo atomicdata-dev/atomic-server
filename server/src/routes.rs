@@ -44,8 +44,17 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             web::resource("/search")
                 .guard(guard::Method(Method::GET))
                 .to(handlers::search::search_query),
-        );
-    app.service(web::resource(ANY).to(handlers::resource::handle_get_resource))
+        )
+        .service(
+            web::resource(ANY)
+                .guard(guard::Method(Method::GET))
+                .to(handlers::get_resource::handle_get_resource),
+        )
+        .service(
+            web::resource(ANY)
+                .guard(guard::Method(Method::POST))
+                .to(handlers::post_resource::handle_post_resource),
+        )
         // Also allow the home resource (not matched by the previous one)
-        .service(web::resource("/").to(handlers::resource::handle_get_resource));
+        .service(web::resource("/").to(handlers::get_resource::handle_get_resource));
 }

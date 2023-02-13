@@ -536,6 +536,30 @@ impl Storelike for Db {
         Box::new(result)
     }
 
+    fn post_resource(
+        &self,
+        subject: &str,
+        body: Vec<u8>,
+        for_agent: Option<&str>,
+    ) -> AtomicResult<Resource> {
+        let endpoints = self.endpoints.iter().filter(|e| e.handle_post.is_some());
+        for e in endpoints {
+            if let Some(fun) = &e.handle_post {
+                let subj_url = url::Url::try_from(subject)?;
+                if subj_url.path() == e.path {
+                    let handle_post_context = crate::endpoints::HandlePostContext {
+                        store: self,
+                        bytes: body,
+                        for_agent,
+                        subject: url::Url::try_from(subject)?,
+                    };
+                    return fun(handle_post_context);
+                }
+            }
+        }
+        Err(AtomicError::method_not_allowed("No endpoint found"))
+    }
+
     fn populate(&self) -> AtomicResult<()> {
         // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
         crate::populate::populate_default_store(self)

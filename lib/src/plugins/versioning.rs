@@ -12,6 +12,7 @@ pub fn version_endpoint() -> Endpoint {
         description: "Constructs a version of a resource from a Commit URL.".to_string(),
         shortname: "versions".to_string(),
         handle: Some(handle_version_request),
+        handle_post: None,
     }
 }
 
@@ -23,6 +24,7 @@ pub fn all_versions_endpoint() -> Endpoint {
             .to_string(),
         shortname: "all-versions".to_string(),
         handle: Some(handle_all_versions_request),
+        handle_post: None,
     }
 }
 
