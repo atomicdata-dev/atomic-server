@@ -22,7 +22,10 @@ pub async fn single_page(
         MetaTags::default()
     };
 
-    let body = template.replace("<!-- { inject_html_head } -->", &meta_tags.to_string());
+    let script = format!("<script>{}</script>", appstate.config.opts.script);
+    let body = template
+        .replace("<!-- { inject_html_head } -->", &meta_tags.to_string())
+        .replace("<!-- { inject_script } -->", &script);
 
     let resp = HttpResponse::Ok()
         .content_type("text/html")

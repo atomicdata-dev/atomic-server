@@ -5,6 +5,10 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## UNRELEASED
+
+- Parse multiple auth cookies #525
+
 ## [v0.34.1] - 2023-02-11
 
 - Improve query performance, refactor indexes. The `.tpf` API is deprecated in favor of the more powerful `.query`. #529
