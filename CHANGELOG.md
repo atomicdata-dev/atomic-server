@@ -8,6 +8,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 ## UNRELEASED
 
 - Parse multiple auth cookies #525
+- Fix `--script` flag
 
 ## [v0.34.1] - 2023-02-11
 
