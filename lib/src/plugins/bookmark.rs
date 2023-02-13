@@ -24,6 +24,7 @@ pub fn bookmark_endpoint() -> Endpoint {
         description: "The website will be fetched and parsed. The main content of the page is identified, and the rest is stripped. Returns the Markdown.".to_string(),
         shortname: "bookmark".to_string(),
         handle: Some(handle_bookmark_request),
+        handle_post: None,
     }
 }
 

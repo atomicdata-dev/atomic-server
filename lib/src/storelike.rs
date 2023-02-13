@@ -239,10 +239,9 @@ pub trait Storelike: Sized {
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
         let first_item = String::from(path_items[0]);
         let mut id_url = first_item;
-        if mapping.is_some() {
+        if let Some(m) = mapping {
             // For the first item, check the user mapping
-            id_url = mapping
-                .unwrap()
+            id_url = m
                 .try_mapping_or_url(&id_url)
                 .ok_or(&*format!("No url found for {}", path_items[0]))?;
         }
@@ -313,6 +312,17 @@ pub trait Storelike: Sized {
             )))
         }
         Ok(current)
+    }
+
+    /// Handles a HTTP POST request to the store.
+    /// This is where [crate::endpoints::Endpoint] are used.
+    fn post_resource(
+        &self,
+        _subject: &str,
+        _body: Vec<u8>,
+        _for_agent: Option<&str>,
+    ) -> AtomicResult<Resource> {
+        Err("`post_resource` not implemented for StoreLike. Implement it in your trait.".into())
     }
 
     /// Loads the default store. For DBs it also adds default Collections and Endpoints.

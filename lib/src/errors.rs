@@ -30,6 +30,7 @@ pub enum AtomicErrorType {
     UnauthorizedError,
     ParseErrror,
     OtherError,
+    MethodNotAllowed,
 }
 
 impl std::error::Error for AtomicError {
@@ -39,6 +40,14 @@ impl std::error::Error for AtomicError {
 }
 
 impl AtomicError {
+    pub fn method_not_allowed(message: &str) -> AtomicError {
+        AtomicError {
+            message: message.into(),
+            error_type: AtomicErrorType::MethodNotAllowed,
+            subject: None,
+        }
+    }
+
     #[allow(dead_code)]
     /// A server will probably return a 404.
     pub fn not_found(message: String) -> AtomicError {

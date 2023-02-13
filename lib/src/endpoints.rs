@@ -5,19 +5,39 @@
 
 use crate::{errors::AtomicResult, plugins, urls, Db, Resource, Storelike, Value};
 
-/// The function that is called when the request matches the path
-type HandleFunction =
+/// The function that is called when a POST request matches the path
+type HandleGet =
     fn(subject: url::Url, store: &Db, for_agent: Option<&str>) -> AtomicResult<Resource>;
 
+/// The function that is called when a GET request matches the path
+type HandlePost = fn(context: HandlePostContext) -> AtomicResult<Resource>;
+
+/// Passed to HandlePost
+pub struct HandlePostContext<'a> {
+    pub subject: url::Url,
+    pub store: &'a Db,
+    pub for_agent: Option<&'a str>,
+    pub bytes: Vec<u8>,
+}
 /// An API endpoint at some path which accepts requests and returns some Resource.
 #[derive(Clone)]
 pub struct Endpoint {
     /// The part behind the server domain, e.g. '/versions' or '/collections'. Include the slash.
     pub path: String,
-    /// The function that is called when the request matches the path.
+    /// Called when a GET request matches the path.
     /// If none is given, the endpoint will return the basic Endpoint resource.
-    pub handle: Option<HandleFunction>,
+    pub handle: Option<HandleGet>,
+    /// Called when a POST request matches the path.
+    pub handle_post: Option<HandlePost>,
     /// The list of properties that can be passed to the Endpoint as Query parameters
+    pub params: Vec<String>,
+    pub description: String,
+    pub shortname: String,
+}
+
+pub struct PostEndpoint {
+    pub path: String,
+    pub handle: Option<HandlePost>,
     pub params: Vec<String>,
     pub description: String,
     pub shortname: String,

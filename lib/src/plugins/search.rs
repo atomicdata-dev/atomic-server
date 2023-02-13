@@ -12,5 +12,6 @@ pub fn search_endpoint() -> Endpoint {
       description: "Full text-search endpoint. You can use the keyword `AND` and `OR`, or use `\"` for advanced searches. ".to_string(),
       shortname: "search".to_string(),
       handle: None,
+      handle_post: None,
   }
 }

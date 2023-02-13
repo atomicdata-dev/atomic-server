@@ -4,18 +4,18 @@ use crate::{
     content_types::ContentType,
     errors::AtomicServerResult,
     helpers::{get_client_agent, try_extension},
-    timer::Timer,
 };
 use actix_web::{web, HttpResponse};
 use atomic_lib::Storelike;
+use simple_server_timing_header::Timer;
 
-/// Respond to a single resource.
-/// The URL should match the Subject of the resource.
+/// Respond to a single resource POST request.
 #[tracing::instrument(skip(appstate, req))]
-pub async fn handle_get_resource(
+pub async fn handle_post_resource(
     path: Option<web::Path<String>>,
     appstate: web::Data<AppState>,
     req: actix_web::HttpRequest,
+    body: web::Bytes,
 ) -> AtomicServerResult<HttpResponse> {
     let mut timer = Timer::new();
 
@@ -58,7 +58,7 @@ pub async fn handle_get_resource(
 
     let mut builder = HttpResponse::Ok();
 
-    tracing::debug!("get_resource: {} as {}", subject, content_type.to_mime());
+    tracing::debug!("post_resource: {} as {}", subject, content_type.to_mime());
     builder.append_header(("Content-Type", content_type.to_mime()));
     // This prevents the browser from displaying the JSON response upon re-opening a closed tab
     // https://github.com/atomicdata-dev/atomic-data-rust/issues/137
@@ -67,8 +67,8 @@ pub async fn handle_get_resource(
         "no-store, no-cache, must-revalidate, private",
     ));
 
-    let resource = store.get_resource_extended(&subject, false, for_agent.as_deref())?;
-    timer.add("get_resource");
+    let resource = store.post_resource(&subject, body.into(), for_agent.as_deref())?;
+    timer.add("post_resource");
 
     let response_body = match content_type {
         ContentType::Json => resource.to_json(store)?,
@@ -81,6 +81,6 @@ pub async fn handle_get_resource(
         }
     };
     timer.add("serialize");
-    builder.append_header(("Server-Timing", timer.to_header()));
+    builder.append_header(("Server-Timing", timer.header_value()));
     Ok(builder.body(response_body))
 }
