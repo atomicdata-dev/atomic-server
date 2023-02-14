@@ -23,6 +23,7 @@ use crate::{
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
     storelike::{Query, QueryResult, Storelike},
+    urls,
     values::SortableValue,
     Atom, Resource,
 };
@@ -424,6 +425,7 @@ impl Storelike for Db {
                             url.query_pairs(),
                             &mut resource,
                             for_agent,
+                            None,
                         )?;
                     }
                 }
@@ -555,6 +557,19 @@ impl Storelike for Db {
                     };
                     return fun(handle_post_context);
                 }
+            }
+        }
+        let mut r = self.get_resource(subject)?;
+        for class in r.get_classes(self)? {
+            if let urls::IMPORTER = class.subject.as_str() {
+                let query_params = url::Url::try_from(subject)?;
+                return crate::plugins::importer::construct_importer(
+                    self,
+                    query_params.query_pairs(),
+                    &mut r,
+                    for_agent,
+                    Some(body),
+                );
             }
         }
         Err(AtomicError::method_not_allowed("No endpoint found"))
