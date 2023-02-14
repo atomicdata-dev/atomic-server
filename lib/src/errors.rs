@@ -28,7 +28,7 @@ pub struct AtomicError {
 pub enum AtomicErrorType {
     NotFoundError,
     UnauthorizedError,
-    ParseErrror,
+    ParseError,
     OtherError,
     MethodNotAllowed,
 }
@@ -82,19 +82,22 @@ impl AtomicError {
         property: Option<&str>,
     ) -> AtomicError {
         use std::fmt::Write;
-        let mut msg = "Error parsing JSON-AD".to_string();
+        let mut msg = "Error parsing JSON-AD ".to_string();
         if let Some(prop) = property {
-            let _ = write!(msg, " with property {prop} ");
+            let _ = write!(msg, "with property {prop} ");
         }
         if let Some(subject) = subject {
-            let _ = write!(msg, " of subject {subject} ");
+            let _ = write!(msg, "of subject {subject} ");
         }
+        // remove last space
+        msg.pop();
+        msg.push_str(". ");
         msg.push_str(message);
 
         AtomicError {
             message: msg,
             subject: None,
-            error_type: AtomicErrorType::ParseErrror,
+            error_type: AtomicErrorType::ParseError,
         }
     }
 

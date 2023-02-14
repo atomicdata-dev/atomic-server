@@ -153,9 +153,15 @@ pub fn check_rights(
     } else {
         if for_agent == urls::PUBLIC_AGENT {
             // resource has no parent and agent is not in rights array - check fails
-            return Err(crate::errors::AtomicError::unauthorized(
-                "This resource is not publicly visible. Try signing in".to_string(),
-            ));
+            let action = match right {
+                Right::Read => "readable",
+                Right::Write => "editable",
+                Right::Append => "appendable",
+            };
+            return Err(crate::errors::AtomicError::unauthorized(format!(
+                "This resource is not publicly {}. Try signing in",
+                action,
+            )));
         }
         // resource has no parent and agent is not in rights array - check fails
         Err(crate::errors::AtomicError::unauthorized(format!(

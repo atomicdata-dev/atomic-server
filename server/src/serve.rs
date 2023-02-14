@@ -30,6 +30,9 @@ fn rebuild_indexes(appstate: &crate::appstate::AppState) -> AtomicServerResult<(
     Ok(())
 }
 
+// Increase the maximum payload size (for POSTing a body, for example) to 50MB
+const PAYLOAD_MAX: usize = 50_242_880;
+
 /// Start the server
 pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     println!("Atomic-server {} \nUse --help for instructions. Visit https://docs.atomicdata.dev and https://github.com/atomicdata-dev/atomic-data-rust for more info.", env!("CARGO_PKG_VERSION"));
@@ -47,6 +50,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
         let cors = Cors::permissive();
 
         actix_web::App::new()
+            .app_data(web::PayloadConfig::new(PAYLOAD_MAX))
             .app_data(web::Data::new(appstate.clone()))
             .wrap(cors)
             .wrap(tracing_actix_web::TracingLogger::default())

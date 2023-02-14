@@ -10,6 +10,7 @@ pub type AtomicServerResult<T> = std::result::Result<T, AtomicServerError>;
 pub enum AppErrorType {
     NotFound,
     Unauthorized,
+    MethodNotAllowed,
     Other,
 }
 
@@ -41,6 +42,7 @@ impl ResponseError for AtomicServerError {
     fn status_code(&self) -> StatusCode {
         match self.error_type {
             AppErrorType::NotFound => StatusCode::NOT_FOUND,
+            AppErrorType::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
             AppErrorType::Other => StatusCode::INTERNAL_SERVER_ERROR,
             AppErrorType::Unauthorized => StatusCode::UNAUTHORIZED,
         }
@@ -80,9 +82,11 @@ impl std::fmt::Display for AtomicServerError {
 impl From<atomic_lib::errors::AtomicError> for AtomicServerError {
     fn from(error: atomic_lib::errors::AtomicError) -> Self {
         let error_type = match error.error_type {
-            atomic_lib::errors::AtomicErrorType::NotFoundError => AppErrorType::NotFound,
-            atomic_lib::errors::AtomicErrorType::UnauthorizedError => AppErrorType::Unauthorized,
-            _ => AppErrorType::Other,
+            atomic_lib::AtomicErrorType::NotFoundError => AppErrorType::NotFound,
+            atomic_lib::AtomicErrorType::UnauthorizedError => AppErrorType::Unauthorized,
+            atomic_lib::AtomicErrorType::MethodNotAllowed => AppErrorType::MethodNotAllowed,
+            atomic_lib::AtomicErrorType::ParseError => AppErrorType::Other,
+            atomic_lib::AtomicErrorType::OtherError => AppErrorType::Other,
         };
         let subject = error
             .subject

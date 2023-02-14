@@ -101,7 +101,7 @@ pub fn parse_json_ad_string(
     parse_opts: &ParseOpts,
 ) -> AtomicResult<Vec<Resource>> {
     let parsed: serde_json::Value = serde_json::from_str(string)
-        .map_err(|e| AtomicError::parse_error(&format!("JSON Parsing error: {}", e), None, None))?;
+        .map_err(|e| AtomicError::parse_error(&format!("Invalid JSON: {}", e), None, None))?;
     let mut vec = Vec::new();
     match parsed {
         serde_json::Value::Array(arr) => {
@@ -109,7 +109,7 @@ pub fn parse_json_ad_string(
                 match item {
                     serde_json::Value::Object(obj) => {
                         let resource = json_ad_object_to_resource(obj, store, parse_opts)
-                            .map_err(|e| format!("Unable to parse resource in array. {}", e))?;
+                            .map_err(|e| format!("Unable to process resource in array. {}", e))?;
                         vec.push(resource);
                     }
                     wrong => {
@@ -315,7 +315,7 @@ fn parse_json_ad_map_to_resource(
                         let importer = parse_opts.importer.as_deref().unwrap();
                         if !orig.has_parent(store, importer) {
                             Err(
-                                "Cannot overwrite resource outside of importer! Enable `overwrite_outside`",
+                                format!("Cannot overwrite {subj} outside of importer! Enable `overwrite_outside`"),
                             )?
                         }
                     };
@@ -341,7 +341,11 @@ fn parse_json_ad_map_to_resource(
                     update_index: true,
                 };
 
-                commit.apply_opts(store, &opts)?.resource_new.unwrap()
+                commit
+                    .apply_opts(store, &opts)
+                    .map_err(|e| format!("Failed to save {}: {}", r.get_subject(), e))?
+                    .resource_new
+                    .unwrap()
             }
         };
         Ok(r.into())

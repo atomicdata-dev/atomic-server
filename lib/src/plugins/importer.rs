@@ -11,16 +11,24 @@ pub fn construct_importer(
     query_params: url::form_urlencoded::Parse,
     resource: &mut Resource,
     for_agent: Option<&str>,
+    body: Option<Vec<u8>>,
 ) -> AtomicResult<Resource> {
     let requested_subject = resource.get_subject().to_string();
     let mut url = None;
     let mut json = None;
     for (k, v) in query_params {
         match k.as_ref() {
-            "json" | urls::IMPORTER_URL => json = Some(v.to_string()),
+            "json" | urls::IMPORTER_URL => return Err("JSON must be POSTed in the body".into()),
             "url" | urls::IMPORTER_JSON => url = Some(v.to_string()),
             _ => {}
         }
+    }
+
+    if let Some(body) = body {
+        json =
+            Some(String::from_utf8(body).map_err(|e| {
+                format!("Error while decoding body, expected a JSON string: {}", e)
+            })?);
     }
 
     if let Some(fetch_url) = url {
