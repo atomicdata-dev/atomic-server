@@ -418,12 +418,25 @@ impl Resource {
     ) -> AtomicResult<()> {
         let full_prop = store.get_property(&property)?;
         if let Some(allowed) = full_prop.allows_only {
-            if !allowed.contains(&value.to_string()) {
-                return Err(format!(
-                    "Property '{}' does not allow value '{}'. Allowed: {:?}",
-                    property, value, allowed
-                )
-                .into());
+            let error = Err(format!(
+                "Property '{}' does not allow value '{}'. Allowed: {:?}",
+                property, value, allowed
+            )
+            .into());
+
+            match &value {
+                Value::ResourceArray(value_array) => {
+                    for item in value_array {
+                        if !allowed.contains(&item.to_string()) {
+                            return error;
+                        }
+                    }
+                }
+                _ => {
+                    if !allowed.contains(&value.to_string()) {
+                        return error;
+                    }
+                }
             }
         }
         if full_prop.data_type == value.datatype() {
