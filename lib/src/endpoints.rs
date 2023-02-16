@@ -6,18 +6,28 @@
 use crate::{errors::AtomicResult, plugins, urls, Db, Resource, Storelike, Value};
 
 /// The function that is called when a POST request matches the path
-type HandleGet =
-    fn(subject: url::Url, store: &Db, for_agent: Option<&str>) -> AtomicResult<Resource>;
+type HandleGet = fn(context: HandleGetContext) -> AtomicResult<Resource>;
 
 /// The function that is called when a GET request matches the path
 type HandlePost = fn(context: HandlePostContext) -> AtomicResult<Resource>;
 
-/// Passed to HandlePost
-pub struct HandlePostContext<'a> {
+/// Passed to an Endpoint GET request handler.
+#[derive(Debug)]
+pub struct HandleGetContext<'a> {
+    /// The requested URL, including query parameters
     pub subject: url::Url,
     pub store: &'a Db,
     pub for_agent: Option<&'a str>,
-    pub bytes: Vec<u8>,
+}
+
+/// Passed to an Endpoint POST request handler for.
+#[derive(Debug)]
+pub struct HandlePostContext<'a> {
+    /// The requested URL, including query parameters
+    pub subject: url::Url,
+    pub store: &'a Db,
+    pub for_agent: Option<&'a str>,
+    pub body: Vec<u8>,
 }
 /// An API endpoint at some path which accepts requests and returns some Resource.
 #[derive(Clone)]
@@ -71,5 +81,6 @@ pub fn default_endpoints() -> Vec<Endpoint> {
         plugins::files::upload_endpoint(),
         #[cfg(feature = "html")]
         plugins::bookmark::bookmark_endpoint(),
+        plugins::importer::import_endpoint(),
     ]
 }

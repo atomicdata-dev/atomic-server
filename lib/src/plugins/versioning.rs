@@ -1,7 +1,10 @@
 use tracing::warn;
 
 use crate::{
-    collections::CollectionBuilder, endpoints::Endpoint, errors::AtomicResult, storelike::Query,
+    collections::CollectionBuilder,
+    endpoints::{Endpoint, HandleGetContext},
+    errors::AtomicResult,
+    storelike::Query,
     urls, AtomicError, Commit, Resource, Storelike,
 };
 
@@ -28,14 +31,9 @@ pub fn all_versions_endpoint() -> Endpoint {
     }
 }
 
-#[tracing::instrument(skip(store))]
-fn handle_version_request(
-    url: url::Url,
-    store: &impl Storelike,
-    // TODO: Implement auth
-    for_agent: Option<&str>,
-) -> AtomicResult<Resource> {
-    let params = url.query_pairs();
+#[tracing::instrument]
+fn handle_version_request(context: HandleGetContext) -> AtomicResult<Resource> {
+    let params = context.subject.query_pairs();
     let mut commit_url = None;
     for (k, v) in params {
         if let "commit" = k.as_ref() {
@@ -43,21 +41,21 @@ fn handle_version_request(
         };
     }
     if commit_url.is_none() {
-        return version_endpoint().to_resource(store);
+        return version_endpoint().to_resource(context.store);
     }
-    let mut resource = construct_version(&commit_url.unwrap(), store, for_agent)?;
-    resource.set_subject(url.to_string());
+    let mut resource = construct_version(&commit_url.unwrap(), context.store, context.for_agent)?;
+    resource.set_subject(context.subject.to_string());
     Ok(resource)
 }
 
-#[tracing::instrument(skip(store))]
-fn handle_all_versions_request(
-    url: url::Url,
-    store: &impl Storelike,
-    // TODO: implement auth
-    for_agent: Option<&str>,
-) -> AtomicResult<Resource> {
-    let params = url.query_pairs();
+#[tracing::instrument]
+fn handle_all_versions_request(context: HandleGetContext) -> AtomicResult<Resource> {
+    let HandleGetContext {
+        store,
+        for_agent,
+        subject,
+    } = context;
+    let params = subject.query_pairs();
     let mut target_subject = None;
     for (k, v) in params {
         if let "subject" = k.as_ref() {
@@ -69,7 +67,7 @@ fn handle_all_versions_request(
     }
     let target = target_subject.unwrap();
     let collection_builder = CollectionBuilder {
-        subject: url.to_string(),
+        subject: subject.to_string(),
         property: Some(urls::SUBJECT.into()),
         value: Some(target.clone()),
         sort_by: None,

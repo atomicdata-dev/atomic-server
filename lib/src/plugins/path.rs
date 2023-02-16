@@ -1,4 +1,8 @@
-use crate::{endpoints::Endpoint, errors::AtomicResult, urls, Resource, Storelike};
+use crate::{
+    endpoints::{Endpoint, HandleGetContext},
+    errors::AtomicResult,
+    urls, Resource, Storelike,
+};
 
 pub fn path_endpoint() -> Endpoint {
     Endpoint {
@@ -11,13 +15,14 @@ pub fn path_endpoint() -> Endpoint {
     }
 }
 
-#[tracing::instrument(skip(store))]
-fn handle_path_request(
-    url: url::Url,
-    store: &impl Storelike,
-    for_agent: Option<&str>,
-) -> AtomicResult<Resource> {
-    let params = url.query_pairs();
+#[tracing::instrument]
+fn handle_path_request(context: HandleGetContext) -> AtomicResult<Resource> {
+    let HandleGetContext {
+        store,
+        for_agent,
+        subject,
+    } = context;
+    let params = subject.query_pairs();
     let mut path = None;
     for (k, v) in params {
         if let "path" = k.as_ref() {
@@ -33,7 +38,7 @@ fn handle_path_request(
             store.get_resource_extended(&subject, false, for_agent)
         }
         crate::storelike::PathReturn::Atom(atom) => {
-            let mut resource = Resource::new(url.to_string());
+            let mut resource = Resource::new(subject.to_string());
             resource.set_propval_string(urls::ATOM_SUBJECT.into(), &atom.subject, store)?;
             resource.set_propval_string(urls::ATOM_PROPERTY.into(), &atom.property, store)?;
             resource.set_propval_string(urls::ATOM_VALUE.into(), &atom.value.to_string(), store)?;
