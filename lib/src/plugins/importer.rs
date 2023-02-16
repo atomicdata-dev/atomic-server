@@ -2,29 +2,60 @@
 Importers allow users to (periodically) import JSON-AD files from a remote source.
 */
 
-use crate::{errors::AtomicResult, storelike::Query, urls, Resource, Storelike};
+use crate::{
+    endpoints::{Endpoint, HandleGetContext, HandlePostContext},
+    errors::AtomicResult,
+    urls, Resource, Storelike,
+};
 
-/// When an importer is shown, we list a bunch of Paramaters and a list of previously imported items.
-#[tracing::instrument(skip(store, query_params))]
-pub fn construct_importer(
-    store: &impl Storelike,
-    query_params: url::form_urlencoded::Parse,
-    resource: &mut Resource,
-    for_agent: Option<&str>,
-    body: Option<Vec<u8>>,
-) -> AtomicResult<Resource> {
-    let requested_subject = resource.get_subject().to_string();
+pub fn import_endpoint() -> Endpoint {
+    Endpoint {
+        path: "/import".to_string(),
+        params: [
+            urls::IMPORTER_OVERWRITE_OUTSIDE.to_string(),
+            urls::IMPORTER_PARENT.to_string(),
+            urls::IMPORTER_URL.to_string(),
+        ].into(),
+        description: "Imports one or more Resources to some parent. POST your JSON-AD and add a `parent` query param to the URL. See https://docs.atomicdata.dev/create-json-ad.html".to_string(),
+        shortname: "path".to_string(),
+        // Not sure if we need this, or if we should derive it from `None` here.
+        handle: Some(handle_get),
+        handle_post: Some(handle_post),
+    }
+}
+
+pub fn handle_get(context: HandleGetContext) -> AtomicResult<Resource> {
+    import_endpoint().to_resource(context.store)
+}
+
+/// When an importer is shown, we list a bunch of Parameters and a list of previously imported items.
+#[tracing::instrument]
+pub fn handle_post(context: HandlePostContext) -> AtomicResult<Resource> {
+    let HandlePostContext {
+        store,
+        body,
+        for_agent,
+        subject,
+    } = context;
     let mut url = None;
     let mut json = None;
-    for (k, v) in query_params {
+    let mut parent_maybe = None;
+    let mut overwrite_outside = false;
+    for (k, v) in subject.query_pairs() {
         match k.as_ref() {
             "json" | urls::IMPORTER_URL => return Err("JSON must be POSTed in the body".into()),
             "url" | urls::IMPORTER_JSON => url = Some(v.to_string()),
+            "parent" | urls::IMPORTER_PARENT => parent_maybe = Some(v.to_string()),
+            "overwrite-outside" | urls::IMPORTER_OVERWRITE_OUTSIDE => {
+                overwrite_outside = v == "true"
+            }
             _ => {}
         }
     }
 
-    if let Some(body) = body {
+    let parent = parent_maybe.ok_or("No parent specified for importer")?;
+
+    if !body.is_empty() {
         json =
             Some(String::from_utf8(body).map_err(|e| {
                 format!("Error while decoding body, expected a JSON string: {}", e)
@@ -40,9 +71,8 @@ pub fn construct_importer(
 
     let parse_opts = crate::parse::ParseOpts {
         for_agent: for_agent.map(|a| a.to_string()),
-        importer: Some(requested_subject.clone()),
-        // TODO: allow users to set this to true using a query param
-        overwrite_outside: false,
+        importer: Some(parent),
+        overwrite_outside,
         // We sign the importer Commits with the default agent,
         // not the one performing the import, because we don't have their private key.
         signer: Some(store.get_default_agent()?),
@@ -54,28 +84,13 @@ pub fn construct_importer(
             return Err("No agent specified for importer".to_string().into());
         }
         store.import(&json_string, &parse_opts)?;
+    } else {
+        return Err(
+            "No JSON specified for importer. Pass a `url` query param, or post a JSON-AD body."
+                .to_string()
+                .into(),
+        );
     }
 
-    let q = Query {
-        property: Some(urls::PARENT.into()),
-        value: Some(requested_subject.into()),
-        limit: Some(10),
-        start_val: None,
-        end_val: None,
-        offset: 0,
-        sort_by: None,
-        sort_desc: false,
-        include_nested: true,
-        include_external: false,
-        for_agent: for_agent.map(|s| s.to_string()),
-    };
-    let results = store.query(&q)?;
-
-    resource.set_propval_unsafe(urls::ENDPOINT_RESULTS.into(), results.resources.into());
-    resource.set_propval(
-        urls::ENDPOINT_PARAMETERS.into(),
-        vec![urls::IMPORTER_JSON, urls::IMPORTER_URL].into(),
-        store,
-    )?;
-    Ok(resource.clone())
+    import_endpoint().to_resource(context.store)
 }

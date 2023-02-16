@@ -108,6 +108,11 @@ impl AtomicError {
         r.set_propval_unsafe(urls::DESCRIPTION.into(), Value::String(self.message));
         r
     }
+
+    pub fn set_subject(mut self, subject: &str) -> Self {
+        self.subject = Some(subject.into());
+        self
+    }
 }
 
 impl std::fmt::Display for AtomicError {

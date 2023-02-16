@@ -11,8 +11,12 @@ use url::Url;
 use urlencoding::encode;
 
 use crate::{
-    client::fetch_body, endpoints::Endpoint, errors::AtomicResult, urls, values::Value,
-    AtomicError, Resource, Storelike,
+    client::fetch_body,
+    endpoints::{Endpoint, HandleGetContext},
+    errors::AtomicResult,
+    urls,
+    values::Value,
+    AtomicError, Resource,
 };
 
 type Handler<'s, 'h> = Vec<(Cow<'s, Selector>, ElementContentHandlers<'h>)>;
@@ -28,12 +32,13 @@ pub fn bookmark_endpoint() -> Endpoint {
     }
 }
 
-fn handle_bookmark_request(
-    url: url::Url,
-    store: &impl Storelike,
-    _: Option<&str>,
-) -> AtomicResult<Resource> {
-    let params = url.query_pairs();
+fn handle_bookmark_request(context: HandleGetContext) -> AtomicResult<Resource> {
+    let HandleGetContext {
+        subject,
+        store,
+        for_agent: _,
+    } = context;
+    let params = subject.query_pairs();
     let mut path = None;
     let mut name = None;
 
@@ -52,7 +57,7 @@ fn handle_bookmark_request(
         _ => return bookmark_endpoint().to_resource(store),
     };
 
-    let mut resource = Resource::new(url.to_string());
+    let mut resource = Resource::new(subject.to_string());
     resource.set_class(urls::BOOKMARK);
     resource.set_propval_string(urls::URL.into(), &path, store)?;
 

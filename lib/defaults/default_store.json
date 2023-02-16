@@ -463,6 +463,46 @@
         "https://atomicdata.dev/properties/shortname": "elements"
     },
     {
+        "@id": "https://atomicdata.dev/properties/importer/json",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "A JSON-AD string to be imported. See https://docs.atomicdata.dev/create-json-ad.html",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "json"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/importer/parent",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "The parent to where the Resources will be imported. If a Resource does not have an explicit parent by itself, it will default to this parent. ",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "import-parent"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/importer/url",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+        "https://atomicdata.dev/properties/description": "A URL to a JSON-AD string to be imported. See https://docs.atomicdata.dev/create-json-ad.html",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "url"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties/importer/overwrite-outside",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+        "https://atomicdata.dev/properties/description": "If true, the importer will overwrite Resources that are _outside_ of the parent specified. This could be dangerous, so make sure you trust the source of the data.",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/classes/Property"
+        ],
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/shortname": "overwrite-outside"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/incomplete",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",

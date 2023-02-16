@@ -17,6 +17,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Add `Storelike::post_resource`, which allows plugins to parse HTTP POST requests #592
 - Move Server-Timing header to crate `simple-server-timing-header`
 - Add `POST` + `body` support for Endpoints #592
+- Refactor `Endpoint` handlers, uses a Context now #592
 
 ## [v0.34.1] - 2023-02-11
 

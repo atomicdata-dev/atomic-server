@@ -19,11 +19,10 @@ use crate::{
     atoms::IndexAtom,
     commit::CommitResponse,
     db::{query_index::NO_VALUE, val_prop_sub_index::find_in_val_prop_sub_index},
-    endpoints::{default_endpoints, Endpoint},
+    endpoints::{default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
     storelike::{Query, QueryResult, Storelike},
-    urls,
     values::SortableValue,
     Atom, Resource,
 };
@@ -365,12 +364,18 @@ impl Storelike for Db {
         let endpoint_span = tracing::span!(tracing::Level::TRACE, "Endpoint").entered();
         // Check if the subject matches one of the endpoints
         for endpoint in self.endpoints.iter() {
+            // TODO: starts_with is too grabby, should be more specific
             if url.path().starts_with(&endpoint.path) {
                 // Not all Endpoints have a handle function.
                 // If there is none, return the endpoint plainly.
                 let mut resource = if let Some(handle) = endpoint.handle {
                     // Call the handle function for the endpoint, if it exists.
-                    (handle)(url, self, for_agent).map_err(|e| {
+                    let context: HandleGetContext = HandleGetContext {
+                        subject: url,
+                        store: self,
+                        for_agent,
+                    };
+                    (handle)(context).map_err(|e| {
                         format!("Error handling {} Endpoint: {}", endpoint.shortname, e)
                     })?
                 } else {
@@ -414,18 +419,6 @@ impl Storelike for Db {
                             url.query_pairs(),
                             &mut resource,
                             for_agent,
-                        )?;
-                    }
-                }
-                crate::urls::IMPORTER => {
-                    has_dynamic = true;
-                    if !skip_dynamic {
-                        resource = crate::plugins::importer::construct_importer(
-                            self,
-                            url.query_pairs(),
-                            &mut resource,
-                            for_agent,
-                            None,
                         )?;
                     }
                 }
@@ -545,34 +538,42 @@ impl Storelike for Db {
         for_agent: Option<&str>,
     ) -> AtomicResult<Resource> {
         let endpoints = self.endpoints.iter().filter(|e| e.handle_post.is_some());
+        let subj_url = url::Url::try_from(subject)?;
         for e in endpoints {
+            println!("Checking endpoint: {}", e.path);
             if let Some(fun) = &e.handle_post {
-                let subj_url = url::Url::try_from(subject)?;
                 if subj_url.path() == e.path {
                     let handle_post_context = crate::endpoints::HandlePostContext {
                         store: self,
-                        bytes: body,
+                        body,
                         for_agent,
-                        subject: url::Url::try_from(subject)?,
+                        subject: subj_url,
                     };
                     return fun(handle_post_context);
                 }
             }
         }
-        let mut r = self.get_resource(subject)?;
-        for class in r.get_classes(self)? {
-            if let urls::IMPORTER = class.subject.as_str() {
-                let query_params = url::Url::try_from(subject)?;
-                return crate::plugins::importer::construct_importer(
-                    self,
-                    query_params.query_pairs(),
-                    &mut r,
-                    for_agent,
-                    Some(body),
-                );
-            }
-        }
-        Err(AtomicError::method_not_allowed("No endpoint found"))
+        // If we get Class Handlers with POST, this is where the code goes
+        // let mut r = self.get_resource(subject)?;
+        // for class in r.get_classes(self)? {
+        //     match class.subject.as_str() {
+        //         urls::IMPORTER => {
+        //             let query_params = url::Url::try_from(subject)?;
+        //             return crate::plugins::importer::construct_importer(
+        //                 self,
+        //                 query_params.query_pairs(),
+        //                 &mut r,
+        //                 for_agent,
+        //                 Some(body),
+        //             );
+        //         }
+        //         _ => {}
+        //     }
+        // }
+        Err(
+            AtomicError::method_not_allowed("Cannot post here - no Endpoint Post handler found")
+                .set_subject(subject),
+        )
     }
 
     fn populate(&self) -> AtomicResult<()> {
@@ -625,3 +626,11 @@ fn corrupt_db_message(subject: &str) -> String {
 }
 
 const DB_CORRUPT_MSG: &str = "Could not deserialize item from database. DB is possibly corrupt, could be due to an update or a lack of migrations. Restore to a previous version, export your data and import your data again.";
+
+impl std::fmt::Debug for Db {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Db")
+            .field("server_url", &self.server_url)
+            .finish()
+    }
+}
