@@ -19,7 +19,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     app.service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
         .service(web::resource("/download/{path:[^{}]+}").to(handlers::download::handle_download))
         // This `generate` imports the static files from the `app_assets` folder
-        .service(ResourceFiles::new("/", generate()).skip_handler_when_not_found())
+        .service(
+            ResourceFiles::new("/", generate())
+                .skip_handler_when_not_found()
+                .do_not_resolve_defaults(),
+        )
         // Catch all (non-download) HTML requests and send them to the single page app
         .service(
             web::resource(ANY)
