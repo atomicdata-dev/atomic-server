@@ -10,6 +10,7 @@ use crate::{
 use actix_web::{web, HttpResponse};
 use atomic_lib::{errors::AtomicResult, urls, Db, Resource, Storelike};
 use serde::Deserialize;
+use simple_server_timing_header::Timer;
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, Occur, Query, QueryParser, TermQuery},
@@ -48,6 +49,7 @@ pub async fn search_query(
     params: web::Query<SearchQuery>,
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
+    let mut timer = Timer::new();
     let store = &appstate.store;
     let searcher = appstate.search_state.reader.searcher();
     let fields = crate::search::get_schema_fields(&appstate.search_state)?;
@@ -62,6 +64,7 @@ pub async fn search_query(
     };
 
     let query = query_from_params(&params, &fields, &appstate)?;
+    timer.add("build_query");
     let top_docs = searcher
         .search(
             &query,
@@ -69,6 +72,7 @@ pub async fn search_query(
         )
         .map_err(|e| format!("Error with creating search results: {} ", e))?;
 
+    timer.add("execute_query");
     let subjects = docs_to_subjects(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
@@ -83,9 +87,11 @@ pub async fn search_query(
     results_resource.set_subject(subject.clone());
 
     let resources = get_resources(req, &appstate, &subject, subjects, limit)?;
+    timer.add("get_resources");
     results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
-
     let mut builder = HttpResponse::Ok();
+    builder.append_header(("Server-Timing", timer.header_value()));
+
     // TODO: support other serialization options
     Ok(builder.body(results_resource.to_json_ad()?))
 }
