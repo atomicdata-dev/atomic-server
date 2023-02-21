@@ -114,7 +114,7 @@ There are two ways you can use `tracing` to get insights into performance.
 - Visit jaeger: `http://localhost:16686`
 
 ```sh
-docker run -d --name jaeger \
+docker run -d --platform linux/amd64 --name jaeger \
   -e COLLECTOR_ZIPKIN_HTTP_PORT=9411 \
   -p 5775:5775/udp \
   -p 6831:6831/udp \

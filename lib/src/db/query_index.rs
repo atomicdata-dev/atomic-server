@@ -132,14 +132,9 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
                         subjects.push(subject.into())
                     }
                     Err(e) => match &e.error_type {
-                        crate::AtomicErrorType::NotFoundError => {
-                            println!("Not found: {}", subject)
-                        }
-                        crate::AtomicErrorType::UnauthorizedError => {
-                            println!("Unauthorized: {}", subject)
-                        }
+                        crate::AtomicErrorType::NotFoundError => {}
+                        crate::AtomicErrorType::UnauthorizedError => {}
                         _other => {
-                            println!("Other error: {}", subject);
                             return Err(format!(
                                 "Error when getting resource in collection: {}",
                                 &e

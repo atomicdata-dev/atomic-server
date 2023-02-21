@@ -7,6 +7,9 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- **Requires `--rebuild-index`**
+- Improve full-text search, use JSON fields #335
+- Update tantivy.
 - Parse multiple auth cookies #525
 - Fix `--script` flag
 
