@@ -17,6 +17,7 @@ _Status: Beta. [Status](server/STATUS.md) specifies which features are stable. [
 **Atomic-server is a graph database server for storing and sharing [Atomic Data](https://docs.atomicdata.dev/).
 Demo on [atomicdata.dev](https://atomicdata.dev)**
 
+<!-- List copied from https://github.com/atomicdata-dev/atomic-data-rust/blob/master/README.md -->
 - 🚀  **Fast** (less than 1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
