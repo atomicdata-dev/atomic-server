@@ -17,6 +17,7 @@ use tantivy::{
     tokenizer::Tokenizer,
     Term,
 };
+use tracing::instrument;
 
 type Queries = Vec<(Occur, Box<dyn Query>)>;
 
@@ -34,6 +35,12 @@ pub struct SearchQuery {
     pub filter: Option<String>,
 }
 
+const DEFAULT_RETURN_LIMIT: usize = 30;
+// We fetch extra documents, as the user may not have the rights to the first ones!
+// We filter these results later.
+// https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
+const UNAUTHORIZED_RESULTS_FACTOR: usize = 3;
+
 /// Parses a search query and responds with a list of resources
 #[tracing::instrument(skip(appstate, req))]
 pub async fn search_query(
@@ -44,53 +51,25 @@ pub async fn search_query(
     let store = &appstate.store;
     let searcher = appstate.search_state.reader.searcher();
     let fields = crate::search::get_schema_fields(&appstate.search_state)?;
-    let default_limit = 30;
     let limit = if let Some(l) = params.limit {
         if l > 0 {
             l
         } else {
-            default_limit
+            DEFAULT_RETURN_LIMIT
         }
     } else {
-        default_limit
+        DEFAULT_RETURN_LIMIT
     };
 
-    // With this first limit, we go for a greater number - as the user may not have the rights to the first ones!
-    // We filter these results later.
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
-    let initial_results_limit = 100;
-
-    let mut query_list: Queries = Vec::new();
-
-    if let Some(parent) = &params.parent {
-        let query = build_parent_query(parent, &fields, store)?;
-
-        query_list.push((Occur::Must, Box::new(query)));
-    }
-
-    if let Some(q) = &params.q {
-        let text_query = build_text_query(&fields, q)?;
-
-        query_list.push((Occur::Must, Box::new(text_query)));
-    }
-
-    if let Some(filter) = &params.filter {
-        let filter_query = BoostQuery::new(
-            build_filter_query(&fields, filter, &appstate.search_state.index)?,
-            20.0,
-        );
-
-        query_list.push((Occur::Must, Box::new(filter_query)));
-    }
-
-    let query = BooleanQuery::new(query_list);
-
-    // execute the query
+    let query = query_from_params(&params, &fields, &appstate)?;
     let top_docs = searcher
-        .search(&query, &TopDocs::with_limit(initial_results_limit))
+        .search(
+            &query,
+            &TopDocs::with_limit(limit * UNAUTHORIZED_RESULTS_FACTOR),
+        )
         .map_err(|e| format!("Error with creating search results: {} ", e))?;
 
-    let subjects = docs_to_resources(top_docs, &fields, &searcher)?;
+    let subjects = docs_to_subjects(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
     // You'd think there would be a simpler way of getting the requested URL...
@@ -103,29 +82,7 @@ pub async fn search_query(
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());
 
-    // Default case: return full resources, do authentication
-    let mut resources: Vec<Resource> = Vec::new();
-
-    // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
-    // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/279
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/280
-    let for_agent = crate::helpers::get_client_agent(req.headers(), &appstate, subject)?;
-    for s in subjects {
-        match store.get_resource_extended(&s, true, for_agent.as_deref()) {
-            Ok(r) => {
-                if resources.len() < limit {
-                    resources.push(r);
-                } else {
-                    break;
-                }
-            }
-            Err(_e) => {
-                tracing::debug!("Skipping search result: {} : {}", s, _e);
-                continue;
-            }
-        }
-    }
+    let resources = get_resources(req, &appstate, &subject, subjects, limit)?;
     results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
 
     let mut builder = HttpResponse::Ok();
@@ -140,10 +97,82 @@ pub struct StringAtom {
     pub value: String,
 }
 
+#[instrument(skip(appstate, req))]
+fn get_resources(
+    req: actix_web::HttpRequest,
+    appstate: &web::Data<AppState>,
+    subject: &str,
+    subjects: Vec<String>,
+    limit: usize,
+) -> AtomicServerResult<Vec<Resource>> {
+    // Default case: return full resources, do authentication
+    let mut resources: Vec<Resource> = Vec::new();
+
+    // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
+    // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
+    // https://github.com/atomicdata-dev/atomic-data-rust/issues/279
+    // https://github.com/atomicdata-dev/atomic-data-rust/issues/280/
+    let for_agent = crate::helpers::get_client_agent(req.headers(), appstate, subject.into())?;
+    for s in subjects {
+        match appstate
+            .store
+            .get_resource_extended(&s, true, for_agent.as_deref())
+        {
+            Ok(r) => {
+                if resources.len() < limit {
+                    resources.push(r);
+                } else {
+                    break;
+                }
+            }
+            Err(_e) => {
+                tracing::debug!("Skipping search result: {} : {}", s, _e);
+                continue;
+            }
+        }
+    }
+    Ok(resources)
+}
+
+#[tracing::instrument(skip(appstate))]
+fn query_from_params(
+    params: &SearchQuery,
+    fields: &Fields,
+    appstate: &web::Data<AppState>,
+) -> AtomicServerResult<impl Query> {
+    let mut query_list: Queries = Vec::new();
+
+    if let Some(parent) = &params.parent {
+        let query = build_parent_query(parent, fields, &appstate.store)?;
+
+        query_list.push((Occur::Must, Box::new(query)));
+    }
+
+    if let Some(q) = &params.q {
+        let text_query = build_text_query(fields, q)?;
+
+        query_list.push((Occur::Must, Box::new(text_query)));
+    }
+
+    if let Some(filter) = &params.filter {
+        let filter_query = BoostQuery::new(
+            build_filter_query(fields, filter, &appstate.search_state.index)?,
+            20.0,
+        );
+
+        query_list.push((Occur::Must, Box::new(filter_query)));
+    }
+
+    let query = BooleanQuery::new(query_list);
+
+    Ok(query)
+}
+
 /// Performs both fuzzy and exact queries on the text and description fields.
 /// Boosts titles and exact matches over descriptions and fuzzy matches.
 /// Does not yet search in JSON fields:
 /// https://github.com/atomicdata-dev/atomic-data-rust/issues/597
+#[tracing::instrument]
 fn build_text_query(fields: &Fields, q: &str) -> AtomicResult<impl Query> {
     let mut token_stream = tantivy::tokenizer::SimpleTokenizer.token_stream(q);
     let mut queries: Queries = Vec::new();
@@ -222,7 +251,7 @@ fn unpack_value(
 }
 
 #[tracing::instrument(skip(searcher, docs))]
-fn docs_to_resources(
+fn docs_to_subjects(
     docs: Vec<(f32, tantivy::DocAddress)>,
     fields: &Fields,
     searcher: &tantivy::Searcher,

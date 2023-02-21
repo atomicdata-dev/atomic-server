@@ -11,7 +11,7 @@ pub fn find_in_prop_val_sub_index(store: &Db, prop: &str, val: Option<&Value>) -
     let mut prefix: Vec<u8> = [prop.as_bytes(), &[SEPARATION_BIT]].concat();
     if let Some(value) = val {
         prefix.extend(value.to_sortable_string().as_bytes());
-        prefix.extend(&[SEPARATION_BIT]);
+        prefix.extend([SEPARATION_BIT]);
     }
     Box::new(
         store

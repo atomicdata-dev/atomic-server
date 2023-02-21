@@ -170,14 +170,7 @@ impl Storelike for Store {
 
     // TODO: Fix this for local stores, include external does not make sense here
     fn all_resources(&self, _include_external: bool) -> Box<dyn Iterator<Item = Resource>> {
-        Box::new(
-            self.hashmap
-                .lock()
-                .unwrap()
-                .clone()
-                .into_iter()
-                .map(|(_subject, resource)| resource),
-        )
+        Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
     fn get_server_url(&self) -> &str {

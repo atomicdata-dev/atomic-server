@@ -122,7 +122,7 @@ impl Commit {
         if opts.validate_timestamp {
             check_timestamp(self.created_at)?;
         }
-        let commit_resource: Resource = self.clone().into_resource(store)?;
+        let commit_resource: Resource = self.into_resource(store)?;
         let mut is_new = false;
         // Create a new resource if it doens't exist yet
         let mut resource_old = match store.get_resource(&self.subject) {
@@ -427,7 +427,7 @@ impl Commit {
     /// Creates an identifier using the server_url
     /// Works for both Signed and Unsigned Commits
     #[tracing::instrument(skip(store))]
-    pub fn into_resource(self, store: &impl Storelike) -> AtomicResult<Resource> {
+    pub fn into_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
         let commit_subject = match self.signature.as_ref() {
             Some(sig) => format!("{}/commits/{}", store.get_server_url(), sig),
             None => {
@@ -451,16 +451,16 @@ impl Commit {
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
         );
-        if let Some(set) = self.set {
+        if let Some(set) = &self.set {
             let mut newset = PropVals::new();
             for (prop, val) in set {
-                newset.insert(prop, val);
+                newset.insert(prop.into(), val.clone());
             }
             resource.set_propval_unsafe(urls::SET.into(), newset.into());
         };
-        if let Some(remove) = self.remove {
+        if let Some(remove) = &self.remove {
             if !remove.is_empty() {
-                resource.set_propval_unsafe(urls::REMOVE.into(), remove.into());
+                resource.set_propval_unsafe(urls::REMOVE.into(), remove.clone().into());
             }
         };
         if let Some(destroy) = self.destroy {
@@ -468,22 +468,22 @@ impl Commit {
                 resource.set_propval_unsafe(urls::DESTROY.into(), true.into());
             }
         }
-        if let Some(previous_commit) = self.previous_commit {
+        if let Some(previous_commit) = &self.previous_commit {
             resource.set_propval_unsafe(
                 urls::PREVIOUS_COMMIT.into(),
-                Value::AtomicUrl(previous_commit),
+                Value::AtomicUrl(previous_commit.into()),
             );
         }
         resource.set_propval_unsafe(
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
         );
-        if let Some(signature) = self.signature {
-            resource.set_propval_unsafe(urls::SIGNATURE.into(), signature.into());
+        if let Some(signature) = &self.signature {
+            resource.set_propval_unsafe(urls::SIGNATURE.into(), signature.clone().into());
         }
-        if let Some(push) = self.push {
+        if let Some(push) = &self.push {
             if !push.is_empty() {
-                resource.set_propval_unsafe(urls::PUSH.into(), push.into());
+                resource.set_propval_unsafe(urls::PUSH.into(), push.clone().into());
             }
         }
         Ok(resource)
@@ -500,7 +500,7 @@ impl Commit {
         &self,
         store: &impl Storelike,
     ) -> AtomicResult<String> {
-        let mut commit_resource = self.clone().into_resource(store)?;
+        let mut commit_resource = self.into_resource(store)?;
         // A deterministic serialization should not contain the hash (signature), since that would influence the hash.
         commit_resource.remove_propval(urls::SIGNATURE);
         let json_obj =

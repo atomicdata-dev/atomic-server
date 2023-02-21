@@ -119,7 +119,7 @@ pub fn post_commit_custom_endpoint(
     commit: &crate::Commit,
     store: &impl Storelike,
 ) -> AtomicResult<()> {
-    let json = commit.clone().into_resource(store)?.to_json_ad()?;
+    let json = commit.into_resource(store)?.to_json_ad()?;
 
     let agent = ureq::builder()
         .timeout(std::time::Duration::from_secs(2))

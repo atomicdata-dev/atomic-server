@@ -102,7 +102,7 @@ pub fn after_apply_commit_message(
         let commit = commit_builder.sign(&store.get_default_agent()?, store, &chat_room)?;
 
         let commit_response = CommitResponse {
-            commit_resource: commit.clone().into_resource(store)?,
+            commit_resource: commit.into_resource(store)?,
             resource_new: None,
             resource_old: None,
             commit_struct: commit,

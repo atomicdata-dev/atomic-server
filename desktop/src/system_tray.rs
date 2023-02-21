@@ -1,8 +1,6 @@
-use tauri::api::shell;
-use tauri::window::WindowBuilder;
 use tauri::{
-  AppHandle, CustomMenuItem, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu,
-  SystemTrayMenuItem, WindowUrl,
+  api::shell, window::WindowBuilder, AppHandle, CustomMenuItem, Manager, SystemTray,
+  SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowUrl,
 };
 
 pub fn build() -> SystemTray {

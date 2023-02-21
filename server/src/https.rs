@@ -114,7 +114,7 @@ async fn cert_init_server(
     fs::create_dir_all(&challenge_path)?;
     challenge_path.push(&challenge.token);
     // let challenge_file_content = format!("{}.{}", challenge.token, key_auth.as_str());
-    fs::write(challenge_path, &key_auth.as_str())?;
+    fs::write(challenge_path, key_auth.as_str())?;
 
     let (tx, rx) = mpsc::channel();
 
