@@ -62,21 +62,21 @@ pub async fn search_query(
 
     let mut query_list: Queries = Vec::new();
 
-    if let Some(parent) = params.parent.clone() {
+    if let Some(parent) = &params.parent {
         let query = build_parent_query(parent, &fields, store)?;
 
         query_list.push((Occur::Must, Box::new(query)));
     }
 
-    if let Some(q) = params.q.clone() {
-        let text_query = build_text_query(&fields, &q)?;
+    if let Some(q) = &params.q {
+        let text_query = build_text_query(&fields, q)?;
 
         query_list.push((Occur::Must, Box::new(text_query)));
     }
 
-    if let Some(filter) = params.filter.clone() {
+    if let Some(filter) = &params.filter {
         let filter_query = BoostQuery::new(
-            build_filter_query(&fields, &filter, &appstate.search_state.index)?,
+            build_filter_query(&fields, filter, &appstate.search_state.index)?,
             20.0,
         );
 
@@ -195,12 +195,8 @@ fn build_filter_query(
 }
 
 #[tracing::instrument(skip(store))]
-fn build_parent_query(
-    subject: String,
-    fields: &Fields,
-    store: &Db,
-) -> AtomicServerResult<TermQuery> {
-    let resource = store.get_resource(subject.as_str())?;
+fn build_parent_query(subject: &str, fields: &Fields, store: &Db) -> AtomicServerResult<TermQuery> {
+    let resource = store.get_resource(subject)?;
     let facet = resource_to_facet(&resource, store)?;
     let term = Term::from_facet(fields.hierarchy, &facet);
 
