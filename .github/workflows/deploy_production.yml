@@ -1,4 +1,4 @@
-name: Deployment Staging
+name: Deployment Production
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
     branches:
       - 'master'
 jobs:
-  deploy-staging:
+  deploy-production:
     uses: './.github/workflows/deployment.yml'
     with:
       environment: production
