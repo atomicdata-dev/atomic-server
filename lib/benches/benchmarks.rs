@@ -77,7 +77,7 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("all_resources()", |b| {
         b.iter(|| {
-            store.all_resources(false);
+            let _all = store.all_resources(false).collect::<Vec<Resource>>();
         })
     });
 }

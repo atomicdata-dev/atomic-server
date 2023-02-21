@@ -133,12 +133,12 @@ fn prompt_field(
     match &property.data_type {
         DataType::String | DataType::Markdown => {
             let msg = format!("string{}", msg_appendix);
-            input = prompt_opt(&msg)?;
+            input = prompt_opt(msg)?;
             return Ok(input);
         }
         DataType::Slug => {
             let msg = format!("slug{}", msg_appendix);
-            input = prompt_opt(&msg)?;
+            input = prompt_opt(msg)?;
             let re = Regex::new(atomic_lib::values::SLUG_REGEX)?;
             match input {
                 Some(slug) => {
@@ -153,7 +153,7 @@ fn prompt_field(
         }
         DataType::Integer => {
             let msg = format!("integer{}", msg_appendix);
-            let number: Option<u32> = prompt_opt(&msg)?;
+            let number: Option<u32> = prompt_opt(msg)?;
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
@@ -163,7 +163,7 @@ fn prompt_field(
         }
         DataType::Float => {
             let msg = format!("float{}", msg_appendix);
-            let number: Option<f64> = prompt_opt(&msg)?;
+            let number: Option<f64> = prompt_opt(msg)?;
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
@@ -173,7 +173,7 @@ fn prompt_field(
         }
         DataType::Date => {
             let msg = format!("date YYYY-MM-DD{}", msg_appendix);
-            let date: Option<String> = prompt_opt(&msg).unwrap();
+            let date: Option<String> = prompt_opt(msg).unwrap();
             let re = Regex::new(atomic_lib::values::DATE_REGEX).unwrap();
             match date {
                 Some(date_val) => {
@@ -259,7 +259,7 @@ fn prompt_field(
         },
         DataType::Timestamp => {
             let msg = format!("timestamp{}", msg_appendix);
-            let number: Option<u64> = prompt_opt(&msg)?;
+            let number: Option<u64> = prompt_opt(msg)?;
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
@@ -272,7 +272,7 @@ fn prompt_field(
                 "unsupported datatype {}, defaulting to string{}",
                 unsup, msg_appendix
             );
-            let string: Option<String> = prompt_opt(&msg)?;
+            let string: Option<String> = prompt_opt(msg)?;
             match string {
                 Some(nr) => {
                     input = Some(nr);
@@ -282,7 +282,7 @@ fn prompt_field(
         }
         DataType::Boolean => {
             let msg = format!("boolean{}", msg_appendix);
-            let number: Option<bool> = prompt_opt(&msg)?;
+            let number: Option<bool> = prompt_opt(msg)?;
             match number {
                 Some(nr) => {
                     if nr {
