@@ -17,6 +17,7 @@ use serde::Deserialize;
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, QueryParser},
+    tokenizer::Tokenizer,
 };
 
 type Queries = Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)>;
@@ -29,11 +30,9 @@ pub struct SearchQuery {
     pub include: Option<bool>,
     /// Maximum amount of results
     pub limit: Option<usize>,
-    /// Filter by Property URL
-    pub property: Option<String>,
     /// Only include resources that have this resource as its ancestor
     pub parent: Option<String>,
-    /// Filter based on props
+    /// Filter based on props, using tantivy QueryParser syntax
     pub filter: Option<String>,
 }
 
@@ -144,18 +143,24 @@ pub struct StringAtom {
 }
 
 fn build_fuzzy_query(fields: &Fields, q: &str) -> impl tantivy::query::Query {
-    let title_term = tantivy::Term::from_field_text(fields.title, q);
-    let description_term = tantivy::Term::from_field_text(fields.description, q);
-    let title_query = tantivy::query::FuzzyTermQuery::new_prefix(title_term, 1, true);
-    let description_query = tantivy::query::FuzzyTermQuery::new_prefix(description_term, 1, true);
+    let mut token_stream = tantivy::tokenizer::SimpleTokenizer.token_stream(q);
+    type Queries = Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)>;
+    let mut queries: Queries = Vec::new();
+    // Parse every word (Token) from the Query, and for each word, create a FuzzyQuery
+    token_stream.process(&mut |token| {
+        let text = &token.text;
+        let title_term = tantivy::Term::from_field_text(fields.title, text);
+        let description_term = tantivy::Term::from_field_text(fields.description, text);
+        let title_query = tantivy::query::FuzzyTermQuery::new_prefix(title_term, 1, true);
+        let description_query =
+            tantivy::query::FuzzyTermQuery::new_prefix(description_term, 1, true);
 
-    let queries: Queries = vec![
-        (
+        queries.push((
             tantivy::query::Occur::Should,
             Box::new(BoostQuery::new(Box::new(title_query), 2.0)),
-        ),
-        (tantivy::query::Occur::Should, Box::new(description_query)),
-    ];
+        ));
+        queries.push((tantivy::query::Occur::Should, Box::new(description_query)));
+    });
 
     BooleanQuery::from(queries)
 }
@@ -166,14 +171,11 @@ fn build_query(
     q: &str,
     index: &tantivy::Index,
 ) -> AtomicResult<Box<dyn tantivy::query::Query>> {
-    // construct the query
     let query_parser = QueryParser::for_index(index, vec![fields.propvals]);
 
-    let query_text = q.to_string();
-
     let query = query_parser
-        .parse_query(&query_text)
-        .map_err(|e| format!("Error parsing query {}", e))?;
+        .parse_query(q)
+        .map_err(|e| format!("Error parsing query: {}", e))?;
 
     Ok(query)
 }
@@ -214,7 +216,7 @@ fn unpack_value(
 fn docs_to_resources(
     docs: Vec<(f32, tantivy::DocAddress)>,
     fields: &Fields,
-    searcher: &tantivy::LeasedItem<tantivy::Searcher>,
+    searcher: &tantivy::Searcher,
 ) -> Result<Vec<String>, AtomicServerError> {
     let mut subjects: HashSet<String> = HashSet::new();
 
