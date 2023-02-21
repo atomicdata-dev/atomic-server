@@ -1,10 +1,6 @@
 //! Full-text search is achieved with the Tantivy crate.
 //! The index is built whenever --rebuild-index is passed,
 //! or after a commit is processed by the CommitMonitor.
-//! Tantivy requires a strict schema, whereas Atomic is dynamic.
-//! We deal with this discrepency by
-
-use std::collections::HashSet;
 
 use crate::{
     appstate::AppState,
@@ -17,6 +13,7 @@ use serde::Deserialize;
 use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, QueryParser},
+    schema::IndexRecordOption,
     tokenizer::Tokenizer,
 };
 
@@ -71,18 +68,18 @@ pub async fn search_query(
     }
 
     if let Some(q) = params.q.clone() {
-        let fuzzy_query = build_fuzzy_query(&fields, &q);
+        let text_query = build_text_query(&fields, &q)?;
 
-        query_list.push((tantivy::query::Occur::Must, Box::new(fuzzy_query)));
+        query_list.push((tantivy::query::Occur::Must, Box::new(text_query)));
     }
 
     if let Some(filter) = params.filter.clone() {
-        let exact_query = BoostQuery::new(
-            build_query(&fields, &filter, &appstate.search_state.index)?,
+        let filter_query = BoostQuery::new(
+            build_filter_query(&fields, &filter, &appstate.search_state.index)?,
             20.0,
         );
 
-        query_list.push((tantivy::query::Occur::Must, Box::new(exact_query)));
+        query_list.push((tantivy::query::Occur::Must, Box::new(filter_query)));
     }
 
     let query = BooleanQuery::new(query_list);
@@ -142,39 +139,56 @@ pub struct StringAtom {
     pub value: String,
 }
 
-fn build_fuzzy_query(fields: &Fields, q: &str) -> impl tantivy::query::Query {
+/// Performs both fuzzy and exact queries on the text and description fields.
+/// Boosts titles and exact matches over descriptions and fuzzy matches.
+/// Does not yet search in JSON fields:
+/// https://github.com/atomicdata-dev/atomic-data-rust/issues/597
+fn build_text_query(fields: &Fields, q: &str) -> AtomicResult<impl tantivy::query::Query> {
     let mut token_stream = tantivy::tokenizer::SimpleTokenizer.token_stream(q);
-    type Queries = Vec<(tantivy::query::Occur, Box<dyn tantivy::query::Query>)>;
     let mut queries: Queries = Vec::new();
-    // Parse every word (Token) from the Query, and for each word, create a FuzzyQuery
+    // for every word, create a fuzzy query and an exact query
     token_stream.process(&mut |token| {
-        let text = &token.text;
-        let title_term = tantivy::Term::from_field_text(fields.title, text);
-        let description_term = tantivy::Term::from_field_text(fields.description, text);
-        let title_query = tantivy::query::FuzzyTermQuery::new_prefix(title_term, 1, true);
-        let description_query =
-            tantivy::query::FuzzyTermQuery::new_prefix(description_term, 1, true);
+        let word = &token.text;
+        let title_term = tantivy::Term::from_field_text(fields.title, word);
+        let description_term = tantivy::Term::from_field_text(fields.description, word);
+        let title_fuzzy = tantivy::query::FuzzyTermQuery::new_prefix(title_term.clone(), 1, true);
+        let description_fuzzy =
+            tantivy::query::FuzzyTermQuery::new_prefix(description_term.clone(), 1, true);
+        let title_exact = tantivy::query::TermQuery::new(title_term, IndexRecordOption::Basic);
+        let description_exact =
+            tantivy::query::TermQuery::new(description_term, IndexRecordOption::Basic);
 
+        // Boost the title higher than the description
         queries.push((
             tantivy::query::Occur::Should,
-            Box::new(BoostQuery::new(Box::new(title_query), 2.0)),
+            Box::new(BoostQuery::new(Box::new(title_exact), 10.)),
         ));
-        queries.push((tantivy::query::Occur::Should, Box::new(description_query)));
+        queries.push((
+            tantivy::query::Occur::Should,
+            Box::new(BoostQuery::new(Box::new(description_exact), 2.0)),
+        ));
+
+        // Rank exact higher than fuzzy
+        queries.push((
+            tantivy::query::Occur::Should,
+            Box::new(BoostQuery::new(Box::new(title_fuzzy), 4.0)),
+        ));
+        queries.push((tantivy::query::Occur::Should, Box::new(description_fuzzy)));
     });
 
-    BooleanQuery::from(queries)
+    Ok(BooleanQuery::from(queries))
 }
 
 #[tracing::instrument(skip(index))]
-fn build_query(
+fn build_filter_query(
     fields: &Fields,
-    q: &str,
+    tantivy_query_syntax: &str,
     index: &tantivy::Index,
 ) -> AtomicResult<Box<dyn tantivy::query::Query>> {
     let query_parser = QueryParser::for_index(index, vec![fields.propvals]);
 
     let query = query_parser
-        .parse_query(q)
+        .parse_query(tantivy_query_syntax)
         .map_err(|e| format!("Error parsing query: {}", e))?;
 
     Ok(query)
@@ -218,7 +232,7 @@ fn docs_to_resources(
     fields: &Fields,
     searcher: &tantivy::Searcher,
 ) -> Result<Vec<String>, AtomicServerError> {
-    let mut subjects: HashSet<String> = HashSet::new();
+    let mut subjects: Vec<String> = Vec::new();
 
     // convert found documents to resources
     for (_score, doc_address) in docs {
@@ -226,8 +240,9 @@ fn docs_to_resources(
         let subject_val = retrieved_doc.get_first(fields.subject).ok_or("No 'subject' in search doc found. This is required when indexing. Run with --rebuild-index")?;
 
         let subject = unpack_value(subject_val, &retrieved_doc, "Subject".to_string())?;
-
-        subjects.insert(subject.clone());
+        if !subjects.contains(&subject) {
+            subjects.push(subject.clone());
+        }
     }
 
     Ok(subjects.into_iter().collect())
