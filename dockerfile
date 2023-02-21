@@ -9,8 +9,6 @@ COPY --chmod=0755 --from=builder /app/target/release/atomic-server /atomic-serve
 ENV ATOMIC_STORE_PATH="/atomic-storage/db"
 ENV ATOMIC_CONFIG_PATH="/atomic-storage/config.toml"
 ENV ATOMIC_PORT="80"
-ENV ATOMIC_PORT_HTTPS="433"
 EXPOSE 80
-EXPOSE 433
 VOLUME /atomic-storage
 ENTRYPOINT ["/atomic-server-bin"]
