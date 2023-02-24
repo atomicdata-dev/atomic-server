@@ -62,11 +62,8 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
 
     // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
     tracing::info!("Starting commit monitor");
-    let commit_monitor = crate::commit_monitor::create_commit_monitor(
-        store.clone(),
-        search_state.clone(),
-        config.clone(),
-    );
+    let commit_monitor =
+        crate::commit_monitor::create_commit_monitor(store.clone(), search_state.clone());
 
     let commit_monitor_clone = commit_monitor.clone();
 

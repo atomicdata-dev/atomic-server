@@ -4,7 +4,6 @@
 
 use crate::{
     actor_messages::{CommitMessage, Subscribe},
-    config::Config,
     errors::AtomicServerResult,
     handlers::web_sockets::WebSocketConnection,
     search::SearchState,
@@ -24,7 +23,6 @@ pub struct CommitMonitor {
     subscriptions: HashMap<String, HashSet<Addr<WebSocketConnection>>>,
     store: Db,
     search_state: SearchState,
-    config: Config,
     last_search_commit: chrono::DateTime<Local>,
     run_expensive_next_tick: bool,
 }
@@ -173,17 +171,12 @@ impl Handler<CommitMessage> for CommitMonitor {
 }
 
 /// Spawns a commit monitor actor
-pub fn create_commit_monitor(
-    store: Db,
-    search_state: SearchState,
-    config: Config,
-) -> Addr<CommitMonitor> {
+pub fn create_commit_monitor(store: Db, search_state: SearchState) -> Addr<CommitMonitor> {
     crate::commit_monitor::CommitMonitor::create(|_ctx: &mut Context<CommitMonitor>| {
         CommitMonitor {
             subscriptions: HashMap::new(),
             store,
             search_state,
-            config,
             run_expensive_next_tick: false,
             last_search_commit: chrono::Local::now(),
         }
