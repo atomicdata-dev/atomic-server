@@ -19,9 +19,10 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_INITIALIZE")]
     pub initialize: bool,
 
-    /// Re-creates the value index. Parses all the resources. Do this if your collections have issues.
+    /// Re-builds the indexes. Parses all the resources.
+    /// Do this when updating requires it, or if you have issues with Collections / Queries / Search.
     #[clap(long, env = "ATOMIC_REBUILD_INDEX")]
-    pub rebuild_index: bool,
+    pub rebuild_indexes: bool,
 
     /// Use staging environments for services like LetsEncrypt
     #[clap(long, env = "ATOMIC_DEVELOPMENT")]
@@ -62,10 +63,6 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_EMAIL")]
     pub email: Option<String>,
 
-    /// Endpoint where the front-end assets are hosted
-    #[clap(long, default_value = "/app_assets", env = "ATOMIC_ASSET_URL")]
-    pub asset_url: String,
-
     /// Custom JS script to include in the body of the HTML template
     #[clap(long, default_value = "", env = "ATOMIC_SCRIPT")]
     pub script: String,
@@ -77,10 +74,6 @@ pub struct Opts {
     /// Path for atomic data store folder. Contains your Store, uploaded files and more. Default value depends on your OS.
     #[clap(long, env = "ATOMIC_DATA_DIR")]
     pub data_dir: Option<PathBuf>,
-
-    /// By default, Atomic-Server keeps previous versions of resources indexed in Search. When enabling this flag, previous versions of resources are removed from the search index when their values are updated.
-    #[clap(long, env = "ATOMIC_REMOVE_PREVIOUS_SEARCH")]
-    pub remove_previous_search: bool,
 
     /// CAUTION: Skip authentication checks, making all data publicly readable. Improves performance.
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]

@@ -72,7 +72,7 @@ pub fn build_schema() -> AtomicServerResult<tantivy::schema::Schema> {
 pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, Index)> {
     let schema = build_schema()?;
     std::fs::create_dir_all(&config.search_index_path)?;
-    if config.opts.rebuild_index {
+    if config.opts.rebuild_indexes {
         std::fs::remove_dir_all(&config.search_index_path)?;
         std::fs::create_dir_all(&config.search_index_path)?;
     }

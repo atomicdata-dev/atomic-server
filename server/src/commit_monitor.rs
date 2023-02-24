@@ -119,9 +119,9 @@ impl CommitMonitor {
 
         // Update the search index
         if let Some(resource) = &msg.commit_response.resource_new {
-            if self.config.opts.remove_previous_search {
-                crate::search::remove_resource(&self.search_state, &target)?;
-            };
+            // We could one day re-(allow) to keep old resources,
+            // but then we also should index the older versions when re-indexing.
+            crate::search::remove_resource(&self.search_state, &target)?;
             // Add new resource to search index
             crate::search::add_resource(&self.search_state, resource, &self.store)?;
             self.run_expensive_next_tick = true;

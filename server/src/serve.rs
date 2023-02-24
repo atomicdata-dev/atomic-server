@@ -4,7 +4,7 @@ use atomic_lib::Storelike;
 
 use crate::errors::AtomicServerResult;
 
-fn rebuild_index(appstate: &crate::appstate::AppState) -> AtomicServerResult<()> {
+fn rebuild_indexes(appstate: &crate::appstate::AppState) -> AtomicServerResult<()> {
     let appstate_clone = appstate.clone();
 
     actix_web::rt::spawn(async move {
@@ -39,8 +39,8 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     let appstate = crate::appstate::init(config.clone())?;
 
     // Start async processes
-    if config.opts.rebuild_index {
-        rebuild_index(&appstate)?;
+    if config.opts.rebuild_indexes {
+        rebuild_indexes(&appstate)?;
     }
 
     let server = HttpServer::new(move || {
