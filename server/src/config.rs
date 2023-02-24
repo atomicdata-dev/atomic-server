@@ -91,16 +91,16 @@ pub struct Opts {
     pub server_url: Option<String>,
 
     /// How much logs you want. Also influences what is sent to your trace service, if you've set one (e.g. OpenTelemetry)
-    #[clap(arg_enum, long, default_value = "info", env = "RUST_LOG")]
+    #[clap(value_enum, long, default_value = "info", env = "RUST_LOG")]
     pub log_level: LogLevel,
 
     /// How you want to trace what's going on with the server. Useful for monitoring performance and errors in production.
     /// Combine with `log_level` to get more or less data (`trace` is the most verbose)
-    #[clap(arg_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
+    #[clap(value_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
     pub trace: Tracing,
 }
 
-#[derive(clap::ArgEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Clone, Debug)]
 pub enum Tracing {
     /// Log to STDOUT in your terminal
     Stdout,
@@ -110,7 +110,7 @@ pub enum Tracing {
     Opentelemetry,
 }
 
-#[derive(clap::ArgEnum, Clone, Debug)]
+#[derive(clap::ValueEnum, Clone, Debug)]
 pub enum LogLevel {
     Warn,
     Info,
@@ -127,8 +127,8 @@ pub enum Command {
     #[clap(name = "import", trailing_var_arg = true)]
     Import(ImportOpts),
     /// Creates a `.env` file in your current directory that shows various options that you can set.
-    #[clap(name = "setup-env")]
-    SetupEnv,
+    #[clap(name = "generate-dotenv")]
+    CreateDotEnv,
     /// Returns the currently selected options, based on the passed flags and parsed environment variables.
     #[clap(name = "show-config")]
     ShowConfig,
@@ -251,7 +251,6 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     let mut search_index_path = cache_dir.to_owned();
     search_index_path.push("search_index");
 
-    // Make sure to also edit the `default.env` if you introduce / change environment variables here.
     for (key, value) in env::vars() {
         match &*key {
             "ATOMIC_CONFIG_FILE_PATH" => {

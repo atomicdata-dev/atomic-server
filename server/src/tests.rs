@@ -13,7 +13,6 @@ use actix_web::{
     App,
 };
 use atomic_lib::{urls, Storelike};
-use clap::StructOpt;
 
 /// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
 fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
@@ -34,6 +33,7 @@ fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
 #[actix_rt::test]
 async fn server_tests() {
     let unique_string = atomic_lib::utils::random_string(10);
+    use clap::Parser;
     let opts = Opts::parse_from([
         "atomic-server",
         "--initialize",

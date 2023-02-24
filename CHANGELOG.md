@@ -12,6 +12,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Update tantivy.
 - Parse multiple auth cookies #525
 - Fix `--script` flag
+- Rename `setup-env` to `generate-dotenv` and build it from clap #599
 
 ## [v0.34.1] - 2023-02-11
 

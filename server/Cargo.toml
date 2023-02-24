@@ -85,7 +85,7 @@ version = "0.34.0"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
-version = "3"
+version = "4"
 
 [dependencies.rustls]
 optional = true
