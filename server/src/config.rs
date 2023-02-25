@@ -93,11 +93,11 @@ pub struct Opts {
     #[clap(value_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
     pub trace: Tracing,
 
-    /// Add this if you want so send e-mails (e.g. on user registration)
+    /// Host address of an SMTP server. Add if you want so send e-mails (e.g. for user registration). Also set the port.
     #[clap(long, env = "ATOMIC_SMTP_HOST")]
     pub smpt_host: Option<String>,
 
-    /// Useful for debugging e-mails during development, or if your SMTP server has an unconventional port number.
+    /// Port of your SMTP server.
     #[clap(long, env = "ATOMIC_SMTP_PORT", default_value = "25")]
     pub smpt_port: u16,
 
