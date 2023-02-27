@@ -10,7 +10,7 @@ use atomic_lib::Storelike;
 use percent_encoding::percent_decode_str;
 use std::str::FromStr;
 
-use crate::content_types::ContentType;
+use crate::content_types::{get_accept, ContentType};
 use crate::errors::{AppErrorType, AtomicServerError};
 use crate::{appstate::AppState, errors::AtomicServerResult};
 
@@ -290,7 +290,9 @@ pub fn get_subject(
     req: &actix_web::HttpRequest,
     conn: &actix_web::dev::ConnectionInfo,
     appstate: &AppState,
-) -> AtomicServerResult<String> {
+) -> AtomicServerResult<(String, ContentType)> {
+    let content_type = get_accept(req.headers());
+
     let domain = &appstate.config.opts.domain;
     let host = conn.host();
     let subdomain = if let Some(index) = host.find(domain) {
@@ -309,23 +311,48 @@ pub fn get_subject(
     }
     let server_without_last_slash = subject_url.to_string().trim_end_matches('/').to_string();
     let subject = format!("{}{}", server_without_last_slash, &req.uri().to_string());
-    Ok(subject)
+    // if let Some((ct, path)) = try_extension(req.path()) {
+    //     content_type = ct;
+    //     return Ok((path.to_string(), content_type));
+    // }
+    Ok((subject, content_type))
 }
 
-/// Finds the extension
-pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
-    let items: Vec<&str> = path.split('.').collect();
-    if items.len() == 2 {
-        let path = items[0];
-        let content_type = match items[1] {
-            "json" => ContentType::Json,
-            "jsonld" => ContentType::JsonLd,
-            "jsonad" => ContentType::JsonAd,
-            "html" => ContentType::Html,
-            "ttl" => ContentType::Turtle,
-            _ => return None,
-        };
-        return Some((content_type, path));
+/// Finds the extension of a supported serialization format.
+/// Not used right now, see: https://github.com/atomicdata-dev/atomic-data-rust/issues/601
+#[allow(dead_code)]
+fn try_extension(path: &str) -> Option<(ContentType, &str)> {
+    // Check if path ends with one of the folliwing extensions
+    let extensions = [
+        ".json",
+        ".jsonld",
+        ".jsonad",
+        ".html",
+        ".ttl",
+        ".nt",
+        ".nq",
+        ".ntriples",
+        ".nt",
+    ];
+    let mut found = None;
+    for ext in extensions.iter() {
+        if path.ends_with(ext) {
+            println!("Found extension: {}", ext);
+            let path = &path[0..path.len() - ext.len()];
+            let content_type = match *ext {
+                ".json" => Some(ContentType::Json),
+                ".jsonld" => Some(ContentType::JsonLd),
+                ".jsonad" => Some(ContentType::JsonAd),
+                ".html" => Some(ContentType::Html),
+                ".ttl" => Some(ContentType::Turtle),
+                ".nt" => Some(ContentType::NTriples),
+                ".ntriples" => Some(ContentType::NTriples),
+                _ => None,
+            };
+            if let Some(ct) = content_type {
+                found = Some((ct, path));
+            }
+        }
     }
-    None
+    found
 }
