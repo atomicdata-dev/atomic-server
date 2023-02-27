@@ -311,3 +311,21 @@ pub fn get_subject(
     let subject = format!("{}{}", server_without_last_slash, &req.uri().to_string());
     Ok(subject)
 }
+
+/// Finds the extension
+pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
+    let items: Vec<&str> = path.split('.').collect();
+    if items.len() == 2 {
+        let path = items[0];
+        let content_type = match items[1] {
+            "json" => ContentType::Json,
+            "jsonld" => ContentType::JsonLd,
+            "jsonad" => ContentType::JsonAd,
+            "html" => ContentType::Html,
+            "ttl" => ContentType::Turtle,
+            _ => return None,
+        };
+        return Some((content_type, path));
+    }
+    None
+}
