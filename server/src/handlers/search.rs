@@ -80,7 +80,7 @@ pub async fn search_query(
     let subjects = docs_to_subjects(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
-    let subject: String = get_subject(&req, &conn, &appstate)?;
+    let (subject, _) = get_subject(&req, &conn, &appstate)?;
 
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());

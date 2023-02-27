@@ -347,7 +347,7 @@ fn parse_json_ad_map_to_resource(
                     validate_timestamp: false,
                     validate_rights: parse_opts.for_agent != ForAgent::Sudo,
                     validate_previous_commit: false,
-                    validate_for_agent: parse_opts.for_agent.clone(),
+                    validate_for_agent: Some(parse_opts.for_agent.to_string()),
                     validate_subject_url_parent: true,
                     update_index: true,
                 };

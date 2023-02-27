@@ -35,7 +35,7 @@ pub async fn upload_handler(
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
     let parent = store.get_resource(&query.parent)?;
-    let subject = get_subject(&req, &conn, &appstate)?;
+    let (subject, _) = get_subject(&req, &conn, &appstate)?;
     let for_agent = get_client_agent(req.headers(), &appstate, subject)?;
     check_write(store, &parent, &for_agent)?;
 
