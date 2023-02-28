@@ -364,8 +364,7 @@ impl Storelike for Db {
         let endpoint_span = tracing::span!(tracing::Level::TRACE, "Endpoint").entered();
         // Check if the subject matches one of the endpoints
         for endpoint in self.endpoints.iter() {
-            // TODO: starts_with is too grabby, should be more specific
-            if url.path().starts_with(&endpoint.path) {
+            if url.path() == endpoint.path {
                 // Not all Endpoints have a handle function.
                 // If there is none, return the endpoint plainly.
                 let mut resource = if let Some(handle) = endpoint.handle {
