@@ -1,0 +1,87 @@
+app = "atomic-server"
+kill_signal = "SIGINT"
+kill_timeout = 5
+processes = []
+
+[env]
+# Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
+# ATOMIC_INITIALIZE=
+
+# Re-builds the indexes. Parses all the resources. Do this when updating requires it, or if you have issues with Collections / Queries / Search
+# ATOMIC_REBUILD_INDEX=
+
+# Use staging environments for services like LetsEncrypt
+# ATOMIC_DEVELOPMENT=
+
+# The origin domain where the app is hosted, without the port and schema values
+# ATOMIC_DOMAIN=localhost
+
+# The port where the HTTP app is available. Set to 80 if you want this to be available on the network
+ATOMIC_PORT = 80
+
+# The port where the HTTPS app is available. Set to 443 if you want this to be available on the network
+ATOMIC_PORT_HTTPS = 443
+
+# The IP address of the server. Set to :: if you want this to be available to other devices on your network
+# ATOMIC_IP=::
+
+# Use HTTPS instead of HTTP. Will get certificates from LetsEncrypt fully automated
+# ATOMIC_HTTPS = true
+
+# Initializes DNS-01 challenge for LetsEncrypt. Use this if you want to use subdomains
+# ATOMIC_HTTPS_DNS=
+
+# The contact mail address for Let's Encrypt HTTPS setup
+# ATOMIC_EMAIL=
+
+# Custom JS script to include in the body of the HTML template
+# ATOMIC_SCRIPT=
+
+# Path for atomic data config directory. Defaults to "~/.config/atomic/""
+# ATOMIC_CONFIG_DIR=
+
+# Path for atomic data store folder. Contains your Store, uploaded files and more. Default value depends on your OS
+# ATOMIC_DATA_DIR=
+
+# CAUTION: Skip authentication checks, making all data publicly readable. Improves performance
+# ATOMIC_PUBLIC_MODE=
+
+# The full URL of the server. It should resolve to the home page. Set this if you use an external server or tunnel, instead of directly exposing atomic-server. If you leave this out, it will be generated from `domain`, `port` and `http` / `https`
+# ATOMIC_SERVER_URL=
+
+# How much logs you want. Also influences what is sent to your trace service, if you've set one (e.g. OpenTelemetry)
+# Possible values: ["warn", "info", "debug", "trace"]
+# RUST_LOG=info
+
+# How you want to trace what's going on with the server. Useful for monitoring performance and errors in production. Combine with `log_level` to get more or less data (`trace` is the most verbose)
+# Possible values: ["stdout", "chrome", "opentelemetry"]
+# ATOMIC_TRACING=stdout
+
+[experimental]
+auto_rollback = true
+
+[[services]]
+http_checks = []
+internal_port = 80
+processes = ["app"]
+protocol = "tcp"
+script_checks = []
+[services.concurrency]
+hard_limit = 25
+soft_limit = 20
+type = "connections"
+
+[[services.ports]]
+force_https = true
+handlers = ["http"]
+port = 80
+
+[[services.ports]]
+handlers = ["tls", "http"]
+port = 443
+
+[[services.tcp_checks]]
+grace_period = "1s"
+interval = "15s"
+restart_limit = 0
+timeout = "2s"
