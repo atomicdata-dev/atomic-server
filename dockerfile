@@ -1,4 +1,4 @@
-FROM frolvlad/alpine-rust as builder
+FROM rust as builder
 WORKDIR /app
 COPY . .
 RUN cargo build --release --bin atomic-server
