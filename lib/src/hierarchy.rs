@@ -4,7 +4,7 @@
 
 use core::fmt;
 
-use crate::{errors::AtomicResult, storelike::Query, urls, AtomicError, Resource, Storelike};
+use crate::{errors::AtomicResult, storelike::Query, urls, Resource, Storelike};
 
 #[derive(Debug)]
 pub enum Right {
@@ -64,32 +64,33 @@ pub fn check_read(
 /// This checks the `append` rights, and if that fails, checks the `write` right.
 /// Throws if not allowed.
 /// Returns string with explanation if allowed.
+#[tracing::instrument(skip(store), level = "debug")]
 pub fn check_append(
     store: &impl Storelike,
     resource: &Resource,
     for_agent: &str,
 ) -> AtomicResult<String> {
-    let parent = if let Ok(parent) = resource.get_parent(store) {
-        parent
-    } else {
-        if resource
-            .get_classes(store)?
-            .iter()
-            .map(|c| c.subject.clone())
-            .collect::<String>()
-            .contains(urls::DRIVE)
-        {
-            return Ok(String::from("Drive without a parent can be created"));
+    match resource.get_parent(store) {
+        Ok(parent) => {
+            if let Ok(msg) = check_rights(store, &parent, for_agent, Right::Append) {
+                Ok(msg)
+            } else {
+                check_rights(store, resource, for_agent, Right::Write)
+            }
         }
-        return Err(AtomicError::unauthorized(format!(
-            "No parent found for {}",
-            resource.get_subject()
-        )));
-    };
-    if let Ok(msg) = check_rights(store, &parent, for_agent, Right::Append) {
-        Ok(msg)
-    } else {
-        check_rights(store, resource, for_agent, Right::Write)
+        Err(e) => {
+            if resource
+                .get_classes(store)?
+                .iter()
+                .map(|c| c.subject.clone())
+                .collect::<String>()
+                .contains(urls::DRIVE)
+            {
+                Ok(String::from("Drive without a parent can be created"))
+            } else {
+                Err(e)
+            }
+        }
     }
 }
 
