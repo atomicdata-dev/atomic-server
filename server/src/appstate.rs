@@ -75,7 +75,9 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     };
     store.set_handle_commit(Box::new(send_commit));
 
-    if config.initialize {
+    // If the user changes their server_url, the drive will not exist.
+    // In this situation, we should re-build a new drive from scratch.
+    if config.initialize || store.get_resource(&config.server_url).is_err() {
         tracing::info!(
             "Running initialization commands (first time startup, or you passed --initialize)"
         );

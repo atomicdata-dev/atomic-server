@@ -18,6 +18,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Move Server-Timing header to crate `simple-server-timing-header`
 - Add `POST` + `body` support for Endpoints #592
 - Refactor `Endpoint` handlers, uses a Context now #592
+- Re-build store + invite when adjusting server url #607
 
 ## [v0.34.1] - 2023-02-11
 
