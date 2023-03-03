@@ -38,9 +38,6 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          tags: |
-            # minimal
-            type=semver,pattern={{version}}
           images: joepmeneer/atomic-server
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
