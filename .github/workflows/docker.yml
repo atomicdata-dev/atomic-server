@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - 'master'
+      - 'develop'
     tags:
       - 'v*'
 
@@ -47,5 +48,5 @@ jobs:
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
-          tags: joepmeneer/atomic-server:latest
+          tags: joepmeneer/atomic-server:latest,joepmeneer/atomic-server:${{ steps.meta.outputs.tag }},joepmeneer/atomic-server:${{ steps.meta.outputs.tag }}
           labels: ${{ steps.meta.outputs.labels }}
