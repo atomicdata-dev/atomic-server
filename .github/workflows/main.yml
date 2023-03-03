@@ -1,5 +1,6 @@
 on: [push, workflow_dispatch]
 
+name: "Build, test, clippy"
 jobs:
   check:
     name: Check
