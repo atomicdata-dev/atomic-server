@@ -210,7 +210,7 @@ pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Generates some nice collections for classes, such as `/agent` and `/collection`.
+/// Generates collections for classes, such as `/agent` and `/collection`.
 /// Requires a `self_url` to be set in the store.
 pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
     let mut query = Query::new_class(urls::CLASS);

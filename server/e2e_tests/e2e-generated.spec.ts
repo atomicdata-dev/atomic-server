@@ -422,12 +422,11 @@ test.describe('data-browser', async () => {
     await signIn(page);
     await page.locator(`${currentDriveTitle} > text=localhost`);
 
-    const dropdownId = await page
-      .locator(sideBarDriveSwitcher)
-      .getAttribute('aria-controls');
-
     await page.click(sideBarDriveSwitcher);
     // temp disable for trailing slash
+    // const dropdownId = await page
+    //   .locator(sideBarDriveSwitcher)
+    //   .getAttribute('aria-controls');
     // await page.click(`[id="${dropdownId}"] >> text=Atomic Data`);
     // await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
 
@@ -469,10 +468,15 @@ test.describe('data-browser', async () => {
     await signIn(page);
     await newDrive(page);
     await newResource('class', page);
+    const shortnameInput = '[data-test="input-shortname"]';
     // Try entering a wrong slug
-    await page.click('[data-test="input-shortname"]');
+    await page.click(shortnameInput);
     await page.keyboard.type('not valid');
     await expect(page.locator('text=Not a valid slug')).toBeVisible();
+    await page.locator(shortnameInput).fill('');
+    await page.keyboard.type('is-valid');
+    await expect(page.locator('text=Not a valid slug')).not.toBeVisible();
+
     // Add a new property
     await page.click(
       '[placeholder="Select a property or enter a property URL..."]',
@@ -490,7 +494,26 @@ test.describe('data-browser', async () => {
     // Dropdown select
     await page.click('[data-test="input-recommends-add-resource"]');
     await page.locator('text=append').click();
-    await expect(page.locator('text=https://atomicdata.dev')).not.toBeVisible();
+    await expect(
+      page.locator(
+        '[data-test="input-recommends"] >> text=https://atomicdata.dev',
+      ),
+    ).not.toBeVisible();
+
+    // Try to save without a description
+    page.locator('button:has-text("Save")').click();
+    await expect(
+      page.locator(
+        'text=Property https://atomicdata.dev/properties/description missing',
+      ),
+    ).toBeVisible();
+
+    // Add a description
+    await page.click('textarea[name="yamdeContent"]');
+    await page.keyboard.type('This is a test class');
+    await page.click('button:has-text("Save")');
+
+    await expect(page.locator('text=Resource Saved')).toBeVisible();
   });
 
   test('sidebar subresource', async ({ page }) => {
@@ -533,6 +556,16 @@ test.describe('data-browser', async () => {
     await newDrive(page);
     // Create new class from new resource menu
     await newResource('class', page);
+
+    await fillInput('shortname', page);
+    await fillInput('description', page);
+    await page.click('[data-test="save"]');
+    await page.locator('text=Resource Saved');
+    await page.click(contextMenu);
+    await page
+      .locator('[data-test="menu-item-edit"] >> visible = true')
+      .click();
+
     await page
       .locator('[title="Add an item to this list"] >> nth=0')
       .first()
@@ -557,6 +590,7 @@ test.describe('data-browser', async () => {
       .fill('This is a test prop');
     await page.locator('dialog footer >> text=Save').click();
 
+    await page.locator('text=Resource Saved');
     expect(
       await page.locator(
         '[data-test="input-recommends"] >> nth=0 >> "test-prop"',
@@ -686,4 +720,19 @@ async function editTitle(title: string, page: Page) {
 
 async function clickSidebarItem(text: string, page: Page) {
   await page.click(`[data-test="sidebar"] >> text="${text}"`);
+}
+
+async function fillInput(
+  propertyShortname: string,
+  page: Page,
+  value?: string,
+) {
+  let locator = `[data-test="input-${propertyShortname}"]`;
+
+  if (propertyShortname === 'description') {
+    locator = 'textarea[name="yamdeContent"]';
+  }
+
+  await page.click(locator);
+  await page.fill(locator, value || `test-${propertyShortname}`);
 }
