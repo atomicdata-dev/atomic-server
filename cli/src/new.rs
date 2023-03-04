@@ -18,7 +18,7 @@ pub fn new(context: &mut Context) -> AtomicResult<()> {
         .matches
         .subcommand_matches("new")
         .unwrap()
-        .value_of("class")
+        .get_one::<&str>("class")
         .expect("Add a class value");
     let class_url = context
         .mapping

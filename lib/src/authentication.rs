@@ -1,6 +1,8 @@
 //! Check signatures in authentication headers, find the correct agent. Authorization is done in Hierarchies
 
-use crate::{commit::check_timestamp, errors::AtomicResult, urls, Storelike};
+use crate::{
+    agents::decode_base64, commit::check_timestamp, errors::AtomicResult, urls, Storelike,
+};
 
 /// Set of values extracted from the request.
 /// Most are coming from headers.
@@ -26,11 +28,11 @@ pub struct AuthValues {
 /// Does not check if the agent has rights to access the subject.
 #[tracing::instrument(skip_all)]
 pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicResult<()> {
-    let agent_pubkey = base64::decode(&auth_header.public_key)?;
+    let agent_pubkey = decode_base64(&auth_header.public_key)?;
     let message = format!("{} {}", subject, &auth_header.timestamp);
     let peer_public_key =
         ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
-    let signature_bytes = base64::decode(&auth_header.signature)?;
+    let signature_bytes = decode_base64(&auth_header.signature)?;
     peer_public_key
                 .verify(message.as_bytes(), &signature_bytes)
                 .map_err(|_e| {

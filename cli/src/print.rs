@@ -14,8 +14,8 @@ pub const SERIALIZE_OPTIONS: [&str; 7] =
 
 /// Returns preferred serialization format. Defaults to pretty.
 pub fn get_serialization(argmatches: &ArgMatches) -> AtomicResult<Format> {
-    let format = if let Some(preferred_format) = argmatches.value_of("as") {
-        match preferred_format {
+    let format = if let Some(preferred_format) = argmatches.get_one::<String>("as") {
+        match preferred_format.as_str() {
             "pretty" => Format::Pretty,
             "json" => Format::Json,
             "jsonld" => Format::JsonLd,

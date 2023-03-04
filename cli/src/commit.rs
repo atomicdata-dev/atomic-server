@@ -62,9 +62,9 @@ fn argument_to_string(context: &Context, argument: &str) -> AtomicResult<String>
     let command_name = context.matches.subcommand_name().unwrap();
     let subcommand_matches = context.matches.subcommand_matches(command_name).unwrap();
     let user_arg = subcommand_matches
-        .value_of(argument)
+        .get_one::<&str>(argument)
         .ok_or(format!("No argument value for {} found", argument))?;
-    Ok(user_arg.into())
+    Ok(user_arg.to_string())
 }
 
 /// Parses a single argument (URL or Bookmark), should return a valid URL
@@ -72,13 +72,13 @@ fn argument_to_url(context: &Context, argument: &str) -> AtomicResult<String> {
     let command_name = context.matches.subcommand_name().unwrap();
     let subcommand_matches = context.matches.subcommand_matches(command_name).unwrap();
     let user_arg = subcommand_matches
-        .value_of(argument)
+        .get_one::<&str>(argument)
         .ok_or(format!("No argument value for {} found", argument))?;
     let id_url: String = context
         .mapping
         .lock()
         .unwrap()
-        .try_mapping_or_url(&String::from(user_arg))
+        .try_mapping_or_url(&String::from(user_arg.to_string()))
         .ok_or(&*format!("No url found for {}", user_arg))?;
     Ok(id_url)
 }

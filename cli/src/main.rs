@@ -105,14 +105,14 @@ fn main() -> AtomicResult<()> {
                     ",
                     )
                     .required(true)
-                    .min_values(1)
+                    .num_args(1..)
                 )
                 .arg(Arg::new("as")
                     .long("as")
-                    .possible_values(SERIALIZE_OPTIONS)
+                    .value_parser(SERIALIZE_OPTIONS)
                     .default_value("pretty")
                     .help("Serialization format")
-                    .takes_value(true)
+                    .num_args(1)
                 )
         )
         .subcommand(
@@ -138,10 +138,10 @@ fn main() -> AtomicResult<()> {
                 )
                 .arg(Arg::new("as")
                     .long("as")
-                    .possible_values(SERIALIZE_OPTIONS)
+                    .value_parser(SERIALIZE_OPTIONS)
                     .default_value("pretty")
                     .help("Serialization format")
-                    .takes_value(true)
+                    .num_args(1)
                 )
         )
         .subcommand(
@@ -294,9 +294,9 @@ fn list(context: &mut Context) {
 /// Triple Pattern Fragment Query
 fn tpf(context: &Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
-    let subject = tpf_value(subcommand_matches.value_of("subject").unwrap());
-    let property = tpf_value(subcommand_matches.value_of("property").unwrap());
-    let value = tpf_value(subcommand_matches.value_of("value").unwrap());
+    let subject = tpf_value(subcommand_matches.get_one::<&str>("subject").unwrap());
+    let property = tpf_value(subcommand_matches.get_one::<&str>("property").unwrap());
+    let value = tpf_value(subcommand_matches.get_one::<&str>("value").unwrap());
     let endpoint = format!("{}/tpf", &context.get_write_context().server);
     let resources =
         atomic_lib::client::fetch_tpf(&endpoint, subject, property, value, &context.store)?;

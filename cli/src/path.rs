@@ -8,9 +8,10 @@ use serialize::Format;
 /// Resolves an Atomic Path query
 pub fn get_path(context: &mut Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
-    let path_vec: Vec<&str> = subcommand_matches
-        .values_of("path")
+    let path_vec: Vec<String> = subcommand_matches
+        .get_many::<String>("path")
         .expect("Add a URL, shortname or path")
+        .map(|s| s.to_string())
         .collect();
     let path_string: String = path_vec.join(" ");
     let serialization: Format = get_serialization(subcommand_matches)?;

@@ -2,6 +2,8 @@
 //! Agents are actors (such as users) that can edit content.
 //! https://docs.atomicdata.dev/commits/concepts.html
 
+use base64::{engine::general_purpose, Engine};
+
 use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
 
 #[derive(Clone, Debug)]
@@ -93,28 +95,39 @@ fn generate_keypair() -> AtomicResult<Pair> {
         .map_err(|e| format!("Error generating keypair {}", e))
         .unwrap();
     Ok(Pair {
-        private: base64::encode(seed),
-        public: base64::encode(key_pair.public_key()),
+        private: encode_base64(&seed),
+        public: encode_base64(key_pair.public_key().as_ref()),
     })
 }
 
 /// Returns a Key Pair (including public key) from a private key, base64 encoded.
 pub fn generate_public_key(private_key: &str) -> Pair {
     use ring::signature::KeyPair;
-    let private_key_bytes = base64::decode(private_key).unwrap();
+    let private_key_bytes = decode_base64(private_key).unwrap();
     let key_pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(private_key_bytes.as_ref())
         .map_err(|_| "Error generating keypair")
         .unwrap();
     Pair {
-        private: base64::encode(private_key_bytes),
-        public: base64::encode(key_pair.public_key().as_ref()),
+        private: encode_base64(&private_key_bytes),
+        public: encode_base64(key_pair.public_key().as_ref()),
     }
+}
+
+pub fn decode_base64(string: &str) -> AtomicResult<Vec<u8>> {
+    let vec = general_purpose::STANDARD
+        .decode(string)
+        .map_err(|e| format!("Invalid key. Not valid Base64. {}", e))?;
+    Ok(vec)
+}
+
+pub fn encode_base64(bytes: &[u8]) -> String {
+    general_purpose::STANDARD.encode(bytes)
 }
 
 /// Checks if the public key is a valid ED25519 base64 key.
 /// Not perfect - only checks byte length and parses base64.
 pub fn verify_public_key(public_key: &str) -> AtomicResult<()> {
-    let pubkey_bin = base64::decode(public_key)
+    let pubkey_bin = decode_base64(public_key)
         .map_err(|e| format!("Invalid public key. Not valid Base64. {}", e))?;
     if pubkey_bin.len() != 32 {
         return Err(format!(

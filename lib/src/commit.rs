@@ -5,8 +5,14 @@ use std::collections::{HashMap, HashSet};
 use urls::{SET, SIGNER};
 
 use crate::{
-    datatype::DataType, errors::AtomicResult, hierarchy, resources::PropVals, urls,
-    values::SubResource, Atom, Resource, Storelike, Value,
+    agents::{decode_base64, encode_base64},
+    datatype::DataType,
+    errors::AtomicResult,
+    hierarchy,
+    resources::PropVals,
+    urls,
+    values::SubResource,
+    Atom, Resource, Storelike, Value,
 };
 
 /// The `resource_new`, `resource_old` and `commit_resource` fields are only created if the Commit is persisted.
@@ -104,11 +110,11 @@ impl Commit {
                 .get_resource(&self.signer)?
                 .get(urls::PUBLIC_KEY)?
                 .to_string();
-            let agent_pubkey = base64::decode(pubkey_b64)?;
+            let agent_pubkey = decode_base64(&pubkey_b64)?;
             let stringified_commit = self.serialize_deterministically_json_ad(store)?;
             let peer_public_key =
                 ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
-            let signature_bytes = base64::decode(signature.clone())?;
+            let signature_bytes = decode_base64(signature)?;
             peer_public_key
                 .verify(stringified_commit.as_bytes(), &signature_bytes)
                 .map_err(|_e| {
@@ -641,9 +647,9 @@ fn sign_at(
 /// Signs a string using a base64 encoded ed25519 private key. Outputs a base64 encoded ed25519 signature.
 #[tracing::instrument]
 pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> AtomicResult<String> {
-    let private_key_bytes = base64::decode(private_key)
+    let private_key_bytes = decode_base64(private_key)
         .map_err(|e| format!("Failed decoding private key {}: {}", private_key, e))?;
-    let public_key_bytes = base64::decode(public_key)
+    let public_key_bytes = decode_base64(public_key)
         .map_err(|e| format!("Failed decoding public key {}: {}", public_key, e))?;
     let key_pair = ring::signature::Ed25519KeyPair::from_seed_and_public_key(
         &private_key_bytes,
@@ -652,9 +658,7 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
     .map_err(|_| "Can't create Ed25519 keypair from Agent's Private Key.")?;
     let message_bytes = message.as_bytes();
     let signature = key_pair.sign(message_bytes);
-    let signature_bytes = signature.as_ref();
-    let signatureb64 = base64::encode(signature_bytes);
-    Ok(signatureb64)
+    Ok(encode_base64(signature.as_ref()))
 }
 
 /// The amount of milliseconds that a Commit signature is valid for.
