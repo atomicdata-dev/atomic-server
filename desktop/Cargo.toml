@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 name = "atomic-server-tauri"
 repository = "https://github.com/atomicdata-dev/atomic-data-rust"
-version = "0.34.0"
+version = "0.34.2"
 
 [build-dependencies]
 [build-dependencies.tauri-build]
