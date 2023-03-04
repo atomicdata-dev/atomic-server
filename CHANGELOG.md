@@ -5,15 +5,14 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
-## UNRELEASED
+## [v0.34.2] - 2023-03-04
 
 - **Requires `--rebuild-index`**
 - Improve full-text search, use JSON fields #335
-- Update tantivy.
-- Parse multiple auth cookies #525
-- Fix `--script` flag
 - Rename `setup-env` to `generate-dotenv` and build it from clap #599
 - Remove `remove_previous_search` and `asset_url` options
+- Parse multiple auth cookies #525
+- Fix `--script` flag
 - Add `Storelike::post_resource`, which allows plugins to parse HTTP POST requests #592
 - Move Server-Timing header to crate `simple-server-timing-header`
 - Add `POST` + `body` support for Endpoints #592

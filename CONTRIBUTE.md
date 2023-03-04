@@ -166,8 +166,8 @@ So please first send an e-mail to joep@ontola.io describing the issue, and then 
 
 ## Releases, Versioning and Tagging
 
-1. Update the `tauri.conf.json` manually to the new version.
-2. Commit changes
+1. Commit changes
+2. Update the `tauri.conf.json` manually to the new version.
 3. Make sure all tests run properly
 4. Use `cargo workspaces version patch` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
 
