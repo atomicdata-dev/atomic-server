@@ -6,7 +6,7 @@ license = "MIT"
 name = "atomic-cli"
 readme = "README.md"
 repository = "https://github.com/atomicdata-dev/atomic-data-rust"
-version = "0.34.3"
+version = "0.34.4"
 
 [dependencies]
 atomic_lib = {version = "0.34.3", path = "../lib", features = ["config", "rdf"]}

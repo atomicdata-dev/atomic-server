@@ -294,9 +294,9 @@ fn list(context: &mut Context) {
 /// Triple Pattern Fragment Query
 fn tpf(context: &Context) -> AtomicResult<()> {
     let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
-    let subject = tpf_value(subcommand_matches.get_one::<&str>("subject").unwrap());
-    let property = tpf_value(subcommand_matches.get_one::<&str>("property").unwrap());
-    let value = tpf_value(subcommand_matches.get_one::<&str>("value").unwrap());
+    let subject = tpf_value(subcommand_matches.get_one::<String>("subject").unwrap());
+    let property = tpf_value(subcommand_matches.get_one::<String>("property").unwrap());
+    let value = tpf_value(subcommand_matches.get_one::<String>("value").unwrap());
     let endpoint = format!("{}/tpf", &context.get_write_context().server);
     let resources =
         atomic_lib::client::fetch_tpf(&endpoint, subject, property, value, &context.store)?;
