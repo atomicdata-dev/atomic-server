@@ -40,6 +40,14 @@ jobs:
         with:
           images: joepmeneer/atomic-server
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: |
+            type=schedule
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=sha
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
