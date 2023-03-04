@@ -6,7 +6,7 @@ use colored::*;
 use dirs::home_dir;
 use std::{cell::RefCell, path::PathBuf, sync::Mutex};
 
-use crate::print::{print_resource, SERIALIZE_OPTIONS};
+use crate::print::SERIALIZE_OPTIONS;
 
 mod commit;
 mod new;
@@ -106,35 +106,6 @@ fn main() -> AtomicResult<()> {
                     )
                     .required(true)
                     .num_args(1..)
-                )
-                .arg(Arg::new("as")
-                    .long("as")
-                    .value_parser(SERIALIZE_OPTIONS)
-                    .default_value("pretty")
-                    .help("Serialization format")
-                    .num_args(1)
-                )
-        )
-        .subcommand(
-            Command::new("tpf")
-                    .about("Finds Atoms using Triple Pattern Fragments.",
-                    )
-                    .after_help("\
-                    Filter the store by <subject> <property> and <value>. \
-                    Use a dot to indicate that you don't need to filter. \
-                    Subjects and properties need to be full URLs. \
-                    ")
-                .arg(Arg::new("subject")
-                    .help("The subject URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
-                    .required(true)
-                )
-                .arg(Arg::new("property")
-                    .help("The property URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
-                    .required(true)
-                )
-                .arg(Arg::new("value")
-                    .help("The value URL or bookmark to be filtered by. Use a dot '.' to indicate 'any'.")
-                    .required(true)
                 )
                 .arg(Arg::new("as")
                     .long("as")
@@ -264,9 +235,6 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
         Some("set") => {
             commit::set(context)?;
         }
-        Some("tpf") => {
-            tpf(context)?;
-        }
         Some("validate") => {
             validate(context);
         }
@@ -289,30 +257,6 @@ fn list(context: &mut Context) {
         ));
     }
     println!("{}", string)
-}
-
-/// Triple Pattern Fragment Query
-fn tpf(context: &Context) -> AtomicResult<()> {
-    let subcommand_matches = context.matches.subcommand_matches("tpf").unwrap();
-    let subject = tpf_value(subcommand_matches.get_one::<String>("subject").unwrap());
-    let property = tpf_value(subcommand_matches.get_one::<String>("property").unwrap());
-    let value = tpf_value(subcommand_matches.get_one::<String>("value").unwrap());
-    let endpoint = format!("{}/tpf", &context.get_write_context().server);
-    let resources =
-        atomic_lib::client::fetch_tpf(&endpoint, subject, property, value, &context.store)?;
-    for r in resources {
-        print_resource(context, &r, subcommand_matches)?;
-    }
-    Ok(())
-}
-
-/// Converts dots to 'None'
-fn tpf_value(string: &str) -> Option<&str> {
-    if string == "." {
-        None
-    } else {
-        Some(string)
-    }
 }
 
 /// Validates the store

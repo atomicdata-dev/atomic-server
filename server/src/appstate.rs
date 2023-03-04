@@ -46,7 +46,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
-        // Building the index here is needed to perform TPF queries on imported resources
+        // Building the index here is needed to perform Queries on imported resources
         tracing::info!("Building index (this could take a few minutes for larger databases)");
         store.build_index(true)?;
         tracing::info!("Building index finished!");

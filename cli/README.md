@@ -32,7 +32,6 @@ SUBCOMMANDS:
     new        Create a Resource
     remove     Remove a single Atom from a Resource.
     set        Update a single Atom. Creates both the Resource if they don't exist. Overwrites existing.
-    tpf        Finds Atoms using Triple Pattern Fragments.
 
 Visit https://atomicdata.dev for more info
 ```

@@ -78,32 +78,6 @@ pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> At
     Ok(body)
 }
 
-/// Uses a TPF endpoint, returns a Vector of matching resources
-pub fn fetch_tpf(
-    endpoint: &str,
-    q_subject: Option<&str>,
-    q_property: Option<&str>,
-    q_value: Option<&str>,
-    store: &impl Storelike,
-) -> AtomicResult<Vec<Resource>> {
-    let mut url = Url::parse(endpoint)?;
-    if let Some(val) = q_subject {
-        url.query_pairs_mut().append_pair("subject", val);
-    }
-    if let Some(val) = q_property {
-        url.query_pairs_mut().append_pair("property", val);
-    }
-    if let Some(val) = q_value {
-        url.query_pairs_mut().append_pair("value", val);
-    }
-    let body = fetch_body(
-        url.as_str(),
-        "application/ad+json",
-        store.get_default_agent().ok(),
-    )?;
-    crate::parse::parse_json_ad_string(&body, store, &ParseOpts::default())
-}
-
 /// Posts a Commit to the endpoint of the Subject from the Commit
 pub fn post_commit(commit: &crate::Commit, store: &impl Storelike) -> AtomicResult<()> {
     let server_url = crate::utils::server_url(commit.get_subject())?;

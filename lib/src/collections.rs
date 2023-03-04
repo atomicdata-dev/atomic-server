@@ -1,17 +1,10 @@
 //! Collections are dynamic resources that refer to multiple resources.
-//! They are constructed using a TPF query
+//! They are constructed using a [Query]
 use crate::{
     errors::AtomicResult,
     storelike::{Query, ResourceCollection},
     urls, Resource, Storelike, Value,
 };
-
-#[derive(Debug)]
-pub struct TpfQuery {
-    pub subject: Option<String>,
-    pub property: Option<String>,
-    pub value: Option<String>,
-}
 
 const DEFAULT_PAGE_SIZE: usize = 30;
 
@@ -21,9 +14,9 @@ const DEFAULT_PAGE_SIZE: usize = 30;
 pub struct CollectionBuilder {
     /// Full Subject URL of the resource, including query parameters
     pub subject: String,
-    /// The TPF property which the results are to be filtered by
+    /// The property which the results are to be filtered by
     pub property: Option<String>,
-    /// The TPF value which the results are to be filtered by
+    /// The value which the results are to be filtered by
     pub value: Option<String>,
     /// URL of the value to sort by
     pub sort_by: Option<String>,
@@ -128,9 +121,9 @@ impl CollectionBuilder {
 pub struct Collection {
     /// Full Subject URL of the resource, including query parameters
     pub subject: String,
-    /// The TPF property which the results are to be filtered by
+    /// The property which the results are to be filtered by
     pub property: Option<String>,
-    /// The TPF value which the results are to be filtered by
+    /// The value which the results are to be filtered by
     pub value: Option<String>,
     /// The actual items that you're interested in. List the member subjects of the current page.
     pub members: Vec<String>,

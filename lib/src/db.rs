@@ -68,7 +68,7 @@ pub struct Db {
     /// See [reference_index]
     reference_index: sled::Tree,
     /// Index sorted by property + value.
-    /// Used for TPF queries where the property is known.
+    /// Used for queries where the property is known.
     prop_val_sub_index: sled::Tree,
     /// Stores the members of Collections, easily sortable.
     query_index: sled::Tree,
@@ -579,7 +579,7 @@ impl Storelike for Db {
         // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
         crate::populate::populate_default_store(self)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
-        // This is a potentially expensive operation, but is needed to make TPF queries work with the models created in here
+        // This is a potentially expensive operation, but is needed to make Queries work with the models created in here
         self.build_index(true)
             .map_err(|e| format!("Failed to build index. {}", e))?;
         crate::populate::create_drive(self)

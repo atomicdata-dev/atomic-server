@@ -271,7 +271,7 @@ pub fn should_update_property<'a>(
 }
 
 /// This is called when an atom is added or deleted.
-/// Check whether the Atom will be hit by a TPF query matching the [QueryFilter].
+/// Check whether the [Atom] will be hit by a [Query] matching the [QueryFilter].
 /// Updates the index accordingly.
 /// We need both the `index_atom` and the full `atom`.
 #[tracing::instrument(skip_all)]
