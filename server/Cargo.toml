@@ -79,7 +79,7 @@ version = ">= 4.0.1"
 [dependencies.atomic_lib]
 features = ["config", "db", "rdf", "html"]
 path = "../lib"
-version = "0.34.0"
+version = "0.34.2"
 
 [dependencies.clap]
 features = ["derive", "env", "cargo"]
