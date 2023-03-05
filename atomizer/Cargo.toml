@@ -7,6 +7,7 @@ version = "0.1.0"
 [dependencies]
 atomic_lib = {version = "0.34.0", path = "../lib"}
 kamadak-exif = "0.5.5"
-# Should match the version of pdf-extract
 mime_guess = "2.0.4"
-pdf-extract = {path = "../../../joepio/pdf-extract"}
+# Preferably use the OG version, but we're waiting for a
+# https://github.com/jrmuizel/pdf-extract/pull/48
+pdf-extract = {repository = "https://github.com/joepio/pdf-extract/"}

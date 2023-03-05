@@ -497,6 +497,7 @@ dependencies = [
  "actix-web-static-files",
  "assert_cmd",
  "atomic_lib",
+ "atomizer",
  "base64 0.13.0",
  "chrono",
  "clap 4.0.26",
@@ -2792,18 +2793,19 @@ dependencies = [
 
 [[package]]
 name = "lopdf"
-version = "0.29.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de0f69c40d6dbc68ebac4bf5aec3d9978e094e22e29fcabd045acd9cec74a9dc"
+checksum = "b49a0272112719d0037ab63d4bb67f73ba659e1e90bc38f235f163a457ac16f3"
 dependencies = [
+ "dtoa",
  "encoding",
  "flate2",
- "itoa 1.0.3",
+ "itoa 0.4.8",
  "linked-hash-map",
  "log",
+ "lzw",
  "pom 3.2.0",
  "time 0.2.27",
- "weezl",
 ]
 
 [[package]]
@@ -2820,6 +2822,12 @@ name = "lz4_flex"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a8cbbb2831780bc3b9c15a41f5b49222ef756b6730a95f3decfdd15903eb5a3"
+
+[[package]]
+name = "lzw"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d947cbb889ed21c2a84be6ffbaebf5b4e0f4340638cba0444907e38b56be084"
 
 [[package]]
 name = "mac"
@@ -3547,7 +3555,9 @@ checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
 
 [[package]]
 name = "pdf-extract"
-version = "0.7.0"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f7875466ea3ecc4b763c4946993d5dcdf4f6e3a67e2f293e506a4a9ec551759"
 dependencies = [
  "adobe-cmap-parser",
  "encoding",
@@ -3800,12 +3810,9 @@ checksum = "07e2192780e9f8e282049ff9bffcaa28171e1cb0844f49ed5374e518ae6024ec"
 
 [[package]]
 name = "postscript"
-version = "0.17.3"
+version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67eb2e5785f269312631cd17b25b3031f8327fa11d31890ffabf2dfa3e67cbf8"
-dependencies = [
- "typeface",
-]
+checksum = "78451badbdaebaf17f053fd9152b3ffb33b516104eacb45e7864aaa9c712f306"
 
 [[package]]
 name = "ppv-lite86"
@@ -5686,12 +5693,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "typeface"
-version = "0.2.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf610e8cc23b65075cc984c5b3dd40ea77849189f395b2604e059c00558b719b"
-
-[[package]]
 name = "typenum"
 version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6108,12 +6109,6 @@ dependencies = [
  "windows 0.37.0",
  "windows-bindgen",
 ]
-
-[[package]]
-name = "weezl"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9193164d4de03a926d909d3bc7c30543cecb35400c02114792c2cae20d5e2dbb"
 
 [[package]]
 name = "which"

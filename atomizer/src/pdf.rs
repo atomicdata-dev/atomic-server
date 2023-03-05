@@ -1,13 +1,13 @@
 use atomic_lib::resources::PropVals;
 
-const content_prop: &str = "content";
+const CONTENT_PROP: &str = atomic_lib::urls::DESCRIPTION;
 
 /// Extracts the text from a PDF file.
 pub fn atomize(mut file: crate::file::File) -> PropVals {
     let mut props = PropVals::new();
-    let bytes = file.bytes().unwrap();
+    let bytes = file.bytes();
     let text = pdf_extract::extract_text_from_mem(&bytes).unwrap();
-    props.insert(content_prop.into(), atomic_lib::Value::String(text));
+    props.insert(CONTENT_PROP.into(), atomic_lib::Value::Markdown(text));
     props
 }
 
@@ -19,8 +19,8 @@ mod tests {
     #[test]
     fn load_pdf() {
         let f = File::open("./test/docs-demo.pdf").unwrap();
-        let propvals = f.atomize();
-        let content = propvals.get(content_prop).unwrap();
+        let propvals = f.to_propvals();
+        let content = propvals.get(CONTENT_PROP).unwrap();
         assert!(content.to_string().contains("Atomic Data"));
     }
 }

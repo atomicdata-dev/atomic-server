@@ -1,14 +1,15 @@
 use atomic_lib::resources::PropVals;
 use exif::{In, Tag};
 
-const date_time: &str = "date_time";
+const DATE_TIME: &str = "date_time";
 
+// These should map to Atomic Data Properties
 fn map_tag(tag: Tag) -> String {
     match tag {
         Tag::PixelXDimension => "pixel_x_dimension",
         Tag::XResolution => "x_resolution",
         Tag::ImageDescription => "image_description",
-        Tag::DateTime => date_time,
+        Tag::DateTime => DATE_TIME,
         _ => "unknown",
     }
     .to_string()
@@ -20,8 +21,9 @@ pub fn atomize(mut file: crate::file::File) -> PropVals {
 
     println!("Reading EXIF data from {}", file.filename());
 
+    let mut buf_reader = std::io::BufReader::new(std::io::Cursor::new(file.bytes()));
     let exif = exif::Reader::new()
-        .read_from_container(file.reader())
+        .read_from_container(&mut buf_reader)
         .unwrap();
 
     let tag_list = [
@@ -52,8 +54,8 @@ mod tests {
     #[test]
     fn load_image() {
         let f = File::open("./test/image.jpg").unwrap();
-        let propvals = f.atomize();
-        let dt = propvals.get(date_time).unwrap();
+        let propvals = f.to_propvals();
+        let dt = propvals.get(DATE_TIME).unwrap();
         println!("Date: {}", dt);
         assert!(dt.to_string().contains("2008"));
     }

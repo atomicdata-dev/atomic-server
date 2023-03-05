@@ -6,25 +6,37 @@ use mime_guess::Mime;
 pub struct File {
     filename: String,
     mime: Mime,
-    reader: std::io::BufReader<std::fs::File>,
+    bytes: Vec<u8>,
 }
 
 impl File {
     pub fn open(filename: &str) -> Result<File, Box<dyn Error>> {
-        let bytes = std::fs::File::open(filename)?;
-        let reader = std::io::BufReader::new(bytes);
+        let file = std::fs::File::open(filename)?;
+        let bytes = std::io::BufReader::new(file)
+            .bytes()
+            .collect::<Result<Vec<u8>, _>>()?;
         let mime = mime_guess::from_path(filename).first_or_octet_stream();
 
         Ok(File {
             filename: filename.to_string(),
             mime,
-            reader,
+            bytes,
+        })
+    }
+
+    pub fn from_filename_bytes(filename: &str, bytes: Vec<u8>) -> Result<File, Box<dyn Error>> {
+        let mime = mime_guess::from_path(filename).first_or_octet_stream();
+
+        Ok(File {
+            filename: filename.to_string(),
+            mime,
+            bytes,
         })
     }
 
     /// Creates property-value combinations based on the file's contents.
     /// Defaults to an empty HashMap if the file type is not supported.
-    pub fn atomize(self) -> PropVals {
+    pub fn to_propvals(self) -> PropVals {
         match self.mime.to_string().as_str() {
             "application/pdf" => crate::pdf::atomize(self),
             "image/jpeg" => crate::image::atomize(self),
@@ -32,14 +44,8 @@ impl File {
         }
     }
 
-    pub fn bytes(&mut self) -> Result<Vec<u8>, Box<dyn Error>> {
-        let mut buffer = vec![];
-        self.reader.read_to_end(&mut buffer)?;
-        Ok(buffer)
-    }
-
-    pub fn reader(&mut self) -> &mut std::io::BufReader<std::fs::File> {
-        &mut self.reader
+    pub fn bytes(&mut self) -> Vec<u8> {
+        self.bytes.clone()
     }
 
     pub fn mime(&self) -> &Mime {

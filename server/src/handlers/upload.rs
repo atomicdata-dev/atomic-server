@@ -67,7 +67,7 @@ pub async fn upload_handler(
 
         let mut file_path = appstate.config.uploads_path.clone();
         file_path.push(&file_id);
-        let mut file = std::fs::File::create(file_path)?;
+        let mut file = std::fs::File::create(file_path.clone())?;
 
         // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
@@ -87,17 +87,20 @@ pub async fn upload_handler(
         let download_url = format!("{}/download/{}", store.get_server_url(), subject_path);
 
         let mut resource = atomic_lib::Resource::new_instance(urls::FILE, store)?;
+        let mime = guess_mime_for_filename(filename);
         resource.set_subject(new_subject);
         resource.set_propval_string(urls::PARENT.into(), &query.parent, store)?;
         resource.set_propval_string(urls::INTERNAL_ID.into(), &file_id, store)?;
         resource.set_propval(urls::FILESIZE.into(), Value::Integer(byte_count), store)?;
-        resource.set_propval_string(
-            urls::MIMETYPE.into(),
-            &guess_mime_for_filename(filename),
-            store,
-        )?;
+        resource.set_propval_string(urls::MIMETYPE.into(), &mime, store)?;
         resource.set_propval_string(urls::FILENAME.into(), filename, store)?;
         resource.set_propval_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
+
+        // Extract data from files, turn into JSON-AD
+        for (prop, val) in atomizer::file::File::open(&file_path.to_string_lossy())?.to_propvals() {
+            resource.set_propval(prop, val, store)?;
+        }
+
         commit_responses.push(resource.save(store)?);
         created_resources.push(resource);
     }
