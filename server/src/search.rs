@@ -158,13 +158,15 @@ pub fn add_resource(
     let writer = appstate.writer.read()?;
 
     let mut doc = Document::default();
-    let json_obj = serde_json::from_str(&resource.to_json(store)?).map_err(|e| {
-        format!(
-            "Failed to convert resource to json for search indexing. Subject: {}. Error: {}",
-            subject, e
-        )
-    })?;
-    doc.add_json_object(fields.propvals, json_obj);
+    doc.add_json_object(
+        fields.propvals,
+        serde_json::from_str(&resource.to_json_ad()?).map_err(|e| {
+            format!(
+                "Failed to convert resource to json for search indexing. Subject: {}. Error: {}",
+                subject, e
+            )
+        })?,
+    );
 
     doc.add_text(fields.subject, subject);
     doc.add_text(fields.title, get_resource_title(resource));
