@@ -12,7 +12,7 @@
   {
     "@id": "https://atomicdata.dev/properties/color",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
-    "https://atomicdata.dev/properties/description": "The color of something.",
+    "https://atomicdata.dev/properties/description": "The color of something in hex format. For example #1b50d8 or #1b50d840 for a transparent color.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
@@ -21,7 +21,7 @@
   },
   {
     "@id": "https://atomicdata.dev/classes/FormattedNumber",
-    "https://atomicdata.dev/properties/description": "A number that should be displayed in a certain way.",
+    "https://atomicdata.dev/properties/description": "A number that should be displayed in a certain way, using a specific [`NumberFormat`](https://atomicdata.dev/classes/NumberFormat).",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Class"
     ],
@@ -41,16 +41,10 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
-    "https://atomicdata.dev/properties/recommends": [],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/shortname"
     ],
-    "https://atomicdata.dev/properties/shortname": "date-format",
-    "https://atomicdata.dev/properties/subresources": [
-      "https://atomicdata.dev/classes/DateFormat/localLong",
-      "https://atomicdata.dev/classes/DateFormat/localRelative",
-      "https://atomicdata.dev/classes/DateFormat/localNumeric"
-    ]
+    "https://atomicdata.dev/properties/shortname": "date-format"
   },
   {
     "@id": "https://atomicdata.dev/classes/FormattedDate",
@@ -59,7 +53,6 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
-    "https://atomicdata.dev/properties/recommends": [],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/dateFormat"
     ],
@@ -78,15 +71,11 @@
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/shortname"
     ],
-    "https://atomicdata.dev/properties/shortname": "number-format",
-    "https://atomicdata.dev/properties/subresources": [
-      "https://atomicdata.dev/classes/NumberFormat/number",
-      "https://atomicdata.dev/classes/NumberFormat/Percentage"
-    ]
+    "https://atomicdata.dev/properties/shortname": "number-format"
   },
   {
     "@id": "https://atomicdata.dev/classes/RangeProperty",
-    "https://atomicdata.dev/properties/description": "A property who's value is contained by a min and/or max size.",
+    "https://atomicdata.dev/properties/description": "A property whose value is contained by a min and/or max size.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Class"
     ],
@@ -95,7 +84,6 @@
       "https://atomicdata.dev/properties/min",
       "https://atomicdata.dev/properties/max"
     ],
-    "https://atomicdata.dev/properties/requires": [],
     "https://atomicdata.dev/properties/shortname": "range-property"
   },
   {
@@ -111,7 +99,7 @@
   },
   {
     "@id": "https://atomicdata.dev/classes/Tag",
-    "https://atomicdata.dev/properties/description": "A tag describes a an enum attribute of a resource.",
+    "https://atomicdata.dev/properties/description": "A tag describes an enum attribute of a resource.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Class"
     ],
@@ -162,7 +150,7 @@
   },
   {
     "@id": "https://atomicdata.dev/classes/FloatRangeProperty",
-    "https://atomicdata.dev/properties/description": "A property who's float value is contained by a min and/or max size.",
+    "https://atomicdata.dev/properties/description": "A property whose float value is contained by a min and/or max size.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Class"
     ],
@@ -171,7 +159,6 @@
       "https://atomicdata.dev/properties/minFloat",
       "https://atomicdata.dev/properties/maxFloat"
     ],
-    "https://atomicdata.dev/properties/requires": [],
     "https://atomicdata.dev/properties/shortname": "float-range-property"
   },
   {
