@@ -539,7 +539,6 @@ impl Storelike for Db {
         let endpoints = self.endpoints.iter().filter(|e| e.handle_post.is_some());
         let subj_url = url::Url::try_from(subject)?;
         for e in endpoints {
-            println!("Checking endpoint: {}", e.path);
             if let Some(fun) = &e.handle_post {
                 if subj_url.path() == e.path {
                     let handle_post_context = crate::endpoints::HandlePostContext {
@@ -548,7 +547,9 @@ impl Storelike for Db {
                         for_agent,
                         subject: subj_url,
                     };
-                    return fun(handle_post_context);
+                    let mut resource = fun(handle_post_context)?;
+                    resource.set_subject(subject.into());
+                    return Ok(resource);
                 }
             }
         }
