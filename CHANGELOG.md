@@ -9,6 +9,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 - Remove `tpf` queries from `atomic-cli` #610
 - Fix `pageSize` property in Collections not using persistence
+- Add Table Ontology #25
+- Fix Post endpoints not including search params in returned `@id` field.
 
 ## [v0.34.2] - 2023-03-04
 
