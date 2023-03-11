@@ -32,8 +32,10 @@ pub struct SearchQuery {
     pub limit: Option<usize>,
     /// Only include resources that have this resource as its ancestor
     pub parent: Option<String>,
-    /// Filter based on props, using tantivy QueryParser syntax
-    pub filter: Option<String>,
+    /// Filter based on props, using tantivy QueryParser syntax.
+    /// e.g. `prop:val` or `prop:val~1` or `prop:val~1 AND prop2:val2`
+    /// See https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html
+    pub filters: Option<String>,
 }
 
 const DEFAULT_RETURN_LIMIT: usize = 30;
@@ -160,7 +162,7 @@ fn query_from_params(
         query_list.push((Occur::Must, Box::new(text_query)));
     }
 
-    if let Some(filter) = &params.filter {
+    if let Some(filter) = &params.filters {
         let filter_query = BoostQuery::new(
             build_filter_query(fields, filter, &appstate.search_state.index)?,
             20.0,

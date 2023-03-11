@@ -8,6 +8,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 ## UNRELEASED
 
 - Remove `tpf` queries from `atomic-cli` #610
+- Fix `pageSize` property in Collections not using persistence
 
 ## [v0.34.2] - 2023-03-04
 

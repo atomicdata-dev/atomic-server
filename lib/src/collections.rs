@@ -340,6 +340,9 @@ pub fn construct_collection_from_params(
     if let Ok(val) = resource.get(urls::COLLECTION_PROPERTY) {
         property = Some(val.to_string());
     }
+    if let Ok(val) = resource.get(urls::COLLECTION_PAGE_SIZE) {
+        page_size = val.to_int()?.try_into().unwrap_or(DEFAULT_PAGE_SIZE);
+    }
     if let Ok(val) = resource.get(urls::COLLECTION_VALUE) {
         value = Some(val.to_string());
     }
