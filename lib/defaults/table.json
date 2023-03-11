@@ -1,0 +1,258 @@
+[
+  {
+    "@id": "https://atomicdata.dev/properties/max",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The maximum size of the value",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "max"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/color",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The color of something in hex format. For example #1b50d8 or #1b50d840 for a transparent color.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "color"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormattedNumber",
+    "https://atomicdata.dev/properties/description": "A number that should be displayed in a certain way, using a specific [`NumberFormat`](https://atomicdata.dev/classes/NumberFormat).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/decimalPlaces"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/numberFormatting"
+    ],
+    "https://atomicdata.dev/properties/shortname": "formatted-number"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/DateFormat",
+    "https://atomicdata.dev/properties/description": "The way the date value should be displayed.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/shortname"
+    ],
+    "https://atomicdata.dev/properties/shortname": "date-format"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormattedDate",
+    "https://atomicdata.dev/properties/description": "A date that is to be displayed according to its formatting.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/dateFormat"
+    ],
+    "https://atomicdata.dev/properties/shortname": "formatted-date"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/NumberFormat",
+    "https://atomicdata.dev/properties/description": "The way a number should be displayed",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/decimalPlaces"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/shortname"
+    ],
+    "https://atomicdata.dev/properties/shortname": "number-format"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/RangeProperty",
+    "https://atomicdata.dev/properties/description": "A property whose value is contained by a min and/or max size.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/min",
+      "https://atomicdata.dev/properties/max"
+    ],
+    "https://atomicdata.dev/properties/shortname": "range-property"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/dateFormat",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/DateFormat",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The way the date value should be displayed.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "date-format"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Tag",
+    "https://atomicdata.dev/properties/description": "A tag describes an enum attribute of a resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/color",
+      "https://atomicdata.dev/properties/emoji"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/shortname"
+    ],
+    "https://atomicdata.dev/properties/shortname": "tag"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/maxFloat",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/description": "The maximum size of the value",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "max-float"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/SelectProperty",
+    "https://atomicdata.dev/properties/description": "A property that has a set selection of possible resources as value.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/max"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/allowsOnly"
+    ],
+    "https://atomicdata.dev/properties/shortname": "select-property"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/decimalPlaces",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The number of decimals that should be shown",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "decimal-places"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FloatRangeProperty",
+    "https://atomicdata.dev/properties/description": "A property whose float value is contained by a min and/or max size.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/minFloat",
+      "https://atomicdata.dev/properties/maxFloat"
+    ],
+    "https://atomicdata.dev/properties/shortname": "float-range-property"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/numberFormatting",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/NumberFormat",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The way a number should be displayed",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "number-formatting"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/minFloat",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/float",
+    "https://atomicdata.dev/properties/description": "The minimum size of the value",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "min-float"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/min",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/integer",
+    "https://atomicdata.dev/properties/description": "The minimum size of the value",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "min"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Table",
+    "https://atomicdata.dev/properties/description": "A table that holds children of a specific classtype",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/classtype",
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "table"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/emoji",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "A UTF-8 Emoji",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "emoji"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/DateFormat/localLong",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/DateFormat"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes/DateFormat",
+    "https://atomicdata.dev/properties/shortname": "local-long"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/DateFormat/localRelative",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/DateFormat"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes/DateFormat",
+    "https://atomicdata.dev/properties/shortname": "local-relative"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/DateFormat/localNumeric",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/DateFormat"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes/DateFormat",
+    "https://atomicdata.dev/properties/shortname": "local-numeric"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/NumberFormat/number",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/NumberFormat"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes/NumberFormat",
+    "https://atomicdata.dev/properties/shortname": "number"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/NumberFormat/Percentage",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/NumberFormat"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes/NumberFormat",
+    "https://atomicdata.dev/properties/shortname": "number"
+  }
+]

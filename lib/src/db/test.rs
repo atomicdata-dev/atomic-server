@@ -184,11 +184,13 @@ fn destroy_resource_and_check_collection_and_commits() {
 #[test]
 fn get_extended_resource_pagination() {
     let store = Db::init_temp("get_extended_resource_pagination").unwrap();
-    let subject = format!("{}/commits?current_page=2", store.get_server_url());
-    // Should throw, because page 2 is out of bounds for default page size
-    let _wrong_resource = store
-        .get_resource_extended(&subject, false, None)
-        .unwrap_err();
+    let subject = format!(
+        "{}/commits?current_page=2&page_size=99999",
+        store.get_server_url()
+    );
+    if store.get_resource_extended(&subject, false, None).is_ok() {
+        panic!("Page 2 should not exist, because page size is set to a high value.")
+    }
     // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
     let subject_with_page_size = format!("{}&page_size=1", subject);
     let resource = store

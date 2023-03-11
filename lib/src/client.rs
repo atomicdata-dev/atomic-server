@@ -1,6 +1,4 @@
 //! Functions for interacting with an Atomic Server
-use url::Url;
-
 use crate::{
     agents::Agent,
     commit::sign_message,
