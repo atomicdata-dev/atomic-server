@@ -1,9 +1,15 @@
 FROM rust:1.67 AS builder
 # Install musl dependencies
 RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev linux-musl-dev
-# set correct linker
+
+# Cross-compiling for musl requires some specific linkers due to ring
+# https://github.com/briansmith/ring/issues/1414#issuecomment-1055177218
+RUN apt update && apt install install musl-tools clang llvm -y
 ENV RUSTFLAGS='-C linker=x86_64-linux-gnu-gcc'
+ENV CC_aarch64_unknown_linux_musl=clang
+ENV AR_aarch64_unknown_linux_musl=llvm-ar
+ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Clink-self-contained=yes -Clinker=rust-lld"
+
 WORKDIR /app
 COPY . .
 RUN cargo build --release --bin atomic-server --config net.git-fetch-with-cli=true --target x86_64-unknown-linux-musl
