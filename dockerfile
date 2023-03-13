@@ -1,7 +1,7 @@
 FROM rust:1.67 AS builder
 # Install musl dependencies
 RUN rustup target add x86_64-unknown-linux-musl
-RUN apt update && apt install -y musl-tools musl-dev
+RUN apt update && apt install -y musl-tools musl-dev linux-musl-dev
 # set correct linker
 ENV RUSTFLAGS='-C linker=x86_64-linux-gnu-gcc'
 WORKDIR /app
