@@ -577,24 +577,7 @@ impl Storelike for Db {
     }
 
     fn populate(&self) -> AtomicResult<()> {
-        // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
-        crate::populate::populate_default_store(self)
-            .map_err(|e| format!("Failed to populate default store. {}", e))?;
-        // This is a potentially expensive operation, but is needed to make Queries work with the models created in here
-        self.build_index(true)
-            .map_err(|e| format!("Failed to build index. {}", e))?;
-        crate::populate::create_drive(self)
-            .map_err(|e| format!("Failed to create drive. {}", e))?;
-        crate::populate::set_drive_rights(self, true)?;
-        crate::populate::populate_collections(self)
-            .map_err(|e| format!("Failed to populate collections. {}", e))?;
-        crate::populate::populate_endpoints(self)
-            .map_err(|e| format!("Failed to populate endpoints. {}", e))?;
-        crate::populate::populate_importer(self)
-            .map_err(|e| format!("Failed to populate importer. {}", e))?;
-        crate::populate::populate_sidebar_items(self)
-            .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
-        Ok(())
+        crate::populate::populate_all(self, true)
     }
 
     #[instrument(skip(self))]

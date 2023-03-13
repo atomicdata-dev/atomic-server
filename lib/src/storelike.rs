@@ -65,12 +65,14 @@ pub trait Storelike: Sized {
 
     /// Constructs the value index from all resources in the store. Could take a while.
     fn build_index(&self, include_external: bool) -> AtomicResult<()> {
+        tracing::info!("Building index (this could take a few minutes for larger databases)");
         for r in self.all_resources(include_external) {
             for atom in r.to_atoms() {
                 self.add_atom_to_index(&atom, &r)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
             }
         }
+        tracing::info!("Building index finished!");
         Ok(())
     }
 

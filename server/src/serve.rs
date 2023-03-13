@@ -8,7 +8,6 @@ fn rebuild_indexes(appstate: &crate::appstate::AppState) -> AtomicServerResult<(
     let appstate_clone = appstate.clone();
 
     actix_web::rt::spawn(async move {
-        tracing::warn!("Building value index... This could take a while, expect worse performance until 'Building value index finished'");
         appstate_clone
             .store
             .clear_index()
@@ -17,7 +16,6 @@ fn rebuild_indexes(appstate: &crate::appstate::AppState) -> AtomicServerResult<(
             .store
             .build_index(true)
             .expect("Failed to build value index");
-        tracing::info!("Building value index finished!");
     });
     tracing::info!("Removing existing search index...");
     appstate_clone

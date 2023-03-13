@@ -265,7 +265,6 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
     Ok(())
 }
 
-#[cfg(feature = "db")]
 /// Adds items to the SideBar as subresources.
 /// Useful for helping a new user get started.
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
@@ -278,5 +277,27 @@ pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     ];
     drive.set_propval(urls::SUBRESOURCES.into(), arr.into(), store)?;
     drive.save_locally(store)?;
+    Ok(())
+}
+
+/// Runs all populate commands. Optionally runs index (blocking), which can be slow!
+#[cfg(feature = "db")]
+pub fn populate_all(store: &crate::Db, index: bool) -> AtomicResult<()> {
+    // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
+    populate_default_store(store)
+        .map_err(|e| format!("Failed to populate default store. {}", e))?;
+    // This is a potentially expensive operation, but is needed to make Queries work with the models created in here
+    if index {
+        store
+            .build_index(true)
+            .map_err(|e| format!("Failed to build index. {}", e))?;
+    }
+    create_drive(store).map_err(|e| format!("Failed to create drive. {}", e))?;
+    set_drive_rights(store, true)?;
+    populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
+    populate_endpoints(store).map_err(|e| format!("Failed to populate endpoints. {}", e))?;
+    populate_importer(store).map_err(|e| format!("Failed to populate importer. {}", e))?;
+    populate_sidebar_items(store)
+        .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
     Ok(())
 }

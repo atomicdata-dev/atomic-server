@@ -46,10 +46,6 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::info!("Initialize: creating and populating new Database");
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
-        // Building the index here is needed to perform Queries on imported resources
-        tracing::info!("Building index (this could take a few minutes for larger databases)");
-        store.build_index(true)?;
-        tracing::info!("Building index finished!");
     }
 
     tracing::info!("Setting default agent");
@@ -81,7 +77,16 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::info!(
             "Running initialization commands (first time startup, or you passed --initialize)"
         );
-        store.populate()?;
+
+        atomic_lib::populate::populate_all(&store, false)?;
+        // Building the index here is needed to perform Queries on imported resources
+        let store_clone = store.clone();
+        std::thread::spawn(move || {
+            let res = store_clone.build_index(true);
+            if let Err(e) = res {
+                tracing::error!("Failed to build index: {}", e);
+            }
+        });
 
         set_up_initial_invite(&store)
             .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
