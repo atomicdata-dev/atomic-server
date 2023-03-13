@@ -78,7 +78,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
             "Running initialization commands (first time startup, or you passed --initialize)"
         );
 
-        atomic_lib::populate::populate_all(&store, false)?;
+        atomic_lib::populate::populate_all(&store)?;
         // Building the index here is needed to perform Queries on imported resources
         let store_clone = store.clone();
         std::thread::spawn(move || {

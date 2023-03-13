@@ -62,7 +62,6 @@ fn populate_collections() {
     let store = Db::init_temp("populate_collections").unwrap();
     let subjects: Vec<String> = store
         .all_resources(false)
-        .into_iter()
         .map(|r| r.get_subject().into())
         .collect();
     println!("{:?}", subjects);
@@ -472,7 +471,6 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
     );
 
     let mut resources: Vec<Resource> = (0..count)
-        .into_iter()
         .map(|_num| {
             let mut demo_resource = Resource::new_generate_subject(store);
             demo_resource

@@ -70,7 +70,7 @@ async fn server_tests() {
     let resp = test::call_service(&app, req.to_request()).await;
     let is_success = resp.status().is_success();
     let body = get_body(resp);
-    println!("{:?}", body);
+    // println!("{:?}", body);
     assert!(is_success);
     assert!(body.as_str().contains("html"));
 
@@ -78,7 +78,11 @@ async fn server_tests() {
     let req =
         test::TestRequest::with_uri("/properties").insert_header(("Accept", "application/ad+json"));
     let resp = test::call_service(&app, req.to_request()).await;
-    assert_eq!(resp.status().as_u16(), 200, "resource should be public");
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "properties collections should be found and public"
+    );
 
     // Should 404
     let req = test::TestRequest::with_uri("/doesnotexist")
@@ -87,7 +91,7 @@ async fn server_tests() {
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_client_error());
 
-    // Edit the properties collection, make it hidden to the public agent
+    // Edit the main drive, make it hidden to the public agent
     let mut drive = store.get_resource(&appstate.config.server_url).unwrap();
     drive
         .set_propval(
