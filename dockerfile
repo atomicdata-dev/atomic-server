@@ -4,7 +4,7 @@ RUN rustup target add x86_64-unknown-linux-musl
 
 # Cross-compiling for musl requires some specific linkers due to ring
 # https://github.com/briansmith/ring/issues/1414#issuecomment-1055177218
-RUN apt update && apt install install musl-tools clang llvm -y
+RUN apt update && apt install musl-tools clang llvm -y
 ENV RUSTFLAGS='-C linker=x86_64-linux-gnu-gcc'
 ENV CC_aarch64_unknown_linux_musl=clang
 ENV AR_aarch64_unknown_linux_musl=llvm-ar
