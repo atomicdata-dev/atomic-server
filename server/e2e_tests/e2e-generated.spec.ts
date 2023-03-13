@@ -128,10 +128,10 @@ test.describe('data-browser', async () => {
     await signIn(page);
     await newDrive(page);
 
-    // Create folder called 'Not This folder'
+    // Create folder called 1
     await page.locator('[data-test="sidebar-new-resource"]').click();
     await page.locator('button:has-text("folder")').click();
-    await setTitle(page, 'Not This Folder');
+    await setTitle(page, 'Salad folder');
 
     // Create document called 'Avocado Salad'
     await page.locator('button:has-text("New Resource")').click();
@@ -143,9 +143,9 @@ test.describe('data-browser', async () => {
 
     await page.locator('[data-test="sidebar-new-resource"]').click();
 
-    // Create folder called 'This folder'
+    // Create folder called 'Cake folder'
     await page.locator('button:has-text("folder")').click();
-    await setTitle(page, 'This Folder');
+    await setTitle(page, 'Cake Folder');
 
     // Create document called 'Avocado Salad'
     await page.locator('button:has-text("New Resource")').click();
@@ -155,15 +155,16 @@ test.describe('data-browser', async () => {
     await page.waitForResponse(`${serverUrl}/commit`);
     await editTitle('Avocado Cake', page);
 
-    await clickSidebarItem('This Folder', page);
+    await clickSidebarItem('Cake Folder', page);
 
-    // Set search scope to 'This folder'
-
+    // Set search scope to 'Cake folder'
     await page.waitForTimeout(REBUILD_INDEX_TIME);
-    await page.locator('button[title="Search in This Folder"]').click();
+    await page.locator('button[title="Search in Cake Folder"]').click();
     // Search for 'Avocado'
     await page.locator('[data-test="address-bar"]').type('Avocado');
-    await expect(page.locator('h2:text("Avocado Cake")')).toBeVisible();
+    // I don't like the `.first` here, but for some reason there is one frame where
+    // Multiple hits render, which fails the tests.
+    await expect(page.locator('h2:text("Avocado Cake")').first()).toBeVisible();
     await expect(page.locator('h2:text("Avocado Salad")')).not.toBeVisible();
 
     // Remove scope
