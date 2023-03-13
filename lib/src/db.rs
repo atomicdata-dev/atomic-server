@@ -577,7 +577,7 @@ impl Storelike for Db {
     }
 
     fn populate(&self) -> AtomicResult<()> {
-        crate::populate::populate_all(self, true)
+        crate::populate::populate_all(self)
     }
 
     #[instrument(skip(self))]

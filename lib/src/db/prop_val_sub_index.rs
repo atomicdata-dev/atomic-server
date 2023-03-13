@@ -13,16 +13,10 @@ pub fn find_in_prop_val_sub_index(store: &Db, prop: &str, val: Option<&Value>) -
         prefix.extend(value.to_sortable_string().as_bytes());
         prefix.extend([SEPARATION_BIT]);
     }
-    Box::new(
-        store
-            .prop_val_sub_index
-            .scan_prefix(prefix)
-            .into_iter()
-            .map(|kv| {
-                let (key, _value) = kv?;
-                key_to_index_atom(&key)
-            }),
-    )
+    Box::new(store.prop_val_sub_index.scan_prefix(prefix).map(|kv| {
+        let (key, _value) = kv?;
+        key_to_index_atom(&key)
+    }))
 }
 
 #[instrument(skip(store))]
