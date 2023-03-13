@@ -1,11 +1,15 @@
-FROM rust:1.67 as builder
+FROM rust:1.67 AS builder
+# Install musl dependencies
+RUN rustup target add x86_64-unknown-linux-musl
+RUN apt update && apt install -y musl-tools musl-dev
 WORKDIR /app
 COPY . .
-RUN cargo build --release --bin atomic-server --config net.git-fetch-with-cli=true
+RUN cargo build --release --bin atomic-server --config net.git-fetch-with-cli=true --target x86_64-unknown-linux-musl
+RUN strip -s /app/target/x86_64-unknown-linux-musl/release/atomic-server
 
-# We only need a small runtime for this step, but make sure glibc is installed
-FROM frolvlad/alpine-glibc:alpine-3.16_glibc-2.34 as runtime
-COPY --chmod=0755 --from=builder /app/target/release/atomic-server /atomic-server-bin
+FROM scratch as runtime
+COPY --from=builder /app/target/x86_64-unknown-linux-musl/release/atomic-server /atomic-server-bin
+
 # For a complete list of possible ENV vars or available flags, run with `--help`
 ENV ATOMIC_STORE_PATH="/atomic-storage/db"
 ENV ATOMIC_CONFIG_PATH="/atomic-storage/config.toml"

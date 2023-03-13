@@ -41,6 +41,8 @@ jobs:
           images: joepmeneer/atomic-server
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: |
+            # set latest tag for master branch
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
