@@ -58,7 +58,7 @@ jobs:
           tags: local
 
       - name: Run Docker image
-        run: nohup docker run -p 80:80 joepmeneer/atomic-server:local --initialize &
+        run: nohup docker run -p 80:80 local --initialize &
 
       - uses: pnpm/action-setup@v2.0.1
         name: Install pnpm
@@ -74,7 +74,7 @@ jobs:
           pnpm run install-playwright
           pnpm run test
 
-      - name: Push Docker image
+      - name: Build + push multiplatform Docker images
         uses: docker/build-push-action@v4
         with:
           context: .
