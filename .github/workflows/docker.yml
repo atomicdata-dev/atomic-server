@@ -60,6 +60,13 @@ jobs:
       - name: Run Docker image
         run: nohup docker run -p 80:80 joepmeneer/atomic-server:local --initialize &
 
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 7
+          run_install: false
+
       - name: Setup and run end-to-end tests
         working-directory: ./server/e2e_tests/
         run: |
