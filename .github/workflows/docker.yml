@@ -53,8 +53,28 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           context: .
+          push: false
+          provenance: false
+          platforms: linux/amd64,linux/arm64
+          tags: local
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Run docker image
+        run: nohup docker run -p 80:80 joepmeneer/atomic-server:local --initialize &
+
+      - name: Setup and run end-to-end tests
+        working-directory: ./server/e2e_tests/
+        run: |
+          pnpm install
+          pnpm run install-playwright
+          pnpm run test
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
           push: true
           provenance: false
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ steps.meta.outputs.labels }}e
