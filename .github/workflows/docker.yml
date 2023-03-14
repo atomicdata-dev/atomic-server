@@ -58,7 +58,7 @@ jobs:
           tags: joepmeneer/atomic-server:local
 
       - name: Run Docker image
-        run: nohup docker run -p 80:80 local --initialize &
+        run: nohup docker run -p 80:80 joepmeneer/atomic-server:local --initialize &
 
       - uses: pnpm/action-setup@v2.0.1
         name: Install pnpm
