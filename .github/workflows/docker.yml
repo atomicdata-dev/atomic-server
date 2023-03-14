@@ -41,6 +41,8 @@ jobs:
           images: joepmeneer/atomic-server
           github-token: ${{ secrets.GITHUB_TOKEN }}
           tags: |
+            # set latest tag for master branch
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'master') }}
             type=schedule
             type=ref,event=branch
             type=ref,event=pr
@@ -58,3 +60,13 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Run docker image
+        run: nohup docker run -p 80:80 joepmeneer/atomic-server:develop --initialize &
+
+      - name: Setup and run end-to-end tests
+        working-directory: ./server/e2e_tests/
+        run: |
+          pnpm install
+          pnpm run install-playwright
+          pnpm run test
