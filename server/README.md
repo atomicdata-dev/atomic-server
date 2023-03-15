@@ -3,8 +3,7 @@
 [![crates.io](https://img.shields.io/crates/v/atomic-server)](https://crates.io/crates/atomic-server)
 [![Discord chat](https://img.shields.io/discord/723588174747533393.svg?logo=discord)](https://discord.gg/a72Rv2P)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-data-rust
-?style=social)](https://github.com/atomicdata-dev/atomic-data-browser)
+[![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-data-rust?style=social)](https://github.com/atomicdata-dev/atomic-data-browser)
 
 _Status: alpha. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 
