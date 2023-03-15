@@ -2,7 +2,7 @@
 
 [![Discord chat][discord-badge]][discord-url]
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-data-browser?style=social)](https://github.com/atomicdata-dev/atomic-data-browser)
+[![github](https://img.shields.io/github/stars/atomicdata-dev/atomic-data-rust?style=social)](https://github.com/atomicdata-dev/atomic-data-rust)
 
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 This repo consists of three components: A library, a server and a CLI.**
