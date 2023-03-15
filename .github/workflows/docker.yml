@@ -55,6 +55,7 @@ jobs:
           context: .
           push: false
           provenance: false
+          load: true
           tags: joepmeneer/atomic-server:local
 
       - name: Run Docker image
