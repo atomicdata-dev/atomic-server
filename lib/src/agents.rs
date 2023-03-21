@@ -6,6 +6,43 @@ use base64::{engine::general_purpose, Engine};
 
 use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
 
+/// None represents no right checks will be performed, effectively SUDO mode.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ForAgent {
+    /// The Subject URL agent that is performing the action.
+    AgentSubject(String),
+    /// Allows all checks to pass.
+    /// See [urls::SUDO_AGENT]
+    Sudo,
+    /// Public Agent, most strict.
+    /// See [urls::PUBLIC_AGENT]
+    Public,
+}
+
+impl std::fmt::Display for ForAgent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ForAgent::AgentSubject(subject) => write!(f, "{}", subject),
+            ForAgent::Sudo => write!(f, "{}", urls::SUDO_AGENT),
+            ForAgent::Public => write!(f, "{}", urls::PUBLIC_AGENT),
+        }
+    }
+}
+
+// From all string-likes
+impl<T: Into<String>> From<T> for ForAgent {
+    fn from(subject: T) -> Self {
+        let subject = subject.into();
+        if subject == urls::SUDO_AGENT {
+            ForAgent::Sudo
+        } else if subject == urls::PUBLIC_AGENT {
+            ForAgent::Public
+        } else {
+            ForAgent::AgentSubject(subject)
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Agent {
     /// Private key for signing commits

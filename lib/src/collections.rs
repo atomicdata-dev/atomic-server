@@ -1,6 +1,7 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a [Query]
 use crate::{
+    agents::ForAgent,
     errors::AtomicResult,
     storelike::{Query, ResourceCollection},
     urls, Resource, Storelike, Value,
@@ -108,7 +109,7 @@ impl CollectionBuilder {
     pub fn into_collection(
         self,
         store: &impl Storelike,
-        for_agent: Option<&str>,
+        for_agent: &ForAgent,
     ) -> AtomicResult<Collection> {
         Collection::collect_members(store, self, for_agent)
     }
@@ -185,7 +186,7 @@ impl Collection {
     pub fn collect_members(
         store: &impl Storelike,
         collection_builder: crate::collections::CollectionBuilder,
-        for_agent: Option<&str>,
+        for_agent: &ForAgent,
     ) -> AtomicResult<Collection> {
         if collection_builder.page_size < 1 {
             return Err("Page size must be greater than 0".into());
@@ -210,7 +211,7 @@ impl Collection {
             sort_desc: collection_builder.sort_desc,
             include_external: collection_builder.include_external,
             include_nested: collection_builder.include_nested,
-            for_agent: for_agent.map(|a| a.to_string()),
+            for_agent: for_agent.clone(),
         };
 
         let query_result = store.query(&q)?;
@@ -325,7 +326,7 @@ pub fn construct_collection_from_params(
     store: &impl Storelike,
     query_params: url::form_urlencoded::Parse,
     resource: &mut Resource,
-    for_agent: Option<&str>,
+    for_agent: &ForAgent,
 ) -> AtomicResult<Resource> {
     let mut sort_by = None;
     let mut sort_desc = false;
@@ -458,7 +459,8 @@ mod test {
             include_nested: false,
             include_external: false,
         };
-        let collection = Collection::collect_members(&store, collection_builder, None).unwrap();
+        let collection =
+            Collection::collect_members(&store, collection_builder, &ForAgent::Sudo).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
     }
 
@@ -478,7 +480,8 @@ mod test {
             include_nested: false,
             include_external: false,
         };
-        let collection = Collection::collect_members(&store, collection_builder, None).unwrap();
+        let collection =
+            Collection::collect_members(&store, collection_builder, &ForAgent::Sudo).unwrap();
         assert!(collection.members.contains(&urls::PROPERTY.into()));
 
         let resource_collection = &collection.to_resource(&store).unwrap();
@@ -504,7 +507,8 @@ mod test {
             include_nested: true,
             include_external: false,
         };
-        let collection = Collection::collect_members(&store, collection_builder, None).unwrap();
+        let collection =
+            Collection::collect_members(&store, collection_builder, &ForAgent::Sudo).unwrap();
         let first_resource = &collection.members_nested.clone().unwrap()[0];
         assert!(first_resource.get_subject().contains("Agent"));
 
@@ -531,7 +535,7 @@ mod test {
             .get_resource_extended(
                 &format!("{}/collections", store.get_server_url()),
                 false,
-                None,
+                &ForAgent::Public,
             )
             .unwrap();
         assert!(
@@ -559,7 +563,11 @@ mod test {
         store.populate().unwrap();
 
         let collection_page_size = store
-            .get_resource_extended("https://atomicdata.dev/classes?page_size=1", false, None)
+            .get_resource_extended(
+                "https://atomicdata.dev/classes?page_size=1",
+                false,
+                &ForAgent::Public,
+            )
             .unwrap();
         assert!(
             collection_page_size
@@ -572,7 +580,7 @@ mod test {
             .get_resource_extended(
                 "https://atomicdata.dev/classes?current_page=2&page_size=1",
                 false,
-                None,
+                &ForAgent::Public,
             )
             .unwrap();
         assert!(

@@ -3,7 +3,9 @@
 //! Examples of endpoints are versions for resources, or (pages for) collections.
 //! See https://docs.atomicdata.dev/endpoints.html or https://atomicdata.dev/classes/Endpoint
 
-use crate::{errors::AtomicResult, plugins, urls, Db, Resource, Storelike, Value};
+use crate::{
+    agents::ForAgent, errors::AtomicResult, plugins, urls, Db, Resource, Storelike, Value,
+};
 
 /// The function that is called when a POST request matches the path
 type HandleGet = fn(context: HandleGetContext) -> AtomicResult<Resource>;
@@ -17,7 +19,7 @@ pub struct HandleGetContext<'a> {
     /// The requested URL, including query parameters
     pub subject: url::Url,
     pub store: &'a Db,
-    pub for_agent: Option<&'a str>,
+    pub for_agent: &'a ForAgent,
 }
 
 /// Passed to an Endpoint POST request handler for.
@@ -26,7 +28,7 @@ pub struct HandlePostContext<'a> {
     /// The requested URL, including query parameters
     pub subject: url::Url,
     pub store: &'a Db,
-    pub for_agent: Option<&'a str>,
+    pub for_agent: &'a ForAgent,
     pub body: Vec<u8>,
 }
 /// An API endpoint at some path which accepts requests and returns some Resource.

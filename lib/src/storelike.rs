@@ -1,7 +1,7 @@
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
 use crate::{
-    agents::Agent,
+    agents::{Agent, ForAgent},
     commit::CommitResponse,
     errors::AtomicError,
     hierarchy,
@@ -186,15 +186,12 @@ pub trait Storelike: Sized {
         &self,
         subject: &str,
         skip_dynamic: bool,
-        for_agent: Option<&str>,
+        for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
         let _ignore = skip_dynamic;
         let resource = self.get_resource(subject)?;
-        if let Some(agent) = for_agent {
-            hierarchy::check_read(self, &resource, agent)?;
-            return Ok(resource);
-        }
-        Ok(resource)
+        hierarchy::check_read(self, &resource, &for_agent)?;
+        return Ok(resource);
     }
 
     /// This function is called whenever a Commit is applied.
@@ -234,7 +231,7 @@ pub trait Storelike: Sized {
         &self,
         atomic_path: &str,
         mapping: Option<&Mapping>,
-        for_agent: Option<&str>,
+        for_agent: &ForAgent,
     ) -> AtomicResult<PathReturn> {
         // The first item of the path represents the starting Resource, the following ones are traversing the graph / selecting properties.
         let path_items: Vec<&str> = atomic_path.split(' ').collect();
@@ -321,7 +318,7 @@ pub trait Storelike: Sized {
         &self,
         _subject: &str,
         _body: Vec<u8>,
-        _for_agent: Option<&str>,
+        _for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
         Err("`post_resource` not implemented for StoreLike. Implement it in your trait.".into())
     }
@@ -373,7 +370,7 @@ pub struct Query {
     /// Whether to include full Resources in the result, if not, will add empty vector here.
     pub include_nested: bool,
     /// For which Agent the query is executed. Pass `None` if you want to skip permission checks.
-    pub for_agent: Option<String>,
+    pub for_agent: ForAgent,
 }
 
 impl Query {
@@ -389,7 +386,7 @@ impl Query {
             sort_desc: false,
             include_external: false,
             include_nested: true,
-            for_agent: None,
+            for_agent: ForAgent::Sudo,
         }
     }
 

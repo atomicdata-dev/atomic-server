@@ -184,7 +184,7 @@ test.describe('data-browser', async () => {
       '[data-test="sort-https://atomicdata.dev/properties/description"]',
     );
     // These values can change as new Properties are added to atomicdata.dev
-    const firstPageText = "text=A base64 serialized JSON object";
+    const firstPageText = 'text=A base64 serialized JSON object';
     const secondPageText = 'text=include-nested';
     await expect(page.locator(firstPageText)).toBeVisible();
     await page.click('[data-test="next-page"]');
@@ -291,8 +291,7 @@ test.describe('data-browser', async () => {
     await signIn(page);
     const { driveURL, driveTitle } = await newDrive(page);
     await page.click(currentDriveTitle);
-    await page.click(contextMenu);
-    await page.click('button:has-text("share")');
+    await contextMenuClick('share', page);
     await expect(await page.isChecked(publicReadRight)).toBe(false);
 
     // Initialize unauthorized page for reader
@@ -552,6 +551,31 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
   });
 
+  test('import', async ({ page }) => {
+    await signIn(page);
+    await newDrive(page);
+    await newResource('folder', page);
+    await contextMenuClick('import', page);
+
+    const localID = 'localIDtest';
+    const name = 'blaat';
+    const importStr = {
+      'https://atomicdata.dev/properties/localId': localID,
+      'https://atomicdata.dev/properties/name': name,
+    };
+    await page.fill(
+      '[placeholder="Paste your JSON-AD..."]',
+      JSON.stringify(importStr),
+    );
+    await page.click('[data-test="import-post"]');
+    await expect(page.locator('text=Imported!')).toBeVisible();
+
+    // get current url, append the localID
+    const url = await page.url();
+    await page.goto(url + '/' + localID);
+    await expect(page.locator(`text=${name}`)).toBeVisible();
+  });
+
   test('dialog', async ({ page }) => {
     await signIn(page);
     await newDrive(page);
@@ -562,10 +586,6 @@ test.describe('data-browser', async () => {
     await fillInput('description', page);
     await page.click('[data-test="save"]');
     await page.locator('text=Resource Saved');
-    await page.click(contextMenu);
-    await page
-      .locator('[data-test="menu-item-edit"] >> visible = true')
-      .click();
 
     await page
       .locator('[title="Add an item to this list"] >> nth=0')
@@ -736,4 +756,12 @@ async function fillInput(
 
   await page.click(locator);
   await page.fill(locator, value || `test-${propertyShortname}`);
+}
+
+/** Click an item from the main, visible context menu */
+async function contextMenuClick(text: string, page: Page) {
+  await page.click(contextMenu);
+  await page
+    .locator(`[data-test="menu-item-${text}"] >> visible = true`)
+    .click();
 }

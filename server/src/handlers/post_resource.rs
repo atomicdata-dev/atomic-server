@@ -67,7 +67,7 @@ pub async fn handle_post_resource(
         "no-store, no-cache, must-revalidate, private",
     ));
 
-    let resource = store.post_resource(&subject, body.into(), for_agent.as_deref())?;
+    let resource = store.post_resource(&subject, body.into(), &for_agent)?;
     timer.add("post_resource");
 
     let response_body = match content_type {

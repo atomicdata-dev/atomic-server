@@ -67,7 +67,7 @@ pub async fn handle_get_resource(
         "no-store, no-cache, must-revalidate, private",
     ));
 
-    let resource = store.get_resource_extended(&subject, false, for_agent.as_deref())?;
+    let resource = store.get_resource_extended(&subject, false, &for_agent)?;
     timer.add("get_resource");
 
     let response_body = match content_type {

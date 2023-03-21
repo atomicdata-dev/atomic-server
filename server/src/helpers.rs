@@ -3,6 +3,7 @@
 use actix_web::cookie::Cookie;
 use actix_web::http::header::{HeaderMap, HeaderValue};
 use actix_web::http::Uri;
+use atomic_lib::agents::ForAgent;
 use atomic_lib::authentication::AuthValues;
 use atomic_lib::AtomicError;
 use percent_encoding::percent_decode_str;
@@ -143,9 +144,9 @@ pub fn get_client_agent(
     headers: &HeaderMap,
     appstate: &AppState,
     requested_subject: String,
-) -> AtomicServerResult<Option<String>> {
+) -> AtomicServerResult<ForAgent> {
     if appstate.config.opts.public_mode {
-        return Ok(None);
+        return Ok(ForAgent::Public);
     }
     // Authentication check. If the user has no headers, continue with the Public Agent.
     let auth_header_values = get_auth(headers, requested_subject)?;
@@ -154,7 +155,7 @@ pub fn get_client_agent(
         &appstate.store,
     )
     .map_err(|e| format!("Authentication failed: {}", e))?;
-    Ok(Some(for_agent))
+    Ok(for_agent.into())
 }
 
 /// Finds the extension

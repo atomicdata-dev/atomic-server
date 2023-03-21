@@ -1,5 +1,9 @@
 use crate::{
-    agents::Agent, errors::AtomicResult, urls, utils::check_valid_url, Resource, Storelike, Value,
+    agents::{Agent, ForAgent},
+    errors::AtomicResult,
+    urls,
+    utils::check_valid_url,
+    Resource, Storelike, Value,
 };
 
 /// If there is a valid Agent in the correct query param, and the invite is valid, update the rights and respond with a redirect to the target resource
@@ -9,7 +13,7 @@ pub fn construct_invite_redirect(
     query_params: url::form_urlencoded::Parse,
     invite_resource: &mut Resource,
     // Not used for invite redirects, invites are always public
-    for_agent: Option<&str>,
+    for_agent: &ForAgent,
 ) -> AtomicResult<Resource> {
     let requested_subject = invite_resource.get_subject().to_string();
     let mut pub_key = None;
@@ -89,7 +93,7 @@ pub fn construct_invite_redirect(
     // Make sure the creator of the invite is still allowed to Write the target
     let invite_creator =
         crate::plugins::versioning::get_initial_commit_for_resource(target, store)?.signer;
-    crate::hierarchy::check_write(store, &store.get_resource(target)?, &invite_creator)
+    crate::hierarchy::check_write(store, &store.get_resource(target)?, &invite_creator.into())
         .map_err(|e| format!("Invite creator is not allowed to write the target. {}", e))?;
 
     add_rights(&agent, target, write, store)?;
@@ -149,6 +153,6 @@ pub fn before_apply_commit(
         .get(urls::TARGET)
         .map_err(|_e| "Invite does not have required Target attribute")?;
     let target_resource = store.get_resource(&target.to_string())?;
-    crate::hierarchy::check_write(store, &target_resource, &commit.signer)?;
+    crate::hierarchy::check_write(store, &target_resource, &commit.signer.clone().into())?;
     Ok(())
 }

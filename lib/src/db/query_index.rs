@@ -2,6 +2,7 @@
 //! It relies on lexicographic ordering of keys, which Sled utilizes using `scan_prefix` queries.
 
 use crate::{
+    agents::ForAgent,
     atoms::IndexAtom,
     errors::AtomicResult,
     storelike::{Query, QueryResult},
@@ -125,8 +126,8 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
             // When an agent is defined, we must perform authorization checks
             // WARNING: EXPENSIVE!
             // TODO: Make async
-            if q.include_nested || q.for_agent.is_some() {
-                match store.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+            if q.include_nested || q.for_agent != ForAgent::Sudo {
+                match store.get_resource_extended(subject, true, &q.for_agent) {
                     Ok(resource) => {
                         resources.push(resource);
                         subjects.push(subject.into())

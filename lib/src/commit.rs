@@ -169,7 +169,7 @@ impl Commit {
         if opts.validate_rights {
             let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&self.signer);
             if is_new {
-                hierarchy::check_append(store, &resource_new, validate_for)?;
+                hierarchy::check_append(store, &resource_new, &validate_for.into())?;
             } else {
                 // Set a parent only if the rights checks are to be validated.
                 // If there is no explicit parent set on the previous resource, use a default.
@@ -183,7 +183,7 @@ impl Commit {
                     )?;
                 }
                 // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
-                hierarchy::check_write(store, &resource_old, validate_for)?;
+                hierarchy::check_write(store, &resource_old, &validate_for.into())?;
             }
         };
         // Check if all required props are there

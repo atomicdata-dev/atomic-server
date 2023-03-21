@@ -12,7 +12,7 @@ use actix::{
     prelude::{Actor, Context, Handler},
     ActorStreamExt, Addr, ContextFutureSpawner,
 };
-use atomic_lib::{Db, Storelike};
+use atomic_lib::{agents::ForAgent, Db, Storelike};
 use chrono::Local;
 use std::collections::{HashMap, HashSet};
 
@@ -61,7 +61,11 @@ impl Handler<Subscribe> for CommitMonitor {
         }
         match self.store.get_resource(&msg.subject) {
             Ok(resource) => {
-                match atomic_lib::hierarchy::check_read(&self.store, &resource, &msg.agent) {
+                match atomic_lib::hierarchy::check_read(
+                    &self.store,
+                    &resource,
+                    &ForAgent::AgentSubject(msg.agent.clone()),
+                ) {
                     Ok(_explanation) => {
                         let mut set = if let Some(set) = self.subscriptions.get(&msg.subject) {
                             set.clone()

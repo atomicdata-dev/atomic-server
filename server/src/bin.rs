@@ -1,4 +1,4 @@
-use atomic_lib::{urls, Storelike};
+use atomic_lib::{agents::ForAgent, urls, Storelike};
 use atomic_server_lib::config::Opts;
 use std::{fs::File, io::Write};
 
@@ -74,7 +74,7 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             };
             let parse_opts = atomic_lib::parse::ParseOpts {
                 importer: Some(importer_subject),
-                for_agent: None,
+                for_agent: ForAgent::Sudo,
                 overwrite_outside: true,
                 save: if import_opts.force {
                     atomic_lib::parse::SaveOpts::Save

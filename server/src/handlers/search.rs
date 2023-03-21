@@ -122,10 +122,7 @@ fn get_resources(
     // https://github.com/atomicdata-dev/atomic-data-rust/issues/280/
     let for_agent = crate::helpers::get_client_agent(req.headers(), appstate, subject.into())?;
     for s in subjects {
-        match appstate
-            .store
-            .get_resource_extended(&s, true, for_agent.as_deref())
-        {
+        match appstate.store.get_resource_extended(&s, true, &for_agent) {
             Ok(r) => {
                 if resources.len() < limit {
                     resources.push(r);
