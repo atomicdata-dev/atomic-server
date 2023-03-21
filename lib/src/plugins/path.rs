@@ -32,10 +32,10 @@ fn handle_path_request(context: HandleGetContext) -> AtomicResult<Resource> {
     if path.is_none() {
         return path_endpoint().to_resource(store);
     }
-    let result = store.get_path(&path.unwrap(), None, for_agent)?;
+    let result = store.get_path(&path.unwrap(), None, &for_agent)?;
     match result {
         crate::storelike::PathReturn::Subject(subject) => {
-            store.get_resource_extended(&subject, false, for_agent)
+            store.get_resource_extended(&subject, false, &for_agent)
         }
         crate::storelike::PathReturn::Atom(atom) => {
             let mut resource = Resource::new(subject.to_string());

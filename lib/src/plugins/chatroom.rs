@@ -5,6 +5,7 @@ They list a bunch of Messages.
 */
 
 use crate::{
+    agents::ForAgent,
     commit::{CommitBuilder, CommitResponse},
     errors::AtomicResult,
     storelike::Query,
@@ -18,7 +19,7 @@ pub fn construct_chatroom(
     store: &impl Storelike,
     url: url::Url,
     resource: &mut Resource,
-    for_agent: Option<&str>,
+    for_agent: &ForAgent,
 ) -> AtomicResult<Resource> {
     // TODO: From range
     let mut start_val = utils::now();
@@ -43,7 +44,7 @@ pub fn construct_chatroom(
         sort_desc: true,
         include_external: false,
         include_nested: true,
-        for_agent: for_agent.map(|s| s.to_string()),
+        for_agent: for_agent.clone(),
     };
 
     let mut messages_unfiltered = store.query(&query_children)?.resources;

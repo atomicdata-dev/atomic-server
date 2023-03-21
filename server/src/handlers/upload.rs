@@ -3,8 +3,7 @@ use std::{ffi::OsStr, io::Write, path::Path};
 use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
-    commit::CommitResponse, hierarchy::check_write, urls, utils::now, AtomicError, Resource,
-    Storelike, Value,
+    commit::CommitResponse, hierarchy::check_write, urls, utils::now, Resource, Storelike, Value,
 };
 use futures::{StreamExt, TryStreamExt};
 use serde::Deserialize;
@@ -39,14 +38,8 @@ pub async fn upload_handler(
             .path_and_query()
             .ok_or("Path must be given")?
     );
-    if let Some(agent) = get_client_agent(req.headers(), &appstate, subject)? {
-        check_write(store, &parent, &agent)?;
-    } else {
-        return Err(AtomicError::unauthorized(
-            "No authorization headers present. These are required when uploading files.".into(),
-        )
-        .into());
-    }
+    let agent = get_client_agent(req.headers(), &appstate, subject)?;
+    check_write(store, &parent, &agent)?;
 
     let mut created_resources: Vec<Resource> = Vec::new();
     let mut commit_responses: Vec<CommitResponse> = Vec::new();

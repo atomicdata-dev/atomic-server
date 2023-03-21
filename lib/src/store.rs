@@ -238,7 +238,7 @@ impl Storelike for Store {
         let mut resources = Vec::new();
         for subject in subjects_deduplicated.iter() {
             // These nested resources are not fully calculated - they will be presented as -is
-            match self.get_resource_extended(subject, true, q.for_agent.as_deref()) {
+            match self.get_resource_extended(subject, true, &q.for_agent) {
                 Ok(resource) => {
                     resources.push(resource);
                 }
@@ -273,7 +273,7 @@ impl Storelike for Store {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{urls, Value};
+    use crate::{agents::ForAgent, urls, Value};
 
     fn init_store() -> Store {
         let store = Store::init().unwrap();
@@ -350,7 +350,11 @@ mod test {
     fn path() {
         let store = init_store();
         let res = store
-            .get_path("https://atomicdata.dev/classes/Class shortname", None, None)
+            .get_path(
+                "https://atomicdata.dev/classes/Class shortname",
+                None,
+                &ForAgent::Sudo,
+            )
             .unwrap();
         match res {
             crate::storelike::PathReturn::Subject(_) => panic!("Should be an Atom"),
@@ -362,7 +366,7 @@ mod test {
             .get_path(
                 "https://atomicdata.dev/classes/Class requires 0",
                 None,
-                None,
+                &ForAgent::Sudo,
             )
             .unwrap();
         match res {
@@ -389,7 +393,7 @@ mod test {
             .get_path(
                 "https://atomicdata.dev/classes/Class requires isa description",
                 None,
-                None,
+                &ForAgent::Sudo,
             )
             .unwrap();
     }
@@ -402,7 +406,7 @@ mod test {
             .get_path(
                 "https://atomicdata.dev/classes/Class requires requires",
                 None,
-                None,
+                &ForAgent::Sudo,
             )
             .unwrap();
     }

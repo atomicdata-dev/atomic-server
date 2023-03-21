@@ -2,7 +2,7 @@ use crate::{
     print::{get_serialization, print_resource},
     Context,
 };
-use atomic_lib::{errors::AtomicResult, serialize, storelike, Atom, Storelike};
+use atomic_lib::{agents::ForAgent, errors::AtomicResult, serialize, storelike, Atom, Storelike};
 use serialize::Format;
 
 /// Resolves an Atomic Path query
@@ -18,10 +18,14 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
 
     // Returns a URL or Value
     let store = &mut context.store;
-    let path = store.get_path(&path_string, Some(&context.mapping.lock().unwrap()), None)?;
+    let path = store.get_path(
+        &path_string,
+        Some(&context.mapping.lock().unwrap()),
+        &ForAgent::Sudo,
+    )?;
     let out = match path {
         storelike::PathReturn::Subject(subject) => {
-            let resource = store.get_resource_extended(&subject, false, None)?;
+            let resource = store.get_resource_extended(&subject, false, &ForAgent::Sudo)?;
             print_resource(context, &resource, subcommand_matches)?;
             return Ok(());
         }

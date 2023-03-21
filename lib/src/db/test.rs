@@ -1,4 +1,4 @@
-use crate::{urls, Value};
+use crate::{agents::ForAgent, urls, Value};
 
 use super::*;
 use ntest::timeout;
@@ -67,7 +67,7 @@ fn populate_collections() {
     println!("{:?}", subjects);
     let collections_collection_url = format!("{}/collections", store.get_server_url());
     let collections_resource = store
-        .get_resource_extended(&collections_collection_url, false, None)
+        .get_resource_extended(&collections_collection_url, false, &ForAgent::Public)
         .unwrap();
     let member_count = collections_resource
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -90,10 +90,15 @@ fn populate_collections() {
 /// Also counts commits.
 fn destroy_resource_and_check_collection_and_commits() {
     let store = Db::init_temp("counter").unwrap();
+    let for_agent = &ForAgent::Public;
     let agents_url = format!("{}/agents", store.get_server_url());
     let agents_collection_1 = store
-        .get_resource_extended(&agents_url, false, None)
+        .get_resource_extended(&agents_url, false, for_agent)
         .unwrap();
+    println!(
+        "Agents collection 1: {}",
+        agents_collection_1.to_json_ad().unwrap()
+    );
     let agents_collection_count_1 = agents_collection_1
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
         .unwrap()
@@ -101,13 +106,13 @@ fn destroy_resource_and_check_collection_and_commits() {
         .unwrap();
     assert_eq!(
         agents_collection_count_1, 1,
-        "The Agents collection is not one (we assume there is one agent already present from init)"
+        "There should be only 1 agent in this members collection (we assume there is one agent already present from init)"
     );
 
     // We will count the commits, and check if they've incremented later on.
     let commits_url = format!("{}/commits", store.get_server_url());
     let commits_collection_1 = store
-        .get_resource_extended(&commits_url, false, None)
+        .get_resource_extended(&commits_url, false, for_agent)
         .unwrap();
     let commits_collection_count_1 = commits_collection_1
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -123,7 +128,7 @@ fn destroy_resource_and_check_collection_and_commits() {
         .unwrap();
     let _res = resource.save_locally(&store).unwrap();
     let agents_collection_2 = store
-        .get_resource_extended(&agents_url, false, None)
+        .get_resource_extended(&agents_url, false, for_agent)
         .unwrap();
     let agents_collection_count_2 = agents_collection_2
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -136,7 +141,7 @@ fn destroy_resource_and_check_collection_and_commits() {
     );
 
     let commits_collection_2 = store
-        .get_resource_extended(&commits_url, false, None)
+        .get_resource_extended(&commits_url, false, for_agent)
         .unwrap();
     let commits_collection_count_2 = commits_collection_2
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -152,7 +157,7 @@ fn destroy_resource_and_check_collection_and_commits() {
 
     _res.resource_new.unwrap().destroy(&store).unwrap();
     let agents_collection_3 = store
-        .get_resource_extended(&agents_url, false, None)
+        .get_resource_extended(&agents_url, false, for_agent)
         .unwrap();
     let agents_collection_count_3 = agents_collection_3
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -165,7 +170,7 @@ fn destroy_resource_and_check_collection_and_commits() {
     );
 
     let commits_collection_3 = store
-        .get_resource_extended(&commits_url, false, None)
+        .get_resource_extended(&commits_url, false, for_agent)
         .unwrap();
     let commits_collection_count_3 = commits_collection_3
         .get(crate::urls::COLLECTION_MEMBER_COUNT)
@@ -187,13 +192,17 @@ fn get_extended_resource_pagination() {
         "{}/commits?current_page=2&page_size=99999",
         store.get_server_url()
     );
-    if store.get_resource_extended(&subject, false, None).is_ok() {
+    let for_agent = &ForAgent::Public;
+    if store
+        .get_resource_extended(&subject, false, for_agent)
+        .is_ok()
+    {
         panic!("Page 2 should not exist, because page size is set to a high value.")
     }
     // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
     let subject_with_page_size = format!("{}&page_size=1", subject);
     let resource = store
-        .get_resource_extended(&subject_with_page_size, false, None)
+        .get_resource_extended(&subject_with_page_size, false, &ForAgent::Public)
         .unwrap();
     let cur_page = resource
         .get(urls::COLLECTION_CURRENT_PAGE)
@@ -263,7 +272,7 @@ fn queries() {
         sort_desc: false,
         include_external: true,
         include_nested: false,
-        for_agent: None,
+        for_agent: ForAgent::Sudo,
     };
     let res = store.query(&q).unwrap();
     assert_eq!(
@@ -340,7 +349,7 @@ fn queries() {
 
     // We set the limit to 2 to make sure Query always returns the 1 out of 10 resources that has public rights.
     q.limit = Some(2);
-    q.for_agent = Some(urls::PUBLIC_AGENT.into());
+    q.for_agent = urls::PUBLIC_AGENT.into();
     let res = store.query(&q).unwrap();
     assert_eq!(res.subjects.len(), 1, "authorized subjects");
     assert_eq!(res.resources.len(), 1, "authorized resources");
@@ -352,7 +361,7 @@ fn queries() {
     q.property = Some(prop_filter.into());
     q.value = Some(demo_reference);
     q.sort_by = Some(sort_by.into());
-    q.for_agent = None;
+    q.for_agent = ForAgent::Sudo;
     q.limit = Some(limit);
     let res = store.query(&q).unwrap();
     println!("res {:?}", res.subjects);
@@ -389,7 +398,7 @@ fn query_include_external() {
         sort_desc: false,
         include_external: true,
         include_nested: false,
-        for_agent: None,
+        for_agent: ForAgent::Sudo,
     };
     let res_include = store.query(&q).unwrap();
     q.include_external = false;
@@ -500,7 +509,7 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
         sort_desc: false,
         include_external: true,
         include_nested: true,
-        for_agent: None,
+        for_agent: ForAgent::Sudo,
     };
     let mut res = store.query(&q).unwrap();
     assert_eq!(

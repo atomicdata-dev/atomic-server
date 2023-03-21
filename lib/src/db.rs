@@ -16,6 +16,7 @@ use std::{
 use tracing::{info, instrument};
 
 use crate::{
+    agents::ForAgent,
     atoms::IndexAtom,
     commit::CommitResponse,
     db::{query_index::NO_VALUE, val_prop_sub_index::find_in_val_prop_sub_index},
@@ -342,7 +343,7 @@ impl Storelike for Db {
         &self,
         subject: &str,
         skip_dynamic: bool,
-        for_agent: Option<&str>,
+        for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
         let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
         // This might add a trailing slash
@@ -390,9 +391,7 @@ impl Storelike for Db {
         let dynamic_span = tracing::span!(tracing::Level::TRACE, "Dynamic").entered();
         let mut resource = self.get_resource(&removed_query_params)?;
 
-        if let Some(agent) = for_agent {
-            let _explanation = crate::hierarchy::check_read(self, &resource, agent)?;
-        }
+        let _explanation = crate::hierarchy::check_read(self, &resource, for_agent)?;
 
         // Whether the resource has dynamic properties
         let mut has_dynamic = false;
@@ -534,7 +533,7 @@ impl Storelike for Db {
         &self,
         subject: &str,
         body: Vec<u8>,
-        for_agent: Option<&str>,
+        for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
         let endpoints = self.endpoints.iter().filter(|e| e.handle_post.is_some());
         let subj_url = url::Url::try_from(subject)?;

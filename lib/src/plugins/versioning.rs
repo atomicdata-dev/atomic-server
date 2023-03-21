@@ -1,6 +1,7 @@
 use tracing::warn;
 
 use crate::{
+    agents::ForAgent,
     collections::CollectionBuilder,
     endpoints::{Endpoint, HandleGetContext},
     errors::AtomicResult,
@@ -43,7 +44,7 @@ fn handle_version_request(context: HandleGetContext) -> AtomicResult<Resource> {
     if commit_url.is_none() {
         return version_endpoint().to_resource(context.store);
     }
-    let mut resource = construct_version(&commit_url.unwrap(), context.store, context.for_agent)?;
+    let mut resource = construct_version(&commit_url.unwrap(), context.store, &context.for_agent)?;
     resource.set_subject(context.subject.to_string());
     Ok(resource)
 }
@@ -123,15 +124,13 @@ pub fn get_initial_commit_for_resource(
 pub fn construct_version(
     commit_url: &str,
     store: &impl Storelike,
-    for_agent: Option<&str>,
+    for_agent: &ForAgent,
 ) -> AtomicResult<Resource> {
     let commit = store.get_resource(commit_url)?;
     // Get all the commits for the subject of that Commit
     let subject = &commit.get(urls::SUBJECT)?.to_string();
-    if let Some(agent) = &for_agent {
-        let current_resource = store.get_resource(subject)?;
-        crate::hierarchy::check_read(store, &current_resource, agent)?;
-    }
+    let current_resource = store.get_resource(subject)?;
+    crate::hierarchy::check_read(store, &current_resource, for_agent)?;
     let commits = get_commits_for_resource(subject, store)?;
     let mut version = Resource::new(subject.into());
     for commit in commits {
@@ -161,7 +160,7 @@ fn construct_version_endpoint_url(store: &impl Storelike, commit_url: &str) -> S
 pub fn get_version(
     commit_url: &str,
     store: &impl Storelike,
-    for_agent: Option<&str>,
+    for_agent: &ForAgent,
 ) -> AtomicResult<Resource> {
     let version_url = construct_version_endpoint_url(store, commit_url);
     match store.get_resource(&version_url) {
@@ -202,9 +201,10 @@ mod test {
             .unwrap();
         let second_commit = resource.save_locally(&store).unwrap().commit_resource;
         let commits = get_commits_for_resource(subject, &store).unwrap();
-        assert_eq!(commits.len(), 2);
+        assert_eq!(commits.len(), 2, "We should have two commits");
 
-        let first_version = construct_version(first_commit.get_subject(), &store, None).unwrap();
+        let first_version =
+            construct_version(first_commit.get_subject(), &store, &ForAgent::Sudo).unwrap();
         assert_eq!(
             first_version
                 .get_shortname("description", &store)
@@ -213,7 +213,8 @@ mod test {
             first_val
         );
 
-        let second_version = construct_version(second_commit.get_subject(), &store, None).unwrap();
+        let second_version =
+            construct_version(second_commit.get_subject(), &store, &ForAgent::Sudo).unwrap();
         assert_eq!(
             second_version
                 .get_shortname("description", &store)

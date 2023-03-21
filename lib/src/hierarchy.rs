@@ -4,18 +4,18 @@
 
 use core::fmt;
 
-use crate::{errors::AtomicResult, storelike::Query, urls, Resource, Storelike};
+use crate::{agents::ForAgent, errors::AtomicResult, storelike::Query, urls, Resource, Storelike};
 
 #[derive(Debug)]
 pub enum Right {
     /// Full read access to the resource and its children.
-    /// https://atomicdata.dev/properties/read
+    /// [urls::READ]
     Read,
     /// Full edit, update, destroy access to the resource and its children.
-    /// https://atomicdata.dev/properties/write
+    /// [urls::WRITE]
     Write,
     /// Create new children (append to tree)
-    /// https://atomicdata.dev/properties/append
+    /// [urls::APPEND]
     Append,
 }
 
@@ -44,7 +44,7 @@ pub fn add_children(store: &impl Storelike, resource: &mut Resource) -> AtomicRe
 pub fn check_write(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: &str,
+    for_agent: &ForAgent,
 ) -> AtomicResult<String> {
     check_rights(store, resource, for_agent, Right::Write)
 }
@@ -55,7 +55,7 @@ pub fn check_write(
 pub fn check_read(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: &str,
+    for_agent: &ForAgent,
 ) -> AtomicResult<String> {
     check_rights(store, resource, for_agent, Right::Read)
 }
@@ -68,7 +68,7 @@ pub fn check_read(
 pub fn check_append(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: &str,
+    for_agent: &ForAgent,
 ) -> AtomicResult<String> {
     match resource.get_parent(store) {
         Ok(parent) => {
@@ -101,10 +101,14 @@ pub fn check_append(
 pub fn check_rights(
     store: &impl Storelike,
     resource: &Resource,
-    for_agent: &str,
+    for_agent_enum: &ForAgent,
     right: Right,
 ) -> AtomicResult<String> {
-    if resource.get_subject() == for_agent {
+    if for_agent_enum == &ForAgent::Sudo {
+        return Ok("Sudo has root access, and can edit anything.".into());
+    }
+    let for_agent = for_agent_enum.to_string();
+    if resource.get_subject() == &for_agent {
         return Ok("Agents can always edit themselves or their children.".into());
     }
     if let Ok(server_agent) = store.get_default_agent() {
@@ -119,7 +123,7 @@ pub fn check_rights(
             Right::Read => {
                 // Commits can be read when their subject / target is readable.
                 let target = store.get_resource(&commit_subject.to_string())?;
-                check_rights(store, &target, for_agent, right)
+                check_rights(store, &target, for_agent_enum, right)
             }
             Right::Write => Err("Commits cannot be edited.".into()),
             Right::Append => Err("Commits cannot have children, you cannot Append to them.".into()),
@@ -150,9 +154,9 @@ pub fn check_rights(
 
     // Try the parents recursively
     if let Ok(parent) = resource.get_parent(store) {
-        check_rights(store, &parent, for_agent, right)
+        check_rights(store, &parent, for_agent_enum, right)
     } else {
-        if for_agent == urls::PUBLIC_AGENT {
+        if for_agent_enum == &ForAgent::Public {
             // resource has no parent and agent is not in rights array - check fails
             let action = match right {
                 Right::Read => "readable",

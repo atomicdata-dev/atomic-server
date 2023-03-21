@@ -1,7 +1,10 @@
 //! Check signatures in authentication headers, find the correct agent. Authorization is done in Hierarchies
 
 use crate::{
-    agents::decode_base64, commit::check_timestamp, errors::AtomicResult, urls, Storelike,
+    agents::{decode_base64, ForAgent},
+    commit::check_timestamp,
+    errors::AtomicResult,
+    urls, Storelike,
 };
 
 /// Set of values extracted from the request.
@@ -51,8 +54,7 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
 pub fn get_agent_from_auth_values_and_check(
     auth_header_values: Option<AuthValues>,
     store: &impl Storelike,
-) -> AtomicResult<String> {
-    let mut for_agent = crate::urls::PUBLIC_AGENT.to_string();
+) -> AtomicResult<ForAgent> {
     if let Some(auth_vals) = auth_header_values {
         // If there are auth headers, check 'em, make sure they are valid.
         check_auth_signature(&auth_vals.requested_subject, &auth_vals)
@@ -62,16 +64,17 @@ pub fn get_agent_from_auth_values_and_check(
         // check if the public key belongs to the agent
         let found_public_key = store.get_value(&auth_vals.agent_subject, urls::PUBLIC_KEY)?;
         if found_public_key.to_string() != auth_vals.public_key {
-            return Err(
+            Err(
                 "The public key in the auth headers does not match the public key in the agent"
                     .to_string()
                     .into(),
-            );
+            )
         } else {
-            for_agent = auth_vals.agent_subject;
+            Ok(ForAgent::AgentSubject(auth_vals.agent_subject))
         }
-    };
-    Ok(for_agent)
+    } else {
+        Ok(ForAgent::Public)
+    }
 }
 
 // fn get_agent_from_value_index() {

@@ -134,6 +134,9 @@ pub const DELETE: &str = "https://atomicdata.dev/methods/delete";
 
 // Instances
 pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
+// The Sudo Agent does not use an HTTP(S) identifier, because it should never resolve.
+// We don't want a user to actually control this URL.
+pub const SUDO_AGENT: &str = "sudo:agent";
 
 // Paths
 pub fn construct_path_import(base: &str) -> String {

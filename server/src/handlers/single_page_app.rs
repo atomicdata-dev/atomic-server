@@ -15,7 +15,7 @@ pub async fn single_page(
     let meta_tags: MetaTags = if let Ok(resource) =
         appstate
             .store
-            .get_resource_extended(&subject, true, Some(urls::PUBLIC_AGENT))
+            .get_resource_extended(&subject, true, &ForAgent::Public)
     {
         resource.into()
     } else {
@@ -40,6 +40,7 @@ pub async fn single_page(
     Ok(resp)
 }
 
+use atomic_lib::agents::ForAgent;
 use atomic_lib::urls;
 use atomic_lib::Resource;
 use atomic_lib::Storelike;

@@ -10,6 +10,7 @@ use actix::{Actor, ActorContext, Addr, AsyncContext, Handler, StreamHandler};
 use actix_web::{web, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use atomic_lib::{
+    agents::ForAgent,
     authentication::{get_agent_from_auth_values_and_check, AuthValues},
     errors::AtomicResult,
     Db, Storelike,
@@ -62,7 +63,7 @@ pub struct WebSocketConnection {
     commit_monitor_addr: Addr<CommitMonitor>,
     /// The Agent who is connected.
     /// If it's not specified, it's the Public Agent.
-    agent: String,
+    agent: ForAgent,
     store: Db,
 }
 
@@ -111,7 +112,7 @@ fn handle_ws_message(
                             .do_send(crate::actor_messages::Subscribe {
                                 addr: ctx.address(),
                                 subject: subject.to_string(),
-                                agent: conn.agent.clone(),
+                                agent: conn.agent.to_string(),
                             });
                         conn.subscribed.insert(subject.into());
                         Ok(())
@@ -133,7 +134,7 @@ fn handle_ws_message(
                     if let Some(subject) = parts.nth(1) {
                         match conn
                             .store
-                            .get_resource_extended(subject, false, Some(&conn.agent))
+                            .get_resource_extended(subject, false, &conn.agent)
                         {
                             Ok(r) => {
                                 let serialized =
@@ -168,8 +169,8 @@ fn handle_ws_message(
                             &conn.store,
                         ) {
                             Ok(a) => {
-                                conn.agent = a.clone();
                                 tracing::debug!("Authenticated websocket for {}", a);
+                                conn.agent = a.into();
                                 Ok(())
                             }
                             Err(e) => Err(format!("Authentication failed: {}", e).into()),
@@ -198,7 +199,7 @@ fn handle_ws_message(
 }
 
 impl WebSocketConnection {
-    fn new(commit_monitor_addr: Addr<CommitMonitor>, agent: String, store: Db) -> Self {
+    fn new(commit_monitor_addr: Addr<CommitMonitor>, agent: ForAgent, store: Db) -> Self {
         let size = std::mem::size_of::<Db>();
         if size > 10000 {
             tracing::warn!(

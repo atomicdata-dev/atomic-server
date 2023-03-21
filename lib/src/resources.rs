@@ -334,7 +334,7 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
-            validate_for_agent: Some(agent.subject),
+            validate_for_agent: agent.subject.into(),
             // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-data-rust/issues/412
             validate_previous_commit: false,
             update_index: true,
@@ -362,7 +362,7 @@ impl Resource {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
-            validate_for_agent: Some(agent.subject),
+            validate_for_agent: agent.subject.into(),
             // https://github.com/atomicdata-dev/atomic-data-rust/issues/412
             validate_previous_commit: false,
             update_index: true,

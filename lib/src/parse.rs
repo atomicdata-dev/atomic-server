@@ -1,8 +1,9 @@
 //! Parsing / deserialization / decoding
 
 use crate::{
-    commit::CommitOpts, datatype::DataType, errors::AtomicResult, resources::PropVals, urls,
-    utils::check_valid_url, values::SubResource, AtomicError, Resource, Storelike, Value,
+    agents::ForAgent, commit::CommitOpts, datatype::DataType, errors::AtomicResult,
+    resources::PropVals, urls, utils::check_valid_url, values::SubResource, AtomicError, Resource,
+    Storelike, Value,
 };
 
 pub const JSON_AD_MIME: &str = "application/ad+json";
@@ -25,7 +26,7 @@ pub struct ParseOpts {
     /// Who's rights will be checked when creating the imported resources.
     /// Is only used when `save` is set to [SaveOpts::Commit].
     /// If [None] is passed, all resources will be
-    pub for_agent: Option<String>,
+    pub for_agent: ForAgent,
     /// Who will perform the importing. If set to none, all possible commits will be signed by the default agent.
     /// Note that this Agent needs a private key to sign the commits.
     /// Is only used when `save` is set to `Commit`.
@@ -58,7 +59,7 @@ impl std::default::Default for ParseOpts {
         Self {
             signer: None,
             importer: None,
-            for_agent: None,
+            for_agent: ForAgent::Sudo,
             overwrite_outside: true,
             save: SaveOpts::Save,
         }
@@ -344,9 +345,9 @@ fn parse_json_ad_map_to_resource(
                     validate_schema: true,
                     validate_signature: true,
                     validate_timestamp: false,
-                    validate_rights: parse_opts.for_agent.is_some(),
+                    validate_rights: parse_opts.for_agent != ForAgent::Sudo,
                     validate_previous_commit: false,
-                    validate_for_agent: parse_opts.for_agent.clone(),
+                    validate_for_agent: Some(parse_opts.for_agent.to_string()),
                     update_index: true,
                 };
 
@@ -541,7 +542,7 @@ mod test {
         let parse_opts = ParseOpts {
             save: SaveOpts::Commit,
             signer: Some(store.get_default_agent().unwrap()),
-            for_agent: None,
+            for_agent: ForAgent::Sudo,
             overwrite_outside: false,
             importer: Some(importer.clone()),
         };
@@ -562,7 +563,7 @@ mod test {
 
         let parse_opts = ParseOpts {
             save: SaveOpts::Commit,
-            for_agent: None,
+            for_agent: ForAgent::Sudo,
             signer: Some(store.get_default_agent().unwrap()),
             overwrite_outside: false,
             importer: Some(importer.clone()),
@@ -621,7 +622,7 @@ mod test {
         let mut parse_opts = ParseOpts {
             save: SaveOpts::Commit,
             signer: Some(agent.clone()),
-            for_agent: Some(agent.subject),
+            for_agent: agent.subject.into(),
             overwrite_outside: false,
             importer: Some(importer),
         };

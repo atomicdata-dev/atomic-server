@@ -3,6 +3,7 @@ Importers allow users to (periodically) import JSON-AD files from a remote sourc
 */
 
 use crate::{
+    agents::ForAgent,
     endpoints::{Endpoint, HandleGetContext, HandlePostContext},
     errors::AtomicResult,
     urls, Resource, Storelike,
@@ -70,7 +71,7 @@ pub fn handle_post(context: HandlePostContext) -> AtomicResult<Resource> {
     }
 
     let parse_opts = crate::parse::ParseOpts {
-        for_agent: for_agent.map(|a| a.to_string()),
+        for_agent: for_agent.clone(),
         importer: Some(parent),
         overwrite_outside,
         // We sign the importer Commits with the default agent,
@@ -80,7 +81,7 @@ pub fn handle_post(context: HandlePostContext) -> AtomicResult<Resource> {
     };
 
     if let Some(json_string) = json {
-        if for_agent.is_none() {
+        if for_agent == &ForAgent::Public {
             return Err("No agent specified for importer".to_string().into());
         }
         store.import(&json_string, &parse_opts)?;
