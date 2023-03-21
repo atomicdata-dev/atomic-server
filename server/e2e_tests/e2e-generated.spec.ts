@@ -585,7 +585,9 @@ test.describe('data-browser', async () => {
     await fillInput('shortname', page);
     await fillInput('description', page);
     await page.click('[data-test="save"]');
+    await page.waitForNavigation();
     await page.locator('text=Resource Saved');
+    await page.goBack();
 
     await page
       .locator('[title="Add an item to this list"] >> nth=0')
