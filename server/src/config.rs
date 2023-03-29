@@ -273,7 +273,6 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
             "The `--email` flag (or ATOMIC_EMAIL env) is required for getting an HTTPS certificate from letsencrypt.org."
                 .into(),
         );
-        // email = Some(promptly::prompt("What is your e-mail? This is required for getting an HTTPS certificate from Let'sEncrypt.").unwrap());
     }
 
     let schema = if opts.https { "https" } else { "http" };
