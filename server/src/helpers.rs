@@ -79,12 +79,13 @@ pub fn get_auth_from_cookie(
     for enc in encoded_session_cookies {
         let session = base64::decode(enc).map_err(|_| {
             AtomicError::unauthorized(
-                "Malformed authentication resource - unable to decode base64".to_string(),
+                "Malformed authentication resource in cookie - unable to decode base64".to_string(),
             )
         })?;
 
         let session_str = std::str::from_utf8(&session).map_err(|_| AtomicServerError {
-            message: "Malformed authentication resource - unable to parse from utf_8".to_string(),
+            message: "Malformed authentication resource in cookie - unable to parse from utf_8"
+                .to_string(),
             error_type: AppErrorType::Unauthorized,
             error_resource: None,
         })?;
@@ -107,7 +108,7 @@ pub fn get_auth_from_cookie(
             // 2. The user is trying to access a resource from a different origin
 
             err = AtomicError::unauthorized(format!(
-                "Wrong requested subject, expected {} was {}",
+                "Wrong requested subject in cookie, expected {} was {}",
                 requested_subject, auth_values.requested_subject
             ))
             .into();
