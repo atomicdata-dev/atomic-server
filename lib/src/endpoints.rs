@@ -87,15 +87,13 @@ impl std::fmt::Debug for Endpoint {
     }
 }
 
-pub fn default_endpoints() -> Vec<Endpoint> {
+pub fn build_default_endpoints() -> Vec<Endpoint> {
     vec![
         plugins::versioning::version_endpoint(),
         plugins::versioning::all_versions_endpoint(),
         plugins::path::path_endpoint(),
         plugins::search::search_endpoint(),
         plugins::files::upload_endpoint(),
-        plugins::register::register_endpoint(),
-        plugins::register::confirm_email_endpoint(),
         #[cfg(feature = "html")]
         plugins::bookmark::bookmark_endpoint(),
         plugins::importer::import_endpoint(),
