@@ -20,18 +20,20 @@ use tracing::instrument;
 
 use crate::{
     agents::ForAgent,
-    atomic_url::AtomicUrl,
+    atomic_url::{AtomicUrl, Routes},
     atoms::IndexAtom,
     commit::CommitResponse,
     db::{query_index::NO_VALUE, val_prop_sub_index::find_in_val_prop_sub_index},
     email::{self, MailMessage},
-    endpoints::{default_endpoints, Endpoint, HandleGetContext},
+    endpoints::{build_default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
+    plugins,
     query::QueryResult,
     resources::PropVals,
     storelike::Storelike,
+    urls,
     values::SortableValue,
-    Atom, Query, Resource,
+    Atom, Query, Resource, Value,
 };
 
 use self::{
@@ -112,7 +114,7 @@ impl Db {
             prop_val_sub_index,
             server_url: AtomicUrl::try_from(server_url)?,
             watched_queries,
-            endpoints: default_endpoints(),
+            endpoints: Vec::new(),
             handle_commit: None,
             smtp_client: None,
         };
@@ -220,9 +222,40 @@ impl Db {
         Some(Resource::from_propvals(propvals, subject))
     }
 
+    pub fn register_default_endpoints(&mut self) -> AtomicResult<()> {
+        // First we delete all existing endpoint resources, as they might not be there in this new run
+        let found_endpoints = self.query(&Query::new_class(urls::ENDPOINT))?.resources;
+
+        for mut found in found_endpoints {
+            found.destroy(self)?;
+        }
+
+        let mut endpoints = build_default_endpoints();
+
+        if self.smtp_client.is_some() {
+            endpoints.push(plugins::register::register_endpoint());
+            endpoints.push(plugins::register::confirm_email_endpoint());
+        }
+
+        for endpoint in endpoints {
+            self.register_endpoint(endpoint)?;
+        }
+
+        Ok(())
+    }
+
     /// Adds an [Endpoint] to the store. This means adding a route with custom behavior.
-    pub fn register_endpoint(&mut self, endpoint: Endpoint) {
+    pub fn register_endpoint(&mut self, endpoint: Endpoint) -> AtomicResult<()> {
+        let mut resource = endpoint.to_resource(self)?;
+        let endpoints_collection = self.get_server_url().set_route(Routes::Endpoints);
+        resource.set_propval(
+            urls::PARENT.into(),
+            Value::AtomicUrl(endpoints_collection.to_string()),
+            self,
+        )?;
+        resource.save_locally(self)?;
         self.endpoints.push(endpoint);
+        Ok(())
     }
 
     /// Registers an SMTP client to the store, allowing the store to send emails.

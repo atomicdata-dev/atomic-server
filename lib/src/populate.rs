@@ -248,26 +248,6 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 }
 
 #[cfg(feature = "db")]
-/// Adds default Endpoints (versioning) to the Db.
-/// Makes sure they are fetchable
-pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
-    use crate::atomic_url::Routes;
-
-    let endpoints = crate::plugins::default_endpoints();
-    let endpoints_collection = store.get_server_url().set_route(Routes::Endpoints);
-    for endpoint in endpoints {
-        let mut resource = endpoint.to_resource(store)?;
-        resource.set_propval(
-            urls::PARENT.into(),
-            Value::AtomicUrl(endpoints_collection.to_string()),
-            store,
-        )?;
-        resource.save_locally(store)?;
-    }
-    Ok(())
-}
-
-#[cfg(feature = "db")]
 /// Adds items to the SideBar as subresources.
 /// Useful for helping a new user get started.
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
@@ -294,7 +274,6 @@ pub fn populate_all(store: &crate::Db) -> AtomicResult<()> {
     create_drive(store, None, &store.get_default_agent()?.subject, true)
         .map_err(|e| format!("Failed to create drive. {}", e))?;
     populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
-    populate_endpoints(store).map_err(|e| format!("Failed to populate endpoints. {}", e))?;
     populate_sidebar_items(store)
         .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
     Ok(())
