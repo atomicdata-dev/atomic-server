@@ -404,7 +404,7 @@ test.describe('data-browser', async () => {
     // Create a new folder
     await newResource('folder', page);
     // Createa sub-resource
-    await page.click('text=New Resource');
+    await page.click('[data-test="new-resource-folder"]');
     await page.click('button:has-text("Document")');
     await page.locator(editableTitle).click();
     await page.keyboard.type('RAM Downloading Strategies');
