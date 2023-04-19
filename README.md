@@ -7,11 +7,10 @@
 
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 AtomicServer is a lightweight, yet powerful CMS / Graph Database.
+Demo on [atomicdata.dev](https://atomicdata.dev)
 This repo also includes the [`atomic_lib`](lib/README.md) Rust library and [`atomic-cli`](cli/README.md).**
 
 _Status: alpha. [Breaking changes](CHANGELOG.md) are expected until 1.0._
-
-Demo on [atomicdata.dev](https://atomicdata.dev)**
 
 <!-- We re-use this table in various places, such as README.md and in the docs repo. Consider this the source. -->
 - 🚀  **Fast** (less than 1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
