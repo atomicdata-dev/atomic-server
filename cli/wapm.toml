@@ -2,7 +2,7 @@
 description = "Create, share, fetch and model linked Atomic Data!"
 license = "MIT"
 name = "atomic"
-repository = "https://github.com/atomicdata-dev/atomic-data-rust"
+repository = "https://github.com/atomicdata-dev/atomic-server"
 version = "0.15.0"
 
 [[module]]

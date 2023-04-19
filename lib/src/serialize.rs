@@ -23,7 +23,7 @@ pub fn resources_to_json_ad(resources: &[Resource]) -> AtomicResult<String> {
 
 /// Converts an Atomic Value to a Serde Value.
 // TODO: Accept JSON-LD / JSON as options
-// https://github.com/atomicdata-dev/atomic-data-rust/issues/315
+// https://github.com/atomicdata-dev/atomic-server/issues/315
 fn val_to_serde(value: Value) -> AtomicResult<SerdeValue> {
     let json_val: SerdeValue = match value {
         Value::AtomicUrl(val) => SerdeValue::String(val),

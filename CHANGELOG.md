@@ -125,7 +125,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Removed system tray from `atomic-server`, since I only want to maintain the Tauri version
 - Rename `src-tauri` to `desktop` and make the tauri code part of the cargo workspace
 - In Queries, respect a `limit` of `None` and `include_external` #317
-- Run end-to-end tests from `atomic-data-browser` in `atomic-data-rust` CI #204
+- Run end-to-end tests from `atomic-data-browser` in `atomic-server` CI #204
 - Use `nextest` for testing #338
 - Improve and monitor test coverage #337
 - Fix commit indexing #345

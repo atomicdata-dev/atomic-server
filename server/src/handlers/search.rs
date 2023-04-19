@@ -41,7 +41,7 @@ pub struct SearchQuery {
 const DEFAULT_RETURN_LIMIT: usize = 30;
 // We fetch extra documents, as the user may not have the rights to the first ones!
 // We filter these results later.
-// https://github.com/atomicdata-dev/atomic-data-rust/issues/279.
+// https://github.com/atomicdata-dev/atomic-server/issues/279.
 const UNAUTHORIZED_RESULTS_FACTOR: usize = 3;
 
 /// Parses a search query and responds with a list of resources
@@ -118,8 +118,8 @@ fn get_resources(
 
     // This is a pretty expensive operation. We need to check the rights for the subjects to prevent data leaks.
     // But we could probably do some things to speed this up: make it async / parallel, check admin rights.
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/279
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/280/
+    // https://github.com/atomicdata-dev/atomic-server/issues/279
+    // https://github.com/atomicdata-dev/atomic-server/issues/280/
     let for_agent = crate::helpers::get_client_agent(req.headers(), appstate, subject.into())?;
     for s in subjects {
         match appstate.store.get_resource_extended(&s, true, &for_agent) {
@@ -176,7 +176,7 @@ fn query_from_params(
 /// Performs both fuzzy and exact queries on the text and description fields.
 /// Boosts titles and exact matches over descriptions and fuzzy matches.
 /// Does not yet search in JSON fields:
-/// https://github.com/atomicdata-dev/atomic-data-rust/issues/597
+/// https://github.com/atomicdata-dev/atomic-server/issues/597
 #[tracing::instrument]
 fn build_text_query(fields: &Fields, q: &str) -> AtomicResult<impl Query> {
     let mut token_stream = tantivy::tokenizer::SimpleTokenizer.token_stream(q);

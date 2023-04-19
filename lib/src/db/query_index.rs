@@ -35,7 +35,7 @@ impl QueryFilter {
     /// This means that whenever the store is updated (when a [Commit](crate::Commit) is added), the QueryFilter is checked.
     pub fn watch(&self, store: &Db) -> AtomicResult<()> {
         if self.property.is_none() && self.value.is_none() {
-            return Err("Cannot watch a query without a property or value. These types of queries are not implemented. See https://github.com/atomicdata-dev/atomic-data-rust/issues/548 ".into());
+            return Err("Cannot watch a query without a property or value. These types of queries are not implemented. See https://github.com/atomicdata-dev/atomic-server/issues/548 ".into());
         };
         store
             .watched_queries
@@ -152,7 +152,7 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         // We iterate over every single resource, even if we don't perform any computation on the items.
         // This helps with pagination, but it comes at a serious performance cost. We might need to change how this works later on.
         // Also, this count does not take into account the `include_external` filter.
-        // https://github.com/atomicdata-dev/atomic-data-rust/issues/290
+        // https://github.com/atomicdata-dev/atomic-server/issues/290
         count = i + 1;
     }
 
@@ -208,7 +208,7 @@ pub fn should_update_property<'a>(
     // This name is not part of the `index_atom` itself, as the name wasn't updated.
     // So here we not only make sure that the QueryFilter actually matches the resource,
     // But we also return which prop & val we matched on, so we can update the index with the correct value.
-    // See https://github.com/atomicdata-dev/atomic-data-rust/issues/395
+    // See https://github.com/atomicdata-dev/atomic-server/issues/395
     let matching_prop = match find_matching_propval(resource, q_filter) {
         Some(a) => a,
         // if the resource doesn't match the filter, we don't need to update the index
@@ -264,7 +264,7 @@ pub fn should_update_property<'a>(
             None
         }
         // TODO: Consider if we should allow the following indexes this.
-        // See https://github.com/atomicdata-dev/atomic-data-rust/issues/548
+        // See https://github.com/atomicdata-dev/atomic-server/issues/548
         // When changing these, also update [QueryFilter::watch]
         (None, None, None) => None,
         (None, None, Some(_)) => None,
@@ -480,7 +480,7 @@ pub mod test {
         assert!(start_none < num_1);
         assert!(num_1 < num_2);
         // TODO: Fix sorting numbers
-        // https://github.com/atomicdata-dev/atomic-data-rust/issues/287
+        // https://github.com/atomicdata-dev/atomic-server/issues/287
         // assert!(num_2 < num_10);
         // assert!(num_10 < num_1000);
         assert!(num_1000 < a_downcase);

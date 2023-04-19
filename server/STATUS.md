@@ -23,10 +23,10 @@ These features are very unlikely to be significantly altered until V1.0. They wi
 - Cookie Authentication.
 - Document editor, see [milestone](https://github.com/atomicdata-dev/atomic-data-browser/milestone/2).
 - Table editor, see [milestone](https://github.com/atomicdata-dev/atomic-data-browser/milestone/3).
-- URL requirements for new URLS, see [issue](https://github.com/atomicdata-dev/atomic-data-rust/issues/556)
+- URL requirements for new URLS, see [issue](https://github.com/atomicdata-dev/atomic-server/issues/556)
 - Full text search. Improvements to sorting algorithm and adding more filter options is likely.
 
 ## Experimental
 
-- Plugin system. All APIs related to this are very likely to change. See [issue](https://github.com/atomicdata-dev/atomic-data-rust/issues/73)
+- Plugin system. All APIs related to this are very likely to change. See [issue](https://github.com/atomicdata-dev/atomic-server/issues/73)
 - Chat rooms. They work, but expect serious changes.

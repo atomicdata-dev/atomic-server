@@ -335,7 +335,7 @@ impl Resource {
             validate_timestamp: false,
             validate_rights: false,
             validate_for_agent: agent.subject.into(),
-            // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-data-rust/issues/412
+            // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-server/issues/412
             validate_previous_commit: false,
             update_index: true,
         };
@@ -363,7 +363,7 @@ impl Resource {
             validate_timestamp: false,
             validate_rights: false,
             validate_for_agent: agent.subject.into(),
-            // https://github.com/atomicdata-dev/atomic-data-rust/issues/412
+            // https://github.com/atomicdata-dev/atomic-server/issues/412
             validate_previous_commit: false,
             update_index: true,
         };
@@ -484,7 +484,7 @@ impl Resource {
 
     /// Changes the subject of the Resource.
     /// Does not 'move' the Resource
-    /// See https://github.com/atomicdata-dev/atomic-data-rust/issues/44
+    /// See https://github.com/atomicdata-dev/atomic-server/issues/44
     pub fn set_subject(&mut self, url: String) {
         self.commit.set_subject(url.clone());
         self.subject = url;

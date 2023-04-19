@@ -2,7 +2,7 @@
 
 First things first: I'm glad you're reading this!
 Join our [Discord](https://discord.gg/a72Rv2P) to chat with other people in the Atomic Data community.
-If you encounter any issues, add them to the [Github issue tracker](https://github.com/atomicdata-dev/atomic-data-rust/issues).
+If you encounter any issues, add them to the [Github issue tracker](https://github.com/atomicdata-dev/atomic-server/issues).
 Same goes for feature requests.
 PR's are welcome, too!
 Note that opening a PR means agreeing that your code becomes distributed under the MIT license.
@@ -91,7 +91,7 @@ npm run test-query {testname}
 
 ## Code coverage
 
-- Visible at https://app.codecov.io/gh/atomicdata-dev/atomic-data-rust/
+- Visible at https://app.codecov.io/gh/atomicdata-dev/atomic-server/
 - Checked in CI
 
 ```sh
@@ -146,7 +146,7 @@ We have benchmarks in the `/lib/benchmarks` folder. Make sure there's a benchmar
 ```sh
 # install criterion
 cargo install cargo-criterion
-# go to atomic-data-rust root folder - don't run benchmarks in `./lib`
+# go to atomic-server root folder - don't run benchmarks in `./lib`
 cd ..
 # run benchmark
 cargo criterion
@@ -192,7 +192,7 @@ Note:
 
 Before tagging a new version, make sure to update the `app_assets` folder:
 
-1. Go up one directory from `atomic-data-rust` => `cd ..`
+1. Go up one directory from `atomic-server` => `cd ..`
 2. In here, clone [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser)
 3. Run `./build-server.sh` to compile assets and copy them to your `app_assets` directory
 4. Make sure not to commit all the files, manually check them
@@ -231,7 +231,7 @@ or:
 
 #### Deploying to atomicdata.dev
 
-1. Run the [`deploy` Github action](https://github.com/atomicdata-dev/atomic-data-rust/actions/workflows/deployment.yml)
+1. Run the [`deploy` Github action](https://github.com/atomicdata-dev/atomic-server/actions/workflows/deployment.yml)
 
 or do it manually:
 

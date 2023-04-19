@@ -86,7 +86,7 @@ fn handle_bookmark_request(context: HandleGetContext) -> AtomicResult<Resource> 
     let cleaned_html = parser.clean_document()?;
     let md = html2md::parse_html(&cleaned_html);
     // Remove empty characters.
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/474
+    // https://github.com/atomicdata-dev/atomic-server/issues/474
     let md = regex::Regex::new(r#"\s{5,}"#).unwrap().replace_all(&md, "");
 
     resource.set_propval(urls::PREVIEW.into(), Value::Markdown(md.into()), store)?;

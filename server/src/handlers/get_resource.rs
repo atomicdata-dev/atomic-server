@@ -61,7 +61,7 @@ pub async fn handle_get_resource(
     tracing::debug!("get_resource: {} as {}", subject, content_type.to_mime());
     builder.append_header(("Content-Type", content_type.to_mime()));
     // This prevents the browser from displaying the JSON response upon re-opening a closed tab
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/137
+    // https://github.com/atomicdata-dev/atomic-server/issues/137
     builder.append_header((
         "Cache-Control",
         "no-store, no-cache, must-revalidate, private",

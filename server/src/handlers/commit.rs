@@ -25,7 +25,7 @@ pub async fn post_commit(
         validate_signature: true,
         validate_timestamp: true,
         validate_rights: true,
-        // https://github.com/atomicdata-dev/atomic-data-rust/issues/412
+        // https://github.com/atomicdata-dev/atomic-server/issues/412
         validate_previous_commit: false,
         validate_for_agent: Some(incoming_commit.signer.to_string()),
         update_index: true,

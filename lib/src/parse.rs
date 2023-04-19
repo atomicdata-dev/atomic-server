@@ -438,7 +438,7 @@ mod test {
 
     // Roundtrip test requires fixing, because the order of imports can get problematic.
     // We should first import all Properties, then Classes, then other things.
-    // See https://github.com/atomicdata-dev/atomic-data-rust/issues/614
+    // See https://github.com/atomicdata-dev/atomic-server/issues/614
     #[ignore]
     #[test]
     fn serialize_parse_roundtrip() {

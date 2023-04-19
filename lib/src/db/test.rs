@@ -354,7 +354,7 @@ fn queries() {
     assert_eq!(res.subjects.len(), 1, "authorized subjects");
     assert_eq!(res.resources.len(), 1, "authorized resources");
     // TODO: Ideally, the count is authorized too. But doing that could be hard. (or expensive)
-    // https://github.com/atomicdata-dev/atomic-data-rust/issues/286
+    // https://github.com/atomicdata-dev/atomic-server/issues/286
     // assert_eq!(res.count, 1, "authorized count");
 
     println!("Filter by value, property and also Sort");

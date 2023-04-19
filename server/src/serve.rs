@@ -33,7 +33,7 @@ const PAYLOAD_MAX: usize = 50_242_880;
 
 /// Start the server
 pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
-    println!("Atomic-server {} \nUse --help for instructions. Visit https://docs.atomicdata.dev and https://github.com/atomicdata-dev/atomic-data-rust for more info.", env!("CARGO_PKG_VERSION"));
+    println!("Atomic-server {} \nUse --help for instructions. Visit https://docs.atomicdata.dev and https://github.com/atomicdata-dev/atomic-server for more info.", env!("CARGO_PKG_VERSION"));
     let tracing_chrome_flush_guard = crate::trace::init_tracing(&config);
 
     // Setup the database and more

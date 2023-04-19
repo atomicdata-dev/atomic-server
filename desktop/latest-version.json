@@ -5,15 +5,15 @@
   "platforms": {
     "darwin": {
       "signature": "",
-      "url": "https://github.com/atomicdata-dev/atomic-data-rust/releases/download/v0.31.1/Atomic.Server_0.31.1_aarch64.m1.macbook.dmg"
+      "url": "https://github.com/atomicdata-dev/atomic-server/releases/download/v0.31.1/Atomic.Server_0.31.1_aarch64.m1.macbook.dmg"
     },
     "linux": {
       "signature": "",
-      "url": "https://github.com/atomicdata-dev/atomic-data-rust/releases/download/v0.31.1/Atomic.Server_0.31.1_linux.m1.macbook.dmg"
+      "url": "https://github.com/atomicdata-dev/atomic-server/releases/download/v0.31.1/Atomic.Server_0.31.1_linux.m1.macbook.dmg"
     },
     "win64": {
       "signature": "",
-      "url": "https://github.com/atomicdata-dev/atomic-data-rust/releases/download/v0.31.1/Atomic.Server_0.31.1_win64.macbook.dmg"
+      "url": "https://github.com/atomicdata-dev/atomic-server/releases/download/v0.31.1/Atomic.Server_0.31.1_win64.macbook.dmg"
     }
   }
 }

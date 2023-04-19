@@ -5,7 +5,7 @@ edition = "2021"
 license = "MIT"
 name = "atomic-cli"
 readme = "README.md"
-repository = "https://github.com/atomicdata-dev/atomic-data-rust"
+repository = "https://github.com/atomicdata-dev/atomic-server"
 version = "0.34.4"
 
 [dependencies]
