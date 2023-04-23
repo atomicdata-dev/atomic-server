@@ -121,6 +121,7 @@ pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
 }
 
 /// Indexes all resources from the store to search.
+/// Skips Commits.
 /// At this moment does not remove existing index.
 pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServerResult<()> {
     tracing::info!("Building search index...");

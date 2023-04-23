@@ -5,8 +5,7 @@ use crate::{
     collections::CollectionBuilder,
     endpoints::{Endpoint, HandleGetContext},
     errors::AtomicResult,
-    storelike::Query,
-    urls, AtomicError, Commit, Resource, Storelike,
+    urls, AtomicError, Commit, Query, Resource, Storelike,
 };
 
 pub fn version_endpoint() -> Endpoint {

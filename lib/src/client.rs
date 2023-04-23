@@ -55,7 +55,7 @@ pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> At
     }
 
     let agent = ureq::builder()
-        .timeout(std::time::Duration::from_secs(2))
+        .timeout(std::time::Duration::from_secs(10))
         .build();
     let resp = agent
         .get(url)

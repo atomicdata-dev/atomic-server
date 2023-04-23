@@ -148,8 +148,8 @@ If you want to make your atomic-server available on the web, but don't want (or 
 It's the easiest way to get your server to run on the web, yet still have full control over your server.
 
 - Create an account on some tunneling service, such as [tunnelto.dev](https://tunnelto.dev/) (which we will use here). Make sure to reserve a subdomain, you want it to remain stable.
-- `tunnelto --port 9883 --subdomain joepio --key YOUR_API_KEY`
-- `atomic-server --domain joepio.tunnelto.dev --custom-server-url 'https://joepio.tunnelto.dev' --initialize`
+- `tunnelto --port 9883 --subdomain my_subdomain --key YOUR_API_KEY`
+- `atomic-server server-url 'https://my_subdomain.tunnelto.dev'`
 
 ### HTTPS Setup on a VPS (static IP required)
 

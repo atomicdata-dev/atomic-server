@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::helpers::get_subject;
 use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::HttpResponse;
 
@@ -9,9 +10,13 @@ use actix_web::HttpResponse;
 pub async fn single_page(
     appstate: actix_web::web::Data<AppState>,
     path: actix_web::web::Path<String>,
+    req: actix_web::HttpRequest,
+    conn: actix_web::dev::ConnectionInfo,
 ) -> AtomicServerResult<HttpResponse> {
     let template = include_str!("../../app_assets/index.html");
-    let subject = format!("{}/{}", appstate.store.get_server_url(), path);
+    // We could check the extension and serialize the Resource in the response. However, I'm not sure this is a great idea.
+    let (subject, _content_type) = get_subject(&req, &conn, &appstate)?;
+
     let meta_tags: MetaTags = if let Ok(resource) =
         appstate
             .store
@@ -35,6 +40,7 @@ pub async fn single_page(
             "Cache-Control",
             "no-store, no-cache, must-revalidate, private",
         ))
+        .append_header(("Vary", "Accept"))
         .body(body);
 
     Ok(resp)
@@ -99,7 +105,10 @@ impl Default for MetaTags {
 
 impl Display for MetaTags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let description = escape_html(&self.description);
+        let description = escape_html(&self.description)
+            .chars()
+            .take(250)
+            .collect::<String>();
         let image = &self.image;
         let title = escape_html(&self.title);
 
@@ -115,6 +124,8 @@ impl Display for MetaTags {
 <meta property=\"twitter:image\" content=\"{image}\">"
         )?;
         if let Some(json_unsafe) = &self.json {
+            // If we would serialize plain JSON in HTML,
+            // users might escape the HTML tag and execute arbitrary code.
             let json_base64 = base64::encode(json_unsafe);
             write!(
                 f,

@@ -1,10 +1,10 @@
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
-use crate::storelike::QueryResult;
-use crate::Value;
-use crate::{atoms::Atom, storelike::Storelike};
+use crate::query::QueryResult;
+use crate::{atomic_url::AtomicUrl, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
+use crate::{Atom, Value};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -13,6 +13,14 @@ pub struct Store {
     // The store currently holds two stores - that is not ideal
     hashmap: Arc<Mutex<HashMap<String, Resource>>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+}
+
+/// The URL used for stores that are not accessible on the web.
+// I'd prefer this to a non-HTTP URI, but that causes parsing issues when we combine it with some paths (at least with Commits)
+pub const LOCAL_STORE_URL_STR: &str = "http://noresolve.localhost";
+
+lazy_static::lazy_static! {
+    static ref LOCAL_STORE_URL: AtomicUrl = AtomicUrl::try_from(LOCAL_STORE_URL_STR).unwrap();
 }
 
 impl Store {
@@ -49,7 +57,7 @@ impl Store {
     /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.
-    fn tpf(
+    pub fn tpf(
         &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
@@ -173,14 +181,14 @@ impl Storelike for Store {
         Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &AtomicUrl {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/atomicdata-dev/atomic-data-rust/issues/6
-        "local:store"
+        &LOCAL_STORE_URL
     }
 
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -213,7 +221,7 @@ impl Storelike for Store {
         self.default_agent.lock().unwrap().replace(agent);
     }
 
-    fn query(&self, q: &crate::storelike::Query) -> AtomicResult<crate::storelike::QueryResult> {
+    fn query(&self, q: &crate::Query) -> AtomicResult<crate::query::QueryResult> {
         let atoms = self.tpf(
             None,
             q.property.as_deref(),

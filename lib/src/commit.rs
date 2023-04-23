@@ -6,6 +6,7 @@ use urls::{SET, SIGNER};
 
 use crate::{
     agents::{decode_base64, encode_base64},
+    atomic_url::Routes,
     datatype::DataType,
     errors::AtomicResult,
     hierarchy,
@@ -45,6 +46,8 @@ pub struct CommitOpts {
     pub update_index: bool,
     /// For who the right checks will be perormed. If empty, the signer of the Commit will be used.
     pub validate_for_agent: Option<String>,
+    /// Checks if the URL of the parent is present in its Parent URL.
+    pub validate_subject_url_parent: bool,
 }
 
 /// A Commit is a set of changes to a Resource.
@@ -119,7 +122,7 @@ impl Commit {
                 .verify(stringified_commit.as_bytes(), &signature_bytes)
                 .map_err(|_e| {
                     format!(
-                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: {}",
+                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: '{}'",
                         stringified_commit,
                     )
                 })?;
@@ -162,9 +165,24 @@ impl Commit {
             }
         };
 
+        // We apply the changes and create a new resource, but don't index it yet.
         let mut resource_new = self
             .apply_changes(resource_old.clone(), store, false)
             .map_err(|e| format!("Error applying changes to Resource {}. {}", self.subject, e))?;
+
+        // For new subjects, make sure that the parent of the resource is part of the URL of the new subject.
+        if is_new && opts.validate_subject_url_parent {
+            if let Ok(parent) = resource_new.get(urls::PARENT) {
+                let parent_str = parent.to_string();
+                if !self.subject.starts_with(&parent_str) {
+                    return Err(format!(
+                        "You cannot create a new Resource with this subject, because the parent '{}' is not part of the URL of the new subject '{}'.",
+                        parent_str, self.subject
+                    )
+                    .into());
+                }
+            }
+        }
 
         if opts.validate_rights {
             let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&self.signer);
@@ -178,7 +196,7 @@ impl Commit {
                     let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
                     resource_old.set_propval(
                         urls::PARENT.into(),
-                        Value::AtomicUrl(default_parent),
+                        Value::AtomicUrl(default_parent.to_string()),
                         store,
                     )?;
                 }
@@ -201,6 +219,7 @@ impl Commit {
         let _resource_new_classes = resource_new.get_classes(store)?;
 
         // BEFORE APPLY COMMIT HANDLERS
+        // TODO: These should be handled by actual plugins
         #[cfg(feature = "db")]
         for class in &_resource_new_classes {
             match class.subject.as_str() {
@@ -379,6 +398,7 @@ impl Commit {
             validate_signature: false,
             validate_timestamp: false,
             validate_rights: false,
+            validate_subject_url_parent: false,
             validate_previous_commit: false,
             validate_for_agent: None,
             update_index: false,
@@ -435,10 +455,18 @@ impl Commit {
     #[tracing::instrument(skip(store))]
     pub fn into_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
         let commit_subject = match self.signature.as_ref() {
-            Some(sig) => format!("{}/commits/{}", store.get_server_url(), sig),
+            Some(sig) => store
+                .get_server_url()
+                .set_route(Routes::Commits)
+                .append(sig)
+                .to_string(),
             None => {
                 let now = crate::utils::now();
-                format!("{}/commitsUnsigned/{}", store.get_server_url(), now)
+                store
+                    .get_server_url()
+                    .set_route(Routes::CommitsUnsigned)
+                    .append(&now.to_string())
+                    .to_string()
             }
         };
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
@@ -689,6 +717,7 @@ mod test {
             validate_previous_commit: true,
             validate_rights: false,
             validate_for_agent: None,
+            validate_subject_url_parent: true,
             update_index: true,
         };
     }
@@ -761,10 +790,10 @@ mod test {
         let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
         let store = crate::Store::init().unwrap();
         store.populate().unwrap();
-        let agent = Agent::new_from_private_key(None, &store, private_key);
+        let agent = Agent::new_from_private_key(None, &store, private_key).unwrap();
         assert_eq!(
             &agent.subject,
-            "local:store/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="
+            "http://noresolve.localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U="
         );
         store.add_resource(&agent.to_resource().unwrap()).unwrap();
         let subject = "https://localhost/new_thing";
@@ -779,8 +808,8 @@ mod test {
         let signature = commit.signature.clone().unwrap();
         let serialized = commit.serialize_deterministically_json_ad(&store).unwrap();
 
-        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"local:store/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
-        assert_eq!(signature, "JOGRyp1NCulc0RNuuNozgIagQPRoZy0Y5+mbSpHY2DKiN3vqUNYLjXbAPYT6Cga6vSG9zztEIa/ZcbQPo7wgBg==");
+        assert_eq!(serialized, "{\"https://atomicdata.dev/properties/createdAt\":0,\"https://atomicdata.dev/properties/isA\":[\"https://atomicdata.dev/classes/Commit\"],\"https://atomicdata.dev/properties/set\":{\"https://atomicdata.dev/properties/description\":\"Some value\",\"https://atomicdata.dev/properties/shortname\":\"someval\"},\"https://atomicdata.dev/properties/signer\":\"http://noresolve.localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=\",\"https://atomicdata.dev/properties/subject\":\"https://localhost/new_thing\"}");
+        assert_eq!(signature, "CZbjUJW/tokEKSZTCFjEHWbWqGW+jyhZWYs82K9wt0SArxu9xGg+D3IniAlygQp0F3KcI4Z876th3/X3fJIVAQ==");
     }
 
     #[test]

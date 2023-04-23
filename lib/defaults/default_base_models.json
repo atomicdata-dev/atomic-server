@@ -78,17 +78,23 @@
   },
   {
     "@id": "https://atomicdata.dev/classes/Property",
-    "https://atomicdata.dev/properties/description": "A Resource that should redirect the browser to a new location. It can also set a `redirectAgent`, which is used in Invites to create an Agent Resource on the Server from a Public Key that the user posesses. See the [Invite docs](https://docs.atomicdata.dev/invitations.html).",
+    "https://atomicdata.dev/properties/description": "A Property is a single field in a Class. It's the thing that a property field in an Atom points to. An example is `birthdate`. An instance of Property requires various Properties, most notably a `datatype` (e.g. `string` or `integer`), a human readable `description` (such as the thing you're reading), and a `shortname`.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Class"
     ],
-    "https://atomicdata.dev/properties/requires": [
-      "https://atomicdata.dev/properties/destination"
-    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
     "https://atomicdata.dev/properties/recommends": [
-      "https://atomicdata.dev/properties/invite/redirectAgent"
+      "https://atomicdata.dev/properties/classtype",
+      "https://atomicdata.dev/properties/isDynamic",
+      "https://atomicdata.dev/properties/isLocked",
+      "https://atomicdata.dev/properties/allowsOnly"
     ],
-    "https://atomicdata.dev/properties/shortname": "redirect"
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/shortname",
+      "https://atomicdata.dev/properties/datatype",
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/shortname": "property"
   },
   {
     "@id": "https://atomicdata.dev/classes/Class",

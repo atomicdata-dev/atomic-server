@@ -2,7 +2,7 @@
 
 use crate::{
     datatype::match_datatype, datatype::DataType, errors::AtomicResult, resources::PropVals,
-    utils::check_valid_url, Resource,
+    utils::check_valid_url, AtomicUrl, Resource,
 };
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -348,6 +348,16 @@ impl From<Vec<Resource>> for Value {
         let mut vec = Vec::new();
         for i in val {
             vec.push(SubResource::Resource(Box::new(i)));
+        }
+        Value::ResourceArray(vec)
+    }
+}
+
+impl From<Vec<AtomicUrl>> for Value {
+    fn from(val: Vec<AtomicUrl>) -> Self {
+        let mut vec = Vec::new();
+        for i in val {
+            vec.push(SubResource::Subject(i.to_string()));
         }
         Value::ResourceArray(vec)
     }

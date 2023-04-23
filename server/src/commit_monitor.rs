@@ -54,8 +54,9 @@ impl Handler<Subscribe> for CommitMonitor {
         fields(to = %msg.subject, agent = %msg.agent)
     )]
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Context<Self>) {
-        // check if the agent has the rights to subscribe to this resource
-        if !msg.subject.starts_with(&self.store.get_self_url().unwrap()) {
+        // check if the agent has the rights to subscribe to this resourceif let Some(self_url) = self.get_self_url() {
+
+        if self.store.is_external_subject(&msg.subject).unwrap_or(true) {
             tracing::warn!("can't subscribe to external resource");
             return;
         }
