@@ -622,8 +622,19 @@ test.describe('data-browser', async () => {
   });
 });
 
+async function disableViewTransition(page: Page) {
+  await page.click('text=Theme Settings');
+  const checkbox = await page.getByLabel('Enable view transition');
+
+  await expect(checkbox).toBeVisible();
+
+  await checkbox.uncheck();
+  await page.goBack();
+}
+
 /** Signs in using an AtomicData.dev test user */
 async function signIn(page: Page) {
+  await disableViewTransition(page);
   await page.click('text=user settings');
   await expect(
     await page.locator('text=edit data and sign Commits'),
@@ -657,7 +668,7 @@ async function newDrive(page: Page) {
   return { driveURL: driveURL as string, driveTitle };
 }
 
-async function makeDrivePublic(page) {
+async function makeDrivePublic(page: Page) {
   await page.click(currentDriveTitle);
   await page.click(contextMenu);
   await page.click('button:has-text("share")');
@@ -686,13 +697,13 @@ async function openAtomic(page: Page) {
 async function editProfileAndCommit(page: Page) {
   await page.click('text=user settings');
   await page.click('text=Edit profile');
-  await expect(await page.locator('text=add another property')).toBeVisible();
+  await expect(page.locator('text=add another property')).toBeVisible();
   const username = `Test user edited at ${new Date().toLocaleDateString()}`;
   await page.fill('[data-test="input-name"]', username);
   await page.click('[data-test="save"]');
-  await expect(await page.locator('text=saved')).toBeVisible();
+  await expect(page.locator('text=Resource saved')).toBeVisible();
   await page.waitForURL(/\/app\/show/);
-  await expect(await page.locator(`text=${username}`).first()).toBeVisible();
+  await expect(page.locator(`text=${username}`).first()).toBeVisible();
 }
 
 /** Create a new Resource in the current Drive */
