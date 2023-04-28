@@ -176,7 +176,7 @@ pub fn get_client_agent(
         &appstate.store,
     )
     .map_err(|e| format!("Authentication failed: {}", e))?;
-    Ok(for_agent.into())
+    Ok(for_agent)
 }
 
 /// Finds the extension

@@ -170,7 +170,7 @@ fn handle_ws_message(
                         ) {
                             Ok(a) => {
                                 tracing::debug!("Authenticated websocket for {}", a);
-                                conn.agent = a.into();
+                                conn.agent = a;
                                 Ok(())
                             }
                             Err(e) => Err(format!("Authentication failed: {}", e).into()),

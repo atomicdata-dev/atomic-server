@@ -190,8 +190,8 @@ pub trait Storelike: Sized {
     ) -> AtomicResult<Resource> {
         let _ignore = skip_dynamic;
         let resource = self.get_resource(subject)?;
-        hierarchy::check_read(self, &resource, &for_agent)?;
-        return Ok(resource);
+        hierarchy::check_read(self, &resource, for_agent)?;
+        Ok(resource)
     }
 
     /// This function is called whenever a Commit is applied.

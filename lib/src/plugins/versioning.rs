@@ -44,7 +44,7 @@ fn handle_version_request(context: HandleGetContext) -> AtomicResult<Resource> {
     if commit_url.is_none() {
         return version_endpoint().to_resource(context.store);
     }
-    let mut resource = construct_version(&commit_url.unwrap(), context.store, &context.for_agent)?;
+    let mut resource = construct_version(&commit_url.unwrap(), context.store, context.for_agent)?;
     resource.set_subject(context.subject.to_string());
     Ok(resource)
 }
