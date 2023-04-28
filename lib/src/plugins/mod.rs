@@ -43,5 +43,6 @@ pub mod invite;
 pub mod bookmark;
 pub mod files;
 pub mod path;
+pub mod query;
 pub mod search;
 pub mod versioning;

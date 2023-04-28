@@ -145,3 +145,4 @@ pub fn construct_path_import(base: &str) -> String {
 
 pub const PATH_IMPORT: &str = "/import";
 pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
+pub const PATH_QUERY: &str = "/query";
