@@ -84,5 +84,6 @@ pub fn default_endpoints() -> Vec<Endpoint> {
         #[cfg(feature = "html")]
         plugins::bookmark::bookmark_endpoint(),
         plugins::importer::import_endpoint(),
+        plugins::query::query_endpoint(),
     ]
 }
