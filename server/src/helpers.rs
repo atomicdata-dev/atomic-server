@@ -18,6 +18,15 @@ pub fn get_auth_headers(
     map: &HeaderMap,
     requested_subject: String,
 ) -> AtomicServerResult<Option<AuthValues>> {
+    if let Some(bearer) = map.get("authorization") {
+        let bearer = bearer
+            .to_str()
+            .map_err(|_e| "Only string headers allowed in authorization header")?
+            .trim_start_matches("Bearer ");
+        let auth_vals = get_auth_from_base64(bearer, &requested_subject)?;
+        return Ok(Some(auth_vals));
+    }
+
     let public_key = map.get("x-atomic-public-key");
     let signature = map.get("x-atomic-signature");
     let timestamp = map.get("x-atomic-timestamp");
@@ -77,50 +86,61 @@ pub fn get_auth_from_cookie(
         AtomicError::unauthorized("No valid session cookies found. ".into()).into();
 
     for enc in encoded_session_cookies {
-        let session = base64::decode(enc).map_err(|_| {
-            AtomicError::unauthorized(
-                "Malformed authentication resource in cookie - unable to decode base64".to_string(),
-            )
-        })?;
+        match get_auth_from_base64(&enc, requested_subject) {
+            Ok(auth_vals) => return Ok(Some(auth_vals)),
+            Err(e) => {
+                if e.message.contains(WRONG_SUBJECT_ERR) && check_multiple {
+                    // if the subject is wrong, we can try the next one
+                    err = e;
+                    continue;
+                } else {
+                    return Err(e);
+                }
+            }
+        }
+    }
 
-        let session_str = std::str::from_utf8(&session).map_err(|_| AtomicServerError {
-            message: "Malformed authentication resource in cookie - unable to parse from utf_8"
-                .to_string(),
+    Err(err)
+}
+
+static WRONG_SUBJECT_ERR: &str = "Wrong requested subject in auth token";
+
+fn get_auth_from_base64(base64: &str, requested_subject: &str) -> AtomicServerResult<AuthValues> {
+    let session = base64::decode(base64).map_err(|_| {
+        AtomicError::unauthorized(
+            "Malformed authentication resource - unable to decode base64".to_string(),
+        )
+    })?;
+
+    let session_str = std::str::from_utf8(&session).map_err(|_| AtomicServerError {
+        message: "Malformed authentication resource - unable to parse from utf_8".to_string(),
+        error_type: AppErrorType::Unauthorized,
+        error_resource: None,
+    })?;
+    let auth_values: AuthValues =
+        serde_json::from_str(session_str).map_err(|e| AtomicServerError {
+            message: format!(
+                "Malformed authentication resource when parsing AuthValues JSON: {}",
+                e
+            ),
             error_type: AppErrorType::Unauthorized,
             error_resource: None,
         })?;
-        let auth_values: AuthValues =
-            serde_json::from_str(session_str).map_err(|e| AtomicServerError {
-                message: format!(
-                    "Malformed authentication resource when parsing AuthValues JSON: {}",
-                    e
-                ),
-                error_type: AppErrorType::Unauthorized,
-                error_resource: None,
-            })?;
+    let subject_invalid = auth_values.requested_subject.ne(requested_subject)
+        && auth_values.requested_subject.ne(&origin(requested_subject));
+    if subject_invalid {
+        // if the subject is invalid, there are two things that could be going on.
+        // 1. The requested resource is wrong
+        // 2. The user is trying to access a resource from a different origin
 
-        let subject_invalid = auth_values.requested_subject.ne(requested_subject)
-            && auth_values.requested_subject.ne(&origin(requested_subject));
-
-        if subject_invalid {
-            // if the subject is invalid, there are two things that could be going on.
-            // 1. The requested resource is wrong
-            // 2. The user is trying to access a resource from a different origin
-
-            err = AtomicError::unauthorized(format!(
-                "Wrong requested subject in cookie, expected {} was {}",
-                requested_subject, auth_values.requested_subject
-            ))
-            .into();
-            if check_multiple {
-                continue;
-            } else {
-                return Err(err);
-            }
-        }
-        return Ok(Some(auth_values));
+        let err = AtomicError::unauthorized(format!(
+            "{}, expected {} was {}",
+            WRONG_SUBJECT_ERR, requested_subject, auth_values.requested_subject
+        ))
+        .into();
+        return Err(err);
     }
-    Err(err)
+    Ok(auth_values)
 }
 
 pub fn get_auth(
@@ -250,6 +270,22 @@ mod test {
         );
         let subject = "https://staging.atomicdata.dev";
         let out = get_auth_from_cookie(&headermap, subject)
+            .expect("Should not return err")
+            .expect("Should contain cookie");
+
+        assert_eq!(out.requested_subject, subject);
+    }
+
+    #[test]
+    fn bearer() {
+        let token = "eyJodHRwczovL2F0b21pY2RhdGEuZGV2L3Byb3BlcnRpZXMvYXV0aC9hZ2VudCI6Imh0dHBzOi8vYXRvbWljZGF0YS5kZXYvYWdlbnRzL1FtZnBSSUJuMkpZRWF0VDBNalNrTU5vQkp6c3R6MTlvcnduVDVvVDJyY1E9IiwiaHR0cHM6Ly9hdG9taWNkYXRhLmRldi9wcm9wZXJ0aWVzL2F1dGgvcmVxdWVzdGVkU3ViamVjdCI6Imh0dHBzOi8vYXRvbWljZGF0YS5kZXYiLCJodHRwczovL2F0b21pY2RhdGEuZGV2L3Byb3BlcnRpZXMvYXV0aC9wdWJsaWNLZXkiOiJRbWZwUklCbjJKWUVhdFQwTWpTa01Ob0JKenN0ejE5b3J3blQ1b1QycmNRPSIsImh0dHBzOi8vYXRvbWljZGF0YS5kZXYvcHJvcGVydGllcy9hdXRoL3RpbWVzdGFtcCI6MTY3NjI4MjU4NDg0NCwiaHR0cHM6Ly9hdG9taWNkYXRhLmRldi9wcm9wZXJ0aWVzL2F1dGgvc2lnbmF0dXJlIjoia1NvLzZQeUdkcnhnbFJFUFdVeUJRVEZxb3RMcmV4L040czRZRFV2d0N0aTl5NEpxWnkwaG92aUtCNkRtMDFCTEdKUU41b3hRdWdveXphSDVIcmVLRHc9PSJ9";
+        let mut headermap = HeaderMap::new();
+        headermap.insert(
+            "authorization".try_into().unwrap(),
+            HeaderValue::from_str(token).unwrap(),
+        );
+        let subject = "https://atomicdata.dev";
+        let out = get_auth_headers(&headermap, subject.into())
             .expect("Should not return err")
             .expect("Should contain cookie");
 
