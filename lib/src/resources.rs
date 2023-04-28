@@ -2,6 +2,7 @@
 //! Has methods for saving resources and getting properties inside them.
 
 use crate::commit::{CommitOpts, CommitResponse};
+use crate::storelike::Query;
 use crate::urls;
 use crate::utils::random_string;
 use crate::values::{SubResource, Value};
@@ -47,13 +48,28 @@ impl Resource {
     }
 
     /// Removes / deletes the resource from the store by performing a Commit.
+    /// Recursively deletes the resource's children.
     pub fn destroy(
         &mut self,
         store: &impl Storelike,
     ) -> AtomicResult<crate::commit::CommitResponse> {
+        let children = self.get_children(store);
+
+        if let Ok(children) = children {
+            for mut child in children {
+                child.destroy(store)?;
+            }
+        }
+
         self.commit.destroy(true);
         self.save(store)
             .map_err(|e| format!("Failed to destroy {} : {}", self.subject, e).into())
+    }
+
+    /// Gets the children of this resource.
+    pub fn get_children(&self, store: &impl Storelike) -> AtomicResult<Vec<Resource>> {
+        let result = store.query(&Query::new_prop_val(urls::PARENT, self.get_subject()))?;
+        Ok(result.resources)
     }
 
     pub fn from_propvals(propvals: PropVals, subject: String) -> Resource {
@@ -544,6 +560,8 @@ impl Resource {
 
 #[cfg(test)]
 mod test {
+    use ntest::assert_panics;
+
     use super::*;
     use crate::{test_utils::init_store, urls};
 
@@ -771,5 +789,79 @@ mod test {
             .to_subjects(None)
             .unwrap();
         assert_eq!(new_val.first().unwrap(), append_value);
+    }
+
+    #[test]
+    fn get_children() {
+        let store = init_store();
+        let mut resource1 = Resource::new_generate_subject(&store);
+        let subject1 = resource1.get_subject().to_string();
+        resource1.save_locally(&store).unwrap();
+
+        let mut resource2 = Resource::new_generate_subject(&store);
+        resource2
+            .set_propval(urls::PARENT.into(), Value::AtomicUrl(subject1), &store)
+            .unwrap();
+        let subject2 = resource2.get_subject().to_string();
+        resource2.save_locally(&store).unwrap();
+
+        let children = resource1.get_children(&store).unwrap();
+
+        assert_eq!(children.len(), 1);
+        assert_eq!(children[0].get_subject(), &subject2);
+    }
+
+    #[test]
+    fn destroy() {
+        let store = init_store();
+        // Create 3 resources in a tree structure.
+
+        let mut resource1 = Resource::new_generate_subject(&store);
+        let subject1 = resource1.get_subject().to_string();
+        resource1.save_locally(&store).unwrap();
+
+        let mut resource2 = Resource::new_generate_subject(&store);
+        resource2
+            .set_propval(
+                urls::PARENT.into(),
+                Value::AtomicUrl(subject1.clone()),
+                &store,
+            )
+            .unwrap();
+        let subject2 = resource2.get_subject().to_string();
+        resource2.save_locally(&store).unwrap();
+
+        let mut resource3 = Resource::new_generate_subject(&store);
+        resource3
+            .set_propval(
+                urls::PARENT.into(),
+                Value::AtomicUrl(subject2.clone()),
+                &store,
+            )
+            .unwrap();
+        let subject3 = resource3.get_subject().to_string();
+        resource3.save_locally(&store).unwrap();
+
+        // Check if all 3 resources exist in the store.
+
+        assert_eq!(
+            store.get_resource(&subject1).unwrap().get_subject(),
+            &subject1
+        );
+        assert_eq!(
+            store.get_resource(&subject2).unwrap().get_subject(),
+            &subject2
+        );
+        assert_eq!(
+            store.get_resource(&subject3).unwrap().get_subject(),
+            &subject3
+        );
+
+        // Destroy the first resource, and check if all 3 resources are gone.
+        resource1.destroy(&store).unwrap();
+
+        assert_panics!({ store.get_resource(&subject1).unwrap() });
+        assert_panics!({ store.get_resource(&subject2).unwrap() });
+        assert_panics!({ store.get_resource(&subject3).unwrap() });
     }
 }

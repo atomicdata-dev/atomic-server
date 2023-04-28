@@ -353,7 +353,7 @@ pub struct Query {
     pub property: Option<String>,
     /// Filter by Value
     pub value: Option<Value>,
-    /// Maximum of items to return
+    /// Maximum of items to return, if none returns all items.
     pub limit: Option<usize>,
     /// Value at which to begin lexicographically sorting things.
     pub start_val: Option<Value>,
