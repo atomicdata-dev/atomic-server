@@ -16,6 +16,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Refactor `for_agent` arguments to use the new `ForAgent` enum #623
 - Add support for Bearer token authentication, find in `/app/token` #632
 - Add a `query` endpoint that allows peroforming collection queries via an enpoint instead of repurposing the collections collection.
+- `resource.destroy` now recursively destroys its children.
 
 ## [v0.34.2] - 2023-03-04
 
