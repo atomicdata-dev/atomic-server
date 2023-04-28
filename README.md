@@ -63,6 +63,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [Items are missing in my Collections / Search results](#items-are-missing-in-my-collections--search-results)
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
   - [Can I embed AtomicServer in another application?](#can-i-embed-atomicserver-in-another-application)
+- [I want to use my own authorization. How do I do that?](#i-want-to-use-my-own-authorization-how-do-i-do-that)
   - [Where is my data stored on my machine?](#where-is-my-data-stored-on-my-machine)
 - [Also in this Repo](#also-in-this-repo)
   - [`atomic-cli`](#atomic-cli)
@@ -297,9 +298,10 @@ Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more ab
 
 ### Can / should I create backups?
 
-You should. Especially before installing a newer AtomicServer version, as it might be imcompatible with the previous database model and could corrupt the database.
-Run `atomic-server export` to create a backup in your `~/.config/atomic/backups` folder.
-Import them using `atomic-server import -p ~/.config/atomic/backups/${date}.json`.
+You should.
+Run `atomic-server export` to create a JSON-AD backup in your `~/.config/atomic/backups` folder.
+Import them using `atomic-server import -p ~/.config/atomic/backups/${date}.json`.'
+You could also copy all folders `atomic-server` uses. To see what these are, see `atomic-server show-config`.
 
 ### I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?
 
@@ -312,7 +314,7 @@ This could especially be helpful if you're running at `localhost:9883` and want 
 
 ### How do I reset my database?
 
-Remove the `db` folder in your `atomic` config: `rm -rf ~/.config/atomic/db`.
+`atomic-server reset`
 
 ### How do I make my data private, yet available online?
 
@@ -333,6 +335,11 @@ Try re-initializing atomic server `atomic-server --initialize`.
 
 Yes. This is what I'm doing with the Tauri desktop distribution of AtomicServer.
 Check out the [`desktop`](https://github.com/atomicdata-dev/atomic-server/tree/master/desktop) code for an example!
+
+## I want to use my own authorization. How do I do that?
+
+You can disable all authorization using `--public-mode`.
+Make sure AtomicServer is not publicly accessible, because this will allow anyone to read any data.
 
 ### Where is my data stored on my machine?
 
