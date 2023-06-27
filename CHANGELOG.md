@@ -5,7 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
-## UNRELEASED
+## [v0.34.3] - 2023-06-27
 
 - Remove `tpf` queries from `atomic-cli` #610
 - Fix `pageSize` property in Collections not using persistence
@@ -15,7 +15,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Don't require building index for populate commands
 - Refactor `for_agent` arguments to use the new `ForAgent` enum #623
 - Add support for Bearer token authentication, find in `/app/token` #632
-- Add a `query` endpoint that allows peroforming collection queries via an enpoint instead of repurposing the collections collection.
+- Add a `query` endpoint that allows performing collection queries via an endpoint instead of repurposing the collections collection.
 - `resource.destroy` now recursively destroys its children.
 - Update JS assets, add History view
 
