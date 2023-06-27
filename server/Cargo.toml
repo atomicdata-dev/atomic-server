@@ -6,7 +6,7 @@ edition = "2021"
 license = "MIT"
 name = "atomic-server"
 repository = "https://github.com/atomicdata-dev/atomic-server"
-version = "0.34.2"
+version = "0.34.5"
 [[bin]]
 name = "atomic-server"
 path = "src/bin.rs"
