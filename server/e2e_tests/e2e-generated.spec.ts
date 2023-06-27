@@ -620,6 +620,38 @@ test.describe('data-browser', async () => {
       ),
     );
   });
+
+  test('history page', async ({ page }) => {
+    await signIn(page);
+    await newDrive(page);
+    // Create new class from new resource menu
+    await newResource('document', page);
+
+    // commit for saving initial document
+    await page.waitForResponse(`${serverUrl}/commit`);
+    // commit for initializing the first element (paragraph)
+    await page.waitForResponse(`${serverUrl}/commit`);
+
+    await editTitle('First Title', page);
+    expect(page.locator('text=First Title')).toBeVisible();
+
+    await editTitle('Second Title', page, true);
+    expect(page.locator('text=Second Title')).toBeVisible();
+
+    await contextMenuClick('history', page);
+    expect(page.locator('text=History of Second Title')).toBeVisible();
+
+    await page.getByTestId('version-button').nth(1).click();
+
+    expect(page.locator('text=First Title')).toBeVisible();
+
+    await page.click('text=Make current version');
+
+    expect(page.locator('text=Resource version updated')).toBeVisible();
+    await page.waitForNavigation();
+    expect(page.locator('h1:has-text("First Title")')).toBeVisible();
+    expect(page.locator('text=History of First Title')).not.toBeVisible();
+  });
 });
 
 async function disableViewTransition(page: Page) {
@@ -743,8 +775,13 @@ async function changeDrive(subject: string, page: Page) {
   await expect(page.locator('text=Create new resource')).toBeVisible();
 }
 
-async function editTitle(title: string, page: Page) {
+async function editTitle(title: string, page: Page, clear = false) {
   await page.locator(editableTitle).click();
+
+  if (clear) {
+    await page.locator(editableTitle).clear();
+  }
+
   // These keys make sure the onChange handler is properly called
   await page.keyboard.press('Space');
   await page.keyboard.press('Backspace');
