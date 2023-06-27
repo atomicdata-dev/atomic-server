@@ -19,7 +19,7 @@ name = "benchmarks"
 base64 = "0.21"
 bincode = {version = "1", optional = true}
 directories = {version = ">= 2, < 5", optional = true}
-html2md = {version = "0.2.13", optional = true}
+html2md = {version = "0.2.14", optional = true}
 kuchiki = {version = "0.8.1", optional = true}
 lol_html = {version = "0.3.1", optional = true}
 rand = {version = "0.8"}
