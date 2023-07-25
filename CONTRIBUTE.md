@@ -28,7 +28,6 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
   - [Drill](#drill)
 - [Responsible disclosure / Coordinated Vulnerability Disclosure](#responsible-disclosure--coordinated-vulnerability-disclosure)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
-  - [Including JS app\_assets](#including-js-app_assets)
   - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
     - [Building and publishing binaries](#building-and-publishing-binaries)
     - [Publishing to Cargo](#publishing-to-cargo)
@@ -187,16 +186,6 @@ Note:
   - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
   - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
   - After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
-
-### Including JS app_assets
-
-Before tagging a new version, make sure to update the `app_assets` folder:
-
-1. Go up one directory from `atomic-server` => `cd ..`
-2. In here, clone [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser)
-3. Run `./build-server.sh` to compile assets and copy them to your `app_assets` directory
-4. Make sure not to commit all the files, manually check them
-5. search and replace `.workbox` with `./app_assets/workbox` in `sw.js`, because we'll host `sw.js` from root.
 
 ### Publishing manually - doing the CI's work
 

@@ -1,4 +1,0 @@
-# This is a fix for making sure github pages serves the doc pages
-include:
-  - "_*_.html"
-  - "_*_.*.html"

@@ -1,34 +1,4 @@
 {
 	"version": "2.0.0",
-	"tasks": [
-		{
-			"type": "npm",
-			"script": "start",
-			"problemMatcher": [
-				"$tsc-watch"
-			],
-			"label": "run data-browser dev server (pnpm start)",
-			"detail": "pnpm workspace @tomic/data-browser start",
-			"isBackground": true,
-			"group": "build"
-		},
-		{
-			"type": "npm",
-			"script": "test",
-			"problemMatcher": [
-				"$tsc-watch"
-			],
-			"label": "test data-browser",
-			"detail": "pnpm test",
-			"isBackground": true,
-			"group": "test"
-		},
-		{
-			"type": "shell",
-			"command": "./build_server.sh",
-			"label": "build server JS assets",
-			"isBackground": true,
-			"group": "build"
-		}
-	]
+	"tasks": []
 }
