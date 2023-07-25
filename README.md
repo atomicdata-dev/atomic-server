@@ -55,6 +55,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [Use `atomic-cli` as client](#use-atomic-cli-as-client)
   - [API](#api)
 - [FAQ \& Troubleshooting](#faq--troubleshooting)
+  - [How do I make a website using this CMS?](#how-do-i-make-a-website-using-this-cms)
   - [Can / should I create backups?](#can--should-i-create-backups)
   - [I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?](#i-lost-the-key--secret-to-my-root-agent-and-the-setup-invite-is-no-longer-usable-what-now)
   - [How do I migrate my data to a new domain?](#how-do-i-migrate-my-data-to-a-new-domain)
@@ -295,6 +296,10 @@ We have a subset of the [API documented using Swagger / OpenAPI](https://editor.
 Also, read the [Atomic Data Docs](https://docs.atomicdata.dev/) to learn more about Collections, Commits, JSON-AD and other concepts used here.
 
 ## FAQ & Troubleshooting
+
+### How do I make a website using this CMS?
+
+Check out [atomic-sveltekit-demo](https://github.com/atomicdata-dev/atomic-sveltekit-demo)
 
 ### Can / should I create backups?
 
