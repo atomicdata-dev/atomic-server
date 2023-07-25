@@ -1,0 +1,55 @@
+import { IconButton, IconButtonVariant } from './index';
+import { Row } from '../Row';
+import { FaPoo } from 'react-icons/fa';
+
+# IconButton
+
+## Demo
+
+### Default
+
+<IconButton title='Poopy button'>
+  <FaPoo />
+</IconButton>
+
+### Color
+
+<IconButton color='main' title='Poopy button'>
+  <FaPoo />
+</IconButton>
+
+### Size
+
+<IconButton size='2rem' title='Poopy button'>
+  <FaPoo />
+</IconButton>
+
+### HTML Button attributes
+
+IconButton accepts all html button attributes
+
+<IconButton title='Poopy button' disabled type='submit'>
+  <FaPoo />
+</IconButton>
+
+### Variants
+
+IconButton has the following variants:
+
+```ts
+IconButtonVariant.Simple;
+IconButtonVariant.Outline;
+IconButtonVariant.Fill;
+```
+
+<Row>
+  <IconButton title='Poopy button'>
+    <FaPoo />
+  </IconButton>
+  <IconButton title='Poopy button' variant={IconButtonVariant.Outline}>
+    <FaPoo />
+  </IconButton>
+  <IconButton title='Poopy button' variant={IconButtonVariant.Fill}>
+    <FaPoo />
+  </IconButton>
+</Row>
