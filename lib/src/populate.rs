@@ -265,6 +265,7 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
     Ok(())
 }
 
+#[cfg(feature = "db")]
 /// Adds items to the SideBar as subresources.
 /// Useful for helping a new user get started.
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
