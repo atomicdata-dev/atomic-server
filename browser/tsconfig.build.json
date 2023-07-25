@@ -1,0 +1,41 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "ES2022",
+    "lib": [
+      "ES6",
+      "ES7",
+      "ESNext"
+    ],
+    // Enforces `.js` relative imports, which is needed because tsc doesn't update filenames
+    "moduleResolution": "nodeNext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "preserve",
+    "strictFunctionTypes": true,
+    "sourceMap": true,
+    "declaration": true,
+    // Enables following definitions to source files instead of d.ts files
+    "declarationMap": true,
+    // used in monorepo ts projects to set precedence in compiling tsc things https://dev.to/t7yang/typescript-yarn-workspace-monorepo-1pao
+    "composite": true,
+    "strictNullChecks": true,
+    // Todo: enable this
+    // "noImplicitAny": true
+    "downlevelIteration": true,
+    // Prevent typecheck to fail if some library is doing something wrong
+    "skipLibCheck": true
+  },
+  "exclude": [
+    "node_modules",
+    "**/node_modules/*"
+  ],
+  "references": [
+    {
+      "path": "lib"
+    },
+    {
+      "path": "react"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+    "compilerOptions": {
+        "paths": {
+            "@tomic/lib/*": [
+                "./lib/src/*"
+            ],
+            "@tomic/react/*": [
+                "./react/src/*"
+            ]
+        },
+    },
+    "files": [],
+    "references": [
+        {
+            "path": "lib"
+        },
+        {
+            "path": "react"
+        }
+    ]
+}
