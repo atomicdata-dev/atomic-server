@@ -8,8 +8,10 @@ use actix_web_static_files::ResourceFiles;
 /// Should match all routes
 const ANY: &str = "{tail:.*}";
 
-// Includes the `app_assets` folder files, used for hosting
-// front-end JS bundles, service workers, css, icons and other static files
+// Includes the js assets from the `browser` folder,
+// used for hosting the front-end JS bundles, service workers,
+// css, icons and other static files.
+// See build.rs for more info.
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 /// Set up the Actix server routes. This defines which paths are used.
