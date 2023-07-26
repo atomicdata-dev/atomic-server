@@ -69,23 +69,23 @@ function DrivePage({ resource }: ResourcePageProps): JSX.Element {
               <CardRow key={child}>
                 <ResourceInline subject={child} />
               </CardRow>
-            ))}
-            <CardRow>
-              <AtomicLink path={paths.new}>
-                <FaPlus /> Create new resource
-              </AtomicLink>
-            </CardRow>
-          </CardInsideFull>
-        </Card>
-        {baseURL.startsWith('http://localhost') && (
-          <p>
-            You are running Atomic-Server on `localhost`, which means that it
-            will not be available from any other machine than your current local
-            device. If you want your Atomic-Server to be available from the web,
-            you should set this up at a Domain on a server.
-          </p>
-        )}
-      </Column>
+            );
+          })}
+          <CardRow>
+            <AtomicLink path={paths.new}>
+              <FaPlus /> Create new resource
+            </AtomicLink>
+          </CardRow>
+        </CardInsideFull>
+      </Card>
+      {baseURL.includes('localhost') && (
+        <p>
+          You are running Atomic-Server on `localhost`, which means that it will
+          not be available from any other machine than your current local
+          device. If you want your Atomic-Server to be available from the web,
+          you should set this up at a Domain on a server.
+        </p>
+      )}
     </ContainerNarrow>
   );
 }

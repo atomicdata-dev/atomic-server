@@ -12,7 +12,6 @@ use crate::{
     schema::{Class, Property},
     Atom, Storelike,
 };
-use crate::{urls, Query};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::instrument;

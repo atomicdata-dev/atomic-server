@@ -174,11 +174,18 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Add `store.getResourceAncestry` method, which returns the ancestry of a resource, including the resource itself.
 - Add `resource.title` property, which returns the name of a resource, or the first property that is can be used to name the resource.
 - `store.createSubject` now accepts a `parent` argument, which allows creating nested subjects.
+- Add `store.getServerSupports` to know which features a Server supports
+
+### @tomic/react
+
+- Add `useServerSupports` hook to see supported features of the server
 
 ## v0.35.0
 
 ### @tomic/browser
 
+- Let users register using e-mail address, improve sign-up UX.
+- Add `Store.parseMetaTags` to load JSON-AD objects stored in the DOM. Speeds up initial page load by allowing server to set JSON-AD objects in the initial HTML response.
 - Move static assets around, align build with server and fix PWA #292
 - Add `useChildren` hook and `Store.getChildren` method
 - Add new file preview UI for images, audio, text and PDF files.
@@ -186,8 +193,14 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Fix Dialogue form #308
 - Refactor search, escape query strings for Tantivy
 - Add `import` context menu, allows importing anywhere
+- Let users register using e-mail address, improve sign-up UX.
 
 ### @tomic/react
+- `store.createSubject` allows creating nested paths
+- `store.createSubject` allows creating nested paths
+- Add `useChildren` hook and `Store.getChildren` method
+- Add `Store.postToServer` method, add `endpoints`, `import_json_ad_string`
+- Add `store.preloadClassesAndProperties` and remove `urls.properties.getAll` and `urls.classes.getAll`. This enables using `atomic-data-browser` without relying on `atomicdata.dev` being available.
 
 - Add more options to `useSearch`
 

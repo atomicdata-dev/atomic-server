@@ -42,7 +42,8 @@ export const AppSettingsContextProvider = (
 
   const [agent, setAgent] = useCurrentAgent();
   const [baseURL, setBaseURL] = useServerURL();
-  const [drive, innerSetDrive] = useLocalStorage('drive', baseURL);
+  // By default, we want to use the current URL's origin with a trailing slash.
+  const [drive, innerSetDrive] = useLocalStorage('drive', baseURL + '/');
 
   const setDrive = useCallback(
     (newDrive: string) => {

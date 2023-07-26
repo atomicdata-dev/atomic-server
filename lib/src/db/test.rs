@@ -1,4 +1,4 @@
-use crate::{agents::ForAgent, urls, Value, Routes};
+use crate::{agents::ForAgent, urls, Value};
 
 use super::*;
 use ntest::timeout;
@@ -202,6 +202,7 @@ fn get_extended_resource_pagination() {
     {
         panic!("Page 2 should not exist, because page size is set to a high value.")
     }
+    let num = 2;
     // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
     let subject_with_page_size = format!("{}&page_size=1", subject);
     let resource = store

@@ -11,7 +11,7 @@ import Data from './DataRoute';
 import { Shortcuts } from './ShortcutsRoute';
 import { About as About } from './AboutRoute';
 import Local from './LocalRoute';
-import SettingsAgent from './SettingsAgent';
+import { SettingsAgentRoute } from './SettingsAgent';
 import { SettingsServer } from './SettingsServer';
 import { paths } from './paths';
 import ResourcePage from '../views/ResourcePage';
@@ -21,8 +21,10 @@ import { TokenRoute } from './TokenRoute';
 import { ImporterPage } from '../views/ImporterPage';
 import { History } from './History';
 import { PruneTestsRoute } from './PruneTestsRoute';
+import ConfirmEmail from './ConfirmEmail';
 
-const homeURL = window.location.origin;
+/** Server URLs should have a `/` at the end */
+const homeURL = window.location.origin + '/';
 
 const isDev = import.meta.env.MODE === 'development';
 
@@ -37,7 +39,7 @@ export function AppRoutes(): JSX.Element {
     <Routes>
       <Route path={paths.new} element={<NewRoute />} />
       <Route path={paths.themeSettings} element={<SettingsTheme />} />
-      <Route path={paths.agentSettings} element={<SettingsAgent />} />
+      <Route path={paths.agentSettings} element={<SettingsAgentRoute />} />
       <Route path={paths.serverSettings} element={<SettingsServer />} />
       <Route path={paths.shortcuts} element={<Shortcuts />} />
       <Route path={paths.data} element={<Data />} />
@@ -51,6 +53,7 @@ export function AppRoutes(): JSX.Element {
       <Route path={paths.history} element={<History />} />
       {isDev && <Route path={paths.pruneTests} element={<PruneTestsRoute />} />}
       {isDev && <Route path={paths.sandbox} element={<Sandbox />} />}
+      <Route path={paths.confirmEmail} element={<ConfirmEmail />} />
       <Route path='/' element={<ResourcePage subject={homeURL} />} />
       <Route path='*' element={<Local />} />
     </Routes>

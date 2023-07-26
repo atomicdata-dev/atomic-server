@@ -340,8 +340,10 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
 
     let base = store
         .get_self_url()
-        .ok_or("No self URL in this Store - required for populating importer")?;
-    let mut importer = crate::Resource::new(base.set_path(IMPORTER).to_string());
+        .ok_or("No self URL in this Store - required for populating importer")?
+        .clone();
+    let importer_subject = base.clone().set_path(IMPORTER);
+    let mut importer = crate::Resource::new(importer_subject.to_string());
     importer.set_class(urls::IMPORTER);
     importer.set(
         urls::PARENT.into(),
