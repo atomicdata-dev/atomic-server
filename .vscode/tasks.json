@@ -70,13 +70,13 @@
 		},
 		{
 			"type": "npm",
-			"script": "test",
+			"script": "test-e2e",
 			"problemMatcher": [
 				"$tsc-watch"
 			],
-			"label": "test data-browser",
+			"label": "test data-browser e2e",
 			"path": "browser",
-			"detail": "pnpm test",
+			"detail": "pnpm test-e2e",
 			"isBackground": true,
 			"group": "test"
 		},

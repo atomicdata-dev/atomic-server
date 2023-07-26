@@ -7,8 +7,15 @@
 
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 AtomicServer is a lightweight, yet powerful CMS / Graph Database.
-Demo on [atomicdata.dev](https://atomicdata.dev)
-This repo also includes the [`atomic_lib`](lib/README.md) Rust library and [`atomic-cli`](cli/README.md).**
+Demo on [atomicdata.dev](https://atomicdata.dev)**
+
+This repo also includes:
+
+- [Atomic Data Browser](/browser/data-browser/README.md), the React front-end for Atomic-Server.
+- [`@tomic/lib`](/browser/lib/README.md) JS NPM library.
+- [`@tomic/react`](/browser/react/README.md) React NPM library.
+- [`atomic_lib`](lib/README.md) Rust library.
+- [`atomic-cli`](cli/README.md) terminal client.
 
 _Status: alpha. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 
@@ -64,11 +71,14 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
   - [Items are missing in my Collections / Search results](#items-are-missing-in-my-collections--search-results)
   - [I get a `failed to retrieve` error when opening](#i-get-a-failed-to-retrieve-error-when-opening)
   - [Can I embed AtomicServer in another application?](#can-i-embed-atomicserver-in-another-application)
-- [I want to use my own authorization. How do I do that?](#i-want-to-use-my-own-authorization-how-do-i-do-that)
+  - [I want to use my own authorization. How do I do that?](#i-want-to-use-my-own-authorization-how-do-i-do-that)
   - [Where is my data stored on my machine?](#where-is-my-data-stored-on-my-machine)
 - [Also in this Repo](#also-in-this-repo)
   - [`atomic-cli`](#atomic-cli)
   - [`atomic-lib`](#atomic-lib)
+  - [Atomic Data Browser](#atomic-data-browser)
+  - [`@tomic/lib`](#tomiclib)
+  - [`@tomic/react`](#tomicreact)
 - [Also check out](#also-check-out)
 - [Contribute](#contribute)
 
@@ -341,7 +351,7 @@ Try re-initializing atomic server `atomic-server --initialize`.
 Yes. This is what I'm doing with the Tauri desktop distribution of AtomicServer.
 Check out the [`desktop`](https://github.com/atomicdata-dev/atomic-server/tree/master/desktop) code for an example!
 
-## I want to use my own authorization. How do I do that?
+### I want to use my own authorization. How do I do that?
 
 You can disable all authorization using `--public-mode`.
 Make sure AtomicServer is not publicly accessible, because this will allow anyone to read any data.
@@ -372,11 +382,47 @@ Powers both `atomic-cli` and `atomic-server`.
 
 [→ Read more](lib/README.md)
 
+### [Atomic Data Browser](/browser/data-browser/README.md)
+
+Front-end for Atomic-Server, built with React.
+
+### [`@tomic/lib`](/browser/lib/README.md)
+
+<a href="https://www.npmjs.com/package\/@tomic/lib" target="_blank">
+  <img src="https://img.shields.io/npm/v/@tomic/lib?color=cc3534" />
+</a>
+<a href="https://www.npmjs.com/package/@tomic/lib" target="_blank">
+  <img src="https://img.shields.io/npm/dm/@tomic/lib?color=%2344cc10" />
+</a>
+<a href="https://bundlephobia.com/result?p=@tomic/lib" target="_blank">
+  <img src="https://img.shields.io/bundlephobia/min/@tomic/lib">
+</a>
+
+Library with `Store`, `Commit`, `JSON-AD` parsing, and more.
+
+[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_lib.html)
+
+### [`@tomic/react`](browser/react/README.md)
+
+<a href="https://www.npmjs.com/package/@tomic/react" target="_blank">
+  <img src="https://img.shields.io/npm/v/@tomic/react?color=cc3534" />
+</a>
+<a href="https://www.npmjs.com/package/@tomic/react" target="_blank">
+  <img src="https://img.shields.io/npm/dm/@tomic/react?color=%2344cc10" />
+</a>
+<a href="https://bundlephobia.com/result?p=@tomic/react" target="_blank">
+  <img src="https://img.shields.io/bundlephobia/min/@tomic/react">
+</a>
+
+React library with many useful hooks for rendering and editing Atomic Data.
+
+[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_react.html)
+
 ## Also check out
 
 - [Atomic-Data-Browser](https://github.com/atomicdata-dev/atomic-data-browser), an in-browser app for viewing and editing atomic data. Also contains a typescript / react front-end library. Will replace most of the html templating in this project.
 - [The Docs](https://github.com/ontola/atomic-data-docs), a book containing detailed documentation of Atomic Data.
-- [RayCast extension](https://www.raycast.com/atomicdata-dev/atomic-data-browser) for searching stuff
+- [RayCast extension](https://www.raycast.com/joepio/atomic) for searching stuff
 - [Newsletter](http://eepurl.com/hHcRA1)
 - [Discord][discord-url]
 

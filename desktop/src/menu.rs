@@ -30,8 +30,8 @@ impl AddDefaultSubmenus for Menu {
       .authors(vec!["Joep Meindertsma".into()])
       .copyright("MIT License")
       .license("MIT")
-      .website("https://atomicdata.dev")
-      .website_label("atomicdata.dev");
+      .website("https://atomicserver.eu")
+      .website_label("atomicserver.eu");
     #[cfg(target_os = "macos")]
     return self.add_submenu(Submenu::new(
       app_name.to_string(),

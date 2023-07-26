@@ -1,5 +1,9 @@
 lockfileVersion: '6.0'
 
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
 importers:
 
   .:
@@ -15,8 +19,8 @@ importers:
         specifier: ^29.3.1
         version: 29.3.1
       '@playwright/test':
-        specifier: ^1.29.0
-        version: 1.29.2
+        specifier: ^1.36
+        version: 1.36.0
       '@types/chai':
         specifier: ^4.2.22
         version: 4.2.22
@@ -2241,13 +2245,15 @@ packages:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.13.0
 
-  /@playwright/test@1.29.2:
-    resolution: {integrity: sha512-+3/GPwOgcoF0xLz/opTnahel1/y42PdcgZ4hs+BZGIUjtmEFSXGg+nFoaH3NSmuc7a6GSFwXDJ5L7VXpqzigNg==}
-    engines: {node: '>=14'}
+  /@playwright/test@1.36.0:
+    resolution: {integrity: sha512-yN+fvMYtiyLFDCQos+lWzoX4XW3DNuaxjBu68G0lkgLgC6BP+m/iTxJQoSicz/x2G5EsrqlZTqTIP9sTgLQerg==}
+    engines: {node: '>=16'}
     hasBin: true
     dependencies:
       '@types/node': 16.11.4
-      playwright-core: 1.29.2
+      playwright-core: 1.36.0
+    optionalDependencies:
+      fsevents: 2.3.2
     dev: true
 
   /@remix-run/router@1.4.0:
@@ -7125,9 +7131,9 @@ packages:
       find-up: 4.1.0
     dev: true
 
-  /playwright-core@1.29.2:
-    resolution: {integrity: sha512-94QXm4PMgFoHAhlCuoWyaBYKb92yOcGVHdQLoxQ7Wjlc7Flg4aC/jbFW7xMR52OfXMVkWicue4WXE7QEegbIRA==}
-    engines: {node: '>=14'}
+  /playwright-core@1.36.0:
+    resolution: {integrity: sha512-7RTr8P6YJPAqB+8j5ATGHqD6LvLLM39sYVNsslh78g8QeLcBs5750c6+msjrHUwwGt+kEbczBj1XB22WMwn+WA==}
+    engines: {node: '>=16'}
     hasBin: true
     dev: true
 

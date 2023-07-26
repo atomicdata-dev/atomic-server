@@ -3,7 +3,28 @@
 
 import { test, expect } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
-import { testConfig } from './test-config.js';
+
+const demoFileName = 'testimage.svg';
+
+const demoFile = () => {
+  const processPath = process.cwd();
+
+  // In the CI, the tests dir is missing for some reason?
+  if (processPath.endsWith('tests')) {
+    return `${processPath}/${demoFileName}`;
+  } else {
+    return `${processPath}/tests/${demoFileName}`;
+  }
+};
+
+const testConfig: TestConfig = {
+  demoFileName,
+  demoFile: demoFile(),
+  demoInviteName: 'document demo',
+  serverUrl: 'http://localhost:9883',
+  frontEndUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
+  initialTest: true,
+};
 
 export interface TestConfig {
   demoFileName: string;
@@ -15,14 +36,7 @@ export interface TestConfig {
   initialTest: boolean;
 }
 
-const {
-  demoFileName,
-  demoFile,
-  demoInviteName,
-  serverUrl,
-  frontEndUrl,
-  initialTest,
-} = testConfig;
+const { demoInviteName, serverUrl, frontEndUrl, initialTest } = testConfig;
 
 const timestamp = () => new Date().toLocaleTimeString();
 const editableTitle = '[data-test="editable-title"]';
@@ -301,7 +315,9 @@ test.describe('data-browser', async () => {
     await page2.goto(frontEndUrl);
     await openSubject(page2, driveURL);
     // TODO set current drive by opening the URL
-    await expect(await page2.locator('text=Unauthorized')).toBeVisible();
+    await expect(
+      await page2.locator('text=Unauthorized').first(),
+    ).toBeVisible();
 
     // Create invite
     await page.click('button:has-text("Send invite")');
@@ -337,7 +353,7 @@ test.describe('data-browser', async () => {
       page.waitForEvent('filechooser'),
       page.click('button:has-text("Upload file")'),
     ]);
-    await fileChooser.setFiles(demoFile);
+    await fileChooser.setFiles(demoFile());
     await page.click(`[data-test="file-pill"]:has-text("${demoFileName}")`);
     const image = page.locator('[data-test="image-viewer"]');
     await expect(image).toBeVisible();

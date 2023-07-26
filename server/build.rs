@@ -7,9 +7,14 @@ fn main() -> std::io::Result<()> {
         println!("Running `pnpm run build` in the data-browser folder...");
         std::process::Command::new("pnpm")
             .current_dir("../browser")
+            .args(["install"])
+            .output()
+            .expect("failed to install deps");
+        std::process::Command::new("pnpm")
+            .current_dir("../browser")
             .args(["run", "build"])
             .output()
-            .expect("failed to execute process");
+            .expect("failed to build js bundle");
     }
 
     resource_dir(js_build_path)
