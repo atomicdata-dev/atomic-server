@@ -215,11 +215,23 @@ export class Resource {
     const commitsCollection = await store.fetchResourceFromServer(
       this.getCommitsCollection(),
     );
+
+    if (commitsCollection.error) {
+      throw commitsCollection.error;
+    }
+
     const commits = commitsCollection.get(properties.collection.members);
 
     const builtVersions: Version[] = [];
 
     let previousResource = new Resource(this.subject);
+
+    if (!commits) {
+      throw new Error(
+        `Couldn't find commits for ${this.getSubject()} in CommitCollection: ` +
+          this.getCommitsCollection(),
+      );
+    }
 
     for (const commit of commits as unknown as string[]) {
       const commitResource = await store.getResourceAsync(commit);

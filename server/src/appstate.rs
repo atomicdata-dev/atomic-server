@@ -41,9 +41,10 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     }
 
     tracing::info!("Opening database at {:?}", &config.store_path);
+    let should_init = !&config.store_path.exists() || config.initialize;
     let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
-    if config.initialize {
-        tracing::info!("Initialize: creating and populating new Database");
+    if should_init {
+        tracing::info!("Initialize: creating and populating new Database...");
         atomic_lib::populate::populate_default_store(&store)
             .map_err(|e| format!("Failed to populate default store. {}", e))?;
     }
@@ -73,11 +74,7 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
 
     // If the user changes their server_url, the drive will not exist.
     // In this situation, we should re-build a new drive from scratch.
-    if config.initialize || store.get_resource(&config.server_url).is_err() {
-        tracing::info!(
-            "Running initialization commands (first time startup, or you passed --initialize)"
-        );
-
+    if should_init {
         atomic_lib::populate::populate_all(&store)?;
         // Building the index here is needed to perform Queries on imported resources
         let store_clone = store.clone();
