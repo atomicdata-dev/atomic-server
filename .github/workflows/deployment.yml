@@ -27,6 +27,12 @@ jobs:
           toolchain: stable
           target: x86_64-unknown-linux-musl
 
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          cache-all-crates: true
+
       - uses: pnpm/action-setup@v2.0.1
         name: Install pnpm
         id: pnpm-install
