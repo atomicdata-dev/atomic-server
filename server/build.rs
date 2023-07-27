@@ -59,21 +59,26 @@ fn should_build() -> bool {
 fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed=../browser");
 
-    let pckgmanager = "pnpm";
+    let pkg_manager = "pnpm";
 
     if should_build() {
         p!("install js packages...");
-        std::process::Command::new(pckgmanager)
+        std::process::Command::new(pkg_manager)
             .current_dir("../browser/data-browser")
             .args(["install"])
             .output()
-            .expect("failed to install deps");
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Failed to install js packages. Make sure you have {} installed.",
+                    pkg_manager
+                )
+            });
         p!("build js assets...");
-        std::process::Command::new(pckgmanager)
+        std::process::Command::new(pkg_manager)
             .current_dir("../browser/data-browser")
             .args(["run", "build"])
             .output()
-            .expect("failed to build js bundle");
+            .expect("Failed to build js bundle");
     }
 
     resource_dir(JS_DIST)
