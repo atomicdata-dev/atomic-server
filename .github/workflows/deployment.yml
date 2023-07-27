@@ -21,17 +21,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           target: x86_64-unknown-linux-musl
+
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 8
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: |
+          echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: build
           args: --release --package atomic-server --target x86_64-unknown-linux-musl
+
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
+
       - name: Transfer binary rsync
         uses: easingthemes/ssh-deploy@v3
         env:
@@ -41,6 +65,7 @@ jobs:
           REMOTE_HOST: ${{ inputs.remote_host }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
+
       - name: executing remote ssh commands using ssh key
         uses: appleboy/ssh-action@master
         with:
