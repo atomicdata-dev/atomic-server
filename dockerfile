@@ -1,6 +1,7 @@
 FROM rust:latest as builder
 WORKDIR /app
 COPY . .
+RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
 # git-fetch-with-cli is a CI bugfix, we should be able to remove it later
 RUN cargo build --release --bin atomic-server --config net.git-fetch-with-cli=true
 
