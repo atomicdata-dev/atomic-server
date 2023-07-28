@@ -4,6 +4,7 @@ COPY . .
 ENV SHELL=bash
 RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
 RUN cd browser && pnpm install && pnpm run build
+RUN source /root/.bashrc
 RUN cd ..
 # git-fetch-with-cli is a CI bugfix, we should be able to remove it later
 RUN cargo build --release --bin atomic-server --config net.git-fetch-with-cli=true
