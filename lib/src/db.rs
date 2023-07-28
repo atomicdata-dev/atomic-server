@@ -129,7 +129,7 @@ impl Db {
     pub fn init_temp(id: &str) -> AtomicResult<Db> {
         let tmp_dir_path = format!(".temp/db/{}", id);
         let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
-        let store = Db::init(std::path::Path::new(&tmp_dir_path), "https://localhost")?;
+        let mut store = Db::init(std::path::Path::new(&tmp_dir_path), "https://localhost")?;
         let agent = store.create_agent(None)?;
         store.set_default_agent(agent);
         store.populate()?;
@@ -233,6 +233,7 @@ impl Db {
         let mut endpoints = build_default_endpoints();
 
         if self.smtp_client.is_some() {
+            tracing::info!("SMTP client is set, adding register endpoints");
             endpoints.push(plugins::register::register_endpoint());
             endpoints.push(plugins::register::confirm_email_endpoint());
         }
@@ -348,7 +349,7 @@ impl Db {
     pub fn register_endpoint(&mut self, endpoint: Endpoint) -> AtomicResult<()> {
         let mut resource = endpoint.to_resource(self)?;
         let endpoints_collection = self.get_server_url().set_route(Routes::Endpoints);
-        resource.set_propval(
+        resource.set(
             urls::PARENT.into(),
             Value::AtomicUrl(endpoints_collection.to_string()),
             self,
@@ -715,7 +716,7 @@ impl Storelike for Db {
         )
     }
 
-    fn populate(&self) -> AtomicResult<()> {
+    fn populate(&mut self) -> AtomicResult<()> {
         crate::populate::populate_all(self)
     }
 

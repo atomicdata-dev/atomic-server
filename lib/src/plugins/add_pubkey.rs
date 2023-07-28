@@ -128,7 +128,7 @@ pub fn handle_confirm_add_pubkey(context: HandleGetContext) -> AtomicResult<Reso
 
     // Add the key to the agent
     let mut agent = store.get_resource(&confirmation.agent)?;
-    agent.push_propval(urls::ACTIVE_KEYS, pubkey.into(), true)?;
+    agent.push(urls::ACTIVE_KEYS, pubkey.into(), true)?;
     agent.save(store)?;
 
     return_success()

@@ -29,11 +29,10 @@ pub struct AppState {
 
 /// Initializes the Store and sets the default agent.
 pub fn init_store(config: &Config) -> AtomicServerResult<Db> {
-    let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+    let store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
 
     tracing::info!("Setting default agent");
     set_default_agent(config, &store)?;
-    store.register_default_endpoints()?;
 
     Ok(store)
 }
@@ -65,11 +64,6 @@ pub async fn init(config: Config) -> AtomicServerResult<AppState> {
     };
 
     let should_init = !&config.store_path.exists() || config.initialize;
-    if should_init {
-        tracing::info!("Initialize: creating and populating new Database...");
-        atomic_lib::populate::populate_default_store(&store)
-            .map_err(|e| format!("Failed to populate default store. {}", e))?;
-    }
 
     // Initialize search constructs
     tracing::info!("Starting search service");
@@ -94,7 +88,9 @@ pub async fn init(config: Config) -> AtomicServerResult<AppState> {
     // If the user changes their server_url, the drive will not exist.
     // In this situation, we should re-build a new drive from scratch.
     if should_init {
-        atomic_lib::populate::populate_all(&store)?;
+        tracing::info!("Initialize: creating and populating new Database...");
+
+        atomic_lib::populate::populate_all(&mut store)?;
         // Building the index here is needed to perform Queries on imported resources
         let store_clone = store.clone();
         std::thread::spawn(move || {

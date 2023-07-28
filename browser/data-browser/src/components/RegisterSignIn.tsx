@@ -53,7 +53,12 @@ export function RegisterSignIn({
   if (agent) {
     return <>{children}</>;
   } else if (!emailRegister) {
-    return <SettingsAgent />;
+    return (
+      <>
+        <SettingsAgent />
+        <ErrorLook>No e-mail support on this server...</ErrorLook>
+      </>
+    );
   }
 
   return (
