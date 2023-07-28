@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Helper functions for dealing with URLs
 
 use crate::errors::AtomicResult;

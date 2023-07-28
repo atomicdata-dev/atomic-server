@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 /*!
 # ChatRoom
 These are similar to Channels in Slack or Discord.

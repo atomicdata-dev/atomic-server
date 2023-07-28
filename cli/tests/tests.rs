@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 #[cfg(test)]
 mod test {
     use assert_cmd::Command;

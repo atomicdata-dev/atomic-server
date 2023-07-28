@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 

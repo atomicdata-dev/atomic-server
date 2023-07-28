@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Populating a Store means adding resources to it.
 //! Some of these are the core Atomic Data resources, such as the Property class.
 //! These base models are required for having a functioning store.

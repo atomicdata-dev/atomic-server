@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! In-memory store of Atomic data.
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 

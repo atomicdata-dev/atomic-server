@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Creating a new resource. Provides prompting logic
 use crate::{CLIResult, Context};
 use atomic_lib::mapping;

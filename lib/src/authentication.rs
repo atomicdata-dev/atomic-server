@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Check signatures in authentication headers, find the correct agent. Authorization is done in Hierarchies
 
 use crate::{
