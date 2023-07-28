@@ -2,8 +2,9 @@ FROM rust:latest as builder
 WORKDIR /app
 COPY . .
 ENV SHELL=bash
+# Install PNPM, source it and build the JS assets
 RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
-RUN source /root/.bashrc
+RUN . /root/.bashrc
 RUN cd browser && pnpm install && pnpm run build
 RUN cd ..
 # git-fetch-with-cli is a CI bugfix, we should be able to remove it later
