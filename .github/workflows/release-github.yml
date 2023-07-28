@@ -17,6 +17,13 @@ jobs:
         with:
           toolchain: stable
           override: true
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 8
+          run_install: false
+
       - name: publish crates
         uses: katyo/publish-crates@v1
         with:
@@ -28,6 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 8
+          run_install: false
+
       - uses: taiki-e/create-gh-release-action@v1
         with:
           # (optional)
@@ -64,6 +78,13 @@ jobs:
         with:
           version: ${{ steps.tag_name.outputs.current_version }}
           path: CHANGELOG.md
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 8
+          run_install: false
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -92,6 +113,13 @@ jobs:
           # - windows-latest
     runs-on: ${{ matrix.os }}
     steps:
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 8
+          run_install: false
+
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
