@@ -53,12 +53,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --package atomic-server --target x86_64-unknown-linux-musl
-
       - name: Install JS
         working-directory: ./browser/
         run: |
@@ -68,6 +62,12 @@ jobs:
         working-directory: ./browser/
         run: |
           pnpm run build
+
+      - uses: actions-rs/cargo@v1
+        with:
+          use-cross: true
+          command: build
+          args: --release --package atomic-server --target x86_64-unknown-linux-musl
 
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
