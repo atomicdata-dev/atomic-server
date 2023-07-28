@@ -44,13 +44,15 @@ Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 ## Running locally (with local development browser)
 
 - Run `cargo run` to start the server
-- Go to `browser` and run `pnpm dev` to start the browsre
-- Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
+- Go to `browser` and run `pnpm dev` to start the browser
+- Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:5173/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `pmpm build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
 
 ## Improve local compilation speed
 
-- Use the [`mold`](https://github.com/rui314/mold) linker `brew install mold` + create a `.cargo/config.toml` and add `[build] rustflags = ["-C", "link-arg=-fuse-ld=lld"]`
+
+- Use the [`mold`](https://github.com/rui314/mold) linker + create a `.cargo/config.toml` and add `[build] rustflags = ["-C", "link-arg=-fuse-ld=lld"]`
+- Note: this is primarily for development on linux systems, as mold for macOS requires a paid license
 
 ## Cross compilation
 
