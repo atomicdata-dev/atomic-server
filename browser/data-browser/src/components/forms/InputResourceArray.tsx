@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ArrayError, useArray } from '@tomic/react';
+import { ArrayError, useArray, validateDatatype } from '@tomic/react';
 import { Button } from '../Button';
 import { InputProps } from './ResourceField';
 import { ErrMessage } from './InputStyles';
@@ -7,6 +7,7 @@ import { ResourceSelector } from './ResourceSelector';
 import { FaPlus, FaTrash } from 'react-icons/fa';
 import { Column, Row } from '../Row';
 import styled from 'styled-components';
+import { useIndexDependantCallback } from '../../hooks/useIndexDependantCallback';
 
 export default function InputResourceArray({
   resource,
@@ -15,12 +16,12 @@ export default function InputResourceArray({
 }: InputProps): JSX.Element {
   const [err, setErr] = useState<ArrayError | undefined>(undefined);
   const [array, setArray] = useArray(resource, property.subject, {
-    handleValidationError: setErr,
+    validate: false,
   });
   /** Add focus to the last added item */
   const [lastIsNew, setLastIsNew] = useState(false);
 
-  function handleAdd() {
+  function handleAddRow() {
     setArray([...array, undefined]);
     setLastIsNew(true);
   }
@@ -30,23 +31,35 @@ export default function InputResourceArray({
     setLastIsNew(false);
   }
 
-  function handleRemove(index: number) {
-    array.splice(index, 1);
-    const newArray = [...array];
-    setArray(newArray);
-  }
+  const handleRemoveRowList = useIndexDependantCallback(
+    (index: number) => () => {
+      const newArray = [...array];
+      newArray.splice(index, 1);
+      setArray(newArray);
+    },
+    array,
+    [setArray],
+  );
 
-  function handleSetSubject(
-    value: string | undefined,
-    _handleErr,
-    index: number,
-  ) {
-    if (value) {
-      array[index] = value;
-      setArray(array);
-      setLastIsNew(false);
-    }
-  }
+  const handleSetSubjectList = useIndexDependantCallback(
+    (index: number) => (value: string | undefined) => {
+      if (value) {
+        const newArray = [...array];
+        newArray[index] = value;
+
+        try {
+          validateDatatype(newArray, property.datatype);
+          setArray(newArray);
+          setLastIsNew(false);
+          setErr(undefined);
+        } catch (e) {
+          setErr(e);
+        }
+      }
+    },
+    array,
+    [property.datatype, setArray],
+  );
 
   function errMaybe(index: number) {
     if (err && err.index === index) {
@@ -64,13 +77,11 @@ export default function InputResourceArray({
             <ResourceSelector
               key={`${property.subject}${index}`}
               value={subject}
-              setSubject={(set, handleErr) =>
-                handleSetSubject(set, handleErr, index)
-              }
+              setSubject={handleSetSubjectList[index]}
               error={errMaybe(index)}
-              setError={setErr}
+              onValidate={setErr}
               classType={property.classType}
-              handleRemove={() => handleRemove(index)}
+              handleRemove={handleRemoveRowList[index]}
               parent={resource.getSubject()}
               {...props}
               autoFocus={lastIsNew && index === array.length - 1}
@@ -81,11 +92,11 @@ export default function InputResourceArray({
       <Row justify='space-between'>
         <StyledButton
           disabled={props.disabled}
-          title='Add an item to this list'
+          title={`Add an item to the ${property.shortname} list`}
           data-test={`input-${property.shortname}-add-resource`}
           subtle
           type='button'
-          onClick={handleAdd}
+          onClick={handleAddRow}
         >
           <FaPlus />
         </StyledButton>
@@ -104,7 +115,7 @@ export default function InputResourceArray({
           </StyledButton>
         )}
       </Row>
-      {err?.index && <ErrMessage>{err?.message}</ErrMessage>}
+      {!!err && <ErrMessage>{err?.message}</ErrMessage>}
     </Column>
   );
 }

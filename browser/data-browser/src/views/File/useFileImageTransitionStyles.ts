@@ -2,9 +2,12 @@ import { getTransitionName } from '../../helpers/transitionName';
 import { useGlobalStylesWhileMounted } from '../../hooks/useGlobalStylesWhileMounted';
 
 export function useFileImageTransitionStyles(subject: string) {
-  const name = getTransitionName('file-image', subject);
+  let css = '';
+  let name = 'none';
 
-  useGlobalStylesWhileMounted(`
+  try {
+    name = getTransitionName('file-image', subject);
+    css = `
     ::view-transition-old(${name}),
     ::view-transition-new(${name}) {
       mix-blend-mode: normal;
@@ -20,8 +23,12 @@ export function useFileImageTransitionStyles(subject: string) {
       animation: none;
       object-fit: cover;
     }
+    `;
+  } catch (e) {
+    // Do nothing
+  }
 
-  `);
+  useGlobalStylesWhileMounted(css);
 
   return { viewTransitionName: name } as Record<string, string>;
 }

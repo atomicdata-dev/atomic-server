@@ -24,14 +24,15 @@ export function InputResource({
   }
 
   return (
-    <ResourceSelector
-      error={error}
-      setError={setError}
-      classType={property.classType}
-      setSubject={setSubject}
-      value={subject}
-      parent={resource.getSubject()}
-      {...props}
-    />
+    <div>
+      <ResourceSelector
+        error={error}
+        classType={property.classType}
+        setSubject={setSubject}
+        value={subject}
+        parent={resource.getSubject()}
+        {...props}
+      />
+    </div>
   );
 }

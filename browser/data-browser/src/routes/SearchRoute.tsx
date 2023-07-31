@@ -13,6 +13,7 @@ import { useSettings } from '../helpers/AppSettings';
 import { ClassFilter } from '../components/SearchFilter';
 import { Button } from '../components/Button';
 import { Column } from '../components/Row';
+import { Main } from '../components/Main';
 
 /** Full text search route */
 export function Search(): JSX.Element {
@@ -101,54 +102,57 @@ export function Search(): JSX.Element {
   }
 
   return (
-    <ContainerNarrow>
-      {error ? (
-        <ErrorLook>{error.message}</ErrorLook>
-      ) : (
-        <>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Heading>
-              <FaSearch />
-              <span>
-                {message ? (
-                  message
-                ) : (
-                  <>
-                    {results.length} {results.length > 1 ? 'Results' : 'Result'}{' '}
-                    for <QueryText>{query}</QueryText>
-                  </>
-                )}
-              </span>
-            </Heading>
-            {enableFilter && (
-              <Button onClick={() => setShowFilter(!showFilter)}>
-                <FaFilter />
-                Filter
-              </Button>
+    <Main>
+      <ContainerNarrow>
+        {error ? (
+          <ErrorLook>{error.message}</ErrorLook>
+        ) : (
+          <>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Heading>
+                <FaSearch />
+                <span>
+                  {message ? (
+                    message
+                  ) : (
+                    <>
+                      {results.length}{' '}
+                      {results.length > 1 ? 'Results' : 'Result'} for{' '}
+                      <QueryText>{query}</QueryText>
+                    </>
+                  )}
+                </span>
+              </Heading>
+              {enableFilter && (
+                <Button onClick={() => setShowFilter(!showFilter)}>
+                  <FaFilter />
+                  Filter
+                </Button>
+              )}
+            </div>
+            {showFilter && (
+              <ClassFilter setFilters={setFilters} filters={filters} />
             )}
-          </div>
-          {showFilter && (
-            <ClassFilter setFilters={setFilters} filters={filters} />
-          )}
-          <Column ref={resultsDiv} gap='1rem'>
-            {results.map((subject, index) => (
-              <ResourceCard
-                initialInView={index < 5}
-                small
-                subject={subject}
-                key={subject}
-                highlight={index === selectedIndex}
-              />
-            ))}
-          </Column>
-        </>
-      )}
-    </ContainerNarrow>
+            <Column ref={resultsDiv} gap='1rem'>
+              {results.map((subject, index) => (
+                <ResourceCard
+                  initialInView={index < 5}
+                  small
+                  subject={subject}
+                  key={subject}
+                  highlight={index === selectedIndex}
+                />
+              ))}
+            </Column>
+          </>
+        )}
+      </ContainerNarrow>
+    </Main>
   );
 }
 

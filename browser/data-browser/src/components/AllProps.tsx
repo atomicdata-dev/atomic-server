@@ -1,6 +1,6 @@
 import { Resource } from '@tomic/react';
 import React from 'react';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import PropVal from './PropVal';
 
 type Props = {
@@ -14,37 +14,52 @@ type Props = {
    * but only on large screens.
    */
   columns?: boolean;
+  basic?: boolean;
 };
 
-const AllPropsWrapper = styled.div`
-  margin-bottom: ${props => props.theme.margin}rem;
-`;
-
 /** Lists all PropVals for some resource. Optionally ignores a bunch of subjects */
-function AllProps({ resource, except = [], editable, columns }: Props) {
+function AllProps({ resource, except = [], editable, columns, basic }: Props) {
   return (
-    <AllPropsWrapper>
-      {[...resource.getPropVals()].map(
-        // This is a place where you might want to use the _val, because of performance. However, we currently don't, because of the form renderer.
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ([prop, _val]): JSX.Element => {
-          if (except.includes(prop)) {
-            return <></>;
-          }
-
-          return (
-            <PropVal
+    <AllPropsWrapper basic={basic}>
+      {[...resource.getPropVals()]
+        .filter(([prop]) => !except.includes(prop))
+        .map(
+          ([prop]): JSX.Element => (
+            <StyledPropVal
               columns={columns}
               key={prop}
+              basic={basic}
               propertyURL={prop}
               resource={resource}
               editable={!!editable}
             />
-          );
-        },
-      )}
+          ),
+        )}
     </AllPropsWrapper>
   );
 }
+
+const AllPropsWrapper = styled.div<{ basic: boolean | undefined }>`
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border-radius: ${p => p.theme.radius};
+  border: ${p => (p.basic ? 'none' : `1px solid ${p.theme.colors.bg2}`)};
+`;
+
+const StyledPropVal = styled(PropVal)<{ basic: boolean | undefined }>`
+  ${p =>
+    !p.basic &&
+    css`
+      padding: 0.5rem;
+      &:nth-child(1) {
+        border-top-left-radius: ${p.theme.radius};
+        border-top-right-radius: ${p.theme.radius};
+      }
+      &:nth-child(odd) {
+        background-color: ${p.theme.colors.bgBody};
+      }
+    `}
+`;
 
 export default AllProps;

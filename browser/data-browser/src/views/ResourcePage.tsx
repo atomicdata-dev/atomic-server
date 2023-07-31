@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   useString,
   useResource,
@@ -23,12 +23,16 @@ import { ChatRoomPage } from './ChatRoomPage';
 import { MessagePage } from './MessagePage';
 import { BookmarkPage } from './BookmarkPage/BookmarkPage';
 import { ImporterPage } from './ImporterPage.jsx';
-import Parent, { PARENT_PADDING_BLOCK } from '../components/Parent';
-import styled from 'styled-components';
+import Parent from '../components/Parent';
 import { FolderPage } from './FolderPage';
 import { ArticlePage } from './Article';
-import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
-import { getTransitionName } from '../helpers/transitionName';
+import { TablePage } from './TablePage';
+import { Main } from '../components/Main';
+
+/** These properties are passed to every View at Page level */
+export type ResourcePageProps = {
+  resource: Resource;
+};
 
 type Props = {
   subject: string;
@@ -42,6 +46,12 @@ type Props = {
 function ResourcePage({ subject }: Props): JSX.Element {
   const resource = useResource(subject);
   const [klass] = useString(resource, properties.isA);
+
+  // The body can have an inert attribute when the user navigated from an open dialog.
+  // we remove it to make the page becomes interavtive again.
+  useEffect(() => {
+    document.body.removeAttribute('inert');
+  }, []);
 
   if (resource.loading) {
     return (
@@ -69,20 +79,6 @@ function ResourcePage({ subject }: Props): JSX.Element {
     </>
   );
 }
-
-const Main = React.memo(styled.main<ViewTransitionProps>`
-  /* Makes the contents fit the entire page */
-  height: calc(
-    100% - (${p => p.theme.heights.breadCrumbBar} + ${PARENT_PADDING_BLOCK} * 2)
-  );
-  view-transition-name: ${props =>
-    getTransitionName('resource-page', props.subject)};
-`);
-
-/** There properties are passed to every View at Page level */
-export type ResourcePageProps = {
-  resource: Resource;
-};
 
 function selectComponent(klass: string) {
   switch (klass) {
@@ -114,6 +110,8 @@ function selectComponent(klass: string) {
       return FolderPage;
     case urls.classes.article:
       return ArticlePage;
+    case urls.classes.table:
+      return TablePage;
     default:
       return ResourcePageDefault;
   }

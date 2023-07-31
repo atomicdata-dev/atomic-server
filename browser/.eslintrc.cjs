@@ -66,6 +66,7 @@ module.exports = {
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-var-requires': 'off',
     '@typescript-eslint/ban-ts-comment': 'off',
+    '@typescript-eslint/no-explicit-any': 'error',
     "react-hooks/rules-of-hooks": "error", // Checks rules of Hooks
     'no-console': ['error', { allow: ['error', 'warn'] }],
     "react/prop-types": "off",

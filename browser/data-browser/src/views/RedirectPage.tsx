@@ -12,9 +12,11 @@ import toast from 'react-hot-toast';
 import { paths } from '../routes/paths';
 import { ResourcePageProps } from './ResourcePage';
 import { useEffect } from 'react';
+import { ErrorBlock } from '../components/ErrorLook';
 
 /** A View that redirects!. */
 function RedirectPage({ resource }: ResourcePageProps): JSX.Element {
+  const [error, setError] = React.useState<Error | undefined>();
   const [destination] = useString(resource, properties.redirect.destination);
   const [redirectAgent] = useString(
     resource,
@@ -47,12 +49,18 @@ function RedirectPage({ resource }: ResourcePageProps): JSX.Element {
     if (destination) {
       // go to the destination, unless the user just hit the back button
       if (navigationType !== 'POP') {
+        store
+          .fetchResourceFromServer(destination)
+          .then(() => {
+            navigate(constructOpenURL(destination));
+          })
+          .catch(err => {
+            setError(err);
+          });
         // Fetch that resource again
-        store.fetchResourceFromServer(destination);
-        navigate(constructOpenURL(destination));
       }
     }
-  });
+  }, [redirectAgent, agent, destination]);
 
   return (
     <ContainerNarrow about={resource.getSubject()}>
@@ -62,6 +70,7 @@ function RedirectPage({ resource }: ResourcePageProps): JSX.Element {
         This page should redirect you automatically (unless you have just
         pressed the back button)
       </p>
+      {error && <ErrorBlock error={error} />}
       <AllProps resource={resource} except={[properties.isA]} />
     </ContainerNarrow>
   );

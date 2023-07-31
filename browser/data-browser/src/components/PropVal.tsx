@@ -12,6 +12,7 @@ type Props = {
   editable: boolean;
   // If set to true, will render the properties in a left column, and the Values in the right one, but only on large screens.
   columns?: boolean;
+  className?: string;
 };
 
 interface PropValRowProps {
@@ -20,10 +21,8 @@ interface PropValRowProps {
 
 export const PropValRow = styled.div<PropValRowProps>`
   word-break: break-word;
-  margin-bottom: 0.5rem;
 
   @media screen and (min-width: 500px) {
-    margin-bottom: ${p => (p.columns ? 0 : '0.5rem')};
     flex-direction: ${p => (p.columns ? 'row' : 'column')};
     display: ${p => (p.columns ? 'flex' : 'block')};
   }
@@ -44,6 +43,7 @@ function PropVal({
   resource,
   editable,
   columns,
+  className,
 }: Props): JSX.Element {
   const property = useProperty(propertyURL);
   const truncated = truncateUrl(propertyURL, 10, true);
@@ -72,7 +72,7 @@ function PropVal({
   }
 
   return (
-    <PropValRow columns={columns}>
+    <PropValRow columns={columns} className={className}>
       <AtomicLink subject={propertyURL}>
         <PropertyLabel title={property.description}>
           {property.error ? (

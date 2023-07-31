@@ -1,8 +1,8 @@
 import React from 'react';
-import { properties, Resource, useString } from '@tomic/react';
-import { ResourceInline } from '../views/ResourceInline';
+import { properties, Resource, useArray } from '@tomic/react';
 import { Detail } from './Detail';
 import { getIconForClass } from '../views/FolderPage/iconMap';
+import { InlineFormattedResourceList } from './InlineFormattedResourceList';
 
 type Props = {
   resource: Resource;
@@ -10,16 +10,16 @@ type Props = {
 
 /** Renders the is-a Class for some resource */
 export function ClassDetail({ resource }: Props): JSX.Element {
-  const [klass] = useString(resource, properties.isA);
+  const [classes] = useArray(resource, properties.isA);
 
   return (
     <React.Fragment>
-      {klass && (
+      {classes && (
         <Detail>
           <>
             {'is a '}
-            {getIconForClass(klass)}
-            <ResourceInline subject={klass} />
+            {getIconForClass(classes[0])}
+            <InlineFormattedResourceList subjects={classes} />
           </>
         </Detail>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useId } from 'react';
+import { useId, useInsertionEffect } from 'react';
 
 const getNode = (id: string) => {
   const existingNode = document.getElementById(id);
@@ -21,7 +21,7 @@ const getNode = (id: string) => {
 export function useGlobalStylesWhileMounted(cssText: string) {
   const id = useId();
 
-  useEffect(() => {
+  useInsertionEffect(() => {
     const node = getNode(id);
 
     node.innerHTML = cssText;

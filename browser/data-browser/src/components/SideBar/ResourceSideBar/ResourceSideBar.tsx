@@ -6,22 +6,23 @@ import { AtomicLink } from '../../AtomicLink';
 import styled from 'styled-components';
 import { Details } from '../../Details';
 import { FloatingActions, floatingHoverStyles } from './FloatingActions';
-import { ErrorLook } from '../../ErrorLook';
+import { errorLookStyle } from '../../ErrorLook';
 import { LoaderInline } from '../../Loader';
 import { getIconForClass } from '../../../views/FolderPage/iconMap';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
 interface ResourceSideBarProps {
   subject: string;
   ancestry: string[];
   /** When a SideBar item is clicked, we should close the SideBar (on mobile devices) */
-  handleClose?: () => unknown;
+  onClick?: () => unknown;
 }
 
 /** Renders a Resource as a nav item for in the sidebar. */
 export function ResourceSideBar({
   subject,
   ancestry,
-  handleClose,
+  onClick,
 }: ResourceSideBarProps): JSX.Element {
   const spanRef = useRef<HTMLSpanElement>(null);
   const resource = useResource(subject, { allowIncomplete: true });
@@ -36,8 +37,8 @@ export function ResourceSideBar({
   const [subResources] = useArray(resource, urls.properties.subResources);
   const hasSubResources = subResources.length > 0;
 
-  const [classType] = useString(resource, urls.properties.isA);
-  const Icon = getIconForClass(classType!);
+  const [classType] = useArray(resource, urls.properties.isA);
+  const Icon = getIconForClass(classType[0]!);
 
   useEffect(() => {
     if (ancestry.includes(subject) && ancestry[0] !== subject) {
@@ -48,9 +49,9 @@ export function ResourceSideBar({
   const TitleComp = useMemo(
     () => (
       <ActionWrapper>
-        <Title subject={subject} clean active={active}>
+        <StyledLink subject={subject} clean>
           <SideBarItem
-            onClick={handleClose}
+            onClick={onClick}
             disabled={active}
             resource={subject}
             title={description}
@@ -61,17 +62,17 @@ export function ResourceSideBar({
               {title}
             </TextWrapper>
           </SideBarItem>
-        </Title>
+        </StyledLink>
         <FloatingActions subject={subject} />
       </ActionWrapper>
     ),
-    [subject, active, handleClose, description, title],
+    [subject, active, onClick, description, title],
   );
 
   if (resource.loading) {
     return (
       <SideBarItem
-        onClick={handleClose}
+        onClick={onClick}
         disabled={active}
         resource={subject}
         title={`${subject} is loading...`}
@@ -83,16 +84,19 @@ export function ResourceSideBar({
 
   if (resource.error) {
     return (
-      <SideBarItem
-        onClick={handleClose}
-        disabled={active}
-        resource={subject}
-        ref={spanRef}
-      >
-        <ErrorLook about={subject} title={resource.error.message}>
-          {subject}
-        </ErrorLook>
-      </SideBarItem>
+      <StyledLink subject={subject} clean>
+        <SideBarItem
+          onClick={onClick}
+          disabled={active}
+          resource={subject}
+          ref={spanRef}
+        >
+          <SideBarErrorWrapper>
+            <FaExclamationTriangle />
+            Resource with error
+          </SideBarErrorWrapper>
+        </SideBarItem>
+      </StyledLink>
     );
   }
 
@@ -121,11 +125,7 @@ const ActionWrapper = styled.div`
   ${floatingHoverStyles}
 `;
 
-interface TitleProps {
-  active: boolean;
-}
-
-const Title = styled(AtomicLink)<TitleProps>`
+const StyledLink = styled(AtomicLink)`
   flex: 1;
   overflow: hidden;
   white-space: nowrap;
@@ -140,4 +140,9 @@ const TextWrapper = styled.span`
     /* color: ${p => p.theme.colors.text}; */
     font-size: 0.8em;
   }
+`;
+
+const SideBarErrorWrapper = styled(TextWrapper)`
+  margin-left: 1.3rem;
+  ${errorLookStyle}
 `;

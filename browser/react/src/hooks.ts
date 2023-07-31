@@ -23,7 +23,7 @@ import {
   unknownSubject,
   JSONArray,
 } from '@tomic/lib';
-import { useDebounce } from './index.js';
+import { useDebouncedCallback } from './index.js';
 
 /**
  * Hook for getting a Resource in a React component. Will try to fetch the
@@ -159,7 +159,9 @@ export function useProperty(subject: string): Property {
   return property;
 }
 
-type setValue = (val: JSONValue) => Promise<void>;
+export type SetValue<T extends JSONValue = JSONValue> = (
+  val: T | undefined,
+) => Promise<void>;
 
 /** Extra options for useValue hooks, mostly related to commits and validation */
 type useValueOptions = {
@@ -218,9 +220,8 @@ type useValueOptions = {
 export function useValue(
   resource: Resource,
   propertyURL: string,
-  /** Saves the resource when the resource is changed, after 100ms */
   opts: useValueOptions = {},
-): [JSONValue | undefined, setValue] {
+): [JSONValue | undefined, SetValue] {
   const {
     commit = false,
     validate = true,
@@ -229,32 +230,18 @@ export function useValue(
   } = opts;
   const [val, set] = useState<JSONValue>(undefined);
   const store = useStore();
-  const debounced = useDebounce(val, commitDebounce);
-  const [touched, setTouched] = useState(false);
 
-  // Try without this
-  // When a component mounts, it needs to let the store know that it will subscribe to changes to that resource.
-  // useEffect(() => {
-  //   function handleNotify(updated: Resource) {
-  //     // When a change happens, set the new Resource.
-  //     set(updated.get(propertyURL));
-  //   }
-  //   store.subscribe(subject, handleNotify);
+  const [saveResource, isWaitingForDebounce] = useDebouncedCallback(
+    () => {
+      if (!commit) {
+        return;
+      }
 
-  //   return () => {
-  //     // When the component is unmounted, unsubscribe from the store.
-  //     store.unsubscribe(subject, handleNotify);
-  //   };
-  // }, [store, resource, subject]);
-
-  // Save the resource when the debounced value has changed
-  useEffect(() => {
-    // Touched prevents the resource from being saved when it is loaded (and not changed)
-    if (commit && touched) {
-      setTouched(false);
-      resource.save(store, store.getAgent()).catch(e => store.notifyError(e));
-    }
-  }, [JSON.stringify(debounced)]);
+      resource.save(store).catch(e => store.notifyError(e));
+    },
+    commitDebounce,
+    [resource, store],
+  );
 
   /**
    * Validates the value. If it fails, it calls the function in the second
@@ -266,20 +253,19 @@ export function useValue(
         // remove the value
         resource.removePropVal(propertyURL);
         set(undefined);
+        saveResource();
 
         return;
       }
 
       set(newVal);
-      setTouched(true);
 
       // Validates and sets a property / value combination. Will invoke the
       // callback if the value is not valid.
       try {
         await resource.set(propertyURL, newVal, store, validate);
+        saveResource();
         handleValidationError?.(undefined);
-        // Clone resource to force hooks to re-evaluate due to shallow comparison.
-        store.notify(resource.clone());
       } catch (e) {
         if (handleValidationError) {
           handleValidationError(e);
@@ -288,11 +274,11 @@ export function useValue(
         }
       }
     },
-    [resource, handleValidationError, store, validate],
+    [resource, handleValidationError, store, validate, saveResource],
   );
 
-  // If a value has already been set, return it.
-  if (val !== undefined) {
+  // If the hook is waiting to commit the changes return the current local value so the component using this hook shows the most recent value.
+  if (isWaitingForDebounce) {
     return [val, validateAndSet];
   }
 
@@ -302,17 +288,8 @@ export function useValue(
   // Try to actually get the value, log any error
   try {
     value = resource.get(propertyURL);
-
-    if (resource.getSubject().startsWith('http://localhost/sear')) {
-      // eslint-disable-next-line no-console
-      console.error('useValue', val, resource.getSubject());
-    }
   } catch (e) {
     store.notifyError(e);
-  }
-
-  if (value === undefined) {
-    return [undefined, validateAndSet];
   }
 
   return [value, validateAndSet];
@@ -326,7 +303,7 @@ export function useString(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
-): [string | undefined, (string: string | undefined) => Promise<void>] {
+): [string | undefined, SetValue<string>] {
   const [val, setVal] = useValue(resource, propertyURL, opts);
 
   if (typeof val === 'string') {
@@ -351,7 +328,7 @@ export function useSubject(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
-): [string | undefined, (string?: string) => Promise<void>] {
+): [string | undefined, SetValue<string>] {
   const [val, setVal] = useValue(resource, propertyURL, opts);
 
   if (!val) {
@@ -379,7 +356,7 @@ export function useTitle(
   resource: Resource,
   truncateLength = 40,
   opts: useValueOptions = titleHookOpts,
-): [string, (string: string) => Promise<void>] {
+): [string, SetValue<string>] {
   const [name, setName] = useString(resource, urls.properties.name, opts);
   const [shortname, setShortname] = useString(
     resource,
@@ -425,7 +402,7 @@ export function useArray(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
-): [string[], setValue] {
+): [string[], SetValue<JSONArray>] {
   const [value, set] = useValue(resource, propertyURL, opts);
   const stableEmptyArray = useRef<JSONArray>([]);
 
@@ -445,7 +422,7 @@ export function useArray(
       // https://github.com/atomicdata-dev/atomic-data-browser/issues/85
       return stableEmptyArray.current;
     }
-  }, [value]);
+  }, [value, resource, propertyURL]);
 
   return [values as string[], set];
 }
@@ -455,11 +432,11 @@ export function useNumber(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
-): [number | undefined, setValue] {
+): [number | undefined, SetValue<number>] {
   const [value, set] = useValue(resource, propertyURL, opts);
 
   if (value === undefined) {
-    return [NaN, set];
+    return [undefined, set];
   }
 
   return [valToNumber(value), set];
@@ -470,7 +447,7 @@ export function useBoolean(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
-): [boolean, setValue] {
+): [boolean, SetValue<boolean>] {
   const [value, set] = useValue(resource, propertyURL, opts);
 
   if (value === undefined) {

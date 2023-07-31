@@ -1,12 +1,16 @@
 import { lighten } from 'polished';
-import styled from 'styled-components';
+import styled, { css } from 'styled-components';
 import React from 'react';
 import { FaExclamationTriangle } from 'react-icons/fa';
 
-export const ErrorLook = styled.span`
+export const errorLookStyle = css`
   color: ${props => props.theme.colors.alert};
   font-family: monospace;
   line-height: 1.2rem;
+`;
+
+export const ErrorLook = styled.span`
+  ${errorLookStyle}
 `;
 
 export interface ErrorBlockProps {

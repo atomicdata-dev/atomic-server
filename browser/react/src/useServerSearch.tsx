@@ -9,8 +9,6 @@ interface SearchResults {
   error?: Error;
 }
 
-const emptyArray = [];
-
 interface SearchOptsHook extends SearchOpts {
   /**
    * Debouncing makes queries slower, but prevents sending many request. Number
@@ -18,6 +16,16 @@ interface SearchOptsHook extends SearchOpts {
    */
   debounce?: number;
 }
+
+const noResultsResult = {
+  results: [],
+  loading: false,
+  error: undefined,
+};
+
+/** Escape values for use in filter string */
+export const escapeFilterValue = (value: string) =>
+  value.replace(/[+^`:{}"[\]()!\\*\s]/gm, '\\$&');
 
 /** Pass a query to search the current server */
 export function useServerSearch(
@@ -53,14 +61,19 @@ export function useServerSearch(
     resource.loading,
   ]);
 
+  const result = useMemo(
+    () => ({
+      results,
+      loading: resource.loading,
+      error: resource.error,
+    }),
+    [results, resource.loading, resource.error],
+  );
+
   if (!query) {
-    return {
-      results: emptyArray,
-      loading: false,
-      error: undefined,
-    };
+    return noResultsResult;
   }
 
   // Return the width so we can use it in our components
-  return { results, loading: resource.loading, error: resource.error };
+  return result;
 }

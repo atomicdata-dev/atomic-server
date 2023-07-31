@@ -96,7 +96,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
               </Button>
             </>
           )}
-          {!isNaN(usagesLeft!) && <p>({usagesLeft} usages left)</p>}
+          {usagesLeft !== undefined && <p>({usagesLeft} usages left)</p>}
         </Row>
       )}
     </ContainerNarrow>

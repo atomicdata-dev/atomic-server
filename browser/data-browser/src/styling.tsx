@@ -95,6 +95,7 @@ export const buildTheme = (darkMode: boolean, mainIn: string): DefaultTheme => {
       textLight: darkMode ? darken(0.4)(text) : lighten(0.4)(text),
       textLight2: darkMode ? darken(0.8)(text) : lighten(0.8)(text),
       alert: '#cf5b5b',
+      alertLight: '#e66f6f',
     },
     animation: {
       duration: `${animationDuration}ms`,
@@ -158,6 +159,7 @@ declare module 'styled-components' {
       textLight2: string;
       /** Error / warning color */
       alert: string;
+      alertLight: string;
     };
     animation: {
       duration: string;
@@ -187,6 +189,7 @@ export const GlobalStyle = createGlobalStyle`
     margin: 0;
     /** Pretty dark mode transition */
     transition: background .2s ease, border-color .2s ease, color .2s ease;
+    font-size: 15px;
   }
 
   input, button, body {

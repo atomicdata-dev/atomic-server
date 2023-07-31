@@ -4,7 +4,7 @@ import {
   useResource,
   useStore,
 } from '@tomic/react';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useId, useState } from 'react';
 import { Button } from '../components/Button.jsx';
 import { ContainerNarrow } from '../components/Containers';
 import Field from '../components/forms/Field.jsx';
@@ -25,6 +25,7 @@ type ImporterPageProps = {
 
 /** Importer Resource for uploading JSON-AD * */
 export function ImporterPage({ resource }: ImporterPageProps) {
+  const parentFieldId = useId();
   const [overwriteOutside, setOverwriteOutside] = useState(false);
   const [parent, setParent] = useCurrentSubject();
   const resourceByS = useResource(parent);
@@ -99,9 +100,11 @@ export function ImporterPage({ resource }: ImporterPageProps) {
             label='Target parent'
             helper='This URL will be used as the default Parent for imported resources.'
             required
+            fieldId={parentFieldId}
           >
             <InputWrapper>
               <InputStyled
+                id={parentFieldId}
                 required
                 placeholder='Enter subject'
                 value={parent}

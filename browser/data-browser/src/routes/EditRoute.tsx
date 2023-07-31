@@ -9,6 +9,7 @@ import { useCurrentSubject } from '../helpers/useCurrentSubject';
 import { ClassDetail } from '../components/ClassDetail';
 import { Title } from '../components/Title';
 import Parent from '../components/Parent';
+import { Main } from '../components/Main';
 
 /** Form for instantiating a new Resource from some Class */
 export function Edit(): JSX.Element {
@@ -33,23 +34,25 @@ export function Edit(): JSX.Element {
     <>
       <Parent resource={resource} />
       <ContainerNarrow>
-        {subject ? (
-          <>
-            <Title resource={resource} prefix='Edit' />
-            <ClassDetail resource={resource} />
-            {/* Key is required for re-rendering when subject changes */}
-            <ResourceForm resource={resource} key={subject} />
-          </>
-        ) : (
-          <form onSubmit={handleClassSet}>
-            <h1>edit a resource</h1>
-            <InputStyled
-              value={subjectInput || undefined}
-              onChange={e => setSubjectInput(e.target.value)}
-              placeholder={'Enter a Resource URL...'}
-            />
-          </form>
-        )}
+        <Main subject={subject}>
+          {subject ? (
+            <>
+              <Title resource={resource} prefix='Edit' />
+              <ClassDetail resource={resource} />
+              {/* Key is required for re-rendering when subject changes */}
+              <ResourceForm resource={resource} key={subject} />
+            </>
+          ) : (
+            <form onSubmit={handleClassSet}>
+              <h1>edit a resource</h1>
+              <InputStyled
+                value={subjectInput || undefined}
+                onChange={e => setSubjectInput(e.target.value)}
+                placeholder={'Enter a Resource URL...'}
+              />
+            </form>
+          )}
+        </Main>
       </ContainerNarrow>
     </>
   );

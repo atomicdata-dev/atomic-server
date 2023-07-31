@@ -59,6 +59,9 @@ const Content = styled.div<ContentProps>`
   display: block;
   flex: 1;
   overflow-y: auto;
+  border-top: 1px solid ${p => p.theme.colors.bg2};
+  border-left: 1px solid ${p => p.theme.colors.bg2};
+  border-top-left-radius: ${p => p.theme.radius};
 `;
 
 /** Persistently shown navigation bar */

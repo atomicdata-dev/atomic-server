@@ -15,7 +15,6 @@ import { constructOpenURL } from '../../helpers/navigation';
 import { paths } from '../../routes/paths';
 import { Button } from '../Button';
 import { ResourceSideBar } from './ResourceSideBar/ResourceSideBar';
-import { SignInButton } from '../SignInButton';
 import { SideBarHeader } from './SideBarHeader';
 import { shortcuts } from '../HotKeyWrapper';
 import { ErrorLook } from '../ErrorLook';
@@ -23,6 +22,7 @@ import { DriveSwitcher } from './DriveSwitcher';
 import { IconButton } from '../IconButton/IconButton';
 import { Row } from '../Row';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
+import { ScrollArea } from '../ScrollArea';
 
 interface SideBarDriveProps {
   /** Closes the sidebar on small screen devices */
@@ -39,7 +39,7 @@ export function SideBarDrive({
   const [subResources] = useArray(driveResource, urls.properties.subResources);
   const [title] = useTitle(driveResource);
   const navigate = useNavigate();
-  const [angentCanWrite] = useCanWrite(driveResource);
+  const [agentCanWrite] = useCanWrite(driveResource);
   const [currentSubject] = useCurrentSubject();
   const currentResource = useResource(currentSubject);
   const [ancestry, setAncestry] = useState<string[]>([]);
@@ -67,7 +67,7 @@ export function SideBarDrive({
           </DriveTitle>
         </TitleButton>
         <HeadingButtonWrapper gap='0'>
-          {angentCanWrite && (
+          {agentCanWrite && (
             <IconButton
               onClick={() => navigate(paths.new)}
               title={`Create a new resource in this drive (${shortcuts.new})`}
@@ -79,36 +79,31 @@ export function SideBarDrive({
           <DriveSwitcher />
         </HeadingButtonWrapper>
       </SideBarHeader>
-      <ListWrapper>
-        {driveResource.isReady() ? (
-          subResources.map(child => {
-            return (
-              <ResourceSideBar
-                key={child}
-                subject={child}
-                ancestry={ancestry}
-                handleClose={handleClickItem}
-              />
-            );
-          })
-        ) : driveResource.loading ? null : (
-          <SideBarErr>
-            {driveResource.error ? (
-              driveResource.isUnauthorized() ? (
-                agent ? (
-                  'unauthorized'
-                ) : (
-                  <SignInButton />
-                )
-              ) : (
-                driveResource.error.message
-              )
-            ) : (
-              'this should not happen'
-            )}
-          </SideBarErr>
-        )}
-      </ListWrapper>
+      <StyledScrollArea>
+        <ListWrapper>
+          {driveResource.isReady() ? (
+            subResources.map(child => {
+              return (
+                <ResourceSideBar
+                  key={child}
+                  subject={child}
+                  ancestry={ancestry}
+                  onClick={handleClickItem}
+                />
+              );
+            })
+          ) : driveResource.loading ? null : (
+            <SideBarErr>
+              {driveResource.error &&
+                (driveResource.isUnauthorized()
+                  ? agent
+                    ? 'unauthorized'
+                    : driveResource.error.message
+                  : driveResource.error.message)}
+            </SideBarErr>
+          )}
+        </ListWrapper>
+      </StyledScrollArea>
     </>
   );
 }
@@ -130,7 +125,6 @@ const SideBarErr = styled(ErrorLook)`
 `;
 
 const ListWrapper = styled.div`
-  overflow-y: auto;
   overflow-x: hidden;
   margin-left: 0.5rem;
 `;
@@ -138,4 +132,8 @@ const ListWrapper = styled.div`
 const HeadingButtonWrapper = styled(Row)`
   color: ${p => p.theme.colors.main};
   font-size: 0.9rem;
+`;
+
+const StyledScrollArea = styled(ScrollArea)`
+  overflow: hidden;
 `;

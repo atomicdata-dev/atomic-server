@@ -12,7 +12,7 @@ import { ContainerNarrow } from '../components/Containers';
 import { ValueForm } from '../components/forms/ValueForm';
 import NewInstanceButton from '../components/NewInstanceButton';
 import { Title } from '../components/Title';
-import { Row } from '../components/Row';
+import { Column, Row } from '../components/Row';
 import { ResourcePageProps } from './ResourcePage';
 import { defaultHiddenProps } from './ResourcePageDefault';
 
@@ -29,23 +29,25 @@ export function ClassPage({ resource }: ResourcePageProps) {
       <Title resource={resource} />
       <ClassDetail resource={resource} />
       <ValueForm resource={resource} propertyURL={properties.description} />
-      <AllProps
-        resource={resource}
-        except={defaultHiddenProps}
-        editable
-        columns
-      />
-      <Row>
-        <NewInstanceButton icon={true} klass={resource.getSubject()} />
-        <Button
-          subtle
-          onClick={async () =>
-            setTSdef(await classToTypescriptDefinition(resource, store))
-          }
-        >
-          typescript interface
-        </Button>
-      </Row>
+      <Column>
+        <AllProps
+          resource={resource}
+          except={defaultHiddenProps}
+          editable
+          columns
+        />
+        <Row>
+          <NewInstanceButton icon={true} klass={resource.getSubject()} />
+          <Button
+            subtle
+            onClick={async () =>
+              setTSdef(await classToTypescriptDefinition(resource, store))
+            }
+          >
+            typescript interface
+          </Button>
+        </Row>
+      </Column>
       {tsDef && <CodeBlock content={tsDef} />}
     </ContainerNarrow>
   );

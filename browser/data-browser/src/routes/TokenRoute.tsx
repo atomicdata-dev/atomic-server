@@ -3,6 +3,7 @@ import { ContainerNarrow } from '../components/Containers';
 import { CodeBlock } from '../components/CodeBlock';
 import { createAuthentication, useServerURL } from '@tomic/react';
 import { useSettings } from '../helpers/AppSettings';
+import { Main } from '../components/Main';
 
 /** Lets user create bearer tokens */
 export const TokenRoute: React.FunctionComponent = () => {
@@ -21,8 +22,10 @@ export const TokenRoute: React.FunctionComponent = () => {
   }, [agent]);
 
   return (
-    <ContainerNarrow>
-      <CodeBlock content={token} />
-    </ContainerNarrow>
+    <Main>
+      <ContainerNarrow>
+        <CodeBlock content={token} />
+      </ContainerNarrow>
+    </Main>
   );
 };

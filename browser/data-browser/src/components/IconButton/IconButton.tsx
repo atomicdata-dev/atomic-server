@@ -11,13 +11,15 @@ export enum IconButtonVariant {
 
 type ColorProp = keyof DefaultTheme['colors'] | 'inherit';
 
-interface BaseProps {
+type BaseProps = {
   className?: string;
   variant?: IconButtonVariant;
   color?: ColorProp;
   size?: string;
   title: string;
-}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  as?: string | React.ComponentType<any>;
+};
 
 export type IconButtonProps = BaseProps &
   React.ButtonHTMLAttributes<HTMLButtonElement>;
@@ -67,11 +69,11 @@ IconButtonLink.displayName = 'IconButtonLink';
 
 IconButtonLink.defaultProps = defaultProps as IconButtonLinkProps;
 
-interface BaseProps {
+interface ButtonBaseProps {
   size?: string;
 }
 
-const IconButtonBase = styled.button<BaseProps>`
+const IconButtonBase = styled.button<ButtonBaseProps>`
   --button-padding: 0.4em;
   cursor: pointer;
   display: inline-grid;
@@ -102,7 +104,7 @@ const SimpleIconButton = styled(IconButtonBase)<ButtonStyleProps>`
 
   &:not([disabled]) {
     &:hover,
-    &:focus {
+    &:focus-visible {
       background-color: ${p => p.theme.colors.bg1};
     }
 
@@ -119,7 +121,7 @@ const OutlineIconButton = styled(IconButtonBase)<ButtonStyleProps>`
 
   &:not([disabled]) {
     &:hover,
-    &:focus {
+    &:focus-visible {
       color: ${p => p.theme.colors.main};
       box-shadow: 0px 0px 0px 1.5px ${p => p.theme.colors.main},
         ${p => p.theme.boxShadowSoft};
@@ -137,7 +139,7 @@ const FillIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   background-color: unset;
   border-radius: 50%;
   &:hover,
-  &:focus {
+  &:focus-visible {
     color: white;
     background-color: ${p => p.theme.colors.main};
     box-shadow: ${p => p.theme.boxShadowSoft};
@@ -150,7 +152,7 @@ const ColoredIconButton = styled(IconButtonBase)<ButtonStyleProps>`
     p.color === 'inherit' ? 'inherit' : p.theme.colors[p.color]};
   border-radius: 50%;
   &:hover,
-  &:focus {
+  &:focus-visible {
     color: white;
     filter: brightness(1.3);
     box-shadow: ${p => p.theme.boxShadowSoft};

@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Client, useStore } from '@tomic/react';
+import { Client, properties, useResource, useStore } from '@tomic/react';
 import {
   editURL,
   dataURL,
@@ -26,6 +26,13 @@ import {
   FaTrash,
 } from 'react-icons/fa';
 import { useQueryScopeHandler } from '../../hooks/useQueryScope';
+import {
+  ConfirmationDialog,
+  ConfirmationDialogTheme,
+} from '../ConfirmationDialog';
+import { ResourceInline } from '../../views/ResourceInline';
+import { ResourceUsage } from '../ResourceUsage';
+import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 
 export interface ResourceContextMenuProps {
   subject: string;
@@ -35,6 +42,7 @@ export interface ResourceContextMenuProps {
   simple?: boolean;
   /** If it's the primary menu in the navbar. Used for triggering keyboard shortcut */
   isMainMenu?: boolean;
+  bindActive?: (active: boolean) => void;
 }
 
 /** Dropdown menu that opens a bunch of actions for some resource */
@@ -44,12 +52,32 @@ function ResourceContextMenu({
   trigger,
   simple,
   isMainMenu,
+  bindActive,
 }: ResourceContextMenuProps) {
   const store = useStore();
   const navigate = useNavigate();
   const location = useLocation();
+  const resource = useResource(subject);
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [currentSubject] = useCurrentSubject();
+
   const { enableScope } = useQueryScopeHandler(subject);
   // Try to not have a useResource hook in here, as that will lead to many costly fetches when the user enters a new subject
+
+  const handleDestroy = useCallback(async () => {
+    const parent = resource.get<string>(properties.parent);
+
+    try {
+      await resource.destroy(store);
+      toast.success('Resource deleted!');
+
+      if (currentSubject === subject) {
+        navigate(parent ? constructOpenURL(parent) : '/');
+      }
+    } catch (error) {
+      toast.error(error.message);
+    }
+  }, [resource, navigate, currentSubject]);
 
   if (subject === undefined) {
     return null;
@@ -57,24 +85,6 @@ function ResourceContextMenu({
 
   if (!Client.isValidSubject(subject)) {
     return null;
-  }
-
-  async function handleDestroy() {
-    if (
-      window.confirm(
-        'Are you sure you want to permanently delete this resource?',
-      )
-    ) {
-      const resource = store.getResourceLoading(subject);
-
-      try {
-        await resource.destroy(store);
-        toast.success('Resource deleted!');
-        navigate('/');
-      } catch (error) {
-        toast.error(error.message);
-      }
-    }
   }
 
   const items: Item[] = [
@@ -137,7 +147,7 @@ function ResourceContextMenu({
       label: 'delete',
       helper:
         'Fetch the resouce again from the server, possibly see new changes.',
-      onClick: handleDestroy,
+      onClick: () => setShowDeleteDialog(true),
     },
     {
       id: 'history',
@@ -162,11 +172,29 @@ function ResourceContextMenu({
   const triggerComp = trigger ?? buildDefaultTrigger(<FaEllipsisV />);
 
   return (
-    <DropdownMenu
-      items={filteredItems}
-      trigger={triggerComp}
-      isMainMenu={isMainMenu}
-    />
+    <>
+      <DropdownMenu
+        items={filteredItems}
+        trigger={triggerComp}
+        isMainMenu={isMainMenu}
+        bindActive={bindActive}
+      />
+      <ConfirmationDialog
+        title={`Delete resource`}
+        show={showDeleteDialog}
+        bindShow={setShowDeleteDialog}
+        theme={ConfirmationDialogTheme.Alert}
+        confirmLabel={'Delete'}
+        onConfirm={handleDestroy}
+      >
+        <>
+          <p>
+            Are you sure you want to delete <ResourceInline subject={subject} />
+          </p>
+          <ResourceUsage resource={resource} />
+        </>
+      </ConfirmationDialog>
+    </>
   );
 }
 

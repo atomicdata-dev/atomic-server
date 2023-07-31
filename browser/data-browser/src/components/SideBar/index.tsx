@@ -17,7 +17,7 @@ const SideBarDriveMemo = React.memo(SideBarDrive);
 
 export function SideBar(): JSX.Element {
   const { drive, sideBarLocked, setSideBarLocked } = useSettings();
-  const [ref, hoveringOverSideBar] = useHover<HTMLElement>(sideBarLocked);
+  const [ref, hoveringOverSideBar, listeners] = useHover<HTMLElement>();
   // Check if the window is small enough to hide the sidebar
   const isWideScreen = useMediaQuery(
     `(min-width: ${SIDEBAR_TOGGLE_WIDTH}px)`,
@@ -43,6 +43,8 @@ export function SideBar(): JSX.Element {
     }
   }, [isWideScreen]);
 
+  const sidebarVisible = sideBarLocked || (hoveringOverSideBar && isWideScreen);
+
   return (
     <SideBarContainer>
       <SideBarStyled
@@ -50,7 +52,8 @@ export function SideBar(): JSX.Element {
         size={size}
         data-test='sidebar'
         locked={isWideScreen && sideBarLocked}
-        exposed={sideBarLocked || (hoveringOverSideBar && isWideScreen)}
+        exposed={sidebarVisible}
+        {...listeners}
       >
         <NavBarSpacer position='top' />
         {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
@@ -89,7 +92,6 @@ const SideBarStyled = styled('nav').attrs<SideBarStyledProps>(p => ({
   z-index: ${p => p.theme.zIndex.sidebar};
   box-sizing: border-box;
   background: ${p => p.theme.colors.bg};
-  border-right: solid 1px ${p => p.theme.colors.bg2};
   transition: opacity 0.3s, left 0.3s;
   left: ${p => (p.exposed ? '0' : `calc(var(--width) * -1 + 0.5rem)`)};
   /* When the user is hovering, show half opacity */
@@ -97,10 +99,14 @@ const SideBarStyled = styled('nav').attrs<SideBarStyledProps>(p => ({
   height: 100vh;
   width: var(--width);
   position: ${p => (p.locked ? 'relative' : 'absolute')};
+  border-right: ${p => (p.locked ? 'none' : `1px solid ${p.theme.colors.bg2}`)};
+  box-shadow: ${p => (p.locked ? 'none' : p.theme.boxShadowSoft)};
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
+
+  view-transition-name: sidebar;
 `;
 
 const MenuWrapper = styled.div`
@@ -135,7 +141,9 @@ const SideBarOverlay = styled.div<SideBarOverlayProps>`
 `;
 
 const SideBarDragArea = styled(DragAreaBase)`
-  height: 100%;
+  --handle-margin: 1rem;
+  height: calc(100% - var(--handle-margin) * 2);
+  margin-top: var(--handle-margin);
   width: 12px;
   right: -6px;
   top: 0;

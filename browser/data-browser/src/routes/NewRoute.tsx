@@ -19,6 +19,7 @@ import { FileDropzoneInput } from '../components/forms/FileDropzone/FileDropzone
 import toast from 'react-hot-toast';
 import { getIconForClass } from '../views/FolderPage/iconMap';
 import { NewFormFullPage } from '../components/forms/NewForm/NewFormPage';
+import { Main } from '../components/Main';
 
 /** Start page for instantiating a new Resource from some Class */
 function NewRoute(): JSX.Element {
@@ -49,6 +50,7 @@ function NewResourceSelector() {
   const buttons = [
     urls.classes.folder,
     urls.classes.document,
+    urls.classes.table,
     urls.classes.chatRoom,
     urls.classes.bookmark,
     urls.classes.class,
@@ -78,46 +80,47 @@ function NewResourceSelector() {
   );
 
   return (
-    <StyledForm onSubmit={handleClassSet}>
-      <h1>
-        Create new resource{' '}
-        {parentSubject && (
-          <>
-            {`under `}
-            <ResourceInline subject={parentSubject} />
-          </>
-        )}
-      </h1>
-      <div>
-        <ResourceSelector
-          setSubject={setClassInputValue}
-          value={classInputValue}
-          error={error}
-          setError={setError}
-          classType={urls.classes.class}
+    <Main>
+      <StyledForm onSubmit={handleClassSet}>
+        <h1>
+          Create new resource{' '}
+          {parentSubject && (
+            <>
+              {`under `}
+              <ResourceInline subject={parentSubject} />
+            </>
+          )}
+        </h1>
+        <div>
+          <ResourceSelector
+            setSubject={setClassInputValue}
+            value={classInputValue}
+            error={error}
+            classType={urls.classes.class}
+          />
+        </div>
+        <Row wrapItems>
+          {classInputValue && (
+            <Button onClick={handleClassSet}>new {className}</Button>
+          )}
+          {!classInputValue && (
+            <>
+              {buttons.map(classType => (
+                <WrappedButton
+                  key={classType}
+                  classType={classType}
+                  parent={calculatedParent}
+                />
+              ))}
+            </>
+          )}
+        </Row>
+        <FileDropzoneInput
+          parentResource={parentResource}
+          onFilesUploaded={onUploadComplete}
         />
-      </div>
-      <Row wrapItems>
-        {classInputValue && (
-          <Button onClick={handleClassSet}>new {className}</Button>
-        )}
-        {!classInputValue && (
-          <>
-            {buttons.map(classType => (
-              <WrappedButton
-                key={classType}
-                classType={classType}
-                parent={calculatedParent}
-              />
-            ))}
-          </>
-        )}
-      </Row>
-      <FileDropzoneInput
-        parentResource={parentResource}
-        onFilesUploaded={onUploadComplete}
-      />
-    </StyledForm>
+      </StyledForm>
+    </Main>
   );
 }
 

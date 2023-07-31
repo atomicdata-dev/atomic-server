@@ -3,7 +3,7 @@
 _Status: Beta. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 
 View, edit and create [Atomic Data](https://atomicdata.dev/) from your browser!
-Front-end for [`atomic-server`](../../README.md).
+Designed for interacting with [`atomic-server`](https://github.com/atomicdata-dev/atomic-data-browser).
 
 **[demo on atomicdata.dev](https://atomicdata.dev/)**
 
@@ -42,7 +42,7 @@ pnpm start
 ```
 
 If you want to _edit_ data, you'll need an [_Agent_](https://atomicdata.dev/classes/Agent), including its `privateKey` and `subject`.
-You can get one by accepting [an Invite](https://atomicdata.dev/invites/1), or by hosting your own [`atomic-server`](../../README.md).
+You can get one by accepting [an Invite](https://atomicdata.dev/invites/1), or by hosting your own [`atomic-server`](https://github.com/atomicdata-dev/atomic-data-rust/blob/master/server/README.md).
 You can set the Agent on the `/app/agent` route.
 
 ## Understanding & contributing to the code
@@ -52,7 +52,7 @@ You can set the Agent on the `/app/agent` route.
 - **Data fetching** is handled by the `Store`, which makes sure that you don't ask twice for the same resource and let's other resources know that things have changed.
 - **Hooks** are used wherever possible. This means functional components, instead of old-style Class components. Hooks tend to use a pattern similar to React's own `useState`, which means that two terms are returned: the first one contains the current value, and the second one is a function for setting the value.
 - **Document** your components and properties! Explain your thinking when doing something non-trivial.
-- **Resources** should have an `about={subject}` tag in HTML elements / DOM nodes, which can be used for debugging and RDFa parsing. This means that you can press `e` to edit anything you're hovering on, or press `d` to show the data!
+- **Resources** should have a `about={subject}` tag in HTML elements / DOM nodes, which can be used for debugging and RDFa parsing. This means that you can press `e` to edit anything you're hovering on, or press `d` to show the data!
 - **Creating views** for new types of Resources should be done in `/views`. Check the README.md in that folder.
 - **Fetching & processing** is done in this order. The UI renders some component that uses `useResource`, and passes a `subject` URL. This is probably first the one that's shown in the navigation bar. This resource is fetched (unless it's already in the store) as a `JSON-AD` object, after which it is put in the Store without any changes. The Parser does not perform validation checks - that would make the application slower. After the resource is added to the store, subscribers (users of that resource, such as Components with the `useResource` hook) will be notified of changes. The component will re-render, and the props can now be used.
 - **Accessing the store from the browser console** can be done in develop mode in your browser with the global `store` object.
@@ -79,7 +79,7 @@ They use the PlayWright framework and run in the browser.
 
 - make sure the data-browser server is running (`pnpm start`) at `http://localhost:5173`
 - make sure an [`atomic-server`](https://crates.io/crates/atomic-server/) instance is running at `http://localhost:9883`
-- make sure the `http://localhost/setup` invite has at least one available usage. You can set a higher amount [here](http://localhost/app/edit?subject=http%3A%2F%2Flocalhost%2Fsetup), or run `atomic-server --initialize` to reset it to 1.
+- make sure the `http://localhost/setup` invite has at least one available usage. You can set a higher amount [here](http://localhost/app/edit?subject=http%3A%2F%2Flocalhost%2Fsetup), or run `atomic-server --inititalize` to reset it to 1.
 - Install the Playwright dependencies: `pnpm playwright-install`
 - `pnpm test` launches the E2E tests (make sure the dev server is running at `http://localhost:5173`)
 - `pnpm test-debug` launches the E2E tests in debug mode (a window opens with debug tools)
