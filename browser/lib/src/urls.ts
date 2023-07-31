@@ -26,10 +26,24 @@ export const classes = {
     grid: 'https://atomicdata.dev/display-style/grid',
     list: 'https://atomicdata.dev/display-style/list',
   },
+  dateFormat: 'https://atomicdata.dev/classes/DateFormat',
+  numberFormat: 'https://atomicdata.dev/classes/NumberFormat',
+  constraintProperties: {
+    rangeProperty: 'https://atomicdata.dev/classes/RangeProperty',
+    floatRangeProperty: 'https://atomicdata.dev/classes/FloatRangeProperty',
+    formattedNumber: 'https://atomicdata.dev/classes/FormattedNumber',
+    selectProperty: 'https://atomicdata.dev/classes/SelectProperty',
+    formattedDate: 'https://atomicdata.dev/classes/FormattedDate',
+  },
+  table: 'https://atomicdata.dev/classes/Table',
+  tag: 'https://atomicdata.dev/classes/Tag',
 };
 
 /** List of commonly used Atomic Data Properties. */
 export const properties = {
+  /** Collection of all the AtomicData.dev properties */
+  allowsOnly: 'https://atomicdata.dev/properties/allowsOnly',
+  getAll: 'https://atomicdata.dev/properties/?page_size=999',
   children: 'https://atomicdata.dev/properties/children',
   classType: 'https://atomicdata.dev/properties/classtype',
   createdBy: 'https://atomicdata.dev/properties/createdBy',
@@ -115,6 +129,20 @@ export const properties = {
     preview: 'https://atomicdata.dev/property/preview',
     imageUrl: 'https://atomicdata.dev/properties/imageUrl',
   },
+  constraints: {
+    max: 'https://atomicdata.dev/properties/max',
+    min: 'https://atomicdata.dev/properties/min',
+    maxFloat: 'https://atomicdata.dev/properties/maxFloat',
+    minFloat: 'https://atomicdata.dev/properties/minFloat',
+    numberFormatting: 'https://atomicdata.dev/properties/numberFormatting',
+    decimalPlaces: 'https://atomicdata.dev/properties/decimalPlaces',
+    dateFormat: 'https://atomicdata.dev/properties/dateFormat',
+  },
+  table: {
+    tableColumnWidths: 'https://atomicdata.dev/properties/tableColumnWidths',
+  },
+  color: 'https://atomicdata.dev/properties/color',
+  emoji: 'https://atomicdata.dev/properties/emoji',
 };
 
 export const datatypes = {
@@ -133,6 +161,15 @@ export const datatypes = {
 export const instances = {
   publicAgent: 'https://atomicdata.dev/agents/publicAgent',
   displayStyleGrid: 'https://atomicdata.dev/agents/publicAgent',
+  numberFormats: {
+    number: 'https://atomicdata.dev/classes/NumberFormat/number',
+    percentage: 'https://atomicdata.dev/classes/NumberFormat/Percentage',
+  },
+  dateFormats: {
+    localNumeric: 'https://atomicdata.dev/classes/DateFormat/localNumeric',
+    localLong: 'https://atomicdata.dev/classes/DateFormat/localLong',
+    localRelative: 'https://atomicdata.dev/classes/DateFormat/localRelative',
+  },
 };
 
 export const endpoints = {

@@ -1,3 +1,4 @@
+import { transparentize } from 'polished';
 import { useEffect, useId, useRef, useState } from 'react';
 import styled from 'styled-components';
 
@@ -63,7 +64,9 @@ export function useResizable<E extends HTMLElement>(
   const styleId = useId();
 
   const mouseMove = useRef((e: MouseEvent) => {
-    const newSize = Math.min(maxSize, Math.max(minSize, e.clientX));
+    const targetRect = targetRef.current?.getBoundingClientRect();
+    const relativePosition = e.clientX - (targetRect?.x ?? 0);
+    const newSize = Math.min(maxSize, Math.max(minSize, relativePosition));
 
     requestAnimationFrame(() => {
       setSize(`${newSize}px`);
@@ -77,7 +80,11 @@ export function useResizable<E extends HTMLElement>(
       };
     }
 
-    const mouseDown = () => {
+    const mouseDown = (e: MouseEvent) => {
+      e.stopPropagation();
+
+      if (e.target !== dragAreaRef.current) return;
+
       setDragging(true);
     };
 
@@ -123,7 +130,7 @@ interface DragAreaBaseProps {
 }
 
 export const DragAreaBase = styled.div<DragAreaBaseProps>`
-  --drag-color: hsla(0, 0%, 0%, 0.2);
+  --drag-color: ${p => transparentize(0.7, p.theme.colors.main)};
   position: absolute;
   cursor: col-resize;
 
@@ -137,4 +144,6 @@ export const DragAreaBase = styled.div<DragAreaBaseProps>`
     background-color: var(--drag-color);
     backdrop-filter: blur(5px);
   }
+
+  border-radius: ${({ theme }) => theme.radius};
 `;

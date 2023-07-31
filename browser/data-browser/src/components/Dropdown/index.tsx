@@ -1,4 +1,11 @@
-import React, { useId, useMemo, useRef, useState, useCallback } from 'react';
+import React, {
+  useContext,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import styled from 'styled-components';
 import { useClickAwayListener } from '../../hooks/useClickAwayListener';
@@ -7,6 +14,10 @@ import { DropdownTriggerRenderFunction } from './DropdownTrigger';
 import { shortcuts } from '../HotKeyWrapper';
 import { Shortcut } from '../Shortcut';
 import { transition } from '../../helpers/transition';
+import { createPortal } from 'react-dom';
+import { DropdownPortalContext } from './dropdownContext';
+import { loopingIndex } from '../../helpers/loopingIndex';
+import { useControlLock } from '../../hooks/useControlLock';
 
 export const DIVIDER = 'divider' as const;
 
@@ -29,12 +40,8 @@ interface DropdownMenuProps {
   trigger: DropdownTriggerRenderFunction;
   /** Enables the keyboard shortcut */
   isMainMenu?: boolean;
+  bindActive?: (active: boolean) => void;
 }
-
-/** Gets the index of an array and loops around when at the beginning or end */
-const loopingIndex = (index: number, length: number) => {
-  return ((index % length) + length) % length;
-};
 
 export const isItem = (
   item: MenuItemMinimial | string | undefined,
@@ -43,6 +50,9 @@ export const isItem = (
 
 const shouldSkip = (item?: Item) => !isItem(item) || item.disabled;
 
+const getAdditionalOffest = (increment: number) =>
+  increment === 0 ? 1 : Math.sign(increment);
+
 /**
  * Returns a function that finds the next available index, it skips disabled
  * items and dividers and loops around when at the start or end of the list.
@@ -50,21 +60,25 @@ const shouldSkip = (item?: Item) => !isItem(item) || item.disabled;
  */
 const createIndexOffset =
   (items: Item[]) => (startingPoint: number, offset: number) => {
-    const findNextAvailable = (scopedOffset: number) => {
-      const newIndex = loopingIndex(startingPoint + scopedOffset, items.length);
+    const findNextAvailable = (
+      scopedStartingPoint: number,
+      scopedOffset: number,
+    ) => {
+      const newIndex = loopingIndex(
+        scopedStartingPoint + scopedOffset,
+        items.length,
+      );
 
-      if (newIndex === startingPoint) {
-        return 0;
-      }
+      const additionalIncrement = getAdditionalOffest(offset);
 
       if (shouldSkip(items[newIndex])) {
-        return findNextAvailable(scopedOffset + offset);
+        return findNextAvailable(newIndex, additionalIncrement);
       }
 
       return newIndex;
     };
 
-    return findNextAvailable(offset);
+    return findNextAvailable(startingPoint, offset);
   };
 
 function normalizeItems(items: Item[]) {
@@ -92,23 +106,30 @@ export function DropdownMenu({
   items,
   trigger,
   isMainMenu,
+  bindActive = () => undefined,
 }: DropdownMenuProps): JSX.Element {
   const menuId = useId();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const [isActive, setIsActive] = useState(false);
-  const [visible, setVisible] = useState(false);
+
+  const [isActive, _setIsActive] = useState(false);
+
+  useControlLock(isActive);
+
+  const setIsActive = useCallback(
+    (active: boolean) => {
+      _setIsActive(active);
+      bindActive(active);
+    },
+    [bindActive],
+  );
 
   const handleClose = useCallback(() => {
-    setVisible(false);
-    // Whenever the menu closes, assume that the next one will be opened with mouse
-    setUseKeys(false);
-    // Always reset to the top item on close
+    triggerRef.current?.focus();
     setTimeout(() => {
       setIsActive(false);
-      setSelectedIndex(0);
     }, 100);
-  }, []);
+  }, [setIsActive]);
 
   useClickAwayListener([triggerRef, dropdownRef], handleClose, isActive, [
     'click',
@@ -119,10 +140,10 @@ export function DropdownMenu({
 
   const [x, setX] = useState(0);
   const [y, setY] = useState(0);
-  const [selectedIndex, setSelectedIndex] = useState(0);
   const getNewIndex = createIndexOffset(normalizedItems);
+  const [selectedIndex, setSelectedIndex] = useState<number>(getNewIndex(0, 0));
   // if the keyboard is used to navigate the menu items
-  const [useKeys, setUseKeys] = useState(false);
+  const [useKeys, setUseKeys] = useState(true);
 
   const handleToggle = useCallback(() => {
     if (isActive) {
@@ -134,8 +155,12 @@ export function DropdownMenu({
     setIsActive(true);
 
     requestAnimationFrame(() => {
-      const triggerRect = triggerRef.current!.getBoundingClientRect();
-      const menuRect = dropdownRef.current!.getBoundingClientRect();
+      if (!triggerRef.current || !dropdownRef.current) {
+        return;
+      }
+
+      const triggerRect = triggerRef.current.getBoundingClientRect();
+      const menuRect = dropdownRef.current.getBoundingClientRect();
       const topPos = triggerRect.y - menuRect.height;
 
       // If the top is outside of the screen, render it below
@@ -154,23 +179,35 @@ export function DropdownMenu({
         setX(triggerRect.x - menuRect.width + triggerRect.width);
       }
 
-      setVisible(true);
+      // The dropdown is hidden at first because in the first few frames it is still position at 0,0.
+      // We only want to show the dropdown after it has been positioned correctly.
+      requestAnimationFrame(() => {
+        dropdownRef.current!.style.visibility = 'visible';
+      });
     });
-  }, [isActive]);
+  }, [isActive, setIsActive]);
 
-  const handleTriggerClick = useCallback(() => {
+  const handleMouseOverMenu = useCallback(() => {
     setUseKeys(false);
+  }, []);
+
+  const handleTriggerActivate = useCallback(() => {
+    setUseKeys(true);
+    setSelectedIndex(getNewIndex(0, 0));
     handleToggle();
   }, [handleToggle]);
 
   // Close the menu
+  useHotkeys('esc', handleClose, { enabled: isActive });
   useHotkeys(
-    'esc',
-    () => {
+    'tab',
+    e => {
+      e.preventDefault();
       handleClose();
     },
     { enabled: isActive },
   );
+
   // Toggle menu
   useHotkeys(
     shortcuts.menu,
@@ -198,6 +235,7 @@ export function DropdownMenu({
     'up',
     e => {
       e.preventDefault();
+      e.stopPropagation();
       setUseKeys(true);
       setSelectedIndex(prev => getNewIndex(prev, -1));
     },
@@ -209,6 +247,7 @@ export function DropdownMenu({
     'down',
     e => {
       e.preventDefault();
+      e.stopPropagation();
       setUseKeys(true);
       setSelectedIndex(prev => getNewIndex(prev, 1));
 
@@ -220,45 +259,85 @@ export function DropdownMenu({
 
   const Trigger = useMemo(() => React.forwardRef(trigger), []);
 
+  const handleBlur = useCallback(() => {
+    // Doesn't work without delay, maybe the browser sets document.activeElement after firering the blur event?
+    requestAnimationFrame(() => {
+      if (!dropdownRef.current) return;
+
+      if (!dropdownRef.current.contains(document.activeElement)) {
+        handleClose();
+      }
+    });
+  }, [handleClose]);
+
   return (
     <>
       <Trigger
         ref={triggerRef}
-        onClick={handleTriggerClick}
+        onClick={handleTriggerActivate}
         isActive={isActive}
         menuId={menuId}
       />
-      <Menu ref={dropdownRef} visible={visible} x={x} y={y} id={menuId}>
-        {isActive &&
-          normalizedItems.map((props, i) => {
-            if (!isItem(props)) {
-              return <ItemDivider key={i} />;
-            }
+      {isActive && (
+        <DropdownPortal>
+          <Menu
+            ref={dropdownRef}
+            isActive={isActive}
+            x={x}
+            y={y}
+            id={menuId}
+            onMouseOver={handleMouseOverMenu}
+            onBlur={handleBlur}
+            aria-labelledby={triggerRef.current?.id}
+            role='menu'
+          >
+            {normalizedItems.map((props, i) => {
+              if (!isItem(props)) {
+                return <ItemDivider key={i} />;
+              }
 
-            const { label, onClick, helper, id, disabled, shortcut, icon } =
-              props;
+              const { label, onClick, helper, id, disabled, shortcut, icon } =
+                props;
 
-            return (
-              <MenuItem
-                onClick={() => {
-                  handleClose();
-                  onClick();
-                }}
-                id={id}
-                data-test={`menu-item-${id}`}
-                disabled={disabled}
-                key={id}
-                helper={shortcut ? `${helper} (${shortcut})` : helper}
-                label={label}
-                selected={useKeys && selectedIndex === i}
-                icon={icon}
-                shortcut={shortcut}
-              />
-            );
-          })}
-      </Menu>
+              return (
+                <MenuItem
+                  onClick={() => {
+                    handleClose();
+                    onClick();
+                  }}
+                  id={id}
+                  data-test={`menu-item-${id}`}
+                  disabled={disabled}
+                  key={id}
+                  helper={shortcut ? `${helper} (${shortcut})` : helper}
+                  label={label}
+                  selected={useKeys && selectedIndex === i}
+                  icon={icon}
+                  shortcut={shortcut}
+                />
+              );
+            })}
+          </Menu>
+        </DropdownPortal>
+      )}
     </>
   );
+}
+
+const DropdownPortal = ({ children }: React.PropsWithChildren) => {
+  const portalRef = useContext(DropdownPortalContext);
+
+  if (!portalRef.current) {
+    return null;
+  }
+
+  return createPortal(children, portalRef.current);
+};
+
+interface MenuProps {
+  isActive: boolean;
+  x: number;
+  y: number;
 }
 
 export interface MenuItemSidebarProps extends MenuItemMinimial {
@@ -279,13 +358,22 @@ export function MenuItem({
   label,
   ...props
 }: MenuItemPropsExtended): JSX.Element {
+  const ref = useRef<HTMLButtonElement>(null);
+
+  if (selected && document.activeElement !== ref.current) {
+    ref.current?.focus();
+  }
+
   return (
     <MenuItemStyled
       clean
+      ref={ref}
       onClick={onClick}
       selected={selected}
       title={helper}
       disabled={disabled}
+      role='menuitem'
+      tabIndex={-1}
       {...props}
     >
       {icon}
@@ -307,7 +395,6 @@ interface MenuItemStyledProps {
   selected: boolean;
 }
 
-// eslint-disable-next-line prettier/prettier
 const MenuItemStyled = styled(Button)<MenuItemStyledProps>`
   align-items: center;
   display: flex;
@@ -330,6 +417,7 @@ const MenuItemStyled = styled(Button)<MenuItemStyledProps>`
   }
   &:disabled {
     color: ${p => p.theme.colors.textLight};
+    cursor: default;
     &:hover {
       cursor: 'default';
     }
@@ -346,14 +434,9 @@ const ItemDivider = styled.div`
   border-bottom: 1px solid ${p => p.theme.colors.bg2};
 `;
 
-interface MenuProps {
-  visible: boolean;
-  x: number;
-  y: number;
-}
-
 const Menu = styled.div<MenuProps>`
-  font-size: ${p => p.theme.fontSizeBody}rem;
+  visibility: hidden;
+  font-size: 0.9rem;
   overflow: hidden;
   background: ${p => p.theme.colors.bg};
   border: ${p =>
@@ -362,12 +445,12 @@ const Menu = styled.div<MenuProps>`
   padding-bottom: 0.4rem;
   border-radius: 8px;
   position: fixed;
-  z-index: 1;
+  z-index: ${p => p.theme.zIndex.dropdown};
   top: ${p => p.y}px;
   left: ${p => p.x}px;
   width: auto;
   box-shadow: ${p => p.theme.boxShadowSoft};
-  opacity: ${p => (p.visible ? 1 : 0)};
+  opacity: ${p => (p.isActive ? 1 : 0)};
 
   ${transition('opacity')};
 `;

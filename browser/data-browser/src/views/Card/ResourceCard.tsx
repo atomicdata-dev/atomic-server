@@ -125,7 +125,12 @@ export function ResourceCardDefault({
         propertyURL={urls.properties.description}
       />
       {!small && (
-        <AllProps resource={resource} except={defaultHiddenProps} editable />
+        <AllProps
+          basic
+          resource={resource}
+          except={defaultHiddenProps}
+          editable
+        />
       )}
     </React.Fragment>
   );

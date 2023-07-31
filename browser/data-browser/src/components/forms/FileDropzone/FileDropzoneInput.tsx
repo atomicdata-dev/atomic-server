@@ -43,16 +43,18 @@ export function FileDropzoneInput({
     accept,
   });
 
+  const defaultText =
+    maxFiles === 1
+      ? 'Drop a file or click here to upload.'
+      : 'Drop files or click here to upload.';
+
   return (
     <>
       <VisualDropZone {...getRootProps()} className={className}>
         {error && <ErrMessage>{error.message}</ErrMessage>}
         <input {...getInputProps()} />
         <TextWrapper>
-          <FaUpload />{' '}
-          {isUploading
-            ? 'Uploading...'
-            : text ?? 'Drop files or click here to upload.'}
+          <FaUpload /> {isUploading ? 'Uploading...' : text ?? defaultText}
         </TextWrapper>
       </VisualDropZone>
     </>

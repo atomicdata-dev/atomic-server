@@ -10,6 +10,7 @@ export interface EditableTitleProps {
   resource: Resource;
   /** Uses `name` by default */
   parentRef?: React.RefObject<HTMLInputElement>;
+  id?: string;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ const opts = {
 export function EditableTitle({
   resource,
   parentRef,
+  id,
   className,
   ...props
 }: EditableTitleProps): JSX.Element {
@@ -33,6 +35,14 @@ export function EditableTitle({
 
   useHotkeys(
     'enter',
+    () => {
+      setIsEditing(false);
+    },
+    { enableOnTags: ['INPUT'] },
+  );
+
+  useHotkeys(
+    'esc',
     () => {
       setIsEditing(false);
     },
@@ -64,6 +74,7 @@ export function EditableTitle({
     />
   ) : (
     <Title
+      id={id}
       canEdit={!!canEdit}
       title={canEdit ? 'Edit title' : 'View title'}
       data-test='editable-title'

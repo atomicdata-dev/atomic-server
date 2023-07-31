@@ -191,7 +191,8 @@ function DocumentPageEdit({
       'element',
       resource.getSubject(),
     );
-    elements.splice(position, 0, elementSubject);
+    const newElements = [...elements];
+    newElements.splice(position, 0, elementSubject);
 
     try {
       const newElement = new Resource(elementSubject, true);
@@ -200,16 +201,9 @@ function DocumentPageEdit({
         newElement.set(properties.parent, resource.getSubject(), store),
         newElement.set(properties.description, '', store),
       ]);
-      // This is a dubious hack to make sure the element is instantly usable.
-      // Edit: seems like it's no longer needed!
-      // store.addResource(newElement);
-      // This makes things slow, but it prevents that an empty element is added to the store
       newElement.save(store);
-      await setElements(elements);
+      await setElements(newElements);
       focusElement(position);
-      // window.setTimeout(() => {
-      //   focusElement(position);
-      // }, 10);
     } catch (e) {
       setErr(e);
     }

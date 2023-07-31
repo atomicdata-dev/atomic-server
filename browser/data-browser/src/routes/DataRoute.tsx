@@ -16,9 +16,10 @@ import { ErrMessage } from '../components/forms/InputStyles';
 import { useSettings } from '../helpers/AppSettings';
 import { CodeBlock } from '../components/CodeBlock';
 import { Title } from '../components/Title';
-import { Row } from '../components/Row';
+import { Column, Row } from '../components/Row';
 import { ErrorLook } from '../components/ErrorLook';
-import { Childrenlist as ChildrenCard } from '../components/ChildrenList';
+import { ResourceUsage } from '../components/ResourceUsage';
+import { Main } from '../components/Main';
 
 /** Renders the data of some Resource */
 function Data(): JSX.Element {
@@ -72,57 +73,67 @@ function Data(): JSX.Element {
 
   return (
     <ContainerNarrow about={subject}>
-      <Title resource={resource} prefix='Data for' link />
-      <PropValRow columns>
-        <PropertyLabel title='The URL of the resource'>subject:</PropertyLabel>
-        <AtomicLink subject={subject}>{subject}</AtomicLink>
-      </PropValRow>
-      <AllProps resource={resource} editable columns />
-      <ChildrenCard resource={resource} />
-      {resource.getCommitBuilder().hasUnsavedChanges() ? (
-        <>
-          <h2>⚠️ contains uncommitted changes</h2>
-          <p>This means that (some) of your local changes are not yet saved.</p>
-          {resource.commitError && (
-            <ErrMessage>{resource.commitError.message}</ErrMessage>
+      <Main>
+        <Column>
+          <Title resource={resource} prefix='Data for' link />
+          <PropValRow columns>
+            <PropertyLabel title='The URL of the resource'>
+              subject:
+            </PropertyLabel>
+            <AtomicLink subject={subject}>{subject}</AtomicLink>
+          </PropValRow>
+          <AllProps resource={resource} editable columns />
+          {resource.getCommitBuilder().hasUnsavedChanges() ? (
+            <>
+              <h2>⚠️ contains uncommitted changes</h2>
+              <p>
+                This means that (some) of your local changes are not yet saved.
+              </p>
+              {resource.commitError && (
+                <ErrMessage>{resource.commitError.message}</ErrMessage>
+              )}
+              <Button onClick={() => resource.save(store)}>save</Button>
+            </>
+          ) : null}
+          <h2>Code</h2>
+          <Row wrapItems>
+            <Button
+              subtle
+              onClick={() => fetchAs('application/ad+json')}
+              data-test='fetch-json-ad'
+            >
+              JSON-AD
+            </Button>
+            <Button
+              subtle
+              onClick={() => fetchAs('application/json')}
+              data-test='fetch-json'
+            >
+              JSON
+            </Button>
+            <Button
+              subtle
+              onClick={() => fetchAs('application/ld+json')}
+              data-test='fetch-json-ld'
+            >
+              JSON-LD
+            </Button>
+            <Button
+              subtle
+              onClick={() => fetchAs('text/turtle')}
+              data-test='fetch-turtle'
+            >
+              Turtle / N-triples / N3
+            </Button>
+          </Row>
+          {err && <ErrMessage>{err.message}</ErrMessage>}
+          {!err && textResponse && (
+            <CodeBlock content={textResponse} loading={textResponseLoading} />
           )}
-          <Button onClick={() => resource.save(store)}>save</Button>
-        </>
-      ) : null}
-      <Row wrapItems>
-        <Button
-          subtle
-          onClick={() => fetchAs('application/ad+json')}
-          data-test='fetch-json-ad'
-        >
-          JSON-AD
-        </Button>
-        <Button
-          subtle
-          onClick={() => fetchAs('application/json')}
-          data-test='fetch-json'
-        >
-          JSON
-        </Button>
-        <Button
-          subtle
-          onClick={() => fetchAs('application/ld+json')}
-          data-test='fetch-json-ld'
-        >
-          JSON-LD
-        </Button>
-        <Button
-          subtle
-          onClick={() => fetchAs('text/turtle')}
-          data-test='fetch-turtle'
-        >
-          Turtle / N-triples / N3
-        </Button>
-      </Row>
-      {err && <ErrMessage>{err.message}</ErrMessage>}
-      {!err && textResponse && (
-        <CodeBlock content={textResponse} loading={textResponseLoading} />
-      )}
+          <h2>Usage</h2>
+          <ResourceUsage resource={resource} />
+        </Column>
+      </Main>
     </ContainerNarrow>
   );
 }

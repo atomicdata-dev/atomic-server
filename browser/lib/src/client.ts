@@ -27,6 +27,12 @@ export interface HeadersObject {
   [key: string]: string;
 }
 
+export type FileLike = { blob: Blob; name: string };
+export type FileOrFileLike = File | FileLike;
+
+const isFileLike = (file: FileOrFileLike): file is FileLike =>
+  'blob' in file && 'name' in file;
+
 const JSON_AD_MIME = 'application/ad+json';
 
 interface FetchResourceOptions extends ParseOpts {
@@ -235,7 +241,7 @@ export class Client {
    * Returns the newly created resources
    */
   public async uploadFiles(
-    files: File[],
+    files: FileOrFileLike[],
     serverUrl: string,
     agent: Agent,
     parent: string,
@@ -244,7 +250,11 @@ export class Client {
     const formData = new FormData();
 
     files.map(file => {
-      formData.append('assets', file, file.name);
+      if (isFileLike(file)) {
+        formData.append('assets', file.blob, file.name);
+      } else {
+        formData.append('assets', file, file.name);
+      }
     });
 
     const uploadURL = new URL(`${serverUrl}/upload`);
@@ -261,6 +271,7 @@ export class Client {
     };
 
     const resp = await this.fetch(uploadURL.toString(), options);
+
     const body = await resp.text();
 
     if (resp.status !== 200) {

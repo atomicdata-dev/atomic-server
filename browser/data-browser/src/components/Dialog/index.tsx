@@ -11,13 +11,20 @@ import { FaTimes } from 'react-icons/fa';
 import styled, { keyframes } from 'styled-components';
 import { effectTimeout } from '../../helpers/effectTimeout';
 import { Button } from '../Button';
+import { DropdownContainer } from '../Dropdown/DropdownContainer';
+import { PopoverContainer } from '../Popover';
 import { Slot } from '../Slot';
-import { DialogPortalContext, DialogTreeContext } from './dialogContext';
+import {
+  DialogPortalContext,
+  DialogTreeContextProvider,
+  useDialogTreeContext,
+} from './dialogContext';
 import { useDialog } from './useDialog';
+import { useControlLock } from '../../hooks/useControlLock';
 
 export interface InternalDialogProps {
   show: boolean;
-  onClose: () => void;
+  onClose: (success: boolean) => void;
   onClosed: () => void;
 }
 
@@ -32,7 +39,11 @@ export enum DialogSlot {
 const ANIM_MS = 80;
 const ANIM_SPEED = `${ANIM_MS}ms`;
 
-type DialogSlotComponent = React.FC<React.PropsWithChildren<unknown>>;
+interface DialogSlotProps {
+  className?: string;
+}
+
+type DialogSlotComponent = React.FC<React.PropsWithChildren<DialogSlotProps>>;
 
 /**
  * Component to build a dialog. The content of this component are rendered in a
@@ -55,7 +66,22 @@ type DialogSlotComponent = React.FC<React.PropsWithChildren<unknown>>;
  *  );
  * ```
  */
-export const Dialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
+export function Dialog(props) {
+  const portalRef = useContext(DialogPortalContext);
+
+  if (!portalRef.current) {
+    return null;
+  }
+
+  return createPortal(
+    <DialogTreeContextProvider>
+      <InnerDialog {...props} />
+    </DialogTreeContextProvider>,
+    portalRef.current,
+  );
+}
+
+const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   children,
   show,
   onClose,
@@ -63,7 +89,13 @@ export const Dialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
 }) => {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const innerDialogRef = useRef<HTMLDivElement>(null);
-  const portalRef = useContext(DialogPortalContext);
+  const { hasOpenInnerPopup } = useDialogTreeContext();
+
+  useControlLock(show);
+
+  const cancelDialog = useCallback(() => {
+    onClose(false);
+  }, [onClose]);
 
   const handleOutSideClick = useCallback<
     React.MouseEventHandler<HTMLDialogElement>
@@ -73,19 +105,19 @@ export const Dialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
         !innerDialogRef.current?.contains(e.target as HTMLElement) &&
         innerDialogRef.current !== e.target
       ) {
-        onClose();
+        cancelDialog();
       }
     },
-    [innerDialogRef.current],
+    [innerDialogRef.current, cancelDialog],
   );
 
   // Close the dialog when the escape key is pressed
   useHotkeys(
     'esc',
     () => {
-      onClose();
+      cancelDialog();
     },
-    { enabled: show },
+    { enabled: show && !hasOpenInnerPopup },
   );
 
   // When closing the `data-closing` attribute must be set before rendering so the animation has started when the regular useEffect is called.
@@ -115,31 +147,28 @@ export const Dialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
         onClosed();
       }, ANIM_MS);
     }
-  }, [show]);
+  }, [show, onClosed]);
 
-  if (!portalRef.current) {
-    return null;
-  }
-
-  return createPortal(
-    <StyledDialog ref={dialogRef} onClick={handleOutSideClick}>
-      <DialogTreeContext.Provider value={true}>
-        <StyledInnerDialog ref={innerDialogRef}>
-          <CloseButtonSlot slot='close'>
-            <Button icon onClick={onClose} aria-label='close'>
-              <FaTimes />
-            </Button>
-          </CloseButtonSlot>
-          {children}
-        </StyledInnerDialog>
-      </DialogTreeContext.Provider>
-    </StyledDialog>,
-    portalRef.current,
+  return (
+    <StyledDialog ref={dialogRef} onMouseDown={handleOutSideClick}>
+      <StyledInnerDialog ref={innerDialogRef}>
+        <PopoverContainer>
+          <DropdownContainer>
+            <CloseButtonSlot slot='close'>
+              <Button icon onClick={cancelDialog} aria-label='close'>
+                <FaTimes />
+              </Button>
+            </CloseButtonSlot>
+            {children}
+          </DropdownContainer>
+        </PopoverContainer>
+      </StyledInnerDialog>
+    </StyledDialog>
   );
 };
 
-export const DialogTitle: DialogSlotComponent = ({ children }) => (
-  <Slot slot={DialogSlot.Title} as='header'>
+export const DialogTitle: DialogSlotComponent = ({ children, className }) => (
+  <Slot slot={DialogSlot.Title} as='header' className={className}>
     {children}
   </Slot>
 );
@@ -148,8 +177,8 @@ export const DialogTitle: DialogSlotComponent = ({ children }) => (
  * Dialog section that is scrollable. Put your main content here. Should be no
  * larger than 4rem
  */
-export const DialogContent: DialogSlotComponent = ({ children }) => (
-  <DialogContentSlot slot={DialogSlot.Content} as='main'>
+export const DialogContent: DialogSlotComponent = ({ children, className }) => (
+  <DialogContentSlot slot={DialogSlot.Content} as='main' className={className}>
     {children}
   </DialogContentSlot>
 );
@@ -158,8 +187,12 @@ export const DialogContent: DialogSlotComponent = ({ children }) => (
  * Bottom part of the Dialog that is always visible. Place your buttons here.
  * Should be no larger than 4rem
  */
-export const DialogActions: DialogSlotComponent = ({ children }) => (
-  <DialogActionsSlot slot={DialogSlot.Actions} as='footer'>
+export const DialogActions: DialogSlotComponent = ({ children, className }) => (
+  <DialogActionsSlot
+    slot={DialogSlot.Actions}
+    as='footer'
+    className={className}
+  >
     {children}
   </DialogActionsSlot>
 );
@@ -169,13 +202,15 @@ const CloseButtonSlot = styled(Slot)`
 `;
 
 const DialogContentSlot = styled(Slot)`
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: visible;
   /* The main section should leave room for the footer */
   max-height: calc(80vh - 8rem);
   padding-bottom: ${({ theme }) => theme.margin}rem;
   // Position the scrollbar against the side of the dialog without any spacing inbetween.
-  margin-right: -${p => p.theme.margin}rem;
-  padding-right: ${p => p.theme.margin}rem;
+  // This also fixes ugly horizontal shadow cutoff.
+  margin-inline: -${p => p.theme.margin}rem;
+  padding-inline: ${p => p.theme.margin}rem;
 `;
 
 const DialogActionsSlot = styled(Slot)`
@@ -231,7 +266,7 @@ const StyledDialog = styled.dialog`
   max-inline-size: min(90vw, 75ch);
   max-block-size: 100vh;
 
-  overflow: hidden;
+  overflow: visible;
   box-shadow: ${p => p.theme.boxShadowSoft};
 
   // Animation props

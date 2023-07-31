@@ -27,9 +27,7 @@ export class EventManager<Types extends string, H extends Handlers<Types>> {
     const handlers = this.subscriptions.get(event);
 
     const wrap = async (handler: H[Types]) => {
-      handler(...args);
-
-      return;
+      return handler(...args);
     };
 
     if (!handlers) {

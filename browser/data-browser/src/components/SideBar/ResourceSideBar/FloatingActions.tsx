@@ -1,5 +1,5 @@
 import { useResource, useTitle } from '@tomic/react';
-import React from 'react';
+import React, { useState } from 'react';
 import { FaEllipsisV, FaPlus } from 'react-icons/fa';
 import styled, { css } from 'styled-components';
 import { useNewRoute } from '../../../helpers/useNewRoute';
@@ -19,11 +19,12 @@ export function FloatingActions({
 }: FloatingActionsProps): JSX.Element {
   const parentResource = useResource(subject);
   const [parentName] = useTitle(parentResource);
+  const [dropdownActive, setDropdownActive] = useState(false);
 
   const handleAddClick = useNewRoute(subject);
 
   return (
-    <Wrapper className={className}>
+    <Wrapper className={className} dropdownActive={dropdownActive}>
       <IconButton
         data-test='add-subresource'
         onClick={handleAddClick}
@@ -35,14 +36,14 @@ export function FloatingActions({
         simple
         subject={subject}
         trigger={SideBarDropDownTrigger}
+        bindActive={setDropdownActive}
       />
     </Wrapper>
   );
 }
 
-const Wrapper = styled.span`
-  visibility: hidden;
-  display: none;
+const Wrapper = styled.span<{ dropdownActive: boolean }>`
+  visibility: ${p => (p.dropdownActive ? 'visible' : 'hidden')};
   font-size: 0.9rem;
   color: ${p => p.theme.colors.main};
 `;
@@ -52,7 +53,6 @@ export const floatingHoverStyles = css`
 
   &:hover ${Wrapper}, &:focus-within ${Wrapper} {
     visibility: visible;
-    display: inline;
   }
 `;
 

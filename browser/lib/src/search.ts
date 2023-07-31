@@ -5,9 +5,9 @@ export interface SearchOpts {
   limit?: number;
   /** Subject of resource to scope the search to. This should be a parent of the resources you're looking for. */
   scope?: string;
-  /** Property-Value pair of set filters. For now, use the `shortname` of the property as the key. */
+  /** Property-Value pair of set filters. */
   filters?: {
-    [propertyShortname: string]: string;
+    [subject: string]: string;
   };
 }
 
@@ -41,10 +41,10 @@ export function escapeTantivyKey(key: string) {
 }
 
 /** Uses Tantivy query syntax */
-function buildFilterString(filters: { [key: string]: string }): string {
+function buildFilterString(filters: Record<string, string>): string {
   return Object.entries(filters)
     .map(([key, value]) => {
-      return value && value.length > 0 && `${escapeTantivyKey(key)}:"${value}"`;
+      return value && `${escapeTantivyKey(key)}:"${value}"`;
     })
     .join(' AND ');
 }
@@ -58,19 +58,18 @@ export function buildSearchSubject(
   const { include = false, limit = 30, scope, filters } = opts;
   const url = new URL(serverURL);
   url.pathname = 'search';
-  query && url.searchParams.set('q', query);
-  include && url.searchParams.set('include', include.toString());
-  limit && url.searchParams.set('limit', limit.toString());
+
   // Only add filters if there are any keys, and if any key is defined
   const hasFilters =
     filters &&
     Object.keys(filters).length > 0 &&
     Object.values(filters).filter(v => v && v.length > 0).length > 0;
-  hasFilters && url.searchParams.set('filters', buildFilterString(filters));
 
-  if (scope) {
-    url.searchParams.set('parent', scope);
-  }
+  query && url.searchParams.set('q', query);
+  include && url.searchParams.set('include', include.toString());
+  limit && url.searchParams.set('limit', limit.toString());
+  hasFilters && url.searchParams.set('filters', buildFilterString(filters));
+  scope && url.searchParams.set('parent', scope);
 
   return url.toString();
 }

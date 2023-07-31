@@ -11,9 +11,11 @@ import {
   FaFileAlt,
   FaFileImport,
   FaFolder,
+  FaHashtag,
   FaHdd,
   FaListAlt,
   FaShareSquare,
+  FaTable,
 } from 'react-icons/fa';
 
 const iconMap = new Map<string, IconType>([
@@ -29,6 +31,8 @@ const iconMap = new Map<string, IconType>([
   [classes.collection, FaListAlt],
   [classes.class, FaCube],
   [classes.property, FaCubes],
+  [classes.table, FaTable],
+  [classes.property, FaHashtag],
 ]);
 
 export function getIconForClass(

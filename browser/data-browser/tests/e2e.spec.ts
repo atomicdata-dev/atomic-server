@@ -3,28 +3,7 @@
 
 import { test, expect } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
-
-const demoFileName = 'testimage.svg';
-
-const demoFile = () => {
-  const processPath = process.cwd();
-
-  // In the CI, the tests dir is missing for some reason?
-  if (processPath.endsWith('tests')) {
-    return `${processPath}/${demoFileName}`;
-  } else {
-    return `${processPath}/tests/${demoFileName}`;
-  }
-};
-
-const testConfig: TestConfig = {
-  demoFileName,
-  demoFile: demoFile(),
-  demoInviteName: 'document demo',
-  serverUrl: 'http://localhost:9883',
-  frontEndUrl: process.env.FRONTEND_URL || 'http://localhost:5173',
-  initialTest: true,
-};
+import { testConfig } from './test-config.js';
 
 export interface TestConfig {
   demoFileName: string;
@@ -36,15 +15,22 @@ export interface TestConfig {
   initialTest: boolean;
 }
 
-const { demoInviteName, serverUrl, frontEndUrl, initialTest } = testConfig;
+const {
+  demoFileName,
+  demoFile,
+  demoInviteName,
+  serverUrl,
+  frontEndUrl,
+  initialTest,
+} = testConfig;
 
 const timestamp = () => new Date().toLocaleTimeString();
 const editableTitle = '[data-test="editable-title"]';
 const sideBarDriveSwitcher = '[title="Open Drive Settings"]';
 const sideBarNewResource = '[data-test="sidebar-new-resource"]';
 const currentDriveTitle = '[data-test=current-drive-title]';
-const publicReadRight =
-  '[data-test="right-public"] input[type="checkbox"] >> nth=0';
+const publicReadRightLocator = (page: Page) =>
+  page.locator('[data-test="right-public"] input[type="checkbox"]').first();
 const contextMenu = '[data-test="context-menu"]';
 const addressBar = '[data-test="address-bar"]';
 const defaultDevServer = 'http://localhost:9883';
@@ -76,13 +62,207 @@ test.describe('data-browser', async () => {
     await expect(page.locator(currentDriveTitle)).toBeVisible();
   });
 
+  test('tables', async ({ page }) => {
+    const tab = async () => {
+      await page.waitForTimeout(100);
+      await page.keyboard.press('Tab');
+      await page.waitForTimeout(30);
+    };
+
+    const createTag = async (emote: string, name: string) => {
+      await page.getByPlaceholder('New tag').fill(name);
+      await page.getByTitle('Pick an emoji').click();
+      await page.getByPlaceholder('Search', { exact: true }).fill(emote);
+      await page.getByRole('button', { name: emote }).click();
+      await page.getByTitle('Add tag').click();
+    };
+
+    const pickTag = async (name: string) => {
+      await page.keyboard.type(name);
+      await page.keyboard.press('Enter');
+      await page.keyboard.press('Escape');
+    };
+
+    const fillRow = async (
+      col1: string,
+      col2: string,
+      col3: string,
+      col4: boolean,
+      col5: string,
+    ) => {
+      await page.waitForTimeout(100);
+      await page.keyboard.type(col1, { delay: 50 });
+      await tab();
+      await page.keyboard.type(col2, { delay: 20 });
+      await tab();
+      await page.keyboard.type(col3, { delay: 10 });
+      await tab();
+
+      if (col4) {
+        await page.keyboard.press('Space');
+      }
+
+      await tab();
+      await pickTag(col5);
+      await tab();
+    };
+
+    // --- Test Start ---
+    await signIn(page);
+    await newDrive(page);
+
+    // Create new Table
+    await newResource('table', page);
+
+    // Name table
+    await page.getByPlaceholder('New Table').fill('Made up music genres');
+    await page.locator('button:has-text("Create")').click();
+    await expect(
+      page.locator('h1:has-text("Made up music genres")'),
+    ).toBeVisible();
+
+    // Create Date column
+    await page.getByRole('button', { name: 'Add column' }).click();
+    await page.waitForTimeout(100);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('text=New Date Column')).toBeVisible();
+    await page
+      .locator('[placeholder="New Column"] >> visible = true')
+      .fill('Existed since');
+    await page.getByLabel('Long').click();
+    await page.locator('button:has-text("Create")').click();
+    await page.waitForTimeout(100);
+    await expect(page.locator('text=New Date Column')).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Existed since' }),
+    ).toBeVisible();
+
+    // Create Number column
+    await page.getByRole('button', { name: 'Add column' }).click();
+    await page.waitForTimeout(100);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('text=New Number Column')).toBeVisible();
+    await page
+      .locator('[placeholder="New Column"] >> visible = true')
+      .fill('Number of tracks');
+
+    await page.locator('button:has-text("Create")').click();
+    await page.waitForTimeout(100);
+    await expect(page.locator('text=New Number Column')).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Number of tracks' }),
+    ).toBeVisible();
+
+    // Create Checkbox column
+    await page.getByRole('button', { name: 'Add column' }).click();
+    await page.waitForTimeout(100);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('text=New Checkbox Column')).toBeVisible();
+    await page
+      .locator('[placeholder="New Column"] >> visible = true')
+      .fill('Approved by W3C');
+
+    await page.locator('button:has-text("Create")').click();
+    await page.waitForTimeout(100);
+    await expect(page.locator('text=New Checkbox Column')).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Approved by W3C' }),
+    ).toBeVisible();
+
+    // Create Select column
+    await page.getByRole('button', { name: 'Add column' }).click();
+    await page.waitForTimeout(100);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await expect(page.locator('text=New Select Column')).toBeVisible();
+    await page
+      .locator('[placeholder="New Column"] >> visible = true')
+      .fill('Descriptive words');
+
+    await createTag('😤', 'wild');
+    await createTag('😵‍💫', 'dreamy');
+    await createTag('🤨', 'wtf');
+    await page.locator('button:has-text("Create")').click();
+    await page.waitForTimeout(100);
+    await expect(page.locator('text=New Select Column')).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Descriptive words' }),
+    ).toBeVisible();
+
+    // Start filling cells
+    await page.getByRole('gridcell').first().click({ force: true });
+    // await page.waitForTimeout(100);
+    await fillRow('Progressive Pizza House', '04032000', '10', true, 'dreamy');
+    await fillRow('Drum or Bass', '10051980', '3000035', false, 'wild');
+    await fillRow('Mumble Punk', '10051965', '60', true, 'wtf');
+
+    // Check if cells have been filled correctly
+    await expect(
+      page.getByRole('gridcell', { name: 'Progressive Pizza House' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('gridcell', { name: 'Drum or Bass' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('gridcell', { name: 'Mumble Punk' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('gridcell', { name: 'March 4, 2000' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('gridcell', { name: 'May 1, 1980' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('gridcell', { name: 'May 1, 1965' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('gridcell', { name: '😵‍💫 dreamy' }),
+    ).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: '😤 wild' })).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: '🤨 wtf' })).toBeVisible();
+
+    // Move to the first cell and change its content.
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.press('ArrowUp');
+    await page.keyboard.type('Progressive Peperoni Pizza House', { delay: 50 });
+    await page.keyboard.press('Escape');
+
+    await expect(
+      page.getByRole('gridcell', { name: 'Progressive Pizza House' }),
+    ).not.toBeVisible();
+
+    await expect(
+      page.getByRole('gridcell', { name: 'Progressive Peperoni Pizza House' }),
+    ).toBeVisible();
+
+    // Move to the index cell on the second row and delete the row.
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('ArrowLeft');
+    await page.keyboard.press('Backspace');
+
+    await expect(
+      page.getByRole('gridcell', { name: 'Drum or Bass' }),
+    ).not.toBeVisible();
+  });
+
   test('sidebar mobile', async ({ page }) => {
     await page.setViewportSize({ width: 500, height: 800 });
     await page.reload();
     // TODO: this keeps hanging. How do I make sure something is _not_ visible?
     // await expect(page.locator('text=new resource')).not.toBeVisible();
     await page.click('[data-test="sidebar-toggle"]');
-    await expect(await page.locator(currentDriveTitle)).toBeVisible();
+    await expect(page.locator(currentDriveTitle)).toBeVisible();
   });
 
   test('switch Server URL', async ({ page }) => {
@@ -143,7 +323,7 @@ test.describe('data-browser', async () => {
     await newDrive(page);
 
     // Create folder called 1
-    await page.locator('[data-test="sidebar-new-resource"]').click();
+    await page.locator(sideBarNewResource).click();
     await page.locator('button:has-text("folder")').click();
     await setTitle(page, 'Salad folder');
 
@@ -155,7 +335,7 @@ test.describe('data-browser', async () => {
     await page.waitForResponse(`${serverUrl}/commit`);
     await editTitle('Avocado Salad', page);
 
-    await page.locator('[data-test="sidebar-new-resource"]').click();
+    await page.locator(sideBarNewResource).click();
 
     // Create folder called 'Cake folder'
     await page.locator('button:has-text("folder")').click();
@@ -207,7 +387,6 @@ test.describe('data-browser', async () => {
 
     // context menu, keyboard & data view
     await page.click(contextMenu);
-    await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
     await expect(page.locator('text=JSON-AD')).toBeVisible();
     await page.click('[data-test="fetch-json-ad"]');
@@ -273,14 +452,16 @@ test.describe('data-browser', async () => {
     // await page.waitForTimeout(500);
     const teststring = `My test: ${timestamp()}`;
     await page.fill('textarea', teststring);
+    await page.waitForResponse(`${serverUrl}/commit`);
+
     // commit editing paragraph
-    await expect(await page.locator(`text=${teststring}`)).toBeVisible();
+    await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
     // multi-user
     const currentUrl = page.url();
     const page2 = await openNewSubjectWindow(browser, currentUrl);
-    await expect(await page2.locator(`text=${teststring}`)).toBeVisible();
-    await expect(await page2.title()).toEqual(title);
+    await expect(page2.locator(`text=${teststring}`)).toBeVisible();
+    expect(await page2.title()).toEqual(title);
 
     // Add a new line on first page, check if it appears on the second
     await page.keyboard.press('Enter');
@@ -289,7 +470,7 @@ test.describe('data-browser', async () => {
     const syncText = 'New paragraph';
     await page.keyboard.type(syncText);
     // If this fails to show up, websockets aren't working properly
-    await expect(await page2.locator(`text=${syncText}`)).toBeVisible();
+    await expect(page2.locator(`text=${syncText}`)).toBeVisible();
   });
 
   /**
@@ -306,7 +487,7 @@ test.describe('data-browser', async () => {
     const { driveURL, driveTitle } = await newDrive(page);
     await page.click(currentDriveTitle);
     await contextMenuClick('share', page);
-    await expect(await page.isChecked(publicReadRight)).toBe(false);
+    expect(publicReadRightLocator(page)).not.toBeChecked();
 
     // Initialize unauthorized page for reader
     const context2 = await browser.newContext();
@@ -315,17 +496,13 @@ test.describe('data-browser', async () => {
     await page2.goto(frontEndUrl);
     await openSubject(page2, driveURL);
     // TODO set current drive by opening the URL
-    await expect(
-      await page2.locator('text=Unauthorized').first(),
-    ).toBeVisible();
+    await expect(page2.locator('text=Unauthorized')).toBeVisible();
 
     // Create invite
     await page.click('button:has-text("Send invite")');
     context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.click('button:has-text("Create Invite")');
-    await expect(
-      await page.locator('text=Invite created and copied '),
-    ).toBeVisible();
+    await expect(page.locator('text=Invite created and copied ')).toBeVisible();
     const inviteUrl = await page.evaluate(() =>
       document
         ?.querySelector('[data-code-content]')
@@ -333,14 +510,14 @@ test.describe('data-browser', async () => {
     );
     expect(inviteUrl).not.toBeFalsy();
 
+    await page.waitForTimeout(200);
+
     // Open invite
     const page3 = await openNewSubjectWindow(browser, inviteUrl as string);
     await page3.click('button:has-text("Accept")');
-    await page3.waitForTimeout(200);
+    await page3.waitForNavigation();
     await page3.reload();
-    await expect(
-      await page3.locator(`text=${driveTitle}`).first(),
-    ).toBeVisible();
+    await expect(page3.locator(`text=${driveTitle}`).first()).toBeVisible();
   });
 
   test('upload, download', async ({ page }) => {
@@ -353,7 +530,7 @@ test.describe('data-browser', async () => {
       page.waitForEvent('filechooser'),
       page.click('button:has-text("Upload file")'),
     ]);
-    await fileChooser.setFiles(demoFile());
+    await fileChooser.setFiles(demoFile);
     await page.click(`[data-test="file-pill"]:has-text("${demoFileName}")`);
     const image = page.locator('[data-test="image-viewer"]');
     await expect(image).toBeVisible();
@@ -364,12 +541,14 @@ test.describe('data-browser', async () => {
     await signIn(page);
     await newDrive(page);
     await newResource('chatroom', page);
-    await page.locator('text=New ChatRoom');
+    await expect(
+      page.getByRole('heading', { name: 'Untitled ChatRoom' }),
+    ).toBeVisible();
     const teststring = `My test: ${timestamp()}`;
     await page.fill('[data-test="message-input"]', teststring);
     const chatRoomUrl = page.url();
     await page.keyboard.press('Enter');
-    await expect(await page.locator(`text=${teststring}`)).toBeVisible();
+    await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
     const dropdownId = await page
       .locator(contextMenu)
@@ -379,22 +558,22 @@ test.describe('data-browser', async () => {
     await page
       .locator(`[id="${dropdownId}"] >> [data-test="menu-item-share"]`)
       .click();
-    await page.locator(publicReadRight).click();
+    await publicReadRightLocator(page).click();
     await page.click('text=save');
 
     const page2 = await openNewSubjectWindow(browser, chatRoomUrl);
     // Second user
     await signIn(page2);
-    await expect(await page2.locator(`text=${teststring}`)).toBeVisible();
+    await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     const teststring2 = `My reply: ${timestamp()}`;
     await page2.fill('[data-test="message-input"]', teststring2);
     await page2.keyboard.press('Enter');
     // Both pages should see then new chat message
-    await expect(await page.locator(`text=${teststring2}`)).toBeVisible();
+    await expect(page.locator(`text=${teststring2}`)).toBeVisible();
     // TODO: get rid of this reload! It should not be necessary
     // For some reason the page does not see the new message
     await page2.reload();
-    await expect(await page2.locator(`text=${teststring2}`)).toBeVisible();
+    await expect(page2.locator(`text=${teststring2}`)).toBeVisible();
   });
 
   test('bookmark', async ({ page }) => {
@@ -419,8 +598,9 @@ test.describe('data-browser', async () => {
 
     // Create a new folder
     await newResource('folder', page);
-    // Createa sub-resource
-    await page.click('[data-test="new-resource-folder"]');
+    // Createa sub-resource in the folder
+    await page.click('text=Untitled folder');
+    await page.click('main >> text=New Resource');
     await page.click('button:has-text("Document")');
     await page.locator(editableTitle).click();
     await page.keyboard.type('RAM Downloading Strategies');
@@ -466,7 +646,7 @@ test.describe('data-browser', async () => {
     await page.fill('[data-test="server-url-input"]', 'https://example.com');
     await page.click('[data-test="server-url-save"]');
 
-    await expect(page.locator(currentDriveTitle)).toHaveText('example.com');
+    await expect(page.locator(currentDriveTitle)).toHaveText('...');
 
     await openDriveMenu(page);
     await page.click(':text("https://atomicdata.dev") + button:text("Select")');
@@ -494,15 +674,16 @@ test.describe('data-browser', async () => {
     await expect(page.locator('text=Not a valid slug')).not.toBeVisible();
 
     // Add a new property
-    await page.click(
+    const input = page.locator(
       '[placeholder="Select a property or enter a property URL..."]',
     );
-    await page.keyboard.type(
-      'https://atomicdata.dev/properties/invite/usagesLeft',
-    );
+    await input.click();
+
+    await expect(page.locator('text=Create property:')).toBeVisible();
+    await input.fill('https://atomicdata.dev/properties/invite/usagesLeft');
     await page.keyboard.press('Enter');
     await page.click('[title="Add this property"]');
-    await expect(page.locator('text=usages-left')).toBeVisible();
+    await expect(page.locator('text=Usages-left').first()).toBeVisible();
     // Integer validation
     await page.click('[data-test="input-usages-left"]');
     await page.keyboard.type('asdf' + '1');
@@ -573,6 +754,8 @@ test.describe('data-browser', async () => {
     await newResource('folder', page);
     await contextMenuClick('import', page);
 
+    const parentSubject = await page.getByLabel('Target Parent').inputValue();
+
     const localID = 'localIDtest';
     const name = 'blaat';
     const importStr = {
@@ -587,9 +770,8 @@ test.describe('data-browser', async () => {
     await expect(page.locator('text=Imported!')).toBeVisible();
 
     // get current url, append the localID
-    const url = await page.url();
-    await page.goto(url + '/' + localID);
-    await expect(page.locator(`text=${name}`)).toBeVisible();
+    await page.goto(parentSubject + '/' + localID);
+    await expect(page.locator(`h1:text("${name}")`)).toBeVisible();
   });
 
   test('dialog', async ({ page }) => {
@@ -606,7 +788,7 @@ test.describe('data-browser', async () => {
     await page.goBack();
 
     await page
-      .locator('[title="Add an item to this list"] >> nth=0')
+      .locator('[title="Add an item to the recommends list"]')
       .first()
       .click();
     await page.locator('[data-test="input-recommends"]').click();
@@ -649,24 +831,28 @@ test.describe('data-browser', async () => {
     await page.waitForResponse(`${serverUrl}/commit`);
 
     await editTitle('First Title', page);
-    expect(page.locator('text=First Title')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'First Title', level: 1 }),
+    ).toBeVisible();
 
     await editTitle('Second Title', page, true);
-    expect(page.locator('text=Second Title')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Second Title', level: 1 }),
+    ).toBeVisible();
 
     await contextMenuClick('history', page);
-    expect(page.locator('text=History of Second Title')).toBeVisible();
+    await expect(page.locator('text=History of Second Title')).toBeVisible();
 
     await page.getByTestId('version-button').nth(1).click();
 
-    expect(page.locator('text=First Title')).toBeVisible();
+    await expect(page.locator('text=First Title')).toBeVisible();
 
     await page.click('text=Make current version');
 
-    expect(page.locator('text=Resource version updated')).toBeVisible();
-    await page.waitForNavigation();
-    expect(page.locator('h1:has-text("First Title")')).toBeVisible();
-    expect(page.locator('text=History of First Title')).not.toBeVisible();
+    await expect(page.locator('text=Resource version updated')).toBeVisible();
+    // await page.waitForNavigation();
+    await expect(page.locator('h1:has-text("First Title")')).toBeVisible();
+    await expect(page.locator('text=History of First Title')).not.toBeVisible();
   });
 });
 
@@ -684,15 +870,13 @@ async function disableViewTransition(page: Page) {
 async function signIn(page: Page) {
   await disableViewTransition(page);
   await page.click('text=user settings');
-  await expect(
-    await page.locator('text=edit data and sign Commits'),
-  ).toBeVisible();
+  await expect(page.locator('text=edit data and sign Commits')).toBeVisible();
   // If there are any issues with this agent, try creating a new one https://atomicdata.dev/invites/1
   const test_agent =
     'eyJzdWJqZWN0IjoiaHR0cHM6Ly9hdG9taWNkYXRhLmRldi9hZ2VudHMvaElNWHFoR3VLSDRkM0QrV1BjYzAwUHVFbldFMEtlY21GWStWbWNVR2tEWT0iLCJwcml2YXRlS2V5IjoiZkx0SDAvY29VY1BleFluNC95NGxFemFKbUJmZTYxQ3lEekUwODJyMmdRQT0ifQ==';
   await page.click('#current-password');
   await page.fill('#current-password', test_agent);
-  await expect(await page.locator('text=Edit profile')).toBeVisible();
+  await expect(page.locator('text=Edit profile')).toBeVisible();
   await page.goBack();
 }
 
@@ -705,9 +889,9 @@ async function newDrive(page: Page) {
   await page.locator(sideBarDriveSwitcher).click();
   await page.locator('button:has-text("New Drive")').click();
   await page.waitForNavigation();
-  await expect(await page.locator('text="Create new resource"')).toBeVisible();
+  await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
-  await expect(driveURL).toContain('localhost');
+  expect(driveURL).toContain('localhost');
   const driveTitle = `testdrive-${timestamp()}`;
   await page.locator(editableTitle).click();
   await page.fill(editableTitle, driveTitle);
@@ -720,10 +904,10 @@ async function makeDrivePublic(page: Page) {
   await page.click(currentDriveTitle);
   await page.click(contextMenu);
   await page.click('button:has-text("share")');
-  await expect(await page.isChecked(publicReadRight)).toBe(false);
-  await page.click(publicReadRight);
+  await expect(publicReadRightLocator(page)).not.toBeChecked();
+  await publicReadRightLocator(page).click();
   await page.locator('text=Save').click();
-  await expect(await page.locator('text="Share settings saved"')).toBeVisible();
+  await expect(page.locator('text="Share settings saved"')).toBeVisible();
 }
 
 async function openSubject(page: Page, subject: string) {
@@ -738,7 +922,7 @@ async function getCurrentSubject(page: Page) {
 async function openAtomic(page: Page) {
   await changeDrive('https://atomicdata.dev', page);
   // Accept the invite, create an account if necessary
-  await expect(await page.locator(currentDriveTitle)).toHaveText('Atomic Data');
+  await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
 }
 
 /** Opens the users' profile, sets a username */
@@ -780,7 +964,8 @@ async function openNewSubjectWindow(browser: Browser, url: string) {
 
 async function openDriveMenu(page: Page) {
   await page.click(sideBarDriveSwitcher);
-  await page.click('[data-test="menu-item-configure-drives"]');
+  await page.waitForTimeout(100);
+  await page.click('text=Configure Drives');
 }
 
 async function changeDrive(subject: string, page: Page) {
@@ -802,6 +987,7 @@ async function editTitle(title: string, page: Page, clear = false) {
   await page.keyboard.press('Space');
   await page.keyboard.press('Backspace');
   await page.keyboard.type(title);
+  await page.keyboard.press('Escape');
   await page.waitForResponse(`${serverUrl}/commit`);
 }
 
@@ -827,6 +1013,7 @@ async function fillInput(
 /** Click an item from the main, visible context menu */
 async function contextMenuClick(text: string, page: Page) {
   await page.click(contextMenu);
+  await page.waitForTimeout(100);
   await page
     .locator(`[data-test="menu-item-${text}"] >> visible = true`)
     .click();

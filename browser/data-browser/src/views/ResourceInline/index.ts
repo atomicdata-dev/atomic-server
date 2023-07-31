@@ -1,0 +1,1 @@
+export { ResourceInline } from './ResourceInline';

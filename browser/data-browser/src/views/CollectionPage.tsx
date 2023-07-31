@@ -26,7 +26,10 @@ import NewInstanceButton from '../components/NewInstanceButton';
 import ResourceCard from './Card/ResourceCard';
 import Table from '../components/Table';
 import { useSubjectParam } from '../helpers/useCurrentSubject';
-import { DropdownInput, DropDownMini } from '../components/forms/DropdownInput';
+import {
+  DropdownInput,
+  DropDownMini,
+} from '../components/forms/ResourceSelector/DropdownInput';
 import { AtomicLink } from '../components/AtomicLink';
 import { ResourcePageProps } from './ResourcePage';
 import { useEffectOnce } from '../hooks/useEffectOnce';

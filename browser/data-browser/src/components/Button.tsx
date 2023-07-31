@@ -9,6 +9,7 @@ export interface ButtonProps
   name?: string;
   /** Renders the button less clicky */
   subtle?: boolean;
+  alert?: boolean;
   /** If it's just an icon */
   icon?: boolean;
   /** Minimal styling */
@@ -21,20 +22,33 @@ export interface ButtonProps
   className?: string;
 }
 
-export const Button = React.forwardRef<
-  HTMLButtonElement,
-  React.PropsWithChildren<ButtonProps>
->(({ children, clean, icon, loading, ...props }, ref): JSX.Element => {
+const getButtonComp = ({ clean, icon, subtle, alert }: ButtonProps) => {
   let Comp = ButtonDefault;
+
+  if (subtle) {
+    Comp = ButtonSubtle;
+  }
+
+  if (alert) {
+    Comp = ButtonAlert;
+  }
 
   if (icon) {
     Comp = ButtonIcon;
   }
 
   if (clean) {
-    //@ts-ignore
     Comp = ButtonClean;
   }
+
+  return Comp;
+};
+
+export const Button = React.forwardRef<
+  HTMLButtonElement,
+  React.PropsWithChildren<ButtonProps>
+>(({ children, loading, ...props }, ref): JSX.Element => {
+  const Comp = getButtonComp(props);
 
   return (
     <Comp type='button' {...props} ref={ref}>
@@ -49,7 +63,6 @@ Button.displayName = 'Button';
 export const ButtonClean = styled.button<ButtonProps>`
   cursor: pointer;
   border: none;
-  outline: none;
   font-size: inherit;
   padding: 0;
   color: inherit;
@@ -69,7 +82,13 @@ export const ButtonBase = styled(ButtonClean)`
   color: ${props => props.theme.colors.bg};
   white-space: nowrap;
   margin-bottom: ${p => (p.gutter ? `${p.theme.margin}rem` : '')};
-  ${transition('background-color', 'box-shadow', 'transform', 'color')};
+  ${transition(
+    'background-color',
+    'box-shadow',
+    'transform',
+    'color',
+    'border-color',
+  )};
 
   // Prevent sticky hover buttons on touch devices
   @media (hover: hover) and (pointer: fine) {
@@ -128,31 +147,52 @@ export const ButtonBar = styled(ButtonClean)<ButtonBarProps>`
 /** Button with some optional margins around it */
 // eslint-disable-next-line prettier/prettier
 export const ButtonDefault = styled(ButtonBase)<ButtonProps>`
+  --button-bg-color: ${p => p.theme.colors.main};
+  --button-bg-color-hover: ${p => p.theme.colors.mainLight};
+  --button-border-color: ${p => p.theme.colors.main};
+  --button-border-color-hover: ${p => p.theme.colors.mainLight};
+  --button-text-color: ${p => p.theme.colors.bg};
+  --button-text-color-hover: ${p => p.theme.colors.bg};
+
   padding: 0.4rem;
   border-radius: ${p => p.theme.radius};
   padding-left: ${p => p.theme.margin}rem;
   padding-right: ${p => p.theme.margin}rem;
-  box-shadow: ${p => (p.subtle ? p.theme.boxShadow : 'none')};
+  /* box-shadow: ${p => (p.subtle ? p.theme.boxShadow : 'none')}; */
   display: inline-flex;
-  background-color: ${p =>
-    p.subtle ? p.theme.colors.bg : p.theme.colors.main};
-  color: ${p => (p.subtle ? p.theme.colors.textLight : p.theme.colors.bg)};
-  border: solid 1px
-    ${p => (p.subtle ? p.theme.colors.bg2 : p.theme.colors.main)};
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  border: solid 1px var(--button-border-color);
 
   &:focus-visible:not([disabled]),
   &:hover:not([disabled]) {
     box-shadow: ${p => p.theme.boxShadowSoft};
-    background-color: ${p =>
-      p.subtle ? p.theme.colors.bg : p.theme.colors.mainLight};
-    color: ${p => (p.subtle ? p.theme.colors.main : p.theme.colors.bg)};
-    border-color: ${p =>
-      p.subtle ? p.theme.colors.main : p.theme.colors.mainLight};
+    background-color: var(--button-bg-color-hover);
+    color: var(--button-text-color-hover);
+    border-color: var(--button-border-color-hover);
   }
 
   &:active:not([disabled]) {
     box-shadow: inset ${p => p.theme.boxShadowIntense};
   }
+`;
+
+export const ButtonSubtle = styled(ButtonDefault)`
+  --button-bg-color: ${p => p.theme.colors.bg};
+  --button-bg-color-hover: ${p => p.theme.colors.bg};
+  --button-border-color: ${p => p.theme.colors.bg2};
+  --button-border-color-hover: ${p => p.theme.colors.main};
+  --button-text-color: ${p => p.theme.colors.textLight};
+  --button-text-color-hover: ${p => p.theme.colors.main};
+
+  box-shadow: ${p => p.theme.boxShadow};
+`;
+
+export const ButtonAlert = styled(ButtonDefault)`
+  --button-bg-color: ${p => p.theme.colors.alert};
+  --button-bg-color-hover: ${p => p.theme.colors.alertLight};
+  --button-border-color: ${p => p.theme.colors.alert};
+  --button-border-color-hover: ${p => p.theme.colors.alertLight};
 `;
 
 /** Button that only shows an icon */

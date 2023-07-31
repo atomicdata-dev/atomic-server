@@ -51,6 +51,8 @@ export class Resource {
   private subject: string;
   private propvals: PropVals;
 
+  private queuedFetch: Promise<unknown> | undefined;
+
   public constructor(subject: string, newResource?: boolean) {
     if (typeof subject !== 'string') {
       throw new Error(
@@ -71,6 +73,14 @@ export class Resource {
       this.get(properties.shortname) ??
       this.get(properties.file.filename) ??
       this.subject) as string;
+  }
+
+  public static compare(resourceA: Resource, resourceB: Resource): boolean {
+    return (
+      resourceA.getSubject() === resourceB.getSubject() &&
+      JSON.stringify(Array.from(resourceA.propvals.entries())) ===
+        JSON.stringify(Array.from(resourceB.propvals.entries()))
+    );
   }
 
   /** Checks if the agent has write rights by traversing the graph. Recursive function. */
@@ -131,6 +141,7 @@ export class Resource {
     res.commitError = this.commitError;
     res.commitBuilder = this.commitBuilder.clone();
     res.appliedCommitSignatures = this.appliedCommitSignatures;
+    res.queuedFetch = this.queuedFetch;
 
     return res;
   }
@@ -141,8 +152,8 @@ export class Resource {
   }
 
   /** Get a Value by its property */
-  public get(propUrl: string): JSONValue {
-    return this.propvals.get(propUrl);
+  public get<T extends JSONValue = JSONValue>(propUrl: string): T {
+    return this.propvals.get(propUrl) as T;
   }
 
   /**
@@ -179,6 +190,27 @@ export class Resource {
     );
   }
 
+  /** Remove the given classes from the resource */
+  public removeClasses(
+    store: Store,
+    ...classSubjects: string[]
+  ): Promise<void> {
+    return this.set(
+      properties.isA,
+      this.getClasses().filter(
+        classSubject => !classSubjects.includes(classSubject),
+      ),
+      store,
+    );
+  }
+
+  /** Adds the given classes to the resource */
+  public addClasses(store: Store, ...classSubject: string[]): Promise<void> {
+    const classesSet = new Set([...this.getClasses(), ...classSubject]);
+
+    return this.set(properties.isA, Array.from(classesSet), store);
+  }
+
   /**
    * Returns the current Commit Builder, which describes the pending changes of
    * the resource
@@ -203,7 +235,7 @@ export class Resource {
   public getChildrenCollection(): string {
     // We create a collection that contains all children of the current Subject
     const url = new URL(this.subject);
-    url.pathname = '/collections';
+    url.pathname = '/query';
     url.searchParams.set('property', properties.parent);
     url.searchParams.set('value', this.subject);
 
@@ -215,23 +247,11 @@ export class Resource {
     const commitsCollection = await store.fetchResourceFromServer(
       this.getCommitsCollection(),
     );
-
-    if (commitsCollection.error) {
-      throw commitsCollection.error;
-    }
-
     const commits = commitsCollection.get(properties.collection.members);
 
     const builtVersions: Version[] = [];
 
     let previousResource = new Resource(this.subject);
-
-    if (!commits) {
-      throw new Error(
-        `Couldn't find commits for ${this.getSubject()} in CommitCollection: ` +
-          this.getCommitsCollection(),
-      );
-    }
 
     for (const commit of commits as unknown as string[]) {
       const commitResource = await store.getResourceAsync(commit);
@@ -314,6 +334,12 @@ export class Resource {
 
   /** Removes the resource form both the server and locally */
   public async destroy(store: Store, agent?: Agent): Promise<void> {
+    if (this.new) {
+      store.removeResource(this.getSubject());
+
+      return;
+    }
+
     const newCommitBuilder = new CommitBuilder(this.getSubject());
     newCommitBuilder.setDestroy(true);
 
@@ -336,9 +362,9 @@ export class Resource {
   /** Appends a Resource to a ResourceArray */
   public pushPropVal(propUrl: string, ...values: JSONArray): void {
     const propVal = (this.get(propUrl) as JSONArray) ?? [];
-    propVal.push(...values);
     this.commitBuilder.addPushAction(propUrl, ...values);
-    this.propvals.set(propUrl, propVal);
+    // Build a new array so that the reference changes. This is needed in most UI frameworks.
+    this.propvals.set(propUrl, [...propVal, ...values]);
   }
 
   /** Removes a property value combination from the resource and adds it to the next Commit */
@@ -362,11 +388,20 @@ export class Resource {
    * Commits the changes and sends the Commit to the resource's `/commit`
    * endpoint. Returns the Url of the created Commit. If you don't pass an Agent
    * explicitly, the default Agent of the Store is used.
+   * When there are no changes no commit is made and the function returns Promise<undefined>.
    */
-  public async save(store: Store, differentAgent?: Agent): Promise<string> {
+  public async save(
+    store: Store,
+    differentAgent?: Agent,
+  ): Promise<string | undefined> {
     // Instantly (optimistically) save for local usage
     // Doing this early is essential for having a snappy UX in the document editor
     store.addResources(this);
+    store.notify(this.clone());
+
+    if (!this.commitBuilder.hasUnsavedChanges()) {
+      return undefined;
+    }
 
     const agent = store.getAgent() ?? differentAgent;
 
@@ -398,8 +433,15 @@ export class Resource {
     const endpoint = new URL(this.getSubject()).origin + `/commit`;
 
     try {
+      // If a commit is already being posted we wait for it to finish because the server can not garantee the commits will be processed in the correct order.
+      if (this.queuedFetch) {
+        await this.queuedFetch;
+      }
+
       this.commitError = undefined;
-      const createdCommit = await store.postCommit(commit, endpoint);
+      const createdCommitPromise = store.postCommit(commit, endpoint);
+      this.queuedFetch = createdCommitPromise;
+      const createdCommit = await createdCommitPromise;
 
       this.setUnsafe(properties.commit.lastCommit, createdCommit.id!);
       // The first `SUBSCRIBE` message will not have worked, because the resource didn't exist yet.
@@ -444,6 +486,8 @@ export class Resource {
    * Set a Property, Value combination and perform a validation. Will throw if
    * property is not valid for the datatype. Will fetch the datatype if it's not
    * available. Adds the property to the commitbuilder.
+   *
+   * When undefined is passed as value, the property is removed from the resource.
    */
   public async set(
     prop: string,
@@ -455,6 +499,11 @@ export class Resource {
      */
     validate = true,
   ): Promise<void> {
+    // If the value is the same, don't do anything. We don't want unnecessary commits.
+    if (this.equalsCurrentValue(prop, value)) {
+      return;
+    }
+
     if (store.isOffline()) {
       console.warn('Offline, not validating');
       validate = false;
@@ -465,9 +514,17 @@ export class Resource {
       validateDatatype(value, fullProp.datatype);
     }
 
+    if (value === undefined) {
+      this.removePropVal(prop);
+      store.notify(this.clone());
+
+      return;
+    }
+
     this.propvals.set(prop, value);
     // Add the change to the Commit Builder, so we can commit our changes later
     this.commitBuilder.addSetAction(prop, value);
+    store.notify(this.clone());
   }
 
   /**
@@ -488,6 +545,17 @@ export class Resource {
     Client.tryValidSubject(subject);
     this.commitBuilder.setSubject(subject);
     this.subject = subject;
+  }
+
+  /** Returns true if the value has not changed */
+  private equalsCurrentValue(prop: string, value: JSONValue) {
+    const ownValue = this.get(prop);
+
+    if (value === Object(value)) {
+      return JSON.stringify(ownValue) === JSON.stringify(value);
+    }
+
+    return ownValue === value;
   }
 }
 

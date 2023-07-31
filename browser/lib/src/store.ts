@@ -14,6 +14,7 @@ import {
   urls,
   Commit,
   JSONADParser,
+  FileOrFileLike,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
@@ -134,6 +135,15 @@ export class Store {
       const existing = this.resources.get(resource.getSubject());
 
       if (existing && !existing.loading) {
+        return;
+      }
+    }
+
+    // Check if the resource is the same as the one we already have, if so, we don't want to notify the store so we don't trigger rerenders.
+    const storeResource = this.resources.get(resource.getSubject());
+
+    if (storeResource) {
+      if (Resource.compare(storeResource, resource)) {
         return;
       }
     }
@@ -380,7 +390,6 @@ export class Store {
       throw Error(`Property ${subject} cannot be loaded: ${resource.error}`);
     }
 
-    const prop = new Property();
     const datatypeUrl = resource.get(urls.properties.datatype);
 
     if (datatypeUrl === undefined) {
@@ -406,12 +415,16 @@ export class Store {
     }
 
     const classTypeURL = resource.get(urls.properties.classType)?.toString();
-    prop.classType = classTypeURL;
-    prop.shortname = shortname.toString();
-    prop.description = description.toString();
-    prop.datatype = datatypeFromUrl(datatypeUrl.toString());
 
-    return prop;
+    const propery: Property = {
+      subject,
+      classType: classTypeURL,
+      shortname: shortname.toString(),
+      description: description.toString(),
+      datatype: datatypeFromUrl(datatypeUrl.toString()),
+    };
+
+    return propery;
   }
 
   /**
@@ -454,12 +467,14 @@ export class Store {
     Promise.allSettled(callbacks.map(async cb => cb(resource)));
   }
 
-  public notifyResourceSaved(resource: Resource): void {
-    this.eventManager.emit(StoreEvents.ResourceSaved, resource);
+  public async notifyResourceSaved(resource: Resource): Promise<void> {
+    await this.eventManager.emit(StoreEvents.ResourceSaved, resource);
   }
 
-  public notifyResourceManuallyCreated(resource: Resource): void {
-    this.eventManager.emit(StoreEvents.ResourceManuallyCreated, resource);
+  public async notifyResourceManuallyCreated(
+    resource: Resource,
+  ): Promise<void> {
+    await this.eventManager.emit(StoreEvents.ResourceManuallyCreated, resource);
   }
 
   /** Parses the HTML document for `JSON-AD` data in <meta> tags, adds it to the store */
@@ -677,7 +692,13 @@ export class Store {
     return this.eventManager.register(event, callback);
   }
 
-  public async uploadFiles(files: File[], parent: string): Promise<string[]> {
+  /** Uploads files to atomic server and create resources for them, then returns the subjects.
+   * If using this in Node.js and it does not work, try injecting node-fetch using `Store.injectFetch()` Some versions of Node create mallformed FormData when using the build-in fetch.
+   */
+  public async uploadFiles(
+    files: FileOrFileLike[],
+    parent: string,
+  ): Promise<string[]> {
     const agent = this.getAgent();
 
     if (!agent) {
@@ -728,6 +749,14 @@ export class Store {
     return ancestry;
   }
 
+  /**
+   * Returns a list of resources currently in the store which pass the given filter function.
+   * This is a client-side filter, and does not query the server.
+   */
+  public clientSideQuery(filter: (resource: Resource) => boolean): Resource[] {
+    return Array.from(this.resources.values()).filter(filter);
+  }
+
   private randomPart(): string {
     return Math.random().toString(36).substring(2);
   }
@@ -757,22 +786,22 @@ export class Store {
  * A Property represents a relationship between a Subject and its Value.
  * https://atomicdata.dev/classes/Property
  */
-export class Property {
-  public subject: string;
+export interface Property {
+  subject: string;
   /** https://atomicdata.dev/properties/datatype */
-  public datatype: Datatype;
+  datatype: Datatype;
   /** https://atomicdata.dev/properties/shortname */
-  public shortname: string;
+  shortname: string;
   /** https://atomicdata.dev/properties/description */
-  public description: string;
+  description: string;
   /** https://atomicdata.dev/properties/classType */
-  public classType?: string;
+  classType?: string;
   /** If the Property cannot be found or parsed, this will contain the error */
-  public error?: Error;
+  error?: Error;
   /** https://atomicdata.dev/properties/isDynamic */
-  public isDynamic?: boolean;
+  isDynamic?: boolean;
   /** When the Property is still awaiting a server response */
-  public loading?: boolean;
+  loading?: boolean;
 }
 
 export interface FetchOpts {

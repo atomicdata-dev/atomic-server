@@ -86,7 +86,7 @@ export function NewBookmarkButton({
           </form>
         </DialogContent>
         <DialogActions>
-          <Button onClick={hide} subtle>
+          <Button onClick={() => hide(false)} subtle>
             Cancel
           </Button>
           <Button onClick={onDone} disabled={url.trim() === ''}>

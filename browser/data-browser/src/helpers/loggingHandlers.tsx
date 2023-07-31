@@ -25,7 +25,8 @@ export function handleInfo(e: Error): void {
   // eslint-disable-next-line no-console
   console.info(e);
 
-  if (!isDev) {
+  // ONLY Notify Errors on Atomicdata.dev, We don't want to be able to read errors from private instances as that would be a privacy issue.
+  if (window.location.hostname === 'atomicdata.dev') {
     Bugsnag.notify(e);
   }
 }

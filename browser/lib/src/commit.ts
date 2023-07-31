@@ -222,6 +222,10 @@ export class CommitBuilder {
       throw new Error('No agent passed to sign commit');
     }
 
+    if (!this.hasUnsavedChanges()) {
+      throw new Error(`No changes to commit in ${this.subject}`);
+    }
+
     const commitPreSigned: CommitPreSigned = {
       ...this.clone().toPlainObject(),
       createdAt,
@@ -460,10 +464,12 @@ export function parseAndApplyCommit(jsonAdObjStr: string, store: Store) {
   const { subject, id, destroy, signature } = commit;
 
   let resource = store.resources.get(subject) as Resource;
+  let isNew = false;
 
   // If the resource doesn't exist in the store, create the resource
   if (!resource) {
     resource = new Resource(subject);
+    isNew = true;
   } else {
     // Commit has already been applied here, ignore the commit
     if (resource.appliedCommitSignatures.has(signature)) {
@@ -484,7 +490,12 @@ export function parseAndApplyCommit(jsonAdObjStr: string, store: Store) {
     return;
   } else {
     resource.appliedCommitSignatures.add(signature);
-    store.addResources(resource);
+
+    if (isNew) {
+      store.addResources(resource);
+    } else {
+      store.notify(resource.clone());
+    }
   }
 }
 
