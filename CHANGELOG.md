@@ -5,6 +5,10 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 Changes to JS assets are not included here, but in [`atomic-data-browser`'s CHANGELOG](https://github.com/atomicdata-dev/atomic-data-browser/blob/main/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## UNRELEASED
+
+- Monorepo! Include `atomic-data-browser` in this repo. #216
+
 ## [v0.34.3] - 2023-06-27
 
 - Remove `tpf` queries from `atomic-cli` #610

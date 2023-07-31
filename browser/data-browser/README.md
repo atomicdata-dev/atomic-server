@@ -1,7 +1,5 @@
 # Atomic Data Browser
 
-[![Build Status](https://github.com/atomicdata-dev/atomic-data-browser/workflows/build/badge.svg)](https://github.com/atomicdata-dev/atomic-data-browser/actions)
-
 _Status: Beta. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 
 View, edit and create [Atomic Data](https://atomicdata.dev/) from your browser!

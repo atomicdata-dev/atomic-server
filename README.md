@@ -129,6 +129,8 @@ Get the binaries from the [releases page](https://github.com/atomicdata-dev/atom
 ### 4. Install using cargo
 
 ```sh
+# Make sure pnpm is installed and available in path! https://pnpm.io/
+pnpm --version
 # Install from source using cargo, and add it to your path
 # If things go wrong, check out `Troubleshooting compiling from source:` below
 cargo install atomic-server --locked
@@ -141,6 +143,8 @@ atomic-server
 ### 5. Compile from source
 
 ```sh
+# make sure pnpm is installed and available in path! https://pnpm.io/
+pnpm --version
 git clone git@github.com:atomicdata-dev/atomic-server.git
 cd atomic-server/server
 cargo run

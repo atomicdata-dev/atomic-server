@@ -14,6 +14,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
+- [Running locally (with local development browser)](#running-locally-with-local-development-browser)
 - [Improve local compilation speed](#improve-local-compilation-speed)
 - [Cross compilation](#cross-compilation)
 - [IDE setup (VSCode)](#ide-setup-vscode)
@@ -39,10 +40,11 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 
-Since `atomic-server` is developed in conjunction with the typescript / react `atomic-data-browser` project, it might make sense to run both locally whilst developing.
 
-- Clone [`atomic-data-browser`](https://github.com/atomicdata-dev/atomic-data-browser) and run it (see readme.md, basically: `pnpm start`)
-- Visit `https://localhost:8080` (default)
+## Running locally (with local development browser)
+
+- Run `cargo run` to start the server
+- Go to `browser` and run `pnpm dev` to start the browsre
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:8080/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `pmpm build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
 
@@ -178,14 +180,14 @@ So please first send an e-mail to joep@ontola.io describing the issue, and then 
 
 The following should be triggered automatically:
 
-  - Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.
-  - The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
+- Push the `v*` tag, a Release will automatically be created on Github with the binaries. This will read `CHANGELOG.md`, so make sure to add the changes from there.
+- The main action required on this repo, is to _update the changelog_ and _tag releases_. The tags trigger the build and publish processes in the CI.
 
 Note:
 
-  - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
-  - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
-  - After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
+- We use [semver](https://semver.org/), and are still quite far from 1.0.0.
+- The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
+- After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
 
 ### Publishing manually - doing the CI's work
 
@@ -228,7 +230,7 @@ or do it manually:
 1. `cargo build --release --target x86_64-unknown-linux-musl --bin atomic-server` (if it fails, use cross, see above)
 1. `scp ../target/x86_64-unknown-linux-gnu/release/atomic-server atomic:~/atomic/server/atomic-server-v0.{version}`
 1. `ssh atomic` (@joepio manages server)
-2. `service atomic restart`
+1. `service atomic restart`
 
 ```sh
 # logs
