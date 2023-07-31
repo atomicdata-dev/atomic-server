@@ -1,12 +1,17 @@
+FROM node:20 as js-builder
+WORKDIR /app/browser
+ENV SHELL=bash
+RUN npm install -g pnpm
+COPY browser/package.json browser/pnpm-lock.yaml ./
+RUN pnpm install -r --frozen-lockfile
+COPY ./browser .
+RUN pnpm install -r --frozen-lockfile
+RUN pnpm build
+
 FROM rust:latest as builder
 WORKDIR /app
 COPY . .
-ENV SHELL=bash
-# Install PNPM, source it and build the JS assets
-RUN curl -fsSL https://get.pnpm.io/install.sh | sh -
-RUN . /root/.bashrc
-RUN cd browser && pnpm install && pnpm run build
-RUN cd ..
+COPY --from=js-builder /app/browser/data-browser/dist /app/browser/data-browser/dist
 # git-fetch-with-cli is a CI bugfix, we should be able to remove it later
 RUN cargo build --release --bin atomic-server --config net.git-fetch-with-cli=true
 
