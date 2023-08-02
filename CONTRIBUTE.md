@@ -71,6 +71,10 @@ This project is primarily being developed in VSCode.
 That doesn't mean that you should, too, but it means you're less likely to run into issues.
 The `/.vscode` directory contains various tasks, recommended extensions, and some settings overwrites.
 
+## Branching
+
+Create new branches off `develop`. When an issue is ready for PR, open PR against `develop`.
+
 ## Testing
 
 - All tests are run in CI
