@@ -57,7 +57,7 @@
       "data-browser"
     ]
   },
-  "packageManager": "pnpm@7.13.3",
+  "packageManager": "pnpm@8.6.12",
   "dependencies": {
     "eslint-plugin-import": "^2.26.0"
   }
