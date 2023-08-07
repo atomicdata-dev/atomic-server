@@ -31,6 +31,7 @@ rio_turtle = {version = "0.8", optional = true}
 serde = {version = "1", features = ["derive"]}
 serde_json = "1"
 sled = {version = "0.34", optional = true, features = ["no_logs"]}
+tokio = "1.29.1"
 toml = {version = "0.7", optional = true}
 tracing = "0.1"
 ureq = "2"

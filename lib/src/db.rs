@@ -83,6 +83,8 @@ pub struct Db {
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
     on_commit: Option<Arc<HandleCommit>>,
+    /// Async runtime
+    runtime: Arc<tokio::runtime::Runtime>,
 }
 
 impl Db {
@@ -90,8 +92,15 @@ impl Db {
     /// The server_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
-        let dal_resources = opendal::services::Sled::default().datadir(path).tree(tree);
-        let dal_op = opendal::Operator::new(dal_resources)?
+        let mut dal_sled = opendal::services::Sled::default();
+
+        let dal_path = path.clone().join("opendal");
+        dal_sled
+            .datadir(dal_path.to_str().expect("wrong data dir string"))
+            .tree("resources_v1");
+
+        let dal_op = opendal::Operator::new(dal_sled)
+            .map_err(|_e| format!("Error operator: {}", _e))?
             .layer(opendal::layers::LoggingLayer::default())
             .finish();
 
@@ -102,7 +111,7 @@ impl Db {
         let prop_val_sub_index = db.open_tree("prop_val_sub_index")?;
         let watched_queries = db.open_tree("watched_queries")?;
         let store = Db {
-            dal_resources,
+            dal_resources: dal_op,
             db,
             default_agent: Arc::new(Mutex::new(None)),
             resources,
@@ -113,6 +122,7 @@ impl Db {
             watched_queries,
             endpoints: default_endpoints(),
             on_commit: None,
+            runtime: Arc::new(tokio::runtime::Runtime::new()?),
         };
         migrate_maybe(&store).map(|e| format!("Error during migration of database: {:?}", e))?;
         crate::populate::populate_base_models(&store)
@@ -169,10 +179,13 @@ impl Db {
     /// Deals with the binary API of Sled
     #[instrument(skip(self))]
     fn get_propvals(&self, subject: &str) -> AtomicResult<PropVals> {
-        let propval_maybe = self
-            .dal_resources
-            .read(subject.as_bytes())
-            .map_err(|e| format!("Can't open {} from store: {}", subject, e))?;
+        let propval_maybe = self.runtime.block_on(async {
+            self.dal_resources
+                .read(subject)
+                .await
+                .map_err(|e| format!("Can't open {} from store: {}", subject, e))
+                .ok()
+        });
         // let propval_maybe = self
         //     .resources
         //     .get(subject.as_bytes())
