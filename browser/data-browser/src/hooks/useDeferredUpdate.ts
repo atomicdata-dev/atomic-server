@@ -17,7 +17,7 @@ export function useDeferredUpdate<T>(
     if (started) {
       onDeferredUpdate(deferredValue);
     }
-  }, [started, deferredValue, onDeferredUpdate]);
+  }, [started, deferredValue]);
 
   return update;
 }
