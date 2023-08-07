@@ -3,26 +3,24 @@
 
 import { test, expect } from '@playwright/test';
 import type { Browser, Page } from '@playwright/test';
-import { testConfig } from './test-config.js';
 
-export interface TestConfig {
-  demoFileName: string;
-  demoFile: string;
-  demoInviteName: string;
-  serverUrl: string;
-  frontEndUrl: string;
-  /** If /setup is used to register */
-  initialTest: boolean;
-}
+const DEMO_FILENAME = 'testimage.svg';
+const SERVER_URL = 'http://localhost:9883';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+// TODO: Should use an env var so the CI can test the setup test.
+const INITIAL_TEST = false;
+const DEMO_INVITE_NAME = 'document demo';
 
-const {
-  demoFileName,
-  demoFile,
-  demoInviteName,
-  serverUrl,
-  frontEndUrl,
-  initialTest,
-} = testConfig;
+const demoFile = () => {
+  const processPath = process.cwd();
+
+  // In the CI, the tests dir is missing for some reason?
+  if (processPath.endsWith('tests')) {
+    return `${processPath}/${DEMO_FILENAME}`;
+  } else {
+    return `${processPath}/tests/${DEMO_FILENAME}`;
+  }
+};
 
 const timestamp = () => new Date().toLocaleTimeString();
 const editableTitle = '[data-test="editable-title"]';
@@ -38,7 +36,7 @@ const currentDialogOkButton = 'dialog[open] >> footer >> text=Ok';
 // Depends on server index throttle time, `commit_monitor.rs`
 const REBUILD_INDEX_TIME = 6000;
 
-async function setTitle(page, title: string) {
+async function setTitle(page: Page, title: string) {
   await page.locator(editableTitle).click();
   await page.fill(editableTitle, title);
   await page.waitForTimeout(300);
@@ -46,17 +44,17 @@ async function setTitle(page, title: string) {
 
 test.describe('data-browser', async () => {
   test.beforeEach(async ({ page }) => {
-    if (!serverUrl) {
+    if (!SERVER_URL) {
       throw new Error('serverUrl is not set');
     }
 
     // Open the server
-    await page.goto(frontEndUrl);
+    await page.goto(FRONTEND_URL);
 
     // Sometimes we run the test server on a different port, but we should
     // only change the drive if it is non-default.
-    if (serverUrl !== 'http://localhost:9883') {
-      await changeDrive(serverUrl, page);
+    if (SERVER_URL !== 'http://localhost:9883') {
+      await changeDrive(SERVER_URL, page);
     }
 
     await expect(page.locator(currentDriveTitle)).toBeVisible();
@@ -266,9 +264,11 @@ test.describe('data-browser', async () => {
   });
 
   test('switch Server URL', async ({ page }) => {
-    await expect(page.locator(`text=${demoInviteName}`)).not.toBeVisible();
+    await expect(page.locator(`text=${DEMO_INVITE_NAME}`)).not.toBeVisible();
     await changeDrive('https://atomicdata.dev', page);
-    await expect(page.locator(`text=${demoInviteName}`).first()).toBeVisible();
+    await expect(
+      page.locator(`text=${DEMO_INVITE_NAME}`).first(),
+    ).toBeVisible();
   });
 
   test('sign in with secret, edit prole, sign out', async ({ page }) => {
@@ -290,7 +290,7 @@ test.describe('data-browser', async () => {
   test('sign up and edit document atomicdata.dev', async ({ page }) => {
     await openAtomic(page);
     // Use invite
-    await page.click(`text=${demoInviteName}`);
+    await page.click(`text=${DEMO_INVITE_NAME}`);
     await page.click('text=Accept as new user');
     await expect(page.locator(editableTitle)).toBeVisible();
     // We need the initial enter because removing the top line isn't working ATM
@@ -330,9 +330,9 @@ test.describe('data-browser', async () => {
     // Create document called 'Avocado Salad'
     await page.locator('button:has-text("New Resource")').click();
     await page.locator('button:has-text("document")').click();
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     await editTitle('Avocado Salad', page);
 
     await page.locator(sideBarNewResource).click();
@@ -344,9 +344,9 @@ test.describe('data-browser', async () => {
     // Create document called 'Avocado Salad'
     await page.locator('button:has-text("New Resource")').click();
     await page.locator('button:has-text("document")').click();
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     await editTitle('Avocado Cake', page);
 
     await clickSidebarItem('Cake Folder', page);
@@ -406,13 +406,13 @@ test.describe('data-browser', async () => {
   });
 
   test('localhost /setup', async ({ page }) => {
-    if (initialTest) {
+    if (INITIAL_TEST) {
       // Setup initial user (this test can only be run once per server)
       await page.click('[data-test="sidebar-drive-open"]');
       await expect(page.locator('text=/setup')).toBeVisible();
       // Don't click on setup - this will take you to a different domain, not to the dev build!
       // await page.click('text=/setup');
-      await openSubject(page, `${serverUrl}/setup`);
+      await openSubject(page, `${SERVER_URL}/setup`);
       await expect(page.locator('text=Accept as')).toBeVisible();
       // await page.click('[data-test="accept-existing"]');
       await page.click('text=Accept as');
@@ -432,9 +432,9 @@ test.describe('data-browser', async () => {
     // Create a document
     await newResource('document', page);
     // commit for saving initial document
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     await page.locator(editableTitle).click();
     const title = `Document ${timestamp()}`;
     // These keys make sure the onChange handler is properly called
@@ -445,14 +445,14 @@ test.describe('data-browser', async () => {
     await page.keyboard.type(title);
 
     // commit for editing title
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     // await page.click('[data-test="document-edit"]');
     // await expect(await page.title()).toEqual(title);
     await page.press(editableTitle, 'Enter');
     // await page.waitForTimeout(500);
     const teststring = `My test: ${timestamp()}`;
     await page.fill('textarea', teststring);
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
 
     // commit editing paragraph
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
@@ -465,8 +465,8 @@ test.describe('data-browser', async () => {
 
     // Add a new line on first page, check if it appears on the second
     await page.keyboard.press('Enter');
-    await page.waitForResponse(`${serverUrl}/commit`);
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     const syncText = 'New paragraph';
     await page.keyboard.type(syncText);
     // If this fails to show up, websockets aren't working properly
@@ -493,10 +493,10 @@ test.describe('data-browser', async () => {
     const context2 = await browser.newContext();
     const page2 = await context2.newPage();
     await page2.setViewportSize({ width: 1000, height: 400 });
-    await page2.goto(frontEndUrl);
+    await page2.goto(FRONTEND_URL);
     await openSubject(page2, driveURL);
     // TODO set current drive by opening the URL
-    await expect(page2.locator('text=Unauthorized')).toBeVisible();
+    await expect(page2.locator('text=Unauthorized').first()).toBeVisible();
 
     // Create invite
     await page.click('button:has-text("Send invite")');
@@ -530,8 +530,8 @@ test.describe('data-browser', async () => {
       page.waitForEvent('filechooser'),
       page.click('button:has-text("Upload file")'),
     ]);
-    await fileChooser.setFiles(demoFile);
-    await page.click(`[data-test="file-pill"]:has-text("${demoFileName}")`);
+    await fileChooser.setFiles(demoFile());
+    await page.click(`[data-test="file-pill"]:has-text("${DEMO_FILENAME}")`);
     const image = page.locator('[data-test="image-viewer"]');
     await expect(image).toBeVisible();
     await expect(image).toHaveScreenshot({ maxDiffPixelRatio: 0.1 });
@@ -826,9 +826,9 @@ test.describe('data-browser', async () => {
     await newResource('document', page);
 
     // commit for saving initial document
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${serverUrl}/commit`);
+    await page.waitForResponse(`${SERVER_URL}/commit`);
 
     await editTitle('First Title', page);
     await expect(
@@ -941,7 +941,7 @@ async function editProfileAndCommit(page: Page) {
 /** Create a new Resource in the current Drive */
 async function newResource(klass: string, page: Page) {
   await page.locator(sideBarNewResource).click();
-  await expect(page).toHaveURL(`${frontEndUrl}/app/new`);
+  await expect(page).toHaveURL(`${FRONTEND_URL}/app/new`);
   await page.locator(`button:has-text("${klass}")`).click();
 }
 
@@ -949,11 +949,11 @@ async function newResource(klass: string, page: Page) {
 async function openNewSubjectWindow(browser: Browser, url: string) {
   const context2 = await browser.newContext();
   const page = await context2.newPage();
-  await page.goto(frontEndUrl);
+  await page.goto(FRONTEND_URL);
 
   // Only when we run on `localhost` we don't need to change drive during tests
-  if (serverUrl !== defaultDevServer) {
-    await changeDrive(serverUrl, page);
+  if (SERVER_URL !== defaultDevServer) {
+    await changeDrive(SERVER_URL, page);
   }
 
   await openSubject(page, url);
@@ -988,7 +988,7 @@ async function editTitle(title: string, page: Page, clear = false) {
   await page.keyboard.press('Backspace');
   await page.keyboard.type(title);
   await page.keyboard.press('Escape');
-  await page.waitForResponse(`${serverUrl}/commit`);
+  await page.waitForResponse(`${SERVER_URL}/commit`);
 }
 
 async function clickSidebarItem(text: string, page: Page) {
