@@ -64,7 +64,7 @@ test.describe('data-browser', async () => {
     const tab = async () => {
       await page.waitForTimeout(100);
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(30);
+      await page.waitForTimeout(100);
     };
 
     const createTag = async (emote: string, name: string) => {
@@ -91,7 +91,7 @@ test.describe('data-browser', async () => {
       await page.waitForTimeout(100);
       await page.keyboard.type(col1, { delay: 50 });
       await tab();
-      await page.keyboard.type(col2, { delay: 20 });
+      await page.keyboard.type(col2, { delay: 100 });
       await tab();
       await page.keyboard.type(col3, { delay: 10 });
       await tab();
@@ -217,10 +217,10 @@ test.describe('data-browser', async () => {
       page.getByRole('gridcell', { name: 'March 4, 2000' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'May 1, 1980' }),
+      page.getByRole('gridcell', { name: 'May 10, 1980' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'May 1, 1965' }),
+      page.getByRole('gridcell', { name: 'May 10, 1965' }),
     ).toBeVisible();
     await expect(
       page.getByRole('gridcell', { name: '😵‍💫 dreamy' }),
@@ -435,21 +435,11 @@ test.describe('data-browser', async () => {
     await page.waitForResponse(`${SERVER_URL}/commit`);
     // commit for initializing the first element (paragraph)
     await page.waitForResponse(`${SERVER_URL}/commit`);
-    await page.locator(editableTitle).click();
     const title = `Document ${timestamp()}`;
-    // These keys make sure the onChange handler is properly called
-    await page.keyboard.press('Space');
-    await page.keyboard.press('Backspace');
-    // await page.waitForTimeout(100);
-    // await page.fill(documentTitle, title);
-    await page.keyboard.type(title);
+    await editTitle(title, page);
 
-    // commit for editing title
-    await page.waitForResponse(`${SERVER_URL}/commit`);
-    // await page.click('[data-test="document-edit"]');
-    // await expect(await page.title()).toEqual(title);
     await page.press(editableTitle, 'Enter');
-    // await page.waitForTimeout(500);
+
     const teststring = `My test: ${timestamp()}`;
     await page.fill('textarea', teststring);
     await page.waitForResponse(`${SERVER_URL}/commit`);
@@ -831,6 +821,7 @@ test.describe('data-browser', async () => {
     await page.waitForResponse(`${SERVER_URL}/commit`);
 
     await editTitle('First Title', page);
+
     await expect(
       page.getByRole('heading', { name: 'First Title', level: 1 }),
     ).toBeVisible();
@@ -839,8 +830,8 @@ test.describe('data-browser', async () => {
     await expect(
       page.getByRole('heading', { name: 'Second Title', level: 1 }),
     ).toBeVisible();
-
     await contextMenuClick('history', page);
+
     await expect(page.locator('text=History of Second Title')).toBeVisible();
 
     await page.getByTestId('version-button').nth(1).click();
@@ -986,6 +977,7 @@ async function editTitle(title: string, page: Page, clear = false) {
   // These keys make sure the onChange handler is properly called
   await page.keyboard.press('Space');
   await page.keyboard.press('Backspace');
+  await page.waitForResponse(`${SERVER_URL}/commit`);
   await page.keyboard.type(title);
   await page.keyboard.press('Escape');
   await page.waitForResponse(`${SERVER_URL}/commit`);
