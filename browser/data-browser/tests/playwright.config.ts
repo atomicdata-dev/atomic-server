@@ -10,8 +10,8 @@ const config: PlaywrightTestConfig = {
   timeout: 1000 * 120, // 2 minutes
   projects: [
     {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
     },
   ],
   // projects: [
