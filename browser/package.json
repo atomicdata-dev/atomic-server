@@ -43,7 +43,7 @@
     "start": "pnpm run -r --parallel start",
     "typedoc": "typedoc . --options typedoc.json",
     "typecheck": "pnpm run -r --parallel typecheck",
-    "playwright-install": "playwright install"
+    "playwright-install": "playwright install chromium"
   },
   "husky": {
     "hooks": {
