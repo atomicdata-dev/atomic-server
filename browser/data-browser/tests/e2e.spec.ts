@@ -834,6 +834,7 @@ test.describe('data-browser', async () => {
 
     await expect(page.locator('text=History of Second Title')).toBeVisible();
 
+    await page.reload();
     await page.getByTestId('version-button').nth(2).click();
 
     await expect(page.locator('text=First Title')).toBeVisible();
