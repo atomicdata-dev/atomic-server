@@ -44,6 +44,7 @@ const AllPropsWrapper = styled.div<{ basic: boolean | undefined }>`
   flex-direction: column;
   gap: 0.5rem;
   border-radius: ${p => p.theme.radius};
+  background-color: ${p => (p.basic ? 'transparent' : p.theme.colors.bg)};
   border: ${p => (p.basic ? 'none' : `1px solid ${p.theme.colors.bg2}`)};
 `;
 

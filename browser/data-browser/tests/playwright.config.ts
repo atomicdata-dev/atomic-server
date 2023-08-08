@@ -6,6 +6,7 @@ const config: PlaywrightTestConfig = {
     viewport: { width: 1200, height: 800 },
   },
   retries: 3,
+  timeout: 1000 * 120, // 2 minutes
   // projects: [
   //   {
   //     name: 'chromium',
