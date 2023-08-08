@@ -1,4 +1,5 @@
 import type { PlaywrightTestConfig } from '@playwright/test';
+import { devices } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
   use: {
@@ -7,6 +8,12 @@ const config: PlaywrightTestConfig = {
   },
   retries: 3,
   timeout: 1000 * 120, // 2 minutes
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+  ],
   // projects: [
   //   {
   //     name: 'chromium',
