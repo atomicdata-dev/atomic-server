@@ -927,6 +927,7 @@ async function editProfileAndCommit(page: Page) {
   await page.click('[data-test="save"]');
   await expect(page.locator('text=Resource saved')).toBeVisible();
   await page.waitForURL(/\/app\/show/);
+  await page.reload();
   await expect(page.locator(`text=${username}`).first()).toBeVisible();
 }
 
