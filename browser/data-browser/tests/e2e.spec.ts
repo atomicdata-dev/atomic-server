@@ -62,7 +62,7 @@ test.describe('data-browser', async () => {
 
   test('tables', async ({ page }) => {
     const tab = async () => {
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(200);
       await page.keyboard.press('Tab');
       await page.waitForTimeout(100);
     };
@@ -89,11 +89,11 @@ test.describe('data-browser', async () => {
       col5: string,
     ) => {
       await page.waitForTimeout(100);
-      await page.keyboard.type(col1, { delay: 50 });
+      await page.keyboard.type(col1, { delay: 100 });
       await tab();
       await page.keyboard.type(col2, { delay: 100 });
       await tab();
-      await page.keyboard.type(col3, { delay: 10 });
+      await page.keyboard.type(col3, { delay: 50 });
       await tab();
 
       if (col4) {
