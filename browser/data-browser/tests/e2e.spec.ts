@@ -31,6 +31,8 @@ const publicReadRightLocator = (page: Page) =>
   page.locator('[data-test="right-public"] input[type="checkbox"]').first();
 const contextMenu = '[data-test="context-menu"]';
 const addressBar = '[data-test="address-bar"]';
+const newDriveMenuItem = '[data-test="menu-item-new-drive"]';
+
 const defaultDevServer = 'http://localhost:9883';
 const currentDialogOkButton = 'dialog[open] >> footer >> text=Ok';
 // Depends on server index throttle time, `commit_monitor.rs`
@@ -625,22 +627,23 @@ test.describe('data-browser', async () => {
 
   test('configure drive page', async ({ page }) => {
     await signIn(page);
-    await openDriveMenu(page);
+    await openConfigureDrive(page);
     await expect(page.locator(currentDriveTitle)).toHaveText('localhost');
 
     // temp disable this, because of trailing slash in base URL
     // await page.click(':text("https://atomicdata.dev") + button:text("Select")');
     // await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
 
-    await openDriveMenu(page);
+    await openConfigureDrive(page);
     await page.fill('[data-test="server-url-input"]', 'https://example.com');
     await page.click('[data-test="server-url-save"]');
 
     await expect(page.locator(currentDriveTitle)).toHaveText('...');
 
-    await openDriveMenu(page);
+    await openConfigureDrive(page);
     await page.click(':text("https://atomicdata.dev") + button:text("Select")');
-    await openDriveMenu(page);
+    await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
+    await openConfigureDrive(page);
     await page.click(
       ':text("https://example.com") ~ [title="Add to favorites"]',
     );
@@ -955,14 +958,19 @@ async function openNewSubjectWindow(browser: Browser, url: string) {
   return page;
 }
 
-async function openDriveMenu(page: Page) {
+async function openConfigureDrive(page: Page) {
+  // Make sure the drive switched dropdown is not open
+  if (await page.locator(newDriveMenuItem).isVisible()) {
+    await page.waitForTimeout(100);
+  }
+
   await page.click(sideBarDriveSwitcher);
-  await page.waitForTimeout(100);
   await page.click('text=Configure Drives');
+  await expect(page.locator('text=Drive Configuration')).toBeVisible();
 }
 
 async function changeDrive(subject: string, page: Page) {
-  await openDriveMenu(page);
+  await openConfigureDrive(page);
   await expect(page.locator('text=Drive Configuration')).toBeVisible();
   await page.fill('[data-test="server-url-input"]', subject);
   await page.click('[data-test="server-url-save"]');
