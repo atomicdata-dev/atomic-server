@@ -17,7 +17,7 @@ export function FilePage({ resource }: ResourcePageProps) {
   const wideScreen = useMediaQuery('(min-width: 600px)');
 
   return (
-    <ContainerWide about={resource.getSubject()}>
+    <ContainerWide>
       <Column gap='2rem'>
         <Row center justify='space-between'>
           <StyledEditableTitle resource={resource} />

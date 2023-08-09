@@ -42,7 +42,7 @@ export function ResourcePageDefault({
   const [lastCommit] = useString(resource, properties.commit.lastCommit);
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <EditableTitle resource={resource} />
       <Details>
         <ClassDetail resource={resource} />

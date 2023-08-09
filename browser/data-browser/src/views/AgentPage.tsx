@@ -13,7 +13,7 @@ function AgentPage({ resource }: ResourcePageProps): JSX.Element {
   const [children] = useArray(resource, properties.children);
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <ValueForm resource={resource} propertyURL={properties.description} />
       <h1>{title}</h1>
       {children.map(child => {

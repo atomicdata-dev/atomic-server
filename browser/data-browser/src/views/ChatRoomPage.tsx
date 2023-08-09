@@ -146,7 +146,7 @@ export function ChatRoomPage({ resource }: ResourcePageProps) {
   }
 
   return (
-    <FullPageWrapper about={resource.getSubject()}>
+    <FullPageWrapper>
       <EditableTitle resource={resource} />
       <ScrollingContent ref={scrollRef}>
         <MessagesPage

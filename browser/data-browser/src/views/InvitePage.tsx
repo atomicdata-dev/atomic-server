@@ -66,7 +66,7 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
   }
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <h1>Invite to {write ? 'edit' : 'view'}</h1>
       <ValueForm resource={resource} propertyURL={properties.description} />
       {usagesLeft === 0 ? (

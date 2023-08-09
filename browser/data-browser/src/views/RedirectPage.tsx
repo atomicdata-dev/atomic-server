@@ -63,7 +63,7 @@ function RedirectPage({ resource }: ResourcePageProps): JSX.Element {
   }, [redirectAgent, agent, destination]);
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <ValueForm resource={resource} propertyURL={properties.description} />
       <h1>Redirect</h1>
       <p>

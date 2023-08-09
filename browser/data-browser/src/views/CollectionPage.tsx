@@ -157,7 +157,7 @@ function Collection({ resource }: ResourcePageProps): JSX.Element {
   );
 
   return (
-    <ContainerFull about={resource.getSubject()}>
+    <ContainerFull>
       <EditableTitle resource={resource} />
       {description && <Markdown text={description} />}
       <ButtonsBar>
