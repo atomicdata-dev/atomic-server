@@ -49,7 +49,7 @@ export function DocumentPage({ resource }: ResourcePageProps): JSX.Element {
 
   return (
     <FullPageWrapper>
-      <DocumentContainer about={resource.getSubject()}>
+      <DocumentContainer>
         {editMode ? (
           <DocumentPageEdit resource={resource} setEditMode={setEditMode} />
         ) : (

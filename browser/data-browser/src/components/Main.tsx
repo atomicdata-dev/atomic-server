@@ -12,7 +12,7 @@ export function Main({
   children,
 }: React.PropsWithChildren<ViewTransitionProps>): JSX.Element {
   return (
-    <StyledMain subject={subject}>
+    <StyledMain subject={subject} about={subject}>
       <VisuallyHidden>
         <a href='#skip-to-content' id='skip-to-content' tabIndex={-1}>
           Start of main content

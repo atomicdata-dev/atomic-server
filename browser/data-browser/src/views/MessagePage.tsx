@@ -14,7 +14,7 @@ export function MessagePage({ resource }: ResourcePageProps) {
   const [lastCommit] = useString(resource, properties.commit.lastCommit);
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <h3>
         Message in <ResourceInline subject={parent!} />
       </h3>

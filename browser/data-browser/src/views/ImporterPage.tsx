@@ -52,7 +52,7 @@ export function ImporterPage({ resource }: ImporterPageProps) {
   }, [parent, jsonAd, overwriteOutside, store]);
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <Title resource={resource} prefix='Import to' link />
       <p>
         Read more about how importing Atomic Data works{' '}

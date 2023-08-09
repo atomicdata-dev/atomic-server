@@ -23,7 +23,7 @@ function DrivePage({ resource }: ResourcePageProps): JSX.Element {
   }
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <Row>
         <EditableTitle resource={resource} />
         {baseURL !== resource.getSubject() && (

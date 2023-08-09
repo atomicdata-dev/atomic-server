@@ -55,15 +55,21 @@ function ResourcePage({ subject }: Props): JSX.Element {
 
   if (resource.loading) {
     return (
-      <ContainerNarrow>
-        <p>Loading...</p>
-        <Spinner />
-      </ContainerNarrow>
+      <Main subject={subject}>
+        <ContainerNarrow>
+          <p>Loading...</p>
+          <Spinner />
+        </ContainerNarrow>
+      </Main>
     );
   }
 
   if (resource.error) {
-    return <ErrorPage resource={resource} />;
+    return (
+      <Main subject={subject}>
+        <ErrorPage resource={resource} />
+      </Main>
+    );
   }
 
   const ReturnComponent = selectComponent(klass!);

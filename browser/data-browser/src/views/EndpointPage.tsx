@@ -50,7 +50,7 @@ function EndpointPage({ resource }: EndpointProps): JSX.Element {
   }
 
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow>
       <h1>{title} endpoint</h1>
       {description && <Markdown text={description} />}
       <form onSubmit={constructSubject}>
