@@ -36,7 +36,7 @@ const newDriveMenuItem = '[data-test="menu-item-new-drive"]';
 const defaultDevServer = 'http://localhost:9883';
 const currentDialogOkButton = 'dialog[open] >> footer >> text=Ok';
 // Depends on server index throttle time, `commit_monitor.rs`
-const REBUILD_INDEX_TIME = 6000;
+const REBUILD_INDEX_TIME = 5000;
 
 async function setTitle(page: Page, title: string) {
   await page.locator(editableTitle).click();
@@ -355,6 +355,7 @@ test.describe('data-browser', async () => {
 
     // Set search scope to 'Cake folder'
     await page.waitForTimeout(REBUILD_INDEX_TIME);
+    await page.reload();
     await page.locator('button[title="Search in Cake Folder"]').click();
     // Search for 'Avocado'
     await page.locator('[data-test="address-bar"]').type('Avocado');
@@ -450,7 +451,7 @@ test.describe('data-browser', async () => {
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
     // multi-user
-    const currentUrl = page.url();
+    const currentUrl = await getCurrentSubject(page);
     const page2 = await openNewSubjectWindow(browser, currentUrl);
     await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     expect(await page2.title()).toEqual(title);
@@ -538,7 +539,7 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
     const teststring = `My test: ${timestamp()}`;
     await page.fill('[data-test="message-input"]', teststring);
-    const chatRoomUrl = page.url();
+    const chatRoomUrl = (await getCurrentSubject(page)) as string;
     await page.keyboard.press('Enter');
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
@@ -907,6 +908,7 @@ async function makeDrivePublic(page: Page) {
 
 async function openSubject(page: Page, subject: string) {
   await page.fill(addressBar, subject);
+  await expect(page.locator(`main[about="${subject}"]`).first()).toBeVisible();
 }
 
 async function getCurrentSubject(page: Page) {
