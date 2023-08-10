@@ -155,6 +155,7 @@ jobs:
         working-directory: ./browser/
         env:
           FRONTEND_URL: http://localhost:9883
+          LANGUAGE: 'en_GB'
         run: pnpm run test-e2e
 
       # Coverage
