@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Callback = (...args: any[]) => void;
+type Callback =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | ((...args: any[]) => void)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  | ((...args: any[]) => Promise<void>);
 
 // T is a generic type for value parameter, our case this will be string
 export function useDebounce<T>(value: T, delay: number): T {
@@ -33,31 +36,23 @@ export function useDebouncedCallback<F extends Callback>(
   time: number,
   deps: unknown[],
 ): [debouncedFunction: (...args: Parameters<F>) => void, isWaiting: boolean] {
-  const timeout = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    return () => {
-      if (timeout.current) {
-        clearTimeout(timeout.current);
-      }
-    };
-  }, []);
+  const [timeoutId, setTimeoutId] = useState<ReturnType<typeof setTimeout>>();
 
   const memoizedFunction = useCallback(
     (...args: Parameters<F>) => {
-      if (timeout.current) {
-        clearTimeout(timeout.current);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
       }
 
-      const id = setTimeout(() => {
-        func(...args);
-        timeout.current = undefined;
+      const id = setTimeout(async () => {
+        await func(...args);
+        setTimeoutId(undefined);
       }, time);
 
-      timeout.current = id;
+      setTimeoutId(id);
     },
-    [...deps, time],
+    [...deps, time, timeoutId],
   );
 
-  return [memoizedFunction, timeout.current !== undefined];
+  return [memoizedFunction, timeoutId !== undefined];
 }

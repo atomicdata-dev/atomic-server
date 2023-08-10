@@ -1,5 +1,14 @@
-import { JSONValue, Property, Resource, urls, useValue } from '@tomic/react';
+import {
+  JSONValue,
+  Property,
+  Resource,
+  urls,
+  useDebouncedCallback,
+  useStore,
+  useValue,
+} from '@tomic/react';
 import React, {
+  startTransition,
   useCallback,
   useContext,
   useEffect,
@@ -42,7 +51,7 @@ function useIsEditing(row: number, column: number) {
 
 const valueOpts = {
   commitDebounce: 0,
-  commit: true,
+  commit: false,
 };
 
 export function TableCell({
@@ -52,15 +61,23 @@ export function TableCell({
   property,
   invalidateTable,
 }: TableCell): JSX.Element {
+  const store = useStore();
+
   const [markForInvalidate, setMarkForInvalidate] = useState(false);
   const { addItemsToHistoryStack } = useContext(TablePageContext);
-
+  const [save, savePending] = useDebouncedCallback(
+    async () => {
+      await resource.save(store);
+    },
+    200,
+    [resource, store],
+  );
   const [value, setValue] = useValue(resource, property.subject, valueOpts);
 
   const [createdAt, setCreatedAt] = useValue(
     resource,
     urls.properties.commit.createdAt,
-    valueOpts,
+    { commit: false, commitDebounce: 0 },
   );
 
   const dataType = property.datatype;
@@ -76,20 +93,17 @@ export function TableCell({
   const onChange = useCallback(
     async (v: JSONValue) => {
       if (!createdAt) {
-        addItemsToHistoryStack(
-          createValueChangedHistoryItem(resource, property.subject),
-        );
-        await setValue(v);
         await setCreatedAt(Date.now());
         setMarkForInvalidate(true);
-
-        return;
       }
 
       addItemsToHistoryStack(
         createValueChangedHistoryItem(resource, property.subject),
       );
+
       await setValue(v);
+
+      save();
     },
     [setValue, setCreatedAt, createdAt, value, resource, property],
   );
@@ -102,11 +116,13 @@ export function TableCell({
   );
 
   useEffect(() => {
-    if (!isEditing && markForInvalidate) {
-      setMarkForInvalidate(false);
-      invalidateTable?.();
+    if (markForInvalidate && !isEditing && !savePending) {
+      startTransition(() => {
+        setMarkForInvalidate(false);
+        invalidateTable?.();
+      });
     }
-  }, [isEditing, markForInvalidate]);
+  }, [isEditing, markForInvalidate, savePending]);
 
   return (
     <Cell

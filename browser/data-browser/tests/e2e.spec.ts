@@ -63,27 +63,35 @@ test.describe('data-browser', async () => {
   });
 
   test('tables', async ({ page }) => {
+    const newColumn = async (type: string) => {
+      await page.getByRole('button', { name: 'Add column' }).click();
+      await page.waitForTimeout(100);
+      await page.click(`text=${type}`);
+    };
+
     const tab = async () => {
       await page.waitForTimeout(200);
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(100);
+      await page.waitForTimeout(500);
     };
 
     const createTag = async (emote: string, name: string) => {
-      await page.getByPlaceholder('New tag').fill(name);
-      await page.getByTitle('Pick an emoji').click();
+      await page.getByPlaceholder('New tag').last().fill(name);
+      await page.getByTitle('Pick an emoji').last().click();
       await page.getByPlaceholder('Search', { exact: true }).fill(emote);
       await page.getByRole('button', { name: emote }).click();
-      await page.getByTitle('Add tag').click();
+      await page.getByTitle('Add tag').last().click();
     };
 
     const pickTag = async (name: string) => {
-      await page.keyboard.type(name);
+      await page.keyboard.type(name, { delay: 100 });
       await page.keyboard.press('Enter');
       await page.keyboard.press('Escape');
+      await expect(page.getByPlaceholder('filter tags')).not.toBeVisible();
     };
 
     const fillRow = async (
+      currentRowNumber: number,
       col1: string,
       col2: string,
       col3: string,
@@ -91,9 +99,14 @@ test.describe('data-browser', async () => {
       col5: string,
     ) => {
       await page.waitForTimeout(100);
-      await page.keyboard.type(col1, { delay: 100 });
+      await page.keyboard.type(col1, { delay: 50 });
       await tab();
-      await page.keyboard.type(col2, { delay: 100 });
+      // Wait for the table to refresh by checking if the next row is visible
+      await expect(
+        page.getByRole('rowheader', { name: `${currentRowNumber + 1}` }),
+      ).toBeAttached();
+
+      await page.keyboard.type(col2, { delay: 50 });
       await tab();
       await page.keyboard.type(col3, { delay: 50 });
       await tab();
@@ -122,67 +135,49 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
 
     // Create Date column
-    await page.getByRole('button', { name: 'Add column' }).click();
-    await page.waitForTimeout(100);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+    await newColumn('Date');
     await expect(page.locator('text=New Date Column')).toBeVisible();
     await page
       .locator('[placeholder="New Column"] >> visible = true')
       .fill('Existed since');
     await page.getByLabel('Long').click();
     await page.locator('button:has-text("Create")').click();
-    await page.waitForTimeout(100);
+    await waitForCommit(page);
     await expect(page.locator('text=New Date Column')).not.toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Existed since' }),
     ).toBeVisible();
 
     // Create Number column
-    await page.getByRole('button', { name: 'Add column' }).click();
-    await page.waitForTimeout(100);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+    await newColumn('Number');
     await expect(page.locator('text=New Number Column')).toBeVisible();
     await page
       .locator('[placeholder="New Column"] >> visible = true')
       .fill('Number of tracks');
 
     await page.locator('button:has-text("Create")').click();
-    await page.waitForTimeout(100);
+    await waitForCommit(page);
     await expect(page.locator('text=New Number Column')).not.toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Number of tracks' }),
     ).toBeVisible();
 
     // Create Checkbox column
-    await page.getByRole('button', { name: 'Add column' }).click();
-    await page.waitForTimeout(100);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+    await newColumn('Checkbox');
     await expect(page.locator('text=New Checkbox Column')).toBeVisible();
     await page
       .locator('[placeholder="New Column"] >> visible = true')
       .fill('Approved by W3C');
 
     await page.locator('button:has-text("Create")').click();
-    await page.waitForTimeout(100);
+    await waitForCommit(page);
     await expect(page.locator('text=New Checkbox Column')).not.toBeVisible();
     await expect(
       page.getByRole('button', { name: 'Approved by W3C' }),
     ).toBeVisible();
 
     // Create Select column
-    await page.getByRole('button', { name: 'Add column' }).click();
-    await page.waitForTimeout(100);
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
+    await newColumn('Select');
     await expect(page.locator('text=New Select Column')).toBeVisible();
     await page
       .locator('[placeholder="New Column"] >> visible = true')
@@ -192,18 +187,33 @@ test.describe('data-browser', async () => {
     await createTag('😵‍💫', 'dreamy');
     await createTag('🤨', 'wtf');
     await page.locator('button:has-text("Create")').click();
-    await page.waitForTimeout(100);
+    await waitForCommit(page);
     await expect(page.locator('text=New Select Column')).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Descriptive words' }),
+    ).toBeVisible();
+
+    await page.reload();
+
+    // Check if table has loaded.
     await expect(
       page.getByRole('button', { name: 'Descriptive words' }),
     ).toBeVisible();
 
     // Start filling cells
     await page.getByRole('gridcell').first().click({ force: true });
-    // await page.waitForTimeout(100);
-    await fillRow('Progressive Pizza House', '04032000', '10', true, 'dreamy');
-    await fillRow('Drum or Bass', '10051980', '3000035', false, 'wild');
-    await fillRow('Mumble Punk', '10051965', '60', true, 'wtf');
+    await expect(page.getByRole('gridcell').first()).toBeFocused();
+    await page.waitForTimeout(100);
+    await fillRow(
+      1,
+      'Progressive Pizza House',
+      '04032000',
+      '10',
+      true,
+      'dreamy',
+    );
+    await fillRow(2, 'Drum or Bass', '15051980', '3000035', false, 'wild');
+    await fillRow(3, 'Mumble Punk', '13051965', '60', true, 'wtf');
 
     // Check if cells have been filled correctly
     await expect(
@@ -219,10 +229,10 @@ test.describe('data-browser', async () => {
       page.getByRole('gridcell', { name: 'March 4, 2000' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'May 10, 1980' }),
+      page.getByRole('gridcell', { name: 'May 15, 1980' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'May 10, 1965' }),
+      page.getByRole('gridcell', { name: 'May 13, 1965' }),
     ).toBeVisible();
     await expect(
       page.getByRole('gridcell', { name: '😵‍💫 dreamy' }),
@@ -332,9 +342,9 @@ test.describe('data-browser', async () => {
     // Create document called 'Avocado Salad'
     await page.locator('button:has-text("New Resource")').click();
     await page.locator('button:has-text("document")').click();
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     await editTitle('Avocado Salad', page);
 
     await page.locator(sideBarNewResource).click();
@@ -346,9 +356,9 @@ test.describe('data-browser', async () => {
     // Create document called 'Avocado Salad'
     await page.locator('button:has-text("New Resource")').click();
     await page.locator('button:has-text("document")').click();
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     await editTitle('Avocado Cake', page);
 
     await clickSidebarItem('Cake Folder', page);
@@ -435,9 +445,9 @@ test.describe('data-browser', async () => {
     // Create a document
     await newResource('document', page);
     // commit for saving initial document
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     const title = `Document ${timestamp()}`;
     await editTitle(title, page);
 
@@ -445,21 +455,21 @@ test.describe('data-browser', async () => {
 
     const teststring = `My test: ${timestamp()}`;
     await page.fill('textarea', teststring);
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
 
     // commit editing paragraph
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
     // multi-user
     const currentUrl = await getCurrentSubject(page);
-    const page2 = await openNewSubjectWindow(browser, currentUrl);
+    const page2 = await openNewSubjectWindow(browser, currentUrl!);
     await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     expect(await page2.title()).toEqual(title);
 
     // Add a new line on first page, check if it appears on the second
     await page.keyboard.press('Enter');
-    await page.waitForResponse(`${SERVER_URL}/commit`);
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
+    await waitForCommit(page);
     const syncText = 'New paragraph';
     await page.keyboard.type(syncText);
     // If this fails to show up, websockets aren't working properly
@@ -820,9 +830,9 @@ test.describe('data-browser', async () => {
     await newResource('document', page);
 
     // commit for saving initial document
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
     // commit for initializing the first element (paragraph)
-    await page.waitForResponse(`${SERVER_URL}/commit`);
+    await waitForCommit(page);
 
     await editTitle('First Title', page);
 
@@ -989,10 +999,10 @@ async function editTitle(title: string, page: Page, clear = false) {
   // These keys make sure the onChange handler is properly called
   await page.keyboard.press('Space');
   await page.keyboard.press('Backspace');
-  await page.waitForResponse(`${SERVER_URL}/commit`);
+  await waitForCommit(page);
   await page.keyboard.type(title);
   await page.keyboard.press('Escape');
-  await page.waitForResponse(`${SERVER_URL}/commit`);
+  await waitForCommit(page);
 }
 
 async function clickSidebarItem(text: string, page: Page) {
@@ -1022,3 +1032,6 @@ async function contextMenuClick(text: string, page: Page) {
     .locator(`[data-test="menu-item-${text}"] >> visible = true`)
     .click();
 }
+
+const waitForCommit = async (page: Page) =>
+  page.waitForResponse(`${SERVER_URL}/commit`);

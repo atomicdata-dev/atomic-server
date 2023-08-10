@@ -29,7 +29,7 @@ export function useCellSizes<T>(
 
       onSizesChange(sizes.map(parseSize));
     },
-    [columns, sizes],
+    [columns, sizes, onSizesChange],
   );
 
   useEffect(() => {

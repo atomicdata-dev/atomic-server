@@ -32,7 +32,7 @@ export function TableRow({
     return (
       <>
         {columns.map((column, i) => (
-          <Loader key={column.subject} delay={i * 100} />
+          <Loader key={column.subject} delay={i * 100} title='loading' />
         ))}
       </>
     );
