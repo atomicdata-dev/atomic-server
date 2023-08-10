@@ -2,6 +2,13 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
+## UNRELEASED
+
+### Atomic Browser
+
+- Show resource usage in data view.
+- Add table editor #639
+
 ## 0.35.1
 
 ### Atomic Browser
