@@ -5,6 +5,8 @@ const config: PlaywrightTestConfig = {
   use: {
     screenshot: 'only-on-failure',
     viewport: { width: 1200, height: 800 },
+    locale: 'en-GB',
+    timezoneId: 'Europe/Amsterdam',
   },
   retries: 3,
   timeout: 1000 * 120, // 2 minutes
