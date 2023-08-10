@@ -226,13 +226,13 @@ test.describe('data-browser', async () => {
       page.getByRole('gridcell', { name: 'Mumble Punk' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'March 4, 2000' }),
+      page.getByRole('gridcell', { name: '4 March 2000' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'May 15, 1980' }),
+      page.getByRole('gridcell', { name: '15 May 1980' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('gridcell', { name: 'May 13, 1965' }),
+      page.getByRole('gridcell', { name: '13 May 1965' }),
     ).toBeVisible();
     await expect(
       page.getByRole('gridcell', { name: '😵‍💫 dreamy' }),
