@@ -45,6 +45,10 @@ export function ConfirmationDialog({
     }
   }, [show]);
 
+  if (!show) {
+    return <></>;
+  }
+
   return (
     <Dialog {...dialogProps}>
       <DialogTitle>
