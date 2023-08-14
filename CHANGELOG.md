@@ -7,7 +7,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
-- Monorepo! Include `atomic-data-browser` in this repo. #216
+- Switch to monorepo. Include `atomic-data-browser` in this repo #216
+- Add Tables (edit, keyboard support, sorting, more) #638
 
 ## [v0.34.3] - 2023-06-27
 
