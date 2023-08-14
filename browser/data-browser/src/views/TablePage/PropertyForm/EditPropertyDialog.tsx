@@ -43,6 +43,10 @@ export function EditPropertyDialog({
     }
   }, [showDialog]);
 
+  const handleSaveClick = useCallback(() => {
+    hide(true);
+  }, [hide]);
+
   return (
     <FormValidationContextProvider onValidationChange={setValid}>
       <Dialog {...dialogProps}>
@@ -50,10 +54,14 @@ export function EditPropertyDialog({
           <h1>Edit Column</h1>
         </DialogTitle>
         <DialogContent>
-          <PropertyForm resource={resource} category={category} />
+          <PropertyForm
+            resource={resource}
+            category={category}
+            onSubmit={handleSaveClick}
+          />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => hide(true)} disabled={!valid}>
+          <Button onClick={handleSaveClick} disabled={!valid}>
             Save
           </Button>
         </DialogActions>

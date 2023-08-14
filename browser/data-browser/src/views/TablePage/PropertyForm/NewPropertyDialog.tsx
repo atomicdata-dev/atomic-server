@@ -134,7 +134,9 @@ export function NewPropertyDialog({
   }, [hide]);
 
   const handleCreateClick = useCallback(() => {
-    hide(true);
+    if (valid) {
+      hide(true);
+    }
   }, [hide]);
 
   useEffect(() => {
@@ -161,13 +163,14 @@ export function NewPropertyDialog({
           <PropertyForm
             resource={resource}
             category={selectedCategory as PropertyFormCategory}
+            onSubmit={handleCreateClick}
           />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelClick} subtle>
             Cancel
           </Button>
-          <Button onClick={handleCreateClick} disabled={!valid}>
+          <Button onClick={handleCreateClick} disabled={!valid} type='submit'>
             Create
           </Button>
         </DialogActions>

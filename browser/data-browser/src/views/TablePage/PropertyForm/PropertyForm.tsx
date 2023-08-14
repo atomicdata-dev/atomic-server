@@ -27,6 +27,7 @@ export type PropertyFormCategory =
   | 'relation';
 
 interface PropertyFormProps {
+  onSubmit: () => void;
   resource: Resource;
   category?: PropertyFormCategory;
 }
@@ -75,6 +76,7 @@ const categoryFormFactory = buildComponentFactory(
 
 export function PropertyForm({
   resource,
+  onSubmit,
   category,
 }: PropertyFormProps): JSX.Element {
   const [nameError, setNameError, onNameBlur] = useValidation('Required');
@@ -124,7 +126,12 @@ export function PropertyForm({
   const CategoryForm = categoryFormFactory(category);
 
   return (
-    <Form>
+    <Form
+      onSubmit={e => {
+        e.preventDefault();
+        onSubmit();
+      }}
+    >
       <div>
         <InputWrapper invalid={!!nameError}>
           <InputStyled
