@@ -23,11 +23,14 @@ _Status: alpha. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 - 🚀  **Fast** (less than 1ms median response time on my laptop), powered by [actix-web](https://github.com/actix/actix-web) and [sled](https://github.com/spacejam/sled)
 - 🪶  **Lightweight** (8MB download, no runtime dependencies)
 - 💻  **Runs everywhere** (linux, windows, mac, arm)
-- ⚛️  **Dynamic schema validation** / type checking using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html).
-- 🌐  **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
-- 🎛️  **Browser GUI included** powered by [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more.
+- 🔧  **Custom data models**: create your own classes and forms. All verified and sharable using [Atomic Schema](https://docs.atomicdata.dev/schema/intro.html)
+- 📄  **Documents**, collaborative, rich text, similar to Google Docs / Notion.
+- ⚙️ **Restful API**, with [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html) responses.
+- 🗄️  **Tables**, with strict schema validation, keyboard support, copy / paste support. Similar to Airtable.
+- 💬  **Group chat**,
 - 💾  **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
 - 🔄  **Synchronization using websockets**: communicates state changes with a client.
+- 🌐  **Embedded server** with support for HTTP / HTTPS / HTTP2.0 and Built-in LetsEncrypt handshake.
 - 🧰  **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - 🔎  **Full-text search** with fuzzy search and various operators, often <3ms responses. Powered by [tantivy](https://github.com/quickwit-inc/tantivy).
 - 📖  **Pagination, sorting and filtering** queries using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html).
