@@ -74,4 +74,8 @@ const NameButton = styled.button<NameButtonProps>`
   color: currentColor;
   cursor: pointer;
   font-weight: ${p => (p.bold ? 'bold' : 'normal')};
+  // TODO: make this dynamic, don't overflow on names, use grid flex?
+  max-width: 8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;

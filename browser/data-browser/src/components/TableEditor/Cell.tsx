@@ -18,6 +18,7 @@ export interface CellProps {
   rowIndex: number;
   columnIndex: number;
   className?: string;
+  disabled?: boolean;
   align?: CellAlign;
   role?: string;
   onClearCell?: () => void;
@@ -33,6 +34,7 @@ export function Cell({
   columnIndex,
   className,
   children,
+  disabled,
   align,
   role,
   onEnterEditModeWithCharacter = () => undefined,
@@ -65,6 +67,13 @@ export function Cell({
         e.stopPropagation();
         setCursorMode(CursorMode.MultiSelect);
         setMultiSelectCorner(rowIndex, columnIndex);
+
+        return;
+      }
+
+      // When the user clicks on the 'add' row
+      if (columnIndex === Infinity || rowIndex === Infinity) {
+        setActiveCell(undefined, undefined);
 
         return;
       }
@@ -123,6 +132,7 @@ export function Cell({
     <CellWrapper
       aria-colindex={columnIndex + 1}
       ref={ref}
+      disabled={disabled}
       role={role ?? 'gridcell'}
       className={className}
       onClick={handleClick}
@@ -176,10 +186,13 @@ const StyledIndexCell = styled(Cell)`
 export interface CellWrapperProps {
   align?: CellAlign;
   allowUserSelect?: boolean;
+  disabled?: boolean;
 }
 
 export const CellWrapper = styled.div<CellWrapperProps>`
-  background-color: ${p => p.theme.colors.bg};
+  background-color: ${p =>
+    p.disabled ? p.theme.colors.bg1 : p.theme.colors.bg};
+  cursor: ${p => (p.disabled ? 'not-allowed' : 'pointer')};
   display: flex;
   width: 100%;
   justify-content: ${p => p.align ?? 'flex-start'};

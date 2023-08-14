@@ -137,7 +137,7 @@ function FancyTableInner<T>({
             {index + 1}
           </IndexCell>
           {children({ index })}
-          <Cell rowIndex={Infinity} columnIndex={Infinity} />
+          <Cell rowIndex={Infinity} columnIndex={Infinity} disabled />
         </TableRow>
       );
     },
