@@ -50,11 +50,17 @@ function setDragStyling(id: string, enable: boolean) {
   }
 }
 
-export function useResizable<E extends HTMLElement>(
-  initialSize: number,
+export function useResizable<E extends HTMLElement>({
+  initialSize,
+  onResize,
   minSize = 0,
   maxSize = Infinity,
-): UseResizeResult<E> {
+}: {
+  initialSize: number;
+  onResize?: (size: number) => void;
+  minSize?: number;
+  maxSize?: number;
+}): UseResizeResult<E> {
   const targetRef = useRef<E>(null);
   const dragAreaRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +69,12 @@ export function useResizable<E extends HTMLElement>(
   const [size, setSize] = useState(`${initialSize}px`);
   const styleId = useId();
 
+  // Needed because mouseMove requires a stable reference
+  const onResizeRef = useRef(onResize);
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  }, [onResize]);
+
   const mouseMove = useRef((e: MouseEvent) => {
     const targetRect = targetRef.current?.getBoundingClientRect();
     const relativePosition = e.clientX - (targetRect?.x ?? 0);
@@ -70,6 +82,7 @@ export function useResizable<E extends HTMLElement>(
 
     requestAnimationFrame(() => {
       setSize(`${newSize}px`);
+      onResizeRef.current?.(newSize);
     });
   });
 

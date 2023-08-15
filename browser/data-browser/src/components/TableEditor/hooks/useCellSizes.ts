@@ -13,7 +13,8 @@ const parseSize = (size: string) => {
 };
 
 const toPixels = (sizes: number[]) => sizes.map(x => `${x}px`);
-const DEFAULT_SIZE_PX = 300;
+
+export const DEFAULT_SIZE_PX = 300;
 const DEFAULT_SIZE_STR = DEFAULT_SIZE_PX + 'px';
 
 export function useCellSizes<T>(
@@ -31,8 +32,12 @@ export function useCellSizes<T>(
   const resizeCell = useCallback(
     (index: number, size: string) => {
       setSizes(prevSizes => {
-        if (prevSizes.length < columns.length) {
-          prevSizes.push(DEFAULT_SIZE_STR);
+        if (prevSizes.length !== columns.length) {
+          console.error(
+            'prevSizes.length !== columns.length',
+            columns,
+            prevSizes,
+          );
         }
 
         const newSizes = [...prevSizes];
@@ -51,6 +56,18 @@ export function useCellSizes<T>(
       setSizes(toPixels(externalSizes));
     }
   }, [externalSizes]);
+
+  useEffect(() => {
+    const diff = columns.length - sizes.length;
+
+    if (diff > 0) {
+      setSizes([...sizes, ...Array(diff).fill(DEFAULT_SIZE_STR)]);
+    }
+
+    if (diff < 0) {
+      setSizes(sizes.slice(0, columns.length));
+    }
+  }, [columns]);
 
   const templateColumns = `${INDEX_CELL_WIDTH} ${sizes.join(
     ' ',

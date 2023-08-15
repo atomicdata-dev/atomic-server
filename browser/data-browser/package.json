@@ -75,6 +75,7 @@
     "predeploy": "build && touch build/.nojekyll",
     "preview": "vite preview",
     "start": "vite",
+    "test": "jest",
     "test-e2e": "playwright test --config=./tests/playwright.config.ts",
     "test-debug": "PWDEBUG=1 playwright test",
     "test-new": "playwright codegen http://localhost:5173",

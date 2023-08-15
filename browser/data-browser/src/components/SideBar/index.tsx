@@ -24,11 +24,11 @@ export function SideBar(): JSX.Element {
     true,
   );
 
-  const { size, targetRef, dragAreaRef, isDragging } = useResizable(
-    300,
-    200,
-    2000,
-  );
+  const { size, targetRef, dragAreaRef, isDragging } = useResizable({
+    initialSize: 300,
+    minSize: 200,
+    maxSize: 2000,
+  });
 
   const mountRefs = useCombineRefs([ref, targetRef]);
 

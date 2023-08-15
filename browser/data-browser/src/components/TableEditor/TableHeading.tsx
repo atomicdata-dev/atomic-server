@@ -5,6 +5,7 @@ import { useTableEditorContext } from './TableEditorContext';
 import { useDraggable } from '@dnd-kit/core';
 import { ReorderDropArea } from './ReorderDropArea';
 import { transparentize } from 'polished';
+import { DEFAULT_SIZE_PX } from './hooks/useCellSizes';
 
 interface TableHeadingProps {
   index: number;
@@ -30,18 +31,17 @@ export function TableHeading({
     data: { index },
   });
 
-  const { size, targetRef, dragAreaRef, isDragging } =
-    useResizable<HTMLDivElement>(200, 100);
+  const { targetRef, dragAreaRef, isDragging } = useResizable<HTMLDivElement>({
+    initialSize: DEFAULT_SIZE_PX,
+    minSize: 100,
+    onResize: size => onResize(index, `${size}px`),
+  });
 
   const { setIsDragging } = useTableEditorContext();
 
   useEffect(() => {
     setIsDragging(isDragging);
   }, [isDragging]);
-
-  useEffect(() => {
-    onResize(index, size);
-  }, [size]);
 
   const setRef = useCallback((node: HTMLDivElement) => {
     setNodeRef(node);
