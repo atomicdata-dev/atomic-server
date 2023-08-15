@@ -41,7 +41,8 @@ const REBUILD_INDEX_TIME = 5000;
 async function setTitle(page: Page, title: string) {
   await page.locator(editableTitle).click();
   await page.fill(editableTitle, title);
-  await page.waitForTimeout(300);
+  // await page.waitForTimeout(300);
+  await waitForCommit(page);
 }
 
 test.describe('data-browser', async () => {
@@ -65,14 +66,11 @@ test.describe('data-browser', async () => {
   test('tables', async ({ page }) => {
     const newColumn = async (type: string) => {
       await page.getByRole('button', { name: 'Add column' }).click();
-      await page.waitForTimeout(100);
       await page.click(`text=${type}`);
     };
 
     const tab = async () => {
-      await page.waitForTimeout(200);
       await page.keyboard.press('Tab');
-      await page.waitForTimeout(500);
     };
 
     const createTag = async (emote: string, name: string) => {
@@ -84,7 +82,7 @@ test.describe('data-browser', async () => {
     };
 
     const pickTag = async (name: string) => {
-      await page.keyboard.type(name, { delay: 100 });
+      await page.keyboard.type(name);
       await page.keyboard.press('Enter');
       await page.keyboard.press('Escape');
       await expect(page.getByPlaceholder('filter tags')).not.toBeVisible();
@@ -98,17 +96,16 @@ test.describe('data-browser', async () => {
       col4: boolean,
       col5: string,
     ) => {
-      await page.waitForTimeout(100);
-      await page.keyboard.type(col1, { delay: 50 });
+      await page.keyboard.type(col1);
       await tab();
       // Wait for the table to refresh by checking if the next row is visible
       await expect(
         page.getByRole('rowheader', { name: `${currentRowNumber + 1}` }),
       ).toBeAttached();
 
-      await page.keyboard.type(col2, { delay: 50 });
+      await page.keyboard.type(col2);
       await tab();
-      await page.keyboard.type(col3, { delay: 50 });
+      await page.keyboard.type(col3);
       await tab();
 
       if (col4) {
@@ -244,7 +241,7 @@ test.describe('data-browser', async () => {
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('ArrowUp');
     await page.keyboard.press('ArrowUp');
-    await page.keyboard.type('Progressive Peperoni Pizza House', { delay: 50 });
+    await page.keyboard.type('Progressive Peperoni Pizza House');
     await page.keyboard.press('Escape');
 
     await expect(
