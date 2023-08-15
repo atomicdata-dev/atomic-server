@@ -137,7 +137,7 @@ export function NewPropertyDialog({
     if (valid) {
       hide(true);
     }
-  }, [hide]);
+  }, [hide, valid]);
 
   useEffect(() => {
     if (showDialog) {
