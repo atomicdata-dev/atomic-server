@@ -8,6 +8,7 @@ import {
 } from '../../components/Dialog';
 import AllProps from '../../components/AllProps';
 import { useTableEditorContext } from '../../components/TableEditor/TableEditorContext';
+import { Title } from '../../components/Title';
 
 interface ExpandedRowDialogProps {
   subject: string;
@@ -36,7 +37,7 @@ export function ExpandedRowDialog({
   return (
     <Dialog {...dialogProps}>
       <DialogTitle>
-        <h1>{resource.title}</h1>
+        <Title resource={resource} link />
       </DialogTitle>
       <DialogContent>
         <AllProps editable columns resource={resource} />
