@@ -8,7 +8,7 @@ import {
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { DropdownMenu, Item } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
-import { FaEdit, FaEllipsisV, FaTimes, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaEllipsisV, FaEye, FaTimes, FaTrash } from 'react-icons/fa';
 import styled from 'styled-components';
 import { EditPropertyDialog } from './PropertyForm/EditPropertyDialog';
 import { TablePageContext } from './tablePageContext';
@@ -18,6 +18,8 @@ import {
 } from '../../components/ConfirmationDialog';
 import { ResourceInline } from '../ResourceInline';
 import { ResourceUsage } from '../../components/ResourceUsage';
+import { useNavigate } from 'react-router';
+import { constructOpenURL } from '../../helpers/navigation';
 
 interface TableHeadingMenuProps {
   resource: Resource;
@@ -40,6 +42,7 @@ export function TableHeadingMenu({
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const { tableClassResource } = useContext(TablePageContext);
+  const navigate = useNavigate();
 
   const isExternalProperty = useIsExternalProperty(resource);
 
@@ -86,6 +89,14 @@ export function TableHeadingMenu({
         onClick: () => setShowEditDialog(true),
         icon: <FaEdit />,
         disabled: !canWrite || isExternalProperty,
+      },
+      {
+        id: 'view',
+        label: 'View',
+        onClick: () => {
+          navigate(constructOpenURL(resource.getSubject()));
+        },
+        icon: <FaEye />,
       },
     ];
 
