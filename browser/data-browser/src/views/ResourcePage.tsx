@@ -28,6 +28,7 @@ import { FolderPage } from './FolderPage';
 import { ArticlePage } from './Article';
 import { TablePage } from './TablePage';
 import { Main } from '../components/Main';
+import { OntologyPage } from './OntologyPage';
 
 /** These properties are passed to every View at Page level */
 export type ResourcePageProps = {
@@ -118,6 +119,8 @@ function selectComponent(klass: string) {
       return ArticlePage;
     case urls.classes.table:
       return TablePage;
+    case urls.classes.ontology:
+      return OntologyPage;
     default:
       return ResourcePageDefault;
   }

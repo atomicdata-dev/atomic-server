@@ -24,9 +24,10 @@ export function Main({
 }
 
 const StyledMain = React.memo(styled.main<ViewTransitionProps>`
+  container-type: inline-size;
   /* Makes the contents fit the entire page */
-  height: calc(
+  /* height: calc(
     100% - (${p => p.theme.heights.breadCrumbBar} + ${PARENT_PADDING_BLOCK} * 2)
-  );
+  ); */
   ${p => transitionName('resource-page', p.subject)}
 `);

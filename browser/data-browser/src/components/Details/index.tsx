@@ -6,7 +6,7 @@ import { Collapse } from '../Collapse';
 export interface DetailsProps {
   open?: boolean;
   initialState?: boolean;
-  title: React.ReactElement;
+  title: React.ReactElement | string;
   disabled?: boolean;
   /** Event that fires when a user opens or closes the details */
   onStateToggle?: (state: boolean) => void;
@@ -101,8 +101,8 @@ const IconButton = styled.button<IconButtonProps>`
   background-color: transparent;
   border: none;
   border-radius: 50%;
-  :hover,
-  :focus {
+  &:hover,
+  &:focus {
     background-color: ${p => p.theme.colors.bg1};
   }
 `;

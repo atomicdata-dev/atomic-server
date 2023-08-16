@@ -81,6 +81,10 @@ const MarkdownWrapper = styled.div<MarkdownWrapperProps>`
     margin-bottom: 1.5rem;
   }
 
+  p:only-child {
+    margin-bottom: 0;
+  }
+
   blockquote {
     margin-inline-start: 0rem;
     padding-inline-start: 1rem;
