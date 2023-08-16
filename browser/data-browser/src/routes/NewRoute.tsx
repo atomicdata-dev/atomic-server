@@ -48,13 +48,11 @@ function NewResourceSelector() {
   const navigate = useNavigate();
 
   const buttons = [
+    urls.classes.table,
     urls.classes.folder,
     urls.classes.document,
-    urls.classes.table,
     urls.classes.chatRoom,
     urls.classes.bookmark,
-    urls.classes.class,
-    urls.classes.property,
   ];
 
   function handleClassSet(e) {
@@ -91,14 +89,6 @@ function NewResourceSelector() {
             </>
           )}
         </h1>
-        <div>
-          <ResourceSelector
-            setSubject={setClassInputValue}
-            value={classInputValue}
-            error={error}
-            classType={urls.classes.class}
-          />
-        </div>
         <Row wrapItems>
           {classInputValue && (
             <Button onClick={handleClassSet}>new {className}</Button>
@@ -115,6 +105,14 @@ function NewResourceSelector() {
             </>
           )}
         </Row>
+        <div>
+          <ResourceSelector
+            setSubject={setClassInputValue}
+            value={classInputValue}
+            error={error}
+            classType={urls.classes.class}
+          />
+        </div>
         <FileDropzoneInput
           parentResource={parentResource}
           onFilesUploaded={onUploadComplete}

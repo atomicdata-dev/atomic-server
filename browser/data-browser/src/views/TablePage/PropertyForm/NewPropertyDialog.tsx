@@ -101,7 +101,8 @@ export function NewPropertyDialog({
 
     tableClassResource.pushPropVal(
       urls.properties.recommends,
-      resource.getSubject(),
+      [resource.getSubject()],
+      true,
     );
 
     await tableClassResource.save(store);

@@ -9,7 +9,7 @@ const config: PlaywrightTestConfig = {
     timezoneId: 'Europe/Amsterdam',
   },
   retries: 3,
-  timeout: 1000 * 120, // 2 minutes
+  // timeout: 1000 * 120, // 2 minutes
   projects: [
     {
       name: 'chromium',

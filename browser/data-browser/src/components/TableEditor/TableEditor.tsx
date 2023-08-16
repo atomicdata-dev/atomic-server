@@ -42,7 +42,7 @@ interface FancyTableProps<T> {
   children: (props: { index: number }) => JSX.Element;
   rowHeight?: number;
   columnToKey: (column: T) => string;
-  lablledBy: string;
+  labelledBy: string;
   onUndoCommand?: () => void;
   onClearRow?: (index: number) => void;
   onClearCells?: (cells: CellIndex<T>[]) => void;
@@ -81,7 +81,7 @@ function FancyTableInner<T>({
   rowHeight,
   columnSizes,
   columnToKey,
-  lablledBy,
+  labelledBy,
   onCellResize = () => undefined,
   onClearCells,
   onClearRow,
@@ -175,7 +175,7 @@ function FancyTableInner<T>({
         <p>{ARIA_TABLE_USAGE}</p>
       </VisuallyHidden>
       <Table
-        aria-labelledby={lablledBy}
+        aria-labelledby={labelledBy}
         aria-rowcount={itemCount}
         aria-colcount={columns.length + 2}
         aria-describedby={ariaUsageId}

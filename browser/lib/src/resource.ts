@@ -360,8 +360,20 @@ export class Resource {
   }
 
   /** Appends a Resource to a ResourceArray */
-  public pushPropVal(propUrl: string, ...values: JSONArray): void {
+  public pushPropVal(
+    propUrl: string,
+    values: JSONArray,
+    unique?: boolean,
+  ): void {
     const propVal = (this.get(propUrl) as JSONArray) ?? [];
+
+    if (unique) {
+      values = values
+        .filter(value => !propVal.includes(value))
+        .filter(value => !this.commitBuilder.push[propUrl]?.includes(value))
+        .filter((value, index, self) => self.indexOf(value) === index);
+    }
+
     this.commitBuilder.addPushAction(propUrl, ...values);
     // Build a new array so that the reference changes. This is needed in most UI frameworks.
     this.propvals.set(propUrl, [...propVal, ...values]);
@@ -433,7 +445,8 @@ export class Resource {
     const endpoint = new URL(this.getSubject()).origin + `/commit`;
 
     try {
-      // If a commit is already being posted we wait for it to finish because the server can not garantee the commits will be processed in the correct order.
+      // If a commit is already being posted we wait for it to finish
+      // because the server can not guarantee the commits will be processed in the correct order.
       if (this.queuedFetch) {
         await this.queuedFetch;
       }

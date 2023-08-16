@@ -32,6 +32,7 @@ export interface TableHeaderProps<T> {
   headerRef: React.Ref<HTMLDivElement>;
 }
 
+/** The entire first row of an Editable Table. */
 export function TableHeader<T>({
   columns,
   onResize,

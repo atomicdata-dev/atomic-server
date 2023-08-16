@@ -14,6 +14,7 @@ interface TableHeadingProps {
   isReordering: boolean;
 }
 
+/** A single column header, mostly used to render Properties */
 export function TableHeading({
   children,
   dragKey,

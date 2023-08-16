@@ -77,10 +77,9 @@ export function useDefaultNewInstanceHandler(klass: string, parent?: string) {
           );
 
           const agentResource = await store.getResourceAsync(agent.subject);
-          agentResource.pushPropVal(
-            properties.drives,
+          agentResource.pushPropVal(properties.drives, [
             newResource.getSubject(),
-          );
+          ]);
           agentResource.save(store);
           setDrive(newResource.getSubject());
           break;

@@ -131,7 +131,7 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
           columnSizes={columnSizes}
           itemCount={collection.totalMembers + 1}
           columnToKey={columnToKey}
-          lablledBy={titleId}
+          labelledBy={titleId}
           onClearRow={handleDeleteRow}
           onCellResize={handleColumnResize}
           onClearCells={handleClearCells}

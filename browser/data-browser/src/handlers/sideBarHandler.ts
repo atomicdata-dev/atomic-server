@@ -18,10 +18,9 @@ export function buildSideBarNewResourceHandler(store: Store) {
       return;
     }
 
-    await parent.pushPropVal(
-      urls.properties.subResources,
+    await parent.pushPropVal(urls.properties.subResources, [
       resource.getSubject(),
-    );
+    ]);
 
     await parent.save(store);
   };
