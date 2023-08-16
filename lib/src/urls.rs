@@ -19,6 +19,7 @@ pub const MESSAGE: &str = "https://atomicdata.dev/classes/Message";
 pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
 pub const ERROR: &str = "https://atomicdata.dev/classes/Error";
 pub const BOOKMARK: &str = "https://atomicdata.dev/class/Bookmark";
+pub const ONTOLOGY: &str = "https://atomicdata.dev/class/ontology";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -115,6 +116,9 @@ pub const IMPORTER_PARENT: &str = "https://atomicdata.dev/properties/importer/pa
 pub const IMPORTER_OVERWRITE_OUTSIDE: &str =
     "https://atomicdata.dev/properties/importer/overwrite-outside";
 pub const LOCAL_ID: &str = "https://atomicdata.dev/properties/localId";
+pub const PROPERTIES: &str = "https://atomicdata.dev/properties/properties";
+pub const CLASSES: &str = "https://atomicdata.dev/properties/classes";
+pub const INSTANCES: &str = "https://atomicdata.dev/properties/instances";
 
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
