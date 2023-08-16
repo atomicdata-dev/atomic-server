@@ -155,7 +155,7 @@ const LinkWrapper = styled.span`
 `;
 
 const TableRow = styled.tr`
-  :nth-child(odd) {
+  &:nth-child(odd) {
     td {
       background-color: ${p => p.theme.colors.bg1};
     }
