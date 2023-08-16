@@ -1,5 +1,4 @@
-import { styled, css } from 'styled-components';
-import { wrapWithCQ } from '../../components/CQWrapper';
+import { styled } from 'styled-components';
 import React from 'react';
 import { Button } from '../../components/Button';
 import { WSIndicator } from './WSIndicator';
@@ -15,7 +14,9 @@ export interface DriveRowProps {
 export function DriveRow({ subject, onClick, disabled }: DriveRowProps) {
   return (
     <DriveRowWrapper>
-      <Title subject={subject} />
+      <TitleWrapper>
+        <ResourceInline subject={subject} />
+      </TitleWrapper>
       <Subject>{subject}</Subject>
       <SelectButton onClick={() => onClick(subject)} disabled={disabled}>
         Select
@@ -26,24 +27,22 @@ export function DriveRow({ subject, onClick, disabled }: DriveRowProps) {
   );
 }
 
-const DriveRowWrapper = wrapWithCQ<object, 'div'>(
-  styled.div`
-    --title-font-weight: 500;
-    display: grid;
-    grid-template-areas: 'title ws subject button icon';
-    grid-template-columns: 20ch 1.3rem auto 10ch 1.3rem;
-    gap: ${p => p.theme.margin}rem;
-    align-items: center;
-    padding-block: 0.3rem;
-  `,
-  'max-width: 500px',
-  css`
+const DriveRowWrapper = styled.div`
+  --title-font-weight: 500;
+  display: grid;
+  grid-template-areas: 'title ws subject button icon';
+  grid-template-columns: 20ch 1.3rem auto 10ch 1.3rem;
+  gap: ${p => p.theme.margin}rem;
+  align-items: center;
+  padding-block: 0.3rem;
+
+  @container (max-width: 500px) {
     grid-template-areas: 'ws title icon' 'subject subject subject' 'button button button';
     grid-template-columns: 1.3rem auto 1rem;
     padding-block: 1rem;
     --title-font-weight: bold;
-  `,
-);
+  }
+`;
 
 const StyledFavoriteButton = styled(FavoriteButton)`
   grid-area: icon;
@@ -68,7 +67,7 @@ const StyledWSIndicator = styled(WSIndicator)`
   grid-area: ws;
 `;
 
-const Title = styled(ResourceInline)`
+const TitleWrapper = styled.div`
   grid-area: title;
   overflow: hidden;
   white-space: nowrap;

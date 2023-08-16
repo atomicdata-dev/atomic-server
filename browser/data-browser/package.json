@@ -37,6 +37,7 @@
     "react-window": "^1.8.7",
     "remark-gfm": "^3.0.1",
     "styled-components": "^6.0.7",
+    "stylis": "4.3.0",
     "yamde": "^1.7.1"
   },
   "devDependencies": {
