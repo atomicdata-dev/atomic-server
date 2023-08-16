@@ -37,6 +37,7 @@ export const classes = {
   },
   table: 'https://atomicdata.dev/classes/Table',
   tag: 'https://atomicdata.dev/classes/Tag',
+  ontology: 'https://atomicdata.dev/class/ontology',
 };
 
 /** List of commonly used Atomic Data Properties. */
@@ -143,6 +144,9 @@ export const properties = {
   },
   color: 'https://atomicdata.dev/properties/color',
   emoji: 'https://atomicdata.dev/properties/emoji',
+  classes: 'https://atomicdata.dev/properties/classes',
+  properties: 'https://atomicdata.dev/properties/properties',
+  instances: 'https://atomicdata.dev/properties/instances',
 };
 
 export const datatypes = {

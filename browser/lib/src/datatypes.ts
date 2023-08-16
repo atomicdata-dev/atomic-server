@@ -187,3 +187,17 @@ export function isString(val: JSONValue): val is string {
 export function isNumber(val: JSONValue): val is number {
   return typeof val === 'number';
 }
+
+export const reverseDatatypeMapping = {
+  [Datatype.ATOMIC_URL]: 'Resource',
+  [Datatype.BOOLEAN]: 'Boolean',
+  [Datatype.DATE]: 'Date',
+  [Datatype.FLOAT]: 'Float',
+  [Datatype.INTEGER]: 'Integer',
+  [Datatype.MARKDOWN]: 'Markdown',
+  [Datatype.RESOURCEARRAY]: 'ResourceArray',
+  [Datatype.SLUG]: 'Slug',
+  [Datatype.STRING]: 'String',
+  [Datatype.TIMESTAMP]: 'Timestamp',
+  [Datatype.UNKNOWN]: 'Unknown',
+};
