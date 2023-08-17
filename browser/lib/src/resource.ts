@@ -75,7 +75,14 @@ export class Resource {
       this.subject) as string;
   }
 
+  /** Checks if the content of two Resource instances is equal
+   * Warning: does not check CommitBuilder, loading state
+   */
   public static compare(resourceA: Resource, resourceB: Resource): boolean {
+    if (resourceA.error !== resourceB.error) {
+      return false;
+    }
+
     return (
       resourceA.getSubject() === resourceB.getSubject() &&
       JSON.stringify(Array.from(resourceA.propvals.entries())) ===
