@@ -462,6 +462,8 @@ export class Resource {
       // https://github.com/atomicdata-dev/atomic-data-rust/issues/486
       store.subscribeWebSocket(this.subject);
 
+      // Let all subscribers know that the commit has been applied
+      store.notify(this);
       store.notifyResourceSaved(this);
 
       return createdCommit.id as string;

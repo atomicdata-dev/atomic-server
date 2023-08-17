@@ -33,6 +33,7 @@ export interface StoreOpts {
   agent?: Agent;
 }
 
+/** These Events trigger certain Handlers */
 export enum StoreEvents {
   /**
    * Whenever `Resource.save()` is called, so only when the user of this library
@@ -455,7 +456,9 @@ export class Store {
     return !window?.navigator?.onLine;
   }
 
-  /** Let's subscribers know that a resource has been changed. Time to update your views! */
+  /** Let's subscribers know that a resource has been changed. Time to update your views!
+   * Note that when using this in React, we need the Resource to be Cloned in order to update.
+   */
   public async notify(resource: Resource): Promise<void> {
     const subject = resource.getSubject();
     const callbacks = this.subscribers.get(subject);

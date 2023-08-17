@@ -45,7 +45,6 @@
     "@types/react-pdf": "^6.2.0",
     "@types/react-router-dom": "^5.0.0",
     "@types/react-window": "^1.8.5",
-    "@types/styled-components": "^5.1.26",
     "babel-plugin-styled-components": "^2.1.4",
     "csstype": "^3.1.0",
     "gh-pages": "^3.1.0",

@@ -98,8 +98,6 @@ test.describe('tables', async () => {
     await expect(
       page.getByRole('button', { name: 'Existed since' }),
     ).toBeVisible();
-    // This and next reloads are monkey patches because of a bug in pushPropval
-    await page.reload();
 
     // Create Number column
     await newColumn('Number');
@@ -114,7 +112,6 @@ test.describe('tables', async () => {
     await expect(
       page.getByRole('button', { name: 'Number of tracks' }),
     ).toBeVisible();
-    await page.reload();
 
     // Create Checkbox column
     await newColumn('Checkbox');
@@ -129,7 +126,6 @@ test.describe('tables', async () => {
     await expect(
       page.getByRole('button', { name: 'Approved by W3C' }),
     ).toBeVisible();
-    await page.reload();
 
     // Create Select column
     await newColumn('Select');
@@ -147,9 +143,13 @@ test.describe('tables', async () => {
     await expect(
       page.getByRole('button', { name: 'Descriptive words' }),
     ).toBeVisible();
-    await page.reload();
 
     // Check if table has loaded.
+    await expect(
+      page.getByRole('button', { name: 'Descriptive words' }),
+    ).toBeVisible();
+
+    await page.reload();
     await expect(
       page.getByRole('button', { name: 'Descriptive words' }),
     ).toBeVisible();
