@@ -264,6 +264,30 @@ test.describe('data-browser', async () => {
     await expect(page.locator(':text-is("Full-service")')).toBeVisible();
   });
 
+  test('quick edit text typing ux', async ({ page }) => {
+    await signIn(page);
+    await newDrive(page);
+    await newResource('folder', page);
+    await waitForCommit(page);
+
+    await page.locator(editableTitle).click();
+    // loop over all letters in alphabet
+
+    const alphabet = 'abcdefghijklmnopqrstuvwxyz';
+
+    for (const letter of alphabet) {
+      await page.type(editableTitle, letter, { delay: Math.random() * 200 });
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(
+      page.locator(`text=${alphabet}`).first(),
+      'String not correct, bad typing UX. Maybe resources are saved twice?',
+    ).toBeVisible();
+    await page.reload();
+    await expect(page.locator(`text=${alphabet}`).first()).toBeVisible();
+  });
+
   test('folder', async ({ page }) => {
     await signIn(page);
     await newDrive(page);

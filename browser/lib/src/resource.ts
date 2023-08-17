@@ -452,6 +452,8 @@ export class Resource {
     const endpoint = new URL(this.getSubject()).origin + `/commit`;
 
     try {
+      store.notify(this);
+
       // If a commit is already being posted we wait for it to finish
       // because the server can not guarantee the commits will be processed in the correct order.
       if (this.queuedFetch) {
@@ -470,7 +472,6 @@ export class Resource {
       store.subscribeWebSocket(this.subject);
 
       // Let all subscribers know that the commit has been applied
-      store.notify(this);
       store.notifyResourceSaved(this);
 
       return createdCommit.id as string;
