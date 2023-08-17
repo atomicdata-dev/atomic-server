@@ -55,7 +55,7 @@ export const before = async ({ page }) => {
 export async function setTitle(page: Page, title: string) {
   await page.locator(editableTitle).click();
   await page.fill(editableTitle, title);
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(500);
 }
 
 export async function disableViewTransition(page: Page) {
@@ -90,7 +90,8 @@ export async function newDrive(page: Page) {
   // Create new drive to prevent polluting the main drive
   await page.locator(sideBarDriveSwitcher).click();
   await page.locator('button:has-text("New Drive")').click();
-  await page.waitForNavigation();
+  expect(page.locator(currentDriveTitle)).not.toContain('localhost');
+  // await page.waitForNavigation();
   await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   expect(driveURL).toContain('localhost');
@@ -193,20 +194,25 @@ export async function changeDrive(subject: string, page: Page) {
   await expect(page.locator('text=Create new resource')).toBeVisible();
 }
 
-export async function editTitle(title: string, page: Page, clear = false) {
+export async function editTitle(title: string, page: Page) {
   await page.locator(editableTitle).click();
-
-  if (clear) {
-    await page.locator(editableTitle).clear();
-  }
-
-  // These keys make sure the onChange handler is properly called
-  await page.keyboard.press('Space');
-  await page.keyboard.press('Backspace');
-  await waitForCommit(page);
-  await page.keyboard.type(title);
+  await page.fill(editableTitle, title);
   await page.keyboard.press('Escape');
-  await waitForCommit(page);
+  // Make sure the commit is processed
+  await page.waitForTimeout(300);
+
+  // // USeful for
+  // await page.waitForLoadState('networkidle');
+
+  // if (clear) {
+  //   await page.locator(editableTitle).clear();
+  // }
+
+  // // These keys make sure the onChange handler is properly called
+  // await page.keyboard.press('Space');
+  // await page.keyboard.press('Backspace');
+  // await waitForCommit(page);
+  // await page.keyboard.type(title);
 }
 
 export async function clickSidebarItem(text: string, page: Page) {

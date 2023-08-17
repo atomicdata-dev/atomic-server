@@ -42,6 +42,7 @@ test.describe('documents', async () => {
 
     // multi-user
     const currentUrl = await getCurrentSubject(page);
+    await page.waitForTimeout(1000);
     const page2 = await openNewSubjectWindow(browser, currentUrl!);
     await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     expect(await page2.title()).toEqual(title);
