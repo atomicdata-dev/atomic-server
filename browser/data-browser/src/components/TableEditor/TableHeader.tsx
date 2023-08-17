@@ -130,7 +130,7 @@ const StyledTableRow = styled(TableRow)`
 
 const StyledDragOverlay = styled(DragOverlay)`
   box-shadow: ${p => p.theme.boxShadowSoft};
-  background-color: ${p => p.theme.colors.bg1};
+  background-color: ${p => p.theme.colors.bg};
   display: flex;
   align-items: center;
   border-radius: ${p => p.theme.radius};

@@ -78,8 +78,8 @@ export const TableHeadingWrapper = styled.div<TableHeadingWrapperProps>`
   position: relative;
   background-color: ${p =>
     p.reordering
-      ? transparentize(0.5, p.theme.colors.bg1)
-      : p.theme.colors.bg1};
+      ? transparentize(0.5, p.theme.colors.bg)
+      : p.theme.colors.bgBody};
   display: flex;
   width: 100%;
   align-items: center;

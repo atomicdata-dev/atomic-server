@@ -99,7 +99,7 @@ const SideBarStyled = styled('nav').attrs<SideBarStyledProps>(p => ({
   height: 100vh;
   width: var(--width);
   position: ${p => (p.locked ? 'relative' : 'absolute')};
-  border-right: ${p => (p.locked ? 'none' : `1px solid ${p.theme.colors.bg2}`)};
+  border-right: ${p => `1px solid ${p.theme.colors.bg2}`};
   box-shadow: ${p => (p.locked ? 'none' : p.theme.boxShadowSoft)};
   display: flex;
   flex-direction: column;
