@@ -2,6 +2,7 @@ import { Resource } from '@tomic/react';
 import React from 'react';
 import styled, { css } from 'styled-components';
 import PropVal from './PropVal';
+import { ResourceSelector } from './forms/ResourceSelector';
 
 type Props = {
   resource: Resource;
@@ -19,22 +20,28 @@ type Props = {
 
 /** Lists all PropVals for some resource. Optionally ignores a bunch of subjects */
 function AllProps({ resource, except = [], editable, columns, basic }: Props) {
+  const propvals = [...resource.getPropVals()].filter(
+    ([prop]) => !except.includes(prop),
+  );
+
+  if (!propvals || propvals.length === 0) {
+    return null;
+  }
+
   return (
     <AllPropsWrapper basic={basic}>
-      {[...resource.getPropVals()]
-        .filter(([prop]) => !except.includes(prop))
-        .map(
-          ([prop]): JSX.Element => (
-            <StyledPropVal
-              columns={columns}
-              key={prop}
-              basic={basic}
-              propertyURL={prop}
-              resource={resource}
-              editable={!!editable}
-            />
-          ),
-        )}
+      {propvals.map(
+        ([prop]): JSX.Element => (
+          <StyledPropVal
+            columns={columns}
+            key={prop}
+            basic={basic}
+            propertyURL={prop}
+            resource={resource}
+            editable={!!editable}
+          />
+        ),
+      )}
     </AllPropsWrapper>
   );
 }
@@ -42,7 +49,6 @@ function AllProps({ resource, except = [], editable, columns, basic }: Props) {
 const AllPropsWrapper = styled.div<{ basic: boolean | undefined }>`
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   border-radius: ${p => p.theme.radius};
   background-color: ${p => (p.basic ? 'transparent' : p.theme.colors.bg)};
   border: ${p => (p.basic ? 'none' : `1px solid ${p.theme.colors.bg2}`)};
@@ -53,12 +59,12 @@ const StyledPropVal = styled(PropVal)<{ basic: boolean | undefined }>`
     !p.basic &&
     css`
       padding: 0.5rem;
+      border-top: solid 1px ${p.theme.colors.bg1};
+
       &:nth-child(1) {
         border-top-left-radius: ${p.theme.radius};
+        border-top: none;
         border-top-right-radius: ${p.theme.radius};
-      }
-      &:nth-child(odd) {
-        background-color: ${p.theme.colors.bgBody};
       }
     `}
 `;

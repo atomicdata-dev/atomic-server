@@ -14,6 +14,7 @@ import { TableRow } from './TableRow';
 import { TableHeader, TableHeadingComponent } from './TableHeader';
 import { useCellSizes } from './hooks/useCellSizes';
 import {
+  CursorMode,
   TableEditorContextProvider,
   useTableEditorContext,
 } from './TableEditorContext';
@@ -31,6 +32,7 @@ import { useClearCommands } from './hooks/useClearCommands';
 import { usePasteCommand } from './hooks/usePasteCommand';
 import { DndWrapper } from './DndWrapper';
 import { VisuallyHidden } from '../VisuallyHidden';
+import { useClickAwayListener } from '../../hooks/useClickAwayListener';
 
 const ARIA_TABLE_USAGE =
   'Use the arrow keys to navigate the table. Press enter to edit a cell. Press escape to exit edit mode.';
@@ -97,7 +99,7 @@ function FancyTableInner<T>({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  const { listRef, tableRef } = useTableEditorContext();
+  const { listRef, tableRef, setCursorMode } = useTableEditorContext();
 
   const [onScroll, setOnScroll] = useState<OnScroll>(() => undefined);
 
@@ -106,6 +108,12 @@ function FancyTableInner<T>({
     columns,
     onCellResize,
   );
+
+  const handleClickOutside = useCallback(() => {
+    setCursorMode(CursorMode.Visual);
+  }, []);
+
+  useClickAwayListener([tableRef], handleClickOutside, true);
 
   const triggerCopyCommand = useCopyCommand(columns, onCopyCommand);
   const triggerPasteCommand = usePasteCommand(columns, onPasteCommand);
