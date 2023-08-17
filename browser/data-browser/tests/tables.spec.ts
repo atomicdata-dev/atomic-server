@@ -45,6 +45,8 @@ test.describe('tables', async () => {
     ) => {
       const rowIndex = currentRowNumber + 1;
       await page.keyboard.type(col1);
+      // Flay newline
+      await page.waitForTimeout(300);
       await tab();
       // Wait for the table to refresh by checking if the next row is visible
       await expect(
@@ -149,6 +151,7 @@ test.describe('tables', async () => {
       page.getByRole('button', { name: 'Descriptive words' }),
     ).toBeVisible();
 
+    await page.waitForLoadState('networkidle');
     await page.reload();
     await expect(
       page.getByRole('button', { name: 'Descriptive words' }),

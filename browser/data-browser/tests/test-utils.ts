@@ -90,15 +90,13 @@ export async function newDrive(page: Page) {
   // Create new drive to prevent polluting the main drive
   await page.locator(sideBarDriveSwitcher).click();
   await page.locator('button:has-text("New Drive")').click();
-  expect(page.locator(currentDriveTitle)).not.toContain('localhost');
+  expect(page.locator(`${currentDriveTitle} > localhost`)).not.toBeVisible();
   // await page.waitForNavigation();
   await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   expect(driveURL).toContain('localhost');
   const driveTitle = `testdrive-${timestamp()}`;
-  await page.locator(editableTitle).click();
-  await page.fill(editableTitle, driveTitle);
-  await page.waitForTimeout(200);
+  await editTitle(driveTitle, page);
 
   return { driveURL: driveURL as string, driveTitle };
 }
@@ -178,6 +176,7 @@ export async function openNewSubjectWindow(browser: Browser, url: string) {
 export async function openConfigureDrive(page: Page) {
   // Make sure the drive switched dropdown is not open
   if (await page.locator(newDriveMenuItem).isVisible()) {
+    await page.click(sideBarDriveSwitcher);
     await page.waitForTimeout(100);
   }
 

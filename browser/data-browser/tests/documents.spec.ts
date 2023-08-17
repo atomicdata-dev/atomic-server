@@ -24,10 +24,6 @@ test.describe('documents', async () => {
     await makeDrivePublic(page);
     // Create a document
     await newResource('document', page);
-    // commit for saving initial document
-    await waitForCommit(page);
-    // commit for initializing the first element (paragraph)
-    await waitForCommit(page);
     const title = `Document ${timestamp()}`;
     await editTitle(title, page);
 
@@ -35,22 +31,19 @@ test.describe('documents', async () => {
 
     const teststring = `My test: ${timestamp()}`;
     await page.fill('textarea', teststring);
-    await waitForCommit(page);
 
     // commit editing paragraph
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
     // multi-user
-    const currentUrl = await getCurrentSubject(page);
+    const currentSubject = await getCurrentSubject(page);
     await page.waitForTimeout(1000);
-    const page2 = await openNewSubjectWindow(browser, currentUrl!);
+    const page2 = await openNewSubjectWindow(browser, currentSubject!);
     await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     expect(await page2.title()).toEqual(title);
 
     // Add a new line on first page, check if it appears on the second
     await page.keyboard.press('Enter');
-    await waitForCommit(page);
-    await waitForCommit(page);
     const syncText = 'New paragraph';
     await page.keyboard.type(syncText);
     // If this fails to show up, websockets aren't working properly
