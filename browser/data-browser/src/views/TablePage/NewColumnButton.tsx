@@ -1,4 +1,4 @@
-import { Datatype } from '@tomic/react';
+import { Datatype, useResource } from '@tomic/react';
 import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { FaChevronCircleDown, FaFile, FaHashtag, FaPlus } from 'react-icons/fa';
 import { DIVIDER, DropdownMenu, Item } from '../../components/Dropdown';
@@ -23,7 +23,8 @@ export function NewColumnButton(): JSX.Element {
   const [showExternalDialog, setShowExternalDialog] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>();
 
-  const { tableClassResource } = useContext(TablePageContext);
+  const { tableClassSubject } = useContext(TablePageContext);
+  const tableClassResource = useResource(tableClassSubject);
 
   const openDialog = useCallback(
     (category: string) => () => {

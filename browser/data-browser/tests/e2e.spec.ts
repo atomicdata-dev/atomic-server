@@ -283,10 +283,13 @@ test.describe('data-browser', async () => {
     await page.waitForLoadState('networkidle');
     await expect(
       page.locator(`text=${alphabet}`).first(),
-      'String not correct, bad typing UX. Maybe resources are saved twice?',
+      'String not correct, bad typing UX. Maybe views are notified of changes twice?',
     ).toBeVisible();
     await page.reload();
-    await expect(page.locator(`text=${alphabet}`).first()).toBeVisible();
+    await expect(
+      page.locator(`text=${alphabet}`).first(),
+      'Text not visible after reload',
+    ).toBeVisible();
   });
 
   test('folder', async ({ page }) => {

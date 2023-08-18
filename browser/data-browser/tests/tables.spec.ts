@@ -35,16 +35,10 @@ test.describe('tables', async () => {
       await expect(page.getByPlaceholder('filter tags')).not.toBeVisible();
     };
 
-    const fillRow = async (
-      currentRowNumber: number,
-      col1: string,
-      col2: string,
-      col3: string,
-      col4: boolean,
-      col5: string,
-    ) => {
+    const fillRow = async (currentRowNumber: number, row) => {
+      const { name, date, number, checkbox, select } = row;
       const rowIndex = currentRowNumber + 1;
-      await page.keyboard.type(col1);
+      await page.keyboard.type(name);
       // Flay newline
       await page.waitForTimeout(300);
       await tab();
@@ -53,12 +47,12 @@ test.describe('tables', async () => {
         page.getByRole('rowheader', { name: `${rowIndex}` }),
       ).toBeAttached();
 
-      await page.keyboard.type(col2);
+      await page.keyboard.type(date);
       await tab();
-      await page.keyboard.type(col3);
+      await page.keyboard.type(number);
       await tab();
 
-      if (col4) {
+      if (checkbox) {
         await page.keyboard.press('Space');
 
         // Check if checked
@@ -69,8 +63,12 @@ test.describe('tables', async () => {
       }
 
       await tab();
-      await pickTag(col5);
+      await pickTag(select);
       await tab();
+      await expect(
+        page.getByRole('gridcell', { name: row.name }),
+        `${row.name} row not visible`,
+      ).toBeVisible();
     };
 
     // --- Test Start ---
@@ -81,60 +79,62 @@ test.describe('tables', async () => {
     await newResource('table', page);
 
     // Name table
-    await page.getByPlaceholder('New Table').fill('Made up music genres');
+    const tableName = 'Made up music genres';
+    await page.getByPlaceholder('New Table').fill(tableName);
     await page.locator('button:has-text("Create")').click();
-    await expect(
-      page.locator('h1:has-text("Made up music genres")'),
-    ).toBeVisible();
+    await expect(page.locator(`h1:has-text("${tableName}")`)).toBeVisible();
 
     // Create Date column
     await newColumn('Date');
     await expect(page.locator('text=New Date Column')).toBeVisible();
+    const dateColumnName = 'Existed since';
     await page
       .locator('[placeholder="New Column"] >> visible = true')
-      .fill('Existed since');
+      .fill(dateColumnName);
     await page.getByLabel('Long').click();
     await page.locator('button:has-text("Create")').click();
     await waitForCommit(page);
     await expect(page.locator('text=New Date Column')).not.toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Existed since' }),
+      page.getByRole('button', { name: dateColumnName }),
     ).toBeVisible();
 
     // Create Number column
     await newColumn('Number');
+    const numberColumnName = 'Number of tracks';
     await expect(page.locator('text=New Number Column')).toBeVisible();
     await page
       .locator('[placeholder="New Column"] >> visible = true')
-      .fill('Number of tracks');
+      .fill(numberColumnName);
 
     await page.locator('button:has-text("Create")').click();
     await waitForCommit(page);
     await expect(page.locator('text=New Number Column')).not.toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Number of tracks' }),
+      page.getByRole('button', { name: numberColumnName }),
     ).toBeVisible();
 
     // Create Checkbox column
     await newColumn('Checkbox');
     await expect(page.locator('text=New Checkbox Column')).toBeVisible();
+    const checkboxColumnName = 'Approved by W3C';
     await page
       .locator('[placeholder="New Column"] >> visible = true')
-      .fill('Approved by W3C');
-
+      .fill(checkboxColumnName);
     await page.locator('button:has-text("Create")').click();
     await waitForCommit(page);
     await expect(page.locator('text=New Checkbox Column')).not.toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Approved by W3C' }),
+      page.getByRole('button', { name: checkboxColumnName }),
     ).toBeVisible();
 
     // Create Select column
     await newColumn('Select');
+    const selectColumnName = 'Descriptive words';
     await expect(page.locator('text=New Select Column')).toBeVisible();
     await page
       .locator('[placeholder="New Column"] >> visible = true')
-      .fill('Descriptive words');
+      .fill(selectColumnName);
 
     await createTag('😤', 'wild');
     await createTag('😵‍💫', 'dreamy');
@@ -143,39 +143,52 @@ test.describe('tables', async () => {
     await waitForCommit(page);
     await expect(page.locator('text=New Select Column')).not.toBeVisible();
     await expect(
-      page.getByRole('button', { name: 'Descriptive words' }),
+      page.getByRole('button', { name: selectColumnName }),
     ).toBeVisible();
 
     // Check if table has loaded.
     await expect(
-      page.getByRole('button', { name: 'Descriptive words' }),
+      page.getByRole('button', { name: selectColumnName }),
     ).toBeVisible();
 
     await page.waitForLoadState('networkidle');
     await page.reload();
     await expect(
-      page.getByRole('button', { name: 'Descriptive words' }),
+      page.getByRole('button', { name: selectColumnName }),
     ).toBeVisible();
 
+    const rows = [
+      {
+        name: 'Progressive Pizza House',
+        date: '04032000',
+        number: '10',
+        checkbox: true,
+        select: 'dreamy',
+      },
+      {
+        name: 'Drum or Bass',
+        date: '15051980',
+        number: '3000035',
+        checkbox: false,
+        select: 'wild',
+      },
+      {
+        name: 'Mumble Punk',
+        date: '13051965',
+        number: '60',
+        checkbox: true,
+        select: 'wtf',
+      },
+    ];
     // Start filling cells
     await page.getByRole('gridcell').first().click({ force: true });
     await expect(page.getByRole('gridcell').first()).toBeFocused();
     await page.waitForTimeout(100);
-    const firstCellName = 'Progressive Pizza House';
-    await fillRow(1, firstCellName, '04032000', '10', true, 'dreamy');
-    await fillRow(2, 'Drum or Bass', '15051980', '3000035', false, 'wild');
-    await fillRow(3, 'Mumble Punk', '13051965', '60', true, 'wtf');
 
-    // Check if cells have been filled correctly
-    await expect(
-      page.getByRole('gridcell', { name: firstCellName }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('gridcell', { name: 'Drum or Bass' }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('gridcell', { name: 'Mumble Punk' }),
-    ).toBeVisible();
+    for (const row of rows) {
+      await fillRow(1, row);
+    }
+
     // Disabled date tests until Playwright bug fixed
     // await expect(
     //   page.getByRole('gridcell', { name: '4 March 2000' }),
@@ -202,7 +215,7 @@ test.describe('tables', async () => {
     await page.keyboard.press('Escape');
 
     await expect(
-      page.getByRole('gridcell', { name: firstCellName }),
+      page.getByRole('gridcell', { name: rows[0].name }),
       "Old cell name shouldn't be visible",
     ).not.toBeVisible();
 

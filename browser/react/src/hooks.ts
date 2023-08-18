@@ -402,9 +402,10 @@ export function useArray(
   resource: Resource,
   propertyURL: string,
   opts?: useValueOptions,
-): [string[], SetValue<JSONArray>] {
+): [string[], SetValue<JSONArray>, (vals: string[]) => void] {
   const [value, set] = useValue(resource, propertyURL, opts);
   const stableEmptyArray = useRef<JSONArray>([]);
+  const store = useStore();
 
   const values = useMemo(() => {
     if (value === undefined) {
@@ -424,7 +425,18 @@ export function useArray(
     }
   }, [value, resource, propertyURL]);
 
-  return [values as string[], set];
+  const push = useCallback(
+    (val: string[]) => {
+      resource.pushPropVal(propertyURL, val);
+
+      if (opts?.commit) {
+        resource.save(store);
+      }
+    },
+    [resource, propertyURL],
+  );
+
+  return [values as string[], set, push];
 }
 
 /** See {@link useValue} */

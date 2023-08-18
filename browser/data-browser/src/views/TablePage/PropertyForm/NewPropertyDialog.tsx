@@ -1,4 +1,4 @@
-import { Resource, Store, urls, useStore } from '@tomic/react';
+import { Resource, Store, urls, useArray, useStore } from '@tomic/react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { Button } from '../../../components/Button';
@@ -73,8 +73,17 @@ export function NewPropertyDialog({
 }: NewPropertyDialogProps): JSX.Element {
   const [valid, setValid] = useState(false);
 
+  console.log('tableClassResource', tableClassResource);
+
   const store = useStore();
   const [resource, setResource] = useState<Resource | null>(null);
+  const [_properties, _setProperties, pushProp] = useArray(
+    tableClassResource,
+    urls.properties.recommends,
+    {
+      commit: true,
+    },
+  );
 
   const handleUserCancelAction = useCallback(async () => {
     if (!resource) {
@@ -99,13 +108,14 @@ export function NewPropertyDialog({
     await saveChildren(store, resource);
     await store.notifyResourceManuallyCreated(resource);
 
-    tableClassResource.pushPropVal(
-      urls.properties.recommends,
-      [resource.getSubject()],
-      true,
-    );
+    await pushProp([resource.getSubject()]);
+    // tableClassResource.pushPropVal(
+    //   urls.properties.recommends,
+    //   [resource.getSubject()],
+    //   true,
+    // );
 
-    await tableClassResource.save(store);
+    // await tableClassResource.save(store);
     setResource(null);
   }, [resource, store, tableClassResource]);
 

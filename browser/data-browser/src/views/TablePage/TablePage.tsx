@@ -63,7 +63,7 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
 
   const tablePageContext: TablePageContextType = useMemo(
     () => ({
-      tableClassResource: tableClass,
+      tableClassSubject: tableClass.getSubject(),
       sorting,
       setSortBy,
       addItemsToHistoryStack,

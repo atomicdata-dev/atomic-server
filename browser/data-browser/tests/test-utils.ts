@@ -195,6 +195,7 @@ export async function changeDrive(subject: string, page: Page) {
 
 export async function editTitle(title: string, page: Page) {
   await page.locator(editableTitle).click();
+  await page.locator(`${editableTitle} > input`);
   await page.fill(editableTitle, title);
   await page.keyboard.press('Escape');
   // Make sure the commit is processed

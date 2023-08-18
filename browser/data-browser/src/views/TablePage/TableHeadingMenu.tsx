@@ -2,6 +2,7 @@ import {
   Resource,
   properties,
   useCanWrite,
+  useResource,
   useStore,
   useString,
 } from '@tomic/react';
@@ -28,10 +29,10 @@ interface TableHeadingMenuProps {
 const Trigger = buildDefaultTrigger(<FaEllipsisV />, 'Edit column');
 
 const useIsExternalProperty = (property: Resource) => {
-  const { tableClassResource } = useContext(TablePageContext);
+  const { tableClassSubject } = useContext(TablePageContext);
   const [parent] = useString(property, properties.parent);
 
-  return parent !== tableClassResource.getSubject();
+  return parent !== tableClassSubject;
 };
 
 export function TableHeadingMenu({
@@ -41,7 +42,8 @@ export function TableHeadingMenu({
   const canWrite = useCanWrite(resource);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { tableClassResource } = useContext(TablePageContext);
+  const { tableClassSubject } = useContext(TablePageContext);
+  const tableClassResource = useResource(tableClassSubject);
   const navigate = useNavigate();
 
   const isExternalProperty = useIsExternalProperty(resource);
