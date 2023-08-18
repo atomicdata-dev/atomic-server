@@ -276,10 +276,11 @@ test.describe('data-browser', async () => {
     const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 
     for (const letter of alphabet) {
-      await page.type(editableTitle, letter, { delay: Math.random() * 200 });
+      await page.type(editableTitle, letter, { delay: Math.random() * 100 });
     }
 
     await page.keyboard.press('Escape');
+    await page.waitForLoadState('networkidle');
     await expect(
       page.locator(`text=${alphabet}`).first(),
       'String not correct, bad typing UX. Maybe resources are saved twice?',
@@ -526,7 +527,7 @@ test.describe('data-browser', async () => {
       page.getByRole('heading', { name: 'First Title', level: 1 }),
     ).toBeVisible();
 
-    await editTitle('Second Title', page, true);
+    await editTitle('Second Title', page);
     await expect(
       page.getByRole('heading', { name: 'Second Title', level: 1 }),
     ).toBeVisible();

@@ -2,7 +2,7 @@ import { Resource } from '@tomic/react';
 import React, { useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FaUpload } from 'react-icons/fa';
-import styled, { keyframes } from 'styled-components';
+import { styled, keyframes } from 'styled-components';
 import { ErrMessage } from '../InputStyles';
 import { useUpload } from '../../../hooks/useUpload';
 

@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 
 export const FieldStyled = styled.div`
   margin-bottom: ${props => props.theme.margin}rem;

@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 /** Hides its content visually but not from assistive technology. */
 export const VisuallyHidden = styled.div`

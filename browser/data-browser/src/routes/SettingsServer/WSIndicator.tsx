@@ -1,7 +1,7 @@
 import { useStore } from '@tomic/react';
 import React, { useEffect, useState } from 'react';
 import { FaExclamationTriangle, FaSignal } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
 
 export interface WSIndicatorProps {

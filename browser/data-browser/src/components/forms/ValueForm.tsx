@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEdit } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import {
   useProperty,
   useStore,

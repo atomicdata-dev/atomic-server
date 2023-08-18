@@ -6,7 +6,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FixedSizeList, ListOnScrollProps } from 'react-window';
 import Autosizer from 'react-virtualized-auto-sizer';
 import { Cell, IndexCell } from './Cell';

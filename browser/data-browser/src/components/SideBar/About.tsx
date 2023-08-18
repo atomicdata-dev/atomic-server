@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Logo } from '../Logo';
 import { SideBarHeader } from './SideBarHeader';
 import React from 'react';

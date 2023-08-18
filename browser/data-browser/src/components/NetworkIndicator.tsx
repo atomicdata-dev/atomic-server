@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import styled, { keyframes } from 'styled-components';
+import { styled, keyframes } from 'styled-components';
 import { MdSignalWifiOff } from 'react-icons/md';
 import { useOnline } from '../hooks/useOnline';
 import { lighten } from 'polished';

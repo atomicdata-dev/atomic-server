@@ -2,7 +2,7 @@ import { Resource, useCanWrite, useTitle } from '@tomic/react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEdit } from 'react-icons/fa';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { transitionName } from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
 

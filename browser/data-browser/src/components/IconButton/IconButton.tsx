@@ -1,5 +1,5 @@
 import React from 'react';
-import styled, { DefaultTheme } from 'styled-components';
+import { styled, DefaultTheme } from 'styled-components';
 import { transition } from '../../helpers/transition';
 
 export enum IconButtonVariant {

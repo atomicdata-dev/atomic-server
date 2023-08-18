@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { FaRegStar, FaStar } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useDriveHistory } from '../../hooks/useDriveHistory';
 import { useSavedDrives } from '../../hooks/useSavedDrives';
 

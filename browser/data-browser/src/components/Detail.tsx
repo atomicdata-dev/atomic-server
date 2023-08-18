@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 /** Small component showing some metadata. They appear next to each other. */
 export const Detail = styled.div`

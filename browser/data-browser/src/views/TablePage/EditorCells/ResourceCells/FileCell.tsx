@@ -1,6 +1,6 @@
 import { properties, useString, useTitle } from '@tomic/react';
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { getFileIcon, imageMimeTypes } from '../../../../helpers/filetypes';
 import { ResourceCellProps } from '../Type';
 import { SimpleResourceLink } from './SimpleResourceLink';

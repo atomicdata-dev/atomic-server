@@ -4,7 +4,7 @@ import { useResource, useStore, Version } from '@tomic/react';
 import { ContainerNarrow } from '../../components/Containers';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ErrorLook } from '../../components/ErrorLook';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useVersions } from './useVersions';
 import { groupVersionsByMonth, setResourceToVersion } from './versionHelpers';
 import { toast } from 'react-hot-toast';

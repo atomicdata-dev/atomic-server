@@ -6,7 +6,7 @@ import { constructOpenURL, useSearchQuery } from '../helpers/navigation';
 import ResourceCard from '../views/Card/ResourceCard';
 import { useServerSearch } from '@tomic/react';
 import { ErrorLook } from '../components/ErrorLook';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FaFilter, FaSearch } from 'react-icons/fa';
 import { useQueryScopeHandler } from '../hooks/useQueryScope';
 import { useSettings } from '../helpers/AppSettings';

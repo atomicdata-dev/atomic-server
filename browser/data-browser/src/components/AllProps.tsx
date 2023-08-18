@@ -1,8 +1,7 @@
 import { Resource } from '@tomic/react';
 import React from 'react';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import PropVal from './PropVal';
-import { ResourceSelector } from './forms/ResourceSelector';
 
 type Props = {
   resource: Resource;

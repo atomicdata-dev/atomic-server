@@ -1,7 +1,7 @@
 import { useResource, useTitle } from '@tomic/react';
 import React, { useState } from 'react';
 import { FaEllipsisV, FaPlus } from 'react-icons/fa';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { useNewRoute } from '../../../helpers/useNewRoute';
 import { buildDefaultTrigger } from '../../Dropdown/DefaultTrigger';
 import { IconButton } from '../../IconButton/IconButton';

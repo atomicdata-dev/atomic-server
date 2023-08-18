@@ -7,7 +7,7 @@ import {
   useString,
 } from '@tomic/react';
 import React, { useCallback } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { CommitDetail } from '../../components/CommitDetail';
 import { ContainerWide } from '../../components/Containers';
 import { EditableTitle } from '../../components/EditableTitle';

@@ -20,7 +20,7 @@ import { Base } from './Base';
 import { useCreateAndNavigate } from './useCreateAndNavigate';
 import { NewInstanceButtonProps } from './NewInstanceButtonProps';
 import { stringToSlug } from '../../helpers/stringToSlug';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { BetaBadge } from '../BetaBadge';
 
 const instanceOpts = {

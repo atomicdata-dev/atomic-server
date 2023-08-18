@@ -13,7 +13,7 @@ import {
   Client,
   useStore,
 } from '@tomic/react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FaCaretDown, FaCaretRight, FaPlus } from 'react-icons/fa';
 
 import { constructOpenURL } from '../../helpers/navigation';

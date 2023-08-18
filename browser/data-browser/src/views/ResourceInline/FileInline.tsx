@@ -2,7 +2,7 @@ import React from 'react';
 import { useString, properties, useResource } from '@tomic/react';
 import { imageMimeTypes, getFileIcon } from '../../helpers/filetypes';
 import { ResourceInlineInstanceProps } from './ResourceInline';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 export function FileInline({
   subject,

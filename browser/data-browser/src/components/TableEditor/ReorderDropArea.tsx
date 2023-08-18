@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { transition } from '../../helpers/transition';
 import { transparentize } from 'polished';
 

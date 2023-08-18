@@ -17,7 +17,7 @@ import React, {
 } from 'react';
 import { FaEdit, FaTimes } from 'react-icons/fa';
 import * as RadixPopover from '@radix-ui/react-popover';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FileDropzoneInput } from '../../../components/forms/FileDropzone/FileDropzoneInput';
 import {
   InputStyled,

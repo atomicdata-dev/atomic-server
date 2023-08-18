@@ -1,6 +1,6 @@
 import React from 'react';
 import { HistoryViewProps } from './HistoryViewProps';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { Column } from '../../components/Row';

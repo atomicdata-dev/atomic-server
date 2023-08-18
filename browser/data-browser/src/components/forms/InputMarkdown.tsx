@@ -4,7 +4,7 @@ import { InputProps } from './ResourceField';
 import { ErrMessage, InputWrapper } from './InputStyles';
 import Yamde from 'yamde';
 import { useSettings } from '../../helpers/AppSettings';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 export default function InputMarkdown({
   resource,

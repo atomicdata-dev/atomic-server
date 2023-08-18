@@ -1,4 +1,4 @@
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { wrapWithCQ } from '../../components/CQWrapper';
 import React from 'react';
 import { Button } from '../../components/Button';

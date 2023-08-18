@@ -10,7 +10,7 @@ import {
   useStore,
   useString,
 } from '@tomic/react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FaEdit, FaEye, FaGripVertical } from 'react-icons/fa';
 import {
   DndContext,

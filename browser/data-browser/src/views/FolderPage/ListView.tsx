@@ -6,7 +6,7 @@ import {
   useTitle,
 } from '@tomic/react';
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { AtomicLink } from '../../components/AtomicLink';
 import { CommitDetail } from '../../components/CommitDetail';
 import { ViewProps } from './FolderDisplayStyle';

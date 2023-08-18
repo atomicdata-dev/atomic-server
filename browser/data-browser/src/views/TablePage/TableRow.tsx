@@ -11,7 +11,7 @@ import {
 } from '@tomic/react';
 import { TableCell } from './TableCell';
 import { randomSubject } from '../../helpers/randomString';
-import styled, { keyframes } from 'styled-components';
+import { styled, keyframes } from 'styled-components';
 
 interface TableRowProps {
   collection: Collection;

@@ -9,7 +9,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { useResource, useTitle } from '@tomic/react';
 import { FaCaretDown, FaTimes, FaTrash } from 'react-icons/fa';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { Hit, useLocalSearch } from '../../../helpers/useLocalSearch';
 import { ButtonInput } from '../../Button';
 import { InputOverlay, InputStyled, InputWrapper } from '../InputStyles';

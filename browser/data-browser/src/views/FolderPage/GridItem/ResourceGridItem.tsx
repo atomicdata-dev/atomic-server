@@ -6,7 +6,7 @@ import {
   useTitle,
 } from '@tomic/react';
 import React, { useCallback, useMemo } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { constructOpenURL } from '../../../helpers/navigation';
 import { getIconForClass } from '../iconMap';
 import { BookmarkGridItem } from './BookmarkGridItem';

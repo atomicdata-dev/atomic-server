@@ -6,7 +6,7 @@ import {
 } from '@tomic/react';
 import React from 'react';
 import { ResourceInline } from '../../views/ResourceInline';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ErrorLook } from '../ErrorLook';
 
 interface UsageRowProps {

@@ -2,7 +2,7 @@ import { Resource } from '@tomic/react';
 import React, { useMemo } from 'react';
 import { constructOpenURL } from '../../../../helpers/navigation';
 import { useNavigateWithTransition } from '../../../../hooks/useNavigateWithTransition';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 export type SimpleResourceLinkProps = {
   resource: Resource;

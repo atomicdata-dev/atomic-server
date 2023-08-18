@@ -6,7 +6,7 @@ import { ErrMessage } from './InputStyles';
 import { ResourceSelector } from './ResourceSelector';
 import { FaPlus, FaTrash } from 'react-icons/fa';
 import { Column, Row } from '../Row';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useIndexDependantCallback } from '../../hooks/useIndexDependantCallback';
 
 export default function InputResourceArray({

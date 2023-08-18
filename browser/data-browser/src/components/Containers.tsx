@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 /** Centered column */
 export const ContainerNarrow = styled.div`

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
   useArray,

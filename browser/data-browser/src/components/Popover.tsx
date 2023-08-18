@@ -1,6 +1,6 @@
 import React, { useCallback, useContext, useEffect } from 'react';
 import * as RadixPopover from '@radix-ui/react-popover';
-import styled, { keyframes } from 'styled-components';
+import { styled, keyframes } from 'styled-components';
 import { transparentize } from 'polished';
 import { useDialogTreeContext } from './Dialog/dialogContext';
 import { useControlLock } from '../hooks/useControlLock';

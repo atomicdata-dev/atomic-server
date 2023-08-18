@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import * as CSS from 'csstype';
 import React from 'react';
 import { ButtonDefault } from './Button';

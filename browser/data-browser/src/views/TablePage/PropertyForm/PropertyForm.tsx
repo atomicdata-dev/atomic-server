@@ -1,6 +1,6 @@
 import { Resource, urls, useString } from '@tomic/react';
 import React, { useCallback, useEffect, useMemo } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ErrorChip } from '../../../components/forms/ErrorChip';
 import { useValidation } from '../../../components/forms/formValidation/useValidation';
 import {

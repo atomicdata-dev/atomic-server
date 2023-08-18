@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { constructOpenURL, pathToURL } from '../helpers/navigation';
 import { FaExternalLinkAlt } from 'react-icons/fa';
 import { ErrorLook } from '../components/ErrorLook';

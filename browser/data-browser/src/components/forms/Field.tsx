@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FaAsterisk, FaInfo, FaTrash } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Collapse } from '../Collapse';
 import { IconButton, IconButtonVariant } from '../IconButton/IconButton';
 import { Row } from '../Row';

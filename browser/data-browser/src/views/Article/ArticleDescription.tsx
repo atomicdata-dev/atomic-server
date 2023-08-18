@@ -2,7 +2,7 @@ import { Resource, useString, properties, useStore } from '@tomic/react';
 import React from 'react';
 import toast from 'react-hot-toast';
 import { FaEdit, FaPlus } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import Markdown from '../../components/datatypes/Markdown';
 import ResourceField from '../../components/forms/ResourceField';

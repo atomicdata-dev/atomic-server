@@ -1,6 +1,6 @@
 import { Resource, Store, urls, useStore } from '@tomic/react';
 import React, { useCallback, useEffect, useState } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Button } from '../../../components/Button';
 import {
   Dialog,

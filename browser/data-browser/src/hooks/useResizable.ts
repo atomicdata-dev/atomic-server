@@ -1,6 +1,6 @@
 import { transparentize } from 'polished';
 import { useEffect, useId, useRef, useState } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 interface UseResizeResult<E extends HTMLElement> {
   size: string;

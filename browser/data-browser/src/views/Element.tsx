@@ -9,7 +9,7 @@ import {
   useServerSearch,
   useString,
 } from '@tomic/react';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { ResourceInline } from './ResourceInline';

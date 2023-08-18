@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { transition } from '../helpers/transition';
 import { Spinner } from './Spinner';
 

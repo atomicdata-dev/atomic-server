@@ -2,7 +2,7 @@ import React, { useContext, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { DialogPortalContext } from './Dialog/dialogContext';
 import { useFileImageTransitionStyles } from '../views/File/useFileImageTransitionStyles';
 

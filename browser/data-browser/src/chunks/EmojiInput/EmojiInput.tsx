@@ -1,6 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import Picker from '@emoji-mart/react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { transition } from '../../helpers/transition';
 import { Popover } from '../../components/Popover';

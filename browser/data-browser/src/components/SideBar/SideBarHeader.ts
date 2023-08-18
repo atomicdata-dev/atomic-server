@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 export const SideBarHeader = styled('div')`
   margin-top: ${props => props.theme.margin}rem;

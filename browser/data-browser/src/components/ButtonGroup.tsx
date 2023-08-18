@@ -1,5 +1,5 @@
 import React, { useCallback, useId, useState } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 export interface ButtonGroupOption {
   label: string;

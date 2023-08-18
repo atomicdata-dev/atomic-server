@@ -12,7 +12,7 @@ import { useCurrentSubject } from '../helpers/useCurrentSubject';
 import { ResourceInline } from '../views/ResourceInline';
 import { Card, CardInsideFull, CardRow } from '../components/Card';
 import { FaGlobe } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Button } from '../components/Button';
 import { InviteForm } from '../components/InviteForm';
 import toast from 'react-hot-toast';

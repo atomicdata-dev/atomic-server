@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import {
   CursorMode,
   TableEvent,

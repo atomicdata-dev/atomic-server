@@ -11,7 +11,7 @@ import { ContainerWide } from '../../components/Containers';
 import { Column, Row } from '../../components/Row';
 import { useDriveHistory } from '../../hooks/useDriveHistory';
 import { DrivesCard } from './DrivesCard';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useSavedDrives } from '../../hooks/useSavedDrives';
 import { constructOpenURL } from '../../helpers/navigation';
 import { useNavigate } from 'react-router';

@@ -13,7 +13,7 @@ import {
   InputWrapper,
   TextAreaStyled,
 } from '../components/forms/InputStyles.jsx';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Column } from '../components/Row';
 import { useCurrentSubject } from '../helpers/useCurrentSubject';
 import { Title } from '../components/Title';

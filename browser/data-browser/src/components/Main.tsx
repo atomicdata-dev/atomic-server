@@ -1,6 +1,6 @@
 import React from 'react';
 import { VisuallyHidden } from './VisuallyHidden';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { transitionName } from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
 import { PARENT_PADDING_BLOCK } from './Parent';

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaTimes } from 'react-icons/fa';
 import { useNavigate } from 'react-router';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import {
   constructOpenURL,
   searchURL,

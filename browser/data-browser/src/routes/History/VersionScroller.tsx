@@ -1,7 +1,7 @@
 import React, { useId } from 'react';
 import { GroupedVersions } from './HistoryViewProps';
 import { Version, useStore } from '@tomic/react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Column } from '../../components/Row';
 import { VersionButton } from './VersionButton';
 import { IconButton } from '../../components/IconButton/IconButton';

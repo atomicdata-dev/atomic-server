@@ -3,7 +3,7 @@ import { useString, useResource, useTitle, urls, useArray } from '@tomic/react';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
 import { SideBarItem } from '../SideBarItem';
 import { AtomicLink } from '../../AtomicLink';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Details } from '../../Details';
 import { FloatingActions, floatingHoverStyles } from './FloatingActions';
 import { errorLookStyle } from '../../ErrorLook';

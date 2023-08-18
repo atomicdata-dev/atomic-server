@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useSettings } from '../helpers/AppSettings';
 
 const NAVBAR_HEIGHT = '2rem';

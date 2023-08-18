@@ -2,7 +2,7 @@ import { useResource, useTitle } from '@tomic/react';
 import React from 'react';
 
 import { AtomicLink } from './AtomicLink';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 interface FilePillProps {
   subject: string;

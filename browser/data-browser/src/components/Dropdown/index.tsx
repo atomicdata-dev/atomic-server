@@ -7,7 +7,7 @@ import React, {
   useCallback,
 } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useClickAwayListener } from '../../hooks/useClickAwayListener';
 import { Button } from '../Button';
 import { DropdownTriggerRenderFunction } from './DropdownTrigger';

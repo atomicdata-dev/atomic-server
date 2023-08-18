@@ -14,7 +14,7 @@ import { Button } from '../components/Button';
 import { useSettings } from '../helpers/AppSettings';
 import { Row } from '../components/Row';
 import { ResourceInline } from '../views/ResourceInline';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FileDropzoneInput } from '../components/forms/FileDropzone/FileDropzoneInput';
 import toast from 'react-hot-toast';
 import { getIconForClass } from '../views/FolderPage/iconMap';

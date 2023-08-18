@@ -7,7 +7,7 @@ import {
 } from '@tomic/react';
 import React from 'react';
 import { FaAngleDown, FaAngleUp, FaAtom } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { dataTypeIconMap } from './dataTypeMaps';
 import { TableHeadingMenu } from './TableHeadingMenu';
 import { TablePageContext } from './tablePageContext';

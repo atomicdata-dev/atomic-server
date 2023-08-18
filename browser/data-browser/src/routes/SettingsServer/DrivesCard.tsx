@@ -2,7 +2,7 @@ import React from 'react';
 import NewIntanceButton from '../../components/NewInstanceButton';
 import { Card, CardInsideFull, CardRow } from '../../components/Card';
 import { urls } from '@tomic/react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
 import { DriveRow } from './DriveRow';
 

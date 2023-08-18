@@ -2,7 +2,7 @@ import React, { Suspense, useState } from 'react';
 import { Resource } from '@tomic/react';
 import { ImageViewer } from '../../components/ImageViewer';
 import { useFileInfo } from '../../hooks/useFile';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { TextPreview } from './TextPreview';
 import { displayFileSize } from './displayFileSize';
 import { Button } from '../../components/Button';

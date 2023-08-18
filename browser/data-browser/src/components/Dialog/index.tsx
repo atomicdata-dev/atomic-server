@@ -8,7 +8,7 @@ import React, {
 import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaTimes } from 'react-icons/fa';
-import styled, { keyframes } from 'styled-components';
+import { styled, keyframes } from 'styled-components';
 import { effectTimeout } from '../../helpers/effectTimeout';
 import { Button } from '../Button';
 import { DropdownContainer } from '../Dropdown/DropdownContainer';

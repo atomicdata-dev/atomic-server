@@ -1,6 +1,6 @@
 import { urls, useString, useTitle } from '@tomic/react';
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { AtomicLink } from '../../components/AtomicLink';
 import Markdown from '../../components/datatypes/Markdown';
 import {

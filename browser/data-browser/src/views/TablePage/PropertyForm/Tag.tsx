@@ -2,7 +2,7 @@ import { urls, useResource, useString, useTitle } from '@tomic/react';
 import { lighten, setLightness, setSaturation } from 'polished';
 import * as RadixPopover from '@radix-ui/react-popover';
 import React, { useCallback, useMemo } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { transition } from '../../../helpers/transition';
 import { Popover } from '../../../components/Popover';
 import { PalettePicker } from '../../../components/PalettePicker';

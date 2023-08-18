@@ -14,7 +14,7 @@ import toast from 'react-hot-toast';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaCopy, FaLink, FaPencilAlt, FaReply, FaTimes } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { AtomicLink } from '../components/AtomicLink';
 import { Button } from '../components/Button';
 import { CommitDetail } from '../components/CommitDetail';

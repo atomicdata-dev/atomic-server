@@ -2,7 +2,7 @@ import { ResourcePageProps } from '../ResourcePage';
 import React, { useCallback } from 'react';
 import { urls, useString } from '@tomic/react';
 import { EditableTitle } from '../../components/EditableTitle';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ContainerFull, ContainerNarrow } from '../../components/Containers';
 import { BookmarkPreview } from './BookmarkPreview';
 import {

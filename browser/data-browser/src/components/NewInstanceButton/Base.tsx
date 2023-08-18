@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { IconType } from 'react-icons';
 import { FaPlus } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { paths } from '../../routes/paths';
 import { Button } from '../Button';
 

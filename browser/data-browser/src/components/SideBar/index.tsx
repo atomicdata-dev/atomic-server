@@ -1,4 +1,4 @@
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import * as React from 'react';
 import { useHover } from '../../helpers/useHover';
 import { useSettings } from '../../helpers/AppSettings';

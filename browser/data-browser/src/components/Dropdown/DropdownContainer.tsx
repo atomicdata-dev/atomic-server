@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { DropdownPortalContext } from './dropdownContext';
 
 export const DropdownContainer: React.FC<React.PropsWithChildren<unknown>> = ({

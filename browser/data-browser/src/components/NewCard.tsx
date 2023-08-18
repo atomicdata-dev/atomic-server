@@ -1,5 +1,5 @@
 import { FaPlus } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { GridCard } from '../views/FolderPage/GridItem/components';
 import React from 'react';
 

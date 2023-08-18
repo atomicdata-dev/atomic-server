@@ -1,5 +1,5 @@
 import * as React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ContainerNarrow } from '../components/Containers';
 import { shortcuts } from '../components/HotKeyWrapper';
 import { Shortcut } from '../components/Shortcut';

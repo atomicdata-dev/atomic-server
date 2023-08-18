@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { AllPropsSimple } from '../../../components/AllPropsSimple';
 import { GridItemViewProps } from './GridItemViewProps';
 

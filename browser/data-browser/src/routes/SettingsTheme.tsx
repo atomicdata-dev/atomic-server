@@ -6,7 +6,7 @@ import { useSettings } from '../helpers/AppSettings';
 import { NavStyleButton } from '../components/NavStyleButton';
 import { DarkModeOption } from '../helpers/useDarkMode';
 import { Column, Row } from '../components/Row';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Checkbox, CheckboxLabel } from '../components/forms/Checkbox';
 import { Main } from '../components/Main';
 

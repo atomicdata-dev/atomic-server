@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { DragAreaBase, useResizable } from '../../hooks/useResizable';
 import { useTableEditorContext } from './TableEditorContext';
 import { useDraggable } from '@dnd-kit/core';

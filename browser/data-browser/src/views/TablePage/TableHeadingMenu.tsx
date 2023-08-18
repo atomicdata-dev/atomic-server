@@ -9,7 +9,7 @@ import React, { useCallback, useContext, useMemo, useState } from 'react';
 import { DropdownMenu, Item } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
 import { FaEdit, FaEllipsisV, FaEye, FaTimes, FaTrash } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { EditPropertyDialog } from './PropertyForm/EditPropertyDialog';
 import { TablePageContext } from './tablePageContext';
 import {

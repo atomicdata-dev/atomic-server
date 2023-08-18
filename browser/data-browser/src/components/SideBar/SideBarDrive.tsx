@@ -9,7 +9,7 @@ import {
 import React, { useEffect, useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
 import { constructOpenURL } from '../../helpers/navigation';
 import { paths } from '../../routes/paths';

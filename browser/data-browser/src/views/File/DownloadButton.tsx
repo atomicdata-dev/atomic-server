@@ -1,6 +1,6 @@
 import React from 'react';
 import { FaDownload } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { IconButton } from '../../components/IconButton/IconButton';
 import { Row } from '../../components/Row';

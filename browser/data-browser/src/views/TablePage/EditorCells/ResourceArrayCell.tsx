@@ -9,7 +9,7 @@ import {
 import React, { useCallback, useEffect, useMemo } from 'react';
 import { FaPlus, FaTimes } from 'react-icons/fa';
 import * as RadixPopover from '@radix-ui/react-popover';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { IconButton } from '../../../components/IconButton/IconButton';
 import { Popover } from '../../../components/Popover';
 import { SelectableTag, Tag } from '../PropertyForm/Tag';

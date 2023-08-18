@@ -5,7 +5,7 @@ import { DropdownInput } from './DropdownInput';
 import { Dialog, useDialog } from '../../Dialog';
 import { useDialogTreeContext } from '../../Dialog/dialogContext';
 import { useSettings } from '../../../helpers/AppSettings';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { NewFormDialog } from '../NewForm/NewFormDialog';
 import { useDeferredUpdate } from '../../../hooks/useDeferredUpdate';
 import { ErrorChip } from '../ErrorChip';
