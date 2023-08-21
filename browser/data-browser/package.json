@@ -33,6 +33,7 @@
     "react-pdf": "^6.2.2",
     "react-router": "^6.9.0",
     "react-router-dom": "^6.9.0",
+    "react-vis": "^1.12.1",
     "react-virtualized-auto-sizer": "^1.0.7",
     "react-window": "^1.8.7",
     "remark-gfm": "^3.0.1",

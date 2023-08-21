@@ -20,6 +20,7 @@ import { Sandbox } from './Sandbox';
 import { TokenRoute } from './TokenRoute';
 import { ImporterPage } from '../views/ImporterPage';
 import { History } from './History';
+import { I4Trust } from './i4trust';
 
 const homeURL = window.location.origin;
 
@@ -48,6 +49,8 @@ export function AppRoutes(): JSX.Element {
       <Route path={paths.search} element={<Search />} />
       <Route path={paths.token} element={<TokenRoute />} />
       <Route path={paths.history} element={<History />} />
+      <Route path={'i4trust'} element={<I4Trust />} />
+
       {isDev && <Route path={paths.sandbox} element={<Sandbox />} />}
       <Route path='/' element={<ResourcePage subject={homeURL} />} />
       <Route path='*' element={<Local />} />
