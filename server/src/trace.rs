@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use opentelemetry_otlp::WithExportConfig;
+
 /// Start logging / tracing. Creates a subscribers that logs to stdout.
 /// Also optionally creates a Chrome trace file. Starts OpenTelemetry if configured.
 /// Returns a [tracing_chrome::FlushGuard] that should be dropped when the server is no longer needed.
@@ -31,7 +35,38 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
             );
             return Some(flush_guard);
         }
-        crate::config::Tracing::Opentelemetry => {
+        crate::config::Tracing::OpenTelemetry => {
+            #[cfg(feature = "telemetry")]
+            {
+                let endpoint =
+                    "https://api.openobserve.ai/api/joep_organization_2642_75oYwOBs0D0s8am/traces";
+                let token = "am9lcEBvbnRvbGEuaW86Mjg3SjBZV2JlNHhPRTlTMTU2eTM=";
+                let mut headers = HashMap::new();
+                headers.insert("Authorization".to_string(), format!("Basic {}", token));
+
+                let otlp_exporter = opentelemetry_otlp::new_exporter()
+                    .http()
+                    .with_headers(headers)
+                    .with_endpoint(endpoint)
+                    .with_http_client(opentelemetry_http::hyper::HyperClient::new_with_timeout_and_authorization_header(
+                        ,
+                    ));
+                let tracer = opentelemetry_otlp::new_pipeline()
+                    .tracing()
+                    .with_exporter(otlp_exporter)
+                    .install_simple()
+                    .expect("Opentelementy");
+
+                let layer = tracing_opentelemetry::layer().with_tracer(tracer);
+                tracing_registry.with(layer).init();
+            }
+            #[cfg(not(feature = "telemetry"))]
+            {
+                tracing::warn!("OpenTelemetry tracing is not enabled, compile atomic-server with `--features opentelemetry` to enable");
+            }
+        }
+
+        crate::config::Tracing::Jaeger => {
             #[cfg(feature = "telemetry")]
             {
                 println!("Enabling tracing for OpenTelemetry and Jaeger");
@@ -39,6 +74,7 @@ pub fn init_tracing(config: &crate::config::Config) -> Option<tracing_chrome::Fl
                     .with_service_name("atomic-server")
                     .install_simple()
                     .expect("Error initializing Jaeger exporter");
+
                 let layer = tracing_opentelemetry::layer().with_tracer(tracer);
                 tracing_registry.with(layer).init();
             }

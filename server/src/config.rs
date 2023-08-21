@@ -99,8 +99,10 @@ pub enum Tracing {
     Stdout,
     /// Create a file in the current directory with tracing data, that can be opened with the chrome://tracing/ URL
     Chrome,
-    /// Log to a local OpenTelemetry service (e.g. Jaeger), using default ports
-    Opentelemetry,
+    /// Log to a local Jaeger service using default ports
+    Jaeger,
+    /// Log to a local OpenTelemetry service (e.g. OpenObserve)
+    OpenTelemetry,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
