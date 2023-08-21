@@ -195,24 +195,12 @@ export async function changeDrive(subject: string, page: Page) {
 
 export async function editTitle(title: string, page: Page) {
   await page.locator(editableTitle).click();
+  await page.waitForTimeout(100);
   await page.locator(`${editableTitle} > input`);
   await page.fill(editableTitle, title);
   await page.keyboard.press('Escape');
   // Make sure the commit is processed
   await page.waitForTimeout(300);
-
-  // // USeful for
-  // await page.waitForLoadState('networkidle');
-
-  // if (clear) {
-  //   await page.locator(editableTitle).clear();
-  // }
-
-  // // These keys make sure the onChange handler is properly called
-  // await page.keyboard.press('Space');
-  // await page.keyboard.press('Backspace');
-  // await waitForCommit(page);
-  // await page.keyboard.type(title);
 }
 
 export async function clickSidebarItem(text: string, page: Page) {
