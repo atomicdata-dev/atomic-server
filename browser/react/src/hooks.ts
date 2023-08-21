@@ -433,7 +433,7 @@ export function useArray(
         resource.save(store);
       }
     },
-    [resource, propertyURL],
+    [resource, propertyURL, store],
   );
 
   return [values as string[], set, push];

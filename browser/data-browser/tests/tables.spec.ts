@@ -17,6 +17,7 @@ test.describe('tables', async () => {
 
     const tab = async () => {
       await page.keyboard.press('Tab');
+      await page.waitForTimeout(150);
     };
 
     const createTag = async (emote: string, name: string) => {
@@ -29,6 +30,7 @@ test.describe('tables', async () => {
     };
 
     const pickTag = async (name: string) => {
+      await expect(page.getByPlaceholder('filter tags')).toBeVisible();
       await page.keyboard.type(name);
       await page.keyboard.press('Enter');
       await page.keyboard.press('Escape');
@@ -39,27 +41,37 @@ test.describe('tables', async () => {
       const { name, date, number, checkbox, select } = row;
       const rowIndex = currentRowNumber + 1;
       await page.keyboard.type(name);
+      await expect(
+        page.locator(
+          `[aria-rowindex="${rowIndex}"] > [aria-colindex="${2}"] > input`,
+        ),
+      ).toBeFocused();
+      await tab();
       // Flay newline
       await page.waitForTimeout(300);
-      await tab();
       // Wait for the table to refresh by checking if the next row is visible
       await expect(
-        page.getByRole('rowheader', { name: `${rowIndex}` }),
+        page.getByRole('rowheader', { name: `${currentRowNumber}` }),
       ).toBeAttached();
 
       await page.keyboard.type(date);
       await tab();
+      // check if focus is on the next column
       await page.keyboard.type(number);
       await tab();
 
       if (checkbox) {
         await page.keyboard.press('Space');
 
-        // Check if checked
         await expect(
           page.locator(`[aria-rowindex="${rowIndex}"]`).getByRole('checkbox'),
           "Checkbox isn't checked",
         ).toBeChecked();
+      } else {
+        await expect(
+          page.locator(`[aria-rowindex="${rowIndex}"]`).getByRole('checkbox'),
+          'Checkbox is checked but should not be',
+        ).not.toBeChecked();
       }
 
       await tab();
@@ -185,8 +197,8 @@ test.describe('tables', async () => {
     await expect(page.getByRole('gridcell').first()).toBeFocused();
     await page.waitForTimeout(100);
 
-    for (const row of rows) {
-      await fillRow(1, row);
+    for (const [index, row] of rows.entries()) {
+      await fillRow(index + 1, row);
     }
 
     // Disabled date tests until Playwright bug fixed

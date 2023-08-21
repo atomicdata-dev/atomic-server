@@ -55,7 +55,7 @@ export const before = async ({ page }) => {
 export async function setTitle(page: Page, title: string) {
   await page.locator(editableTitle).click();
   await page.fill(editableTitle, title);
-  await page.waitForTimeout(500);
+  // await page.waitForTimeout(500);
 }
 
 export async function disableViewTransition(page: Page) {

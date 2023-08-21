@@ -413,12 +413,9 @@ export class Resource {
     store: Store,
     differentAgent?: Agent,
   ): Promise<string | undefined> {
-    // Instantly (optimistically) save for local usage
-    // Doing this early is essential for having a snappy UX in the document editor
-    store.addResources(this);
-    store.notify(this.clone());
-
     if (!this.commitBuilder.hasUnsavedChanges()) {
+      console.warn(`No changes to ${this.subject}, not saving`);
+
       return undefined;
     }
 
@@ -452,17 +449,25 @@ export class Resource {
     const endpoint = new URL(this.getSubject()).origin + `/commit`;
 
     try {
+      // We optimistically update all viewed instances for snappy feedback
+      store.addResources(this);
       store.notify(this);
 
       // If a commit is already being posted we wait for it to finish
       // because the server can not guarantee the commits will be processed in the correct order.
+
       if (this.queuedFetch) {
-        await this.queuedFetch;
+        try {
+          await this.queuedFetch;
+        } catch (e) {
+          // Continue
+        }
       }
 
       this.commitError = undefined;
       const createdCommitPromise = store.postCommit(commit, endpoint);
       this.queuedFetch = createdCommitPromise;
+      store.notify(this);
       const createdCommit = await createdCommitPromise;
 
       this.setUnsafe(properties.commit.lastCommit, createdCommit.id!);
@@ -501,6 +506,7 @@ export class Resource {
       this.commitBuilder = oldCommitBuilder;
       this.commitError = e;
       store.addResources(this);
+      store.notify(this.clone());
       throw e;
     }
   }

@@ -276,7 +276,7 @@ test.describe('data-browser', async () => {
     const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 
     for (const letter of alphabet) {
-      await page.type(editableTitle, letter, { delay: Math.random() * 100 });
+      await page.type(editableTitle, letter, { delay: Math.random() * 300 });
     }
 
     await page.keyboard.press('Escape');
@@ -428,17 +428,22 @@ test.describe('data-browser', async () => {
     await setTitle(page, d1);
 
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      "Sidebar doesn't show updated parent resource title",
     ).toBeVisible();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      "Sidebar doesn't show child resource title",
     ).toBeVisible();
+    await page.waitForLoadState('networkidle');
     await page.reload();
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      "Sidebar doesn't show parent resource resource title after refresh",
     ).toBeVisible();
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      "Sidebar doesn't show child resource title after refresh",
     ).toBeVisible();
   });
 

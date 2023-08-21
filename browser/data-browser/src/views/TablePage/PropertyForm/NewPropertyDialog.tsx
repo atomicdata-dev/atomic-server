@@ -73,8 +73,6 @@ export function NewPropertyDialog({
 }: NewPropertyDialogProps): JSX.Element {
   const [valid, setValid] = useState(false);
 
-  console.log('tableClassResource', tableClassResource);
-
   const store = useStore();
   const [resource, setResource] = useState<Resource | null>(null);
   const [_properties, _setProperties, pushProp] = useArray(
@@ -109,15 +107,8 @@ export function NewPropertyDialog({
     await store.notifyResourceManuallyCreated(resource);
 
     await pushProp([resource.getSubject()]);
-    // tableClassResource.pushPropVal(
-    //   urls.properties.recommends,
-    //   [resource.getSubject()],
-    //   true,
-    // );
-
-    // await tableClassResource.save(store);
     setResource(null);
-  }, [resource, store, tableClassResource]);
+  }, [resource, store, tableClassResource, pushProp]);
 
   const [dialogProps, show, hide] = useDialog({
     bindShow,

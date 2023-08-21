@@ -3,7 +3,6 @@ import {
   signIn,
   newDrive,
   newResource,
-  waitForCommit,
   editTitle,
   editableTitle,
   getCurrentSubject,
@@ -37,7 +36,6 @@ test.describe('documents', async () => {
 
     // multi-user
     const currentSubject = await getCurrentSubject(page);
-    await page.waitForTimeout(1000);
     const page2 = await openNewSubjectWindow(browser, currentSubject!);
     await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     expect(await page2.title()).toEqual(title);
@@ -46,7 +44,9 @@ test.describe('documents', async () => {
     await page.keyboard.press('Enter');
     const syncText = 'New paragraph';
     await page.keyboard.type(syncText);
-    // If this fails to show up, websockets aren't working properly
-    await expect(page2.locator(`text=${syncText}`)).toBeVisible();
+    await expect(
+      page2.locator(`text=${syncText}`),
+      'New paragraph not found in second window. Websockets not working?',
+    ).toBeVisible();
   });
 });

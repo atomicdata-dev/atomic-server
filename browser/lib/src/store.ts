@@ -467,7 +467,8 @@ export class Store {
       return;
     }
 
-    Promise.allSettled(callbacks.map(async cb => cb(resource)));
+    // We clone for react, because otherwise it won't rerender
+    Promise.allSettled(callbacks.map(async cb => cb(resource.clone())));
   }
 
   public async notifyResourceSaved(resource: Resource): Promise<void> {
@@ -720,6 +721,7 @@ export class Store {
     return resources.map(r => r.getSubject());
   }
 
+  /** Posts a Commit to some endpoint. Returns the Commit created by the server. */
   public async postCommit(commit: Commit, endpoint: string): Promise<Commit> {
     return this.client.postCommit(commit, endpoint);
   }
