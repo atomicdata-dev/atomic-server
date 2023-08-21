@@ -34,7 +34,6 @@ const InputCheckBox = styled.input`
   --size: calc(100% - (var(--inset) * 2));
 
   background-color: ${p => p.theme.colors.bg1};
-  appearance: none;
   border: 1px solid ${p => p.theme.colors.bg2};
   width: 1rem;
   height: 1rem;
