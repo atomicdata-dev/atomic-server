@@ -218,9 +218,16 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
     const teststring = `My test: ${timestamp()}`;
     await page.fill('[data-test="message-input"]', teststring);
-    const chatRoomUrl = (await getCurrentSubject(page)) as string;
     await page.keyboard.press('Enter');
-    await expect(page.locator(`text=${teststring}`)).toBeVisible();
+    const chatRoomUrl = (await getCurrentSubject(page)) as string;
+    await expect(
+      page.locator('[data-test="message-input"]'),
+      'Text input not cleared on enter',
+    ).toHaveText('');
+    await expect(
+      page.locator(`text=${teststring}`),
+      'Chat message not appearing directly after sending',
+    ).toBeVisible();
 
     const dropdownId = await page
       .locator(contextMenu)
@@ -261,7 +268,10 @@ test.describe('data-browser', async () => {
     await input.fill('https://ontola.io');
     await page.locator(currentDialogOkButton).click();
 
-    await expect(page.locator(':text-is("Full-service")')).toBeVisible();
+    await expect(
+      page.locator(':text-is("Full-service")'),
+      'Page contents not properly imported',
+    ).toBeVisible();
   });
 
   test('quick edit text typing ux', async ({ page }) => {
@@ -280,15 +290,20 @@ test.describe('data-browser', async () => {
     }
 
     await page.keyboard.press('Escape');
-    await page.waitForLoadState('networkidle');
+
     await expect(
       page.locator(`text=${alphabet}`).first(),
-      'String not correct, bad typing UX. Maybe views are notified of changes twice?',
+      'String not correct after typing, bad typing UX. Maybe views are notified of changes twice?',
     ).toBeVisible();
+
+    // wait for commit debounce
+    // await page.waitForTimeout(2000);
+    // make sure no commits are waiting for each other
+    await page.waitForLoadState('networkidle');
     await page.reload();
     await expect(
       page.locator(`text=${alphabet}`).first(),
-      'Text not visible after reload',
+      'Text not correct after reload',
     ).toBeVisible();
   });
 
@@ -534,11 +549,16 @@ test.describe('data-browser', async () => {
     await expect(
       page.getByRole('heading', { name: 'First Title', level: 1 }),
     ).toBeVisible();
+    // Wait for commit debounce
+    await page.waitForTimeout(500);
 
     await editTitle('Second Title', page);
     await expect(
       page.getByRole('heading', { name: 'Second Title', level: 1 }),
     ).toBeVisible();
+    // Wait for commit debounce
+    await page.waitForTimeout(500);
+
     await contextMenuClick('history', page);
 
     await expect(page.locator('text=History of Second Title')).toBeVisible();

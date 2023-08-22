@@ -81,6 +81,12 @@ test.describe('tables', async () => {
         page.getByRole('gridcell', { name: row.name }),
         `${row.name} row not visible`,
       ).toBeVisible();
+      await expect(
+        page.locator(
+          `[aria-rowindex="${rowIndex + 1}"] > [aria-colindex="${2}"] > input`,
+        ),
+        "Next row's first cell isn't focused",
+      ).toBeFocused();
     };
 
     // --- Test Start ---

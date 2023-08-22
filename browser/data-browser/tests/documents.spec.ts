@@ -37,7 +37,10 @@ test.describe('documents', async () => {
     // multi-user
     const currentSubject = await getCurrentSubject(page);
     const page2 = await openNewSubjectWindow(browser, currentSubject!);
-    await expect(page2.locator(`text=${teststring}`)).toBeVisible();
+    await expect(
+      page2.locator(`text=${teststring}`),
+      'First paragraph title not visible in second tab. Not a websocket issue',
+    ).toBeVisible();
     expect(await page2.title()).toEqual(title);
 
     // Add a new line on first page, check if it appears on the second
@@ -46,7 +49,19 @@ test.describe('documents', async () => {
     await page.keyboard.type(syncText);
     await expect(
       page2.locator(`text=${syncText}`),
-      'New paragraph not found in second window. Websockets not working?',
+      'New paragraph not found in second window. Websockets may not be working.',
     ).toBeVisible();
+
+    // Delete a row, cmd + backspace
+    await page.keyboard.down('Meta');
+    await page.keyboard.press('Backspace');
+    await expect(
+      page.locator(`text=${syncText}`),
+      'Paragraph not deleted in first window.',
+    ).not.toBeVisible();
+    await expect(
+      page2.locator(`text=${syncText}`),
+      'Paragraph not deleted in second window',
+    ).not.toBeVisible();
   });
 });
