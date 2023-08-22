@@ -91,6 +91,10 @@ pub struct Opts {
     /// Combine with `log_level` to get more or less data (`trace` is the most verbose)
     #[clap(value_enum, long, env = "ATOMIC_TRACING", default_value = "stdout")]
     pub trace: Tracing,
+
+    /// Introduces random delays in the server, to simulate a slow connection. Useful for testing.
+    #[clap(long, env = "ATOMIC_SLOW_MODE")]
+    pub slow_mode: bool,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]

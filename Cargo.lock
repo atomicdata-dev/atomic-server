@@ -500,6 +500,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-jaeger",
  "percent-encoding",
+ "rand 0.8.5",
  "rcgen",
  "regex",
  "rio_api 0.7.1",

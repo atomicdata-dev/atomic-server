@@ -9,6 +9,12 @@ pub async fn post_commit(
     appstate: web::Data<AppState>,
     body: String,
 ) -> AtomicServerResult<HttpResponse> {
+    if appstate.config.opts.slow_mode {
+        use rand::Rng;
+        let mut rng = rand::thread_rng();
+        let random_number = rng.gen_range(100..1000);
+        tokio::time::sleep(tokio::time::Duration::from_millis(random_number)).await;
+    }
     let store = &appstate.store;
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;

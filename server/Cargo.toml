@@ -88,6 +88,9 @@ version = "0.34.2"
 features = ["derive", "env", "cargo"]
 version = "4"
 
+[dependencies.rand]
+version = "0.8"
+
 [dependencies.rustls]
 optional = true
 version = "0.20"
