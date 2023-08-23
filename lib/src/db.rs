@@ -388,7 +388,8 @@ impl Storelike for Db {
         }
         endpoint_span.exit();
 
-        let dynamic_span = tracing::span!(tracing::Level::TRACE, "Dynamic").entered();
+        let dynamic_span =
+            tracing::span!(tracing::Level::TRACE, "get_resource_extended (dynamic)").entered();
         let mut resource = self.get_resource(&removed_query_params)?;
 
         let _explanation = crate::hierarchy::check_read(self, &resource, for_agent)?;

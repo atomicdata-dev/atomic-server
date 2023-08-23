@@ -60,7 +60,7 @@ export function EditableTitle({
     ref.current?.select();
   }, [isEditing]);
 
-  return canEdit && isEditing ? (
+  return isEditing ? (
     <TitleInput
       ref={ref}
       data-test='editable-title'
@@ -74,6 +74,7 @@ export function EditableTitle({
     />
   ) : (
     <Title
+      disabled={!canEdit}
       id={id}
       canEdit={!!canEdit}
       title={canEdit ? 'Edit title' : 'View title'}
