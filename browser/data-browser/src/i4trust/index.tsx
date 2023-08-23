@@ -3,14 +3,20 @@ import { ContainerFull } from '../components/Containers';
 import fetch from 'cross-fetch';
 
 const baseUrl =
-  'https://www.mt-dashboard.nl/orion/ngsi-ld/v1/entities/urn:ngsi-ld:Devices:public-eye_';
+  'https://www.mt-dataexchange.nl/orion/ngsi-ld/v1/entities/urn:ngsi-ld:Devices:public-eye_';
 const devices = ['Boardwalk', 'Waterfront', 'MT-Picnic'];
 
 export function I4Trust(): JSX.Element {
+  const [token, setToken] = useLocalStorage('token', '');
+
   return (
     <main>
       <ContainerFull>
         <h1>Orion Sensor Data</h1>
+        <label>
+          Token
+          <input value={token} onChange={e => setToken(e.target.value)} />
+        </label>
         <div
           style={{
             display: 'flex',
@@ -18,9 +24,11 @@ export function I4Trust(): JSX.Element {
             gap: '1rem',
           }}
         >
-          {devices.map(device => (
-            <Device id={device} key={device} />
-          ))}
+          {token &&
+            devices.map(device => (
+              <Device id={device} key={device} token={token} />
+            ))}
+          {!token && <p>Enter a token</p>}
         </div>
       </ContainerFull>
     </main>
@@ -66,22 +74,32 @@ export interface Temporal {
   numValue: NumValue[];
 }
 
-function fetchMeasurement(id: string): Promise<Measurement> {
+function orionFetch<T>(url: string, token: string): Promise<T> {
+  const fetchOpts = {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  };
+
+  return fetch(url, fetchOpts).then(res => res.json());
+}
+
+function fetchMeasurement(id: string, token: string): Promise<Measurement> {
   const url = `${baseUrl}${id}-measurement`;
 
-  return fetch(url).then(res => res.json());
+  return orionFetch(url, token);
 }
 
-function fetchDevice(id: string): Promise<Device> {
+function fetchDevice(id: string, token: string): Promise<Device> {
   const url = `${baseUrl}${id}`;
 
-  return fetch(url).then(res => res.json());
+  return orionFetch(url, token);
 }
 
-function fetchTemporal(id: string): Promise<Temporal> {
-  const url = `https://www.mt-dashboard.nl/orion-temporal/temporal/entities/urn:ngsi-ld:Devices:public-eye_${id}-measurement?lastN=60`;
+function fetchTemporal(id: string, token: string): Promise<Temporal> {
+  const url = `https://www.mt-dataexchange.nl/orion-temporal/temporal/entities/urn:ngsi-ld:Devices:public-eye_${id}-measurement?lastN=60`;
 
-  return fetch(url).then(res => res.json());
+  return orionFetch(url, token);
 }
 
 function timeAgo(dateString?: string): string {
@@ -109,7 +127,7 @@ function timeAgo(dateString?: string): string {
   }
 }
 
-function Device({ id }) {
+function Device({ id, token }) {
   const [measurement, setMeasurement] = React.useState<Measurement | undefined>(
     undefined,
   );
@@ -117,19 +135,32 @@ function Device({ id }) {
   const [temporal, setTemporal] = React.useState<Temporal | undefined>(
     undefined,
   );
-
-  const fetchData = () => {
-    fetchMeasurement(id).then(setMeasurement);
-    fetchDevice(id).then(setDevice);
-    fetchTemporal(id).then(setTemporal);
-  };
+  const [error, setError] = React.useState<Error | undefined>(undefined);
 
   useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const mes = await fetchMeasurement(id, token);
+        setMeasurement(mes);
+        const dev = await fetchDevice(id, token);
+        setDevice(dev);
+        const tmp = await fetchTemporal(id, token);
+        setTemporal(tmp);
+      } catch (e) {
+        console.error(e);
+        setError(e);
+      }
+    };
+
     fetchData();
     const intervalId = setInterval(fetchData, 15000);
 
     return () => clearInterval(intervalId);
-  }, []);
+  }, [token]);
+
+  if (error) {
+    return <div>Error: {error.message}</div>;
+  }
 
   return (
     <div style={{}}>
@@ -164,6 +195,7 @@ import {
   HorizontalGridLines,
   LineMarkSeries,
 } from 'react-vis';
+import { useLocalStorage } from '@tomic/react';
 
 export default function Graph(props) {
   const coordinates = props.temporal?.numValue.map((value, _index) => {
@@ -181,7 +213,7 @@ export default function Graph(props) {
         style={{
           strokeWidth: '3px',
         }}
-        lineStyle={{ stroke: 'red', fill: 'none' }}
+        lineStyle={{ stroke: 'blue', fill: 'none' }}
         markStyle={{ stroke: 'blue' }}
         data={coordinates}
       />

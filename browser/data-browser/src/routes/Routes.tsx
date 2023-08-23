@@ -20,7 +20,7 @@ import { Sandbox } from './Sandbox';
 import { TokenRoute } from './TokenRoute';
 import { ImporterPage } from '../views/ImporterPage';
 import { History } from './History';
-import { I4Trust } from './i4trust';
+import { I4Trust } from '../i4trust';
 
 const homeURL = window.location.origin;
 
