@@ -243,12 +243,9 @@ impl WebSocketConnection {
 impl Handler<CommitMessage> for WebSocketConnection {
     type Result = ();
 
+    #[tracing::instrument(name = "handle_commit", skip_all)]
     fn handle(&mut self, msg: CommitMessage, ctx: &mut ws::WebsocketContext<Self>) {
         let resource = msg.commit_response.commit_resource;
-        tracing::debug!(
-            "handle commit in web socket connection for resource {}",
-            resource.get_subject()
-        );
         let formatted_commit = format!("COMMIT {}", resource.to_json_ad().unwrap());
         ctx.text(formatted_commit);
     }

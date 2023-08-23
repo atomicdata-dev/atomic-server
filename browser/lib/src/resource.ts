@@ -433,6 +433,8 @@ export class Resource {
       this.commitBuilder.setPreviousCommit(lastCommit);
     }
 
+    const wasNew = this.new;
+
     // Cloning the CommitBuilder to prevent race conditions, and keeping a back-up of current state for when things go wrong during posting.
     const oldCommitBuilder = this.commitBuilder.clone();
     this.commitBuilder = new CommitBuilder(this.getSubject());
@@ -471,10 +473,13 @@ export class Resource {
       const createdCommit = await createdCommitPromise;
 
       this.setUnsafe(properties.commit.lastCommit, createdCommit.id!);
-      // The first `SUBSCRIBE` message will not have worked, because the resource didn't exist yet.
-      // That's why we need to repeat the process
-      // https://github.com/atomicdata-dev/atomic-data-rust/issues/486
-      store.subscribeWebSocket(this.subject);
+
+      if (wasNew) {
+        // The first `SUBSCRIBE` message will not have worked, because the resource didn't exist yet.
+        // That's why we need to repeat the process
+        // https://github.com/atomicdata-dev/atomic-data-rust/issues/486
+        store.subscribeWebSocket(this.subject);
+      }
 
       // Let all subscribers know that the commit has been applied
       store.notifyResourceSaved(this);
