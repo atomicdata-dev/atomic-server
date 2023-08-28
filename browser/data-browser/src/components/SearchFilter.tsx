@@ -27,7 +27,7 @@ export function ClassFilter({ filters, setFilters }): JSX.Element {
       <ResourceSelector
         setSubject={setClass}
         value={klass}
-        classType={urls.classes.class}
+        isA={urls.classes.class}
       />
       {allProps?.map(propertySubject => (
         <PropertyFilter

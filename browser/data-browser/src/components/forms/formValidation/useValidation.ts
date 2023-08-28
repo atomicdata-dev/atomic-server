@@ -16,6 +16,10 @@ export function useValidation(
 
   const setError = useCallback((error: string | undefined) => {
     setValidations(prev => {
+      if (prev[id] === error) {
+        return prev;
+      }
+
       return {
         ...prev,
         [id]: error,

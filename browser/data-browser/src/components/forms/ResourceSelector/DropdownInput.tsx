@@ -56,6 +56,8 @@ function isCreateOption(option: unknown): option is CreateOption {
   return option?.type === 'createOption';
 }
 
+// TODO: Component is still used in collection page because we want to show a list of properties there even if the user is not searching anything. We should add predetermined options to Searchbox instead.
+
 /**
  * Renders an input field with a dropdown menu. You can search through the
  * items, select them from a list, clear the entire thing, add new items.
@@ -89,12 +91,12 @@ export const DropdownInput: React.FC<DropDownListProps> = ({
   const openMenuButtonRef = useRef(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useContext(DropdownPortalContext);
-  const {
-    ref: inputWrapperRef,
-    above,
-    below,
-    width,
-  } = useAvailableSpace<HTMLDivElement>(isOpen);
+  const inputWrapperRef = useRef<HTMLDivElement>(null);
+
+  const { above, below, width } = useAvailableSpace<HTMLDivElement>(
+    isOpen,
+    inputWrapperRef,
+  );
 
   /** Close the menu and set the value */
   const handleClickOutside = useCallback(() => {

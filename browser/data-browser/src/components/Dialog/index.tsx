@@ -66,7 +66,7 @@ type DialogSlotComponent = React.FC<React.PropsWithChildren<DialogSlotProps>>;
  *  );
  * ```
  */
-export function Dialog(props) {
+export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
   const portalRef = useContext(DialogPortalContext);
 
   if (!portalRef.current) {
@@ -225,7 +225,8 @@ const DialogActionsSlot = styled(Slot)`
 const StyledInnerDialog = styled.div`
   display: grid;
   grid-template-columns: auto 2rem;
-  grid-template-rows: 1fr auto 1fr;
+  grid-template-rows: 1fr auto auto;
+  gap: 1rem;
   grid-template-areas: 'title close' 'content content' 'actions actions';
   max-height: 100%;
 `;
@@ -263,7 +264,8 @@ const StyledDialog = styled.dialog`
   background-color: ${props => props.theme.colors.bg};
   border-radius: ${props => props.theme.radius};
   border: solid 1px ${props => props.theme.colors.bg2};
-  max-inline-size: min(90vw, 75ch);
+  max-inline-size: min(90vw, 100ch);
+  min-inline-size: min(90vw, 60ch);
   max-block-size: 100vh;
 
   overflow: visible;

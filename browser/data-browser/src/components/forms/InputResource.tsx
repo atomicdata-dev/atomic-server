@@ -27,7 +27,7 @@ export function InputResource({
     <div>
       <ResourceSelector
         error={error}
-        classType={property.classType}
+        isA={property.classType}
         setSubject={setSubject}
         value={subject}
         parent={resource.getSubject()}

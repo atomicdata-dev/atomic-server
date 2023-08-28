@@ -22,6 +22,7 @@ import { DropdownContainer } from './components/Dropdown/DropdownContainer';
 import { PopoverContainer } from './components/Popover';
 import { SkipNav } from './components/SkipNav';
 import { ControlLockProvider } from './hooks/useControlLock';
+import { FormValidationContextProvider } from './components/forms/formValidation/FormValidationContextProvider';
 
 function fixDevUrl(url: string) {
   if (isDev()) {
@@ -82,21 +83,26 @@ function App(): JSX.Element {
                   <GlobalStyle />
                   {/* @ts-ignore fallback component type too strict */}
                   <ErrBoundary FallbackComponent={CrashPage}>
-                    <Toaster />
-                    <MetaSetter />
-                    <DropdownContainer>
-                      <DialogContainer>
-                        <PopoverContainer>
-                          <DropdownContainer>
-                            <SkipNav />
-                            <NavWrapper>
-                              <AppRoutes />
-                            </NavWrapper>
-                          </DropdownContainer>
-                        </PopoverContainer>
-                        <NetworkIndicator />
-                      </DialogContainer>
-                    </DropdownContainer>
+                    {/* Default form validation provider. Does not do anyting on its own but will make sure useValidation works without context*/}
+                    <FormValidationContextProvider
+                      onValidationChange={() => undefined}
+                    >
+                      <Toaster />
+                      <MetaSetter />
+                      <DropdownContainer>
+                        <DialogContainer>
+                          <PopoverContainer>
+                            <DropdownContainer>
+                              <SkipNav />
+                              <NavWrapper>
+                                <AppRoutes />
+                              </NavWrapper>
+                            </DropdownContainer>
+                          </PopoverContainer>
+                          <NetworkIndicator />
+                        </DialogContainer>
+                      </DropdownContainer>
+                    </FormValidationContextProvider>
                   </ErrBoundary>
                 </ThemeWrapper>
               </HotKeysWrapper>

@@ -1,5 +1,5 @@
 import { urls, useStore, useString } from '@tomic/react';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { styled } from 'styled-components';
 import { ResourceSelector } from '../../../components/forms/ResourceSelector';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
@@ -16,8 +16,6 @@ export function RelationPropertyForm({
     valueOpts,
   );
 
-  const [error, setError] = useState<Error>();
-
   useEffect(() => {
     resource.set(urls.properties.datatype, urls.datatypes.atomicUrl, store);
   }, []);
@@ -27,13 +25,11 @@ export function RelationPropertyForm({
       <Label as='label'>
         <strong>Resource type:</strong>
         <ResourceSelector
-          classType={urls.classes.class}
+          isA={urls.classes.class}
           value={classType}
           setSubject={setClassType}
-          onValidate={setError}
         />
       </Label>
-      {error}
     </>
   );
 }
