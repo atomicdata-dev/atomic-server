@@ -79,8 +79,7 @@ export default function InputResourceArray({
               value={subject}
               setSubject={handleSetSubjectList[index]}
               error={errMaybe(index)}
-              onValidate={setErr}
-              classType={property.classType}
+              isA={property.classType}
               handleRemove={handleRemoveRowList[index]}
               parent={resource.getSubject()}
               {...props}
