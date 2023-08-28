@@ -22,6 +22,10 @@ export interface ButtonProps
   className?: string;
 }
 
+interface ButtonPropsStyled {
+  gutter?: boolean;
+}
+
 const getButtonComp = ({ clean, icon, subtle, alert }: ButtonProps) => {
   let Comp = ButtonDefault;
 
@@ -38,6 +42,7 @@ const getButtonComp = ({ clean, icon, subtle, alert }: ButtonProps) => {
   }
 
   if (clean) {
+    // @ts-ignore
     Comp = ButtonClean;
   }
 
@@ -48,10 +53,13 @@ export const Button = React.forwardRef<
   HTMLButtonElement,
   React.PropsWithChildren<ButtonProps>
 >(({ children, loading, ...props }, ref): JSX.Element => {
+  // Filter out props that should not be passed to the button element or styled component.
+  const { icon: _icon, ...buttonProps } = props;
+
   const Comp = getButtonComp(props);
 
   return (
-    <Comp type='button' {...props} ref={ref}>
+    <Comp type='button' {...buttonProps} ref={ref}>
       {loading ? <Spinner /> : children}
     </Comp>
   );
@@ -60,14 +68,14 @@ export const Button = React.forwardRef<
 Button.displayName = 'Button';
 
 /** Extremly minimal set of button properties */
-export const ButtonClean = styled.button<ButtonProps>`
+export const ButtonClean = styled.button<ButtonPropsStyled>`
   cursor: pointer;
   border: none;
   font-size: inherit;
   padding: 0;
   color: inherit;
   margin: 0;
-  -webkit-appearance: none;
+  appearance: none;
   background-color: initial;
   -webkit-tap-highlight-color: transparent; /* Remove the tap / click effect on touch devices */
 `;
@@ -77,6 +85,7 @@ export const ButtonBase = styled(ButtonClean)`
   height: 2rem;
   display: flex;
   align-items: center;
+  gap: 1ch;
   justify-content: center;
   background-color: ${props => props.theme.colors.main};
   color: ${props => props.theme.colors.bg};
@@ -146,7 +155,7 @@ export const ButtonBar = styled(ButtonClean)<ButtonBarProps>`
 
 /** Button with some optional margins around it */
 // eslint-disable-next-line prettier/prettier
-export const ButtonDefault = styled(ButtonBase)<ButtonProps>`
+export const ButtonDefault = styled(ButtonBase)<ButtonPropsStyled>`
   --button-bg-color: ${p => p.theme.colors.main};
   --button-bg-color-hover: ${p => p.theme.colors.mainLight};
   --button-border-color: ${p => p.theme.colors.main};
@@ -158,7 +167,6 @@ export const ButtonDefault = styled(ButtonBase)<ButtonProps>`
   border-radius: ${p => p.theme.radius};
   padding-left: ${p => p.theme.margin}rem;
   padding-right: ${p => p.theme.margin}rem;
-  /* box-shadow: ${p => (p.subtle ? p.theme.boxShadow : 'none')}; */
   display: inline-flex;
   background-color: var(--button-bg-color);
   color: var(--button-text-color);

@@ -110,7 +110,7 @@ function NewResourceSelector() {
             setSubject={setClassInputValue}
             value={classInputValue}
             error={error}
-            classType={urls.classes.class}
+            isA={urls.classes.class}
           />
         </div>
         <FileDropzoneInput

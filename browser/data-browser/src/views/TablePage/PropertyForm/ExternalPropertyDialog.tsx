@@ -9,7 +9,7 @@ import {
 import { ResourceSelector } from '../../../components/forms/ResourceSelector';
 import { Resource, urls, useArray } from '@tomic/react';
 import { Button } from '../../../components/Button';
-import { ErrorLook } from '../../../components/ErrorLook';
+import { FormValidationContextProvider } from '../../../components/forms/formValidation/FormValidationContextProvider';
 
 interface ExternalPropertyDialogProps {
   open: boolean;
@@ -23,7 +23,7 @@ export function ExternalPropertyDialog({
   tableClassResource,
 }: ExternalPropertyDialogProps): JSX.Element {
   const [subject, setSubject] = useState<string | undefined>();
-  const [error, setError] = useState<Error | undefined>();
+  const [isValid, setIsValid] = useState(false);
 
   const [recommends, setRecommends] = useArray(
     tableClassResource,
@@ -48,27 +48,28 @@ export function ExternalPropertyDialog({
 
   return (
     <Dialog {...dialogProps}>
-      <DialogTitle>
-        <h1>Add external property</h1>
-      </DialogTitle>
-      <DialogContent>
-        <ResourceSelector
-          hideCreateOption
-          setSubject={setSubject}
-          value={subject}
-          onValidate={setError}
-          classType={urls.classes.property}
-        />
-        {error && <ErrorLook>{error.message}</ErrorLook>}
-      </DialogContent>
-      <DialogActions>
-        <Button subtle onClick={() => hide()}>
-          Cancel
-        </Button>
-        <Button disabled={!subject || !!error} onClick={onAddClick}>
-          Add
-        </Button>
-      </DialogActions>
+      <FormValidationContextProvider onValidationChange={setIsValid}>
+        <DialogTitle>
+          <h1>Add external property</h1>
+        </DialogTitle>
+        <DialogContent>
+          <ResourceSelector
+            required
+            hideCreateOption
+            setSubject={setSubject}
+            value={subject}
+            isA={urls.classes.property}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button subtle onClick={() => hide()}>
+            Cancel
+          </Button>
+          <Button disabled={!isValid} onClick={onAddClick}>
+            Add
+          </Button>
+        </DialogActions>
+      </FormValidationContextProvider>
     </Dialog>
   );
 }

@@ -34,7 +34,7 @@ export const InputWrapper = styled.div<InputWrapperProps>`
   border-radius: ${props => props.theme.radius};
   overflow: hidden;
 
-  &:hover {
+  &:hover:has(input:not(:disabled)) {
     border-color: ${props => props.theme.colors.main};
   }
   &:focus-within {

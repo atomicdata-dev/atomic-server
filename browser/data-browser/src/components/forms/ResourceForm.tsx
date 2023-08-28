@@ -223,12 +223,11 @@ export function ResourceForm({
           </Button>
           <ResourceSelector
             value={undefined}
-            setSubject={(set, _setNewPropErr) => {
+            setSubject={set => {
               setNewProperty(set);
             }}
             error={newPropErr}
-            setError={setNewPropErr}
-            classType={urls.classes.property}
+            isA={urls.classes.property}
           />
         </PropertyAdder>
         {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
