@@ -80,7 +80,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             allows_only: None,
         },
         Property {
-            class_type: Some(urls::PROPERTY.into()),
+            class_type: None,
             data_type: DataType::AtomicUrl,
             shortname: "parent".into(),
             description: "The parent of a Resource sets the hierarchical structure of the Resource, and therefore also the rights / grants. It is used for both navigation, structure and authorization. Parents are the inverse of [children](https://atomicdata.dev/properties/children).".into(),
