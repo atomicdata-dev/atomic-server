@@ -88,7 +88,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
             allows_only: None,
         },
         Property {
-            class_type: Some(urls::PROPERTY.into()),
+            class_type: None,
             data_type: DataType::ResourceArray,
             shortname: "allows-only".into(),
             description: "Restricts this Property to only the values inside this one. This essentially turns the Property into an `enum`.".into(),
