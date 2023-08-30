@@ -1,26 +1,36 @@
-import { styled, keyframes } from 'styled-components';
+import { styled, keyframes, css } from 'styled-components';
 
 const fadeIn = keyframes`
   from {
     opacity: 0;
-    top: var(--error-chip-starting-position);
+    top: var(--error-chip-start);
   }
   to {
     opacity: 1;
-    top: 0.5rem;
+    top: var(--error-chip-end);
   }
 `;
 
-export const ErrorChip = styled.span<{ noMovement?: boolean }>`
-  --error-chip-starting-position: ${p => (p.noMovement ? '0.5rem' : '0rem')};
+export const ErrorChip = styled.span<{
+  noMovement?: boolean;
+  top?: string;
+}>`
+  --error-chip-end: ${p => p.top ?? '0.5rem'};
+  --error-chip-start: calc(var(--error-chip-end) - 0.5rem);
   position: relative;
-  top: 0.5rem;
+  top: var(--error-chip-end);
   background-color: ${p => p.theme.colors.alert};
   color: white;
   padding: 0.25rem 0.5rem;
   border-radius: ${p => p.theme.radius};
-  animation: ${fadeIn} 0.1s ease-in-out;
   box-shadow: ${p => p.theme.boxShadowSoft};
+
+  ${p =>
+    !p.noMovement
+      ? css`
+          animation: ${fadeIn} 0.1s ease-in-out;
+        `
+      : ''}
 
   &::before {
     --triangle-size: 0.5rem;
@@ -33,4 +43,9 @@ export const ErrorChip = styled.span<{ noMovement?: boolean }>`
     background-color: ${p => p.theme.colors.alert};
     clip-path: polygon(0% 100%, 100% 100%, 50% 0%);
   }
+`;
+
+export const ErrorChipInput = styled(ErrorChip)`
+  position: absolute;
+  --error-chip-end: ${p => p.top ?? '2rem'};
 `;

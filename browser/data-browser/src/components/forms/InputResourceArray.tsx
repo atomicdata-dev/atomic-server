@@ -12,11 +12,13 @@ import { useIndexDependantCallback } from '../../hooks/useIndexDependantCallback
 export default function InputResourceArray({
   resource,
   property,
+  commit,
   ...props
 }: InputProps): JSX.Element {
   const [err, setErr] = useState<ArrayError | undefined>(undefined);
   const [array, setArray] = useArray(resource, property.subject, {
     validate: false,
+    commit,
   });
   /** Add focus to the last added item */
   const [lastIsNew, setLastIsNew] = useState(false);

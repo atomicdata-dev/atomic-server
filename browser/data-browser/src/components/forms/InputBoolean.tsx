@@ -6,14 +6,16 @@ import { ErrMessage, InputStyled } from './InputStyles';
 export default function InputBoolean({
   resource,
   property,
+  commit,
   ...props
 }: InputProps): JSX.Element {
   const [err, setErr] = useState<Error | undefined>(undefined);
   const [value, setValue] = useBoolean(resource, property.subject, {
     handleValidationError: setErr,
+    commit,
   });
 
-  function handleUpdate(e) {
+  function handleUpdate(e: React.ChangeEvent<HTMLInputElement>) {
     setValue(e.target.checked);
   }
 

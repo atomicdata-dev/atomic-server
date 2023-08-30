@@ -4,6 +4,7 @@ import styled from 'styled-components';
 import { Details } from '../../components/Details';
 import { FaAtom, FaCube, FaHashtag } from 'react-icons/fa';
 import { ScrollArea } from '../../components/ScrollArea';
+import { toAnchorId } from './toAnchorId';
 
 interface OntologySidebarProps {
   ontology: Resource;
@@ -78,7 +79,9 @@ function Item({ subject }: ItemProps): JSX.Element {
 
   return (
     <StyledLi>
-      <ItemLink href={`#list-item-${subject}`}>{resource.title}</ItemLink>
+      <ItemLink href={`#${toAnchorId(subject)}`} error={!!resource.error}>
+        {resource.title}
+      </ItemLink>
     </StyledLi>
   );
 }
@@ -107,12 +110,12 @@ const StyledLi = styled.li`
   margin-bottom: 0;
 `;
 
-const ItemLink = styled.a`
+const ItemLink = styled.a<{ error: boolean }>`
   padding-left: 1rem;
   padding-block: 0.2rem;
   border-radius: ${p => p.theme.radius};
   display: block;
-  color: ${p => p.theme.colors.textLight};
+  color: ${p => (p.error ? p.theme.colors.alert : p.theme.colors.textLight)};
   text-decoration: none;
   width: 100%;
   &:hover,
@@ -126,5 +129,6 @@ const ItemLink = styled.a`
 const SideBarScrollArea = styled(ScrollArea)`
   overflow: hidden;
   padding: ${p => p.theme.margin}rem;
+  padding-left: 0.5rem;
   max-height: 100vh;
 `;

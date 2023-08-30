@@ -1,13 +1,14 @@
 import React from 'react';
-import { Card } from '../../components/Card';
+import { Card } from '../../../components/Card';
 import { urls, useArray, useResource, useString } from '@tomic/react';
 import { FaHashtag } from 'react-icons/fa';
 import styled from 'styled-components';
-import Markdown from '../../components/datatypes/Markdown';
-import { Column, Row } from '../../components/Row';
-import { InlineFormattedResourceList } from '../../components/InlineFormattedResourceList';
-import { InlineDatatype } from './InlineDatatype';
-import { AtomicLink } from '../../components/AtomicLink';
+import Markdown from '../../../components/datatypes/Markdown';
+import { Column, Row } from '../../../components/Row';
+import { InlineFormattedResourceList } from '../../../components/InlineFormattedResourceList';
+import { InlineDatatype } from '../InlineDatatype';
+import { AtomicLink } from '../../../components/AtomicLink';
+import { toAnchorId } from '../toAnchorId';
 
 interface PropertyCardReadProps {
   subject: string;
@@ -21,7 +22,7 @@ export function PropertyCardRead({
   const [allowsOnly] = useArray(resource, urls.properties.allowsOnly);
 
   return (
-    <StyledCard id={`list-item-${subject}`}>
+    <StyledCard id={toAnchorId(subject)}>
       <Column>
         <Row center justify='space-between'>
           <Heading>

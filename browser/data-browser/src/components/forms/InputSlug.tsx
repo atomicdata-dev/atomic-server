@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
+import { stringToSlug } from '../../helpers/stringToSlug';
+import { useValidation } from './formValidation/useValidation';
 import styled from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
-import { useValidation } from './formValidation/useValidation';
 
-export default function InputString({
+export default function InputSlug({
   resource,
   property,
   commit,
@@ -15,21 +16,30 @@ export default function InputString({
   const [err, setErr, onBlur] = useValidation();
 
   const [value, setValue] = useString(resource, property.subject, {
+    handleValidationError: setErr,
     commit,
   });
 
+  const [inputValue, setInputValue] = useState(value);
+
   function handleUpdate(event: React.ChangeEvent<HTMLInputElement>): void {
-    const newval = event.target.value;
-    setValue(newval);
+    const newValue = stringToSlug(event.target.value);
+    setInputValue(newValue);
+
+    setErr(undefined);
 
     try {
-      validateDatatype(newval, property.datatype);
-      setErr(undefined);
+      if (newValue === '') {
+        setValue(undefined);
+      } else {
+        validateDatatype(newValue, property.datatype);
+        setValue(newValue);
+      }
     } catch (e) {
-      setErr('Invalid value');
+      setErr('Invalid Slug');
     }
 
-    if (props.required && newval === '') {
+    if (props.required && newValue === '') {
       setErr('Required');
     }
   }
@@ -38,13 +48,13 @@ export default function InputString({
     <Wrapper>
       <InputWrapper invalid={!!err}>
         <InputStyled
-          value={value === undefined ? '' : value}
+          value={inputValue ?? ''}
           onChange={handleUpdate}
-          {...props}
           onBlur={onBlur}
+          {...props}
         />
       </InputWrapper>
-      {err && <ErrorChipInput>{err}</ErrorChipInput>}
+      {err && <ErrorChipInput top='2rem'>{err}</ErrorChipInput>}
     </Wrapper>
   );
 }

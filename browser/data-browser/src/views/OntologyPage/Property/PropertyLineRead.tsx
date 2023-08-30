@@ -1,8 +1,9 @@
 import { urls, useResource, useString } from '@tomic/react';
 import React from 'react';
 import styled from 'styled-components';
-import Markdown from '../../components/datatypes/Markdown';
-import { InlineDatatype } from './InlineDatatype';
+import Markdown from '../../../components/datatypes/Markdown';
+import { InlineDatatype } from '../InlineDatatype';
+import { ErrorLook } from '../../../components/ErrorLook';
 
 interface PropertyLineReadProps {
   subject: string;
@@ -13,6 +14,14 @@ export function PropertyLineRead({
 }: PropertyLineReadProps): JSX.Element {
   const resource = useResource(subject);
   const [description] = useString(resource, urls.properties.description);
+
+  if (resource.error) {
+    return (
+      <tr>
+        <ErrorLook>Property does not exist anymore</ErrorLook>
+      </tr>
+    );
+  }
 
   return (
     <tr>

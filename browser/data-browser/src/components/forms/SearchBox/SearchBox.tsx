@@ -15,6 +15,7 @@ import { ErrorChip } from '../ErrorChip';
 import { useValidation } from '../formValidation/useValidation';
 
 interface SearchBoxProps {
+  autoFocus?: boolean;
   value: string | undefined;
   isA?: string;
   scope?: string;
@@ -24,9 +25,11 @@ interface SearchBoxProps {
   className?: string;
   onChange: (value: string | undefined) => void;
   onCreateItem?: (name: string) => void;
+  onClose?: () => void;
 }
 
 export function SearchBox({
+  autoFocus,
   value,
   isA,
   scope,
@@ -37,6 +40,7 @@ export function SearchBox({
   children,
   onChange,
   onCreateItem,
+  onClose,
 }: React.PropsWithChildren<SearchBoxProps>): JSX.Element {
   const selectedResource = useResource(value);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -52,16 +56,21 @@ export function SearchBox({
     placeholder ??
     `Search for a ${isA ? typeResource.title : 'resource'} or enter a URL...`;
 
-  const handleExit = useCallback((lostFocus: boolean) => {
-    setOpen(false);
-    handleBlur();
+  const handleExit = useCallback(
+    (lostFocus: boolean) => {
+      setOpen(false);
+      handleBlur();
 
-    if (!lostFocus) {
-      triggerRef.current?.focus();
-    } else {
-      setJustFocussed(false);
-    }
-  }, []);
+      if (!lostFocus) {
+        triggerRef.current?.focus();
+      } else {
+        setJustFocussed(false);
+      }
+
+      onClose?.();
+    },
+    [onClose],
+  );
 
   const handleSelect = useCallback(
     (newValue: string) => {
@@ -97,7 +106,7 @@ export function SearchBox({
     }
 
     if (selectedResource.error) {
-      setError('Invalid Resource');
+      setError('Invalid Resource', true);
 
       return;
     }
@@ -114,6 +123,7 @@ export function SearchBox({
           invalid={!!error}
         >
           <TriggerButton
+            autoFocus={autoFocus}
             disabled={disabled}
             ref={triggerRef}
             tabIndex={0}
@@ -127,7 +137,7 @@ export function SearchBox({
             {value ? (
               <ResourceTitle>
                 {selectedResource.error
-                  ? 'Invalid Resource'
+                  ? selectedResource.getSubject()
                   : selectedResource.title}
               </ResourceTitle>
             ) : (
@@ -210,6 +220,7 @@ const ResourceTitle = styled.span`
   color: var(--search-box-hightlight);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 `;
 
 const PlaceholderText = styled.span`

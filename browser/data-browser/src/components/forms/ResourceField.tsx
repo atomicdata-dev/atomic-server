@@ -115,6 +115,7 @@ export type InputProps = {
   disabled?: boolean;
   /** Whether the field should be focused on render */
   autoFocus?: boolean;
+  commit?: boolean;
 };
 
 interface IFieldProps {
