@@ -5,19 +5,20 @@ import {
   urls,
   reverseDatatypeMapping,
   unknownSubject,
+  useResource,
 } from '@tomic/react';
 import { ResourceInline } from '../ResourceInline';
-import styled from 'styled-components';
+import { toAnchorId } from './toAnchorId';
+import { useOntologyContext } from './OntologyContext';
 
 interface TypeSuffixProps {
   resource: Resource;
 }
 
-export function InlineDatatype({
-  resource,
-}: TypeSuffixProps): JSX.Element | null {
+export function InlineDatatype({ resource }: TypeSuffixProps): JSX.Element {
   const [datatype] = useString(resource, urls.properties.datatype);
   const [classType] = useString(resource, urls.properties.classType);
+  const { hasClass } = useOntologyContext();
 
   const name = reverseDatatypeMapping[datatype ?? unknownSubject];
 
@@ -29,8 +30,22 @@ export function InlineDatatype({
     <span>
       {name}
       {'<'}
-      <ResourceInline subject={classType} />
+      {hasClass(classType) ? (
+        <LocalLink subject={classType} />
+      ) : (
+        <ResourceInline subject={classType} />
+      )}
       {'>'}
     </span>
   );
+}
+
+interface LocalLinkProps {
+  subject: string;
+}
+
+function LocalLink({ subject }: LocalLinkProps): JSX.Element {
+  const resource = useResource(subject);
+
+  return <a href={`#${toAnchorId(subject)}`}>{resource.title}</a>;
 }

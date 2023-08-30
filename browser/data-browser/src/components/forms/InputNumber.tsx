@@ -6,14 +6,16 @@ import { ErrMessage, InputStyled, InputWrapper } from './InputStyles';
 export default function InputNumber({
   resource,
   property,
+  commit,
   ...props
 }: InputProps): JSX.Element {
   const [err, setErr] = useState<Error | undefined>(undefined);
   const [value, setValue] = useNumber(resource, property.subject, {
     handleValidationError: setErr,
+    commit,
   });
 
-  function handleUpdate(e) {
+  function handleUpdate(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.value === '') {
       setValue(undefined);
 
@@ -21,7 +23,6 @@ export default function InputNumber({
     }
 
     const newval = +e.target.value;
-    // I pass the error setter for validation purposes
     setValue(newval);
   }
 

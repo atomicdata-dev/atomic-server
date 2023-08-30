@@ -34,25 +34,40 @@ import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 
+export enum ContextMenuOptions {
+  View = 'view',
+  Data = 'data',
+  Edit = 'edit',
+  Refresh = 'refresh',
+  Scope = 'scope',
+  Share = 'share',
+  Delete = 'delete',
+  History = 'history',
+  Import = 'import',
+}
+
 export interface ResourceContextMenuProps {
   subject: string;
-  // ID's of actions that are hidden
-  hide?: string[];
+  // If given only these options will appear in the list.
+  showOnly?: ContextMenuOptions[];
   trigger?: DropdownTriggerRenderFunction;
   simple?: boolean;
   /** If it's the primary menu in the navbar. Used for triggering keyboard shortcut */
   isMainMenu?: boolean;
   bindActive?: (active: boolean) => void;
+  /** Callback that is called after the resource was deleted */
+  onAfterDelete?: () => void;
 }
 
 /** Dropdown menu that opens a bunch of actions for some resource */
 function ResourceContextMenu({
   subject,
-  hide,
+  showOnly,
   trigger,
   simple,
   isMainMenu,
   bindActive,
+  onAfterDelete,
 }: ResourceContextMenuProps) {
   const store = useStore();
   const navigate = useNavigate();
@@ -69,6 +84,7 @@ function ResourceContextMenu({
 
     try {
       await resource.destroy(store);
+      onAfterDelete?.();
       toast.success('Resource deleted!');
 
       if (currentSubject === subject) {
@@ -77,7 +93,7 @@ function ResourceContextMenu({
     } catch (error) {
       toast.error(error.message);
     }
-  }, [resource, navigate, currentSubject]);
+  }, [resource, navigate, currentSubject, onAfterDelete]);
 
   if (subject === undefined) {
     return null;
@@ -93,14 +109,14 @@ function ResourceContextMenu({
       : [
           {
             disabled: location.pathname.startsWith(paths.show),
-            id: 'view',
+            id: ContextMenuOptions.View,
             label: 'normal view',
             helper: 'Open the regular, default View.',
             onClick: () => navigate(constructOpenURL(subject)),
           },
           {
             disabled: location.pathname.startsWith(paths.data),
-            id: 'data',
+            id: ContextMenuOptions.Data,
             label: 'data view',
             helper: 'View the resource and its properties in the Data View.',
             shortcut: shortcuts.data,
@@ -108,7 +124,7 @@ function ResourceContextMenu({
           },
           DIVIDER,
           {
-            id: 'refresh',
+            id: ContextMenuOptions.Refresh,
             icon: <FaRedo />,
             label: 'refresh',
             helper:
@@ -118,7 +134,7 @@ function ResourceContextMenu({
         ]),
     {
       // disabled: !canWrite || location.pathname.startsWith(paths.edit),
-      id: 'edit',
+      id: ContextMenuOptions.Edit,
       label: 'edit',
       helper: 'Open the edit form.',
       icon: <FaEdit />,
@@ -126,7 +142,7 @@ function ResourceContextMenu({
       onClick: () => navigate(editURL(subject)),
     },
     {
-      id: 'scope',
+      id: ContextMenuOptions.Scope,
       label: 'search in',
       helper: 'Scope search to resource',
       icon: <FaSearch />,
@@ -134,7 +150,7 @@ function ResourceContextMenu({
     },
     {
       // disabled: !canWrite || history.location.pathname.startsWith(paths.edit),
-      id: 'share',
+      id: ContextMenuOptions.Share,
       label: 'share',
       icon: <FaShareSquare />,
       helper: 'Open the share menu',
@@ -142,22 +158,21 @@ function ResourceContextMenu({
     },
     {
       // disabled: !canWrite,
-      id: 'delete',
+      id: ContextMenuOptions.Delete,
       icon: <FaTrash />,
       label: 'delete',
-      helper:
-        'Fetch the resouce again from the server, possibly see new changes.',
+      helper: 'Delete this resource.',
       onClick: () => setShowDeleteDialog(true),
     },
     {
-      id: 'history',
+      id: ContextMenuOptions.History,
       icon: <FaClock />,
       label: 'history',
       helper: 'Show the history of this resource',
       onClick: () => navigate(historyURL(subject)),
     },
     {
-      id: 'import',
+      id: ContextMenuOptions.Import,
       icon: <FaDownload />,
       label: 'import',
       helper: 'Import Atomic Data to this resource',
@@ -165,8 +180,11 @@ function ResourceContextMenu({
     },
   ];
 
-  const filteredItems = hide
-    ? items.filter(item => !isItem(item) || !hide.includes(item.id))
+  const filteredItems = showOnly
+    ? items.filter(
+        item =>
+          !isItem(item) || showOnly.includes(item.id as ContextMenuOptions),
+      )
     : items;
 
   const triggerComp = trigger ?? buildDefaultTrigger(<FaEllipsisV />);

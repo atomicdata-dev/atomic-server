@@ -6,7 +6,7 @@ export function useValidation(
   initialValue?: string | undefined,
 ): [
   error: string | undefined,
-  setError: (error: string | undefined) => void,
+  setError: (error: Error | string | undefined, immediate?: boolean) => void,
   onBlur: () => void,
 ] {
   const id = useId();
@@ -14,18 +14,27 @@ export function useValidation(
   const [touched, setTouched] = useState(false);
   const { setValidations, validations } = useContext(FormValidationContext);
 
-  const setError = useCallback((error: string | undefined) => {
-    setValidations(prev => {
-      if (prev[id] === error) {
-        return prev;
-      }
+  const setError = useCallback(
+    (error: Error | string | undefined, immediate = false) => {
+      const err = error instanceof Error ? error.message : error;
 
-      return {
-        ...prev,
-        [id]: error,
-      };
-    });
-  }, []);
+      setValidations(prev => {
+        if (prev[id] === err) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          [id]: err,
+        };
+      });
+
+      if (immediate) {
+        setTouched(true);
+      }
+    },
+    [],
+  );
 
   const handleBlur = useCallback(() => {
     setTouched(true);

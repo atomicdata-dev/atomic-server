@@ -189,15 +189,15 @@ export function isNumber(val: JSONValue): val is number {
 }
 
 export const reverseDatatypeMapping = {
-  [Datatype.ATOMIC_URL]: 'Resource',
+  [Datatype.STRING]: 'String',
+  [Datatype.SLUG]: 'Slug',
+  [Datatype.MARKDOWN]: 'Markdown',
+  [Datatype.INTEGER]: 'Integer',
+  [Datatype.FLOAT]: 'Float',
   [Datatype.BOOLEAN]: 'Boolean',
   [Datatype.DATE]: 'Date',
-  [Datatype.FLOAT]: 'Float',
-  [Datatype.INTEGER]: 'Integer',
-  [Datatype.MARKDOWN]: 'Markdown',
-  [Datatype.RESOURCEARRAY]: 'ResourceArray',
-  [Datatype.SLUG]: 'Slug',
-  [Datatype.STRING]: 'String',
   [Datatype.TIMESTAMP]: 'Timestamp',
+  [Datatype.ATOMIC_URL]: 'Resource',
+  [Datatype.RESOURCEARRAY]: 'ResourceArray',
   [Datatype.UNKNOWN]: 'Unknown',
 };
