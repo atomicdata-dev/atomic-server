@@ -491,11 +491,7 @@ export function parseAndApplyCommit(jsonAdObjStr: string, store: Store) {
   } else {
     resource.appliedCommitSignatures.add(signature);
 
-    if (isNew) {
-      store.addResources(resource);
-    } else {
-      store.notify(resource.clone());
-    }
+    store.addResources(resource);
   }
 }
 

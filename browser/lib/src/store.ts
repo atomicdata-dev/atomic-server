@@ -143,8 +143,15 @@ export class Store {
     // Check if the resource is the same as the one we already have, if so, we don't want to notify the store so we don't trigger rerenders.
     const storeResource = this.resources.get(resource.getSubject());
 
+    if (
+      resource.getSubject() ===
+      'http://localhost:9883/drive/tu7vhq3388g/folder/m8lfc263tw8'
+    ) {
+      console.trace(resource);
+    }
+
     if (storeResource) {
-      if (Resource.compare(storeResource, resource)) {
+      if (resource.equals(storeResource)) {
         return;
       }
     }
@@ -454,21 +461,6 @@ export class Store {
     }
 
     return !window?.navigator?.onLine;
-  }
-
-  /** Let's subscribers know that a resource has been changed. Time to update your views!
-   * Note that when using this in React, we need the Resource to be Cloned in order to update.
-   */
-  public async notify(resource: Resource): Promise<void> {
-    const subject = resource.getSubject();
-    const callbacks = this.subscribers.get(subject);
-
-    if (callbacks === undefined) {
-      return;
-    }
-
-    // We clone for react, because otherwise it won't rerender
-    Promise.allSettled(callbacks.map(async cb => cb(resource.clone())));
   }
 
   public async notifyResourceSaved(resource: Resource): Promise<void> {
@@ -784,6 +776,22 @@ export class Store {
     }
 
     return url;
+  }
+
+  /** Lets subscribers know that a resource has been changed. Time to update your views. */
+  private async notify(resource: Resource): Promise<void> {
+    const subject = resource.getSubject();
+    const callbacks = this.subscribers.get(subject);
+
+    if (callbacks === undefined) {
+      return;
+    }
+
+    // Clone once
+    const cloned = resource.clone();
+
+    // We clone for react, because otherwise it won't rerender
+    Promise.allSettled(callbacks.map(async cb => cb(cloned)));
   }
 }
 

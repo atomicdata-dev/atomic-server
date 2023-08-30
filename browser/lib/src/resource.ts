@@ -30,6 +30,8 @@ export const unknownSubject = 'unknown-subject';
  * / Value combinations.
  */
 export class Resource {
+  // WARNING: WHEN ADDING A PROPERTY, ALSO ADD IT TO THE CLONE METHOD
+
   /** If the resource could not be fetched, we put that info here. */
   public error?: Error;
   /** If the commit could not be saved, we put that info here. */
@@ -50,8 +52,6 @@ export class Resource {
   private commitBuilder: CommitBuilder;
   private subject: string;
   private propvals: PropVals;
-
-  private queuedFetch: Promise<unknown> | undefined;
 
   public constructor(subject: string, newResource?: boolean) {
     if (typeof subject !== 'string') {
@@ -75,19 +75,40 @@ export class Resource {
       this.subject) as string;
   }
 
-  /** Checks if the content of two Resource instances is equal
-   * Warning: does not check CommitBuilder, loading state
-   */
-  public static compare(resourceA: Resource, resourceB: Resource): boolean {
-    if (resourceA.error !== resourceB.error) {
+  /** Checks if the content of two Resource instances is equal*/
+
+  public equals(resourceB: Resource): boolean {
+    if (this.getSubject() !== resourceB.getSubject()) {
       return false;
     }
 
-    return (
-      resourceA.getSubject() === resourceB.getSubject() &&
-      JSON.stringify(Array.from(resourceA.propvals.entries())) ===
-        JSON.stringify(Array.from(resourceB.propvals.entries()))
-    );
+    if (this.new !== resourceB.new) {
+      return false;
+    }
+
+    if (this.error !== resourceB.error) {
+      return false;
+    }
+
+    if (this.loading !== resourceB.loading) {
+      return false;
+    }
+
+    if (
+      JSON.stringify(Array.from(this.propvals.entries())) ===
+      JSON.stringify(Array.from(resourceB.propvals.entries()))
+    ) {
+      return false;
+    }
+
+    if (
+      JSON.stringify(Array.from(this.commitBuilder.set.entries())) ===
+      JSON.stringify(Array.from(resourceB.commitBuilder.set.entries()))
+    ) {
+      return false;
+    }
+
+    return true;
   }
 
   /** Checks if the agent has write rights by traversing the graph. Recursive function. */
@@ -143,12 +164,10 @@ export class Resource {
     res.propvals = structuredClone(this.propvals);
     res.loading = this.loading;
     res.new = this.new;
-    // structured clone
     res.error = structuredClone(this.error);
     res.commitError = this.commitError;
     res.commitBuilder = this.commitBuilder.clone();
     res.appliedCommitSignatures = this.appliedCommitSignatures;
-    res.queuedFetch = this.queuedFetch;
 
     return res;
   }
@@ -451,28 +470,15 @@ export class Resource {
     const endpoint = new URL(this.getSubject()).origin + `/commit`;
 
     try {
-      // We optimistically update all viewed instances for snappy feedback
-      store.addResources(this);
-      store.notify(this);
-
-      // If a commit is already being posted we wait for it to finish
-      // because the server can not guarantee the commits will be processed in the correct order.
-
-      if (this.queuedFetch) {
-        try {
-          await this.queuedFetch;
-        } catch (e) {
-          // Continue
-        }
-      }
-
       this.commitError = undefined;
-      const createdCommitPromise = store.postCommit(commit, endpoint);
-      this.queuedFetch = createdCommitPromise;
-      store.notify(this);
-      const createdCommit = await createdCommitPromise;
-
+      store.addResources(this);
+      const createdCommit = await store.postCommit(commit, endpoint);
+      // const res = store.getResourceLoading(this.subject);
       this.setUnsafe(properties.commit.lastCommit, createdCommit.id!);
+
+      // Let all subscribers know that the commit has been applied
+      // store.addResources(this);
+      store.notifyResourceSaved(this);
 
       if (wasNew) {
         // The first `SUBSCRIBE` message will not have worked, because the resource didn't exist yet.
@@ -480,9 +486,6 @@ export class Resource {
         // https://github.com/atomicdata-dev/atomic-data-rust/issues/486
         store.subscribeWebSocket(this.subject);
       }
-
-      // Let all subscribers know that the commit has been applied
-      store.notifyResourceSaved(this);
 
       return createdCommit.id as string;
     } catch (e) {
@@ -511,7 +514,6 @@ export class Resource {
       this.commitBuilder = oldCommitBuilder;
       this.commitError = e;
       store.addResources(this);
-      store.notify(this.clone());
       throw e;
     }
   }
@@ -550,7 +552,6 @@ export class Resource {
 
     if (value === undefined) {
       this.removePropVal(prop);
-      store.notify(this.clone());
 
       return;
     }
@@ -558,7 +559,6 @@ export class Resource {
     this.propvals.set(prop, value);
     // Add the change to the Commit Builder, so we can commit our changes later
     this.commitBuilder.addSetAction(prop, value);
-    store.notify(this.clone());
   }
 
   /**
