@@ -7,6 +7,7 @@ import InputResourceArray from './InputResourceArray';
 import InputMarkdown from './InputMarkdown';
 import InputNumber from './InputNumber';
 import InputBoolean from './InputBoolean';
+import InputSlug from './InputSlug';
 
 /** Renders a fitting HTML input depending on the Datatype */
 export default function InputSwitcher(props: InputProps): JSX.Element {
@@ -20,7 +21,7 @@ export default function InputSwitcher(props: InputProps): JSX.Element {
     }
 
     case Datatype.SLUG: {
-      return <InputString {...props} />;
+      return <InputSlug {...props} />;
     }
 
     case Datatype.INTEGER: {

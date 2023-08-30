@@ -8,11 +8,13 @@ import { ErrorLook } from '../ErrorLook';
 export function InputResource({
   resource,
   property,
+  commit,
   ...props
 }: InputProps): JSX.Element {
   const [error, setError] = useState<Error | undefined>(undefined);
   const [subject, setSubject] = useSubject(resource, property.subject, {
     handleValidationError: setError,
+    commit,
   });
 
   if (subject === noNestedSupport) {
