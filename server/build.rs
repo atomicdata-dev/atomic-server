@@ -11,6 +11,20 @@ macro_rules! p {
     }
 }
 
+fn main() -> std::io::Result<()> {
+    println!("cargo:rerun-if-changed=../browser");
+
+    if should_build() {
+        build_js()
+    }
+
+    resource_dir(JS_DIST)
+        .build()
+        .unwrap_or_else(|_| panic!("failed to open data browser assets from {}", JS_DIST));
+
+    Ok(())
+}
+
 /// Check if any JS files were modified since the last build
 fn should_build() -> bool {
     if let Ok(dist) = std::fs::metadata(format!("{}/index.html", JS_DIST)) {
@@ -48,42 +62,43 @@ fn should_build() -> bool {
             }
         }
 
-        p!("No changes in JS, skipping build.");
+        p!("No changes in JS source files, skipping JS build.");
         false
     } else {
-        p!("No dist folder found, building...");
+        p!("No JS dist folder found, building...");
         true
     }
 }
 
-fn main() -> std::io::Result<()> {
-    println!("cargo:rerun-if-changed=../browser");
-
+/// Runs JS package manager to install packages and build the JS bundle
+fn build_js() {
     let pkg_manager = "pnpm";
+    let browser_path = "../browser/data-browser";
 
-    if should_build() {
-        p!("install js packages...");
-        std::process::Command::new(pkg_manager)
-            .current_dir("../browser/data-browser")
-            .args(["install"])
-            .output()
-            .unwrap_or_else(|_| {
-                panic!(
-                    "Failed to install js packages. Make sure you have {} installed.",
-                    pkg_manager
-                )
-            });
-        p!("build js assets...");
-        std::process::Command::new(pkg_manager)
-            .current_dir("../browser/data-browser")
-            .args(["run", "build"])
-            .output()
-            .expect("Failed to build js bundle");
+    p!("install js packages...");
+    std::process::Command::new(pkg_manager)
+        .current_dir(browser_path)
+        .args(["install"])
+        .output()
+        .unwrap_or_else(|_| {
+            panic!(
+                "Failed to install js packages. Make sure you have {} installed.",
+                pkg_manager
+            )
+        });
+    p!("build js assets...");
+    let out = std::process::Command::new(pkg_manager)
+        .current_dir(browser_path)
+        .args(["run", "build"])
+        .output()
+        .expect("Failed to build js bundle");
+    // Check if out contains errors
+    if out.status.success() {
+        p!("js build successful");
+    } else {
+        panic!(
+            "js build failed: {}",
+            String::from_utf8(out.stderr).unwrap()
+        );
     }
-
-    resource_dir(JS_DIST)
-        .build()
-        .unwrap_or_else(|_| panic!("failed to open data browser assets from {}", JS_DIST));
-
-    Ok(())
 }
