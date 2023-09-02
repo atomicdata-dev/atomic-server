@@ -20,6 +20,7 @@ actix-cors = "0.6"
 actix-files = "0.6"
 actix-multipart = "0.4"
 actix-web-actors = "4"
+atomizer = { version = "0.1.0", path = "../atomizer" }
 base64 = "0.13"
 chrono = "0.4"
 colored = "2"
