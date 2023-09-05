@@ -20,6 +20,10 @@ import { Column, Row } from '../components/Row';
 import { ErrorLook } from '../components/ErrorLook';
 import { ResourceUsage } from '../components/ResourceUsage';
 import { Main } from '../components/Main';
+import { IconButton } from '../components/IconButton/IconButton';
+import { FaArrowLeft } from 'react-icons/fa';
+import { useNavigate } from 'react-router';
+import { constructOpenURL } from '../helpers/navigation';
 
 /** Renders the data of some Resource */
 function Data(): JSX.Element {
@@ -32,6 +36,7 @@ function Data(): JSX.Element {
   const [err, setErr] = useState<Error | undefined>(undefined);
   const { agent } = useSettings();
   const store = useStore();
+  const navigate = useNavigate();
 
   if (!subject) {
     <ContainerNarrow>No subject passed</ContainerNarrow>;
@@ -71,11 +76,24 @@ function Data(): JSX.Element {
     }
   }
 
+  const handleBackClick = () => {
+    navigate(constructOpenURL(subject ?? ''));
+  };
+
   return (
     <ContainerNarrow about={subject}>
       <Main>
         <Column>
-          <Title resource={resource} prefix='Data for' link />
+          <Row center gap='1ch'>
+            <IconButton
+              size='1.4em'
+              title={`Back to ${resource.title}`}
+              onClick={handleBackClick}
+            >
+              <FaArrowLeft />
+            </IconButton>
+            <Title resource={resource} prefix='Data for' link />
+          </Row>
           <PropValRow columns>
             <PropertyLabel title='The URL of the resource'>
               subject:
