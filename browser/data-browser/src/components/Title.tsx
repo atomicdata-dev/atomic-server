@@ -1,6 +1,7 @@
 import { Resource, useTitle } from '@tomic/react';
 import React from 'react';
 import { AtomicLink } from './AtomicLink';
+import styled from 'styled-components';
 
 interface PageTitleProps {
   /** Put in front of the subject's name */
@@ -18,13 +19,17 @@ export function Title({ resource, prefix, link }: PageTitleProps): JSX.Element {
   const [title] = useTitle(resource);
 
   return (
-    <h1>
+    <H1>
       {prefix && `${prefix} `}
       {link ? (
         <AtomicLink subject={resource.getSubject()}>{title}</AtomicLink>
       ) : (
         title
       )}
-    </h1>
+    </H1>
   );
 }
+
+const H1 = styled.h1`
+  margin-bottom: 0;
+`;
