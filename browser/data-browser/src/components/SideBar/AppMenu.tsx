@@ -1,16 +1,17 @@
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { FaPlusCircle } from 'react-icons/fa';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  FaCog,
+  FaInfo,
+  FaKeyboard,
+  FaPlusCircle,
+  FaUser,
+} from 'react-icons/fa';
 import { constructOpenURL } from '../../helpers/navigation';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
-import { appMenuItems } from './menuItems';
-import { SideBarHeader } from './SideBarHeader';
 import { SideBarMenuItem } from './SideBarMenuItem';
+import styled from 'styled-components';
+import { paths } from '../../routes/paths';
+import { unknownSubject, useCurrentAgent, useResource } from '@tomic/react';
 
 // Non standard event type so we have to type it ourselfs for now.
 type BeforeInstallPromptEvent = {
@@ -26,6 +27,8 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
   const event = useRef<BeforeInstallPromptEvent | null>(null);
   const [subject] = useCurrentSubject();
   const [showInstallButton, setShowInstallButton] = useState(false);
+  const [agent] = useCurrentAgent();
+  const agentResource = useResource(agent?.subject ?? unknownSubject);
 
   const install = useCallback(() => {
     if (!event.current) {
@@ -53,33 +56,50 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
     return () => window.removeEventListener('beforeinstallprompt', listener);
   }, []);
 
-  const items = useMemo(() => {
-    if (!showInstallButton) {
-      return appMenuItems;
-    }
-
-    return [
-      {
-        icon: <FaPlusCircle />,
-        label: 'Install App',
-        helper: 'Install app to desktop',
-        handleClickItem: install,
-        path: constructOpenURL(subject ?? window.location.href),
-      },
-      ...appMenuItems,
-    ];
-  }, [appMenuItems, showInstallButton, subject]);
-
   return (
-    <>
-      <SideBarHeader>App</SideBarHeader>
-      {items.map(p => (
+    <Section aria-label='App menu'>
+      <SideBarMenuItem
+        icon={<FaUser />}
+        label={agent ? agentResource.title : 'Login'}
+        helper='See and edit the current Agent / User (u)'
+        path={paths.agentSettings}
+        onClick={onItemClick}
+      />
+      <SideBarMenuItem
+        icon={<FaCog />}
+        label='Settings'
+        helper='Edit the theme (t)'
+        path={paths.themeSettings}
+        onClick={onItemClick}
+      />
+      <SideBarMenuItem
+        icon={<FaKeyboard />}
+        label='Keyboard Shortcuts'
+        helper='View the keyboard shortcuts (?)'
+        path={paths.shortcuts}
+        onClick={onItemClick}
+      />
+      <SideBarMenuItem
+        icon={<FaInfo />}
+        label='About'
+        helper='Welcome page, tells about this app'
+        path={paths.about}
+        onClick={onItemClick}
+      />
+      {showInstallButton && (
         <SideBarMenuItem
-          key={p.label}
-          {...p}
-          handleClickItem={p.handleClickItem ?? onItemClick}
+          icon={<FaPlusCircle />}
+          label='Install App'
+          helper='Install app to desktop'
+          path={constructOpenURL(subject ?? window.location.href)}
+          onClick={install}
         />
-      ))}
-    </>
+      )}
+    </Section>
   );
 }
+
+const Section = styled.section`
+  border-top: 1px solid ${p => p.theme.colors.bg2};
+  padding-top: ${p => p.theme.margin}rem;
+`;

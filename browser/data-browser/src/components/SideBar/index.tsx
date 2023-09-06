@@ -9,6 +9,7 @@ import { NavBarSpacer } from '../NavBarSpacer';
 import { AppMenu } from './AppMenu';
 import { About } from './About';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { Column } from '../Row';
 
 /** Amount of pixels where the sidebar automatically shows */
 export const SIDEBAR_TOGGLE_WIDTH = 600;
@@ -47,6 +48,7 @@ export function SideBar(): JSX.Element {
 
   return (
     <SideBarContainer>
+      {/* @ts-ignore */}
       <SideBarStyled
         ref={mountRefs}
         size={size}
@@ -59,8 +61,10 @@ export function SideBar(): JSX.Element {
         {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
         <SideBarDriveMemo handleClickItem={closeSideBar} key={drive} />
         <MenuWrapper>
-          <AppMenu onItemClick={closeSideBar} />
-          <About />
+          <Column>
+            <AppMenu onItemClick={closeSideBar} />
+            <About />
+          </Column>
         </MenuWrapper>
         <NavBarSpacer baseMargin='1rem' position='bottom' />
         <SideBarDragArea ref={dragAreaRef} isDragging={isDragging} />
@@ -83,12 +87,12 @@ interface SideBarOverlayProps {
   visible: boolean;
 }
 
-// eslint-disable-next-line prettier/prettier
-const SideBarStyled = styled('nav').attrs<SideBarStyledProps>(p => ({
+//@ts-ignore
+const SideBarStyled = styled.nav.attrs<SideBarStyledProps>(p => ({
   style: {
     '--width': p.size,
   },
-}))<SideBarStyledProps>`
+}))`
   z-index: ${p => p.theme.zIndex.sidebar};
   box-sizing: border-box;
   background: ${p => p.theme.colors.bg};

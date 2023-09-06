@@ -7,6 +7,7 @@ export enum IconButtonVariant {
   Outline,
   Fill,
   Colored,
+  Square,
 }
 
 type ColorProp = keyof DefaultTheme['colors'] | 'inherit';
@@ -56,7 +57,7 @@ export const IconButtonLink = React.forwardRef<
   HTMLAnchorElement,
   React.PropsWithChildren<IconButtonLinkProps>
 >(({ variant, children, color, ...props }, ref) => {
-  const Comp = ComponentMap.get(variant!) ?? SimpleIconButton;
+  const Comp = ComponentMap.get(variant ?? IconButtonVariant.Simple)!;
 
   return (
     <Comp ref={ref} color={color!} as='a' {...props}>
@@ -84,8 +85,8 @@ const IconButtonBase = styled.button<ButtonBaseProps>`
   border: none;
 
   padding: var(--button-padding);
-  width: calc(1em + var(--button-padding) * 2);
-  height: calc(1em + var(--button-padding) * 2);
+  width: calc(${p => p.size} + var(--button-padding) * 2);
+  height: calc(${p => p.size} + var(--button-padding) * 2);
 
   &[disabled] {
     opacity: 0.5;
@@ -134,6 +135,27 @@ const OutlineIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   }
 `;
 
+const SquareIconButton = styled(IconButtonBase)<ButtonStyleProps>`
+  color: ${p => (p.color === 'inherit' ? 'inherit' : p.theme.colors[p.color])};
+  background-color: ${p => p.theme.colors.bg};
+  border-radius: ${p => p.theme.radius};
+  border: 1px solid ${p => p.theme.colors.bg2};
+
+  &:not([disabled]) {
+    &:hover,
+    &:focus-visible {
+      color: ${p => p.theme.colors.main};
+      border-color: ${p => p.theme.colors.main};
+      box-shadow: ${p => p.theme.boxShadowSoft};
+    }
+  }
+
+  &&:active {
+    background-color: ${p => p.theme.colors.main};
+    color: white;
+  }
+`;
+
 const FillIconButton = styled(IconButtonBase)<ButtonStyleProps>`
   color: ${p => (p.color === 'inherit' ? 'inherit' : p.theme.colors[p.color])};
   background-color: unset;
@@ -164,4 +186,5 @@ const ComponentMap = new Map([
   [IconButtonVariant.Outline, OutlineIconButton],
   [IconButtonVariant.Fill, FillIconButton],
   [IconButtonVariant.Colored, ColoredIconButton],
+  [IconButtonVariant.Square, SquareIconButton],
 ]);
