@@ -9,7 +9,7 @@ export interface SideBarMenuItemProps extends AtomicLinkProps {
   icon?: React.ReactNode;
   disabled?: boolean;
   /** Is called when clicking on the item. Used for closing the menu. */
-  handleClickItem?: () => void;
+  onClick?: () => void;
 }
 
 export function SideBarMenuItem({
@@ -19,11 +19,11 @@ export function SideBarMenuItem({
   path,
   href,
   subject,
-  handleClickItem,
+  onClick,
 }: SideBarMenuItemProps) {
   return (
     <AtomicLink href={href} subject={subject} path={path} clean>
-      <SideBarItem key={label} title={helper} onClick={handleClickItem}>
+      <SideBarItem key={label} title={helper} onClick={onClick}>
         {icon && <SideBarIcon>{icon}</SideBarIcon>}
         {label}
       </SideBarItem>
