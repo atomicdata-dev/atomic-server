@@ -142,6 +142,10 @@ export const properties = {
   table: {
     tableColumnWidths: 'https://atomicdata.dev/properties/tableColumnWidths',
   },
+  ontology: {
+    customNodePositioning:
+      'https://atomicdata.dev/properties/custom-node-positioning',
+  },
   color: 'https://atomicdata.dev/properties/color',
   emoji: 'https://atomicdata.dev/properties/emoji',
   classes: 'https://atomicdata.dev/properties/classes',

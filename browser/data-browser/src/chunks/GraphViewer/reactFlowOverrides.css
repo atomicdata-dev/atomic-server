@@ -1,0 +1,5 @@
+.react-flow__handle {
+  background-color: transparent;
+  border: none;
+  cursor: grab;
+}

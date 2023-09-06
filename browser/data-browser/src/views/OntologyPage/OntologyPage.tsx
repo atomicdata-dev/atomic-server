@@ -15,6 +15,7 @@ import { NewClassButton } from './NewClassButton';
 import { toAnchorId } from './toAnchorId';
 import { OntologyContextProvider } from './OntologyContext';
 import { PropertyCardWrite } from './Property/PropertyCardWrite';
+import { Graph } from './Graph';
 
 export function OntologyPage({ resource }: ResourcePageProps) {
   const [classes] = useArray(resource, urls.properties.classes);
@@ -91,7 +92,7 @@ export function OntologyPage({ resource }: ResourcePageProps) {
         </ListSlot>
         {!editMode && (
           <GraphSlot>
-            <TempGraph>Placeholder</TempGraph>
+            <Graph ontology={resource} />
           </GraphSlot>
         )}
       </FullPageWrapper>
@@ -99,19 +100,10 @@ export function OntologyPage({ resource }: ResourcePageProps) {
   );
 }
 
-const TempGraph = styled.div`
-  position: sticky;
-  display: grid;
-  place-items: center;
-  background-color: ${p => p.theme.colors.bg1};
-  border: 1px solid ${p => p.theme.colors.bg2};
-  aspect-ratio: 9 / 16;
-  border-radius: ${p => p.theme.radius};
-  top: 1rem;
-  overflow: hidden;
-`;
-
 const FullPageWrapper = styled.div<{ edit: boolean }>`
+  --ontology-graph-position: sticky;
+  --ontology-graph-ratio: 9 / 16;
+
   display: grid;
   grid-template-areas: ${p =>
     p.edit
@@ -130,11 +122,8 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
 
     grid-template-columns: 1fr 5fr;
     grid-template-rows: 4rem auto auto;
-
-    ${TempGraph} {
-      position: static;
-      aspect-ratio: 16/9;
-    }
+    --ontology-graph-position: sticky;
+    --ontology-graph-ratio: 16/9;
   }
 `;
 
