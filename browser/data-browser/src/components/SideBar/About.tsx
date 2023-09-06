@@ -3,7 +3,7 @@ import { Logo } from '../Logo';
 import { SideBarHeader } from './SideBarHeader';
 import React from 'react';
 import { FaGithub, FaDiscord, FaBook } from 'react-icons/fa';
-import { IconButtonLink } from '../IconButton/IconButton';
+import { IconButtonLink, IconButtonVariant } from '../IconButton/IconButton';
 
 interface AboutItem {
   icon: React.ReactNode;
@@ -32,9 +32,9 @@ const aboutMenuItems: AboutItem[] = [
 export function About() {
   return (
     <>
-      <SideBarHeader>
+      {/* <SideBarHeader>
         <Logo style={{ height: '1.1rem', maxWidth: '100%' }} />
-      </SideBarHeader>
+      </SideBarHeader> */}
       <AboutWrapper>
         {aboutMenuItems.map(({ href, icon, helper }) => (
           <IconButtonLink
@@ -45,6 +45,7 @@ export function About() {
             title={helper}
             size='1.2em'
             color='textLight'
+            variant={IconButtonVariant.Square}
           >
             {icon}
           </IconButtonLink>
@@ -57,7 +58,6 @@ export function About() {
 const AboutWrapper = styled.div`
   --inner-padding: 0.5rem;
   display: flex;
-  /* flex-direction: column; */
   align-items: center;
   gap: 0.5rem;
   margin-left: calc(1rem - var(--inner-padding));
