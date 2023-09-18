@@ -39,7 +39,7 @@ _Status: alpha. [Breaking changes](CHANGELOG.md) are expected until 1.0._
 - 📖  **Pagination, sorting and filtering** queries using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html).
 - 🔐  **Authorization** (read / write permissions) and Hierarchical structures powered by [Atomic Hierarchy](https://docs.atomicdata.dev/hierarchy.html)
 - 📲  **Invite and sharing system** with [Atomic Invites](https://docs.atomicdata.dev/invitations.html)
-- 📂  **File management**: Upload, download and preview attachments.
+- 📂  **File management**: Upload, download and preview attachments with support for using S3 as file storage backend.
 - 🖥️  **Desktop app**: Easy desktop installation, with status bar icon, powered by [tauri](https://github.com/tauri-apps/tauri/).
 - 📚  **Libraries**: [Javascript / Typescript](https://www.npmjs.com/package/@tomic/lib), [React](https://www.npmjs.com/package/@tomic/react), [Svelte](https://www.npmjs.com/package/@tomic/svelte)
 
@@ -51,6 +51,7 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 
 Check out the [documentation](http://docs.atomicdata.dev/atomicserver/intro.html) for installation instructions, API docs, and more.
 
+### Configuring S3 for File Storage
 ## Contribute
 
 Issues and PRs are welcome!

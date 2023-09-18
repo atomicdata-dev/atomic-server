@@ -106,6 +106,20 @@ ATOMIC_HTTPS=false
 ATOMIC_SERVER_URL=https://example.com
 ```
 
+### Configuring S3 for File Storage
+You can configure atomic-server to use S3 (and compatible services) for file storage via environment variables or command line arguments when starting atomic-server.
+
+Credentials can either be found in the standard location for AWS credentials on your OS (e.g. `~/.aws/credentials` on UNIX systems) or by using the environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.
+
+Available configuration values:
+
+- bucket: `--s3-bucket="my-bucket-name"` or env var `ATOMIC_S3_BUCKET` (required)
+- region: `--s3-region="us-east-2"` or env var `ATOMIC_S3_REGION`
+- endpoint: `--s3-endpoint="https://s3.us-east-2.amazonaws.com"` or env var `ATOMIC_S3_ENDPOINT`
+0 path: `--s3-path="atomic_uploads"` or env var `ATOMIC_S3_PATH`
+
+For example, the above configuration would uploads files to `s3://my-bucket-name/atomic_uploads/` in the `us-east-2` region.
+
 ## Using `systemd` to run Atomic-Server as a service
 
 In Linux operating systems, you can use `systemd` to manage running processes.

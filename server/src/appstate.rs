@@ -1,6 +1,7 @@
 //! App state, which is accessible from handlers
 use crate::{
-    commit_monitor::CommitMonitor, config::Config, errors::AtomicServerResult, search::SearchState,
+    commit_monitor::CommitMonitor, config::Config, errors::AtomicServerResult, files::FileStore,
+    search::SearchState,
 };
 use atomic_lib::{
     agents::{generate_public_key, Agent},
@@ -23,6 +24,10 @@ pub struct AppState {
     /// The Actix Address of the CommitMonitor, which should receive updates when a commit is applied
     pub commit_monitor: actix::Addr<CommitMonitor>,
     pub search_state: SearchState,
+    /// stores config values and the active FileStore type, e.g. FS or S3
+    pub file_store: FileStore,
+    /// stores config values for FS filestore regardless of active file store as fallback
+    pub fs_file_store: FileStore,
 }
 
 /// Creates the AppState (the server's context available in Handlers).
@@ -102,11 +107,18 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         crate::search::add_all_resources(&search_state, &store)?
     }
 
+    tracing::info!("Initializing file stores");
+    // Initialize file stores
+    let fs_file_store = FileStore::init_fs_from_config(&config);
+    let file_store = FileStore::init_from_config(&config, fs_file_store.clone());
+
     Ok(AppState {
         store,
         config,
         commit_monitor,
         search_state,
+        file_store,
+        fs_file_store,
     })
 }
 
