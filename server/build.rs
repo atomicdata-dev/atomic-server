@@ -4,6 +4,7 @@ use static_files::resource_dir;
 
 const JS_DIST: &str = "../browser/data-browser/dist";
 const SRC_BROWSER: &str = "../browser/data-browser/src";
+const BROWSER_ROOT: &str = "../browser/";
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -12,7 +13,7 @@ macro_rules! p {
 }
 
 fn main() -> std::io::Result<()> {
-    println!("cargo:rerun-if-changed=../browser");
+    println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
 
     if should_build() {
         build_js()
@@ -27,8 +28,8 @@ fn main() -> std::io::Result<()> {
 
 /// Check if any JS files were modified since the last build
 fn should_build() -> bool {
-    if let Ok(dist) = std::fs::metadata(format!("{}/index.html", JS_DIST)) {
-        let dist_time = dist
+    if let Ok(index_html) = std::fs::metadata(format!("{}/index.html", JS_DIST)) {
+        let dist_time = index_html
             .modified()
             .unwrap()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -73,11 +74,11 @@ fn should_build() -> bool {
 /// Runs JS package manager to install packages and build the JS bundle
 fn build_js() {
     let pkg_manager = "pnpm";
-    let browser_path = "../browser/data-browser";
 
     p!("install js packages...");
+
     std::process::Command::new(pkg_manager)
-        .current_dir(browser_path)
+        .current_dir(BROWSER_ROOT)
         .args(["install"])
         .output()
         .unwrap_or_else(|_| {
@@ -88,7 +89,7 @@ fn build_js() {
         });
     p!("build js assets...");
     let out = std::process::Command::new(pkg_manager)
-        .current_dir(browser_path)
+        .current_dir(BROWSER_ROOT)
         .args(["run", "build"])
         .output()
         .expect("Failed to build js bundle");
