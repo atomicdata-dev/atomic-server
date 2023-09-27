@@ -31,8 +31,9 @@ module.exports = {
     tsconfigRootDir: __dirname,
     project: [
       'lib/tsconfig.json',
+      'cli/tsconfig.json',
       'react/tsconfig.json',
-      'data-browser/tsconfig.json',
+      'data-browser/tsconfig.json'
     ],
   },
   plugins: ['react', '@typescript-eslint', 'prettier', 'react-hooks', 'jsx-a11y'],

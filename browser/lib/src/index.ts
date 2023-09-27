@@ -46,3 +46,4 @@ export * from './urls.js';
 export * from './truncate.js';
 export * from './collection.js';
 export * from './collectionBuilder.js';
+export * from './ontology.js';
