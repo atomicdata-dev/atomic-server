@@ -15,11 +15,14 @@ import {
   Commit,
   JSONADParser,
   FileOrFileLike,
+  OptionalClass,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
 /** Function called when a resource is updated or removed */
-type ResourceCallback = (resource: Resource) => void;
+type ResourceCallback<C extends OptionalClass = never> = (
+  resource: Resource<C>,
+) => void;
 /** Callback called when the stores agent changes */
 type AgentCallback = (agent: Agent | undefined) => void;
 type ErrorCallback = (e: Error) => void;
@@ -202,7 +205,7 @@ export class Store {
   /**
    * Always fetches resource from the server then adds it to the store.
    */
-  public async fetchResourceFromServer(
+  public async fetchResourceFromServer<C extends OptionalClass = never>(
     /** The resource URL to be fetched */
     subject: string,
     opts: {
@@ -220,9 +223,9 @@ export class Store {
       /** HTTP Body for POSTing */
       body?: ArrayBuffer | string;
     } = {},
-  ): Promise<Resource> {
+  ): Promise<Resource<C>> {
     if (opts.setLoading) {
-      const newR = new Resource(subject);
+      const newR = new Resource<C>(subject);
       newR.loading = true;
       this.addResources(newR);
     }
@@ -304,13 +307,13 @@ export class Store {
    * done in the background . If the subject is undefined, an empty non-saved
    * resource will be returned.
    */
-  public getResourceLoading(
+  public getResourceLoading<C extends OptionalClass = never>(
     subject: string = unknownSubject,
     opts: FetchOpts = {},
-  ): Resource {
+  ): Resource<C> {
     // This is needed because it can happen that the useResource react hook is called while there is no subject passed.
     if (subject === unknownSubject || subject === null) {
-      const newR = new Resource(unknownSubject, opts.newResource);
+      const newR = new Resource<C>(unknownSubject, opts.newResource);
 
       return newR;
     }
@@ -318,7 +321,7 @@ export class Store {
     const found = this.resources.get(subject);
 
     if (!found) {
-      const newR = new Resource(subject, opts.newResource);
+      const newR = new Resource<C>(subject, opts.newResource);
       newR.loading = true;
       this.addResources(newR);
 
@@ -345,7 +348,9 @@ export class Store {
    * store. Not recommended to use this for rendering, because it might cause
    * resources to be fetched multiple times.
    */
-  public async getResourceAsync(subject: string): Promise<Resource> {
+  public async getResourceAsync<C extends OptionalClass = never>(
+    subject: string,
+  ): Promise<Resource<C>> {
     const found = this.resources.get(subject);
 
     if (found && found.isReady()) {
@@ -357,7 +362,7 @@ export class Store {
       return new Promise((resolve, reject) => {
         const defaultTimeout = 5000;
 
-        const cb = res => {
+        const cb: ResourceCallback<C> = res => {
           this.unsubscribe(subject, cb);
           resolve(res);
         };

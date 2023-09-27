@@ -97,6 +97,18 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@16.18.39)
 
+  cli:
+    dependencies:
+      '@tomic/lib':
+        specifier: ^0.35.1
+        version: link:../lib
+      chalk:
+        specifier: ^5.3.0
+        version: 5.3.0
+      typescript:
+        specifier: ^4.8
+        version: 4.9.5
+
   data-browser:
     dependencies:
       '@bugsnag/core':
@@ -240,7 +252,7 @@ importers:
         version: 1.1.0
       vite:
         specifier: ^4.0.4
-        version: 4.4.8
+        version: 4.4.8(@types/node@16.18.39)
       vite-plugin-pwa:
         specifier: ^0.14.1
         version: 0.14.7(vite@4.4.8)(workbox-build@6.6.0)(workbox-window@6.6.0)
@@ -269,6 +281,9 @@ importers:
       '@types/fast-json-stable-stringify':
         specifier: ^2.1.0
         version: 2.1.0
+      '@types/yargs':
+        specifier: ^17.0.24
+        version: 17.0.24
       chai:
         specifier: ^4.3.4
         version: 4.3.7
@@ -4124,6 +4139,11 @@ packages:
     dependencies:
       ansi-styles: 4.3.0
       supports-color: 7.2.0
+
+  /chalk@5.3.0:
+    resolution: {integrity: sha512-dLitG79d+GV1Nb/VYcCDFivJeK1hiukt9QjRNVOsUtTy1rR1YJsmpGGTZ3qJos+uw7WmWF4wUwBd9jxjocFC2w==}
+    engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
+    dev: false
 
   /char-regex@1.0.2:
     resolution: {integrity: sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==}
@@ -9660,7 +9680,7 @@ packages:
       fast-glob: 3.3.1
       pretty-bytes: 6.1.1
       rollup: 3.27.2
-      vite: 4.4.8
+      vite: 4.4.8(@types/node@16.18.39)
       workbox-build: 6.6.0
       workbox-window: 6.6.0
     transitivePeerDependencies:
@@ -9701,7 +9721,7 @@ packages:
       fsevents: 2.3.2
     dev: true
 
-  /vite@4.4.8:
+  /vite@4.4.8(@types/node@16.18.39):
     resolution: {integrity: sha512-LONawOUUjxQridNWGQlNizfKH89qPigK36XhMI7COMGztz8KNY0JHim7/xDd71CZwGT4HtSRgI7Hy+RlhG0Gvg==}
     engines: {node: ^14.18.0 || >=16.0.0}
     hasBin: true
@@ -9729,6 +9749,7 @@ packages:
       terser:
         optional: true
     dependencies:
+      '@types/node': 16.18.39
       esbuild: 0.18.17
       postcss: 8.4.27
       rollup: 3.27.2
