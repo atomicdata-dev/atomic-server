@@ -14,6 +14,10 @@ import {
   applyCommitToResource,
   Commit,
   parseCommitResource,
+  InferTypeOfValueInTriple,
+  QuickAccesPropType,
+  getKnownNameBySubject,
+  OptionalClass,
 } from './index.js';
 
 /** Contains the PropertyURL / Value combinations */
@@ -29,7 +33,7 @@ export const unknownSubject = 'unknown-subject';
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
  * / Value combinations.
  */
-export class Resource {
+export class Resource<C extends OptionalClass = never> {
   /** If the resource could not be fetched, we put that info here. */
   public error?: Error;
   /** If the commit could not be saved, we put that info here. */
@@ -73,6 +77,20 @@ export class Resource {
       this.get(properties.shortname) ??
       this.get(properties.file.filename) ??
       this.subject) as string;
+  }
+
+  public get props(): QuickAccesPropType<C> {
+    const props: QuickAccesPropType<C> = {};
+
+    for (const prop of this.propvals.keys()) {
+      const name = getKnownNameBySubject(prop);
+
+      if (name) {
+        props[name] = this.get(prop);
+      }
+    }
+
+    return props;
   }
 
   /** Checks if the content of two Resource instances is equal
@@ -138,7 +156,7 @@ export class Resource {
    * Creates a clone of the Resource, which makes sure the reference is
    * different from the previous one. This can be useful when doing reference compares.
    */
-  public clone(): Resource {
+  public clone(): Resource<C> {
     const res = new Resource(this.subject);
     res.propvals = structuredClone(this.propvals);
     res.loading = this.loading;
@@ -159,8 +177,10 @@ export class Resource {
   }
 
   /** Get a Value by its property */
-  public get<T extends JSONValue = JSONValue>(propUrl: string): T {
-    return this.propvals.get(propUrl) as T;
+  public get<Prop extends string, Returns = InferTypeOfValueInTriple<C, Prop>>(
+    propUrl: Prop,
+  ): Returns {
+    return this.propvals.get(propUrl) as Returns;
   }
 
   /**
@@ -185,7 +205,7 @@ export class Resource {
     return valToArray(result);
   }
 
-  /** Get a Value by its property */
+  /** Returns a list of classes of this resource */
   public getClasses(): string[] {
     return this.getSubjects(properties.isA);
   }
@@ -518,9 +538,12 @@ export class Resource {
    *
    * When undefined is passed as value, the property is removed from the resource.
    */
-  public async set(
-    prop: string,
-    value: JSONValue,
+  public async set<
+    Prop extends string,
+    Value extends InferTypeOfValueInTriple<C, Prop>,
+  >(
+    prop: Prop,
+    value: Value,
     store: Store,
     /**
      * Disable validation if you don't need it. It might cause a fetch if the

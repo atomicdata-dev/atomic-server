@@ -22,6 +22,7 @@ import {
   FetchOpts,
   unknownSubject,
   JSONArray,
+  OptionalClass,
 } from '@tomic/lib';
 import { useDebouncedCallback } from './index.js';
 
@@ -29,12 +30,12 @@ import { useDebouncedCallback } from './index.js';
  * Hook for getting a Resource in a React component. Will try to fetch the
  * subject and add its parsed values to the store.
  */
-export function useResource(
+export function useResource<C extends OptionalClass = never>(
   subject: string = unknownSubject,
   opts?: FetchOpts,
-): Resource {
+): Resource<C> {
   const store = useStore();
-  const [resource, setResource] = useState<Resource>(
+  const [resource, setResource] = useState<Resource<C>>(
     store.getResourceLoading(subject, opts),
   );
 
@@ -45,7 +46,7 @@ export function useResource(
 
   // When a component mounts, it needs to let the store know that it will subscribe to changes to that resource.
   useEffect(() => {
-    function handleNotify(updated: Resource) {
+    function handleNotify(updated: Resource<C>) {
       // When a change happens, set the new Resource.
       setResource(updated);
     }

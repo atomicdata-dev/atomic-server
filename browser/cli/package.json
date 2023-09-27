@@ -1,0 +1,34 @@
+{
+  "version": "0.35.2",
+  "author": "Polle Pas",
+  "dependencies": {
+    "@tomic/lib": "^0.35.2",
+    "chalk": "^5.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.8"
+  },
+  "description": "",
+  "license": "MIT",
+  "name": "@tomic/cli",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint ./src --ext .js,.ts",
+    "lint-fix": "eslint ./src --ext .js,.ts --fix",
+    "prepublishOnly": "pnpm run build && pnpm run lint-fix",
+    "watch": "tsc --build --watch",
+    "start": "pnpm watch",
+    "tsc": "tsc --build",
+    "typecheck": "tsc --noEmit"
+  },
+  "bin": {
+    "ad-generate": "./bin/src/index.js"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@tomic/lib": "^0.35.2"
+  }
+}

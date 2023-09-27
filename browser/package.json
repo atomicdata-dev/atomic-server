@@ -54,7 +54,8 @@
     "packages": [
       "lib",
       "react",
-      "data-browser"
+      "data-browser",
+      "cli"
     ]
   },
   "packageManager": "pnpm@8.6.12",
