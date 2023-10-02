@@ -26,7 +26,6 @@ export function NewOntologyButton({
   label,
 }: NewInstanceButtonProps): JSX.Element {
   const ontology = useResource(klass);
-
   const [shortname, setShortname] = useState('');
   const [valid, setValid] = useState(false);
 
@@ -41,7 +40,7 @@ export function NewOntologyButton({
       [properties.properties]: [],
       [properties.instances]: [],
     });
-  }, [shortname]);
+  }, [shortname, createResourceAndNavigate]);
 
   const [dialogProps, show, hide] = useDialog({ onSuccess });
 

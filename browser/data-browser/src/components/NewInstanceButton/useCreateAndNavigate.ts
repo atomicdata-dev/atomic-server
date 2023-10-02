@@ -10,6 +10,7 @@ import { useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { constructOpenURL } from '../../helpers/navigation';
+import { getNamePartFromProps } from '../../helpers/getNamePartFromProps';
 
 /**
  * Hook that builds a function that will create a new resource with the given
@@ -34,11 +35,13 @@ export function useCreateAndNavigate(klass: string, parent?: string) {
       /** Do not set a parent for the new resource. Useful for top-level resources */
       noParent?: boolean,
     ): Promise<Resource> => {
-      const subject = store.createSubject(
-        className,
+      const namePart = getNamePartFromProps(propVals);
+      const newSubject = await store.buildUniqueSubjectFromParts(
+        [className, namePart],
         noParent ? undefined : parent,
       );
-      const resource = new Resource(subject, true);
+
+      const resource = new Resource(newSubject, true);
 
       await Promise.all([
         ...Object.entries(propVals).map(([key, val]) =>
@@ -49,7 +52,7 @@ export function useCreateAndNavigate(klass: string, parent?: string) {
 
       try {
         await resource.save(store);
-        navigate(constructOpenURL(subject, extraParams));
+        navigate(constructOpenURL(newSubject, extraParams));
         toast.success(`${title} created`);
         store.notifyResourceManuallyCreated(resource);
       } catch (e) {
