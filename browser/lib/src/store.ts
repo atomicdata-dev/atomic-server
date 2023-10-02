@@ -183,11 +183,13 @@ export class Store {
    * Will retry until it works.
    */
   public async buildUniqueSubjectFromParts(
-    ...parts: string[]
+    parts: string[],
+    parent?: string,
   ): Promise<string> {
     const path = parts.join('/');
+    const parentUrl = parent ?? this.getServerUrl();
 
-    return this.findAvailableSubject(path);
+    return this.findAvailableSubject(path, parentUrl);
   }
 
   /** Creates a random URL. Add a classnme (e.g. 'persons') to make a nicer name */
@@ -773,9 +775,10 @@ export class Store {
 
   private async findAvailableSubject(
     path: string,
+    parent: string,
     firstTry = true,
   ): Promise<string> {
-    let url = `${this.getServerUrl()}/${path}`;
+    let url = `${parent}/${path}`;
 
     if (!firstTry) {
       const randomPart = this.randomPart();
@@ -785,7 +788,7 @@ export class Store {
     const taken = await this.checkSubjectTaken(url);
 
     if (taken) {
-      return this.findAvailableSubject(path, false);
+      return this.findAvailableSubject(path, parent, false);
     }
 
     return url;
