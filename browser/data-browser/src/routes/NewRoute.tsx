@@ -53,6 +53,7 @@ function NewResourceSelector() {
     urls.classes.document,
     urls.classes.chatRoom,
     urls.classes.bookmark,
+    urls.classes.ontology,
   ];
 
   function handleClassSet(e) {

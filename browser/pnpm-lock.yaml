@@ -100,11 +100,12 @@ importers:
   cli:
     dependencies:
       '@tomic/lib':
-        specifier: ^0.35.1
+        specifier: ^0.35.2
         version: link:../lib
       chalk:
         specifier: ^5.3.0
         version: 5.3.0
+    devDependencies:
       typescript:
         specifier: ^4.8
         version: 4.9.5
@@ -281,9 +282,6 @@ importers:
       '@types/fast-json-stable-stringify':
         specifier: ^2.1.0
         version: 2.1.0
-      '@types/yargs':
-        specifier: ^17.0.24
-        version: 17.0.24
       chai:
         specifier: ^4.3.4
         version: 4.3.7

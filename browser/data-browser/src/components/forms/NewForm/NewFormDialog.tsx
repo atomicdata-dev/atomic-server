@@ -1,4 +1,10 @@
-import { properties, useResource, useStore, useTitle } from '@tomic/react';
+import {
+  JSONValue,
+  properties,
+  useResource,
+  useStore,
+  useTitle,
+} from '@tomic/react';
 import React, { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
@@ -11,10 +17,11 @@ import { NewFormProps } from './NewFormPage';
 import { NewFormTitle, NewFormTitleVariant } from './NewFormTitle';
 import { SubjectField } from './SubjectField';
 import { useNewForm } from './useNewForm';
+import { randomString } from '../../../helpers/randomString';
 
 export interface NewFormDialogProps extends NewFormProps {
   closeDialog: () => void;
-  initialTitle: string;
+  initialProps?: Record<string, JSONValue>;
   onSave: (subject: string) => void;
   parent: string;
 }
@@ -23,15 +30,13 @@ export interface NewFormDialogProps extends NewFormProps {
 export const NewFormDialog = ({
   classSubject,
   closeDialog,
-  initialTitle,
+  initialProps,
   onSave,
   parent,
 }: NewFormDialogProps): JSX.Element => {
   const klass = useResource(classSubject);
   const [className] = useTitle(klass);
   const store = useStore();
-  // Wrap in useState to avoid changing the value when the prop changes.
-  const [initialShortname] = useState(initialTitle);
 
   const [subject, setSubject] = useState(store.createSubject());
 
@@ -49,13 +54,24 @@ export const NewFormDialog = ({
 
   // Onmount we generate a new subject based on the classtype and the user input.
   useEffectOnce(() => {
-    store.buildUniqueSubjectFromParts(className, initialShortname).then(val => {
-      setSubjectValue(val);
-    });
+    (async () => {
+      const namePart = normalizeName(
+        (initialProps?.[properties.shortname] as string) ??
+          (initialProps?.[properties.name] as string) ??
+          randomString(8),
+      );
 
-    // Set the shortname to the initial user input of a dropdown.
-    // In the future we might need to change this when we want to have forms other than `property` and`class` in dialogs.
-    resource.set(properties.shortname, initialShortname, store);
+      const uniqueSubject = await store.buildUniqueSubjectFromParts(
+        className,
+        namePart,
+      );
+
+      await setSubjectValue(uniqueSubject);
+
+      for (const [prop, value] of Object.entries(initialProps ?? {})) {
+        await resource.set(prop, value, store);
+      }
+    })();
   });
 
   const [save, saving, error] = useSaveResource(resource, onResourceSave);
@@ -84,6 +100,7 @@ export const NewFormDialog = ({
           classSubject={classSubject}
           key={`${classSubject}+${subjectValue}`}
           variant={ResourceFormVariant.Dialog}
+          onSave={onResourceSave}
         />
       </DialogContent>
       <DialogActions>
@@ -98,3 +115,5 @@ export const NewFormDialog = ({
     </>
   );
 };
+
+const normalizeName = (name: string) => name.replaceAll('/t', '-');

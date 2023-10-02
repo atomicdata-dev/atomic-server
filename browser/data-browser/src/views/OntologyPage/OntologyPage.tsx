@@ -16,6 +16,7 @@ import { toAnchorId } from './toAnchorId';
 import { OntologyContextProvider } from './OntologyContext';
 import { PropertyCardWrite } from './Property/PropertyCardWrite';
 import { Graph } from './Graph';
+import { CreateInstanceButton } from './CreateInstanceButton';
 
 export function OntologyPage({ resource }: ResourcePageProps) {
   const [classes] = useArray(resource, urls.properties.classes);
@@ -87,6 +88,7 @@ export function OntologyPage({ resource }: ResourcePageProps) {
                   <ResourceCard subject={c} id={toAnchorId(c)} />
                 </li>
               ))}
+              {editMode && <CreateInstanceButton ontology={resource} />}
             </StyledUl>
           </Column>
         </ListSlot>
@@ -125,6 +127,8 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
     --ontology-graph-position: sticky;
     --ontology-graph-ratio: 16/9;
   }
+
+  padding-bottom: 3rem;
 `;
 
 const TitleSlot = styled.div`

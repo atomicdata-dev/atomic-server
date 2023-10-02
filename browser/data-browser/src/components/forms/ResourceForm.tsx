@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useArray,
@@ -13,8 +13,7 @@ import {
   Client,
   useStore,
 } from '@tomic/react';
-import { styled } from 'styled-components';
-import { FaCaretDown, FaCaretRight, FaPlus } from 'react-icons/fa';
+import { FaCaretDown, FaCaretRight } from 'react-icons/fa';
 
 import { constructOpenURL } from '../../helpers/navigation';
 import { Button } from '../Button';
@@ -43,6 +42,7 @@ export interface ResourceFormProps {
   resource: Resource;
 
   variant?: ResourceFormVariant;
+  onSave?: () => void;
 }
 
 const nonEssentialProps = [
@@ -50,6 +50,7 @@ const nonEssentialProps = [
   properties.parent,
   properties.read,
   properties.write,
+  properties.commit.lastCommit,
 ];
 
 /** Form for editing and creating a Resource */
@@ -57,6 +58,7 @@ export function ResourceForm({
   classSubject,
   resource,
   variant,
+  onSave,
 }: ResourceFormProps): JSX.Element {
   const [isAArray] = useArray(resource, properties.isA);
 
@@ -72,10 +74,8 @@ export function ResourceForm({
   const [klassIsa] = useString(klass, properties.isA);
   const [newPropErr, setNewPropErr] = useState<Error | undefined>(undefined);
   const navigate = useNavigate();
-  const [newProperty, setNewProperty] = useState<string | undefined>(undefined);
   /** A list of custom properties, set by the User while editing this form */
   const [tempOtherProps, setTempOtherProps] = useState<string[]>([]);
-  const [otherProps, setOtherProps] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const store = useStore();
   const wasNew: boolean = resource.new;
@@ -84,14 +84,14 @@ export function ResourceForm({
     // We need to read the earlier .new state, because the resource is no
     // longer new after it was saved, during this callback
     wasNew && store.notifyResourceManuallyCreated(resource);
+    onSave?.();
     navigate(constructOpenURL(resource.getSubject()));
   });
   // I'm not entirely sure if debouncing is needed here.
   const debouncedResource = useDebounce(resource, 5000);
   const [_canWrite, canWriteErr] = useCanWrite(debouncedResource);
 
-  /** Builds otherProps */
-  useEffect(() => {
+  const otherProps = useMemo(() => {
     const allProps = Array.from(resource.getPropVals().keys());
 
     const prps = allProps.filter(prop => {
@@ -108,8 +108,8 @@ export function ResourceForm({
       return propIsNotRenderedYet && isEssential;
     });
 
-    setOtherProps(prps.concat(tempOtherProps));
-    // I actually want to run this useEffect every time the requires / recommends
+    return [...prps, ...tempOtherProps];
+    // I actually want to run this memo every time the requires / recommends
     // array changes, but that leads to a weird loop, so that's what the length is for
   }, [resource, tempOtherProps, requires.length, recommends.length]);
 
@@ -134,23 +134,23 @@ export function ResourceForm({
     );
   }
 
-  function handleAddProp() {
+  function handleAddProp(newProp: string | undefined) {
     setNewPropErr(undefined);
 
-    if (!Client.isValidSubject(newProperty)) {
+    if (!Client.isValidSubject(newProp)) {
       setNewPropErr(new Error('Invalid URL'));
 
       return;
     }
 
-    if (!newProperty) {
+    if (!newProp) {
       return;
     }
 
     if (
-      tempOtherProps.includes(newProperty) ||
-      requires.includes(newProperty) ||
-      recommends.includes(newProperty)
+      tempOtherProps.includes(newProp) ||
+      requires.includes(newProp) ||
+      recommends.includes(newProp)
     ) {
       setNewPropErr(
         new Error(
@@ -158,10 +158,8 @@ export function ResourceForm({
         ),
       );
     } else {
-      setTempOtherProps(tempOtherProps.concat(newProperty));
+      setTempOtherProps(prev => [...prev, newProp]);
     }
-
-    setNewProperty(undefined);
   }
 
   function handleDelete(propertyURL: string) {
@@ -211,25 +209,16 @@ export function ResourceForm({
         label='add another property...'
         helper='In Atomic Data, any Resource could have any single Property. Use this field to add new property-value combinations to your resource.'
       >
-        <PropertyAdder>
-          {/* TODO: When adding a property, clear the form. Make the button optional / remove it. */}
-          <Button
-            subtle
-            disabled={!newProperty}
-            onClick={handleAddProp}
-            title='Add this property'
-          >
-            <FaPlus />
-          </Button>
+        <div>
           <ResourceSelector
             value={undefined}
             setSubject={set => {
-              setNewProperty(set);
+              handleAddProp(set);
             }}
             error={newPropErr}
             isA={urls.classes.property}
           />
-        </PropertyAdder>
+        </div>
         {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
       </Field>
       <UploadForm parentResource={resource} />
@@ -249,6 +238,10 @@ export function ResourceForm({
         <ResourceField propertyURL={properties.parent} resource={resource} />
         <ResourceField propertyURL={properties.write} resource={resource} />
         <ResourceField propertyURL={properties.read} resource={resource} />
+        <ResourceField
+          propertyURL={properties.commit.lastCommit}
+          resource={resource}
+        />
       </Collapse>
       {variant !== ResourceFormVariant.Dialog && (
         <>
@@ -265,8 +258,3 @@ export function ResourceForm({
 ResourceForm.defaultProps = {
   variant: ResourceFormVariant.Default,
 };
-
-const PropertyAdder = styled.div`
-  display: flex;
-  flex-direction: row;
-`;

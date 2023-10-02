@@ -1,4 +1,9 @@
-import { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+
+const listeners = new Map<
+  string,
+  Set<(value: React.SetStateAction<unknown>) => void>
+>();
 
 export type SetLocalStorageValue<T> = (value: T | ((val: T) => T)) => void;
 /**
@@ -39,8 +44,12 @@ export function useLocalStorage<T>(
         // Allow value to be a function so we have same API as useState
         const valueToStore =
           value instanceof Function ? value(storedValue) : value;
+
         // Save state
-        setStoredValue(valueToStore);
+        for (const listener of listeners.get(key) || []) {
+          listener(valueToStore);
+        }
+
         // Save to local storage
         window.localStorage.setItem(key, JSON.stringify(valueToStore));
       } catch (error) {
@@ -50,6 +59,18 @@ export function useLocalStorage<T>(
     },
     [storedValue, key],
   );
+
+  useEffect(() => {
+    if (!listeners.has(key)) {
+      listeners.set(key, new Set());
+    }
+
+    listeners.get(key)?.add(setStoredValue as (value: unknown) => void);
+
+    return () => {
+      listeners.get(key)?.delete(setStoredValue as (value: unknown) => void);
+    };
+  }, [key]);
 
   return [storedValue, setValue];
 }
