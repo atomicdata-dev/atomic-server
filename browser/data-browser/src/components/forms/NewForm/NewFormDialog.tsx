@@ -1,10 +1,4 @@
-import {
-  JSONValue,
-  properties,
-  useResource,
-  useStore,
-  useTitle,
-} from '@tomic/react';
+import { JSONValue, useResource, useStore, useTitle } from '@tomic/react';
 import React, { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
@@ -17,7 +11,7 @@ import { NewFormProps } from './NewFormPage';
 import { NewFormTitle, NewFormTitleVariant } from './NewFormTitle';
 import { SubjectField } from './SubjectField';
 import { useNewForm } from './useNewForm';
-import { randomString } from '../../../helpers/randomString';
+import { getNamePartFromProps } from '../../../helpers/getNamePartFromProps';
 
 export interface NewFormDialogProps extends NewFormProps {
   closeDialog: () => void;
@@ -55,15 +49,11 @@ export const NewFormDialog = ({
   // Onmount we generate a new subject based on the classtype and the user input.
   useEffectOnce(() => {
     (async () => {
-      const namePart = normalizeName(
-        (initialProps?.[properties.shortname] as string) ??
-          (initialProps?.[properties.name] as string) ??
-          randomString(8),
-      );
+      const namePart = getNamePartFromProps(initialProps ?? {});
 
       const uniqueSubject = await store.buildUniqueSubjectFromParts(
-        className,
-        namePart,
+        [className, namePart],
+        parent,
       );
 
       await setSubjectValue(uniqueSubject);
@@ -115,5 +105,3 @@ export const NewFormDialog = ({
     </>
   );
 };
-
-const normalizeName = (name: string) => name.replaceAll('/t', '-');
