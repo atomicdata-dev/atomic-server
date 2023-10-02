@@ -1,0 +1,22 @@
+VERSION 0.7
+PROJECT applied-knowledge-systems/atomic-server
+FROM node:latest
+WORKDIR browser
+
+main-pipeline:
+  PIPELINE --push 
+  TRIGGER push main 
+  TRIGGER pr main 
+  ARG tag=latest
+  BUILD +build --tag=$tag
+
+deps:
+  RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
+  COPY . .
+  RUN pnpm install --no-frozen-lockfile
+  SAVE ARTIFACT node_modules /node_modules
+
+build:
+  FROM +deps
+  RUN pnpm run build
+  SAVE ARTIFACT dist /dist AS LOCAL dist
