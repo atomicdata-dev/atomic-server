@@ -115,10 +115,6 @@ export const LinkView = styled.a<LinkViewProps>`
   cursor: pointer;
   pointer-events: ${props => (props.disabled ? 'none' : 'inherit')};
 
-  svg {
-    font-size: 60%;
-  }
-
   &:hover {
     color: ${props => props.theme.colors.mainLight};
     text-decoration: ${p => (p.clean ? 'none' : 'underline')};

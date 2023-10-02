@@ -3,3 +3,7 @@
   border: none;
   cursor: grab;
 }
+
+.react-flow__attribution {
+  background: unset;
+}

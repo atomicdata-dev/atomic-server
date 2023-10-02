@@ -5,6 +5,7 @@ import { NewInstanceButtonProps } from './NewInstanceButtonProps';
 import { NewInstanceButtonDefault } from './NewInstanceButtonDefault';
 import { useSettings } from '../../helpers/AppSettings';
 import { NewTableButton } from './NewTableButton';
+import { NewOntologyButton } from './NewOntologyButton';
 
 type InstanceButton = (props: NewInstanceButtonProps) => JSX.Element;
 
@@ -12,6 +13,7 @@ type InstanceButton = (props: NewInstanceButtonProps) => JSX.Element;
 const classMap = new Map<string, InstanceButton>([
   [classes.bookmark, NewBookmarkButton],
   [classes.table, NewTableButton],
+  [classes.ontology, NewOntologyButton],
 ]);
 
 /** A button for creating a new instance of some thing */

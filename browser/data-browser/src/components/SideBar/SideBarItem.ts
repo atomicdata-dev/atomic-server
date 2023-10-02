@@ -26,4 +26,8 @@ export const SideBarItem = styled('span')<SideBarItemProps>`
   &:active {
     background-color: ${p => p.theme.colors.bg2};
   }
+
+  svg {
+    font-size: 0.8rem;
+  }
 `;

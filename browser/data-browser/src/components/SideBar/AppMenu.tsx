@@ -9,7 +9,6 @@ import {
 import { constructOpenURL } from '../../helpers/navigation';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { SideBarMenuItem } from './SideBarMenuItem';
-import styled from 'styled-components';
 import { paths } from '../../routes/paths';
 import { unknownSubject, useCurrentAgent, useResource } from '@tomic/react';
 
@@ -57,7 +56,7 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
   }, []);
 
   return (
-    <Section aria-label='App menu'>
+    <section aria-label='App menu'>
       <SideBarMenuItem
         icon={<FaUser />}
         label={agent ? agentResource.title : 'Login'}
@@ -95,11 +94,6 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
           onClick={install}
         />
       )}
-    </Section>
+    </section>
   );
 }
-
-const Section = styled.section`
-  border-top: 1px solid ${p => p.theme.colors.bg2};
-  padding-top: ${p => p.theme.margin}rem;
-`;

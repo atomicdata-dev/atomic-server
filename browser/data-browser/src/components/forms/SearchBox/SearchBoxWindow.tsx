@@ -165,7 +165,7 @@ export function SearchBoxWindow({
         {!searchValue && <CenteredMessage>Start Searching</CenteredMessage>}
         <StyledScrollArea>
           <ul>
-            {onCreateItem && (
+            {onCreateItem ? (
               <ResultLine
                 selected={selectedIndex === 0}
                 onMouseOver={() => handleMouseMove(0)}
@@ -173,7 +173,7 @@ export function SearchBoxWindow({
               >
                 Create {searchValue}
               </ResultLine>
-            )}
+            ) : null}
             {results.map((result, i) => (
               <ResourceResultLine
                 key={result}

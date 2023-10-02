@@ -8,6 +8,8 @@ import { Column } from '../../../components/Row';
 import Markdown from '../../../components/datatypes/Markdown';
 import { AtomicLink } from '../../../components/AtomicLink';
 import { toAnchorId } from '../toAnchorId';
+import { ViewTransitionProps } from '../../../helpers/ViewTransitionProps';
+import { transitionName } from '../../../helpers/transitionName';
 
 interface ClassCardReadProps {
   subject: string;
@@ -20,7 +22,7 @@ export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
   const [recommends] = useArray(resource, urls.properties.recommends);
 
   return (
-    <StyledCard>
+    <StyledCard subject={subject}>
       <Column>
         <StyledH3 id={toAnchorId(subject)}>
           <FaCube />
@@ -48,8 +50,9 @@ export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
   );
 }
 
-const StyledCard = styled(Card)`
+const StyledCard = styled(Card)<ViewTransitionProps>`
   padding-bottom: ${p => p.theme.margin}rem;
+  ${props => transitionName('resource-page', props.subject)};
 `;
 
 const StyledH3 = styled.h3`
