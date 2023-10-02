@@ -10,6 +10,9 @@ import { AppMenu } from './AppMenu';
 import { About } from './About';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { Column } from '../Row';
+import { OntologiesPanel } from './OntologySideBar/OntologiesPanel';
+import { SideBarPanel } from './SideBarPanel';
+import { Panel, usePanelList } from './usePanelList';
 
 /** Amount of pixels where the sidebar automatically shows */
 export const SIDEBAR_TOGGLE_WIDTH = 600;
@@ -30,6 +33,8 @@ export function SideBar(): JSX.Element {
     minSize: 200,
     maxSize: 2000,
   });
+
+  const { enabledPanels } = usePanelList();
 
   const mountRefs = useCombineRefs([ref, targetRef]);
 
@@ -61,9 +66,18 @@ export function SideBar(): JSX.Element {
         {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
         <SideBarDriveMemo handleClickItem={closeSideBar} key={drive} />
         <MenuWrapper>
-          <Column>
-            <AppMenu onItemClick={closeSideBar} />
-            <About />
+          <Column gap='0.5rem'>
+            {enabledPanels.has(Panel.Ontologies) && (
+              <SideBarPanel title='Ontologies' key={drive}>
+                <OntologiesPanel />
+              </SideBarPanel>
+            )}
+            <SideBarPanel title='App'>
+              <Column>
+                <AppMenu onItemClick={closeSideBar} />
+                <About />
+              </Column>
+            </SideBarPanel>
           </Column>
         </MenuWrapper>
         <NavBarSpacer baseMargin='1rem' position='bottom' />

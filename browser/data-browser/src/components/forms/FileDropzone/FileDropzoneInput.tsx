@@ -62,8 +62,6 @@ export function FileDropzoneInput({
 }
 
 const VisualDropZone = styled.div`
-  background-color: ${p =>
-    p.theme.darkMode ? 'rgba(0, 0, 0, 0.8)' : 'rgba(255, 255, 255, 0.8)'};
   backdrop-filter: blur(10px);
   border: 2px dashed ${p => p.theme.colors.bg2};
   border-radius: ${p => p.theme.radius};

@@ -8,15 +8,9 @@ import { SearchBox } from '../SearchBox';
 import { SearchBoxButton } from '../SearchBox/SearchBox';
 import { FaTrash } from 'react-icons/fa';
 import { ErrorChip } from '../ErrorChip';
+import { urls } from '@tomic/react';
 
 interface ResourceSelectorProps {
-  /**
-   * Whether a certain type of Class is required here. Pass the URL of the
-   * class. Is used for constructing a list of options.
-   */
-  isA?: string;
-  /** If true, the form will show an error if it is left empty. */
-  required?: boolean;
   /**
    * This callback is called when the Subject Changes. You can pass an Error
    * Handler as the second argument to set an error message. Take the second
@@ -25,10 +19,15 @@ interface ResourceSelectorProps {
   setSubject: (subject: string | undefined) => void;
   /** The value (URL of the Resource that is selected) */
   value?: string;
+  /**
+   * Whether a certain type of Class is required here. Pass the URL of the
+   * class. Is used for constructing a list of options.
+   */
+  isA?: string;
+  /** If true, the form will show an error if it is left empty. */
+  required?: boolean;
   /** A function to remove this item. Only relevant in arrays. */
   handleRemove?: () => void;
-  /** Only pass an error if it is applicable to this specific field */
-  onValidate?: (valid: boolean) => void;
   error?: Error;
   disabled?: boolean;
   autoFocus?: boolean;
@@ -46,9 +45,8 @@ export const ResourceSelector = React.memo(function ResourceSelector({
   setSubject,
   value,
   handleRemove,
-  onValidate,
   error,
-  isA: classType,
+  isA,
   disabled,
   parent,
   hideCreateOption,
@@ -60,7 +58,7 @@ export const ResourceSelector = React.memo(function ResourceSelector({
   const { inDialog } = useDialogTreeContext();
 
   const handleCreateItem = useMemo(() => {
-    if (hideCreateOption) {
+    if (hideCreateOption || !isA) {
       return undefined;
     }
 
@@ -68,14 +66,14 @@ export const ResourceSelector = React.memo(function ResourceSelector({
       setInitialNewTitle(name);
       showDialog();
     };
-  }, [hideCreateOption, setSubject, showDialog]);
+  }, [hideCreateOption, setSubject, showDialog, isA]);
 
   return (
     <Wrapper>
       <StyledSearchBox
         value={value}
         onChange={setSubject}
-        isA={classType}
+        isA={isA}
         required={required}
         disabled={disabled}
         onCreateItem={handleCreateItem}
@@ -87,14 +85,16 @@ export const ResourceSelector = React.memo(function ResourceSelector({
         )}
       </StyledSearchBox>
       {error && <PositionedErrorChip>{error.message}</PositionedErrorChip>}
-      {!inDialog && classType && (
+      {!inDialog && isA && (
         <Dialog {...dialogProps}>
           {isDialogOpen && (
             <NewFormDialog
               parent={parent || drive}
-              classSubject={classType}
+              classSubject={isA}
               closeDialog={closeDialog}
-              initialTitle={initialNewTitle}
+              initialProps={{
+                [urls.properties.shortname]: initialNewTitle,
+              }}
               onSave={setSubject}
             />
           )}

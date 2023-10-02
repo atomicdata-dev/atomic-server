@@ -9,6 +9,7 @@ import { Column, Row } from '../components/Row';
 import { styled } from 'styled-components';
 import { Checkbox, CheckboxLabel } from '../components/forms/Checkbox';
 import { Main } from '../components/Main';
+import { Panel, usePanelList } from '../components/SideBar/usePanelList';
 
 export const SettingsTheme: React.FunctionComponent = () => {
   const {
@@ -17,6 +18,16 @@ export const SettingsTheme: React.FunctionComponent = () => {
     viewTransitionsEnabled,
     setViewTransitionsEnabled,
   } = useSettings();
+
+  const { enabledPanels, enablePanel, disablePanel } = usePanelList();
+
+  const changePanelPref = (panel: Panel) => (state: boolean) => {
+    if (state) {
+      enablePanel(panel);
+    } else {
+      disablePanel(panel);
+    }
+  };
 
   return (
     <Main>
@@ -53,6 +64,14 @@ export const SettingsTheme: React.FunctionComponent = () => {
           </Row>
           <Heading>Main color</Heading>
           <MainColorPicker />
+          <Heading>Panels</Heading>
+          <CheckboxLabel>
+            <Checkbox
+              checked={enabledPanels.has(Panel.Ontologies)}
+              onChange={changePanelPref(Panel.Ontologies)}
+            />{' '}
+            Enable Ontology panel
+          </CheckboxLabel>
           <Heading>Animations</Heading>
           <CheckboxLabel>
             <Checkbox

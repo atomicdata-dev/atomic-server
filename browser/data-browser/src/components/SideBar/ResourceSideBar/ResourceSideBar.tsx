@@ -135,11 +135,6 @@ const TextWrapper = styled.span`
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-
-  svg {
-    /* color: ${p => p.theme.colors.text}; */
-    font-size: 0.8em;
-  }
 `;
 
 const SideBarErrorWrapper = styled(TextWrapper)`
