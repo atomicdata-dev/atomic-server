@@ -1,22 +1,39 @@
 VERSION 0.7
-PROJECT applied-knowledge-systems/atomic-server
-FROM node:latest
+PROJECT ontola/atomic-server
+FROM node:20.8.0-bookworm
 WORKDIR browser
 
 main-pipeline:
-  PIPELINE --push 
-  TRIGGER push main 
-  TRIGGER pr main 
+  PIPELINE --push
+  TRIGGER push develop
+  TRIGGER push main
+  TRIGGER pr develop
   ARG tag=latest
   BUILD +build --tag=$tag
 
+all:
+  BUILD +build --tag=latest
+  BUILD +test
+  BUILD +lint
+
 deps:
   RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
+  COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .
+  COPY data-browser/package.json data-browser/.
+  COPY lib/package.json lib/.
+  COPY react/package.json react/.
+  RUN pnpm install --frozen-lockfile --shamefully-hoist
   COPY . .
-  RUN pnpm install --no-frozen-lockfile
-  SAVE ARTIFACT node_modules /node_modules
+
+test:
+  FROM +deps
+  RUN pnpm run test
+
+lint:
+  FROM +deps
+  RUN pnpm run lint
 
 build:
   FROM +deps
   RUN pnpm run build
-  SAVE ARTIFACT dist /dist AS LOCAL dist
+  SAVE ARTIFACT data-browser/dist data-browser/dist AS LOCAL dist

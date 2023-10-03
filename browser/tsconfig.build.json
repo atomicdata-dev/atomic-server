@@ -3,6 +3,8 @@
     "target": "ES5",
     "module": "ES2022",
     "lib": [
+      // Not sure if DOM should be here. Lib should also work without a browser!
+      "DOM",
       "ES6",
       "ES7",
       "ESNext"

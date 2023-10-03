@@ -1,5 +1,5 @@
 [workspace]
-workspace.resolver = "2"
+resolver = "2"
 members = [
   "server",
   "cli",

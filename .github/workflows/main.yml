@@ -1,4 +1,5 @@
-on: [push, workflow_dispatch]
+on: [workflow_dispatch]
+# on: [push, workflow_dispatch]
 
 name: "Build, test, clippy"
 jobs:
