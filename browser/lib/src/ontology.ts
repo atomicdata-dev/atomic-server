@@ -7,7 +7,14 @@ export type BaseObject = {
 
 // Extended via module augmentation
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
-export interface Classes {}
+export interface Classes {
+  'unknown-subject': {
+    requires: BaseProps;
+    recommends: never;
+  };
+}
+
+export type UnknownClass = 'unknown-subject';
 
 export type BaseProps =
   | 'https://atomicdata.dev/properties/isA'
@@ -46,15 +53,19 @@ export type InferTypeOfValueInTriple<
     : JSONValue,
 > = Returns;
 
-/** Type of the dynamically created resource.props field */
-export type QuickAccesPropType<Class extends keyof Classes | never = never> = {
+type QuickAccesKnownPropType<Class extends OptionalClass> = {
   readonly [Prop in keyof PropsOfClass<Class> as PropSubjectToNameMapping[Prop]]: InferTypeOfValueInTriple<
     Class,
     Prop
   >;
 };
 
-export type OptionalClass = keyof Classes | never;
+/** Type of the dynamically created resource.props field */
+export type QuickAccesPropType<Class extends OptionalClass = UnknownClass> =
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  Class extends UnknownClass ? any : QuickAccesKnownPropType<Class>;
+
+export type OptionalClass = keyof Classes | UnknownClass;
 
 // A map of all known classes and properties to their camelcased shortname.
 const globalReverseNameMapping = new Map<string, string>();

@@ -33,7 +33,8 @@ export const unknownSubject = 'unknown-subject';
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
  * / Value combinations.
  */
-export class Resource<C extends OptionalClass = never> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export class Resource<C extends OptionalClass = any> {
   /** If the resource could not be fetched, we put that info here. */
   public error?: Error;
   /** If the commit could not be saved, we put that info here. */
@@ -80,7 +81,7 @@ export class Resource<C extends OptionalClass = never> {
   }
 
   public get props(): QuickAccesPropType<C> {
-    const props: QuickAccesPropType<C> = {};
+    const props: QuickAccesPropType<C> = {} as QuickAccesPropType<C>;
 
     for (const prop of this.propvals.keys()) {
       const name = getKnownNameBySubject(prop);
@@ -168,7 +169,7 @@ export class Resource<C extends OptionalClass = never> {
     res.appliedCommitSignatures = this.appliedCommitSignatures;
     res.queuedFetch = this.queuedFetch;
 
-    return res;
+    return res as Resource<C>;
   }
 
   /** Checks if the resource is both loaded and free from errors */
