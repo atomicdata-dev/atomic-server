@@ -16,11 +16,12 @@ import {
   JSONADParser,
   FileOrFileLike,
   OptionalClass,
+  UnknownClass,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
 /** Function called when a resource is updated or removed */
-type ResourceCallback<C extends OptionalClass = never> = (
+type ResourceCallback<C extends OptionalClass = UnknownClass> = (
   resource: Resource<C>,
 ) => void;
 /** Callback called when the stores agent changes */
@@ -120,6 +121,7 @@ export class Store {
     this.client.setFetch(fetchOverride);
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public addResources(...resources: Resource[]): void {
     for (const resource of resources) {
       this.addResource(resource);
@@ -207,7 +209,7 @@ export class Store {
   /**
    * Always fetches resource from the server then adds it to the store.
    */
-  public async fetchResourceFromServer<C extends OptionalClass = never>(
+  public async fetchResourceFromServer<C extends OptionalClass = UnknownClass>(
     /** The resource URL to be fetched */
     subject: string,
     opts: {
@@ -309,7 +311,7 @@ export class Store {
    * done in the background . If the subject is undefined, an empty non-saved
    * resource will be returned.
    */
-  public getResourceLoading<C extends OptionalClass = never>(
+  public getResourceLoading<C extends OptionalClass = UnknownClass>(
     subject: string = unknownSubject,
     opts: FetchOpts = {},
   ): Resource<C> {
@@ -350,7 +352,7 @@ export class Store {
    * store. Not recommended to use this for rendering, because it might cause
    * resources to be fetched multiple times.
    */
-  public async getResourceAsync<C extends OptionalClass = never>(
+  public async getResourceAsync<C extends OptionalClass = UnknownClass>(
     subject: string,
   ): Promise<Resource<C>> {
     const found = this.resources.get(subject);

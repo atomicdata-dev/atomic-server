@@ -13,7 +13,8 @@
     "@types/fast-json-stable-stringify": "^2.1.0",
     "chai": "^4.3.4",
     "typescript": "^4.8",
-    "whatwg-fetch": "^3.6.2"
+    "whatwg-fetch": "^3.6.2",
+    "@tomic/cli": "^0.35.2"
   },
   "files": [
     "dist"
@@ -34,7 +35,8 @@
     "start": "pnpm watch",
     "test": "NODE_OPTIONS='--experimental-vm-modules' ../node_modules/jest/bin/jest.js",
     "tsc": "tsc --build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "generate-ontologies": "ad-generate ontologies"
   },
   "source": "src/index.ts",
   "type": "module",

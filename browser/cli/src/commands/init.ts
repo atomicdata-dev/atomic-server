@@ -12,9 +12,9 @@ const TEMPLATE_CONFIG_FILE = {
 export const initCommand = async (args: string[]) => {
   const forced = args.includes('--force') || args.includes('-f');
   const filePath = path.join(process.cwd(), 'atomic.config.json');
-  const stat = fs.statSync(filePath);
+  const stat = fs.statSync(filePath, { throwIfNoEntry: false });
 
-  if (stat.isFile() && !forced) {
+  if (stat?.isFile() && !forced) {
     return console.error(
       chalk.red(
         `ERROR: File already exists. If you meant to override the existing file, use the command with the ${chalk.cyan(

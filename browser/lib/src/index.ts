@@ -29,6 +29,15 @@
  * @module
  */
 
+import { initOntologies } from './ontologies/index.js';
+
+initOntologies();
+
+export * from './ontologies/core.js';
+export * from './ontologies/collections.js';
+export * from './ontologies/commits.js';
+export * from './ontologies/dataBrowser.js';
+export * from './ontologies/server.js';
 export * from './agent.js';
 export * from './authentication.js';
 export * from './class.js';

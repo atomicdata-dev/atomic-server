@@ -1,3 +1,6 @@
+/**
+ * @deprecated
+ */
 export const classes = {
   agent: 'https://atomicdata.dev/classes/Agent',
   chatRoom: 'https://atomicdata.dev/classes/ChatRoom',
@@ -40,7 +43,7 @@ export const classes = {
   ontology: 'https://atomicdata.dev/class/ontology',
 };
 
-/** List of commonly used Atomic Data Properties. */
+/** @deprecated List of commonly used Atomic Data Properties. */
 export const properties = {
   /** Collection of all the AtomicData.dev properties */
   allowsOnly: 'https://atomicdata.dev/properties/allowsOnly',
@@ -184,6 +187,9 @@ export const endpoints = {
   import: '/import',
 };
 
+/**
+ * @deprecated
+ */
 export const urls = {
   properties,
   endpoints,

@@ -12,6 +12,10 @@ export interface AtomicConfig {
    */
   moduleAlias?: string;
   /**
+   * [OPTIONAL] By default we generate class types for ease of use (e.g: export type Property = typeof core.classes.property;). But these names can clash with other interfaces or classes in your project. When 'useNameSpaces' is set to true the types will be wrapped in a namespace.
+   */
+  useNamespaces?: boolean;
+  /**
    * [OPTIONAL] The secret of the agent that is used to access your atomic data server. This can also be provided as a command line argument if you don't want to store it in the config file.
    * If left empty the public agent is used.
    */

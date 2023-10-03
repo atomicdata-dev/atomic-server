@@ -1,0 +1,12 @@
+{
+  "outputFolder": "./src/ontologies",
+  "moduleAlias": "../index.js",
+  "useNamespaces": true,
+  "ontologies": [
+    "https://atomicdata.dev/ontology/core",
+    "https://atomicdata.dev/ontology/commit",
+    "https://atomicdata.dev/ontology/collection",
+    "https://atomicdata.dev/ontology/data-browser",
+    "https://atomicdata.dev/ontology/server"
+  ]
+}
