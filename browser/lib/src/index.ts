@@ -33,6 +33,8 @@ import { initOntologies } from './ontologies/index.js';
 
 initOntologies();
 
+const __INTERNAL_KNOWN_SUBJECTS = new Set<string>();
+
 export * from './ontologies/core.js';
 export * from './ontologies/collections.js';
 export * from './ontologies/commits.js';

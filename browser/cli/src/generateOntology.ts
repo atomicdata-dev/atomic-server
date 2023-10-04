@@ -8,6 +8,8 @@ import { generateSubjectToNameMapping } from './generateSubjectToNameMapping.js'
 import { generateClassExports } from './generateClassExports.js';
 
 import { atomicConfig } from './config.js';
+import { PropertyRecord } from './PropertyRecord.js';
+import { Core } from '@tomic/lib';
 
 enum Inserts {
   MODULE_ALIAS = '{{1}}',
@@ -40,13 +42,21 @@ declare module '${Inserts.MODULE_ALIAS}' {
 
 export const generateOntology = async (
   subject: string,
+  propertyRecord: PropertyRecord,
 ): Promise<{
   filename: string;
   content: string;
 }> => {
-  const ontology = await store.getResourceAsync(subject);
+  const ontology = await store.getResourceAsync<Core.Ontology>(subject);
+
+  const properties = ontology.props.properties ?? [];
+
+  for (const prop of properties) {
+    propertyRecord.repordPropertyDefined(prop);
+  }
+
   const [baseObjStr, reverseMapping] = await generateBaseObject(ontology);
-  const classesStr = generateClasses(ontology, reverseMapping);
+  const classesStr = generateClasses(ontology, reverseMapping, propertyRecord);
   const propertiesStr = generatePropTypeMapping(ontology, reverseMapping);
   const subToNameStr = generateSubjectToNameMapping(ontology, reverseMapping);
   const classExportsStr = generateClassExports(ontology, reverseMapping);
