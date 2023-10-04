@@ -1,20 +1,7 @@
 import { Datatype, Resource } from '@tomic/lib';
 import { store } from './store.js';
 import { ReverseMapping } from './generateBaseObject.js';
-
-const DatatypeToTSTypeMap = {
-  [Datatype.ATOMIC_URL]: 'string',
-  [Datatype.RESOURCEARRAY]: 'string[]',
-  [Datatype.BOOLEAN]: 'boolean',
-  [Datatype.DATE]: 'string',
-  [Datatype.TIMESTAMP]: 'string',
-  [Datatype.INTEGER]: 'number',
-  [Datatype.FLOAT]: 'number',
-  [Datatype.STRING]: 'string',
-  [Datatype.SLUG]: 'string',
-  [Datatype.MARKDOWN]: 'string',
-  [Datatype.UNKNOWN]: 'JSONValue',
-};
+import { DatatypeToTSTypeMap } from './DatatypeToTSTypeMap.js';
 
 export const generatePropTypeMapping = (
   ontology: Resource,

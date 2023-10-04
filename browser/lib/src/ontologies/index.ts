@@ -1,7 +1,6 @@
-
 /* -----------------------------------
-* GENERATED WITH ATOMIC-GENERATE
-* -------------------------------- */
+ * GENERATED WITH ATOMIC-GENERATE
+ * -------------------------------- */
 
 import { registerOntologies } from '../index.js';
 

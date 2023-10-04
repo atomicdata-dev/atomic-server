@@ -86,3 +86,7 @@ export function registerOntologies(...ontologies: BaseObject[]): void {
 export function getKnownNameBySubject(subject: string): string | undefined {
   return globalReverseNameMapping.get(subject);
 }
+
+export function __INTERNAL_GET_KNOWN_SUBJECT_MAPPING(): Map<string, string> {
+  return globalReverseNameMapping;
+}

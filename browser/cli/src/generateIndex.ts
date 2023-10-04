@@ -6,6 +6,7 @@ enum Inserts {
   MODULE_ALIAS = '{{1}}',
   IMPORTS = '{{2}}',
   REGISTER_ARGS = '{{3}}',
+  EXTERNALS_IMPORT = '{{4}}',
 }
 
 const TEMPLATE = `
@@ -22,12 +23,19 @@ export function initOntologies(): void {
 }
 `;
 
-export const generateIndex = (ontologies: string[]) => {
+export const generateIndex = (
+  ontologies: string[],
+  inludeExternals: boolean,
+) => {
   const names = ontologies.map(x => {
     const res = store.getResourceLoading(x);
 
     return camelCaseify(res.title);
   });
+
+  if (inludeExternals) {
+    names.push('externals');
+  }
 
   const importLines = names.map(createImportLine).join('\n');
   const registerArgs = names.join(', ');

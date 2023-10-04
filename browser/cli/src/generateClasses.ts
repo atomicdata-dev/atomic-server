@@ -1,16 +1,17 @@
-import { Resource } from '@tomic/lib';
+import { Core, Resource } from '@tomic/lib';
 import { store } from './store.js';
 import { ReverseMapping } from './generateBaseObject.js';
+import { PropertyRecord } from './PropertyRecord.js';
 
 export const generateClasses = (
-  ontology: Resource,
+  ontology: Resource<Core.Ontology>,
   reverseMapping: ReverseMapping,
+  propertyRecord: PropertyRecord,
 ): string => {
-  const classes = ontology.get(
-    'https://atomicdata.dev/properties/classes',
-  ) as string[];
+  const classes = ontology.props.classes ?? [];
+
   const classStringList = classes.map(subject => {
-    return generateClass(subject, reverseMapping);
+    return generateClass(subject, reverseMapping, propertyRecord);
   });
 
   const innerStr = classStringList.join('\n');
@@ -23,8 +24,9 @@ export const generateClasses = (
 const generateClass = (
   subject: string,
   reverseMapping: ReverseMapping,
+  propertyRecord: PropertyRecord,
 ): string => {
-  const resource = store.getResourceLoading(subject);
+  const resource = store.getResourceLoading<Core.Class>(subject);
 
   const transformSubject = (str: string) => {
     const name = reverseMapping[str];
@@ -36,12 +38,12 @@ const generateClass = (
     return `typeof ${name}`;
   };
 
-  const requires = (resource.get(
-    'https://atomicdata.dev/properties/requires',
-  ) ?? []) as string[];
-  const recommends = (resource.get(
-    'https://atomicdata.dev/properties/recommends',
-  ) ?? []) as string[];
+  const requires = resource.props.requires ?? [];
+  const recommends = resource.props.recommends ?? [];
+
+  for (const prop of [...requires, ...recommends]) {
+    propertyRecord.reportPropertyUsed(prop);
+  }
 
   return classString(
     reverseMapping[subject],
