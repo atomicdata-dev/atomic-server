@@ -30,8 +30,8 @@ pub struct SearchQuery {
     pub include: Option<bool>,
     /// Maximum amount of results
     pub limit: Option<usize>,
-    /// Only include resources that have this resource as its ancestor
-    pub parent: Option<String>,
+    /// Only include resources that have one of these resources as its ancestor
+    pub parents: Option<Vec<String>>,
     /// Filter based on props, using tantivy QueryParser syntax.
     /// e.g. `prop:val` or `prop:val~1` or `prop:val~1 AND prop2:val2`
     /// See https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html
@@ -147,9 +147,14 @@ fn query_from_params(
 ) -> AtomicServerResult<impl Query> {
     let mut query_list: Queries = Vec::new();
 
-    if let Some(parent) = &params.parent {
-        let query = build_parent_query(parent, fields, &appstate.store)?;
+    if let Some(parents) = &params.parents {
+        let mut queries: Vec<Box<dyn Query>> = Vec::new();
+        for parent in parents {
+            let boxed_q = build_parent_query(parent, fields, &appstate.store)?;
+            queries.push(Box::new(boxed_q));
+        }
 
+        let query = BooleanQuery::union(queries);
         query_list.push((Occur::Must, Box::new(query)));
     }
 
