@@ -37,7 +37,7 @@ export function Search(): JSX.Element {
   const [selectedIndex, setSelected] = useState(0);
   const { results, loading, error } = useServerSearch(query, {
     debounce: 0,
-    scope: scope || drive,
+    parents: scope || drive,
     filters,
   });
   const navigate = useNavigate();

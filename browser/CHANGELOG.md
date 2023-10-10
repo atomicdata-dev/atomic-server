@@ -4,6 +4,8 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 ## UNRELEASED
 
+- The `scope` option in `SearchOpts` has changed to `parents` and now accepts an array of subjects instead of a single subject.
+
 ### Atomic Browser
 
 - Show resource usage in data view.
