@@ -10,6 +10,7 @@ use crate::{
 use actix_web::{web, HttpResponse};
 use atomic_lib::{errors::AtomicResult, urls, Db, Resource, Storelike};
 use serde::Deserialize;
+use serde_with::{formats::CommaSeparator, StringWithSeparator};
 use simple_server_timing_header::Timer;
 use tantivy::{
     collector::TopDocs,
@@ -22,6 +23,9 @@ use tracing::instrument;
 
 type Queries = Vec<(Occur, Box<dyn Query>)>;
 
+// All this serde stuff is to allow comma separated lists in the query params.
+#[serde_with::serde_as]
+#[serde_with::skip_serializing_none]
 #[derive(Deserialize, Debug)]
 pub struct SearchQuery {
     /// The text search query entered by the user in the search box
@@ -31,6 +35,7 @@ pub struct SearchQuery {
     /// Maximum amount of results
     pub limit: Option<usize>,
     /// Only include resources that have one of these resources as its ancestor
+    #[serde_as(as = "Option<StringWithSeparator::<CommaSeparator, String>>")]
     pub parents: Option<Vec<String>>,
     /// Filter based on props, using tantivy QueryParser syntax.
     /// e.g. `prop:val` or `prop:val~1` or `prop:val~1 AND prop2:val2`

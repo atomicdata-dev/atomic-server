@@ -12,7 +12,7 @@ export function useResourceSearch(
 
   const searchOpts = useMemo(
     (): SearchOpts => ({
-      scope: drive,
+      parents: drive,
       filters: classType ? { [urls.properties.isA]: classType } : undefined,
     }),
     [drive, classType],

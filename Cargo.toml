@@ -1,4 +1,5 @@
 [workspace]
+workspace.resolver = "2"
 members = [
   "server",
   "cli",

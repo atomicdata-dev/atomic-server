@@ -3,8 +3,8 @@ export interface SearchOpts {
   include?: boolean;
   /** Max of how many results to return */
   limit?: number;
-  /** Subject of resource to scope the search to. This should be a parent of the resources you're looking for. */
-  scope?: string;
+  /** Subjects of resource to scope the search to. This should be a list of parents of the resources you're looking for. */
+  parents?: string[] | string;
   /** Property-Value pair of set filters. */
   filters?: {
     [subject: string]: string;
@@ -55,7 +55,7 @@ export function buildSearchSubject(
   query: string,
   opts: SearchOpts = {},
 ) {
-  const { include = false, limit = 30, scope, filters } = opts;
+  const { include = false, limit = 30, parents, filters } = opts;
   const url = new URL(serverURL);
   url.pathname = 'search';
 
@@ -69,7 +69,15 @@ export function buildSearchSubject(
   include && url.searchParams.set('include', include.toString());
   limit && url.searchParams.set('limit', limit.toString());
   hasFilters && url.searchParams.set('filters', buildFilterString(filters));
-  scope && url.searchParams.set('parent', scope);
+
+  if (parents) {
+    if (Array.isArray(parents)) {
+      url.searchParams.append('parents', parents.join(','));
+    } else {
+      url.searchParams.append('parents', parents);
+    }
+  }
+  // parents && url.searchParams.set('parents', JSON.stringify(parents));
 
   return url.toString();
 }
