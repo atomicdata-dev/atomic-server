@@ -73,7 +73,10 @@ pub const NO_VALUE: &str = "";
 
 #[tracing::instrument(skip(store))]
 /// Performs a query on the `query_index` Tree, which is a lexicographic sorted list of all hits for QueryFilters.
-pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
+pub fn query_sorted_indexed(
+    store: &Db,
+    q: &Query,
+) -> AtomicResult<(Vec<String>, Vec<Resource>, usize)> {
     // When there is no explicit start / end value passed, we use the very first and last
     // lexicographic characters in existence to make the range practically encompass all values.
     let start = if let Some(val) = &q.start_val {
@@ -97,18 +100,14 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         };
 
     let mut subjects: Vec<String> = vec![];
-    let mut resources = Vec::new();
+    let mut resources: Vec<Resource> = vec![];
     let mut count = 0;
 
     let self_url = store
         .get_self_url()
         .ok_or("No self_url set, required for Queries")?;
 
-    let limit = if let Some(limit) = q.limit {
-        limit
-    } else {
-        std::usize::MAX
-    };
+    let limit = q.limit.unwrap_or(std::usize::MAX);
 
     for (i, kv) in iter.enumerate() {
         // The user's maximum amount of results has not yet been reached
@@ -118,49 +117,30 @@ pub fn query_indexed(store: &Db, q: &Query) -> AtomicResult<QueryResult> {
         if in_selection {
             let (k, _v) = kv.map_err(|_e| "Unable to parse query_cached")?;
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
+
             // If no external resources should be included, skip this one if it's an external resource
             if !q.include_external && !subject.starts_with(&self_url) {
                 continue;
             }
 
-            // When an agent is defined, we must perform authorization checks
-            // WARNING: EXPENSIVE!
-            // TODO: Make async
-            if q.include_nested || q.for_agent != ForAgent::Sudo {
-                match store.get_resource_extended(subject, true, &q.for_agent) {
-                    Ok(resource) => {
-                        resources.push(resource);
-                        subjects.push(subject.into())
-                    }
-                    Err(e) => match &e.error_type {
-                        crate::AtomicErrorType::NotFoundError => {}
-                        crate::AtomicErrorType::UnauthorizedError => {}
-                        _other => {
-                            return Err(format!(
-                                "Error when getting resource in collection: {}",
-                                &e
-                            )
-                            .into());
-                        }
-                    },
+            if should_include_resource(q) {
+                if let Ok(resource) = store.get_resource_extended(subject, true, &q.for_agent) {
+                    resources.push(resource);
+                    subjects.push(subject.into());
                 }
             } else {
-                // If there is no need for nested resources, and no auth checks, we can skip the expensive part!
-                subjects.push(subject.into())
+                subjects.push(subject.into());
             }
         }
+
         // We iterate over every single resource, even if we don't perform any computation on the items.
         // This helps with pagination, but it comes at a serious performance cost. We might need to change how this works later on.
         // Also, this count does not take into account the `include_external` filter.
+        count += 1;
         // https://github.com/atomicdata-dev/atomic-server/issues/290
-        count = i + 1;
     }
 
-    Ok(QueryResult {
-        count,
-        resources,
-        subjects,
-    })
+    Ok((subjects, resources, count))
 }
 
 /// Checks if the resource will match with a QueryFilter.
@@ -388,6 +368,14 @@ pub fn parse_collection_members_key(bytes: &[u8]) -> AtomicResult<(QueryFilter, 
         return Err("Can't parse subject in members_key".into());
     };
     Ok((q_filter, value, subject))
+}
+
+pub fn requires_query_index(query: &Query) -> bool {
+    query.sort_by.is_some() || query.start_val.is_some() || query.end_val.is_some()
+}
+
+pub fn should_include_resource(query: &Query) -> bool {
+    query.include_nested || query.for_agent != ForAgent::Sudo
 }
 
 #[cfg(test)]

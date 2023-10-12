@@ -11,6 +11,7 @@ mod val_prop_sub_index;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
+    vec,
 };
 
 use tracing::{info, instrument};
@@ -19,7 +20,10 @@ use crate::{
     agents::ForAgent,
     atoms::IndexAtom,
     commit::CommitResponse,
-    db::{query_index::NO_VALUE, val_prop_sub_index::find_in_val_prop_sub_index},
+    db::{
+        query_index::{requires_query_index, NO_VALUE},
+        val_prop_sub_index::find_in_val_prop_sub_index,
+    },
     endpoints::{default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
     resources::PropVals,
@@ -35,8 +39,8 @@ use self::{
         remove_atom_from_prop_val_sub_index,
     },
     query_index::{
-        check_if_atom_matches_watched_query_filters, query_indexed, update_indexed_member,
-        IndexIterator, QueryFilter,
+        check_if_atom_matches_watched_query_filters, query_sorted_indexed, should_include_resource,
+        update_indexed_member, IndexIterator, QueryFilter,
     },
     val_prop_sub_index::{add_atom_to_reference_index, remove_atom_from_reference_index},
 };
@@ -208,6 +212,110 @@ impl Db {
             .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
 
         Some(Resource::from_propvals(propvals, subject))
+    }
+
+    fn build_index_for_atom(
+        &self,
+        atom: &IndexAtom,
+        query_filter: &QueryFilter,
+    ) -> AtomicResult<()> {
+        // Get the SortableValue either from the Atom or the Resource.
+        let sort_val: SortableValue = if let Some(sort) = &query_filter.sort_by {
+            if &atom.property == sort {
+                atom.sort_value.clone()
+            } else {
+                // Find the sort value in the store
+                match self.get_value(&atom.subject, sort) {
+                    Ok(val) => val.to_sortable_string(),
+                    // If we try sorting on a value that does not exist,
+                    // we'll use an empty string as the sortable value.
+                    Err(_) => NO_VALUE.to_string(),
+                }
+            }
+        } else {
+            atom.sort_value.clone()
+        };
+
+        update_indexed_member(self, query_filter, &atom.subject, &sort_val, false)?;
+        Ok(())
+    }
+
+    fn get_index_iterator_for_query(&self, q: &Query) -> IndexIterator {
+        match (&q.property, q.value.as_ref()) {
+            (Some(prop), val) => find_in_prop_val_sub_index(self, prop, val),
+            (None, None) => self.all_index_atoms(q.include_external),
+            (None, Some(val)) => find_in_val_prop_sub_index(self, val, None),
+        }
+    }
+
+    fn query_basic(&self, q: &Query) -> AtomicResult<QueryResult> {
+        let self_url = self
+            .get_self_url()
+            .ok_or("No self_url set, required for Queries")?;
+
+        let mut subjects: Vec<String> = vec![];
+        let mut resources: Vec<Resource> = vec![];
+        let mut total_count = 0;
+
+        let atoms = self.get_index_iterator_for_query(q);
+
+        for (i, atom_res) in atoms.enumerate() {
+            let atom = atom_res?;
+
+            if q.offset > i {
+                continue;
+            }
+
+            if !q.include_external && !atom.subject.starts_with(&self_url) {
+                continue;
+            }
+            if q.limit.is_none() || subjects.len() < q.limit.unwrap() {
+                if !should_include_resource(q) {
+                    subjects.push(atom.subject.clone());
+                    total_count += 1;
+                    continue;
+                }
+
+                if let Ok(resource) = self.get_resource_extended(&atom.subject, true, &q.for_agent)
+                {
+                    subjects.push(atom.subject.clone());
+                    resources.push(resource);
+                }
+            }
+
+            total_count += 1;
+        }
+
+        Ok(QueryResult {
+            subjects,
+            resources,
+            count: total_count,
+        })
+    }
+
+    fn query_complex(&self, q: &Query) -> AtomicResult<QueryResult> {
+        let (mut subjects, mut resources, mut total_count) = query_sorted_indexed(self, q)?;
+        let q_filter: QueryFilter = q.into();
+
+        if total_count == 0 && !q_filter.is_watched(self) {
+            info!(filter = ?q_filter, "Building query index");
+            let atoms = self.get_index_iterator_for_query(q);
+            q_filter.watch(self)?;
+
+            // Build indexes
+            for atom in atoms.flatten() {
+                self.build_index_for_atom(&atom, &q_filter)?;
+            }
+
+            // Query through the new indexes.
+            (subjects, resources, total_count) = query_sorted_indexed(self, q)?;
+        }
+
+        Ok(QueryResult {
+            subjects,
+            resources,
+            count: total_count,
+        })
     }
 }
 
@@ -468,50 +576,11 @@ impl Storelike for Db {
     /// Tries `query_cache`, which you should implement yourself.
     #[instrument(skip(self))]
     fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
-        let q_filter: QueryFilter = q.into();
-        if let Ok(res) = query_indexed(self, q) {
-            if res.count > 0 || q_filter.is_watched(self) {
-                // Yay, we have a cache hit!
-                // We don't have to create the indexes, so we can return early.
-                return Ok(res);
-            }
+        if requires_query_index(q) {
+            return self.query_complex(q);
         }
 
-        // Maybe make this optional?
-        q_filter.watch(self)?;
-
-        info!(filter = ?q_filter, "Building query index");
-
-        let atoms: IndexIterator = match (&q.property, q.value.as_ref()) {
-            (Some(prop), val) => find_in_prop_val_sub_index(self, prop, val),
-            (None, None) => self.all_index_atoms(q.include_external),
-            (None, Some(val)) => find_in_val_prop_sub_index(self, val, None),
-        };
-
-        for a in atoms {
-            let atom = a?;
-            // Get the SortableValue either from the Atom or the Resource.
-            let sort_val: SortableValue = if let Some(sort) = &q_filter.sort_by {
-                if &atom.property == sort {
-                    atom.sort_value
-                } else {
-                    // Find the sort value in the store
-                    match self.get_value(&atom.subject, sort) {
-                        Ok(val) => val.to_sortable_string(),
-                        // If we try sorting on a value that does not exist,
-                        // we'll use an empty string as the sortable value.
-                        Err(_) => NO_VALUE.to_string(),
-                    }
-                }
-            } else {
-                atom.sort_value
-            };
-
-            update_indexed_member(self, &q_filter, &atom.subject, &sort_val, false)?;
-        }
-
-        // Retry the same query!
-        query_indexed(self, q)
+        self.query_basic(q)
     }
 
     #[instrument(skip(self))]

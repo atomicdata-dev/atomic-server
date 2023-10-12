@@ -297,8 +297,8 @@ fn queries() {
     assert_eq!(res.resources.len(), limit, "nested resources");
 
     q.sort_by = Some(sort_by.into());
-    println!("!!!!!!!           !!!!!!!!   SORT STUFF");
     let mut res = store.query(&q).unwrap();
+    assert!(!res.resources.is_empty(), "resources should be returned");
     let mut prev_resource = res.resources[0].clone();
     // For one resource, we will change the order by changing its value
     let mut resource_changed_order_opt = None;
