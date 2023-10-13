@@ -85,5 +85,7 @@ pub fn default_endpoints() -> Vec<Endpoint> {
         plugins::bookmark::bookmark_endpoint(),
         plugins::importer::import_endpoint(),
         plugins::query::query_endpoint(),
+        #[cfg(debug_assertions)]
+        plugins::prunetests::prune_tests_endpoint(),
     ]
 }
