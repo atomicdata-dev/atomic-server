@@ -128,7 +128,7 @@ export class Client {
     subject: string,
     opts: FetchResourceOptions = {},
   ): Promise<HTTPResourceResult> {
-    const { signInfo, from, body: bodyReq } = opts;
+    const { signInfo, from, body: bodyReq, method } = opts;
     let createdResources: Resource[] = [];
     const parser = new JSONADParser();
     let resource = new Resource(subject);
@@ -160,7 +160,7 @@ export class Client {
 
       const response = await this.fetch(url, {
         headers: requestHeaders,
-        method: bodyReq ? 'POST' : 'GET',
+        method: method ?? 'GET',
         body: bodyReq,
       });
       const body = await response.text();

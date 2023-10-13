@@ -17,6 +17,7 @@ import {
   FileOrFileLike,
   OptionalClass,
   UnknownClass,
+  Server,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
@@ -533,10 +534,10 @@ export class Store {
   }
 
   /** Sends an HTTP POST request to the server to the Subject. Parses the returned Resource and adds it to the store. */
-  public async postToServer(
+  public async postToServer<R extends OptionalClass = Server.EndpointResponse>(
     url: string,
-    data: ArrayBuffer | string,
-  ): Promise<Resource> {
+    data?: ArrayBuffer | string,
+  ): Promise<Resource<R>> {
     return this.fetchResourceFromServer(url, {
       body: data,
       noWebSocket: true,

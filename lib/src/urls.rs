@@ -20,6 +20,8 @@ pub const IMPORTER: &str = "https://atomicdata.dev/classes/Importer";
 pub const ERROR: &str = "https://atomicdata.dev/classes/Error";
 pub const BOOKMARK: &str = "https://atomicdata.dev/class/Bookmark";
 pub const ONTOLOGY: &str = "https://atomicdata.dev/class/ontology";
+pub const ENDPOINT_RESPONSE: &str =
+    "https://atomicdata.dev/ontology/server/class/endpoint-response";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";
@@ -119,7 +121,10 @@ pub const LOCAL_ID: &str = "https://atomicdata.dev/properties/localId";
 pub const PROPERTIES: &str = "https://atomicdata.dev/properties/properties";
 pub const CLASSES: &str = "https://atomicdata.dev/properties/classes";
 pub const INSTANCES: &str = "https://atomicdata.dev/properties/instances";
-
+// ... for Endpoint-Response
+pub const STATUS: &str = "https://atomicdata.dev/ontology/server/property/status";
+pub const RESPONSE_MESSAGE: &str =
+    "https://atomicdata.dev/ontology/server/property/response-message";
 // Datatypes
 pub const STRING: &str = "https://atomicdata.dev/datatypes/string";
 pub const MARKDOWN: &str = "https://atomicdata.dev/datatypes/markdown";
@@ -150,3 +155,4 @@ pub fn construct_path_import(base: &str) -> String {
 pub const PATH_IMPORT: &str = "/import";
 pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
 pub const PATH_QUERY: &str = "/query";
+pub const PATH_PRUNE_TESTS: &str = "/prunetests";

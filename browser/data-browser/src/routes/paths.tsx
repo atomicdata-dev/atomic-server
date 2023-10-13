@@ -16,4 +16,5 @@ export const paths = {
   allVersions: '/all-versions',
   sandbox: '/sandbox',
   fetchBookmark: '/fetch-bookmark',
+  pruneTests: '/prunetests',
 };

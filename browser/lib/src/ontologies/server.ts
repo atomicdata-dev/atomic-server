@@ -12,6 +12,8 @@ export const server = {
     redirect: 'https://atomicdata.dev/classes/Redirect',
     file: 'https://atomicdata.dev/classes/File',
     invite: 'https://atomicdata.dev/classes/Invite',
+    endpointResponse:
+      'https://atomicdata.dev/ontology/server/class/endpoint-response',
   },
   properties: {
     drives: 'https://atomicdata.dev/properties/drives',
@@ -35,6 +37,9 @@ export const server = {
     children: 'https://atomicdata.dev/properties/children',
     parameters: 'https://atomicdata.dev/properties/endpoint/parameters',
     destination: 'https://atomicdata.dev/properties/destination',
+    status: 'https://atomicdata.dev/ontology/server/property/status',
+    responseMessage:
+      'https://atomicdata.dev/ontology/server/property/response-message',
   },
 } as const;
 
@@ -46,6 +51,7 @@ export namespace Server {
   export type Redirect = typeof server.classes.redirect;
   export type File = typeof server.classes.file;
   export type Invite = typeof server.classes.invite;
+  export type EndpointResponse = typeof server.classes.endpointResponse;
 }
 
 declare module '../index.js' {
@@ -92,6 +98,13 @@ declare module '../index.js' {
         | typeof server.properties.users
         | typeof server.properties.usagesLeft;
     };
+    [server.classes.endpointResponse]: {
+      requires:
+        | BaseProps
+        | typeof server.properties.status
+        | typeof server.properties.responseMessage;
+      recommends: never;
+    };
   }
 
   interface PropTypeMapping {
@@ -116,6 +129,8 @@ declare module '../index.js' {
     [server.properties.children]: string[];
     [server.properties.parameters]: string[];
     [server.properties.destination]: string;
+    [server.properties.status]: number;
+    [server.properties.responseMessage]: string;
   }
 
   interface PropSubjectToNameMapping {
@@ -140,5 +155,7 @@ declare module '../index.js' {
     [server.properties.children]: 'children';
     [server.properties.parameters]: 'parameters';
     [server.properties.destination]: 'destination';
+    [server.properties.status]: 'status';
+    [server.properties.responseMessage]: 'responseMessage';
   }
 }
