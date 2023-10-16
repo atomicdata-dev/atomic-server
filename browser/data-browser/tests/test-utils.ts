@@ -35,7 +35,7 @@ export const currentDialogOkButton = 'dialog[open] >> footer >> text=Ok';
 export const REBUILD_INDEX_TIME = 5000;
 
 /** Checks server URL and browser URL */
-export const before = async ({ page }) => {
+export const before = async ({ page }: { page: Page }) => {
   if (!SERVER_URL) {
     throw new Error('serverUrl is not set');
   }
@@ -61,8 +61,8 @@ export async function setTitle(page: Page, title: string) {
 }
 
 export async function disableViewTransition(page: Page) {
-  await page.click('text=Theme Settings');
-  const checkbox = await page.getByLabel('Enable view transition');
+  await page.click('text=Settings');
+  const checkbox = page.getByLabel('Enable view transition');
 
   await expect(checkbox).toBeVisible();
 
@@ -73,7 +73,7 @@ export async function disableViewTransition(page: Page) {
 /** Signs in using an AtomicData.dev test user */
 export async function signIn(page: Page) {
   await disableViewTransition(page);
-  await page.click('text=user settings');
+  await page.click('text=Login');
   await expect(page.locator('text=edit data and sign Commits')).toBeVisible();
   // If there are any issues with this agent, try creating a new one https://atomicdata.dev/invites/1
   const test_agent =
@@ -235,3 +235,7 @@ export async function contextMenuClick(text: string, page: Page) {
 
 export const waitForCommit = async (page: Page) =>
   page.waitForResponse(`${SERVER_URL}/commit`);
+
+export function currentDialog(page: Page) {
+  return page.locator('dialog[open]');
+}

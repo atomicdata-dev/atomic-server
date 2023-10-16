@@ -1,6 +1,17 @@
-import { buildSearchSubject, SearchOpts, urls } from '@tomic/lib';
+import {
+  buildSearchSubject,
+  removeCachedSearchResults,
+  SearchOpts,
+  urls,
+} from '@tomic/lib';
 import { useEffect, useMemo, useState } from 'react';
-import { useArray, useDebounce, useResource, useServerURL } from './index.js';
+import {
+  useArray,
+  useDebounce,
+  useResource,
+  useServerURL,
+  useStore,
+} from './index.js';
 
 interface SearchResults {
   /** Subject URLs for resources that match the query */
@@ -33,7 +44,7 @@ export function useServerSearch(
   opts: SearchOptsHook = {},
 ): SearchResults {
   const { debounce = 50 } = opts;
-
+  const store = useStore();
   const [results, setResults] = useState<string[]>([]);
   const [serverURL] = useServerURL();
   // Calculating the query takes a while, so we debounce it
@@ -60,6 +71,13 @@ export function useServerSearch(
     resultsIn?.toString(),
     resource.loading,
   ]);
+
+  // Remove cached results when component unmounts.
+  useEffect(() => {
+    return () => {
+      removeCachedSearchResults(store);
+    };
+  }, []);
 
   const result = useMemo(
     () => ({

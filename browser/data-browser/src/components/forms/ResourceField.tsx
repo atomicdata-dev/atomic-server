@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useProperty, Resource, Property } from '@tomic/react';
 import { styled } from 'styled-components';
 import Field from './Field';
@@ -6,7 +5,7 @@ import Markdown from '../datatypes/Markdown';
 import { InputWrapper, InputStyled } from './InputStyles';
 import InputSwitcher from './InputSwitcher';
 import { AtomicLink } from '../AtomicLink';
-import { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Button } from '../Button';
 
 function generateErrorPropName(prop: Property): string {
@@ -27,14 +26,19 @@ function ResourceField({
   disabled,
   label: labelProp,
 }: IFieldProps): JSX.Element {
+  const id = useId();
   const property = useProperty(propertyURL);
   const [collapsedDynamic, setCollapsedDynamic] = useState(true);
 
   if (property === null) {
     return (
-      <Field label={labelProp || 'loading...'}>
+      <Field label={labelProp || 'loading...'} fieldId={id}>
         <InputWrapper>
-          <InputStyled disabled={disabled} placeholder='loading property...' />
+          <InputStyled
+            disabled={disabled}
+            placeholder='loading property...'
+            id={id}
+          />
         </InputWrapper>
       </Field>
     );
@@ -71,8 +75,10 @@ function ResourceField({
       handleDelete={handleDelete}
       required={required}
       disabled={disabled}
+      fieldId={id}
     >
       <InputSwitcher
+        id={id}
         key={propertyURL + ' input-switcher'}
         data-test={`input-${property.shortname}`}
         resource={resource}
@@ -106,6 +112,7 @@ function HelperText({ text, link }: HelperTextProps) {
 
 /** A single field in a Resource form should receive these */
 export type InputProps = {
+  id?: string;
   /** The resource that is being edited */
   resource: Resource;
   /** The property of the resource that is being edited */

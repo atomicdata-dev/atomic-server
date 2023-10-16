@@ -99,7 +99,7 @@ test.describe('tables', async () => {
     // Name table
     const tableName = 'Made up music genres';
     await page.getByPlaceholder('New Table').fill(tableName);
-    await page.locator('button:has-text("Create")').click();
+    await page.locator('dialog[open] button:has-text("Create")').click();
     await expect(page.locator(`h1:has-text("${tableName}")`)).toBeVisible();
 
     // Create Date column

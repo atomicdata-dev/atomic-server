@@ -15,7 +15,12 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
   const store = useStore();
   const [active, setActive] = useState(false);
   const [classSubject, setClassSubject] = useState<string | undefined>();
-  const [dialogProps, show, close, isOpen] = useDialog();
+  const [dialogProps, show, close, isOpen] = useDialog({
+    onSuccess: () => {
+      setClassSubject(undefined);
+      setActive(false);
+    },
+  });
 
   const handleClassSelect = (subject: string | undefined) => {
     setClassSubject(subject);
@@ -30,8 +35,6 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
   const handleSave = (subject: string) => {
     ontology.pushPropVal(urls.properties.instances, [subject], true);
     ontology.save(store);
-    setClassSubject(undefined);
-    setActive(false);
   };
 
   return (

@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Client, properties, useResource, useStore } from '@tomic/react';
+import { Client, core, useResource, useStore } from '@tomic/react';
 import {
   editURL,
   dataURL,
@@ -57,6 +57,7 @@ export interface ResourceContextMenuProps {
   bindActive?: (active: boolean) => void;
   /** Callback that is called after the resource was deleted */
   onAfterDelete?: () => void;
+  title?: string;
 }
 
 /** Dropdown menu that opens a bunch of actions for some resource */
@@ -66,6 +67,7 @@ function ResourceContextMenu({
   trigger,
   simple,
   isMainMenu,
+  title,
   bindActive,
   onAfterDelete,
 }: ResourceContextMenuProps) {
@@ -80,7 +82,7 @@ function ResourceContextMenu({
   // Try to not have a useResource hook in here, as that will lead to many costly fetches when the user enters a new subject
 
   const handleDestroy = useCallback(async () => {
-    const parent = resource.get<string>(properties.parent);
+    const parent = resource.get(core.properties.parent);
 
     try {
       await resource.destroy(store);
@@ -187,7 +189,12 @@ function ResourceContextMenu({
       )
     : items;
 
-  const triggerComp = trigger ?? buildDefaultTrigger(<FaEllipsisV />);
+  const triggerComp =
+    trigger ??
+    buildDefaultTrigger(
+      <FaEllipsisV />,
+      title ?? `Open ${resource.title} menu`,
+    );
 
   return (
     <>

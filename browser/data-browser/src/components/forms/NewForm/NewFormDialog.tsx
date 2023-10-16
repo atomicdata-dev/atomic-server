@@ -14,7 +14,7 @@ import { useNewForm } from './useNewForm';
 import { getNamePartFromProps } from '../../../helpers/getNamePartFromProps';
 
 export interface NewFormDialogProps extends NewFormProps {
-  closeDialog: () => void;
+  closeDialog: (success?: boolean) => void;
   initialProps?: Record<string, JSONValue>;
   onSave: (subject: string) => void;
   parent: string;
@@ -43,7 +43,7 @@ export const NewFormDialog = ({
 
   const onResourceSave = useCallback(() => {
     onSave(resource.getSubject());
-    closeDialog();
+    closeDialog(true);
   }, [onSave, closeDialog, resource]);
 
   // Onmount we generate a new subject based on the classtype and the user input.
@@ -95,7 +95,7 @@ export const NewFormDialog = ({
       </DialogContent>
       <DialogActions>
         {error && <InlineErrMessage>{error.message}</InlineErrMessage>}
-        <Button subtle onClick={closeDialog}>
+        <Button subtle onClick={() => closeDialog(false)}>
           Cancel
         </Button>
         <Button onClick={save} disabled={saving}>

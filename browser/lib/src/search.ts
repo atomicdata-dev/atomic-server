@@ -1,3 +1,5 @@
+import { Store } from './index.js';
+
 export interface SearchOpts {
   /** Fetch full resources instead of subjects */
   include?: boolean;
@@ -10,6 +12,13 @@ export interface SearchOpts {
     [subject: string]: string;
   };
 }
+
+const baseURL = (serverURL: string) => {
+  const url = new URL(serverURL);
+  url.pathname = 'search';
+
+  return url;
+};
 
 // https://github.com/quickwit-oss/tantivy/blob/064518156f570ee2aa03cf63be6d5605a96d6285/query-grammar/src/query_grammar.rs#L19
 const specialCharsTantivy = [
@@ -56,8 +65,7 @@ export function buildSearchSubject(
   opts: SearchOpts = {},
 ) {
   const { include = false, limit = 30, parents, filters } = opts;
-  const url = new URL(serverURL);
-  url.pathname = 'search';
+  const url = baseURL(serverURL);
 
   // Only add filters if there are any keys, and if any key is defined
   const hasFilters =
@@ -80,4 +88,16 @@ export function buildSearchSubject(
   // parents && url.searchParams.set('parents', JSON.stringify(parents));
 
   return url.toString();
+}
+
+export function removeCachedSearchResults(store: Store) {
+  const url = baseURL(store.getServerUrl()).toString();
+
+  const searchResources = store.clientSideQuery(r =>
+    r.getSubject().startsWith(url),
+  );
+
+  for (const resource of searchResources) {
+    store.removeResource(resource.getSubject());
+  }
 }
