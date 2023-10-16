@@ -49,6 +49,7 @@ impl Resource {
 
     /// Removes / deletes the resource from the store by performing a Commit.
     /// Recursively deletes the resource's children.
+    #[tracing::instrument(skip(store))]
     pub fn destroy(
         &mut self,
         store: &impl Storelike,
