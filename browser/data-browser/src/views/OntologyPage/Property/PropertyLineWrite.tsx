@@ -1,4 +1,4 @@
-import { urls, useCanWrite, useProperty, useResource } from '@tomic/react';
+import { core, useCanWrite, useProperty, useResource } from '@tomic/react';
 import React from 'react';
 import styled from 'styled-components';
 import InputSwitcher from '../../../components/forms/InputSwitcher';
@@ -23,8 +23,8 @@ export function PropertyLineWrite({
   onRemove,
 }: PropertyLineWriteProps): JSX.Element {
   const resource = useResource(subject);
-  const shortnameProp = useProperty(urls.properties.shortname);
-  const descriptionProp = useProperty(urls.properties.description);
+  const shortnameProp = useProperty(core.properties.shortname);
+  const descriptionProp = useProperty(core.properties.description);
   const [dialogProps, show, hide] = useDialog();
   const [canEdit] = useCanWrite(resource);
 
@@ -65,7 +65,11 @@ export function PropertyLineWrite({
           property={descriptionProp}
         />
         <PropertyDatatypePicker disabled={disabled} resource={resource} />
-        <IconButton title='open' color='textLight' onClick={show}>
+        <IconButton
+          title={`Configure ${resource.title}`}
+          color='textLight'
+          onClick={show}
+        >
           <FaSlidersH />
         </IconButton>
         <IconButton

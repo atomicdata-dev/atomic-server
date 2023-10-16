@@ -48,7 +48,7 @@ export function ClassCardWrite({ subject }: ClassCardWriteProps): JSX.Element {
   };
 
   return (
-    <StyledCard>
+    <StyledCard data-testid={`class-card-write-${resource.title}`}>
       <Column id={toAnchorId(subject)}>
         <Row center justify='space-between'>
           <TitleWrapper>

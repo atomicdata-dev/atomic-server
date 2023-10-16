@@ -6,7 +6,7 @@ import React, {
   useState,
 } from 'react';
 import styled from 'styled-components';
-import { useResource } from '@tomic/react';
+import { removeCachedSearchResults, useResource, useStore } from '@tomic/react';
 import { DropdownPortalContext } from '../../Dropdown/dropdownContext';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { SearchBoxWindow } from './SearchBoxWindow';
@@ -42,6 +42,7 @@ export function SearchBox({
   onCreateItem,
   onClose,
 }: React.PropsWithChildren<SearchBoxProps>): JSX.Element {
+  const store = useStore();
   const selectedResource = useResource(value);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [inputValue, setInputValue] = useState('');
@@ -83,8 +84,9 @@ export function SearchBox({
       }
 
       handleExit(false);
+      removeCachedSearchResults(store);
     },
-    [inputValue, onChange, handleExit],
+    [inputValue, onChange, handleExit, store],
   );
 
   const handleTriggerFocus = () => {
