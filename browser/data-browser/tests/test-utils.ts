@@ -1,4 +1,4 @@
-import { Page, expect, Browser } from '@playwright/test';
+import { Page, expect, Browser, Locator } from '@playwright/test';
 
 export const DEMO_FILENAME = 'testimage.svg';
 export const SERVER_URL = 'http://localhost:9883';
@@ -122,6 +122,10 @@ export async function getCurrentSubject(page: Page) {
   return page.locator(addressBar).getAttribute('value');
 }
 
+export async function openAgentPage(page: Page) {
+  page.goto(`${FRONTEND_URL}/app/agent`);
+}
+
 /** Set atomicdata.dev as current server */
 export async function openAtomic(page: Page) {
   await changeDrive('https://atomicdata.dev', page);
@@ -131,7 +135,7 @@ export async function openAtomic(page: Page) {
 
 /** Opens the users' profile, sets a username */
 export async function editProfileAndCommit(page: Page) {
-  await page.click('text=user settings');
+  await openAgentPage(page);
   await page.click('text=Edit profile');
   await expect(page.locator('text=add another property')).toBeVisible();
   const username = `Test user edited at ${new Date().toLocaleDateString()}`;
@@ -143,6 +147,34 @@ export async function editProfileAndCommit(page: Page) {
   await expect(page.locator(`text=${username}`).first()).toBeVisible();
 }
 
+export async function fillSearchBox(
+  page: Page,
+  placeholder: string,
+  fillText: string,
+  options: {
+    nth?: number;
+    container?: Locator;
+  } = {},
+) {
+  const { nth, container } = options;
+  const selector = container ?? page;
+
+  if (nth !== undefined) {
+    await selector.getByRole('button', { name: placeholder }).nth(nth).click();
+  } else {
+    await selector.getByRole('button', { name: placeholder }).click();
+  }
+
+  await selector.getByPlaceholder(placeholder).type(fillText);
+
+  return async (name: string) => {
+    // wait for the search to load (TODO: make this better)
+    await page.waitForTimeout(100);
+    selector.getByTestId('searchbox-results').getByText(name).hover();
+    selector.getByTestId('searchbox-results').getByText(name).click();
+  };
+}
+
 /** Create a new Resource in the current Drive.
  * Class can be an Class URL or a shortname available in the new page. */
 export async function newResource(klass: string, page: Page) {
@@ -150,7 +182,7 @@ export async function newResource(klass: string, page: Page) {
   await expect(page).toHaveURL(`${FRONTEND_URL}/app/new`);
 
   if (klass.startsWith('https://')) {
-    await page.getByPlaceholder('Select a class').fill(klass);
+    await fillSearchBox(page, 'Search for a class or enter a URL', klass);
     await page.keyboard.press('Enter');
     await page.click(`button:has-text("new ")`);
   } else {

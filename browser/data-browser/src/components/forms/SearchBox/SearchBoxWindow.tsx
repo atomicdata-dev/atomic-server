@@ -161,7 +161,7 @@ export function SearchBoxWindow({
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
       />
-      <ResultBox>
+      <ResultBox data-testid='searchbox-results'>
         {!searchValue && <CenteredMessage>Start Searching</CenteredMessage>}
         <StyledScrollArea>
           <ul>
