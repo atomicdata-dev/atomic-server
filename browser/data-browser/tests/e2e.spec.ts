@@ -31,6 +31,8 @@ import {
   signIn,
   timestamp,
   waitForCommit,
+  openAgentPage,
+  fillSearchBox,
 } from './test-utils';
 
 test.describe('data-browser', async () => {
@@ -62,7 +64,7 @@ test.describe('data-browser', async () => {
     });
 
     // Sign out
-    await page.click('text=user settings');
+    await openAgentPage(page);
     await page.click('[data-test="sign-out"]');
     await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
     await page.reload();
@@ -249,9 +251,6 @@ test.describe('data-browser', async () => {
     await page2.keyboard.press('Enter');
     // Both pages should see then new chat message
     await expect(page.locator(`text=${teststring2}`)).toBeVisible();
-    // TODO: get rid of this reload! It should not be necessary
-    // For some reason the page does not see the new message
-    await page2.reload();
     await expect(page2.locator(`text=${teststring2}`)).toBeVisible();
   });
 
@@ -342,7 +341,7 @@ test.describe('data-browser', async () => {
     // await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
 
     // Cleanup drives for signed in user
-    await page.click('text=user settings');
+    await openAgentPage(page);
     await page.click('text=Edit profile');
     await page.click('[data-test="input-drives-clear"]');
     await page.click('[data-test="save"]');
@@ -376,35 +375,24 @@ test.describe('data-browser', async () => {
     const shortnameInput = '[data-test="input-shortname"]';
     // Try entering a wrong slug
     await page.click(shortnameInput);
-    await page.keyboard.type('not valid');
-    await expect(page.locator('text=Not a valid slug')).toBeVisible();
+    await page.keyboard.type('not valid-');
+    await page.locator(shortnameInput).blur();
+    await expect(page.getByText('Invalid Slug')).toBeVisible();
     await page.locator(shortnameInput).fill('');
     await page.keyboard.type('is-valid');
     await expect(page.locator('text=Not a valid slug')).not.toBeVisible();
 
-    // Add a new property
-    const input = page.locator(
-      '[placeholder="Select a property or enter a property URL..."]',
+    await fillSearchBox(
+      page,
+      'Search for a property or enter a URL',
+      'https://atomicdata.dev/properties/invite/usagesLeft',
     );
-    await input.click();
-
-    await expect(page.locator('text=Create property:')).toBeVisible();
-    await input.fill('https://atomicdata.dev/properties/invite/usagesLeft');
     await page.keyboard.press('Enter');
-    await page.click('[title="Add this property"]');
     await expect(page.locator('text=Usages-left').first()).toBeVisible();
     // Integer validation
     await page.click('[data-test="input-usages-left"]');
-    await page.keyboard.type('asdf' + '1');
+    await page.keyboard.type('asdf1');
     await expect(page.locator('text=asdf')).not.toBeVisible();
-    // Dropdown select
-    await page.click('[data-test="input-recommends-add-resource"]');
-    await page.locator('text=append').click();
-    await expect(
-      page.locator(
-        '[data-test="input-recommends"] >> text=https://atomicdata.dev',
-      ),
-    ).not.toBeVisible();
 
     // Try to save without a description
     page.locator('button:has-text("Save")').click();
@@ -505,20 +493,27 @@ test.describe('data-browser', async () => {
       .locator('[title="Add an item to the recommends list"]')
       .first()
       .click();
-    await page.locator('[data-test="input-recommends"]').click();
-    await page.locator('[data-test="input-recommends"]').fill('test-prop');
 
     // Create new Property using dialog
-    await page.locator('text=Create property: test-prop').click();
+
+    const clickOption = await fillSearchBox(
+      page,
+      'Search for a property or enter a URL',
+      'test-prop',
+      { nth: 0 },
+    );
+
+    await clickOption('Create test-prop');
+
     await expect(page.locator('h1:has-text("new property")')).toBeVisible();
-    await page.locator('[data-test="input-datatype"]').click();
-    // click twice, first click is buggy, it closes the dropdown from earlier
-    await page.locator('[data-test="input-datatype"]').click();
-    await page
-      .locator(
-        'li:has-text("boolean - Either `true` or `false`. In JSON-AD, th...")',
-      )
-      .click();
+    // Set datatype of new property to boolean
+
+    const selectDatatypeOption = await fillSearchBox(
+      page,
+      'Search for a datatype or enter a URL',
+      'boolean',
+    );
+    await selectDatatypeOption('boolean - Either `true` or `false`');
     await page.locator('dialog textarea[name="yamdeContent"]').click();
     await page
       .locator('dialog textarea[name="yamdeContent"]')

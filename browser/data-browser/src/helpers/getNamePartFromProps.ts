@@ -1,14 +1,14 @@
-import { JSONValue, properties } from '@tomic/react';
+import { core, JSONValue } from '@tomic/react';
 import { randomString } from './randomString';
 
 const normalizeName = (name: string) =>
-  encodeURIComponent(name.replaceAll('/t', '-'));
+  encodeURIComponent(name.replace(/\s/g, '-'));
 
 export const getNamePartFromProps = (
   props: Record<string, JSONValue>,
 ): string =>
   normalizeName(
-    (props?.[properties.shortname] as string) ??
-      (props?.[properties.name] as string) ??
+    (props?.[core.properties.shortname] as string) ??
+      (props?.[core.properties.name] as string) ??
       randomString(8),
   );
