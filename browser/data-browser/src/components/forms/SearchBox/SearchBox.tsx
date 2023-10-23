@@ -18,7 +18,7 @@ interface SearchBoxProps {
   autoFocus?: boolean;
   value: string | undefined;
   isA?: string;
-  scope?: string;
+  scopes?: string[];
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
@@ -32,7 +32,7 @@ export function SearchBox({
   autoFocus,
   value,
   isA,
-  scope,
+  scopes,
   placeholder,
   disabled,
   required,
@@ -167,7 +167,7 @@ export function SearchBox({
             <SearchBoxWindow
               searchValue={inputValue}
               onChange={setInputValue}
-              scope={scope}
+              scopes={scopes}
               isA={isA}
               placeholder={placeholderText}
               triggerRef={triggerRef}
