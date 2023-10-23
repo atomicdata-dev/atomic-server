@@ -4,7 +4,12 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 ## UNRELEASED
 
+### @tomic/lib
+
+- When saving a resource whose parent has not yet been saved we now add them to a batch that gets saved later when the parent is saved.
 - The `scope` option in `SearchOpts` has changed to `parents` and now accepts an array of subjects instead of a single subject.
+- BREAKING: Removed `getCommitBuilder()` method from `Resource`
+- Added `hasUnsavedChanges()` method to `Resource`
 
 ### Atomic Browser
 

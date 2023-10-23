@@ -169,7 +169,7 @@ export function ShareRoute(): JSX.Element {
           {canWrite && (
             <span>
               <Button
-                disabled={!resource.getCommitBuilder().hasUnsavedChanges()}
+                disabled={!resource.hasUnsavedChanges()}
                 onClick={handleSave}
               >
                 Save

@@ -18,6 +18,7 @@ import {
   QuickAccesPropType,
   getKnownNameBySubject,
   OptionalClass,
+  core,
 } from './index.js';
 
 /** Contains the PropertyURL / Value combinations */
@@ -239,12 +240,9 @@ export class Resource<C extends OptionalClass = any> {
     return this.set(properties.isA, Array.from(classesSet), store);
   }
 
-  /**
-   * Returns the current Commit Builder, which describes the pending changes of
-   * the resource
-   */
-  public getCommitBuilder(): CommitBuilder {
-    return this.commitBuilder;
+  /** Returns true if the resource has changes in it's commit builder that are not yet saved to the server. */
+  public hasUnsavedChanges(): boolean {
+    return this.commitBuilder.hasUnsavedChanges();
   }
 
   public getCommitsCollection(): string {
@@ -446,6 +444,13 @@ export class Resource<C extends OptionalClass = any> {
       throw new Error('No agent has been set or passed, you cannot save.');
     }
 
+    // If the parent of this resource is new we can't save yet so we add it to a batched that gets saved when the parent does.
+    if (this.isParentNew(store)) {
+      store.batchResource(this.getSubject());
+
+      return;
+    }
+
     // The previousCommit is required in Commits. We should use the `lastCommit` value on the resource.
     // This makes sure that we're making adjustments to the same version as the server.
     const lastCommit = this.get(properties.commit.lastCommit)?.toString();
@@ -500,6 +505,9 @@ export class Resource<C extends OptionalClass = any> {
         // That's why we need to repeat the process
         // https://github.com/atomicdata-dev/atomic-data-rust/issues/486
         store.subscribeWebSocket(this.subject);
+
+        // Save any children that have been batched while creating this resource
+        await store.saveBatchForParent(this.getSubject());
       }
 
       // Let all subscribers know that the commit has been applied
@@ -614,6 +622,18 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     return ownValue === value;
+  }
+
+  private isParentNew(store: Store) {
+    const parentSubject = this.propvals.get(core.properties.parent) as string;
+
+    if (!parentSubject) {
+      return false;
+    }
+
+    const parent = store.getResourceLoading(parentSubject);
+
+    return parent.new;
   }
 }
 

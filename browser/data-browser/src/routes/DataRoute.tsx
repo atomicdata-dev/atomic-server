@@ -101,7 +101,7 @@ function Data(): JSX.Element {
             <AtomicLink subject={subject}>{subject}</AtomicLink>
           </PropValRow>
           <AllProps resource={resource} editable columns />
-          {resource.getCommitBuilder().hasUnsavedChanges() ? (
+          {resource.hasUnsavedChanges() ? (
             <>
               <h2>⚠️ contains uncommitted changes</h2>
               <p>

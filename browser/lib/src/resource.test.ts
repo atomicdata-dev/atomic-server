@@ -36,12 +36,5 @@ describe('resource.ts', () => {
       testsubject,
       testsubject,
     ]);
-
-    resource.getCommitBuilder().push[urls.properties.subResources] = [
-      testsubject,
-      testsubject2,
-      testsubject,
-      testsubject,
-    ];
   });
 });

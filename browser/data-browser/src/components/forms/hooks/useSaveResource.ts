@@ -16,7 +16,7 @@ export type UseSaveResourceResult = [
  */
 export const useSaveResource = (
   resource: Resource,
-  onSaveSucces: () => void = () => void 0,
+  onSaveSucces?: () => void,
 ): UseSaveResourceResult => {
   const store = useStore();
   const [saving, setSaving] = useState(false);
@@ -31,7 +31,7 @@ export const useSaveResource = (
       try {
         await resource.save(store);
         setSaving(false);
-        onSaveSucces();
+        onSaveSucces?.();
         toast.success('Resource saved');
 
         if (resource.new) {

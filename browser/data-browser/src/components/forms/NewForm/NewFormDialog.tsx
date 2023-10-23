@@ -1,4 +1,4 @@
-import { JSONValue, useResource, useStore, useTitle } from '@tomic/react';
+import { Core, JSONValue, useResource, useStore, useTitle } from '@tomic/react';
 import React, { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
@@ -28,7 +28,7 @@ export const NewFormDialog = ({
   onSave,
   parent,
 }: NewFormDialogProps): JSX.Element => {
-  const klass = useResource(classSubject);
+  const klass = useResource<Core.Class>(classSubject);
   const [className] = useTitle(klass);
   const store = useStore();
 
