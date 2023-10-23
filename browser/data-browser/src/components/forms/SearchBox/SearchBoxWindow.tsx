@@ -9,13 +9,14 @@ import { focusOffsetElement } from '../../../helpers/focusOffsetElement';
 import { isURL } from '../../../helpers/isURL';
 import { useAvailableSpace } from '../hooks/useAvailableSpace';
 import { remToPixels } from '../../../helpers/remToPixels';
+import { useSettings } from '../../../helpers/AppSettings';
 
 const BOX_HEIGHT_REM = 20;
 
 interface SearchBoxWindowProps {
   searchValue: string;
   isA?: string;
-  scope?: string;
+  scopes?: string[];
   placeholder?: string;
   triggerRef: React.RefObject<HTMLButtonElement>;
   onExit: (lostFocus: boolean) => void;
@@ -28,13 +29,14 @@ export function SearchBoxWindow({
   searchValue,
   onChange,
   isA,
-  scope,
+  scopes,
   placeholder,
   triggerRef,
   onExit,
   onSelect,
   onCreateItem,
 }: SearchBoxWindowProps): JSX.Element {
+  const { drive } = useSettings();
   const [realIndex, setIndex] = useState<number | undefined>(undefined);
   const { below } = useAvailableSpace(true, triggerRef);
   const wrapperRef = React.useRef<HTMLDivElement>(null);
@@ -45,9 +47,14 @@ export function SearchBoxWindow({
     [isA],
   );
 
+  const parents = useMemo(
+    () => scopes ?? [drive, 'https://atomicdata.dev'],
+    [scopes],
+  );
+
   const { results } = useServerSearch(searchValue, {
     filters,
-    scope,
+    parents,
   });
 
   const isAboveTrigger = below < remToPixels(BOX_HEIGHT_REM);
