@@ -5,13 +5,14 @@ import {
   useStore,
   useResource,
   useArray,
+  Core,
 } from '@tomic/react';
 import { useState, useEffect } from 'react';
 
 const resourseOpts = { newResource: true };
 
 type UseNewForm = {
-  klass: Resource;
+  klass: Resource<Core.Class>;
   setSubject: (v: string) => void;
   initialSubject?: string;
   parent?: string;
@@ -22,10 +23,9 @@ export const useNewForm = (args: UseNewForm) => {
   const { klass, setSubject, initialSubject, parent } = args;
 
   const store = useStore();
-  const [klassShortname] = useString(klass, properties.shortname);
   const [subjectValue, setSubjectValueInternal] = useState<string>(() => {
     if (initialSubject === undefined) {
-      return store.createSubject(klassShortname);
+      return store.createSubject(klass.props.shortname);
     }
 
     return initialSubject;

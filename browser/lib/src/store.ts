@@ -18,6 +18,7 @@ import {
   OptionalClass,
   UnknownClass,
   Server,
+  core,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
@@ -89,6 +90,10 @@ export class Store {
   private serverUrl: string;
   /** All the resources of the store */
   private _resources: Map<string, Resource>;
+
+  /** List of resources that have parents that are not saved to the server, when a parent is saved it should also save its children */
+  private batchedResources: Map<string, Set<string>> = new Map();
+
   /** Current Agent, used for signing commits. Is required for posting things. */
   private agent?: Agent;
   /** Mapped from origin to websocket */
@@ -478,7 +483,9 @@ export class Store {
     }
 
     // We clone for react, because otherwise it won't rerender
-    Promise.allSettled(callbacks.map(async cb => cb(resource.clone())));
+    const cloned = resource.clone();
+    this._resources.set(subject, cloned);
+    Promise.allSettled(callbacks.map(async cb => cb(cloned)));
   }
 
   public async notifyResourceSaved(resource: Resource): Promise<void> {
@@ -770,6 +777,52 @@ export class Store {
    */
   public clientSideQuery(filter: (resource: Resource) => boolean): Resource[] {
     return Array.from(this.resources.values()).filter(filter);
+  }
+
+  /**
+   * @Internal
+   * Add the resource to a batch that is saved when the parent is saved. Only gets saved when the parent is new.
+   */
+  public batchResource(subject: string) {
+    const resource = this._resources.get(subject);
+
+    if (!resource) {
+      throw new Error(
+        `Resource ${subject} can not be saved because it is not in the store.`,
+      );
+    }
+
+    const parent = resource.get(core.properties.parent);
+
+    if (parent === undefined) {
+      throw new Error(
+        `Resource ${subject} can not be added to a batch because it's missing a parent.`,
+      );
+    }
+
+    if (!this.batchedResources.has(parent)) {
+      this.batchedResources.set(parent, new Set([subject]));
+    } else {
+      this.batchedResources.get(parent)!.add(subject);
+    }
+  }
+
+  /**
+   * @Internal
+   * Saves all resources that are in a batch for a parent.
+   */
+  public async saveBatchForParent(subject: string) {
+    const subjects = this.batchedResources.get(subject);
+
+    if (!subjects) return;
+
+    for (const resourceSubject of subjects) {
+      const resource = this._resources.get(resourceSubject);
+
+      await resource?.save(this);
+    }
+
+    this.batchedResources.delete(subject);
   }
 
   private randomPart(): string {
