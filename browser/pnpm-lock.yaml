@@ -100,7 +100,7 @@ importers:
   cli:
     dependencies:
       '@tomic/lib':
-        specifier: ^0.35.2
+        specifier: workspace:*
         version: link:../lib
       chalk:
         specifier: ^5.3.0

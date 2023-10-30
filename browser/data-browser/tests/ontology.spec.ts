@@ -7,6 +7,8 @@ import {
   currentDialog,
 } from './test-utils';
 
+const WAIT_FOR_SEARCH_INDEX_TIME = 6000;
+
 test.describe('Ontology', async () => {
   test.beforeEach(before);
 
@@ -157,7 +159,7 @@ test.describe('Ontology', async () => {
 
     // Create arrow-kind instances
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(WAIT_FOR_SEARCH_INDEX_TIME);
 
     const createInstance = async (name: string) => {
       await page.getByRole('button', { name: 'New Instance' }).click();
@@ -180,7 +182,7 @@ test.describe('Ontology', async () => {
     await createInstance('Red arrow with circle');
     await createInstance('Green arrow with black border');
 
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(WAIT_FOR_SEARCH_INDEX_TIME);
 
     await page
       .getByRole('button', { name: 'add an item to the allows-only list' })

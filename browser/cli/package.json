@@ -2,7 +2,7 @@
   "version": "0.35.2",
   "author": "Polle Pas",
   "dependencies": {
-    "@tomic/lib": "^0.35.2",
+    "@tomic/lib": "workspace:*",
     "chalk": "^5.3.0",
     "prettier": "3.0.3"
   },
@@ -30,6 +30,6 @@
   },
   "type": "module",
   "peerDependencies": {
-    "@tomic/lib": "^0.35.2"
+    "@tomic/lib": "workspace:*"
   }
 }
