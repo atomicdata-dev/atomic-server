@@ -54,6 +54,7 @@ export class Resource<C extends OptionalClass = any> {
    * applying the same commit twice
    */
   public appliedCommitSignatures: Set<string>;
+  public readonly __internalObject = this;
 
   private commitBuilder: CommitBuilder;
   private subject: string;
@@ -657,4 +658,15 @@ export interface Right {
 export interface Version {
   commit: Commit;
   resource: Resource;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function proxyResource<C extends OptionalClass = any>(
+  resource: Resource<C>,
+): Resource<C> {
+  if (resource.__internalObject !== resource) {
+    console.warn('Attempted to proxy a proxy for ' + resource.getSubject());
+  }
+
+  return new Proxy(resource.__internalObject, {});
 }

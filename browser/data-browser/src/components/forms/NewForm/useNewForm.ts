@@ -6,6 +6,7 @@ import {
   useResource,
   useArray,
   Core,
+  core,
 } from '@tomic/react';
 import { useState, useEffect } from 'react';
 
@@ -23,6 +24,8 @@ export const useNewForm = (args: UseNewForm) => {
   const { klass, setSubject, initialSubject, parent } = args;
 
   const store = useStore();
+  const [initialized, setInitialized] = useState(false);
+
   const [subjectValue, setSubjectValueInternal] = useState<string>(() => {
     if (initialSubject === undefined) {
       return store.createSubject(klass.props.shortname);
@@ -33,19 +36,23 @@ export const useNewForm = (args: UseNewForm) => {
 
   const [subjectErr, setSubjectErr] = useState<Error | undefined>(undefined);
   const resource = useResource(subjectValue, resourseOpts);
-  const [parentVal, setParent] = useString(resource, properties.parent);
-  const [isAVal, setIsA] = useArray(resource, properties.isA);
+  const [parentVal] = useString(resource, properties.parent);
+  const [isAVal] = useArray(resource, properties.isA);
 
   // When the resource is created or updated, make sure that the parent and class are present
   useEffect(() => {
-    if (parentVal !== parent) {
-      setParent(parent);
-    }
+    (async () => {
+      if (parentVal !== parent) {
+        await resource.set(core.properties.parent, parent, store);
+      }
 
-    if (isAVal.length === 0) {
-      setIsA([klass.getSubject()]);
-    }
-  }, [resource, parent]);
+      if (isAVal.length === 0) {
+        await resource.addClasses(store, klass.getSubject());
+      }
+
+      setInitialized(true);
+    })();
+  }, [resource]);
 
   async function setSubjectValue(newSubject: string) {
     setSubjectValueInternal(newSubject);
@@ -69,5 +76,6 @@ export const useNewForm = (args: UseNewForm) => {
     subjectValue,
     setSubjectValue,
     resource,
+    initialized,
   };
 };

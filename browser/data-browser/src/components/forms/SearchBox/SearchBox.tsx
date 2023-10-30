@@ -80,6 +80,7 @@ export function SearchBox({
         onChange(newValue);
         setInputValue('');
       } catch (e) {
+        console.error(e);
         // not a URL
       }
 
@@ -129,7 +130,7 @@ export function SearchBox({
             disabled={disabled}
             ref={triggerRef}
             tabIndex={0}
-            empty={inputValue.length === 0}
+            $empty={inputValue.length === 0}
             onFocus={handleTriggerFocus}
             onClick={() => {
               setOpen(true);
@@ -182,7 +183,7 @@ export function SearchBox({
   );
 }
 
-const TriggerButton = styled.button<{ empty: boolean }>`
+const TriggerButton = styled.button<{ $empty: boolean }>`
   display: flex;
   align-items: center;
   padding: 0.5rem;
@@ -194,7 +195,7 @@ const TriggerButton = styled.button<{ empty: boolean }>`
   width: 100%;
   overflow: hidden;
   cursor: text;
-  color: ${p => (p.empty ? p.theme.colors.textLight : p.theme.colors.text)};
+  color: ${p => (p.$empty ? p.theme.colors.textLight : p.theme.colors.text)};
 
   &:disabled {
     background-color: ${props => props.theme.colors.bg1};

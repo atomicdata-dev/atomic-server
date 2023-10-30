@@ -1,4 +1,4 @@
-import { urls, useServerSearch } from '@tomic/react';
+import { core, useServerSearch } from '@tomic/react';
 import React, { useMemo, useState } from 'react';
 import styled, { css } from 'styled-components';
 import { ResourceResultLine, ResultLine } from './ResultLine';
@@ -40,22 +40,21 @@ export function SearchBoxWindow({
   const [realIndex, setIndex] = useState<number | undefined>(undefined);
   const { below } = useAvailableSpace(true, triggerRef);
   const wrapperRef = React.useRef<HTMLDivElement>(null);
-  const filters = useMemo(
+
+  const searchOptions = useMemo(
     () => ({
-      ...(isA ? { [urls.properties.isA]: isA } : {}),
+      filters: {
+        ...(isA ? { [core.properties.isA]: isA } : {}),
+      },
+      parents: scopes ?? [drive, 'https://atomicdata.dev'],
     }),
-    [isA],
+    [isA, scopes],
   );
 
-  const parents = useMemo(
-    () => scopes ?? [drive, 'https://atomicdata.dev'],
-    [scopes],
+  const { results, error: searchError } = useServerSearch(
+    searchValue,
+    searchOptions,
   );
-
-  const { results } = useServerSearch(searchValue, {
-    filters,
-    parents,
-  });
 
   const isAboveTrigger = below < remToPixels(BOX_HEIGHT_REM);
 
@@ -156,8 +155,16 @@ export function SearchBoxWindow({
     }
   };
 
+  if (searchError) {
+    return (
+      <Wrapper onBlur={handleBlur} ref={wrapperRef} $above={isAboveTrigger}>
+        <CenteredMessage>Error: {searchError.message}</CenteredMessage>
+      </Wrapper>
+    );
+  }
+
   return (
-    <Wrapper onBlur={handleBlur} ref={wrapperRef} above={isAboveTrigger}>
+    <Wrapper onBlur={handleBlur} ref={wrapperRef} $above={isAboveTrigger}>
       <Input
         autoFocus
         placeholder={placeholder}
@@ -220,7 +227,7 @@ const ResultBox = styled.div`
   overflow: hidden;
 `;
 
-const Wrapper = styled.div<{ above: boolean }>`
+const Wrapper = styled.div<{ $above: boolean }>`
   display: flex;
 
   background-color: ${p => p.theme.colors.bg};
@@ -230,8 +237,8 @@ const Wrapper = styled.div<{ above: boolean }>`
   height: ${BOX_HEIGHT_REM}rem;
   position: absolute;
   width: var(--radix-popover-trigger-width);
-  ${({ above, theme }) =>
-    above
+  ${({ $above, theme }) =>
+    $above
       ? css`
           bottom: 0;
           flex-direction: column-reverse;

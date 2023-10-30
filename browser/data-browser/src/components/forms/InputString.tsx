@@ -36,7 +36,7 @@ export default function InputString({
 
   return (
     <Wrapper>
-      <InputWrapper invalid={!!err}>
+      <InputWrapper $invalid={!!err}>
         <InputStyled
           value={value === undefined ? '' : value}
           onChange={handleUpdate}

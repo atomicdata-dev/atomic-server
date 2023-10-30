@@ -73,7 +73,7 @@ export function RangeInput({
 
   return (
     <Row center gap='0.5rem'>
-      <InputWrapper invalid={invalid}>
+      <InputWrapper $invalid={invalid}>
         <InputStyled
           type='number'
           max={maxValue}
@@ -84,7 +84,7 @@ export function RangeInput({
         />
       </InputWrapper>
       {' - '}
-      <InputWrapper invalid={invalid}>
+      <InputWrapper $invalid={invalid}>
         <InputStyled
           type='number'
           placeholder='max'

@@ -160,25 +160,35 @@ export class Store {
       }
     }
 
-    const cloned = resource.clone();
+    this.resources.set(resource.getSubject(), resource.__internalObject);
 
-    this.resources.set(cloned.getSubject(), cloned);
-
-    this.notify(cloned);
+    this.notify(resource.__internalObject);
   }
 
   /** Checks if a subject is free to use */
   public async checkSubjectTaken(subject: string): Promise<boolean> {
     const r = this.resources.get(subject);
 
-    if (r?.isReady() && !r.new) {
+    if (r?.isReady() && !r?.new) {
       return true;
     }
 
     try {
-      const resp = await this.fetchResourceFromServer(subject);
+      const signInfo = this.agent
+        ? { agent: this.agent, serverURL: this.getServerUrl() }
+        : undefined;
 
-      if (resp.isReady()) {
+      const { createdResources } = await this.client.fetchResourceHTTP(
+        subject,
+        {
+          method: 'GET',
+          signInfo,
+        },
+      );
+
+      if (
+        createdResources.find(res => res.getSubject() === subject)?.isReady()
+      ) {
         return true;
       }
     } catch (e) {
@@ -330,29 +340,29 @@ export class Store {
       return newR;
     }
 
-    const found = this.resources.get(subject);
+    let resource = this.resources.get(subject);
 
-    if (!found) {
-      const newR = new Resource<C>(subject, opts.newResource);
-      newR.loading = true;
-      this.addResources(newR);
+    if (!resource) {
+      resource = new Resource<C>(subject, opts.newResource);
+      resource.loading = true;
+      this.addResources(resource);
 
       if (!opts.newResource) {
         this.fetchResourceFromServer(subject, opts);
       }
 
-      return newR;
-    } else if (!opts.allowIncomplete && found.loading === false) {
+      return resource;
+    } else if (!opts.allowIncomplete && resource.loading === false) {
       // In many cases, a user will always need a complete resource.
       // This checks if the resource is incomplete and fetches it if it is.
-      if (found.get(urls.properties.incomplete)) {
-        found.loading = true;
-        this.addResources(found);
+      if (resource.get(urls.properties.incomplete)) {
+        resource.loading = true;
+        this.addResources(resource);
         this.fetchResourceFromServer(subject, opts);
       }
     }
 
-    return found;
+    return resource;
   }
 
   /**
@@ -540,8 +550,11 @@ export class Store {
   /** Removes (destroys / deletes) resource from this store */
   public removeResource(subject: string): void {
     const resource = this.resources.get(subject);
-    this.resources.delete(subject);
-    resource && this.eventManager.emit(StoreEvents.ResourceRemoved, resource);
+
+    if (resource) {
+      this.resources.delete(subject);
+      this.eventManager.emit(StoreEvents.ResourceRemoved, resource);
+    }
   }
 
   /**
@@ -560,9 +573,12 @@ export class Store {
     }
 
     resource.setSubject(newSubject);
-    this.addResources(resource);
-    this.resources.set(newSubject, resource);
+
+    const subs = this.subscribers.get(oldSubject) ?? [];
+    this.subscribers.set(newSubject, subs);
     this.removeResource(oldSubject);
+
+    this.addResources(resource);
   }
 
   /**
@@ -627,10 +643,11 @@ export class Store {
 
   /**
    * Registers a callback for when the a resource is updated. When you call
-   * this, you should probably also call .unsubscribe some time later.
+   * this
+   * The method returns a function that you can call to unsubscribe. You can also unsubscribe by calling `store.unsubscribe()`.
    */
   // TODO: consider subscribing to properties, maybe add a second subscribe function, use that in useValue
-  public subscribe(subject: string, callback: ResourceCallback): void {
+  public subscribe(subject: string, callback: ResourceCallback): () => void {
     if (subject === undefined) {
       throw Error('Cannot subscribe to undefined subject');
     }
@@ -645,6 +662,10 @@ export class Store {
 
     callbackArray.push(callback);
     this.subscribers.set(subject, callbackArray);
+
+    return () => {
+      this.unsubscribe(subject, callback);
+    };
   }
 
   public subscribeWebSocket(subject: string): void {

@@ -21,15 +21,15 @@ export const LabelHelper = styled.label`
 `;
 
 export interface InputWrapperProps {
-  invalid?: boolean;
+  $invalid?: boolean;
 }
 
 /** A wrapper for inputs, for example when you want to add a button to some field */
 export const InputWrapper = styled.div<InputWrapperProps>`
   display: flex;
   flex: 1;
-  --border-color: ${({ invalid, theme }) =>
-    invalid ? theme.colors.alert : theme.colors.bg2};
+  --border-color: ${({ $invalid, theme }) =>
+    $invalid ? theme.colors.alert : theme.colors.bg2};
   border: solid 1px var(--border-color);
   border-radius: ${props => props.theme.radius};
   overflow: hidden;
