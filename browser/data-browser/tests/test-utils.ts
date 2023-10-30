@@ -2,6 +2,9 @@ import { Page, expect, Browser, Locator } from '@playwright/test';
 
 export const DEMO_FILENAME = 'testimage.svg';
 export const SERVER_URL = 'http://localhost:9883';
+export const DELETE_PREVIOUS_TEST_DRIVES =
+  process.env.DELETE_PREVIOUS_TEST_DRIVES === 'false' ? false : true;
+
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 // TODO: Should use an env var so the CI can test the setup test.
 export const INITIAL_TEST = false;
@@ -168,10 +171,8 @@ export async function fillSearchBox(
   await selector.getByPlaceholder(placeholder).type(fillText);
 
   return async (name: string) => {
-    // wait for the search to load (TODO: make this better)
-    await page.waitForTimeout(100);
-    selector.getByTestId('searchbox-results').getByText(name).hover();
-    selector.getByTestId('searchbox-results').getByText(name).click();
+    await selector.getByTestId('searchbox-results').getByText(name).hover();
+    await selector.getByTestId('searchbox-results').getByText(name).click();
   };
 }
 

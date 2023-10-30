@@ -37,7 +37,7 @@
     "dev": "pnpm run start",
     "lint": "pnpm run -r lint",
     "lint-fix": "pnpm run -r lint-fix",
-    "build": "pnpm run -r build",
+    "build": "pnpm --filter \"@tomic/lib\" run build && pnpm --filter=!./lib run -r build ",
     "test": "pnpm run -r test",
     "test-e2e": "pnpm run --filter @tomic/data-browser test-e2e",
     "test-query": "pnpm run --filter @tomic/data-browser test-query",
