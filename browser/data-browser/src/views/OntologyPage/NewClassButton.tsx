@@ -1,7 +1,7 @@
 import { Datatype, Resource, useStore, validateDatatype } from '@tomic/react';
 import React, { useRef, useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { transition } from '../../helpers/transition';
 import {
   Dialog,

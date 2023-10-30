@@ -1,7 +1,7 @@
 import { Resource, useTitle } from '@tomic/react';
 import React from 'react';
 import { AtomicLink } from './AtomicLink';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 interface PageTitleProps {
   /** Put in front of the subject's name */

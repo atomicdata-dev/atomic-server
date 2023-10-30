@@ -11,7 +11,7 @@ import { Column, Row } from '../../../components/Row';
 import { SearchBox } from '../../../components/forms/SearchBox';
 import { OntologyDescription } from '../OntologyDescription';
 import { PropertyDatatypePicker } from '../PropertyDatatypePicker';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { newClass } from '../newClass';
 import { toAnchorId } from '../toAnchorId';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';

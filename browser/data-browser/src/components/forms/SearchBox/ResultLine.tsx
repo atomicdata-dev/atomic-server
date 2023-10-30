@@ -1,6 +1,6 @@
 import { urls, useResource, useString } from '@tomic/react';
 import React, { useEffect, useRef } from 'react';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { getIconForClass } from '../../../views/FolderPage/iconMap';
 
 interface ResultLineProps {

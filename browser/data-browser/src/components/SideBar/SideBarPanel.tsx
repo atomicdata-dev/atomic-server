@@ -1,5 +1,5 @@
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Collapse } from '../Collapse';
 import { FaCaretRight } from 'react-icons/fa';
 import { transition } from '../../helpers/transition';

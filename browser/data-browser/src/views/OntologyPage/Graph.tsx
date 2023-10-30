@@ -1,6 +1,6 @@
 import { Resource } from '@tomic/react';
 import React, { Suspense } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 const OntologyGraph = React.lazy(
   () => import('../../chunks/GraphViewer/OntologyGraph'),

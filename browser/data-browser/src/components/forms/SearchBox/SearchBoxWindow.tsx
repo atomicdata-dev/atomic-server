@@ -1,6 +1,6 @@
 import { core, useServerSearch } from '@tomic/react';
 import React, { useMemo, useState } from 'react';
-import styled, { css } from 'styled-components';
+import { styled, css } from 'styled-components';
 import { ResourceResultLine, ResultLine } from './ResultLine';
 import { fadeIn } from '../../../helpers/commonAnimations';
 import { ScrollArea } from '../../ScrollArea';

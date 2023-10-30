@@ -2,7 +2,7 @@ import React from 'react';
 import { Card } from '../../../components/Card';
 import { urls, useArray, useResource, useString } from '@tomic/react';
 import { FaHashtag } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import Markdown from '../../../components/datatypes/Markdown';
 import { Column, Row } from '../../../components/Row';
 import { InlineFormattedResourceList } from '../../../components/InlineFormattedResourceList';

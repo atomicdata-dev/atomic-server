@@ -4,7 +4,7 @@ import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
 import { stringToSlug } from '../../helpers/stringToSlug';
 import { useValidation } from './formValidation/useValidation';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
 
 export default function InputSlug({

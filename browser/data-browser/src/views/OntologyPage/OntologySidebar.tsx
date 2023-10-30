@@ -1,6 +1,6 @@
 import { Resource, urls, useArray, useResource } from '@tomic/react';
 import React from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Details } from '../../components/Details';
 import { FaAtom, FaCube, FaHashtag } from 'react-icons/fa';
 import { ScrollArea } from '../../components/ScrollArea';

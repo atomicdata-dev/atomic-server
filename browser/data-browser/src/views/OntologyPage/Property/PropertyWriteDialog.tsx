@@ -6,7 +6,7 @@ import {
   DialogTitle,
   InternalDialogProps,
 } from '../../../components/Dialog';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import InputSwitcher from '../../../components/forms/InputSwitcher';
 import { PropertyFormCommon } from './PropertyFormCommon';
 
