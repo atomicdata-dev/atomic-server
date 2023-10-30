@@ -59,7 +59,7 @@ export function DecimalPlacesInput({
         Decimal Places
       </FormGroupHeading>
       <div>
-        <InputWrapper invalid={error !== undefined}>
+        <InputWrapper $invalid={error !== undefined}>
           <InputStyled
             id={id}
             type='number'

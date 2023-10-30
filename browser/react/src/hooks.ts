@@ -23,6 +23,7 @@ import {
   unknownSubject,
   JSONArray,
   OptionalClass,
+  proxyResource,
 } from '@tomic/lib';
 import { useDebouncedCallback } from './index.js';
 
@@ -35,30 +36,18 @@ export function useResource<C extends OptionalClass = never>(
   opts?: FetchOpts,
 ): Resource<C> {
   const store = useStore();
-  const [resource, setResource] = useState<Resource<C>>(
+  const [resource, setResource] = useState<Resource<C>>(() =>
     store.getResourceLoading(subject, opts),
   );
 
   // If the subject changes, make sure to change the resource!
-  useEffect(() => {
-    setResource(store.getResourceLoading(subject, opts));
-  }, [subject, store]);
-
   // When a component mounts, it needs to let the store know that it will subscribe to changes to that resource.
   useEffect(() => {
-    function handleNotify(updated: Resource<C>) {
-      // When a change happens, set the new Resource.
-      setResource(updated);
-    }
+    setResource(proxyResource(store.getResourceLoading(subject, opts)));
 
-    if (subject) {
-      store.subscribe(subject, handleNotify);
-
-      return () => {
-        // Unsubscribe from the store when next useEffect is called or the component is unmounted.
-        store.unsubscribe(subject, handleNotify);
-      };
-    }
+    return store.subscribe(subject, (updated: Resource<C>) => {
+      setResource(proxyResource(updated));
+    });
   }, [store, subject]);
 
   return resource;
@@ -79,7 +68,7 @@ export function useResources(
     // When a change happens, set the new Resource.
     function handleNotify(updated: Resource) {
       setResources(prev => {
-        prev.set(updated.getSubject(), updated);
+        prev.set(updated.getSubject(), proxyResource(updated));
 
         // We need to create new Maps for react hooks to update - React only checks references, not content
         return new Map(prev);
@@ -89,7 +78,7 @@ export function useResources(
     setResources(prev => {
       for (const subject of subjects) {
         const resource = store.getResourceLoading(subject, opts);
-        prev.set(subject, resource);
+        prev.set(subject, proxyResource(resource));
 
         // Let the store know to call handleNotify when a resource is updated.
         store.subscribe(subject, handleNotify);

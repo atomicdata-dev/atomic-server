@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ArrayError, useArray, validateDatatype } from '@tomic/react';
 import { Button } from '../Button';
 import { InputProps } from './ResourceField';
@@ -20,6 +20,7 @@ export default function InputResourceArray({
     validate: false,
     commit,
   });
+
   /** Add focus to the last added item */
   const [lastIsNew, setLastIsNew] = useState(false);
 
@@ -63,13 +64,16 @@ export default function InputResourceArray({
     [property.datatype, setArray],
   );
 
-  function errMaybe(index: number) {
-    if (err && err.index === index) {
-      return err;
-    }
+  const errMaybe = useCallback(
+    (index: number) => {
+      if (err && err.index === index) {
+        return err;
+      }
 
-    return undefined;
-  }
+      return undefined;
+    },
+    [err],
+  );
 
   return (
     <Column>

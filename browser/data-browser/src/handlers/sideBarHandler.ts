@@ -40,12 +40,14 @@ export function buildSideBarRemoveResourceHandler(store: Store) {
     const parent = await store.getResourceAsync(parentSubject);
     const subResources = parent.getSubjects(urls.properties.subResources);
 
-    await parent.set(
-      urls.properties.subResources,
-      subResources.filter(r => r !== resource.getSubject()),
-      store,
-    );
+    if (subResources.length > 0) {
+      await parent.set(
+        urls.properties.subResources,
+        subResources.filter(r => r !== resource.getSubject()),
+        store,
+      );
 
-    parent.save(store);
+      await parent.save(store);
+    }
   };
 }

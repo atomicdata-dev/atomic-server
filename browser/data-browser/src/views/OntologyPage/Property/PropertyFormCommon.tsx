@@ -43,6 +43,7 @@ export function PropertyFormCommon({
   const [ontologySubject] = useCurrentSubject();
   const ontologyResource = useResource(ontologySubject);
   const allowsOnly = useProperty(urls.properties.allowsOnly);
+
   const handleCreateClass = useCallback(
     async (shortname: string) => {
       const createdSubject = await newClass(shortname, ontologyResource, store);

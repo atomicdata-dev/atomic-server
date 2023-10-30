@@ -18,12 +18,15 @@ export const NewFormFullPage = ({
   const [subject, setSubject] = useQueryString('newSubject');
   const [parentSubject] = useQueryString('parent');
 
-  const { subjectErr, subjectValue, setSubjectValue, resource } = useNewForm({
-    klass,
-    setSubject,
-    initialSubject: subject,
-    parent: parentSubject,
-  });
+  const { initialized, subjectErr, subjectValue, setSubjectValue, resource } =
+    useNewForm({
+      klass,
+      setSubject,
+      initialSubject: subject,
+      parent: parentSubject,
+    });
+
+  if (!initialized) return <>Initializing Resource</>;
 
   return (
     <>

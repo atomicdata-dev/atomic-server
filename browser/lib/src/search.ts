@@ -93,8 +93,9 @@ export function buildSearchSubject(
 export function removeCachedSearchResults(store: Store) {
   const url = baseURL(store.getServerUrl()).toString();
 
-  const searchResources = store.clientSideQuery(r =>
-    r.getSubject().startsWith(url),
+  // Get all resources that start with the search URL but aren't the search endpoint itself.
+  const searchResources = store.clientSideQuery(
+    r => r.getSubject() !== url && r.getSubject().startsWith(url),
   );
 
   for (const resource of searchResources) {

@@ -133,7 +133,7 @@ export function PropertyForm({
       }}
     >
       <div>
-        <InputWrapper invalid={!!nameError}>
+        <InputWrapper $invalid={!!nameError}>
           <InputStyled
             type='text'
             value={name}

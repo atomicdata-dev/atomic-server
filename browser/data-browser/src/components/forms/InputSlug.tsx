@@ -46,7 +46,7 @@ export default function InputSlug({
 
   return (
     <Wrapper>
-      <InputWrapper invalid={!!err}>
+      <InputWrapper $invalid={!!err}>
         <InputStyled
           value={inputValue ?? ''}
           onChange={handleUpdate}

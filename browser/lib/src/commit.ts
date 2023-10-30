@@ -464,12 +464,10 @@ export function parseAndApplyCommit(jsonAdObjStr: string, store: Store) {
   const { subject, id, destroy, signature } = commit;
 
   let resource = store.resources.get(subject) as Resource;
-  let isNew = false;
 
   // If the resource doesn't exist in the store, create the resource
   if (!resource) {
     resource = new Resource(subject);
-    isNew = true;
   } else {
     // Commit has already been applied here, ignore the commit
     if (resource.appliedCommitSignatures.has(signature)) {

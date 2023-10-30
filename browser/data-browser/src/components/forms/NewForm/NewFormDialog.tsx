@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
 import { DialogTitle, DialogContent, DialogActions } from '../../Dialog';
-import { ErrorLook } from '../../ErrorLook';
+import { ErrorBlock, ErrorLook } from '../../ErrorLook';
 import { useSaveResource } from '../hooks/useSaveResource';
 import { InlineErrMessage } from '../InputStyles';
 import { ResourceForm, ResourceFormVariant } from '../ResourceForm';
@@ -32,7 +32,7 @@ export const NewFormDialog = ({
   const [className] = useTitle(klass);
   const store = useStore();
 
-  const [subject, setSubject] = useState(store.createSubject());
+  const [subject, setSubject] = useState<string>();
 
   const { subjectErr, subjectValue, setSubjectValue, resource } = useNewForm({
     klass,
@@ -68,6 +68,10 @@ export const NewFormDialog = ({
 
   if (!parent) {
     return <ErrorLook>No parent set</ErrorLook>;
+  }
+
+  if (resource.error) {
+    return <ErrorBlock error={resource.error}></ErrorBlock>;
   }
 
   return (
