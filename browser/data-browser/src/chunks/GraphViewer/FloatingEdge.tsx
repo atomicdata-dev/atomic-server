@@ -6,7 +6,7 @@ import {
   EdgeProps,
   Node,
 } from 'reactflow';
-import styled, { useTheme } from 'styled-components';
+import { styled, useTheme } from 'styled-components';
 import { getEdgeParams, getSelfReferencePath } from './getEdgeParams';
 import { EdgeData } from './buildGraph';
 

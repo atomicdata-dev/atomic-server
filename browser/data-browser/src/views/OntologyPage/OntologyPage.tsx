@@ -2,7 +2,7 @@ import React from 'react';
 import { ResourcePageProps } from '../ResourcePage';
 import { urls, useArray, useCanWrite } from '@tomic/react';
 import { OntologySidebar } from './OntologySidebar';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ClassCardRead } from './Class/ClassCardRead';
 import { PropertyCardRead } from './Property/PropertyCardRead';
 import ResourceCard from '../Card/ResourceCard';

@@ -1,7 +1,7 @@
 import { urls, useArray, useProperty, useResource } from '@tomic/react';
 import React, { useCallback } from 'react';
 import { Card } from '../../../components/Card';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { FaCube } from 'react-icons/fa';
 import { Column, Row } from '../../../components/Row';
 import { OntologyDescription } from '../OntologyDescription';

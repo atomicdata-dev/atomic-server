@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { Card } from '../../../components/Card';
 import { urls, useCanWrite, useProperty, useResource } from '@tomic/react';
 import { FaHashtag } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { Column, Row } from '../../../components/Row';
 import { toAnchorId } from '../toAnchorId';
 import InputSwitcher from '../../../components/forms/InputSwitcher';

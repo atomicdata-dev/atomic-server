@@ -1,6 +1,4 @@
 import { styled } from 'styled-components';
-import { Logo } from '../Logo';
-import { SideBarHeader } from './SideBarHeader';
 import React from 'react';
 import { FaGithub, FaDiscord, FaBook } from 'react-icons/fa';
 import { IconButtonLink, IconButtonVariant } from '../IconButton/IconButton';

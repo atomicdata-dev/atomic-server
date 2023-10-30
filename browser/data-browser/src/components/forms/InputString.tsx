@@ -2,7 +2,7 @@ import React from 'react';
 import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
 import { useValidation } from './formValidation/useValidation';
 
