@@ -4,6 +4,10 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 ## UNRELEASED
 
+### @tomic/cli
+
+- Created @tomic/cli, a tool that generates typescript types based on the provided ontologies
+
 ### @tomic/lib
 
 - When saving a resource whose parent has not yet been saved we now add them to a batch that gets saved later when the parent is saved.
@@ -11,6 +15,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - BREAKING: Removed `getCommitBuilder()` method from `Resource`
 - Added `hasUnsavedChanges()` method to `Resource`
 - No longer clones resources when notifying.
+- TS: Added support for typed resources which will give you better type hints when used with ontologies (see @tomic/cli)
 
 ### Atomic Browser
 
