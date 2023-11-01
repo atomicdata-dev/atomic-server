@@ -10,11 +10,13 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - The `scope` option in `SearchOpts` has changed to `parents` and now accepts an array of subjects instead of a single subject.
 - BREAKING: Removed `getCommitBuilder()` method from `Resource`
 - Added `hasUnsavedChanges()` method to `Resource`
+- No longer clones resources when notifying.
 
 ### Atomic Browser
 
 - Show resource usage in data view.
 - Add table editor #639
+- Add Ontology editor #648
 
 ## 0.35.1
 
