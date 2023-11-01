@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useBoolean } from '@tomic/react';
 import { InputProps } from './ResourceField';
-import { ErrMessage, InputStyled } from './InputStyles';
+import { ErrMessage } from './InputStyles';
+import { Checkbox } from './Checkbox';
 
 export default function InputBoolean({
   resource,
@@ -15,18 +16,9 @@ export default function InputBoolean({
     commit,
   });
 
-  function handleUpdate(e: React.ChangeEvent<HTMLInputElement>) {
-    setValue(e.target.checked);
-  }
-
   return (
     <>
-      <InputStyled
-        type='checkbox'
-        checked={!!value}
-        onChange={handleUpdate}
-        {...props}
-      />
+      <Checkbox checked={!!value} onChange={setValue} {...props} />
       {err && <ErrMessage>{err.message}</ErrMessage>}
     </>
   );

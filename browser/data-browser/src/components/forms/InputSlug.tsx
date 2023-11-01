@@ -17,6 +17,7 @@ export default function InputSlug({
 
   const [value, setValue] = useString(resource, property.subject, {
     handleValidationError: setErr,
+    validate: false,
     commit,
   });
 
