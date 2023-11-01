@@ -52,6 +52,7 @@ function useIsEditing(row: number, column: number) {
 const valueOpts = {
   commitDebounce: 0,
   commit: false,
+  validate: false,
 };
 
 export function TableCell({
@@ -105,7 +106,7 @@ export function TableCell({
 
       save();
     },
-    [setValue, setCreatedAt, createdAt, value, resource, property],
+    [setValue, setCreatedAt, createdAt, resource, property, save],
   );
 
   const handleEnterEditModeWithCharacter = useCallback(
@@ -139,7 +140,7 @@ export function TableCell({
           resource={resource}
         />
       ) : (
-        <React.Fragment key={`${value}`}>
+        <React.Fragment>
           <Editor.Display
             value={value}
             onChange={onChange}

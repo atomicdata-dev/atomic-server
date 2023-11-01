@@ -13,9 +13,9 @@ export default function InputString({
   ...props
 }: InputProps): JSX.Element {
   const [err, setErr, onBlur] = useValidation();
-
   const [value, setValue] = useString(resource, property.subject, {
     commit,
+    validate: false,
   });
 
   function handleUpdate(event: React.ChangeEvent<HTMLInputElement>): void {

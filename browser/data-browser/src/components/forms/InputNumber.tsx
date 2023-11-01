@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNumber } from '@tomic/react';
+import { Datatype, useNumber } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { ErrMessage, InputStyled, InputWrapper } from './InputStyles';
 
@@ -12,6 +12,7 @@ export default function InputNumber({
   const [err, setErr] = useState<Error | undefined>(undefined);
   const [value, setValue] = useNumber(resource, property.subject, {
     handleValidationError: setErr,
+    validate: false,
     commit,
   });
 
@@ -33,6 +34,7 @@ export default function InputNumber({
           placeholder='Enter a number...'
           type='number'
           value={value === undefined ? '' : Number.isNaN(value) ? '' : value}
+          step={property.datatype === Datatype.INTEGER ? 1 : 'any'}
           onChange={handleUpdate}
           {...props}
         />
