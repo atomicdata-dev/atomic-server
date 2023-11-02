@@ -228,7 +228,6 @@ const StyledInnerDialog = styled.div`
   grid-template-rows: 1fr auto auto;
   gap: 1rem;
   grid-template-areas: 'title close' 'content content' 'actions actions';
-  max-height: 100%;
 `;
 
 const fadeInForground = keyframes`
@@ -267,7 +266,8 @@ const StyledDialog = styled.dialog`
   max-inline-size: min(90vw, 100ch);
   min-inline-size: min(90vw, 60ch);
   max-block-size: 100vh;
-
+  height: fit-content;
+  max-height: 90vh;
   overflow: visible;
   box-shadow: ${p => p.theme.boxShadowSoft};
 
