@@ -6,6 +6,7 @@ import { SideBarDrive } from './SideBarDrive';
 import { DragAreaBase, useResizable } from '../../hooks/useResizable';
 import { useCombineRefs } from '../../hooks/useCombineRefs';
 import { NavBarSpacer } from '../NavBarSpacer';
+import { OverlapSpacer } from './OverlapSpacer';
 import { AppMenu } from './AppMenu';
 import { About } from './About';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
@@ -80,6 +81,7 @@ export function SideBar(): JSX.Element {
             </SideBarPanel>
           </Column>
         </MenuWrapper>
+        <OverlapSpacer />
         <NavBarSpacer baseMargin='1rem' position='bottom' />
         <SideBarDragArea ref={dragAreaRef} isDragging={isDragging} />
       </SideBarStyled>
