@@ -1,5 +1,5 @@
 /**
- * @deprecated
+ * @deprecated These have been move to their respective onotlogies e.g. core, server, collections, etc.
  */
 export const classes = {
   agent: 'https://atomicdata.dev/classes/Agent',
@@ -43,7 +43,9 @@ export const classes = {
   ontology: 'https://atomicdata.dev/class/ontology',
 };
 
-/** @deprecated List of commonly used Atomic Data Properties. */
+/**
+ *  @deprecated These have been move to their respective onotlogies e.g. core, server, collections, etc.
+ */
 export const properties = {
   /** Collection of all the AtomicData.dev properties */
   allowsOnly: 'https://atomicdata.dev/properties/allowsOnly',
@@ -188,7 +190,7 @@ export const endpoints = {
 };
 
 /**
- * @deprecated
+ * @deprecated These have been move to their respective onotlogies e.g. core, server, collections, etc.
  */
 export const urls = {
   properties,

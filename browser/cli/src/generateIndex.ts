@@ -11,7 +11,7 @@ enum Inserts {
 
 const TEMPLATE = `
 /* -----------------------------------
-* GENERATED WITH ATOMIC-GENERATE
+* GENERATED WITH @tomic/cli
 * -------------------------------- */
 
 import { registerOntologies } from '${Inserts.MODULE_ALIAS}';

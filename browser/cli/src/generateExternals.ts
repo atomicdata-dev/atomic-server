@@ -13,7 +13,7 @@ enum Inserts {
 
 const TEMPLATE = `
 /* -----------------------------------
-* GENERATED WITH ATOMIC-GENERATE
+* GENERATED WITH @tomic-cli
 * -------------------------------- */
 
 export const externals = {
