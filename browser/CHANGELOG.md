@@ -11,6 +11,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - Show resource usage (incoming links) in data view.
 - New resource selector that uses searchbox #677
 - Sidebar redesign
+- Switch to current drive button #681
 
 ### @tomic/lib
 

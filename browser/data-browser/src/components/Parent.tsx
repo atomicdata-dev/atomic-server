@@ -14,6 +14,8 @@ import { Row } from './Row';
 import { useQueryScopeHandler } from '../hooks/useQueryScope';
 import { IconButton } from './IconButton/IconButton';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
+import { useSettings } from '../helpers/AppSettings';
+import { Button } from './Button';
 
 type ParentProps = {
   resource: Resource;
@@ -31,7 +33,11 @@ function Parent({ resource }: ParentProps): JSX.Element {
   return (
     <ParentWrapper aria-label='Breadcrumbs'>
       <Row fullWidth center gap='initial'>
-        {parent && <NestedParent subject={parent} depth={0} />}
+        {parent ? (
+          <NestedParent subject={parent} depth={0} />
+        ) : (
+          <DriveMismatch subject={resource.getSubject()} />
+        )}
         {canEdit ? (
           <BreadCrumbInputWrapper>
             <BreadCrumbInput
@@ -78,6 +84,24 @@ type NestedParentProps = {
 
 const MAX_BREADCRUMB_DEPTH = 4;
 
+/** Shows a "Set drive" button if the current drive is different from the Subject */
+function DriveMismatch({ subject }: { subject: string }) {
+  const { drive, setDrive } = useSettings();
+
+  const handleSetDrive = () => {
+    setDrive(subject);
+  };
+
+  const mismatch = subject && subject !== drive;
+
+  if (mismatch)
+    return (
+      <Button onClick={handleSetDrive} title='Set Drive'>
+        Set Drive
+      </Button>
+    );
+}
+
 /** The actually recursive part */
 function NestedParent({ subject, depth }: NestedParentProps): JSX.Element {
   const resource = useResource(subject, { allowIncomplete: true });
@@ -87,7 +111,7 @@ function NestedParent({ subject, depth }: NestedParentProps): JSX.Element {
 
   // Prevent infinite recursion, set a limit to parent breadcrumbs
   if (depth > MAX_BREADCRUMB_DEPTH) {
-    return <Breadcrumb>...</Breadcrumb>;
+    return <Breadcrumb>Set as drive</Breadcrumb>;
   }
 
   function handleClick(e) {
@@ -97,7 +121,11 @@ function NestedParent({ subject, depth }: NestedParentProps): JSX.Element {
 
   return (
     <>
-      {parent && <NestedParent subject={parent} depth={depth + 1} />}
+      {parent ? (
+        <NestedParent subject={parent} depth={depth + 1} />
+      ) : (
+        <DriveMismatch subject={subject} />
+      )}
       <Breadcrumb href={subject} onClick={handleClick}>
         {title}
       </Breadcrumb>
