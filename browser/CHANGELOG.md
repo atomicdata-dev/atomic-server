@@ -2,7 +2,7 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
-## UNRELEASED
+## 0.36.0
 
 ### Atomic Browser
 

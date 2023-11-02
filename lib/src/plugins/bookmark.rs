@@ -3,7 +3,7 @@ Parse HTML documents and extract metadata.
 Convert articles to Markdown strings.
 Removes navigation elements and sidebars if possible, so we get a `reader` like view.
  */
-use kuchiki::{traits::TendrilSink, NodeRef};
+use kuchikiki::{parse_html, traits::TendrilSink, NodeRef};
 use lol_html::{element, rewrite_str, text, ElementContentHandlers, RewriteStrSettings, Selector};
 use rand::Rng;
 use std::{borrow::Cow, collections::HashMap, string::FromUtf8Error};
@@ -134,7 +134,7 @@ impl Parser {
     }
 
     pub fn get_meta(&self) -> SiteMeta {
-        let document = kuchiki::parse_html().one(self.internal_html.clone());
+        let document = parse_html().one(self.internal_html.clone());
         let mut title = None;
         let mut description = None;
         let mut image = None;
@@ -196,7 +196,7 @@ impl Parser {
     fn select_best_node(&mut self) -> AtomicResult<()> {
         const BEST_SCENARIO_SELECTORS: [&str; 3] = ["article", "main", r#"div[role="main"]"#];
 
-        let document = kuchiki::parse_html().one(self.internal_html.clone());
+        let document = parse_html().one(self.internal_html.clone());
 
         let mut best_node = document
             .select("body")
@@ -222,7 +222,7 @@ impl Parser {
     }
 
     fn index_svgs(&mut self) -> Result<(), AtomicError> {
-        let document = kuchiki::parse_html().one(self.internal_html.clone());
+        let document = parse_html().one(self.internal_html.clone());
 
         for node in document
             .select("svg")
