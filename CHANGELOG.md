@@ -10,6 +10,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Switch to monorepo. Include `atomic-data-browser` in this repo #216
 - Add Tables (edit, keyboard support, sorting, more) #638
 - The `parent` query param in `/search` has changed to `parents` and accepts an array of Subjects #677
+- Improve query performance, less index storage #678
 
 ## [v0.34.3] - 2023-06-27
 
