@@ -4,8 +4,10 @@ import {
   useString,
   useResource,
   useTitle,
-  properties,
-  urls,
+  core,
+  server,
+  dataBrowser,
+  collections,
 } from '@tomic/react';
 import AllProps from '../../components/AllProps';
 import { AtomicLink } from '../../components/AtomicLink';
@@ -20,6 +22,9 @@ import { BookmarkCard } from './BookmarkCard.jsx';
 import { CardViewProps, CardViewPropsBase } from './CardViewProps';
 import { ElementCard } from './ElementCard';
 import { ArticleCard } from '../Article';
+import { styled } from 'styled-components';
+import { ViewTransitionProps } from '../../helpers/ViewTransitionProps';
+import { transitionName } from '../../helpers/transitionName';
 
 interface ResourceCardProps extends CardViewPropsBase {
   /** The subject URL - the identifier of the resource. */
@@ -73,7 +78,7 @@ function ResourceCardInner(props: ResourceCardProps): JSX.Element {
   const { subject } = props;
   const resource = useResource(subject);
   const [title] = useTitle(resource);
-  const [klass] = useString(resource, properties.isA);
+  const [klass] = useString(resource, core.properties.isA);
 
   if (resource.loading) {
     return <p>Loading...</p>;
@@ -92,17 +97,17 @@ function ResourceCardInner(props: ResourceCardProps): JSX.Element {
 
   /** Check if there exists a View for this Class. These should be registered in `../views` */
   switch (klass) {
-    case urls.classes.collection:
+    case collections.classes.collection:
       return <CollectionCard resource={resource} {...props} />;
-    case urls.classes.file:
+    case server.classes.file:
       return <FileCard resource={resource} {...props} />;
-    case urls.classes.message:
+    case dataBrowser.classes.message:
       return <MessageCard resource={resource} {...props} />;
-    case urls.classes.bookmark:
+    case dataBrowser.classes.bookmark:
       return <BookmarkCard resource={resource} {...props} />;
-    case urls.classes.elements.paragraph:
+    case dataBrowser.classes.paragraph:
       return <ElementCard resource={resource} {...props} />;
-    case urls.classes.article:
+    case dataBrowser.classes.article:
       return <ArticleCard resource={resource} {...props} />;
     default:
       return <ResourceCardDefault resource={resource} {...props} />;
@@ -113,16 +118,16 @@ export function ResourceCardDefault({
   resource,
   small,
 }: CardViewProps): JSX.Element {
-  const [title] = useTitle(resource);
-
   return (
     <React.Fragment>
       <AtomicLink subject={resource.getSubject()}>
-        <h2>{title}</h2>
+        <DefaultCardTitle subject={resource.getSubject()}>
+          {resource.title}
+        </DefaultCardTitle>
       </AtomicLink>
       <ValueForm
         resource={resource}
-        propertyURL={urls.properties.description}
+        propertyURL={core.properties.description}
       />
       {!small && (
         <AllProps
@@ -137,3 +142,7 @@ export function ResourceCardDefault({
 }
 
 export default ResourceCard;
+
+const DefaultCardTitle = styled.h2<ViewTransitionProps>`
+  ${props => transitionName('page-title', props.subject)}
+`;
