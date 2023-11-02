@@ -16,7 +16,7 @@ use tantivy::{
     collector::TopDocs,
     query::{BooleanQuery, BoostQuery, Occur, Query, QueryParser, TermQuery},
     schema::IndexRecordOption,
-    tokenizer::Tokenizer,
+    tokenizer::{TokenStream, Tokenizer},
     Term,
 };
 use tracing::instrument;
@@ -189,7 +189,8 @@ fn query_from_params(
 /// https://github.com/atomicdata-dev/atomic-server/issues/597
 #[tracing::instrument]
 fn build_text_query(fields: &Fields, q: &str) -> AtomicResult<impl Query> {
-    let mut token_stream = tantivy::tokenizer::SimpleTokenizer.token_stream(q);
+    let mut tokenizer = tantivy::tokenizer::SimpleTokenizer::default();
+    let mut token_stream = tokenizer.token_stream(q);
     let mut queries: Queries = Vec::new();
     // for every word, create a fuzzy query and an exact query
     token_stream.process(&mut |token| {

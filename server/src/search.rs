@@ -90,26 +90,11 @@ pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, Index)> {
 
 /// Returns the schema for the search index.
 pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
-    let subject = appstate
-        .schema
-        .get_field("subject")
-        .ok_or("No 'subject' in the schema")?;
-    let title = appstate
-        .schema
-        .get_field("title")
-        .ok_or("No 'title' in the schema")?;
-    let description = appstate
-        .schema
-        .get_field("description")
-        .ok_or("No 'description' in the schema")?;
-    let propvals = appstate
-        .schema
-        .get_field("propvals")
-        .ok_or("No 'propvals' in the schema")?;
-    let hierarchy = appstate
-        .schema
-        .get_field("hierarchy")
-        .ok_or("No 'hierarchy' in the schema")?;
+    let subject = appstate.schema.get_field("subject")?;
+    let title = appstate.schema.get_field("title")?;
+    let description = appstate.schema.get_field("description")?;
+    let propvals = appstate.schema.get_field("propvals")?;
+    let hierarchy = appstate.schema.get_field("hierarchy")?;
 
     Ok(Fields {
         subject,

@@ -7,6 +7,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## [v0.36.0] - 2023-11-02
 
+- **Requires `--rebuild-index`**
 - Switch to monorepo. Include `atomic-data-browser` in this repo #216
 - Add Tables (edit, keyboard support, sorting, more) #638
 - The `parent` query param in `/search` has changed to `parents` and accepts an array of Subjects #677
