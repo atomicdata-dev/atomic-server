@@ -4,24 +4,27 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 ## UNRELEASED
 
-### @tomic/cli
+### Atomic Browser
 
-- Created @tomic/cli, a tool that generates typescript types based on the provided ontologies
+- Add table editor #639. Add resource instances using table columns, add properties as rows, paste and copy CSV, keyboard support, sorting.
+- Add ontology editor #648. Easily create classes, properties and visualize their relationships.
+- Show resource usage (incoming links) in data view.
+- New resource selector that uses searchbox #677
+- Sidebar redesign
 
 ### @tomic/lib
 
+- Add support for typed resources through `resource.props`, powered by `@tomic/cli` (see below)
 - When saving a resource whose parent has not yet been saved we now add them to a batch that gets saved later when the parent is saved.
 - The `scope` option in `SearchOpts` has changed to `parents` and now accepts an array of subjects instead of a single subject.
 - BREAKING: Removed `getCommitBuilder()` method from `Resource`
 - Added `hasUnsavedChanges()` method to `Resource`
-- No longer clones resources when notifying.
-- TS: Added support for typed resources which will give you better type hints when used with ontologies (see @tomic/cli)
+- Fix bugs in state management: proxy resources instead of clone (for react) #682 #675 #657
 
-### Atomic Browser
+### @tomic/cli
 
-- Show resource usage in data view.
-- Add table editor #639
-- Add Ontology editor #648
+- **NEW**
+- Generate typescript files from ontologies #665
 
 ## 0.35.1
 
