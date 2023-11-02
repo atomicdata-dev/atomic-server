@@ -1,6 +1,7 @@
 import {
-  classes,
-  properties,
+  core,
+  dataBrowser,
+  server,
   useResource,
   useString,
   useTitle,
@@ -21,18 +22,20 @@ import { FileGridItem } from './FileGridItem';
 import { ErrorBoundary } from '../../ErrorPage';
 import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransition';
 import { LoaderBlock } from '../../../components/Loader';
+import { ArticleGridItem } from './ArticleGridItem';
 
 export interface ResourceGridItemProps {
   subject: string;
 }
 
 const gridItemMap = new Map<string, React.FC<GridItemViewProps>>([
-  [classes.bookmark, BookmarkGridItem],
-  [classes.class, BasicGridItem],
-  [classes.property, BasicGridItem],
-  [classes.chatRoom, ChatRoomGridItem],
-  [classes.document, DocumentGridItem],
-  [classes.file, FileGridItem],
+  [dataBrowser.classes.bookmark, BookmarkGridItem],
+  [core.classes.class, BasicGridItem],
+  [core.classes.property, BasicGridItem],
+  [dataBrowser.classes.chatroom, ChatRoomGridItem],
+  [dataBrowser.classes.document, DocumentGridItem],
+  [server.classes.file, FileGridItem],
+  [dataBrowser.classes.article, ArticleGridItem],
 ]);
 
 function getResourceRenderer(
@@ -48,7 +51,7 @@ export function ResourceGridItem({
   const resource = useResource(subject);
   const [title] = useTitle(resource);
 
-  const [classTypeSubject] = useString(resource, properties.isA);
+  const [classTypeSubject] = useString(resource, core.properties.isA);
   const classType = useResource(classTypeSubject);
   const [classTypeName] = useTitle(classType);
 
@@ -71,7 +74,7 @@ export function ResourceGridItem({
     return <Loader />;
   }
 
-  const isFolder = classTypeSubject === classes.folder;
+  const isFolder = classTypeSubject === dataBrowser.classes.folder;
 
   const transitionSubject = isFolder ? undefined : subject;
 

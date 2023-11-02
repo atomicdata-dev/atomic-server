@@ -7,6 +7,7 @@ import { TextPreview } from '../../File/TextPreview';
 import { InnerWrapper } from './components';
 import { GridItemViewProps } from './GridItemViewProps';
 import { useFileImageTransitionStyles } from '../../File/useFileImageTransitionStyles';
+import { GridItemWithImage } from './GridItemWithImage';
 
 const imageMimeTypes = new Set([
   'image/png',
@@ -27,16 +28,7 @@ export function FileGridItem({ resource }: GridItemViewProps): JSX.Element {
   }
 
   if (imageMimeTypes.has(mimeType)) {
-    return (
-      <InnerWrapper>
-        <Image
-          src={downloadUrl}
-          alt=''
-          loading='lazy'
-          style={transitionStyles}
-        />
-      </InnerWrapper>
-    );
+    return <GridItemWithImage src={downloadUrl} style={transitionStyles} />;
   }
 
   if (isTextFile(mimeType)) {
@@ -45,13 +37,6 @@ export function FileGridItem({ resource }: GridItemViewProps): JSX.Element {
 
   return <TextWrapper>No preview available</TextWrapper>;
 }
-
-const Image = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center;
-`;
 
 const TextWrapper = styled(InnerWrapper)`
   display: grid;
