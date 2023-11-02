@@ -18,6 +18,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 - [Improve local compilation speed](#improve-local-compilation-speed)
 - [Cross compilation](#cross-compilation)
 - [IDE setup (VSCode)](#ide-setup-vscode)
+- [Branching](#branching)
 - [Testing](#testing)
 - [Code coverage](#code-coverage)
 - [Debugging](#debugging)

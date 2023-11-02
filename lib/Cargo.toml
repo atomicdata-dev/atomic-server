@@ -6,7 +6,7 @@ license = "MIT"
 name = "atomic_lib"
 readme = "README.md"
 repository = "https://github.com/atomicdata-dev/atomic-server"
-version = "0.34.5"
+version = "0.36.0"
 
 # Enables benchmarks to use the features, such as Db
 [[bench]]
@@ -20,7 +20,7 @@ base64 = "0.21"
 bincode = {version = "1", optional = true}
 directories = {version = ">= 2, < 5", optional = true}
 html2md = {version = "0.2.14", optional = true}
-kuchiki = {version = "0.8.1", optional = true}
+kuchikiki = {version = "0.8.2", optional = true}
 lol_html = {version = "0.3.1", optional = true}
 rand = {version = "0.8"}
 regex = "1"
@@ -45,5 +45,5 @@ ntest = "0.9"
 [features]
 config = ["directories", "toml"]
 db = ["sled", "bincode"]
-html = ["kuchiki", "lol_html", "html2md"]
+html = ["kuchikiki", "lol_html", "html2md"]
 rdf = ["rio_api", "rio_turtle"]
