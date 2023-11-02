@@ -2,6 +2,9 @@ import { styled } from 'styled-components';
 import React from 'react';
 import { FaGithub, FaDiscord, FaBook } from 'react-icons/fa';
 import { IconButtonLink, IconButtonVariant } from '../IconButton/IconButton';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { useSettings } from '../../helpers/AppSettings';
+import { transition } from '../../helpers/transition';
 
 interface AboutItem {
   icon: React.ReactNode;
@@ -28,12 +31,16 @@ const aboutMenuItems: AboutItem[] = [
 ];
 
 export function About() {
+  const narrow = useMediaQuery('(max-width: 920px)');
+  const { navbarFloating } = useSettings();
+  const elivate = narrow && navbarFloating;
+
   return (
     <>
       {/* <SideBarHeader>
         <Logo style={{ height: '1.1rem', maxWidth: '100%' }} />
       </SideBarHeader> */}
-      <AboutWrapper>
+      <AboutWrapper $elivate={elivate}>
         {aboutMenuItems.map(({ href, icon, helper }) => (
           <IconButtonLink
             target='_blank'
@@ -53,10 +60,12 @@ export function About() {
   );
 }
 
-const AboutWrapper = styled.div`
+const AboutWrapper = styled.div<{ $elivate: boolean }>`
   --inner-padding: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
   margin-left: calc(1rem - var(--inner-padding));
+  padding-bottom: ${p => (p.$elivate ? '3.5rem' : '0rem')};
+  ${transition('padding-bottom')}
 `;
