@@ -7,6 +7,7 @@ import {
 } from './TableEditorContext';
 import { FaExpandAlt } from 'react-icons/fa';
 import { IconButton } from '../IconButton/IconButton';
+import { KeyboardInteraction } from './helpers/keyboardHandlers';
 
 export enum CellAlign {
   Start = 'flex-start',
@@ -53,6 +54,7 @@ export function Cell({
     multiSelectCornerCellRef,
     setCursorMode,
     registerEventListener,
+    disabledKeyboardInteractions,
   } = useTableEditorContext();
 
   const isActive = rowIndex === selectedRow && columnIndex === selectedColumn;
@@ -89,10 +91,14 @@ export function Cell({
         return setCursorMode(CursorMode.Edit);
       }
 
+      if (disabledKeyboardInteractions.has(KeyboardInteraction.ExitEditMode)) {
+        return;
+      }
+
       setCursorMode(CursorMode.Visual);
       setActiveCell(rowIndex, columnIndex);
     },
-    [setActiveCell, isActive, columnIndex],
+    [setActiveCell, isActive, columnIndex, disabledKeyboardInteractions],
   );
 
   useLayoutEffect(() => {

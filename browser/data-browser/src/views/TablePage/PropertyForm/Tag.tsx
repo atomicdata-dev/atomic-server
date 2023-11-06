@@ -62,12 +62,10 @@ interface TagWrapperProps {
   color: string;
 }
 
-const TagWrapper = styled.span`
-  --tag-dark-color: ${(props: TagWrapperProps) =>
-    setLightness(0.11, props.color)};
-  --tag-mid-color: ${(props: TagWrapperProps) =>
-    setLightness(0.4, props.color)};
-  --tag-light-color: ${(props: TagWrapperProps) =>
+const TagWrapper = styled.span<TagWrapperProps>`
+  --tag-dark-color: ${props => setLightness(0.11, props.color)};
+  --tag-mid-color: ${props => setLightness(0.4, props.color)};
+  --tag-light-color: ${props =>
     setSaturation(0.5, setLightness(0.9, props.color))};
   display: inline-flex;
   gap: 0.5rem;
@@ -99,9 +97,14 @@ export function SelectableTag({
 }: SelectableTagProps): JSX.Element {
   const { color, text } = useTagData(subject);
 
-  const handleClick = useCallback(() => {
-    onClick(subject);
-  }, [onClick]);
+  const handleClick: React.MouseEventHandler = useCallback(
+    e => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick(subject);
+    },
+    [onClick],
+  );
 
   const className = selected ? 'selected-tag' : '';
 
@@ -111,6 +114,7 @@ export function SelectableTag({
       as='button'
       onClick={handleClick}
       className={className}
+      tabIndex={-1}
     >
       {text}
     </TagWrapperButton>

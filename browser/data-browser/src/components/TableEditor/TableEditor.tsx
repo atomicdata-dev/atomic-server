@@ -33,6 +33,7 @@ import { usePasteCommand } from './hooks/usePasteCommand';
 import { DndWrapper } from './DndWrapper';
 import { VisuallyHidden } from '../VisuallyHidden';
 import { useClickAwayListener } from '../../hooks/useClickAwayListener';
+import { KeyboardInteraction } from './helpers/keyboardHandlers';
 
 const ARIA_TABLE_USAGE =
   'Use the arrow keys to navigate the table. Press enter to edit a cell. Press escape to exit edit mode.';
@@ -99,8 +100,8 @@ function FancyTableInner<T>({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  const { listRef, tableRef, setCursorMode } = useTableEditorContext();
-
+  const { listRef, tableRef, setCursorMode, disabledKeyboardInteractions } =
+    useTableEditorContext();
   const [onScroll, setOnScroll] = useState<OnScroll>(() => undefined);
 
   const { templateColumns, contentRowWidth, resizeCell } = useCellSizes(
@@ -110,8 +111,12 @@ function FancyTableInner<T>({
   );
 
   const handleClickOutside = useCallback(() => {
+    if (disabledKeyboardInteractions.has(KeyboardInteraction.ExitEditMode)) {
+      return;
+    }
+
     setCursorMode(CursorMode.Visual);
-  }, []);
+  }, [disabledKeyboardInteractions]);
 
   useClickAwayListener([tableRef], handleClickOutside, true);
 
