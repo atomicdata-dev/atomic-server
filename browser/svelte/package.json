@@ -1,0 +1,56 @@
+{
+  "name": "@tomic/svelte",
+  "description": "Atomic Data Svelte library",
+  "author": "Polle Pas",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.35.1",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs.js"
+    }
+  },
+  "main": "./dist/index.cjs.js",
+  "module": "./dist/index.js",
+  "typings": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "build:watch": "tsc && vite build --watch",
+    "lint": "eslint ./src --ext .js,.svelte,.ts,.tsx",
+    "lint-fix": "eslint ./src --ext .js,.svelte,.ts,.tsx --fix",
+    "test": "vitest",
+    "coverage": "vitest --coverage"
+  },
+  "devDependencies": {
+    "@rollup/plugin-typescript": "^10.0.1",
+    "@types/node": "^18.11.17",
+    "@typescript-eslint/eslint-plugin": "^5.47.0",
+    "@typescript-eslint/parser": "^5.47.0",
+    "eslint-config-prettier": "^8.5.0",
+    "eslint-plugin-prettier": "^4.2.1",
+    "prettier": "^2.8.1",
+    "rollup-plugin-typescript-paths": "^1.4.0",
+    "tslib": "^2.4.1",
+    "typescript": "^4.9.3",
+    "vite": "^4.0.0",
+    "vitest": "^0.26.1"
+  },
+  "packageManager": "pnpm@7.13.3",
+  "dependencies": {
+    "@tomic/lib": "^0.35.0-beta.1",
+    "eslint": "^8.30.0",
+    "svelte": "^3.55.0"
+  },
+  "peerDependencies": {
+    "@tomic/lib": "0.35.x"
+  }
+}
