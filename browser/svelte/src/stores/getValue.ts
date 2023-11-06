@@ -45,8 +45,6 @@ export const getValue = <T extends JSONValue = JSONValue>(
     if (commit) {
       await resource.save(adStore);
     }
-
-    await adStore.notify(resource);
   };
 
   const writable = {
