@@ -601,7 +601,7 @@ export class Store {
       });
 
       this.resources.forEach(r => {
-        if (r.isUnauthorized()) {
+        if (r.isUnauthorized() || r.loading) {
           this.fetchResourceFromServer(r.getSubject());
         }
       });
