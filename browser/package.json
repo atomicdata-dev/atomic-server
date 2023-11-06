@@ -57,6 +57,7 @@
       "lib",
       "react",
       "data-browser",
+      "svelte",
       "cli"
     ]
   },

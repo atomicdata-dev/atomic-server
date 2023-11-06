@@ -1,12 +1,12 @@
 {
   "name": "@tomic/svelte",
   "description": "Atomic Data Svelte library",
-  "author": "Polle Pas",
+  "author": "Ontola, Polle Pas",
   "private": false,
   "publishConfig": {
     "access": "public"
   },
-  "version": "0.35.1",
+  "version": "0.36.0",
   "type": "module",
   "license": "MIT",
   "exports": {
@@ -32,25 +32,17 @@
   },
   "devDependencies": {
     "@rollup/plugin-typescript": "^10.0.1",
-    "@types/node": "^18.11.17",
-    "@typescript-eslint/eslint-plugin": "^5.47.0",
     "@typescript-eslint/parser": "^5.47.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-prettier": "^4.2.1",
-    "prettier": "^2.8.1",
     "rollup-plugin-typescript-paths": "^1.4.0",
     "tslib": "^2.4.1",
-    "typescript": "^4.9.3",
-    "vite": "^4.0.0",
     "vitest": "^0.26.1"
   },
   "packageManager": "pnpm@7.13.3",
   "dependencies": {
-    "@tomic/lib": "^0.35.0-beta.1",
-    "eslint": "^8.30.0",
+    "@tomic/lib": "workspace:*",
     "svelte": "^3.55.0"
   },
   "peerDependencies": {
-    "@tomic/lib": "0.35.x"
+    "@tomic/lib": "workspace:*"
   }
 }
