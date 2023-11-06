@@ -1,12 +1,12 @@
 import {
+  core,
   JSONValue,
-  properties,
   Store,
   useArray,
   useResource,
   useStore,
 } from '@tomic/react';
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FaPlus, FaTimes } from 'react-icons/fa';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { styled } from 'styled-components';
@@ -27,6 +27,7 @@ import {
   useCellOptions,
 } from '../../../components/TableEditor';
 import { useTableEditorContext } from '../../../components/TableEditor/TableEditorContext';
+import { CellOptions } from '../../../components/TableEditor/hooks/useCellOptions';
 
 const TAG_SPACING = '0.5rem';
 
@@ -35,13 +36,16 @@ const emptyArray: string[] = [];
 function buildListWithTitles(
   store: Store,
   subjects: string[],
+  ignore: string[],
 ): { subject: string; title: string }[] {
-  return subjects.map(subject => {
-    const resource = store.getResourceLoading(subject);
-    const title = resource?.get(properties.shortname) ?? subject;
+  return subjects
+    .filter(v => !ignore.includes(v))
+    .map(subject => {
+      const resource = store.getResourceLoading(subject);
+      const title = resource?.get(core.properties.shortname) ?? subject;
 
-    return { subject, title: title as string };
-  });
+      return { subject, title: title as string };
+    });
 }
 
 function ResourceArrayCellEdit({
@@ -49,53 +53,50 @@ function ResourceArrayCellEdit({
   property,
   onChange,
 }: EditCellProps<JSONValue>): JSX.Element {
+  const val = (value as string[]) ?? emptyArray;
+
   const store = useStore();
   const propertyResource = useResource(property);
-  const [allowsOnly] = useArray(propertyResource, properties.allowsOnly);
-  const [filteredTags, setFilteredTags] = React.useState<string[]>(allowsOnly);
-  const [open, setOpen] = React.useState(true);
-  const [selectedIndex, setSelectedIndex] = React.useState(0);
-  const [focusIndex, setFocusIndex] = React.useState(0);
+  const [allowsOnly] = useArray(propertyResource, core.properties.allowsOnly);
+  const [query, setQuery] = useState('');
+  const filteredTags = useMemo(() => {
+    const listWithTitles = buildListWithTitles(store, allowsOnly, val);
+
+    return listWithTitles
+      .filter(v => v.title.includes(query))
+      .map(ft => ft.subject);
+  }, [store, allowsOnly, val, query]);
+  const [open, setOpen] = useState(true);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   const { activeCellRef } = useTableEditorContext();
 
-  const val = (value as string[]) ?? emptyArray;
-
-  const cellOptions = useMemo(() => {
+  const cellOptions = useMemo((): CellOptions => {
     const disabledKeyboardInteractions = new Set<KeyboardInteraction>([
       KeyboardInteraction.EditNextRow,
     ]);
 
-    if (focusIndex !== 0) {
-      disabledKeyboardInteractions.add(KeyboardInteraction.EditPreviousCell);
-    }
-
-    if (focusIndex !== val.length) {
-      disabledKeyboardInteractions.add(KeyboardInteraction.EditNextCell);
+    if (open) {
+      disabledKeyboardInteractions.add(KeyboardInteraction.ExitEditMode);
     }
 
     return {
       disabledKeyboardInteractions,
       hideActiveIndicator: true,
     };
-  }, [focusIndex, val]);
+  }, [val, open]);
 
   useCellOptions(cellOptions);
 
-  const listWithTitles = useMemo(
-    () => buildListWithTitles(store, allowsOnly),
-    [allowsOnly],
-  );
+  // const listWithTitles = useMemo(
+  //   () => buildListWithTitles(store, allowsOnly, val),
+  //   [allowsOnly, val],
+  // );
 
-  const handleSearch = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const query = stringToSlug(e.target.value);
-      const filtered = listWithTitles.filter(v => v.title.includes(query));
-      setFilteredTags(filtered.map(v => v.subject));
-      setSelectedIndex(0);
-    },
-    [listWithTitles],
-  );
+  const handleSearch = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setQuery(stringToSlug(e.target.value));
+    setSelectedIndex(0);
+  }, []);
 
   const handleAddTag = useCallback(
     (subject: string) => {
@@ -152,13 +153,10 @@ function ResourceArrayCellEdit({
   return (
     <AbsoluteCell>
       <Row gap={TAG_SPACING} center wrapItems>
-        {val.map((v, i) => (
+        {val.map(v => (
           <Tag subject={v} key={v}>
             <TagIconButton
               title='remove tag'
-              onFocus={() => {
-                setFocusIndex(i);
-              }}
               onClick={() => handleRemoveTag(v)}
             >
               <FaTimes />
@@ -167,16 +165,11 @@ function ResourceArrayCellEdit({
         ))}
         <Popover
           defaultOpen
+          noLock
           open={open}
           onOpenChange={setOpen}
           Trigger={
-            <IconButton
-              title='Add tag'
-              as={RadixPopover.Trigger}
-              onFocus={() => {
-                setFocusIndex(val.length);
-              }}
-            >
+            <IconButton title='Add tag' as={RadixPopover.Trigger}>
               <StyledIcon />
             </IconButton>
           }
