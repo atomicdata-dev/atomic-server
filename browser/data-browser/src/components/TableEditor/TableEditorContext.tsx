@@ -7,12 +7,14 @@ export enum TableEvent {
   EnterEditModeWithCharacter = 'enterEditModeWithCharacter',
   ClearCell = 'clearCell',
   ClearRow = 'clearRow',
+  InteractionsFired = 'interactionsFired',
 }
 
 export type TableEventHandlers = {
   enterEditModeWithCharacter: (key: string) => void;
   clearCell: () => void;
   clearRow: (index: number) => void;
+  interactionsFired: (interactions: KeyboardInteraction[]) => void;
 };
 
 export enum CursorMode {
@@ -26,6 +28,8 @@ function emptySetState<T>(_: T | ((__: T) => T)): undefined {
 }
 
 export interface TableEditorContext {
+  mouseDown: boolean;
+  setMouseDown: React.Dispatch<React.SetStateAction<boolean>>;
   tableRef: React.MutableRefObject<HTMLDivElement | null>;
   disabledKeyboardInteractions: Set<KeyboardInteraction>;
   setDisabledKeyboardInteractions: React.Dispatch<
@@ -55,10 +59,13 @@ export interface TableEditorContext {
   registerEventListener<T extends TableEvent>(
     event: T,
     cb: TableEventHandlers[T],
-  );
+  ): () => void;
+  emitInteractionsFired(interactions: KeyboardInteraction[]): void;
 }
 
 const initial = {
+  mouseDown: false,
+  setMouseDown: emptySetState,
   tableRef: { current: null },
   disabledKeyboardInteractions: new Set<KeyboardInteraction>(),
   setDisabledKeyboardInteractions: emptySetState,
@@ -80,7 +87,8 @@ const initial = {
   clearCell: () => undefined,
   clearRow: (_: number) => undefined,
   enterEditModeWithCharacter: (_: string) => undefined,
-  registerEventListener: () => undefined,
+  registerEventListener: () => () => undefined,
+  emitInteractionsFired: () => undefined,
 };
 
 const TableEditorContext = React.createContext<TableEditorContext>(initial);
@@ -88,6 +96,7 @@ const TableEditorContext = React.createContext<TableEditorContext>(initial);
 export function TableEditorContextProvider({
   children,
 }: React.PropsWithChildren<unknown>): JSX.Element {
+  const [mouseDown, setMouseDown] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<FixedSizeList>(null);
   const [eventManager] = useState(
@@ -146,8 +155,17 @@ export function TableEditorContextProvider({
     [eventManager],
   );
 
+  const emitInteractionsFired = useCallback(
+    (interactions: KeyboardInteraction[]) => {
+      eventManager.emit(TableEvent.InteractionsFired, interactions);
+    },
+    [eventManager],
+  );
+
   const context = useMemo(
     () => ({
+      mouseDown,
+      setMouseDown,
       tableRef,
       disabledKeyboardInteractions,
       setDisabledKeyboardInteractions,
@@ -170,6 +188,7 @@ export function TableEditorContextProvider({
       clearCell,
       clearRow,
       enterEditModeWithCharacter,
+      emitInteractionsFired,
     }),
     [
       disabledKeyboardInteractions,
@@ -182,6 +201,8 @@ export function TableEditorContextProvider({
       setMultiSelectCorner,
       isDragging,
       cursorMode,
+      emitInteractionsFired,
+      mouseDown,
     ],
   );
 

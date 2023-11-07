@@ -12,6 +12,7 @@ export interface PopoverProps {
   onOpenChange: (open: boolean) => void;
   className?: string;
   noArrow?: boolean;
+  noLock?: boolean;
 }
 
 export function Popover({
@@ -20,6 +21,7 @@ export function Popover({
   open,
   defaultOpen,
   noArrow,
+  noLock,
   onOpenChange,
   Trigger,
 }: React.PropsWithChildren<PopoverProps>): JSX.Element {
@@ -28,7 +30,7 @@ export function Popover({
 
   const container = containerRef.current ?? undefined;
 
-  useControlLock(!!open);
+  useControlLock(!noLock && !!open);
 
   const handleOpenChange = useCallback(
     (changedToOpen: boolean) => {

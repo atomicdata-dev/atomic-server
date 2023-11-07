@@ -7,6 +7,7 @@ import {
 } from './TableEditorContext';
 import { FaExpandAlt } from 'react-icons/fa';
 import { IconButton } from '../IconButton/IconButton';
+import { KeyboardInteraction } from './helpers/keyboardHandlers';
 
 export enum CellAlign {
   Start = 'flex-start',
@@ -23,6 +24,7 @@ export interface CellProps {
   role?: string;
   onClearCell?: () => void;
   onEnterEditModeWithCharacter?: (key: string) => void;
+  onEditNextRow?: () => void;
 }
 
 interface IndexCellProps extends CellProps {
@@ -38,10 +40,12 @@ export function Cell({
   align,
   role,
   onEnterEditModeWithCharacter = () => undefined,
+  onEditNextRow,
 }: React.PropsWithChildren<CellProps>): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
 
   const {
+    mouseDown,
     selectedRow,
     selectedColumn,
     multiSelectCornerRow,
@@ -53,6 +57,8 @@ export function Cell({
     multiSelectCornerCellRef,
     setCursorMode,
     registerEventListener,
+    disabledKeyboardInteractions,
+    setMouseDown,
   } = useTableEditorContext();
 
   const isActive = rowIndex === selectedRow && columnIndex === selectedColumn;
@@ -60,8 +66,21 @@ export function Cell({
     rowIndex === multiSelectCornerRow &&
     columnIndex === multiSelectCornerColumn;
 
-  const handleClick = useCallback(
+  const handleMouseUp = useCallback(() => {
+    setMouseDown(false);
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    if (mouseDown) {
+      setMultiSelectCorner(rowIndex, columnIndex);
+      setCursorMode(CursorMode.MultiSelect);
+    }
+  }, [mouseDown, rowIndex, columnIndex]);
+
+  const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      setMouseDown(true);
+
       // When Shift is pressed, enter multi-select mode
       if (e.shiftKey) {
         e.stopPropagation();
@@ -86,13 +105,20 @@ export function Cell({
 
       if (isActive && columnIndex !== 0) {
         // Enter edit mode when clicking on a higlighted cell, except when it's the index column.
+        setMultiSelectCorner(undefined, undefined);
+        setMouseDown(false);
+
         return setCursorMode(CursorMode.Edit);
+      }
+
+      if (disabledKeyboardInteractions.has(KeyboardInteraction.ExitEditMode)) {
+        return;
       }
 
       setCursorMode(CursorMode.Visual);
       setActiveCell(rowIndex, columnIndex);
     },
-    [setActiveCell, isActive, columnIndex],
+    [setActiveCell, isActive, columnIndex, disabledKeyboardInteractions],
   );
 
   useLayoutEffect(() => {
@@ -117,16 +143,28 @@ export function Cell({
 
       activeCellRef.current = ref.current;
 
-      const unregister = registerEventListener(
-        TableEvent.EnterEditModeWithCharacter,
-        onEnterEditModeWithCharacter,
-      );
+      const unregisters = [
+        registerEventListener(
+          TableEvent.EnterEditModeWithCharacter,
+          onEnterEditModeWithCharacter,
+        ),
+        registerEventListener(TableEvent.InteractionsFired, interactions => {
+          if (
+            interactions.includes(KeyboardInteraction.EditNextRow) &&
+            isActive
+          ) {
+            onEditNextRow?.();
+          }
+        }),
+      ];
 
       return () => {
-        unregister();
+        for (const unregister of unregisters) {
+          unregister();
+        }
       };
     }
-  }, [isActive, onEnterEditModeWithCharacter]);
+  }, [isActive, onEnterEditModeWithCharacter, onEditNextRow]);
 
   return (
     <CellWrapper
@@ -135,10 +173,12 @@ export function Cell({
       disabled={disabled}
       role={role ?? 'gridcell'}
       className={className}
-      onClick={handleClick}
       allowUserSelect={cursorMode === CursorMode.Edit}
       align={align}
       tabIndex={isActive ? 0 : -1}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseEnter={handleMouseEnter}
     >
       {children}
     </CellWrapper>

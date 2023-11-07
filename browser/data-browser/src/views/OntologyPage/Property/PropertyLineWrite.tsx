@@ -49,7 +49,7 @@ export function PropertyLineWrite({
 
   return (
     <ListItem>
-      <Row center>
+      <Row center wrapItems>
         <InputSwitcher
           commit
           required
