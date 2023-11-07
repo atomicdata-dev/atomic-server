@@ -23,6 +23,7 @@ import { PopoverContainer } from './components/Popover';
 import { SkipNav } from './components/SkipNav';
 import { ControlLockProvider } from './hooks/useControlLock';
 import { FormValidationContextProvider } from './components/forms/formValidation/FormValidationContextProvider';
+import { StyleSheetManager } from 'styled-components';
 
 function fixDevUrl(url: string) {
   if (isDev()) {
@@ -68,6 +69,19 @@ if (isDev()) {
   window.store = store;
 }
 
+import isPropValid from '@emotion/is-prop-valid';
+
+// This implements the default behavior from styled-components v5
+function shouldForwardProp(propName, target) {
+  if (typeof target === 'string') {
+    // For HTML elements, forward the prop if it is a valid HTML attribute
+    return isPropValid(propName);
+  }
+
+  // For other elements, forward all props
+  return true;
+}
+
 /** Entrypoint of the application. This is where providers go. */
 function App(): JSX.Element {
   return (
@@ -78,33 +92,35 @@ function App(): JSX.Element {
           <BrowserRouter basename='/'>
             <ControlLockProvider>
               <HotKeysWrapper>
-                <ThemeWrapper>
-                  {/* @ts-ignore TODO: Check if types are fixed or upgrade styled-components to 6.0.0 */}
-                  <GlobalStyle />
-                  {/* @ts-ignore fallback component type too strict */}
-                  <ErrBoundary FallbackComponent={CrashPage}>
-                    {/* Default form validation provider. Does not do anyting on its own but will make sure useValidation works without context*/}
-                    <FormValidationContextProvider
-                      onValidationChange={() => undefined}
-                    >
-                      <Toaster />
-                      <MetaSetter />
-                      <DropdownContainer>
-                        <DialogContainer>
-                          <PopoverContainer>
-                            <DropdownContainer>
-                              <SkipNav />
-                              <NavWrapper>
-                                <AppRoutes />
-                              </NavWrapper>
-                            </DropdownContainer>
-                          </PopoverContainer>
-                          <NetworkIndicator />
-                        </DialogContainer>
-                      </DropdownContainer>
-                    </FormValidationContextProvider>
-                  </ErrBoundary>
-                </ThemeWrapper>
+                <StyleSheetManager shouldForwardProp={shouldForwardProp}>
+                  <ThemeWrapper>
+                    {/* @ts-ignore TODO: Check if types are fixed or upgrade styled-components to 6.0.0 */}
+                    <GlobalStyle />
+                    {/* @ts-ignore fallback component type too strict */}
+                    <ErrBoundary FallbackComponent={CrashPage}>
+                      {/* Default form validation provider. Does not do anyting on its own but will make sure useValidation works without context*/}
+                      <FormValidationContextProvider
+                        onValidationChange={() => undefined}
+                      >
+                        <Toaster />
+                        <MetaSetter />
+                        <DropdownContainer>
+                          <DialogContainer>
+                            <PopoverContainer>
+                              <DropdownContainer>
+                                <SkipNav />
+                                <NavWrapper>
+                                  <AppRoutes />
+                                </NavWrapper>
+                              </DropdownContainer>
+                            </PopoverContainer>
+                            <NetworkIndicator />
+                          </DialogContainer>
+                        </DropdownContainer>
+                      </FormValidationContextProvider>
+                    </ErrBoundary>
+                  </ThemeWrapper>
+                </StyleSheetManager>
               </HotKeysWrapper>
             </ControlLockProvider>
           </BrowserRouter>
