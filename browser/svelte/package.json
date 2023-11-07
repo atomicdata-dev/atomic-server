@@ -35,7 +35,7 @@
     "@typescript-eslint/parser": "^5.47.0",
     "rollup-plugin-typescript-paths": "^1.4.0",
     "tslib": "^2.4.1",
-    "vitest": "^0.26.1"
+    "vitest": "^0.34.6"
   },
   "packageManager": "pnpm@7.13.3",
   "dependencies": {

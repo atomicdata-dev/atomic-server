@@ -51,7 +51,6 @@
     "gh-pages": "^3.1.0",
     "lint-staged": "^10.5.4",
     "types-wm": "^1.1.0",
-    "vite": "^4.0.4",
     "vite-plugin-pwa": "^0.14.1",
     "workbox-cli": "^6.4.1"
   },
