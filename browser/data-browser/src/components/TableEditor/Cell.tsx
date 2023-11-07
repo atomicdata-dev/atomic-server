@@ -106,6 +106,7 @@ export function Cell({
       if (isActive && columnIndex !== 0) {
         // Enter edit mode when clicking on a higlighted cell, except when it's the index column.
         setMultiSelectCorner(undefined, undefined);
+        setMouseDown(false);
 
         return setCursorMode(CursorMode.Edit);
       }
