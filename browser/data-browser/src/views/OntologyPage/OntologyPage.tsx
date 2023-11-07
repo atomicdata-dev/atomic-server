@@ -128,6 +128,12 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
     --ontology-graph-ratio: 16/9;
   }
 
+  @container (max-width: 600px) {
+    grid-template-areas: ${p =>
+      p.edit ? `'title' 'list' 'list'` : `'title' 'graph' 'list'`};
+    grid-template-columns: 100%;
+  }
+
   padding-bottom: 3rem;
 `;
 
