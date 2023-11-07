@@ -1,5 +1,5 @@
-import { Resource, type JSONValue } from '@tomic/lib';
-import { type Readable, type Writable, get } from 'svelte/store';
+import { Resource, JSONValue } from '@tomic/lib';
+import { Readable, Writable, get } from 'svelte/store';
 
 import { store } from './store';
 
