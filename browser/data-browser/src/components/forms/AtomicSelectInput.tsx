@@ -30,7 +30,7 @@ export function AtomicSelectInput({
   };
 
   return (
-    <InputWrapper>
+    <StyledInputWrapper>
       <SelectWrapper disabled={!!props.disabled}>
         <Select {...props} onChange={handleChange} value={value as string}>
           {options.map(option => (
@@ -40,9 +40,13 @@ export function AtomicSelectInput({
           ))}
         </Select>
       </SelectWrapper>
-    </InputWrapper>
+    </StyledInputWrapper>
   );
 }
+
+const StyledInputWrapper = styled(InputWrapper)`
+  min-width: 15ch;
+`;
 
 const SelectWrapper = styled.span<{ disabled: boolean }>`
   width: 100%;
