@@ -87,6 +87,8 @@ const MAX_BREADCRUMB_DEPTH = 4;
 /** Shows a "Set drive" button if the current drive is different from the Subject */
 function DriveMismatch({ subject }: { subject: string }) {
   const { drive, setDrive } = useSettings();
+  const resource = useResource(subject, { allowIncomplete: true });
+  const [title] = useTitle(resource);
 
   const handleSetDrive = () => {
     setDrive(subject);
@@ -96,7 +98,11 @@ function DriveMismatch({ subject }: { subject: string }) {
 
   if (mismatch)
     return (
-      <Button onClick={handleSetDrive} title='Set Drive'>
+      <Button
+        title={`Set ${title} as current drive`}
+        subtle
+        onClick={handleSetDrive}
+      >
         Set Drive
       </Button>
     );
