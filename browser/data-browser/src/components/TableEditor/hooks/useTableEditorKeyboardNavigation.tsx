@@ -43,6 +43,7 @@ export function useTableEditorKeyboardNavigation(
     multiSelectCornerColumn,
     setActiveCell,
     listRef,
+    emitInteractionsFired,
   } = tableContext;
 
   const hasControlLock = useHasControlLock();
@@ -50,8 +51,6 @@ export function useTableEditorKeyboardNavigation(
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLDivElement>) => {
       if (hasControlLock || tableHeaderHasFocus(headerRef)) {
-        console.warn('Control lock enabled, can not use keyboard.');
-
         return;
       }
 
@@ -102,6 +101,8 @@ export function useTableEditorKeyboardNavigation(
 
         handler.handler(context);
       }
+
+      emitInteractionsFired(handlers.map(h => h.id));
     },
     [
       disabledKeyboardInteractions,
@@ -114,6 +115,7 @@ export function useTableEditorKeyboardNavigation(
       commands.undo,
       commands.expand,
       hasControlLock,
+      emitInteractionsFired,
     ],
   );
 

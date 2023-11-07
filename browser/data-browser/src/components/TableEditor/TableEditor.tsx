@@ -187,6 +187,7 @@ function FancyTableInner<T>({
       <VisuallyHidden id={ariaUsageId}>
         <p>{ARIA_TABLE_USAGE}</p>
       </VisuallyHidden>
+      {/* @ts-ignore */}
       <Table
         aria-labelledby={labelledBy}
         aria-rowcount={itemCount}
@@ -234,6 +235,7 @@ interface TableProps {
   totalContentHeight: number;
 }
 
+// @ts-ignore
 const Table = styled.div.attrs<TableProps>(p => ({
   style: {
     '--table-template-columns': p.gridTemplateColumns,

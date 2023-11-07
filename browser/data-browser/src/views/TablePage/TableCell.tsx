@@ -65,6 +65,7 @@ export function TableCell({
   const store = useStore();
 
   const [markForInvalidate, setMarkForInvalidate] = useState(false);
+  const { setActiveCell } = useTableEditorContext();
   const { addItemsToHistoryStack } = useContext(TablePageContext);
   const [save, savePending] = useDebouncedCallback(
     async () => {
@@ -116,6 +117,25 @@ export function TableCell({
     [onChange, dataType],
   );
 
+  const handleEditNextRow = useCallback(() => {
+    if (markForInvalidate && !savePending) {
+      startTransition(() => {
+        setMarkForInvalidate(false);
+        invalidateTable?.();
+        setTimeout(() => {
+          setActiveCell(rowIndex + 1, columnIndex);
+        }, 0);
+      });
+    }
+  }, [
+    markForInvalidate,
+    savePending,
+    invalidateTable,
+    setActiveCell,
+    rowIndex,
+    columnIndex,
+  ]);
+
   useEffect(() => {
     if (markForInvalidate && !isEditing && !savePending) {
       startTransition(() => {
@@ -123,7 +143,7 @@ export function TableCell({
         invalidateTable?.();
       });
     }
-  }, [isEditing, markForInvalidate, savePending]);
+  }, [isEditing, markForInvalidate, savePending, invalidateTable]);
 
   return (
     <Cell
@@ -131,6 +151,7 @@ export function TableCell({
       columnIndex={columnIndex}
       align={alignment}
       onEnterEditModeWithCharacter={handleEnterEditModeWithCharacter}
+      onEditNextRow={handleEditNextRow}
     >
       {isEditing ? (
         <Editor.Edit

@@ -24,6 +24,7 @@ export interface CellProps {
   role?: string;
   onClearCell?: () => void;
   onEnterEditModeWithCharacter?: (key: string) => void;
+  onEditNextRow?: () => void;
 }
 
 interface IndexCellProps extends CellProps {
@@ -39,6 +40,7 @@ export function Cell({
   align,
   role,
   onEnterEditModeWithCharacter = () => undefined,
+  onEditNextRow,
 }: React.PropsWithChildren<CellProps>): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -123,16 +125,28 @@ export function Cell({
 
       activeCellRef.current = ref.current;
 
-      const unregister = registerEventListener(
-        TableEvent.EnterEditModeWithCharacter,
-        onEnterEditModeWithCharacter,
-      );
+      const unregisters = [
+        registerEventListener(
+          TableEvent.EnterEditModeWithCharacter,
+          onEnterEditModeWithCharacter,
+        ),
+        registerEventListener(TableEvent.InteractionsFired, interactions => {
+          if (
+            interactions.includes(KeyboardInteraction.EditNextRow) &&
+            isActive
+          ) {
+            onEditNextRow?.();
+          }
+        }),
+      ];
 
       return () => {
-        unregister();
+        for (const unregister of unregisters) {
+          unregister();
+        }
       };
     }
-  }, [isActive, onEnterEditModeWithCharacter]);
+  }, [isActive, onEnterEditModeWithCharacter, onEditNextRow]);
 
   return (
     <CellWrapper

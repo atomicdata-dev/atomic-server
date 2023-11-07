@@ -7,12 +7,14 @@ export enum TableEvent {
   EnterEditModeWithCharacter = 'enterEditModeWithCharacter',
   ClearCell = 'clearCell',
   ClearRow = 'clearRow',
+  InteractionsFired = 'interactionsFired',
 }
 
 export type TableEventHandlers = {
   enterEditModeWithCharacter: (key: string) => void;
   clearCell: () => void;
   clearRow: (index: number) => void;
+  interactionsFired: (interactions: KeyboardInteraction[]) => void;
 };
 
 export enum CursorMode {
@@ -55,7 +57,8 @@ export interface TableEditorContext {
   registerEventListener<T extends TableEvent>(
     event: T,
     cb: TableEventHandlers[T],
-  );
+  ): () => void;
+  emitInteractionsFired(interactions: KeyboardInteraction[]): void;
 }
 
 const initial = {
@@ -80,7 +83,8 @@ const initial = {
   clearCell: () => undefined,
   clearRow: (_: number) => undefined,
   enterEditModeWithCharacter: (_: string) => undefined,
-  registerEventListener: () => undefined,
+  registerEventListener: () => () => undefined,
+  emitInteractionsFired: () => undefined,
 };
 
 const TableEditorContext = React.createContext<TableEditorContext>(initial);
@@ -146,6 +150,13 @@ export function TableEditorContextProvider({
     [eventManager],
   );
 
+  const emitInteractionsFired = useCallback(
+    (interactions: KeyboardInteraction[]) => {
+      eventManager.emit(TableEvent.InteractionsFired, interactions);
+    },
+    [eventManager],
+  );
+
   const context = useMemo(
     () => ({
       tableRef,
@@ -170,6 +181,7 @@ export function TableEditorContextProvider({
       clearCell,
       clearRow,
       enterEditModeWithCharacter,
+      emitInteractionsFired,
     }),
     [
       disabledKeyboardInteractions,
@@ -182,6 +194,7 @@ export function TableEditorContextProvider({
       setMultiSelectCorner,
       isDragging,
       cursorMode,
+      emitInteractionsFired,
     ],
   );
 
