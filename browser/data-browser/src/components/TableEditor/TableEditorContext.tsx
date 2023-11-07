@@ -28,6 +28,8 @@ function emptySetState<T>(_: T | ((__: T) => T)): undefined {
 }
 
 export interface TableEditorContext {
+  mouseDown: boolean;
+  setMouseDown: React.Dispatch<React.SetStateAction<boolean>>;
   tableRef: React.MutableRefObject<HTMLDivElement | null>;
   disabledKeyboardInteractions: Set<KeyboardInteraction>;
   setDisabledKeyboardInteractions: React.Dispatch<
@@ -62,6 +64,8 @@ export interface TableEditorContext {
 }
 
 const initial = {
+  mouseDown: false,
+  setMouseDown: emptySetState,
   tableRef: { current: null },
   disabledKeyboardInteractions: new Set<KeyboardInteraction>(),
   setDisabledKeyboardInteractions: emptySetState,
@@ -92,6 +96,7 @@ const TableEditorContext = React.createContext<TableEditorContext>(initial);
 export function TableEditorContextProvider({
   children,
 }: React.PropsWithChildren<unknown>): JSX.Element {
+  const [mouseDown, setMouseDown] = useState(false);
   const tableRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<FixedSizeList>(null);
   const [eventManager] = useState(
@@ -159,6 +164,8 @@ export function TableEditorContextProvider({
 
   const context = useMemo(
     () => ({
+      mouseDown,
+      setMouseDown,
       tableRef,
       disabledKeyboardInteractions,
       setDisabledKeyboardInteractions,
@@ -195,6 +202,7 @@ export function TableEditorContextProvider({
       isDragging,
       cursorMode,
       emitInteractionsFired,
+      mouseDown,
     ],
   );
 

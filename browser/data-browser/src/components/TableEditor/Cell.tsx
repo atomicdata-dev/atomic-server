@@ -45,6 +45,7 @@ export function Cell({
   const ref = useRef<HTMLDivElement>(null);
 
   const {
+    mouseDown,
     selectedRow,
     selectedColumn,
     multiSelectCornerRow,
@@ -57,6 +58,7 @@ export function Cell({
     setCursorMode,
     registerEventListener,
     disabledKeyboardInteractions,
+    setMouseDown,
   } = useTableEditorContext();
 
   const isActive = rowIndex === selectedRow && columnIndex === selectedColumn;
@@ -64,8 +66,21 @@ export function Cell({
     rowIndex === multiSelectCornerRow &&
     columnIndex === multiSelectCornerColumn;
 
-  const handleClick = useCallback(
+  const handleMouseUp = useCallback(() => {
+    setMouseDown(false);
+  }, []);
+
+  const handleMouseEnter = useCallback(() => {
+    if (mouseDown) {
+      setMultiSelectCorner(rowIndex, columnIndex);
+      setCursorMode(CursorMode.MultiSelect);
+    }
+  }, [mouseDown, rowIndex, columnIndex]);
+
+  const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
+      setMouseDown(true);
+
       // When Shift is pressed, enter multi-select mode
       if (e.shiftKey) {
         e.stopPropagation();
@@ -90,6 +105,8 @@ export function Cell({
 
       if (isActive && columnIndex !== 0) {
         // Enter edit mode when clicking on a higlighted cell, except when it's the index column.
+        setMultiSelectCorner(undefined, undefined);
+
         return setCursorMode(CursorMode.Edit);
       }
 
@@ -155,10 +172,12 @@ export function Cell({
       disabled={disabled}
       role={role ?? 'gridcell'}
       className={className}
-      onClick={handleClick}
       allowUserSelect={cursorMode === CursorMode.Edit}
       align={align}
       tabIndex={isActive ? 0 : -1}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
+      onMouseEnter={handleMouseEnter}
     >
       {children}
     </CellWrapper>
