@@ -1,6 +1,6 @@
-import { type FetchOpts, Resource, Store } from '@tomic/lib';
+import { FetchOpts, Resource, Store } from '@tomic/lib';
 
-import { type Readable, get, readable, Subscriber } from 'svelte/store';
+import { Readable, get, readable, Subscriber } from 'svelte/store';
 import { store } from './store';
 
 const subscribeToADStore = (
