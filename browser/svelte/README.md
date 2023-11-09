@@ -8,6 +8,7 @@ This library is still at an early stage and the API is subject to change.
 ## Quick Examples
 
 ### Getting a resource and displaying one of its properties
+
 ```html
   <script lang="ts">
     import { getResource, getValue } from '@tomic/svelte';
@@ -21,6 +22,7 @@ This library is still at an early stage and the API is subject to change.
 ```
 
 ### Changing the value of a property with an input field
+
 ```html
   <script lang="ts">
     import { getResource, getValue, setValue } from '@tomic/svelte';
@@ -35,18 +37,22 @@ This library is still at an early stage and the API is subject to change.
 
 ## Getting started
 
-Install the library with your prefered package manager: <br />
-```
+Install the library with your preferred package manager:
+
+```sh
 npm install -S @tomic/svelte @tomic/lib
 ```
-```
+
+```sh
 yarn add @tomic/svelte @tomic/lib
 ```
-```
+
+```sh
 pnpm add @tomic/svelte @tomic/lib
 ```
 
 Initialise the store
+
 ```html
 // App.svelte
 
@@ -64,8 +70,9 @@ Initialise the store
 // do sveltey things
 ```
 
-You can now acces this store from any component in your app with the store store.
-```html
+You can now access this store from any component in your app with the store store.
+
+```svelte
 // Some random component.svelte
 
 <script lang="ts">
@@ -75,10 +82,10 @@ You can now acces this store from any component in your app with the store store
 </script>
 ```
 
-However this resource does not update when some of its data changes somewhere else in your app.
+However, this resource does not update when some of its data changes somewhere else in your app.
 That's where the `getResource` and `getValue` functions come in handy.
 
-To get a value and display it in your component we first retrieve (or create) a resource from the store with `getResource` and then get it's value with `getValue`.
+To get a value and display it in your component we first retrieve (or create) a resource from the store with `getResource` and then get its value with `getValue`.
 
 ```html
 // Some random component.svelte
@@ -96,7 +103,8 @@ To get a value and display it in your component we first retrieve (or create) a 
   ...
 ```
 
-Updating values of a resource is super simple, just do what you would normaly do with a writable svelte store:
+Updating the values of a resource is super simple, just do what you would normally do with a writable svelte store:
+
 ```ts
 const value = getValue<string>(resource, urls.properties.name);
 
