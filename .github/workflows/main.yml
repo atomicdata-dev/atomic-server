@@ -1,17 +1,12 @@
-on:
-  [
-    push,
-    workflow_dispatch,
-  ]
+on: [push, workflow_dispatch]
 
-name: 'Build, test, clippy'
+name: "Build, test, clippy"
 jobs:
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
-      - run:
-          |
+      - run: |
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-4.0 libayatana-appindicator3-dev
       - uses: actions/checkout@v2
@@ -43,8 +38,7 @@ jobs:
 
       - name: Get pnpm store directory
         id: pnpm-cache
-        run:
-          |
+        run: |
           echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
 
       - uses: actions/cache@v3
@@ -52,34 +46,29 @@ jobs:
         with:
           path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys:
-            |
+          restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
       - name: Install JS deps
         working-directory: ./browser/
-        run:
-          |
+        run: |
           pnpm install
           pnpm run playwright-install
 
       - name: Lint JS
         working-directory: ./browser/
-        run:
-          |
+        run: |
           pnpm run lint
-
-      - name: Test JS (no e2e)
-        working-directory: ./browser/
-        run:
-          |
-          pnpm run test
 
       - name: Build JS
         working-directory: ./browser/
-        run:
-          |
+        run: |
           pnpm run build
+
+      - name: Test JS (no e2e)
+        working-directory: ./browser/
+        run: |
+          pnpm run test
 
       - name: Save JS Build Artifacts
         uses: actions/upload-artifact@v3
@@ -89,13 +78,9 @@ jobs:
   e2e:
     name: End-to-end tests
     runs-on: ubuntu-latest
-    needs:
-      [
-        build_js,
-      ]
+    needs: [build_js]
     steps:
-      - run:
-          |
+      - run: |
           sudo apt-get update
           sudo apt-get install -y webkit2gtk-4.0  libayatana-appindicator3-dev
       - uses: actions/checkout@v3
@@ -146,8 +131,7 @@ jobs:
 
       - name: Get pnpm store directory
         id: pnpm-cache
-        run:
-          |
+        run: |
           echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
 
       - uses: actions/cache@v3
@@ -155,14 +139,12 @@ jobs:
         with:
           path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys:
-            |
+          restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
       - name: Install Playwright
         working-directory: ./browser/
-        run:
-          |
+        run: |
           pnpm install
           pnpm run playwright-install
 
@@ -173,8 +155,8 @@ jobs:
         working-directory: ./browser/
         env:
           FRONTEND_URL: http://localhost:9883
-          LANGUAGE: 'en_GB'
-          DELETE_PREVIOUS_TEST_DRIVES: 'false'
+          LANGUAGE: "en_GB"
+          DELETE_PREVIOUS_TEST_DRIVES: "false"
         run: pnpm run test-e2e
 
       # Coverage
