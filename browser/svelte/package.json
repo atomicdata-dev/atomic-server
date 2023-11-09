@@ -27,7 +27,7 @@
     "build:watch": "tsc && vite build --watch",
     "lint": "eslint ./src --ext .js,.svelte,.ts,.tsx",
     "lint-fix": "eslint ./src --ext .js,.svelte,.ts,.tsx --fix",
-    "test": "vitest",
+    "test": "vitest run",
     "coverage": "vitest --coverage"
   },
   "devDependencies": {
