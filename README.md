@@ -14,6 +14,7 @@ This repo also includes:
 - [Atomic Data Browser](/browser/data-browser/README.md), the React front-end for Atomic-Server.
 - [`@tomic/lib`](/browser/lib/README.md) JS NPM library.
 - [`@tomic/react`](/browser/react/README.md) React NPM library.
+- [`@tomic/svelte`](/browser/svelte/README.md) Svelte NPM library.
 - [`atomic_lib`](lib/README.md) Rust library.
 - [`atomic-cli`](cli/README.md) terminal client.
 
