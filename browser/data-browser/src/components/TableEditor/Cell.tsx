@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import { styled } from 'styled-components';
 import {
   CursorMode,
@@ -44,6 +50,8 @@ export function Cell({
 }: React.PropsWithChildren<CellProps>): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
 
+  const [markEnterEditMode, setMarkEnterEditMode] = useState(false);
+
   const {
     mouseDown,
     selectedRow,
@@ -77,6 +85,20 @@ export function Cell({
     }
   }, [mouseDown, rowIndex, columnIndex]);
 
+  const shouldEnterEditMode = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      // @ts-ignore
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') {
+        // If the user clicked on an input don't enter edit mode. (Necessary for normal checkbox behavior)
+        return false;
+      }
+
+      // Enter edit mode when clicking on a higlighted cell, except when it's the index column.
+      return isActive && columnIndex !== 0;
+    },
+    [isActive, columnIndex],
+  );
+
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       setMouseDown(true);
@@ -97,18 +119,10 @@ export function Cell({
         return;
       }
 
-      // @ts-ignore
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') {
-        // If the user clicked on an input don't enter edit mode. (Necessary for normal checkbox behavior)
+      if (shouldEnterEditMode(e)) {
+        setMarkEnterEditMode(true);
+
         return;
-      }
-
-      if (isActive && columnIndex !== 0) {
-        // Enter edit mode when clicking on a higlighted cell, except when it's the index column.
-        setMultiSelectCorner(undefined, undefined);
-        setMouseDown(false);
-
-        return setCursorMode(CursorMode.Edit);
       }
 
       if (disabledKeyboardInteractions.has(KeyboardInteraction.ExitEditMode)) {
@@ -118,8 +132,18 @@ export function Cell({
       setCursorMode(CursorMode.Visual);
       setActiveCell(rowIndex, columnIndex);
     },
-    [setActiveCell, isActive, columnIndex, disabledKeyboardInteractions],
+    [setActiveCell, columnIndex, shouldEnterEditMode],
   );
+
+  const handleClick = useCallback(() => {
+    if (markEnterEditMode) {
+      setMultiSelectCorner(undefined, undefined);
+      setMouseDown(false);
+
+      setCursorMode(CursorMode.Edit);
+      setMarkEnterEditMode(false);
+    }
+  }, [markEnterEditMode]);
 
   useLayoutEffect(() => {
     if (!ref.current) {
@@ -178,6 +202,7 @@ export function Cell({
       tabIndex={isActive ? 0 : -1}
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onClick={handleClick}
       onMouseEnter={handleMouseEnter}
     >
       {children}

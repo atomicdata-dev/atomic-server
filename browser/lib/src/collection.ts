@@ -22,6 +22,7 @@ export interface CollectionParams extends QueryFilter {
  * Use the `invalidate` method to force a refresh.
  */
 export class Collection {
+  public readonly __internalObject = this;
   private store: Store;
   private pages = new Map<number, Resource>();
   private server: string;
@@ -152,4 +153,12 @@ export class Collection {
 
     this._totalMembers = totalMembers;
   }
+}
+
+export function proxyCollection(collection: Collection): Collection {
+  if (collection.__internalObject !== collection) {
+    console.warn('Attempted to proxy a proxy for a collection');
+  }
+
+  return new Proxy(collection.__internalObject, {});
 }

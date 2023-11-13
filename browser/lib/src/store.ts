@@ -19,6 +19,8 @@ import {
   UnknownClass,
   Server,
   core,
+  commits,
+  collections,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
@@ -31,6 +33,10 @@ type AgentCallback = (agent: Agent | undefined) => void;
 type ErrorCallback = (e: Error) => void;
 
 type Fetch = typeof fetch;
+
+type AddResourcesOpts = {
+  skipCommitCompare?: boolean;
+};
 
 export interface StoreOpts {
   /** The default store URL, where to send commits and where to create new instances */
@@ -128,9 +134,12 @@ export class Store {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public addResources(...resources: Resource[]): void {
-    for (const resource of resources) {
-      this.addResource(resource);
+  public addResources(
+    resources: Resource | Resource[],
+    opts?: AddResourcesOpts,
+  ): void {
+    for (const resource of Array.isArray(resources) ? resources : [resources]) {
+      this.addResource(resource, opts ?? {});
     }
   }
 
@@ -140,7 +149,10 @@ export class Store {
    * Adds a Resource to the store and notifies subscribers. Replaces existing
    * resources, unless this new resource is explicitly incomplete.
    */
-  public addResource(resource: Resource): void {
+  public addResource(
+    resource: Resource,
+    { skipCommitCompare }: AddResourcesOpts,
+  ): void {
     // Incomplete resources may miss some properties
     if (resource.get(urls.properties.incomplete)) {
       // If there is a resource with the same subject, we won't overwrite it with an incomplete one
@@ -151,11 +163,18 @@ export class Store {
       }
     }
 
-    // Check if the resource is the same as the one we already have, if so, we don't want to notify the store so we don't trigger rerenders.
-    const storeResource = this.resources.get(resource.getSubject());
+    // Check if the resource has the same last commit as the one already in the store, if so, we don't want to notify so we don't trigger rerenders.
+    if (!skipCommitCompare) {
+      const storeResource = this.resources.get(resource.getSubject());
 
-    if (storeResource) {
-      if (resource.equals(storeResource)) {
+      if (
+        storeResource &&
+        !storeResource.hasClasses(collections.classes.collection) &&
+        !storeResource.loading &&
+        !storeResource.new &&
+        storeResource.get(commits.properties.lastCommit) ===
+          resource.get(commits.properties.lastCommit)
+      ) {
         return;
       }
     }
@@ -279,7 +298,7 @@ export class Store {
         },
       );
 
-      this.addResources(...createdResources);
+      this.addResources(createdResources);
     }
 
     return this.resources.get(subject)!;
@@ -511,7 +530,7 @@ export class Store {
       const json = JSON.parse(atob(content));
 
       const [_, resources] = parser.parseObject(json);
-      this.addResources(...resources);
+      this.addResources(resources);
     });
   }
 
@@ -739,7 +758,7 @@ export class Store {
       parent,
     );
 
-    this.addResources(...resources);
+    this.addResources(resources);
 
     return resources.map(r => r.getSubject());
   }

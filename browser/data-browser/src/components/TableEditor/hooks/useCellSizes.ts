@@ -58,6 +58,10 @@ export function useCellSizes<T>(
   }, [externalSizes]);
 
   useEffect(() => {
+    if (columns.length === 0) {
+      return;
+    }
+
     const diff = columns.length - sizes.length;
 
     if (diff > 0) {

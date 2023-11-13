@@ -98,6 +98,10 @@ export class Resource<C extends OptionalClass = any> {
 
   /** Checks if the content of two Resource instances is equal */
   public equals(resourceB: Resource): boolean {
+    if (this === resourceB.__internalObject) {
+      return true;
+    }
+
     if (this.getSubject() !== resourceB.getSubject()) {
       return false;
     }
@@ -115,14 +119,14 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     if (
-      JSON.stringify(Array.from(this.propvals.entries())) ===
+      JSON.stringify(Array.from(this.propvals.entries())) !==
       JSON.stringify(Array.from(resourceB.propvals.entries()))
     ) {
       return false;
     }
 
     if (
-      JSON.stringify(Array.from(this.commitBuilder.set.entries())) ===
+      JSON.stringify(Array.from(this.commitBuilder.set.entries())) !==
       JSON.stringify(Array.from(resourceB.commitBuilder.set.entries()))
     ) {
       return false;
@@ -497,7 +501,7 @@ export class Resource<C extends OptionalClass = any> {
 
     try {
       this.commitError = undefined;
-      store.addResources(this);
+      store.addResources(this, { skipCommitCompare: true });
       const createdCommit = await store.postCommit(commit, endpoint);
       // const res = store.getResourceLoading(this.subject);
       this.setUnsafe(properties.commit.lastCommit, createdCommit.id!);
@@ -542,7 +546,7 @@ export class Resource<C extends OptionalClass = any> {
       // If it fails, revert to the old resource with the old CommitBuilder
       this.commitBuilder = oldCommitBuilder;
       this.commitError = e;
-      store.addResources(this);
+      store.addResources(this, { skipCommitCompare: true });
       throw e;
     }
   }

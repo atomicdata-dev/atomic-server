@@ -4,10 +4,7 @@ import { CellIndex, CopyValue } from '../../../components/TableEditor';
 import { getValuesFromSubject } from './clipboard';
 import { transformToPropertiesPerSubject } from './transformPropertiesPerSubject';
 
-export function useHandleCopyCommand(
-  collection: Collection,
-  collectionVersion: number,
-) {
+export function useHandleCopyCommand(collection: Collection) {
   const store = useStore();
 
   return useCallback(
@@ -24,6 +21,6 @@ export function useHandleCopyCommand(
       return Promise.all(unresolvedValues);
     },
 
-    [collection, collectionVersion, store],
+    [collection, store],
   );
 }

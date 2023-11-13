@@ -41,7 +41,7 @@ function handleMessage(ev: MessageEvent, store: Store) {
     store.notifyError(ev.data.slice(6));
   } else if (ev.data.startsWith('RESOURCE ')) {
     const resources = parseResourceMessage(ev);
-    store.addResources(...resources);
+    store.addResources(resources);
   } else {
     console.warn('Unknown websocket message:', ev);
   }

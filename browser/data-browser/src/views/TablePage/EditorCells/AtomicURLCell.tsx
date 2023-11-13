@@ -1,4 +1,5 @@
 import {
+  Core,
   JSONValue,
   Resource,
   unknownSubject,
@@ -47,19 +48,15 @@ import {
 } from '../../../components/TableEditor';
 
 const useClassType = (subject: string) => {
-  const resource = useResource(subject);
-  const [classType] = useString(resource, urls.properties.classType);
-  const classTypeResource = useResource(classType);
-  const [classTypeTitle] = useTitle(classTypeResource);
+  const property = useResource<Core.Property>(subject);
+
+  const classType = useResource<Core.Class>(property.props.classtype);
+  const hasClassType = classType?.getSubject() !== unknownSubject;
 
   return {
     classType,
-    classTypeTitle,
+    hasClassType,
   };
-};
-
-const cellOptions = {
-  disabledKeyboardInteractions: new Set([KeyboardInteraction.EditNextRow]),
 };
 
 function AtomicURLCellEdit({
@@ -69,13 +66,25 @@ function AtomicURLCellEdit({
   resource: row,
 }: EditCellProps<JSONValue>): JSX.Element {
   const cell = useResource(value as string);
-  const { classType, classTypeTitle } = useClassType(property);
+  const { classType, hasClassType } = useClassType(property);
   const [title] = useTitle(cell);
   const [open, setOpen] = useState(true);
   const { setCursorMode } = useTableEditorContext();
   const selectedElement = useRef<HTMLLIElement>(null);
 
   const [searchValue, setSearchValue] = useState('');
+
+  const cellOptions = useMemo(() => {
+    if (open) {
+      return {
+        disabledKeyboardInteractions: new Set([
+          KeyboardInteraction.ExitEditMode,
+        ]),
+      };
+    } else {
+      return {};
+    }
+  }, [open]);
 
   useCellOptions(cellOptions);
 
@@ -106,7 +115,7 @@ function AtomicURLCellEdit({
 
   const { results, selectedIndex, handleKeyDown } = useResourceSearch(
     searchValue,
-    classType,
+    hasClassType ? classType.getSubject() : undefined,
     handleResultClick,
   );
 
@@ -116,6 +125,10 @@ function AtomicURLCellEdit({
         e.preventDefault();
         setOpen(false);
 
+        return;
+      }
+
+      if (e.key === 'Tab') {
         return;
       }
 
@@ -141,11 +154,11 @@ function AtomicURLCellEdit({
       <PopoverTrigger>
         <FaEdit />{' '}
         {cell.getSubject() === unknownSubject
-          ? `select ${classTypeTitle ?? 'resource'}`
+          ? `select ${hasClassType ? classType.title : 'resource'}`
           : title}
       </PopoverTrigger>
     );
-  }, [title, cell, classTypeTitle]);
+  }, [title, cell, classType, hasClassType]);
 
   useEffect(() => {
     if (selectedElement.current) {
@@ -153,17 +166,19 @@ function AtomicURLCellEdit({
     }
   }, [selectedIndex]);
 
-  const placehoder = classType ? `Search ${classTypeTitle}` : 'Search...';
+  const placehoder = hasClassType ? `Search ${classType.title}` : 'Search...';
 
   const showFileDropzone =
-    results.length === 0 && classType === urls.classes.file;
-  const showNoResults = results.length === 0 && classType !== urls.classes.file;
+    results.length === 0 && classType.getSubject() === urls.classes.file;
+  const showNoResults =
+    results.length === 0 && classType.getSubject() !== urls.classes.file;
 
   return (
     <SearchPopover
       Trigger={Trigger}
       open={open}
       onOpenChange={handleOpenChange}
+      noLock
     >
       <InputWrapper>
         <InputStyled

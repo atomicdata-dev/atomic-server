@@ -1,4 +1,10 @@
-import { Collection, CollectionBuilder, QueryFilter, Store } from '@tomic/lib';
+import {
+  Collection,
+  CollectionBuilder,
+  proxyCollection,
+  QueryFilter,
+  Store,
+} from '@tomic/lib';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useServerURL } from './useServerURL.js';
 import { useStore } from './hooks.js';
@@ -6,8 +12,6 @@ import { useStore } from './hooks.js';
 export type UseCollectionResult = {
   collection: Collection;
   invalidateCollection: () => Promise<void>;
-  /** Because collection is a class and fetches data after it is created we need a way to track if it changes so we can rerender parts of the UI */
-  collectionVersion: number;
 };
 
 const buildCollection = (
@@ -38,7 +42,6 @@ export function useCollection(
 ): UseCollectionResult {
   const store = useStore();
   const [server] = useServerURL();
-  const [collectionVersion, setCollectionVersion] = useState(0);
 
   const queryFilterMemo = useQueryFilterMemo(queryFilter);
 
@@ -48,7 +51,7 @@ export function useCollection(
 
   useEffect(() => {
     collection.waitForReady().then(() => {
-      setCollectionVersion(version => version + 1);
+      setCollection(proxyCollection(collection.__internalObject));
     });
   }, []);
 
@@ -61,19 +64,16 @@ export function useCollection(
     );
 
     newCollection.waitForReady().then(() => {
-      setCollection(newCollection);
-      setCollectionVersion(version => version + 1);
+      setCollection(proxyCollection(newCollection.__internalObject));
     });
   }, [queryFilterMemo, pageSize, store, server]);
 
   const invalidateCollection = useCallback(async () => {
-    const clonedCollection = collection.clone();
-    await clonedCollection.refresh();
-    setCollection(clonedCollection);
-    setCollectionVersion(version => version + 1);
+    await collection.refresh();
+    setCollection(proxyCollection(collection.__internalObject));
   }, [collection, store, server, queryFilter, pageSize]);
 
-  return { collection, invalidateCollection, collectionVersion };
+  return { collection, invalidateCollection };
 }
 
 function useQueryFilterMemo(queryFilter: QueryFilter) {

@@ -21,7 +21,6 @@ export function useHandlePaste(
   tableClass: Resource,
   invalidateCollection: () => void,
   addHistoryItemBatchToStack: (historyItemBatch: HistoryItemBatch) => void,
-  collectionVersion: number,
 ) {
   const store = useStore();
 
@@ -87,6 +86,6 @@ export function useHandlePaste(
         invalidateCollection();
       }
     },
-    [collectionVersion, collection, invalidateCollection, store],
+    [collection, invalidateCollection, store],
   );
 }

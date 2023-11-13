@@ -26,14 +26,8 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
   const store = useStore();
   const titleId = useId();
 
-  const {
-    tableClass,
-    sorting,
-    setSortBy,
-    collection,
-    invalidateCollection,
-    collectionVersion,
-  } = useTableData(resource);
+  const { tableClass, sorting, setSortBy, collection, invalidateCollection } =
+    useTableData(resource);
 
   const { columns, reorderColumns } = useTableColumns(tableClass);
 
@@ -46,7 +40,6 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
     tableClass,
     invalidateCollection,
     addItemsToHistoryStack,
-    collectionVersion,
   );
 
   const [showExpandedRowDialog, setShowExpandedRowDialog] = useState(false);
@@ -94,7 +87,7 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
     addItemsToHistoryStack,
   );
 
-  const handleCopyCommand = useHandleCopyCommand(collection, collectionVersion);
+  const handleCopyCommand = useHandleCopyCommand(collection);
 
   const [columnSizes, handleColumnResize] = useHandleColumnResize(resource);
 
@@ -115,12 +108,8 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
         />
       );
     },
-    [collection, columns, collectionVersion],
+    [collection, columns],
   );
-
-  if (collectionVersion === 0) {
-    return <ContainerFull>Loading...</ContainerFull>;
-  }
 
   return (
     <ContainerFull>

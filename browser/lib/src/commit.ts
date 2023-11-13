@@ -489,7 +489,7 @@ export function parseAndApplyCommit(jsonAdObjStr: string, store: Store) {
   } else {
     resource.appliedCommitSignatures.add(signature);
 
-    store.addResources(resource);
+    store.addResources(resource, { skipCommitCompare: true });
   }
 }
 
@@ -522,7 +522,7 @@ function execSetCommit(
     resource.setUnsafe(key, newVal);
   }
 
-  store && store.addResources(...parsedResources);
+  store && store.addResources(parsedResources);
 }
 
 function execRemoveCommit(remove: string[], resource: Resource) {
@@ -556,5 +556,5 @@ function execPushCommit(
     resource.setUnsafe(key, new_arr);
   }
 
-  store && store.addResources(...parsedResources);
+  store && store.addResources(parsedResources);
 }
