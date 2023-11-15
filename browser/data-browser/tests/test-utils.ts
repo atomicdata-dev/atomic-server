@@ -125,6 +125,39 @@ export async function getCurrentSubject(page: Page) {
   return page.locator(addressBar).getAttribute('value');
 }
 
+export async function waitForCommitOnCurrentResource(
+  page: Page,
+  match?: { set?: Record<string, unknown> },
+) {
+  const currentSubject = await getCurrentSubject(page);
+
+  await page.waitForResponse(async response => {
+    const result = await response.json();
+
+    const isForCurrentResource =
+      result['https://atomicdata.dev/properties/subject'] === currentSubject;
+
+    if (!isForCurrentResource) {
+      return false;
+    }
+
+    if (match) {
+      const set = result['https://atomicdata.dev/properties/set'];
+
+      for (const key in match.set) {
+        if (set[key] !== match.set[key]) {
+          return false;
+        }
+      }
+    }
+
+    // Wait for commit response to be processed by the store.
+    await page.waitForTimeout(200);
+
+    return true;
+  });
+}
+
 export async function openAgentPage(page: Page) {
   page.goto(`${FRONTEND_URL}/app/agent`);
 }

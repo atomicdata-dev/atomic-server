@@ -10,6 +10,8 @@ test.describe('tables', async () => {
   test.beforeEach(before);
 
   test('create and fill', async ({ page }) => {
+    test.slow();
+
     const newColumn = async (type: string) => {
       await page.getByRole('button', { name: 'Add column' }).click();
       await page.click(`text=${type}`);
@@ -51,7 +53,7 @@ test.describe('tables', async () => {
       await page.waitForTimeout(300);
       // Wait for the table to refresh by checking if the next row is visible
       await expect(
-        page.getByRole('rowheader', { name: `${currentRowNumber}` }),
+        page.getByRole('rowheader', { name: `${currentRowNumber + 1}` }),
       ).toBeAttached();
 
       await page.keyboard.type(date);

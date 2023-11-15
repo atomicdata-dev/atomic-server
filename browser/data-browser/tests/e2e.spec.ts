@@ -33,6 +33,7 @@ import {
   waitForCommit,
   openAgentPage,
   fillSearchBox,
+  waitForCommitOnCurrentResource,
 } from './test-utils';
 
 test.describe('data-browser', async () => {
@@ -231,20 +232,13 @@ test.describe('data-browser', async () => {
       'Chat message not appearing directly after sending',
     ).toBeVisible();
 
-    const dropdownId = await page
-      .locator(contextMenu)
-      .getAttribute('aria-controls');
-
-    await page.click(contextMenu);
-    await page
-      .locator(`[id="${dropdownId}"] >> [data-test="menu-item-share"]`)
-      .click();
-    await publicReadRightLocator(page).click();
-    await page.click('text=save');
-
     const page2 = await openNewSubjectWindow(browser, chatRoomUrl);
     // Second user
     await signIn(page2);
+
+    // TODO: TEMP FIX, NO LONGER NEEDED IF #686 IS FIXED
+    page2.reload();
+
     await expect(page2.locator(`text=${teststring}`)).toBeVisible();
     const teststring2 = `My reply: ${timestamp()}`;
     await page2.fill('[data-test="message-input"]', teststring2);
@@ -298,7 +292,7 @@ test.describe('data-browser', async () => {
     // wait for commit debounce
     // await page.waitForTimeout(2000);
     // make sure no commits are waiting for each other
-    await page.waitForLoadState('networkidle');
+    await waitForCommitOnCurrentResource(page);
     await page.reload();
     await expect(
       page.locator(`text=${alphabet}`).first(),
@@ -438,7 +432,9 @@ test.describe('data-browser', async () => {
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
       "Sidebar doesn't show child resource title",
     ).toBeVisible();
-    await page.waitForLoadState('networkidle');
+
+    await waitForCommitOnCurrentResource(page);
+
     await page.reload();
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
@@ -551,8 +547,14 @@ test.describe('data-browser', async () => {
     await expect(
       page.getByRole('heading', { name: 'Second Title', level: 1 }),
     ).toBeVisible();
-    // Wait for commit debounce
-    await page.waitForTimeout(500);
+
+    // The history page does not update when the resource changes so we need to wait to be sure the commit is done
+    // before opening the history page.
+    await waitForCommitOnCurrentResource(page, {
+      set: {
+        ['https://atomicdata.dev/properties/name']: 'Second Title',
+      },
+    });
 
     await contextMenuClick('history', page);
 

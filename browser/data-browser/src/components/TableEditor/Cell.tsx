@@ -129,10 +129,14 @@ export function Cell({
         return;
       }
 
+      if (isActive && cursorMode === CursorMode.Edit) {
+        return;
+      }
+
       setCursorMode(CursorMode.Visual);
       setActiveCell(rowIndex, columnIndex);
     },
-    [setActiveCell, columnIndex, shouldEnterEditMode],
+    [setActiveCell, columnIndex, shouldEnterEditMode, cursorMode, isActive],
   );
 
   const handleClick = useCallback(() => {

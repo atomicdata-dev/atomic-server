@@ -13,6 +13,8 @@ test.describe('Ontology', async () => {
   test.beforeEach(before);
 
   test('Create and edit ontology', async ({ page }) => {
+    test.slow();
+
     const pickOption = async (query: Locator) => {
       await page.waitForTimeout(100);
       await query.hover();

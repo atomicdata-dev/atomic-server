@@ -72,7 +72,7 @@ function DocumentPageEdit({
   const [elements, setElements] = useArray(
     resource,
     properties.document.elements,
-    { commit: true, validate: false, commitDebounce: 0 },
+    { commit: false, validate: false, commitDebounce: 0 },
   );
 
   const titleRef = React.useRef<HTMLInputElement>(null);
@@ -201,9 +201,10 @@ function DocumentPageEdit({
         newElement.set(properties.parent, resource.getSubject(), store),
         newElement.set(properties.description, '', store),
       ]);
-      newElement.save(store);
       await setElements(newElements);
       focusElement(position);
+      await newElement.save(store);
+      await resource.save(store);
     } catch (e) {
       setErr(e);
     }
@@ -236,6 +237,7 @@ function DocumentPageEdit({
     if (elements.length === 1) {
       setElements([]);
       focusElement(0);
+      resource.save(store);
 
       return;
     }
@@ -254,6 +256,7 @@ function DocumentPageEdit({
       addElement(index + 1);
     } else {
       focusElement(index + 1);
+      resource.save(store);
     }
   }
 
@@ -263,6 +266,7 @@ function DocumentPageEdit({
     elements.splice(to, 0, element);
     setElements(elements);
     focusElement(to);
+    resource.save(store);
   }
 
   function handleSortEnd(event: DragEndEvent): void {
@@ -285,6 +289,7 @@ function DocumentPageEdit({
     toast.success('Upload succeeded!');
     fileSubjects.map(subject => elements.push(subject));
     setElements([...elements]);
+    resource.save(store);
   }
 
   /** Add a new line, or move to the last line if it is empty */

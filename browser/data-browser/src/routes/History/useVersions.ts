@@ -26,7 +26,7 @@ export function useVersions(resource: Resource): UseVersionsResult {
       .finally(() => {
         setLoading(false);
       });
-  }, [resource.getSubject()]);
+  }, [resource]);
 
   return { versions, loading, error };
 }

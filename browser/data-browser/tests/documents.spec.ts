@@ -10,6 +10,7 @@ import {
   openNewSubjectWindow,
   timestamp,
   before,
+  waitForCommitOnCurrentResource,
 } from './test-utils';
 test.describe('documents', async () => {
   test.beforeEach(before);
@@ -36,6 +37,7 @@ test.describe('documents', async () => {
 
     // multi-user
     const currentSubject = await getCurrentSubject(page);
+    await waitForCommitOnCurrentResource(page);
     const page2 = await openNewSubjectWindow(browser, currentSubject!);
     await expect(
       page2.locator(`text=${teststring}`),

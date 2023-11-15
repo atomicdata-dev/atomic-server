@@ -413,19 +413,13 @@ function MessagesPage({ subject, setReplyTo }: MessagesPageProps) {
   const resource = useResource(subject);
   const [messages] = useArray(resource, properties.chatRoom.messages);
   const [nextPage] = useString(resource, properties.chatRoom.nextPage);
-  const [inView] = useState(true);
-  const ref = useRef<HTMLDivElement>(null);
-
-  if (!inView) {
-    return <>Not in view...</>;
-  }
 
   if (!resource.isReady()) {
     return <>loading...</>;
   }
 
   return (
-    <div ref={ref}>
+    <div>
       {nextPage && <MessagesPage subject={nextPage} setReplyTo={setReplyTo} />}
       {messages.map(message => (
         <Message

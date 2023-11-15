@@ -60,6 +60,9 @@ export class Resource<C extends OptionalClass = any> {
   private subject: string;
   private propvals: PropVals;
 
+  private inProgressCommit: Promise<void> | undefined;
+  private hasQueue = false;
+
   public constructor(subject: string, newResource?: boolean) {
     if (typeof subject !== 'string') {
       throw new Error(
@@ -305,7 +308,7 @@ export class Resource<C extends OptionalClass = any> {
     for (const commit of commits as unknown as string[]) {
       const commitResource = await store.getResourceAsync(commit);
       const parsedCommit = parseCommitResource(commitResource);
-      const builtResource = await applyCommitToResource(
+      const builtResource = applyCommitToResource(
         previousResource.clone(),
         parsedCommit,
       );
@@ -467,11 +470,24 @@ export class Resource<C extends OptionalClass = any> {
       throw new Error('No agent has been set or passed, you cannot save.');
     }
 
+    if (this.hasQueue) {
+      return;
+    }
+
     // If the parent of this resource is new we can't save yet so we add it to a batched that gets saved when the parent does.
     if (this.isParentNew(store)) {
       store.batchResource(this.getSubject());
 
       return;
+    }
+
+    if (this.inProgressCommit) {
+      this.hasQueue = true;
+      await this.inProgressCommit;
+      this.hasQueue = false;
+      this.inProgressCommit = undefined;
+
+      return this.save(store, differentAgent);
     }
 
     // The previousCommit is required in Commits. We should use the `lastCommit` value on the resource.
@@ -483,6 +499,14 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     const wasNew = this.new;
+
+    let reportDone: () => void = () => undefined;
+
+    this.inProgressCommit = new Promise(resolve => {
+      reportDone = () => {
+        resolve();
+      };
+    });
 
     // Cloning the CommitBuilder to prevent race conditions, and keeping a back-up of current state for when things go wrong during posting.
     const oldCommitBuilder = this.commitBuilder.clone();
@@ -520,6 +544,8 @@ export class Resource<C extends OptionalClass = any> {
         await store.saveBatchForParent(this.getSubject());
       }
 
+      reportDone();
+
       return createdCommit.id as string;
     } catch (e) {
       // Logic for handling error if the previousCommit is wrong.
@@ -540,6 +566,8 @@ export class Resource<C extends OptionalClass = any> {
         }
 
         // Try again!
+        reportDone();
+
         return await this.save(store, agent);
       }
 
@@ -547,6 +575,7 @@ export class Resource<C extends OptionalClass = any> {
       this.commitBuilder = oldCommitBuilder;
       this.commitError = e;
       store.addResources(this, { skipCommitCompare: true });
+      reportDone();
       throw e;
     }
   }
