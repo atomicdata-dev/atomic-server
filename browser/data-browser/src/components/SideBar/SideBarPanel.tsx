@@ -35,6 +35,7 @@ export const PanelDevider = styled.h2`
   display: flex;
   align-items: center;
   gap: 1ch;
+  color: ${p => p.theme.colors.text};
 
   margin-bottom: 0;
 

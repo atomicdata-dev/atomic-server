@@ -21,7 +21,6 @@ export const ThemeWrapper = ({ children }: ThemeWrapperProps): JSX.Element => {
 
   return (
     <>
-      {/* @ts-ignore TODO: Check if types are fixed or upgrade styled-components to 6.0.0 */}
       <ThemeProvider key={mainColor} theme={buildTheme(darkMode, mainColor)}>
         {children}
       </ThemeProvider>
@@ -177,6 +176,25 @@ export const GlobalStyle = createGlobalStyle`
 
   * {
     box-sizing: border-box;
+    scrollbar-color: ${p => p.theme.colors.bg2} ${p => p.theme.colors.bg};
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+    padding: 3px;
+    background-color: ${p =>
+      p.theme.colors.bg}; /* color of the tracking area */
+  }
+  &::-webkit-scrollbar-thumb {
+    width: 8px;
+    margin: auto;
+    background-color: ${p =>
+      p.theme.colors.bg2}; /* color of the tracking area */
+    border-radius: ${p => p.theme.radius};
+
+    &:hover {
+      background-color: ${p => darken(0.1)(p.theme.colors.bg2)};
+    }
+  }
   }
 
   body {
