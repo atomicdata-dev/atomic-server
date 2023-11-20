@@ -1,29 +1,40 @@
-import { Resource, JSONValue } from '@tomic/lib';
+import { Resource, InferTypeOfValueInTriple, OptionalClass } from '@tomic/lib';
 import { Readable, Writable, get } from 'svelte/store';
 
 import { store } from './store';
 
-export type ValueSubscriber<T extends JSONValue> = (
-  value: T | undefined,
-) => void;
-export type ValueUpdater<T extends JSONValue> = (
-  value: T | undefined,
-) => T | undefined;
+export type ValueSubscriber<
+  Prop extends string,
+  C extends OptionalClass = never,
+> = (value: InferTypeOfValueInTriple<C, Prop>) => void;
+export type ValueUpdater<
+  Prop extends string,
+  C extends OptionalClass = never,
+> = (
+  value: InferTypeOfValueInTriple<C, Prop>,
+) => InferTypeOfValueInTriple<C, Prop>;
 
-export const getValue = <T extends JSONValue = JSONValue>(
-  resourceStore: Readable<Resource>,
-  property: string,
+/**
+ * Gets the value of a property on a resource.
+ * Returns a writable store.
+ * The type of the value is automatically inferred from the property when the resource is marked with a class (using a Generic) and the types were generated using @tomic/cli.
+ */
+export const getValue = <Prop extends string, C extends OptionalClass = never>(
+  resourceStore: Readable<Resource<C>>,
+  property: Prop,
   commit = false,
-): Writable<T | undefined> => {
-  const adStore = get(store);
-  let resource: Resource = get(resourceStore);
+): Writable<InferTypeOfValueInTriple<C, Prop>> => {
+  type Returns = InferTypeOfValueInTriple<C, Prop>;
 
-  let value: T | undefined = resource.get(property) as T;
-  const subscriptions = new Set<ValueSubscriber<T>>();
+  const adStore = get(store);
+  let resource: Resource<C> = get(resourceStore);
+
+  let value = resource.get(property);
+  const subscriptions = new Set<ValueSubscriber<Prop, C>>();
   let subscribedToStore = false;
 
-  const storeSubscriber = (newResource: Resource) => {
-    value = newResource.get(property) as T;
+  const storeSubscriber = (newResource: Resource<C>) => {
+    value = newResource.get(property);
     notifySvelteChange();
   };
 
@@ -33,7 +44,7 @@ export const getValue = <T extends JSONValue = JSONValue>(
     }
   };
 
-  const setValue = async (val: T | undefined) => {
+  const setValue = async (val: Returns) => {
     value = val;
 
     if (val === undefined) {
@@ -50,12 +61,12 @@ export const getValue = <T extends JSONValue = JSONValue>(
   };
 
   const writable = {
-    set(val: T): void {
+    set(val: Returns): void {
       setValue(val);
       notifySvelteChange();
     },
 
-    subscribe(subscriber: ValueSubscriber<T>): () => void {
+    subscribe(subscriber: ValueSubscriber<Prop, C>): () => void {
       if (!subscribedToStore) {
         adStore.subscribe(resource.getSubject(), storeSubscriber);
         subscribedToStore = true;
@@ -76,7 +87,7 @@ export const getValue = <T extends JSONValue = JSONValue>(
       };
     },
 
-    update(updater: ValueUpdater<T>): void {
+    update(updater: ValueUpdater<Prop, C>): void {
       setValue(updater(value)).then(() => {
         notifySvelteChange();
       });
@@ -84,7 +95,7 @@ export const getValue = <T extends JSONValue = JSONValue>(
   };
 
   resourceStore.subscribe(r => {
-    value = r.get(property) as T;
+    value = r.get(property);
     resource = r;
     notifySvelteChange();
   });
