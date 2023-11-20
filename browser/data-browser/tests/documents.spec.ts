@@ -30,14 +30,15 @@ test.describe('documents', async () => {
     await page.press(editableTitle, 'Enter');
 
     const teststring = `My test: ${timestamp()}`;
-    await page.fill('textarea', teststring);
 
-    // commit editing paragraph
+    const waiter = waitForCommitOnCurrentResource(page);
+    await page.fill('textarea', teststring);
+    await waiter;
+
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
 
     // multi-user
     const currentSubject = await getCurrentSubject(page);
-    await waitForCommitOnCurrentResource(page);
     const page2 = await openNewSubjectWindow(browser, currentSubject!);
     await expect(
       page2.locator(`text=${teststring}`),

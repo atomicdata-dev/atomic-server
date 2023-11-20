@@ -278,9 +278,19 @@ test.describe('data-browser', async () => {
 
     const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 
+    const waiter = waitForCommitOnCurrentResource(page, {
+      set: {
+        ['https://atomicdata.dev/properties/name']: alphabet,
+      },
+    });
+
     for (const letter of alphabet) {
       await page.type(editableTitle, letter, { delay: Math.random() * 300 });
     }
+
+    // wait for commit debounce
+    // make sure no commits are waiting for each other
+    await waiter;
 
     await page.keyboard.press('Escape');
 
@@ -289,10 +299,6 @@ test.describe('data-browser', async () => {
       'String not correct after typing, bad typing UX. Maybe views are notified of changes twice?',
     ).toBeVisible();
 
-    // wait for commit debounce
-    // await page.waitForTimeout(2000);
-    // make sure no commits are waiting for each other
-    await waitForCommitOnCurrentResource(page);
     await page.reload();
     await expect(
       page.locator(`text=${alphabet}`).first(),
@@ -422,7 +428,10 @@ test.describe('data-browser', async () => {
     await page.locator(`[title="Create new resource under ${d0}"]`).click();
     await page.click(`button:has-text("${klass}")`);
     const d1 = 'depth1';
+
+    const waiter = waitForCommitOnCurrentResource(page);
     await setTitle(page, d1);
+    await waiter;
 
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d0}`),
@@ -432,8 +441,6 @@ test.describe('data-browser', async () => {
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
       "Sidebar doesn't show child resource title",
     ).toBeVisible();
-
-    await waitForCommitOnCurrentResource(page);
 
     await page.reload();
     await expect(
@@ -543,18 +550,20 @@ test.describe('data-browser', async () => {
     // Wait for commit debounce
     await page.waitForTimeout(500);
 
+    const waiter = waitForCommitOnCurrentResource(page, {
+      set: {
+        ['https://atomicdata.dev/properties/name']: 'Second Title',
+      },
+    });
     await editTitle('Second Title', page);
+    await waiter;
+
     await expect(
       page.getByRole('heading', { name: 'Second Title', level: 1 }),
     ).toBeVisible();
 
     // The history page does not update when the resource changes so we need to wait to be sure the commit is done
     // before opening the history page.
-    await waitForCommitOnCurrentResource(page, {
-      set: {
-        ['https://atomicdata.dev/properties/name']: 'Second Title',
-      },
-    });
 
     await contextMenuClick('history', page);
 
