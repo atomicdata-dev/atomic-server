@@ -10,29 +10,29 @@ This library is still at an early stage and the API is subject to change.
 ### Getting a resource and displaying one of its properties
 
 ```html
-  <script lang="ts">
-    import { getResource, getValue } from '@tomic/svelte';
-    import { urls } from '@tomic/lib';
+<script lang="ts">
+  import { getResource, getValue } from '@tomic/svelte';
+  import { core } from '@tomic/lib';
 
-    const resource = getResource('https://example.com/');
-    const name = getValue<string>(resource, urls.properties.name);
-  </script>
+  const resource = getResource('https://example.com/');
+  const name = getValue<string>(resource, core.properties.name);
+</script>
 
-  <h1>{$name}</h1>
+<h1>{$name}</h1>
 ```
 
 ### Changing the value of a property with an input field
 
 ```html
-  <script lang="ts">
-    import { getResource, getValue, setValue } from '@tomic/svelte';
-    import { urls } from '@tomic/lib';
+<script lang="ts">
+  import { getResource, getValue, setValue } from '@tomic/svelte';
+  import { core } from '@tomic/lib';
 
-    const resource = getResource('https://example.com/');
-    const name = getValue<string>(resource, urls.properties.name);
-  </script>
+  const resource = getResource('https://example.com/');
+  const name = getValue<string>(resource, core.properties.name);
+</script>
 
-  <input bind:value={$name} />
+<input bind:value="{$name}" />
 ```
 
 ## Getting started
@@ -64,7 +64,7 @@ Initialise the store
     // This is where you configure your atomic data store.
     const store = new Store();
     initStore(store);
-  })
+  });
 </script>
 
 // do sveltey things
@@ -92,23 +92,24 @@ To get a value and display it in your component we first retrieve (or create) a 
 
 <script lang="ts">
   import { getResource, getValue } from '@tomic/svelte';
-  import { urls } from '@tomic/lib';
+  import { core } from '@tomic/lib';
 
   const resource = getResource('https://example.com/');
-  const name = getValue<string>(resource, urls.properties.name);
+  const name = getValue<string>(resource, core.properties.name);
 </script>
 
 <main>
   <h1>{$name}</h1>
   ...
+</main>
 ```
 
 Updating the values of a resource is super simple, just do what you would normally do with a writable svelte store:
 
 ```ts
-const value = getValue<string>(resource, urls.properties.name);
+const value = getValue<string>(resource, core.properties.name);
 
-$value = "New Value";
+$value = 'New Value';
 ```
 
 The value now updates and changes will permeate through the store.
