@@ -23,6 +23,7 @@ enum Inserts {
 const TEMPLATE = `
 /* -----------------------------------
 * GENERATED WITH @tomic/cli
+* For more info on how to use ontologies: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/cli/readme.md
 * -------------------------------- */
 
 import { BaseProps } from '${Inserts.MODULE_ALIAS}'
