@@ -5,6 +5,7 @@ trace-*.json
 .DS_Store
 .cargo
 artifact
+server/assets_tmp
 
 # Local Netlify folder
 .netlify
