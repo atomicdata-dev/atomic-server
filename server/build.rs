@@ -1,7 +1,5 @@
 use std::time::SystemTime;
 
-use static_files::resource_dir;
-
 const JS_DIST_SOURCE: &str = "../browser/data-browser/dist";
 const SRC_BROWSER: &str = "../browser/data-browser/src";
 const BROWSER_ROOT: &str = "../browser/";
@@ -18,11 +16,16 @@ fn main() -> std::io::Result<()> {
 
     if should_build() {
         build_js();
-        // copy files to server folder
         dircpy::copy_dir(JS_DIST_SOURCE, JS_DIST_TMP)?;
     }
 
-    resource_dir(JS_DIST_TMP)
+    if !std::path::Path::new(JS_DIST_TMP).exists() {
+        p!("Could not find JS_DIST_TMP folder, copying JS_DIST_SOURCE");
+        dircpy::copy_dir(JS_DIST_SOURCE, JS_DIST_TMP)?;
+    }
+
+    // Makes the static files available for compilation
+    static_files::resource_dir(JS_DIST_TMP)
         .build()
         .unwrap_or_else(|e| panic!("failed to open data browser assets from {JS_DIST_TMP}. {e}"));
 
@@ -72,9 +75,12 @@ fn should_build() -> bool {
 
         p!("No changes in JS source files, skipping JS build.");
         false
-    } else {
-        p!("No JS dist folder found, building...");
+    } else if std::path::Path::new(SRC_BROWSER).exists() {
+        p!("No JS dist folder found, but did find source folder, building...");
         true
+    } else {
+        p!("Could not find index.html in JS_DIST_TMP, assuming this is a `cargo publish` run. Skipping JS build.");
+        false
     }
 }
 

@@ -9,6 +9,7 @@ name = "atomic-server"
 readme = "./README.md"
 repository = "https://github.com/atomicdata-dev/atomic-server"
 version = "0.36.1"
+include = ["src/**/*", "Cargo.toml", "assets_tmp", "build.rs"]
 
 [[bin]]
 name = "atomic-server"
