@@ -12,13 +12,12 @@ This library is still at an early stage and the API is subject to change.
 ```html
 <script lang="ts">
   import { getResource, getValue } from '@tomic/svelte';
-  import { core } from '@tomic/lib';
+  import { Core } from '@tomic/lib';
 
-  const resource = getResource('https://example.com/');
-  const name = getValue<string>(resource, core.properties.name);
+  const resource = getResource<Core.Agent>('https://example.com/user1');
 </script>
 
-<h1>{$name}</h1>
+<h1>{$resource.props.name}</h1>
 ```
 
 ### Changing the value of a property with an input field
@@ -26,10 +25,10 @@ This library is still at an early stage and the API is subject to change.
 ```html
 <script lang="ts">
   import { getResource, getValue, setValue } from '@tomic/svelte';
-  import { core } from '@tomic/lib';
+  import { core, Core } from '@tomic/lib';
 
-  const resource = getResource('https://example.com/');
-  const name = getValue<string>(resource, core.properties.name);
+  const resource = getResource<Core.Agent>('https://example.com/user1');
+  const name = getValue(resource, core.properties.name); // Writable<string>
 </script>
 
 <input bind:value="{$name}" />
@@ -95,7 +94,7 @@ To get a value and display it in your component we first retrieve (or create) a 
   import { core } from '@tomic/lib';
 
   const resource = getResource('https://example.com/');
-  const name = getValue<string>(resource, core.properties.name);
+  const name = getValue(resource, core.properties.name);
 </script>
 
 <main>
@@ -107,9 +106,31 @@ To get a value and display it in your component we first retrieve (or create) a 
 Updating the values of a resource is super simple, just do what you would normally do with a writable svelte store:
 
 ```ts
-const value = getValue<string>(resource, core.properties.name);
+const value = getValue(resource, core.properties.name);
 
 $value = 'New Value';
 ```
 
 The value now updates and changes will permeate through the store.
+
+## Typescript
+
+This library is build using typescript and is fully typed. To full advantage of Atomic Data's strong type system use [@tomic/cli](https://www.npmjs.com/package/@tomic/cli) to generate types using Ontologies. These can then be used like this:
+
+```html
+<script lang="ts">
+  import { getResource, getValue } from '@tomic/svelte';
+  import { core } from '@tomic/lib';
+  // User 'app' ontology generated using @tomic/cli
+  import { Person, app } from './ontologies';
+
+  const resource = getResource<Person>('https://myapp.com/users/me'); // Readable<Resource<Person>>
+  const name = getValue(resource, core.properties.name); // Writable<string>
+  const hobbies = getValue(resource, app.properties.hobbies); // Writable<string[]>
+</script>
+
+<main>
+  <h1>{$name}</h1>
+  ...
+</main>
+```
