@@ -3,16 +3,18 @@ PROJECT ontola/atomic-server
 FROM node:20.8.0-bookworm
 WORKDIR browser
 
-main-pipeline:
+pipeline:
   PIPELINE --push
   TRIGGER push develop
   TRIGGER push main
   TRIGGER pr develop
   ARG tag=latest
+  BUILD +test
+  BUILD +lint
   BUILD +build --tag=$tag
 
 all:
-  BUILD +build --tag=latest
+  BUILD +build
   BUILD +test
   BUILD +lint
 
@@ -22,6 +24,8 @@ deps:
   COPY data-browser/package.json data-browser/.
   COPY lib/package.json lib/.
   COPY react/package.json react/.
+  COPY svelte/package.json svelte/.
+  COPY cli/package.json cli/.
   RUN pnpm install --frozen-lockfile --shamefully-hoist
   COPY . .
 
@@ -36,4 +40,4 @@ lint:
 build:
   FROM +deps
   RUN pnpm run build
-  SAVE ARTIFACT data-browser/dist data-browser/dist AS LOCAL dist
+  SAVE ARTIFACT ./data-browser/dist

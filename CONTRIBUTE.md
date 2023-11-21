@@ -15,6 +15,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 - [Table of contents](#table-of-contents)
 - [Running locally](#running-locally)
 - [Running locally (with local development browser)](#running-locally-with-local-development-browser)
+- [Compilation using Earthly](#compilation-using-earthly)
 - [Improve local compilation speed](#improve-local-compilation-speed)
 - [Cross compilation](#cross-compilation)
 - [IDE setup (VSCode)](#ide-setup-vscode)
@@ -41,7 +42,6 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 
 Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 
-
 ## Running locally (with local development browser)
 
 - Run `cargo run` to start the server
@@ -49,8 +49,16 @@ Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:5173/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `pmpm build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
 
-## Improve local compilation speed
+## Compilation using Earthly
 
+There are `earthfile`s in `browser` and in `atomic-server`.
+These can be used by Earthly to build all steps, including a full docker image.
+
+- Make sure `earthly` is installed
+- `earthly --org ontola -P --satellite henk --artifact +e2e/test-results +pipeline`
+- `earthly --org ontola -P --satellite henk --artifact +build-server/atomic-server ./output/atomicserver`
+
+## Improve local compilation speed
 
 - Use the [`mold`](https://github.com/rui314/mold) linker + create a `.cargo/config.toml` and add `[build] rustflags = ["-C", "link-arg=-fuse-ld=lld"]`
 - Note: this is primarily for development on linux systems, as mold for macOS requires a paid license

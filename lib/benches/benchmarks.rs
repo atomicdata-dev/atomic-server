@@ -48,7 +48,11 @@ fn criterion_benchmark(c: &mut Criterion) {
     });
 
     let big_resource = store
-        .get_resource_extended("https://localhost/collections", false, None)
+        .get_resource_extended(
+            "https://localhost/collections",
+            false,
+            &agents::ForAgent::Public,
+        )
         .unwrap();
 
     c.bench_function("resource.to_json_ad()", |b| {

@@ -30,23 +30,6 @@ impl Store {
     /// Triple Pattern Fragments interface.
     /// Use this for most queries, e.g. finding all items with some property / value combination.
     /// Returns an empty array if nothing is found.
-    ///
-    /// # Example
-    ///
-    /// For example, if I want to view all Resources that are instances of the class "Property", I'd do:
-    ///
-    /// ```
-    /// use atomic_lib::Storelike;
-    /// let mut store = atomic_lib::Store::init().unwrap();
-    /// store.populate();
-    /// let atoms = store.tpf(
-    ///     None,
-    ///     Some("https://atomicdata.dev/properties/isA"),
-    ///     Some(&atomic_lib::Value::AtomicUrl("https://atomicdata.dev/classes/Class".into())),
-    ///     true
-    /// ).unwrap();
-    /// assert!(atoms.len() > 11)
-    /// ```
     // Very costly, slow implementation.
     // Does not assume any indexing.
     fn tpf(

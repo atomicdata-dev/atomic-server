@@ -440,7 +440,7 @@ test.describe('data-browser', async () => {
       page.locator(`[data-test="sidebar"] >> text=${d1}`),
       "Sidebar doesn't show child resource title",
     ).toBeVisible();
-
+    await page.waitForTimeout(500);
     await page.reload();
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d1}`),

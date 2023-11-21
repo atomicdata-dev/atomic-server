@@ -8,4 +8,5 @@ browser/node_modules
 **/.temp
 .gitignore
 Earthfile
+browser/Earthfile
 .earthlyignore

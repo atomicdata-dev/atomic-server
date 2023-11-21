@@ -7,7 +7,9 @@ const config: PlaywrightTestConfig = {
     viewport: { width: 1200, height: 800 },
     locale: 'en-GB',
     timezoneId: 'Europe/Amsterdam',
+    actionTimeout: 5000,
   },
+  reporter: [['html', { attachmentsBaseURL: 'https://external-storage.com/' }]],
   retries: 3,
   // timeout: 1000 * 120, // 2 minutes
   projects: [

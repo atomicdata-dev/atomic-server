@@ -4,3 +4,4 @@ trace-*.json
 **/.temp
 .DS_Store
 .cargo
+artifact

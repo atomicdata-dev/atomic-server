@@ -527,7 +527,6 @@ mod test {
         let store = crate::db::test::DB.lock().unwrap().clone();
         let subjects: Vec<String> = store
             .all_resources(false)
-            .into_iter()
             .map(|r| r.get_subject().into())
             .collect();
         println!("{:?}", subjects);
