@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useResource, useStore, Version } from '@tomic/react';
 
 import { ContainerNarrow } from '../../components/Containers';

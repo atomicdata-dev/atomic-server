@@ -1,5 +1,13 @@
 import { core, useServerSearch } from '@tomic/react';
-import React, { useMemo, useState } from 'react';
+import {
+  ChangeEvent,
+  ClipboardEventHandler,
+  KeyboardEventHandler,
+  RefObject,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { styled, css } from 'styled-components';
 import { ResourceResultLine, ResultLine } from './ResultLine';
 import { fadeIn } from '../../../helpers/commonAnimations';
@@ -18,7 +26,7 @@ interface SearchBoxWindowProps {
   isA?: string;
   scopes?: string[];
   placeholder?: string;
-  triggerRef: React.RefObject<HTMLButtonElement>;
+  triggerRef: RefObject<HTMLButtonElement>;
   onExit: (lostFocus: boolean) => void;
   onChange: (value: string) => void;
   onSelect: (value: string) => void;
@@ -39,7 +47,7 @@ export function SearchBoxWindow({
   const { drive } = useSettings();
   const [realIndex, setIndex] = useState<number | undefined>(undefined);
   const { below } = useAvailableSpace(true, triggerRef);
-  const wrapperRef = React.useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const searchOptions = useMemo(
     () => ({
@@ -65,7 +73,7 @@ export function SearchBoxWindow({
       ? loopingIndex(realIndex, results.length + offset)
       : undefined;
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown: KeyboardEventHandler<HTMLInputElement> = e => {
     if (e.key === 'Enter') {
       e.preventDefault();
       pickSelectedItem();
@@ -146,7 +154,7 @@ export function SearchBoxWindow({
     });
   };
 
-  const handlePaste: React.ClipboardEventHandler<HTMLInputElement> = e => {
+  const handlePaste: ClipboardEventHandler<HTMLInputElement> = e => {
     const data = e.clipboardData.getData('text');
 
     if (isURL(data)) {
@@ -169,7 +177,7 @@ export function SearchBoxWindow({
         autoFocus
         placeholder={placeholder}
         value={searchValue}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+        onChange={(e: ChangeEvent<HTMLInputElement>) =>
           onChange(e.target.value)
         }
         onKeyDown={handleKeyDown}

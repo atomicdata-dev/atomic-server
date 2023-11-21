@@ -1,5 +1,5 @@
 import { Datatype } from '@tomic/react';
-import React from 'react';
+
 import { InputProps } from './ResourceField';
 import InputString from './InputString';
 import { InputResource } from './InputResource';

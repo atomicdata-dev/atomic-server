@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import toast from 'react-hot-toast';
 import { FaCheck, FaCopy } from 'react-icons/fa';
 import { styled } from 'styled-components';

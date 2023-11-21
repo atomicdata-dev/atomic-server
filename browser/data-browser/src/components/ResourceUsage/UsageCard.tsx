@@ -1,5 +1,5 @@
 import { Collection } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { Details } from '../Details';
 import { UsageRow } from './UsageRow';

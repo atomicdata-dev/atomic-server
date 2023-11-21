@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { styled, keyframes } from 'styled-components';
 import { MdSignalWifiOff } from 'react-icons/md';
 import { useOnline } from '../hooks/useOnline';

@@ -1,5 +1,5 @@
 import { DndContext, Modifier, closestCorners } from '@dnd-kit/core';
-import React from 'react';
+
 import { useDragSensors } from './hooks/useDragSensors';
 
 const restrictToHorizontalAxis: Modifier = ({ transform }) => {

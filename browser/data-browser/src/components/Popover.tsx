@@ -1,4 +1,15 @@
-import React, { useCallback, useContext, useEffect } from 'react';
+import {
+  createContext,
+  createRef,
+  FC,
+  PropsWithChildren,
+  ReactNode,
+  RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+} from 'react';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { styled, keyframes } from 'styled-components';
 import { transparentize } from 'polished';
@@ -6,7 +17,7 @@ import { useDialogTreeContext } from './Dialog/dialogContext';
 import { useControlLock } from '../hooks/useControlLock';
 
 export interface PopoverProps {
-  Trigger: React.ReactNode;
+  Trigger: ReactNode;
   open?: boolean;
   defaultOpen?: boolean;
   onOpenChange: (open: boolean) => void;
@@ -24,7 +35,7 @@ export function Popover({
   noLock,
   onOpenChange,
   Trigger,
-}: React.PropsWithChildren<PopoverProps>): JSX.Element {
+}: PropsWithChildren<PopoverProps>): JSX.Element {
   const { setHasOpenInnerPopup } = useDialogTreeContext();
   const containerRef = useContext(PopoverContainerContext);
 
@@ -101,14 +112,12 @@ const Arrow = styled(RadixPopover.Arrow)`
   fill: ${p => p.theme.colors.bg2};
 `;
 
-const PopoverContainerContext = React.createContext<
-  React.RefObject<HTMLDivElement>
->(React.createRef());
+const PopoverContainerContext = createContext<RefObject<HTMLDivElement>>(
+  createRef(),
+);
 
-export const PopoverContainer: React.FC<React.PropsWithChildren> = ({
-  children,
-}) => {
-  const popoverContainerRef = React.useRef<HTMLDivElement>(null);
+export const PopoverContainer: FC<PropsWithChildren> = ({ children }) => {
+  const popoverContainerRef = useRef<HTMLDivElement>(null);
 
   return (
     <ContainerDiv ref={popoverContainerRef}>

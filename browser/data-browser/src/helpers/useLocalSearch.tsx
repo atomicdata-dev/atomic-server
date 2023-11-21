@@ -1,4 +1,4 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
 import {
   Client,
   Resource,
@@ -19,8 +19,8 @@ export function useLocalSearch(
   subjects?: string[],
   disabled?: boolean,
 ): Hit[] {
-  const [index, setIndex] = React.useState<SearchIndex | undefined>(undefined);
-  const [results, setResults] = React.useState<Hit[]>([]);
+  const [index, setIndex] = useState<SearchIndex | undefined>(undefined);
+  const [results, setResults] = useState<Hit[]>([]);
   const store = useStore();
   let resources = useResources(subjects || []);
   // Calculate the query takes a while, so we debounce it
@@ -34,7 +34,7 @@ export function useLocalSearch(
 
   const resourcesD = useDebounce(resources, 100);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (disabled) {
       return;
     }
@@ -42,7 +42,7 @@ export function useLocalSearch(
     setIndex(constructIndex(resourcesD));
   }, [resourcesD, disabled]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (disabled) {
       return;
     }

@@ -1,4 +1,10 @@
-import React from 'react';
+import {
+  ComponentType,
+  ButtonHTMLAttributes,
+  forwardRef,
+  PropsWithChildren,
+  AnchorHTMLAttributes,
+} from 'react';
 import { styled, DefaultTheme } from 'styled-components';
 import { transition } from '../../helpers/transition';
 
@@ -19,15 +25,15 @@ type BaseProps = {
   size?: string;
   title: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  as?: string | React.ComponentType<any>;
+  as?: string | ComponentType<any>;
 };
 
 export type IconButtonProps = BaseProps &
-  React.ButtonHTMLAttributes<HTMLButtonElement>;
+  ButtonHTMLAttributes<HTMLButtonElement>;
 
-export const IconButton = React.forwardRef<
+export const IconButton = forwardRef<
   HTMLButtonElement,
-  React.PropsWithChildren<IconButtonProps>
+  PropsWithChildren<IconButtonProps>
 >(({ variant, children, color, ...props }, ref) => {
   const Comp = ComponentMap.get(variant!) ?? SimpleIconButton;
 
@@ -49,13 +55,13 @@ const defaultProps = {
 IconButton.defaultProps = defaultProps;
 
 export type IconButtonLinkProps = BaseProps &
-  React.AnchorHTMLAttributes<HTMLAnchorElement> & {
+  AnchorHTMLAttributes<HTMLAnchorElement> & {
     href: string;
   };
 
-export const IconButtonLink = React.forwardRef<
+export const IconButtonLink = forwardRef<
   HTMLAnchorElement,
-  React.PropsWithChildren<IconButtonLinkProps>
+  PropsWithChildren<IconButtonLinkProps>
 >(({ variant, children, color, ...props }, ref) => {
   const Comp = ComponentMap.get(variant ?? IconButtonVariant.Simple)!;
 

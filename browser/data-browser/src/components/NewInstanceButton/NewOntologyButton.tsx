@@ -5,7 +5,7 @@ import {
   useResource,
   validateDatatype,
 } from '@tomic/react';
-import React, { FormEvent, useCallback, useState } from 'react';
+import { FormEvent, useCallback, useState } from 'react';
 import { Button } from '../Button';
 import { Dialog, DialogActions, DialogContent, useDialog } from '../Dialog';
 import Field from '../forms/Field';

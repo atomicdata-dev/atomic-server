@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId, Fragment } from 'react';
 import { GroupedVersions } from './HistoryViewProps';
 import { Version, useStore } from '@tomic/react';
 import { styled } from 'styled-components';
@@ -41,7 +41,7 @@ export function VersionScroller({
       <Scroller aria-labelledby={scrollerTitleId}>
         <Column>
           {Object.entries(groupedVersions).map(([key, group]) => (
-            <React.Fragment key={key}>
+            <Fragment key={key}>
               <GroupHeading>{key}</GroupHeading>
               {[...group].map(version => (
                 <VersionButton
@@ -54,7 +54,7 @@ export function VersionScroller({
                   }
                 />
               ))}
-            </React.Fragment>
+            </Fragment>
           ))}
         </Column>
       </Scroller>

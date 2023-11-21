@@ -1,5 +1,5 @@
 import { styled } from 'styled-components';
-import React from 'react';
+
 import { Button } from '../../components/Button';
 import { WSIndicator } from './WSIndicator';
 import { ResourceInline } from '../../views/ResourceInline';

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Card } from '../../../components/Card';
 import { urls, useCanWrite, useProperty, useResource } from '@tomic/react';
 import { FaHashtag } from 'react-icons/fa';

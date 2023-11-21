@@ -1,5 +1,5 @@
 import { urls, useArray, useProperty, useResource } from '@tomic/react';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { Card } from '../../../components/Card';
 import { styled } from 'styled-components';
 import { FaCube } from 'react-icons/fa';

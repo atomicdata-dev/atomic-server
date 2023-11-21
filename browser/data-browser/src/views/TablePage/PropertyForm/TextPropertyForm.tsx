@@ -1,5 +1,5 @@
 import { Datatype, urls, useStore } from '@tomic/react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { RadioGroup, RadioInput } from '../../../components/forms/RadioInput';
 import { FormGroupHeading } from './FormGroupHeading';
 import { TableRangeInput } from './Inputs/TableRangeInput';

@@ -9,13 +9,7 @@ import {
   useString,
   useTitle,
 } from '@tomic/react';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FaEdit, FaTimes } from 'react-icons/fa';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { styled } from 'styled-components';

@@ -1,5 +1,5 @@
 import { core, useCanWrite, useProperty, useResource } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import InputSwitcher from '../../../components/forms/InputSwitcher';
 import { Row } from '../../../components/Row';

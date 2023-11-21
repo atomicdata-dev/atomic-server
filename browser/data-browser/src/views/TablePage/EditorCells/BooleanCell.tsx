@@ -1,5 +1,5 @@
 import { JSONValue } from '@tomic/react';
-import React from 'react';
+
 import { Checkbox } from '../../../components/forms/Checkbox';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
 

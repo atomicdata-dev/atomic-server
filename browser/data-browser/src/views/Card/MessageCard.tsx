@@ -1,5 +1,5 @@
 import { useString, properties } from '@tomic/react';
-import React from 'react';
+
 import { CommitDetail } from '../../components/CommitDetail';
 import Markdown from '../../components/datatypes/Markdown';
 import { Detail, Details } from '../../components/Detail';

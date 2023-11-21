@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Client, core, useResource, useStore } from '@tomic/react';
 import {
@@ -75,7 +75,7 @@ function ResourceContextMenu({
   const navigate = useNavigate();
   const location = useLocation();
   const resource = useResource(subject);
-  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [currentSubject] = useCurrentSubject();
 
   const { enableScope } = useQueryScopeHandler(subject);

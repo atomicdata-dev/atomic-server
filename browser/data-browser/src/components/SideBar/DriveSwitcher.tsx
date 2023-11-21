@@ -1,5 +1,5 @@
 import { classes, Resource, urls, useResources } from '@tomic/react';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import {
   FaCog,
   FaHdd,

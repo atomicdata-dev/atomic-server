@@ -1,5 +1,5 @@
 import { urls } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { RadioInput } from '../../../../components/forms/RadioInput';
 import { formatDate } from '../../../../helpers/dates/formatDate';

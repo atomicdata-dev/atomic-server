@@ -1,4 +1,4 @@
-import React, { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 import {
   useString,
@@ -119,7 +119,7 @@ export function ResourceCardDefault({
   small,
 }: CardViewProps): JSX.Element {
   return (
-    <React.Fragment>
+    <>
       <AtomicLink subject={resource.getSubject()}>
         <DefaultCardTitle subject={resource.getSubject()}>
           {resource.title}
@@ -137,7 +137,7 @@ export function ResourceCardDefault({
           editable
         />
       )}
-    </React.Fragment>
+    </>
   );
 }
 

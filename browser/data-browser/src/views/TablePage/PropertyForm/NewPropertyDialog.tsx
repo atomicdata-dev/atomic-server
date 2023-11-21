@@ -1,5 +1,5 @@
 import { Resource, Store, urls, useArray, useStore } from '@tomic/react';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { Button } from '../../../components/Button';
 import {

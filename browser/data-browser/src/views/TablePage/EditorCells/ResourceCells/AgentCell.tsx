@@ -1,6 +1,6 @@
 import { useTitle } from '@tomic/react';
 import { complement, setLightness } from 'polished';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { ResourceCellProps } from '../Type';
 import { SimpleResourceLink } from './SimpleResourceLink';

@@ -1,5 +1,4 @@
 import { useTitle } from '@tomic/react';
-import React from 'react';
 
 import { AtomicLink } from '../../components/AtomicLink';
 import { Row } from '../../components/Row';
@@ -13,7 +12,7 @@ function FileCard({ resource }: CardViewProps): JSX.Element {
   const { downloadFile, bytes } = useFileInfo(resource);
 
   return (
-    <React.Fragment>
+    <>
       <Row justify='space-between'>
         <AtomicLink subject={resource.getSubject()}>
           <h2>{title}</h2>
@@ -21,7 +20,7 @@ function FileCard({ resource }: CardViewProps): JSX.Element {
         <DownloadIconButton downloadFile={downloadFile} fileSize={bytes} />
       </Row>
       <FilePreview resource={resource} />
-    </React.Fragment>
+    </>
   );
 }
 

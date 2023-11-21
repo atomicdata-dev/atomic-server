@@ -1,4 +1,3 @@
-import React from 'react';
 import { useString, properties } from '@tomic/react';
 import AllProps from '../components/AllProps';
 import { ClassDetail } from '../components/ClassDetail';

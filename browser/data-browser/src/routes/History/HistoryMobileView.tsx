@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { HistoryViewProps } from './HistoryViewProps';
 import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
@@ -56,7 +56,7 @@ export function HistoryMobileView({
           </Column>
         </DialogContent>
         <DialogActions>
-          <Button onClick={closeDialog} subtle>
+          <Button onClick={() => closeDialog(false)} subtle>
             Cancel
           </Button>
           <Button onClick={onVersionAccept}>Make current version</Button>

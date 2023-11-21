@@ -1,5 +1,5 @@
 import { Resource } from '@tomic/react';
-import React from 'react';
+
 import { styled, css } from 'styled-components';
 import PropVal from './PropVal';
 

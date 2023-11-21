@@ -5,7 +5,7 @@ import {
   useResource,
   useTitle,
 } from '@tomic/react';
-import React from 'react';
+
 import { FaAngleDown, FaAngleUp, FaAtom } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { dataTypeIconMap } from './dataTypeMaps';
@@ -13,6 +13,7 @@ import { TableHeadingMenu } from './TableHeadingMenu';
 import { TablePageContext } from './tablePageContext';
 import { IconType } from 'react-icons';
 import { TableSorting } from './tableSorting';
+import { useContext } from 'react';
 
 export interface TableHeadingProps {
   column: Property;
@@ -33,7 +34,7 @@ function getIcon(
 export function TableHeading({ column }: TableHeadingProps): JSX.Element {
   const propResource = useResource(column.subject);
   const [title] = useTitle(propResource);
-  const { setSortBy, sorting } = React.useContext(TablePageContext);
+  const { setSortBy, sorting } = useContext(TablePageContext);
 
   const Icon = getIcon(propResource, sorting, column.datatype);
   const isSorted = sorting.prop === propResource.getSubject();

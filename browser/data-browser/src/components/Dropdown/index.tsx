@@ -1,10 +1,13 @@
-import React, {
+import {
   useContext,
   useId,
   useMemo,
   useRef,
   useState,
   useCallback,
+  PropsWithChildren,
+  forwardRef,
+  ReactNode,
 } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { styled } from 'styled-components';
@@ -26,7 +29,7 @@ export type MenuItemMinimial = {
   label: string;
   helper?: string;
   id: string;
-  icon?: React.ReactNode;
+  icon?: ReactNode;
   disabled?: boolean;
   /** Keyboard shortcut helper */
   shortcut?: string;
@@ -257,7 +260,7 @@ export function DropdownMenu({
     [getNewIndex],
   );
 
-  const Trigger = useMemo(() => React.forwardRef(trigger), []);
+  const Trigger = useMemo(() => forwardRef(trigger), []);
 
   const handleBlur = useCallback(() => {
     // Doesn't work without delay, maybe the browser sets document.activeElement after firering the blur event?
@@ -324,7 +327,7 @@ export function DropdownMenu({
   );
 }
 
-const DropdownPortal = ({ children }: React.PropsWithChildren) => {
+const DropdownPortal = ({ children }: PropsWithChildren) => {
   const portalRef = useContext(DropdownPortalContext);
 
   if (!portalRef.current) {

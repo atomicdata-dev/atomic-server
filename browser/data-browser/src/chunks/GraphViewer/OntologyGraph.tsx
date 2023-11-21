@@ -1,5 +1,5 @@
 import { Resource, useStore } from '@tomic/react';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import ReactFlow, {
   Controls,
   useReactFlow,

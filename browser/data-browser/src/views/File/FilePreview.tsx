@@ -1,4 +1,4 @@
-import React, { Suspense, useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Resource } from '@tomic/react';
 import { ImageViewer } from '../../components/ImageViewer';
 import { useFileInfo } from '../../hooks/useFile';
@@ -9,7 +9,7 @@ import { Button } from '../../components/Button';
 import { isTextFile } from './isTextFile';
 import { useFilePreviewSizeLimit } from '../../hooks/useFilePreviewSizeLimit';
 
-const PDFViewer = React.lazy(() => import('../../chunks/PDFViewer'));
+const PDFViewer = lazy(() => import('../../chunks/PDFViewer'));
 
 interface FilePreviewProps {
   resource: Resource;

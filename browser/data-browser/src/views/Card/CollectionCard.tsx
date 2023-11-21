@@ -1,5 +1,5 @@
 import { useArray, useString, useTitle, properties } from '@tomic/react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 
 import Markdown from '../../components/datatypes/Markdown';
 import { AtomicLink } from '../../components/AtomicLink';
@@ -28,7 +28,7 @@ function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
   }
 
   return (
-    <React.Fragment>
+    <>
       <AtomicLink subject={resource.getSubject()}>
         <h2>{title}</h2>
       </AtomicLink>
@@ -53,7 +53,7 @@ function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
           )}
         </CardInsideFull>
       )}
-    </React.Fragment>
+    </>
   );
 }
 

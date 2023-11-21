@@ -7,7 +7,7 @@ import {
   useStore,
   useValue,
 } from '@tomic/react';
-import React, {
+import {
   startTransition,
   useCallback,
   useContext,
@@ -161,13 +161,13 @@ export function TableCell({
           resource={resource}
         />
       ) : (
-        <React.Fragment>
+        <>
           <Editor.Display
             value={value}
             onChange={onChange}
             property={property.subject}
           />
-        </React.Fragment>
+        </>
       )}
     </Cell>
   );

@@ -1,5 +1,5 @@
 import { useStore, urls, useString } from '@tomic/react';
-import React, { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Checkbox, CheckboxLabel } from '../../../components/forms/Checkbox';
 import { DateFormatPicker } from './Inputs/DateFormatPicker';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';

@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useArray, useTitle, properties } from '@tomic/react';
 
 import { ContainerNarrow } from '../components/Containers';

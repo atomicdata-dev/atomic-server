@@ -1,5 +1,5 @@
 import { properties, useString } from '@tomic/react';
-import React from 'react';
+
 import { GridItemDescription, InnerWrapper } from './components';
 import { GridItemViewProps } from './GridItemViewProps';
 

@@ -1,5 +1,5 @@
+import { useState, Fragment } from 'react';
 import { JSONValue } from '@tomic/react';
-import React, { useState } from 'react';
 import { styled } from 'styled-components';
 import { ResourceInline } from '../../views/ResourceInline';
 
@@ -30,10 +30,10 @@ function ResourceArray({ subjects: subjectsIn }: Props): JSX.Element {
         }
 
         return (
-          <React.Fragment key={url}>
+          <Fragment key={url}>
             <ResourceInline subject={url} />
             {index !== subjects.length - 1 && ', '}
-          </React.Fragment>
+          </Fragment>
         );
       })}
       {tooMany && (

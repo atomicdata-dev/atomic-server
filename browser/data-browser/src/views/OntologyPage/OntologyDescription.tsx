@@ -5,7 +5,7 @@ import {
   useProperty,
   useCanWrite,
 } from '@tomic/react';
-import React from 'react';
+
 import Markdown from '../../components/datatypes/Markdown';
 import InputMarkdown from '../../components/forms/InputMarkdown';
 

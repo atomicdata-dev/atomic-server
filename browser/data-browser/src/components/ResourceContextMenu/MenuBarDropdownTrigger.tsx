@@ -1,4 +1,3 @@
-import React from 'react';
 import { ButtonBar } from '../Button';
 import { FaEllipsisV } from 'react-icons/fa';
 import { DropdownTriggerRenderFunction } from '../Dropdown/DropdownTrigger';

@@ -1,4 +1,3 @@
-import React from 'react';
 import Field from '../Field';
 import { InputStyled, InputWrapper } from '../InputStyles';
 

@@ -1,5 +1,5 @@
 import { JSONValue, urls, useResource, useString } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { InputBase } from './InputBase';
 import { ProgressBar } from './ProgressBar';

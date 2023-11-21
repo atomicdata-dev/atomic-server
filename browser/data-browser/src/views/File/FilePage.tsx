@@ -1,5 +1,5 @@
 import { properties } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { ContainerWide } from '../../components/Containers';
 import { EditableTitle } from '../../components/EditableTitle';

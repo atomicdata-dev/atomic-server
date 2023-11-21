@@ -1,5 +1,5 @@
 import { Version, useResource, useTitle } from '@tomic/react';
-import React from 'react';
+
 import { AtomicLink } from '../../components/AtomicLink';
 
 const formatter = new Intl.DateTimeFormat('default', {

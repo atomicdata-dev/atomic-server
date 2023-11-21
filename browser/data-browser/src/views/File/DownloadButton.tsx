@@ -1,4 +1,3 @@
-import React from 'react';
 import { FaDownload } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { Button } from '../../components/Button';

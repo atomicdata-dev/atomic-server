@@ -1,5 +1,5 @@
 import { Resource, classes, useCollection } from '@tomic/react';
-import React from 'react';
+
 import { PropertyUsage } from './PropertyUsage';
 import { UsageCard } from './UsageCard';
 import { ClassUsage } from './ClassUsage';

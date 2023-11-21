@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useArray, properties, Datatype } from '@tomic/react';
 import { ContainerNarrow } from '../components/Containers';
 import { Card, CardInsideFull, CardRow } from '../components/Card';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useResource, useTitle } from '@tomic/react';
 import { NewInstanceButtonProps } from './NewInstanceButtonProps';
 import { Base } from './Base';

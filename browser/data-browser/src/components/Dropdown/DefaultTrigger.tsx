@@ -1,4 +1,4 @@
-import React, { useId } from 'react';
+import { useId } from 'react';
 import { IconButton } from '../IconButton/IconButton';
 import { DropdownTriggerRenderFunction } from './DropdownTrigger';
 

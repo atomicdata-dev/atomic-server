@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useResource } from '@tomic/react';
 import { constructOpenURL, newURL } from '../helpers/navigation';

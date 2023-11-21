@@ -1,5 +1,5 @@
 import { urls, useStore } from '@tomic/react';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
 
 export function FilePropertyForm({

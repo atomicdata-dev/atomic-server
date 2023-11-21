@@ -1,5 +1,5 @@
 import { Resource, urls, useArray, useStore } from '@tomic/react';
-import React, { Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { Button } from '../../../components/Button';
 import {
@@ -13,9 +13,7 @@ import { stringToSlug } from '../../../helpers/stringToSlug';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
 import { EditableTag, tagColors } from './Tag';
 
-const EmojiInput = React.lazy(
-  () => import('../../../chunks/EmojiInput/EmojiInput'),
-);
+const EmojiInput = lazy(() => import('../../../chunks/EmojiInput/EmojiInput'));
 const valueOpts = {
   commit: false,
   validate: false,

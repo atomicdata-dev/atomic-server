@@ -4,7 +4,6 @@ import { ResourceForm } from '../ResourceForm';
 import { NewFormTitle } from './NewFormTitle';
 import { SubjectField } from './SubjectField';
 import { useNewForm } from './useNewForm';
-import React from 'react';
 
 export interface NewFormProps {
   classSubject: string;

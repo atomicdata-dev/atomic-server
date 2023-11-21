@@ -1,5 +1,5 @@
 import { Resource, useValue } from '@tomic/react';
-import React from 'react';
+
 import { InputWrapper } from './InputStyles';
 import { styled, css } from 'styled-components';
 

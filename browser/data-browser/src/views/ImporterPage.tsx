@@ -4,7 +4,7 @@ import {
   useResource,
   useStore,
 } from '@tomic/react';
-import React, { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { Button } from '../components/Button.jsx';
 import { ContainerNarrow } from '../components/Containers';
 import Field from '../components/forms/Field.jsx';

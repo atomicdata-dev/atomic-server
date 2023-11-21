@@ -5,7 +5,7 @@ import Markdown from '../datatypes/Markdown';
 import { InputWrapper, InputStyled } from './InputStyles';
 import InputSwitcher from './InputSwitcher';
 import { AtomicLink } from '../AtomicLink';
-import React, { useId, useState } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '../Button';
 
 function generateErrorPropName(prop: Property): string {

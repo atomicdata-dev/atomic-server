@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 
 /**
  * Returns a callback ref that sets all given refs to the same passed in node.

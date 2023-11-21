@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { memo, useEffect, useState } from 'react';
 import {
   Collection,
   Property,
@@ -19,7 +19,7 @@ interface TableRowProps {
   columns: Property[];
 }
 
-const TableCellMemo = React.memo(TableCell);
+const TableCellMemo = memo(TableCell);
 
 export function TableRow({
   collection,
@@ -69,11 +69,11 @@ export function TableNewRow({
   invalidateTable,
 }: TableNewRowProps): JSX.Element {
   const store = useStore();
-  const [subject] = React.useState<string>(() =>
+  const [subject] = useState<string>(() =>
     randomSubject(parent.getSubject(), 'row'),
   );
 
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = useState(true);
 
   const resource = useResource(subject, resourceOpts);
 

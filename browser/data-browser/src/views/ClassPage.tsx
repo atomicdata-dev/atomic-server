@@ -3,7 +3,7 @@ import {
   properties,
   useStore,
 } from '@tomic/react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import AllProps from '../components/AllProps';
 import { Button } from '../components/Button';
 import { ClassDetail } from '../components/ClassDetail';

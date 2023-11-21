@@ -9,7 +9,7 @@ import {
   useString,
   useSubject,
 } from '@tomic/react';
-import React, { useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaCopy, FaLink, FaPencilAlt, FaReply, FaTimes } from 'react-icons/fa';
@@ -114,7 +114,7 @@ export function ChatRoomPage({ resource }: ResourcePageProps) {
     }
   }
 
-  const handleReplyCallback = React.useCallback(handleReplyTo, [inputRef]);
+  const handleReplyCallback = useCallback(handleReplyTo, [inputRef]);
 
   function handleReplyTo(subject: string) {
     setReplyTo(subject);
@@ -198,10 +198,7 @@ interface MessageProps {
 const MESSAGE_MAX_LEN = 500;
 
 /** Single message shown in a ChatRoom */
-const Message = React.memo(function Message({
-  subject,
-  setReplyTo,
-}: MessageProps) {
+const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
   const resource = useResource(subject);
   const [description] = useString(resource, properties.description);
   const [lastCommit] = useSubject(resource, properties.commit.lastCommit);

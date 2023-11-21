@@ -1,4 +1,3 @@
-import React from 'react';
 import { ResourceInline } from '../views/ResourceInline';
 
 interface InlineFormattedResourceListProps {

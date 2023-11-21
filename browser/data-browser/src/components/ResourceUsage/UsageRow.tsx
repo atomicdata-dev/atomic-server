@@ -4,7 +4,7 @@ import {
   unknownSubject,
   useMemberFromCollection,
 } from '@tomic/react';
-import React from 'react';
+
 import { ResourceInline } from '../../views/ResourceInline';
 import { styled } from 'styled-components';
 import { ErrorLook } from '../ErrorLook';

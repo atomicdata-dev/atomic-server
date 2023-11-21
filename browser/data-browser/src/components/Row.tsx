@@ -1,7 +1,8 @@
 import { styled } from 'styled-components';
 import * as CSS from 'csstype';
-import React from 'react';
+
 import { ButtonDefault } from './Button';
+import { forwardRef } from 'react';
 
 export interface FlexProps extends React.HTMLAttributes<HTMLDivElement> {
   gap?: CSS.Property.Gap;
@@ -21,7 +22,7 @@ export type ColumnProps = Omit<FlexProps, 'direction'> & {
   reverse?: boolean;
 };
 
-export const Row = React.forwardRef<
+export const Row = forwardRef<
   HTMLDivElement,
   React.PropsWithChildren<RowProps>
 >(({ children, reverse, ...props }, ref) => {
@@ -34,7 +35,7 @@ export const Row = React.forwardRef<
 
 Row.displayName = 'Row';
 
-export const Column = React.forwardRef<
+export const Column = forwardRef<
   HTMLDivElement,
   React.PropsWithChildren<ColumnProps>
 >(({ children, reverse, ...props }, ref) => {

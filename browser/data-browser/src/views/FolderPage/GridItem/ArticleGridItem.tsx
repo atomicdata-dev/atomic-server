@@ -1,5 +1,5 @@
 import { Server, useResource, useSubject } from '@tomic/react';
-import React from 'react';
+
 import { atomicArgu } from '../../../ontologies/atomic-argu';
 import { GridItemViewProps } from './GridItemViewProps';
 import { GridItemWithImage } from './GridItemWithImage';

@@ -99,7 +99,7 @@ function NavBar(): JSX.Element {
       floating={navbarFloating}
     >
       {showButtons && (
-        <React.Fragment>
+        <>
           <ButtonBar
             leftPadding
             type='button'
@@ -127,7 +127,7 @@ function NavBar(): JSX.Element {
               </ButtonBar>
             </>
           )}
-        </React.Fragment>
+        </>
       )}
       <Searchbar
         subject={subject}

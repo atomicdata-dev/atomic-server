@@ -1,5 +1,5 @@
 import { core, useString } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { AtomicLink } from '../../components/AtomicLink';
 import { markdownToPlainText } from '../../helpers/markdown';

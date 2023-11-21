@@ -1,4 +1,3 @@
-import React from 'react';
 import NewIntanceButton from '../../components/NewInstanceButton';
 import { Card, CardInsideFull, CardRow } from '../../components/Card';
 import { urls } from '@tomic/react';

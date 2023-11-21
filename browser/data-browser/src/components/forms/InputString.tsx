@@ -1,4 +1,3 @@
-import React from 'react';
 import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';

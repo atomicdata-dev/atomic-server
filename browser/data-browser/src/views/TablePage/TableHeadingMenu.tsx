@@ -5,8 +5,9 @@ import {
   useResource,
   useStore,
   useString,
+  core,
 } from '@tomic/react';
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useState } from 'react';
 import { DropdownMenu, Item } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
 import { FaEdit, FaEllipsisV, FaEye, FaTimes, FaTrash } from 'react-icons/fa';
@@ -49,19 +50,21 @@ export function TableHeadingMenu({
   const isExternalProperty = useIsExternalProperty(resource);
 
   const removeProperty = useCallback(async () => {
-    const recommends =
-      tableClassResource.get<string[]>(properties.recommends) ?? [];
-    const requires =
-      tableClassResource.get<string[]>(properties.requires) ?? [];
+    const recommends = tableClassResource.getArray(
+      core.properties.recommends,
+    ) as string[];
+    const requires = tableClassResource.getArray(
+      core.properties.requires,
+    ) as string[];
 
     await tableClassResource.set(
-      properties.recommends,
+      core.properties.recommends,
       recommends.filter(r => r !== resource.getSubject()),
       store,
     );
 
     await tableClassResource.set(
-      properties.requires,
+      core.properties.requires,
       requires.filter(r => r !== resource.getSubject()),
       store,
     );

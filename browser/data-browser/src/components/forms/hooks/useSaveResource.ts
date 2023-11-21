@@ -1,5 +1,5 @@
 import { Resource, useStore } from '@tomic/react';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
 
 export type UseSaveResourceResult = [
