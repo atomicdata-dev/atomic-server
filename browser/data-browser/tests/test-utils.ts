@@ -56,11 +56,13 @@ export const before = async ({ page }: { page: Page }) => {
 };
 
 export async function setTitle(page: Page, title: string) {
+  const waiter = waitForCommitOnCurrentResource(page);
   await page.locator(editableTitle).click();
   await page.locator(`${editableTitle} > input`);
   await page.type(editableTitle, title);
   await page.keyboard.press('Escape');
   // await page.waitForTimeout(500);
+  await waiter;
 }
 
 export async function disableViewTransition(page: Page) {
@@ -122,7 +124,9 @@ export async function openSubject(page: Page, subject: string) {
 }
 
 export async function getCurrentSubject(page: Page) {
-  return page.locator(addressBar).getAttribute('value');
+  const selector = await page.waitForSelector('main[about]');
+
+  return selector.getAttribute('about');
 }
 
 export async function waitForCommitOnCurrentResource(
@@ -131,28 +135,41 @@ export async function waitForCommitOnCurrentResource(
 ) {
   const currentSubject = await getCurrentSubject(page);
 
+  console.log('currentSubject', currentSubject);
   await page.waitForResponse(async response => {
-    const result = await response.json();
-
-    const isForCurrentResource =
-      result['https://atomicdata.dev/properties/subject'] === currentSubject;
-
-    if (!isForCurrentResource) {
+    if (!response.url().endsWith('/commit')) {
       return false;
     }
 
-    if (match) {
-      const set = result['https://atomicdata.dev/properties/set'];
+    try {
+      const result = await response.json();
+      const isForCurrentResource =
+        result['https://atomicdata.dev/properties/subject'] === currentSubject;
 
-      for (const key in match.set) {
-        if (set[key] !== match.set[key]) {
-          return false;
+      console.log(
+        'Received Subject',
+        result['https://atomicdata.dev/properties/subject'],
+      );
+
+      if (!isForCurrentResource) {
+        return false;
+      }
+
+      if (match) {
+        const set = result['https://atomicdata.dev/properties/set'];
+
+        for (const key in match.set) {
+          if (set[key] !== match.set[key]) {
+            return false;
+          }
         }
       }
-    }
 
-    // Wait for commit response to be processed by the store.
-    await page.waitForTimeout(200);
+      // Wait for commit response to be processed by the store.
+      await page.waitForTimeout(200);
+    } catch (e) {
+      return false;
+    }
 
     return true;
   });

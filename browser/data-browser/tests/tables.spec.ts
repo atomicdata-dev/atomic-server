@@ -42,12 +42,13 @@ test.describe('tables', async () => {
     const fillRow = async (currentRowNumber: number, row) => {
       const { name, date, number, checkbox, select } = row;
       const rowIndex = currentRowNumber + 1;
-      await page.keyboard.type(name);
+      await page.keyboard.press('Enter');
       await expect(
         page.locator(
           `[aria-rowindex="${rowIndex}"] > [aria-colindex="${2}"] > input`,
         ),
       ).toBeFocused();
+      await page.keyboard.type(name);
       await tab();
       // Flay newline
       await page.waitForTimeout(300);
@@ -203,7 +204,7 @@ test.describe('tables', async () => {
     // Start filling cells
     await page.getByRole('gridcell').first().click({ force: true });
     await expect(page.getByRole('gridcell').first()).toBeFocused();
-    await page.waitForTimeout(100);
+    await page.waitForTimeout(1000);
 
     for (const [index, row] of rows.entries()) {
       await fillRow(index + 1, row);

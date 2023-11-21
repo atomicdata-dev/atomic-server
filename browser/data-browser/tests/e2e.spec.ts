@@ -189,8 +189,9 @@ test.describe('data-browser', async () => {
 
     // Open invite
     const page3 = await openNewSubjectWindow(browser, inviteUrl as string);
+    const waiter = page3.waitForNavigation();
     await page3.click('button:has-text("Accept")');
-    await page3.waitForNavigation();
+    await waiter;
     await page3.reload();
     await expect(page3.locator(`text=${driveTitle}`).first()).toBeVisible();
   });
@@ -429,9 +430,7 @@ test.describe('data-browser', async () => {
     await page.click(`button:has-text("${klass}")`);
     const d1 = 'depth1';
 
-    const waiter = waitForCommitOnCurrentResource(page);
     await setTitle(page, d1);
-    await waiter;
 
     await expect(
       page.locator(`[data-test="sidebar"] >> text=${d0}`),
