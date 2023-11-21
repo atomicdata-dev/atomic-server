@@ -1,5 +1,5 @@
 import { Resource } from '@tomic/react';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FaUpload } from 'react-icons/fa';
 import { styled } from 'styled-components';

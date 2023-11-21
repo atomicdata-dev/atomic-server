@@ -1,9 +1,9 @@
-import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { styled } from 'styled-components';
 import remarkGFM from 'remark-gfm';
 import { Button } from '../Button';
 import { truncateMarkdown } from '../../helpers/markdown';
+import { useState } from 'react';
 
 type Props = {
   text: string;
@@ -27,7 +27,7 @@ function Markdown({
   renderGFM,
   maxLength,
 }: Props): JSX.Element | null {
-  const [collapsed, setCollapsed] = React.useState(true);
+  const [collapsed, setCollapsed] = useState(true);
 
   maxLength = maxLength || 5000;
 

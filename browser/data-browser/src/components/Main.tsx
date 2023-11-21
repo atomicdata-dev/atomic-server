@@ -1,4 +1,4 @@
-import React from 'react';
+import { PropsWithChildren, memo } from 'react';
 import { VisuallyHidden } from './VisuallyHidden';
 import { styled } from 'styled-components';
 import { transitionName } from '../helpers/transitionName';
@@ -10,7 +10,7 @@ import { PARENT_PADDING_BLOCK } from './Parent';
 export function Main({
   subject,
   children,
-}: React.PropsWithChildren<ViewTransitionProps>): JSX.Element {
+}: PropsWithChildren<ViewTransitionProps>): JSX.Element {
   return (
     <StyledMain subject={subject} about={subject}>
       <VisuallyHidden>
@@ -23,7 +23,7 @@ export function Main({
   );
 }
 
-const StyledMain = React.memo(styled.main<ViewTransitionProps>`
+const StyledMain = memo(styled.main<ViewTransitionProps>`
   container-type: inline-size;
   /* Makes the contents fit the entire page */
   /* height: calc(

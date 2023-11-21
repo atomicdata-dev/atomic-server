@@ -1,5 +1,4 @@
 import { styled } from 'styled-components';
-import React from 'react';
 
 export function SkipNav(): JSX.Element {
   return <SkipLink href='#skip-to-content'>Skip Navigation?</SkipLink>;

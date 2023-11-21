@@ -1,4 +1,3 @@
-import React from 'react';
 import { Resource } from '@tomic/react';
 import AllProps from '../AllProps';
 import { styled } from 'styled-components';

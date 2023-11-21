@@ -7,7 +7,7 @@ import {
   useSubject,
   useTitle,
 } from '@tomic/react';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { styled } from 'styled-components';
 
 export interface AllPropsSimpleProps {

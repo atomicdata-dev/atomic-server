@@ -1,4 +1,3 @@
-import React from 'react';
 import { ContainerFull } from '../components/Containers';
 
 export function Sandbox(): JSX.Element {

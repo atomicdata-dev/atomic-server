@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { urls, useArray, useProperty, useResource } from '@tomic/react';
 import { ResourceSelector } from '../components/forms/ResourceSelector';
 

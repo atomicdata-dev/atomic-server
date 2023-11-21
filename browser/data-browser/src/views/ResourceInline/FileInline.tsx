@@ -1,4 +1,3 @@
-import React from 'react';
 import { useString, properties, useResource } from '@tomic/react';
 import { imageMimeTypes, getFileIcon } from '../../helpers/filetypes';
 import { ResourceInlineInstanceProps } from './ResourceInline';

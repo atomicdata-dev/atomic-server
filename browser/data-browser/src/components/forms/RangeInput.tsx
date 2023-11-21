@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { InputStyled, InputWrapper } from './InputStyles';
 import { Row } from '../Row';
 

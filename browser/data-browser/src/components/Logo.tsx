@@ -1,4 +1,3 @@
-import React from 'react';
 import { useSettings } from '../helpers/AppSettings';
 
 interface LogoProps {

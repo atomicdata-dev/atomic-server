@@ -1,4 +1,3 @@
-import React from 'react';
 import { styled, css } from 'styled-components';
 import {
   useProperty,
@@ -12,6 +11,7 @@ import { useSubjectParam } from '../helpers/useCurrentSubject';
 import { FaSort, FaSortDown, FaSortUp } from 'react-icons/fa';
 import { Button } from './Button';
 import { ValueForm } from './forms/ValueForm';
+import { memo } from 'react';
 
 type TableProps = {
   /** A Collection Resource with a filter-value set */
@@ -152,10 +152,7 @@ type RowProps = {
   propsArray: string[];
 };
 
-const TableRow = React.memo(function TableRow({
-  subject,
-  propsArray,
-}: RowProps) {
+const TableRow = memo(function TableRow({ subject, propsArray }: RowProps) {
   const resource = useResource(subject, {
     // We don't need to fetch all members for Collections when looking at a Table view.
     allowIncomplete: true,

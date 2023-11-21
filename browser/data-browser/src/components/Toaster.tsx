@@ -1,4 +1,3 @@
-import React from 'react';
 import toast, { ToastBar, Toaster as ReactHotToast } from 'react-hot-toast';
 import { FaCopy, FaTimes } from 'react-icons/fa';
 import { useTheme } from 'styled-components';

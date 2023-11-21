@@ -1,13 +1,23 @@
-import React, { createContext, useMemo, useState } from 'react';
+import {
+  createContext,
+  Dispatch,
+  FC,
+  PropsWithChildren,
+  RefObject,
+  SetStateAction,
+  useContext,
+  useMemo,
+  useState,
+} from 'react';
 
-export const DialogPortalContext = createContext<
-  React.RefObject<HTMLDivElement>
->(null!);
+export const DialogPortalContext = createContext<RefObject<HTMLDivElement>>(
+  null!,
+);
 
 interface DialogTreeContext {
   inDialog: boolean;
   hasOpenInnerPopup: boolean;
-  setHasOpenInnerPopup: React.Dispatch<React.SetStateAction<boolean>>;
+  setHasOpenInnerPopup: Dispatch<SetStateAction<boolean>>;
 }
 
 export const DialogTreeContext = createContext<DialogTreeContext>({
@@ -16,7 +26,7 @@ export const DialogTreeContext = createContext<DialogTreeContext>({
   setHasOpenInnerPopup: () => undefined,
 });
 
-export const DialogTreeContextProvider: React.FC<React.PropsWithChildren> = ({
+export const DialogTreeContextProvider: FC<PropsWithChildren> = ({
   children,
 }) => {
   const [hasOpenInnerPopup, setHasOpenInnerPopup] = useState<boolean>(false);
@@ -38,5 +48,5 @@ export const DialogTreeContextProvider: React.FC<React.PropsWithChildren> = ({
 };
 
 export function useDialogTreeContext() {
-  return React.useContext(DialogTreeContext);
+  return useContext(DialogTreeContext);
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { InputProps } from './ResourceField';
 import { noNestedSupport, useSubject } from '@tomic/react';
 import { ResourceSelector } from './ResourceSelector';

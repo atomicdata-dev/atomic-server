@@ -1,5 +1,5 @@
 import { Resource, urls, useCanWrite, useProperty } from '@tomic/react';
-import React from 'react';
+
 import {
   Dialog,
   DialogContent,

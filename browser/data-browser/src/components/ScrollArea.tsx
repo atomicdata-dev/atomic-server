@@ -1,7 +1,7 @@
-import React from 'react';
 import * as RadixScrollArea from '@radix-ui/react-scroll-area';
 import { styled } from 'styled-components';
 import { transparentize } from 'polished';
+import { forwardRef } from 'react';
 
 const SIZE = '0.8rem';
 
@@ -9,7 +9,7 @@ export interface ScrollAreaProps {
   className?: string;
 }
 
-export const ScrollArea = React.forwardRef<
+export const ScrollArea = forwardRef<
   HTMLDivElement,
   React.PropsWithChildren<ScrollAreaProps>
 >(({ children, className }, ref): JSX.Element => {

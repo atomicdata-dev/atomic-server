@@ -1,5 +1,5 @@
 import { Resource, useCanWrite, useTitle } from '@tomic/react';
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEdit } from 'react-icons/fa';
 import { styled, css } from 'styled-components';
@@ -99,6 +99,7 @@ const TitleShared = css`
 interface TitleProps {
   subtle: boolean;
   canEdit: boolean;
+  disabled: boolean;
 }
 
 const Title = styled.h1<TitleProps & ViewTransitionProps>`

@@ -1,5 +1,5 @@
 import { urls, useArray, useResource, useString } from '@tomic/react';
-import React from 'react';
+
 import { Card } from '../../../components/Card';
 import { PropertyLineRead } from '../Property/PropertyLineRead';
 import { styled } from 'styled-components';

@@ -1,5 +1,5 @@
 import { useStore } from '@tomic/react';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { IconType } from 'react-icons';
 import { FaPlus } from 'react-icons/fa';

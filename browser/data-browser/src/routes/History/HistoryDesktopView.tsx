@@ -1,4 +1,3 @@
-import React from 'react';
 import { HistoryViewProps } from './HistoryViewProps';
 import { styled } from 'styled-components';
 import { Button } from '../../components/Button';

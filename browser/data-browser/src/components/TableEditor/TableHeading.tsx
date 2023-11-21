@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { styled } from 'styled-components';
 import { DragAreaBase, useResizable } from '../../hooks/useResizable';
 import { useTableEditorContext } from './TableEditorContext';

@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { styled } from 'styled-components';
 import {
   TableHeading,
@@ -42,7 +42,7 @@ export function TableHeader<T>({
   NewColumnButtonComponent,
   headerRef,
 }: TableHeaderProps<T>): JSX.Element {
-  const [activeIndex, setActiveIndex] = React.useState<number | undefined>();
+  const [activeIndex, setActiveIndex] = useState<number | undefined>();
 
   const handleDragStart = useCallback(
     (event: DragStartEvent) => {

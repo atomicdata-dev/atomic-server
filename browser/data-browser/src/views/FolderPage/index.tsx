@@ -6,7 +6,7 @@ import {
   useResources,
   useString,
 } from '@tomic/react';
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { styled } from 'styled-components';
 import { EditableTitle } from '../../components/EditableTitle';
 import { FileDropZone } from '../../components/forms/FileDropzone/FileDropzone';

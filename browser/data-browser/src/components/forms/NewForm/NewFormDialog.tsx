@@ -1,5 +1,5 @@
 import { Core, JSONValue, useResource, useStore, useTitle } from '@tomic/react';
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
 import { DialogTitle, DialogContent, DialogActions } from '../../Dialog';

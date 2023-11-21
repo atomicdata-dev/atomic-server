@@ -1,5 +1,5 @@
 import { properties, useArray, useResource, useString } from '@tomic/react';
-import React from 'react';
+
 import Markdown from '../../../components/datatypes/Markdown';
 import { GridItemDescription, InnerWrapper } from './components';
 import { GridItemViewProps } from './GridItemViewProps';

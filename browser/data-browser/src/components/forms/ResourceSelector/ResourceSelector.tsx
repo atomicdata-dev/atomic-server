@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Dialog, useDialog } from '../../Dialog';
 import { useDialogTreeContext } from '../../Dialog/dialogContext';
 import { useSettings } from '../../../helpers/AppSettings';
@@ -40,7 +40,7 @@ interface ResourceSelectorProps {
  * Form field for selecting a single resource. Needs external subject &
  * setSubject properties
  */
-export const ResourceSelector = React.memo(function ResourceSelector({
+export const ResourceSelector = memo(function ResourceSelector({
   required,
   setSubject,
   value,

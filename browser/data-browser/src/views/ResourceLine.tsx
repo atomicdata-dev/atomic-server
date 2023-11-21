@@ -1,4 +1,3 @@
-import React from 'react';
 import { urls, useString, useResource, useTitle } from '@tomic/react';
 import { ResourceInline } from './ResourceInline';
 import { ErrorLook } from '../components/ErrorLook';

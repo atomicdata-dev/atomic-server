@@ -1,4 +1,3 @@
-import React from 'react';
 import { useString, useResource, urls, Client, useArray } from '@tomic/react';
 import { AtomicLink } from '../../components/AtomicLink';
 import { ErrorLook } from '../../components/ErrorLook';

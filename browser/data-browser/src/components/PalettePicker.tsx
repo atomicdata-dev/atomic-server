@@ -1,4 +1,3 @@
-import React from 'react';
 import { styled } from 'styled-components';
 import { transition } from '../helpers/transition';
 import { Row } from './Row';

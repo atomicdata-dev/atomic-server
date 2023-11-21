@@ -1,5 +1,5 @@
 import { properties, useString } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import { BasicGridItem } from './BasicGridItem';
 import { InnerWrapper } from './components';

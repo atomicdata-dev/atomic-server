@@ -1,5 +1,5 @@
 import { urls, useResource, useString } from '@tomic/react';
-import React from 'react';
+
 import { styled } from 'styled-components';
 import Markdown from '../../../components/datatypes/Markdown';
 import { InlineDatatype } from '../InlineDatatype';

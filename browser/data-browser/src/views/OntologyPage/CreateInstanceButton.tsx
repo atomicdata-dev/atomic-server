@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Resource, urls, useStore } from '@tomic/react';
 import { styled } from 'styled-components';
 import { FaPlus } from 'react-icons/fa';

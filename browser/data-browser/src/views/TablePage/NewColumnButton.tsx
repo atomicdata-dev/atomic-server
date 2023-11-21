@@ -1,5 +1,5 @@
 import { Datatype, useResource } from '@tomic/react';
-import React, { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useMemo, useState } from 'react';
 import { FaChevronCircleDown, FaFile, FaHashtag, FaPlus } from 'react-icons/fa';
 import { DIVIDER, DropdownMenu, Item } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';

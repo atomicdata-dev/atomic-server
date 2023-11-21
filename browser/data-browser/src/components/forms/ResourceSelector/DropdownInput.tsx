@@ -1,10 +1,4 @@
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-  useContext,
-} from 'react';
+import { useEffect, useRef, useState, useCallback, useContext } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { useResource, useTitle } from '@tomic/react';

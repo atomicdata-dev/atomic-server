@@ -1,5 +1,5 @@
 import { classes } from '@tomic/react';
-import React from 'react';
+
 import { NewBookmarkButton } from './NewBookmarkButton';
 import { NewInstanceButtonProps } from './NewInstanceButtonProps';
 import { NewInstanceButtonDefault } from './NewInstanceButtonDefault';

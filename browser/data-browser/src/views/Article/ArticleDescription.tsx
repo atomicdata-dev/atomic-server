@@ -1,5 +1,6 @@
 import { Resource, useString, properties, useStore } from '@tomic/react';
-import React from 'react';
+import { useState } from 'react';
+
 import toast from 'react-hot-toast';
 import { FaEdit, FaPlus } from 'react-icons/fa';
 import { styled } from 'styled-components';
@@ -23,7 +24,7 @@ export function ArticleDescription({
 }: ArticleDescriptionProps): JSX.Element {
   const store = useStore();
   const [description] = useString(resource, properties.description);
-  const [editMode, setEditMode] = React.useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   const saveContent = async () => {
     try {

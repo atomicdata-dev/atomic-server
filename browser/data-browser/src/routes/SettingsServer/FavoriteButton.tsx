@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { FaRegStar, FaStar } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { useDriveHistory } from '../../hooks/useDriveHistory';

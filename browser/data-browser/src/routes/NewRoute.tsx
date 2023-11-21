@@ -1,5 +1,5 @@
 import { useResource, useString, useTitle, urls } from '@tomic/react';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router';
 
 import {

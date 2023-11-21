@@ -1,4 +1,4 @@
-import React from 'react';
+import { Fragment } from 'react';
 import { styled } from 'styled-components';
 import { displayShortcut } from './HotKeyWrapper';
 
@@ -13,9 +13,9 @@ export function Shortcut({ shortcut, className }: ShortcutProps): JSX.Element {
   return (
     <Wrapper className={className}>
       {parts.map((part, i) => (
-        <React.Fragment key={i}>
+        <Fragment key={i}>
           <KBD>{part}</KBD> {i < parts.length - 1 && '+ '}
-        </React.Fragment>
+        </Fragment>
       ))}
     </Wrapper>
   );

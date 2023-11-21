@@ -1,4 +1,3 @@
-import React from 'react';
 import { styled, css } from 'styled-components';
 import {
   useResource,
@@ -96,7 +95,7 @@ function DriveMismatch({ subject }: { subject: string }) {
 
   const mismatch = subject && subject !== drive;
 
-  if (mismatch)
+  if (mismatch) {
     return (
       <Button
         title={`Set ${title} as current drive`}
@@ -106,6 +105,9 @@ function DriveMismatch({ subject }: { subject: string }) {
         Set Drive
       </Button>
     );
+  }
+
+  return null;
 }
 
 /** The actually recursive part */

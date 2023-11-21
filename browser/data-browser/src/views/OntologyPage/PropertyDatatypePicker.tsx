@@ -1,4 +1,3 @@
-import React from 'react';
 import { Resource, reverseDatatypeMapping, urls } from '@tomic/react';
 import { AtomicSelectInput } from '../../components/forms/AtomicSelectInput';
 interface PropertyDatatypePickerProps {

@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import React from 'react';
+
 import { Route, Routes } from 'react-router-dom';
 
 import Show from './ShowRoute';

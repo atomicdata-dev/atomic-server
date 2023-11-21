@@ -1,5 +1,5 @@
 import { Resource, Server, useStore } from '@tomic/react';
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Button } from '../components/Button';
 import { ContainerFull } from '../components/Containers';
 import { Column } from '../components/Row';

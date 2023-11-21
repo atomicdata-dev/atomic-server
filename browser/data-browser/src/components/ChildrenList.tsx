@@ -1,12 +1,13 @@
 import { useChildren } from '@tomic/react';
-import React from 'react';
+import { useState } from 'react';
+
 import { FaCaretDown, FaCaretRight } from 'react-icons/fa';
 import { ResourceInline } from '../views/ResourceInline';
 import { Button } from './Button';
 import { Card, CardInsideFull, CardRow } from './Card';
 
 export function Childrenlist({ resource }) {
-  const [show, setShow] = React.useState(false);
+  const [show, setShow] = useState(false);
 
   return (
     <>

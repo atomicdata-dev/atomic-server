@@ -1,5 +1,5 @@
 import { Resource, unknownSubject, urls, useArray } from '@tomic/react';
-import React, { createContext, useCallback, useContext, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
 
 interface OntologyContext {
   addClass: (subject: string) => Promise<void>;

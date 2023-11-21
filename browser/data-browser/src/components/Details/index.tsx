@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { FaCaretRight } from 'react-icons/fa';
 import { Collapse } from '../Collapse';
@@ -20,8 +20,8 @@ export function Details({
   title,
   disabled,
   onStateToggle,
-}: React.PropsWithChildren<DetailsProps>): JSX.Element {
-  const [isOpen, setIsOpen] = React.useState(initialState);
+}: PropsWithChildren<DetailsProps>): JSX.Element {
+  const [isOpen, setIsOpen] = useState(initialState);
 
   useEffect(() => {
     setIsOpen(open);

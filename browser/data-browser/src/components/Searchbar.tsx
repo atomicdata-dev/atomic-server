@@ -1,6 +1,6 @@
 import { Client, useResource, useTitle } from '@tomic/react';
 import { transparentize } from 'polished';
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaTimes } from 'react-icons/fa';
 import { useNavigate } from 'react-router';

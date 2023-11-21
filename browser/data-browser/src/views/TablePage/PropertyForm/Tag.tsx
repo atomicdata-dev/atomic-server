@@ -1,7 +1,7 @@
 import { urls, useResource, useString, useTitle } from '@tomic/react';
 import { lighten, setLightness, setSaturation } from 'polished';
 import * as RadixPopover from '@radix-ui/react-popover';
-import React, { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { styled } from 'styled-components';
 import { transition } from '../../../helpers/transition';
 import { Popover } from '../../../components/Popover';
@@ -130,7 +130,7 @@ export function EditableTag({
   onDelete,
 }: EditableTagProps): JSX.Element {
   const { color, setColor, text } = useTagData(subject);
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
 
   const handleColorChange = useCallback(
     (pickedColor: string) => {

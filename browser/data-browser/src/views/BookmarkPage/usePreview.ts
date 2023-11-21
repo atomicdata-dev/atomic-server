@@ -1,11 +1,6 @@
 import { AtomicError, ErrorType } from './../../../../lib/src/error';
 import { Resource, Store, urls, useStore, useString } from '@tomic/react';
-import React, {
-  startTransition,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import { startTransition, useCallback, useEffect, useState } from 'react';
 import { debounce } from '../../helpers/debounce';
 import { paths } from '../../routes/paths';
 

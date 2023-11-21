@@ -1,4 +1,3 @@
-import React from 'react';
 import { ResourcePageProps } from '../ResourcePage';
 import { urls, useArray, useCanWrite } from '@tomic/react';
 import { OntologySidebar } from './OntologySidebar';
@@ -17,6 +16,7 @@ import { OntologyContextProvider } from './OntologyContext';
 import { PropertyCardWrite } from './Property/PropertyCardWrite';
 import { Graph } from './Graph';
 import { CreateInstanceButton } from './CreateInstanceButton';
+import { useState } from 'react';
 
 export function OntologyPage({ resource }: ResourcePageProps) {
   const [classes] = useArray(resource, urls.properties.classes);
@@ -24,7 +24,7 @@ export function OntologyPage({ resource }: ResourcePageProps) {
   const [instances] = useArray(resource, urls.properties.instances);
   const [canWrite] = useCanWrite(resource);
 
-  const [editMode, setEditMode] = React.useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   return (
     <OntologyContextProvider ontology={resource}>

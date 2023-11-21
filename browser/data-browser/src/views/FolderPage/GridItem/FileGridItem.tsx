@@ -1,4 +1,3 @@
-import React from 'react';
 import { styled } from 'styled-components';
 import { useFileInfo } from '../../../hooks/useFile';
 import { useFilePreviewSizeLimit } from '../../../hooks/useFilePreviewSizeLimit';

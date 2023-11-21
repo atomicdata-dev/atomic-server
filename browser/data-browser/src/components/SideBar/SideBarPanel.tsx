@@ -1,8 +1,8 @@
-import React from 'react';
 import { styled } from 'styled-components';
 import { Collapse } from '../Collapse';
 import { FaCaretRight } from 'react-icons/fa';
 import { transition } from '../../helpers/transition';
+import { useState } from 'react';
 
 interface SideBarPanelProps {
   title: string;
@@ -12,7 +12,7 @@ export function SideBarPanel({
   children,
   title,
 }: React.PropsWithChildren<SideBarPanelProps>): JSX.Element {
-  const [open, setOpen] = React.useState(true);
+  const [open, setOpen] = useState(true);
 
   return (
     <Wrapper>

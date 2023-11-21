@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card } from '../../../components/Card';
 import { urls, useArray, useResource, useString } from '@tomic/react';
 import { FaHashtag } from 'react-icons/fa';

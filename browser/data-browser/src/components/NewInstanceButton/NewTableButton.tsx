@@ -5,7 +5,7 @@ import {
   useStore,
   useTitle,
 } from '@tomic/react';
-import React, { FormEvent, useCallback, useState } from 'react';
+import { FormEvent, useCallback, useState } from 'react';
 import { Button } from '../Button';
 import {
   Dialog,

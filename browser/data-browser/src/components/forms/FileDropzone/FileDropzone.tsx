@@ -1,5 +1,5 @@
 import { Resource } from '@tomic/react';
-import React, { useCallback, useEffect } from 'react';
+import { PropsWithChildren, useCallback, useEffect, useRef } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { FaUpload } from 'react-icons/fa';
 import { styled, keyframes } from 'styled-components';
@@ -19,9 +19,9 @@ export function FileDropZone({
   parentResource,
   children,
   onFilesUploaded,
-}: React.PropsWithChildren<FileDropZoneProps>): JSX.Element {
+}: PropsWithChildren<FileDropZoneProps>): JSX.Element {
   const { upload, isUploading, error } = useUpload(parentResource);
-  const dropzoneRef = React.useRef<HTMLDivElement>(null);
+  const dropzoneRef = useRef<HTMLDivElement>(null);
   const onDrop = useCallback(
     async (files: File[]) => {
       const uploaded = await upload(files);

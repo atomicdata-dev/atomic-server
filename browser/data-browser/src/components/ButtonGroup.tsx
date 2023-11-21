@@ -1,4 +1,4 @@
-import React, { useCallback, useId, useState } from 'react';
+import { useCallback, useId, useState } from 'react';
 import { styled } from 'styled-components';
 
 export interface ButtonGroupOption {

@@ -1,4 +1,3 @@
-import React from 'react';
 import type { ResourceInlineInstanceProps } from './ResourceInline';
 import { Tag } from '../TablePage/PropertyForm/Tag';
 import { styled } from 'styled-components';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useSettings } from '../../helpers/AppSettings';
 import { styled } from 'styled-components';

@@ -1,4 +1,4 @@
-import React, { createContext } from 'react';
+import { createContext } from 'react';
 
 export const DropdownPortalContext = createContext<
   React.RefObject<HTMLDivElement>

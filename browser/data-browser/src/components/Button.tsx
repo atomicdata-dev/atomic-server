@@ -1,4 +1,4 @@
-import React from 'react';
+import { forwardRef, PropsWithChildren } from 'react';
 import { styled } from 'styled-components';
 import { transition } from '../helpers/transition';
 import { Spinner } from './Spinner';
@@ -49,9 +49,9 @@ const getButtonComp = ({ clean, icon, subtle, alert }: ButtonProps) => {
   return Comp;
 };
 
-export const Button = React.forwardRef<
+export const Button = forwardRef<
   HTMLButtonElement,
-  React.PropsWithChildren<ButtonProps>
+  PropsWithChildren<ButtonProps>
 >(({ children, loading, ...props }, ref): JSX.Element => {
   // Filter out props that should not be passed to the button element or styled component.
   const { icon: _icon, ...buttonProps } = props;

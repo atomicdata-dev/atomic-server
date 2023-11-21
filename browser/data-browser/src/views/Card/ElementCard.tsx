@@ -1,5 +1,5 @@
 import { urls, useResource, useString, useTitle } from '@tomic/react';
-import React from 'react';
+
 import { AtomicLink } from '../../components/AtomicLink';
 import Markdown from '../../components/datatypes/Markdown';
 import { CardViewProps } from './CardViewProps';

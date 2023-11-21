@@ -1,5 +1,5 @@
 import { transparentize } from 'polished';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import {
   getHeight,

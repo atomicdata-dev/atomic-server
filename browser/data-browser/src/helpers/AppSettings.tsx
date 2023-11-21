@@ -1,4 +1,10 @@
-import React, { ReactNode, useCallback, useContext, useMemo } from 'react';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useMemo,
+} from 'react';
 import { DarkModeOption, useDarkMode } from './useDarkMode';
 import {
   useLocalStorage,
@@ -169,4 +175,4 @@ export const useSettings = (): AppSettings => {
  * The context must be provided by wrapping a high level React element in
  * <SettingsContext.Provider value={new AppSettings}>
  */
-export const SettingsContext = React.createContext<AppSettings>(initialState);
+export const SettingsContext = createContext<AppSettings>(initialState);

@@ -1,5 +1,5 @@
 import { ResourcePageProps } from '../ResourcePage';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { urls, useString } from '@tomic/react';
 import { EditableTitle } from '../../components/EditableTitle';
 import { styled } from 'styled-components';

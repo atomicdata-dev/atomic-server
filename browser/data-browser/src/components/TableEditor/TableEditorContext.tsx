@@ -1,4 +1,11 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  createContext,
+  useContext,
+} from 'react';
 import { FixedSizeList } from 'react-window';
 import { EventManager } from '../../helpers/EventManager';
 import { KeyboardInteraction } from './helpers/keyboardHandlers';
@@ -91,7 +98,7 @@ const initial = {
   emitInteractionsFired: () => undefined,
 };
 
-const TableEditorContext = React.createContext<TableEditorContext>(initial);
+const TableEditorContext = createContext<TableEditorContext>(initial);
 
 export function TableEditorContextProvider({
   children,
@@ -214,5 +221,5 @@ export function TableEditorContextProvider({
 }
 
 export function useTableEditorContext() {
-  return React.useContext(TableEditorContext);
+  return useContext(TableEditorContext);
 }

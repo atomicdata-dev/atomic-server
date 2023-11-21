@@ -1,5 +1,5 @@
 import { useResource } from '@tomic/react';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import {
   Dialog,
   DialogContent,

@@ -1,4 +1,3 @@
-import React from 'react';
 import { properties, Resource, useArray } from '@tomic/react';
 import { Detail } from './Detail';
 import { getIconForClass } from '../views/FolderPage/iconMap';
@@ -13,7 +12,7 @@ export function ClassDetail({ resource }: Props): JSX.Element {
   const [classes] = useArray(resource, properties.isA);
 
   return (
-    <React.Fragment>
+    <>
       {classes && (
         <Detail>
           <>
@@ -23,6 +22,6 @@ export function ClassDetail({ resource }: Props): JSX.Element {
           </>
         </Detail>
       )}
-    </React.Fragment>
+    </>
   );
 }

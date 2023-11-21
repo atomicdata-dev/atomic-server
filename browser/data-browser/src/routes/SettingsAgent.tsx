@@ -215,7 +215,7 @@ const SettingsAgent: React.FunctionComponent = () => {
             </InputWrapper>
           </Field>
           {advanced ? (
-            <React.Fragment>
+            <>
               <Field
                 label='Subject URL'
                 helper={
@@ -260,7 +260,7 @@ const SettingsAgent: React.FunctionComponent = () => {
                   </ButtonInput>
                 </InputWrapper>
               </Field>
-            </React.Fragment>
+            </>
           ) : null}
           {agent && (
             <Button

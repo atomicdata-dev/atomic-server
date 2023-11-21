@@ -6,7 +6,7 @@ import {
   useChildren,
   useString,
 } from '@tomic/react';
-import React, { useCallback } from 'react';
+import { useCallback } from 'react';
 import { styled } from 'styled-components';
 import { CommitDetail } from '../../components/CommitDetail';
 import { ContainerWide } from '../../components/Containers';

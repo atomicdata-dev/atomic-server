@@ -1,6 +1,6 @@
 import { lighten } from 'polished';
 import { styled, css } from 'styled-components';
-import React from 'react';
+
 import { FaExclamationTriangle } from 'react-icons/fa';
 
 export const errorLookStyle = css`

@@ -1,5 +1,5 @@
 import { urls, useNumber, useStore, useString } from '@tomic/react';
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { RadioGroup, RadioInput } from '../../../components/forms/RadioInput';
 import { FormGroupHeading } from './FormGroupHeading';
 import { DecimalPlacesInput } from './Inputs/DecimalPlacesInput';

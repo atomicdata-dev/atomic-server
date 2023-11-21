@@ -6,7 +6,7 @@ import {
   urls,
   useCurrentAgent,
 } from '@tomic/react';
-import React, { useCallback, useState } from 'react';
+import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
 import { ErrorLook } from './ErrorLook';
 import { Button } from './Button';
