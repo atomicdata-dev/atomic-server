@@ -40,7 +40,7 @@ function Label({ text }: { text: string }): JSX.Element {
   const parts = text.split('\n');
 
   if (parts.length === 1) {
-    return <span>text</span>;
+    return <>{text}</>;
   }
 
   // SVG does not have any auto word wrap so we split the lines manually and offset them.
