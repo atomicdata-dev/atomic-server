@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+  useContext,
+  createContext,
+} from 'react';
 import {
   Property,
   Store,
@@ -480,7 +488,7 @@ export function useDate(
 
 /** Preferred way of using the store in a Component or Hook */
 export function useStore(): Store {
-  const store = React.useContext(StoreContext);
+  const store = useContext(StoreContext);
 
   if (store === undefined) {
     throw new Error(
@@ -552,4 +560,4 @@ export function useCanWrite(
  * The context must be provided by wrapping a high level React element in
  * `<StoreContext.Provider value={new Store}>My App</StoreContext.Provider>`
  */
-export const StoreContext = React.createContext<Store>(new Store());
+export const StoreContext = createContext<Store>(new Store());
