@@ -31,9 +31,7 @@ test.describe('documents', async () => {
 
     const teststring = `My test: ${timestamp()}`;
 
-    const waiter = waitForCommitOnCurrentResource(page);
     await page.fill('textarea', teststring);
-    await waiter;
 
     await expect(page.locator(`text=${teststring}`)).toBeVisible();
 

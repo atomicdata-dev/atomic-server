@@ -216,7 +216,9 @@ test.describe('data-browser', async () => {
   test('chatroom', async ({ page, browser }) => {
     await signIn(page);
     await newDrive(page);
+    const waiter = waitForCommitOnCurrentResource(page);
     await newResource('chatroom', page);
+    await waiter;
     await expect(
       page.getByRole('heading', { name: 'Untitled ChatRoom' }),
     ).toBeVisible();
@@ -271,8 +273,9 @@ test.describe('data-browser', async () => {
   test('quick edit text typing ux', async ({ page }) => {
     await signIn(page);
     await newDrive(page);
+    const waiters = waitForCommitOnCurrentResource(page);
     await newResource('folder', page);
-    await waitForCommit(page);
+    await waiters;
 
     await page.locator(editableTitle).click();
     // loop over all letters in alphabet

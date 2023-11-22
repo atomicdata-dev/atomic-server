@@ -129,6 +129,8 @@ export async function getCurrentSubject(page: Page) {
   return selector.getAttribute('about');
 }
 
+/** Waits until a commit for main resource is processed
+ */
 export async function waitForCommitOnCurrentResource(
   page: Page,
   match?: { set?: Record<string, unknown> },

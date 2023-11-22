@@ -21,6 +21,6 @@
     "test-debug": "PWDEBUG=1 playwright test",
     "test-update": "playwright test --update-snapshots",
     "test-new": "playwright codegen http://localhost:5173",
-    "test-query": "PWDEBUG=1 playwright test \"e2e.spec.ts\" \"tables.spec.ts\" \"documents.spec.ts\" \"ontology.spec.ts\" \"search.spec.ts\" -g"
+    "test-query": "PWDEBUG=1 DELETE_PREVIOUS_TEST_DRIVES=false playwright test \"e2e.spec.ts\" \"tables.spec.ts\" \"documents.spec.ts\" \"ontology.spec.ts\" \"search.spec.ts\" -g"
   }
 }
