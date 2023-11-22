@@ -8,6 +8,7 @@ const config: PlaywrightTestConfig = {
     locale: 'en-GB',
     timezoneId: 'Europe/Amsterdam',
     actionTimeout: 5000,
+    trace: 'retain-on-failure',
   },
   reporter: [
     [
