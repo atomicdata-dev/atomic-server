@@ -490,9 +490,8 @@ test.describe('data-browser', async () => {
     await fillInput('shortname', page);
     await fillInput('description', page);
     await page.click('[data-test="save"]');
-    await page.waitForNavigation();
     await page.locator('text=Resource Saved');
-    await page.goBack();
+    await contextMenuClick('edit', page);
 
     await page
       .locator('[title="Add an item to the recommends list"]')
@@ -579,7 +578,6 @@ test.describe('data-browser', async () => {
     await page.click('text=Make current version');
 
     await expect(page.locator('text=Resource version updated')).toBeVisible();
-    // await page.waitForNavigation();
     await expect(page.locator('h1:has-text("First Title")')).toBeVisible();
     await expect(page.locator('text=History of First Title')).not.toBeVisible();
   });

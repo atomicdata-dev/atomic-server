@@ -98,7 +98,6 @@ export async function newDrive(page: Page) {
   await page.locator(sideBarDriveSwitcher).click();
   await page.locator('button:has-text("New Drive")').click();
   expect(page.locator(`${currentDriveTitle} > localhost`)).not.toBeVisible();
-  // await page.waitForNavigation();
   await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   expect(driveURL).toContain('localhost');
