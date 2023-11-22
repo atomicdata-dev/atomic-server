@@ -1,4 +1,3 @@
-/// <reference types="vite/client" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
@@ -27,7 +26,8 @@ export default defineConfig({
       manifest: {
         name: 'Atomic Data Browser',
         short_name: 'Atomic',
-        description: 'The easiest way to create, share and model Linked Atomic Data.',
+        description:
+          'The easiest way to create, share and model Linked Atomic Data.',
         theme_color: '#ffffff',
         icons: [
           {
@@ -72,7 +72,7 @@ export default defineConfig({
             type: 'image/png',
             purpose: 'maskable',
           },
-        ]
+        ],
       },
       workbox: {
         // See https://github.com/atomicdata-dev/atomic-data-browser/issues/294
@@ -85,12 +85,12 @@ export default defineConfig({
               cacheName: 'google-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                maxAgeSeconds: 60 * 60 * 24 * 365, // <== 365 days
               },
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
+                statuses: [0, 200],
+              },
+            },
           },
           {
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
@@ -99,18 +99,17 @@ export default defineConfig({
               cacheName: 'gstatic-fonts-cache',
               expiration: {
                 maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                maxAgeSeconds: 60 * 60 * 24 * 365, // <== 365 days
               },
               cacheableResponse: {
-                statuses: [0, 200]
+                statuses: [0, 200],
               },
-            }
-          }
-        ]
-      }
+            },
+          },
+        ],
+      },
     }),
   ],
-  references: [{ path: 'lib' }, { path: 'react' }],
   optimizeDeps: {
     // this may help when linking + HMR is not working
     // exclude: ['@tomic/lib', '@tomic/react'],
