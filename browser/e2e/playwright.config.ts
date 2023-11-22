@@ -9,7 +9,16 @@ const config: PlaywrightTestConfig = {
     timezoneId: 'Europe/Amsterdam',
     actionTimeout: 5000,
   },
-  reporter: [['html', { attachmentsBaseURL: 'https://external-storage.com/' }]],
+  reporter: [
+    [
+      'html',
+      {
+        // attachmentsBaseURL: '://external-storage.com/',
+        // outputFolder: '/artifact/test-report',
+        open: 'never',
+      },
+    ],
+  ],
   retries: 3,
   // timeout: 1000 * 120, // 2 minutes
   projects: [

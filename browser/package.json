@@ -2,7 +2,6 @@
   "devDependencies": {
     "@esm-bundle/chai": "4.3.4",
     "@jest/globals": "^29.3.1",
-    "@playwright/test": "^1.37.0",
     "@types/chai": "^4.2.22",
     "@types/jest": "^27.0.2",
     "@types/node": "^16.11.4",
@@ -40,12 +39,11 @@
     "lint-fix": "pnpm run -r lint-fix",
     "build": "pnpm --filter \"@tomic/lib\" run build && pnpm --filter=!./lib run -r build ",
     "test": "pnpm run -r test",
-    "test-e2e": "pnpm run --filter @tomic/data-browser test-e2e",
-    "test-query": "pnpm run --filter @tomic/data-browser test-query",
+    "test-e2e": "pnpm run --filter @tomic/e2e test-e2e",
+    "test-query": "pnpm run --filter @tomic/e2e test-query",
     "start": "pnpm run -r --parallel start",
     "typedoc": "typedoc . --options typedoc.json",
-    "typecheck": "pnpm run -r --parallel typecheck",
-    "playwright-install": "playwright install chromium"
+    "typecheck": "pnpm run -r --parallel typecheck"
   },
   "husky": {
     "hooks": {
@@ -54,6 +52,7 @@
   },
   "workspaces": {
     "packages": [
+      "e2e",
       "lib",
       "react",
       "data-browser",

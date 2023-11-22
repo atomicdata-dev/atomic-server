@@ -10,6 +10,7 @@ publish
 */dev-dist
 */yarn-error.log
 test-results
+playwright-report
 */nohup.out
 */yarn-error.log
 lib/coverage

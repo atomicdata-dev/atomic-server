@@ -135,7 +135,6 @@ export async function waitForCommitOnCurrentResource(
 ) {
   const currentSubject = await getCurrentSubject(page);
 
-  console.log('currentSubject', currentSubject);
   await page.waitForResponse(async response => {
     if (!response.url().endsWith('/commit')) {
       return false;
@@ -145,11 +144,6 @@ export async function waitForCommitOnCurrentResource(
       const result = await response.json();
       const isForCurrentResource =
         result['https://atomicdata.dev/properties/subject'] === currentSubject;
-
-      console.log(
-        'Received Subject',
-        result['https://atomicdata.dev/properties/subject'],
-      );
 
       if (!isForCurrentResource) {
         return false;

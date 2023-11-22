@@ -14,8 +14,8 @@
     "strictNullChecks": true,
   },
   "include": [
-    "./src",
-    "../e2e"
+    "./tests",
+    "playwright.config.ts"
   ],
   "references": [
     {

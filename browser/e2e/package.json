@@ -1,0 +1,26 @@
+{
+  "version": "0.36.0",
+  "author": {
+    "email": "joep@ontola.io",
+    "name": "Joep Meindertsma"
+  },
+  "homepage": "https://atomicdata.dev/",
+  "license": "MIT",
+  "name": "@tomic/e2e",
+  "private": true,
+  "repository": {
+    "url": "https://github.com/atomicdata-dev/atomic-server/"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.37.0"
+  },
+  "scripts": {
+    "playwright-install": "playwright install chromium",
+    "upload-report": "netlify deploy --dir playwright-report --prod --site atomic-tests",
+    "test-e2e": "playwright test --config=./playwright.config.ts",
+    "test-debug": "PWDEBUG=1 playwright test",
+    "test-update": "playwright test --update-snapshots",
+    "test-new": "playwright codegen http://localhost:5173",
+    "test-query": "PWDEBUG=1 playwright test \"e2e.spec.ts\" \"tables.spec.ts\" \"documents.spec.ts\" \"ontology.spec.ts\" \"search.spec.ts\" -g"
+  }
+}
