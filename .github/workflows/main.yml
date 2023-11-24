@@ -28,4 +28,4 @@ jobs:
           fi
           git checkout -b "$branch" || true
       - name: Earthly pipeline
-        run: earthly --org ontola --ci --sat henk -P +pipeline --tag=${{ github.sha }}
+        run: earthly --org ontola --ci --sat henk -P +pipeline --push --tag=${{ github.sha }}
