@@ -1,4 +1,4 @@
-# Guide for Atomic Data Rust contributors
+# Guide for Atomic-Server contributors
 
 First things first: I'm glad you're reading this!
 Join our [Discord](https://discord.gg/a72Rv2P) to chat with other people in the Atomic Data community.
@@ -13,16 +13,17 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 ## Table of contents
 
 - [Table of contents](#table-of-contents)
-- [Running locally](#running-locally)
-- [Running locally (with local development browser)](#running-locally-with-local-development-browser)
-- [Compilation using Earthly](#compilation-using-earthly)
-- [Improve local compilation speed](#improve-local-compilation-speed)
-- [Cross compilation](#cross-compilation)
-- [IDE setup (VSCode)](#ide-setup-vscode)
-- [Branching](#branching)
+- [Running \& compiling](#running--compiling)
+  - [Running locally (with local development browser)](#running-locally-with-local-development-browser)
+  - [Debugging](#debugging)
+  - [IDE setup (VSCode)](#ide-setup-vscode)
+  - [Compilation using Earthly](#compilation-using-earthly)
+  - [Improve local compilation speed](#improve-local-compilation-speed)
+  - [Cross compilation](#cross-compilation)
+- [Git policy](#git-policy)
+  - [Open a PR](#open-a-pr)
+  - [Branching](#branching)
 - [Testing](#testing)
-- [Code coverage](#code-coverage)
-- [Debugging](#debugging)
 - [Performance monitoring / benchmarks](#performance-monitoring--benchmarks)
   - [Tracing](#tracing)
     - [Tracing with OpenTelemetry (and Jaeger)](#tracing-with-opentelemetry-and-jaeger)
@@ -31,6 +32,7 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
   - [Drill](#drill)
 - [Responsible disclosure / Coordinated Vulnerability Disclosure](#responsible-disclosure--coordinated-vulnerability-disclosure)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
+  - [CI situation](#ci-situation)
   - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
     - [Building and publishing binaries](#building-and-publishing-binaries)
     - [Publishing to Cargo](#publishing-to-cargo)
@@ -38,18 +40,28 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
     - [Deploying to atomicdata.dev](#deploying-to-atomicdatadev)
     - [Publishing atomic-cli to WAPM](#publishing-atomic-cli-to-wapm)
 
-## Running locally
+## Running & compiling
 
-Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
+TL;DR Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server`).
 
-## Running locally (with local development browser)
+### Running locally (with local development browser)
 
 - Run `cargo run` to start the server
 - Go to `browser`, run `pnpm install` (if you haven't already), and run `pnpm dev` to start the browser
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:5173/app/show?subject=http%3A%2F%2Flocalhost`)
-- use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you push new assets using `pmpm build-server` in `atomic-data-browser`. This can be useful if you're debugging specific features that you can't reproduce while the front-end is hosted in vite.
+- use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you update JS assets in `browser`
 
-## Compilation using Earthly
+### Debugging
+
+- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
+
+### IDE setup (VSCode)
+
+This project is primarily being developed in VSCode.
+That doesn't mean that you should, too, but it means you're less likely to run into issues.
+The `/.vscode` directory contains various tasks, recommended extensions, and some settings overwrites.
+
+### Compilation using Earthly
 
 There are `earthfile`s in `browser` and in `atomic-server`.
 These can be used by Earthly to build all steps, including a full docker image.
@@ -58,12 +70,12 @@ These can be used by Earthly to build all steps, including a full docker image.
 - `earthly --org ontola -P --satellite henk --artifact +e2e/test-results +pipeline`
 - `earthly --org ontola -P --satellite henk --artifact +build-server/atomic-server ./output/atomicserver`
 
-## Improve local compilation speed
+### Improve local compilation speed
 
 - Use the [`mold`](https://github.com/rui314/mold) linker + create a `.cargo/config.toml` and add `[build] rustflags = ["-C", "link-arg=-fuse-ld=lld"]`
 - Note: this is primarily for development on linux systems, as mold for macOS requires a paid license
 
-## Cross compilation
+### Cross compilation
 
 If you want to build `atomic-server` for some other target (e.g. building for linux from macOS), you can use the `cross` crate.
 
@@ -73,20 +85,19 @@ cargo install cross
 cross build --target x86_64-unknown-linux-musl --bin atomic-server --release
 ```
 
+## Git policy
 
-## IDE setup (VSCode)
+### Open a PR
 
-This project is primarily being developed in VSCode.
-That doesn't mean that you should, too, but it means you're less likely to run into issues.
-The `/.vscode` directory contains various tasks, recommended extensions, and some settings overwrites.
+- Make sure your branch is up to date with `develop`.
+- Open a PR against `develop`.
+- Make sure all relevant tests / lint pass.
 
-## Branching
+### Branching
 
 Create new branches off `develop`. When an issue is ready for PR, open PR against `develop`.
 
 ## Testing
-
-- All tests are run in CI
 
 ```sh
 # Make sure nextest is installed
@@ -102,8 +113,11 @@ cargo run
 # now, open new terminal window
 cd server/e2e_tests/ && npm i && npm run test
 # if things go wrong, debug!
-npm run test-query {testname}
+pnpm run test-query {testname}
 ```
+
+<!--
+NOTE: NOT WORKING SINCE EARHTLY
 
 ## Code coverage
 
@@ -114,11 +128,7 @@ npm run test-query {testname}
 # install cargo-llvm-cov, see https://github.com/taiki-e/cargo-llvm-cov
 # Run the tests with a coverage report
 cargo llvm-cov --all-features --show-missing-lines
-```
-
-## Debugging
-
-- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
+``` -->
 
 ## Performance monitoring / benchmarks
 
@@ -203,6 +213,11 @@ Note:
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
 - After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
+
+### CI situation
+
+- Github Action for `push`: builds + tests + docker (using `earthly`, see `Earthfile`)
+- Github Action for `tag`: create release + publish binaries
 
 ### Publishing manually - doing the CI's work
 

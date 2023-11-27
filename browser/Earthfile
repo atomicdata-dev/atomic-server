@@ -3,20 +3,11 @@ PROJECT ontola/atomic-server
 FROM node:20.8.0-bookworm
 WORKDIR browser
 
-pipeline:
-  PIPELINE --push
-  TRIGGER push develop
-  TRIGGER push main
-  TRIGGER pr develop
-  ARG tag=latest
-  BUILD +test
-  BUILD +lint
-  BUILD +build --tag=$tag
-
 all:
   BUILD +build
   BUILD +test
   BUILD +lint
+  BUILD +typedoc
 
 deps:
   RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
@@ -41,3 +32,7 @@ build:
   FROM +deps
   RUN pnpm run build
   SAVE ARTIFACT ./data-browser/dist
+
+typedoc:
+  FROM +build
+  RUN --secret NETLIFY_AUTH_TOKEN=NETLIFY_TOKEN pnpm run typedoc-publish

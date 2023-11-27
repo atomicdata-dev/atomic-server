@@ -408,7 +408,7 @@ Front-end for Atomic-Server, built with React.
 
 Library with `Store`, `Commit`, `JSON-AD` parsing, and more.
 
-[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_lib.html)
+[**docs**](https://atomic-lib.netlify.app/modules/_tomic_lib)
 
 ### [`@tomic/react`](browser/react/README.md)
 
@@ -424,7 +424,7 @@ Library with `Store`, `Commit`, `JSON-AD` parsing, and more.
 
 React library with many useful hooks for rendering and editing Atomic Data.
 
-[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_react.html)
+[**docs**](https://atomic-lib.netlify.app/modules/_tomic_react)
 
 ## Also check out
 

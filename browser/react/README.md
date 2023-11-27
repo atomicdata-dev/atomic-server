@@ -5,7 +5,7 @@ Re-exports `@tomic/lib`.
 
 [**demo + template on codesandbox**!](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223)
 
-[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_react.html)
+[**docs**](https://atomic-lib.netlify.app/modules/_tomic_react)
 
 ## Setup
 

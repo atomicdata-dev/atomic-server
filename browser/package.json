@@ -20,6 +20,7 @@
     "eslint-plugin-react-hooks": "^4.3.0",
     "husky": "^8.0.3",
     "jest": "^29.0.2",
+    "netlify-cli": "16.2.0",
     "prettier": "2.4.1",
     "prettier-plugin-jsdoc": "^0.3.24",
     "react": "^18.2.0",
@@ -42,7 +43,8 @@
     "test-e2e": "pnpm run --filter @tomic/e2e test-e2e",
     "test-query": "pnpm run --filter @tomic/e2e test-query",
     "start": "pnpm run -r --parallel start",
-    "typedoc": "typedoc . --options typedoc.json",
+    "typedoc": "typedoc --options ./typedoc.json",
+    "typedoc-publish": "pnpm run typedoc && netlify deploy --dir data-browser/publish/docs/ --prod --auth $NETLIFY_AUTH_TOKEN --site atomic-lib",
     "typecheck": "pnpm run -r --parallel typecheck"
   },
   "husky": {

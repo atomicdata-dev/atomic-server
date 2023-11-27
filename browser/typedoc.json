@@ -1,7 +1,12 @@
 {
   "$schema": "https://typedoc.org/schema.json",
   "entryPointStrategy": "packages",
+  "entryPoints": [
+    "lib",
+    "react"
+  ],
   "excludeExternals": true,
+  "includeVersion": true,
   "readme": "DOCS.md",
   "name": "@tomic",
   "out": "data-browser/publish/docs"

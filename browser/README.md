@@ -38,7 +38,7 @@ pnpm start # run the server!
 
 Library with `Store`, `Commit`, `JSON-AD` parsing, and more.
 
-[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_lib.html)
+[**docs**](https://atomic-lib.netlify.app/modules/_tomic_lib)
 
 [→ Read more](lib/README.md)
 
@@ -59,7 +59,7 @@ React library with many useful hooks for rendering and editing Atomic Data.
 
 [**demo + template on codesandbox**](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223)
 
-[**docs**](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_react.html)
+[**docs**](https://atomic-lib.netlify.app/modules/_tomic_react)
 
 [→ Read more](react/README.md)
 

@@ -20,7 +20,7 @@ For code examples, see [`examples/basic.rs`](examples/basic.rs) and the many tes
   - In-memory store for getting / setting data (`Store`). Useful for clients.
   - On disk database (`Db`, uses Sled), which powers `atomic-server`.
 - [JSON-AD Parser & Serializer](https://docs.atomicdata.dev/core/json-ad.html)
-- Serialization of atomic data  to JSON-AD, plain JSON, RDF, Turtle, N-Triples and JSON-LD.
+- Serialization of atomic data to JSON-AD, plain JSON, RDF, Turtle, N-Triples and JSON-LD.
 - [Path](https://docs.atomicdata.dev/core/paths.html) traversal
 - Convert Atomic Data to Rust native types
 - Resolve / parse mappings (bookmarks)

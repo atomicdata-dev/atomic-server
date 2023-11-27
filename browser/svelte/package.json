@@ -1,35 +1,10 @@
 {
-  "name": "@tomic/svelte",
-  "description": "Atomic Data Svelte library",
   "author": "Ontola, Polle Pas",
-  "private": false,
-  "publishConfig": {
-    "access": "public"
+  "dependencies": {
+    "@tomic/lib": "workspace:*",
+    "svelte": "^3.55.0"
   },
-  "version": "0.36.0",
-  "type": "module",
-  "license": "MIT",
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs.js"
-    }
-  },
-  "main": "./dist/index.cjs.js",
-  "module": "./dist/index.js",
-  "typings": "./dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "build:watch": "tsc && vite build --watch",
-    "lint": "eslint ./src --ext .js,.svelte,.ts,.tsx",
-    "lint-fix": "eslint ./src --ext .js,.svelte,.ts,.tsx --fix",
-    "test": "vitest run",
-    "coverage": "vitest --coverage"
-  },
+  "description": "Atomic Data Svelte library",
   "devDependencies": {
     "@rollup/plugin-typescript": "^10.0.1",
     "@typescript-eslint/parser": "^5.47.0",
@@ -37,12 +12,40 @@
     "tslib": "^2.4.1",
     "vitest": "^0.34.6"
   },
-  "packageManager": "pnpm@7.13.3",
-  "dependencies": {
-    "@tomic/lib": "workspace:*",
-    "svelte": "^3.55.0"
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs.js"
+    }
   },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "main": "./dist/index.cjs.js",
+  "module": "./dist/index.js",
+  "main-dev": "src/index.ts",
+  "name": "@tomic/svelte",
+  "packageManager": "pnpm@7.13.3",
   "peerDependencies": {
     "@tomic/lib": "workspace:*"
-  }
+  },
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc && vite build",
+    "build:watch": "tsc && vite build --watch",
+    "coverage": "vitest --coverage",
+    "dev": "vite",
+    "lint": "eslint ./src --ext .js,.svelte,.ts,.tsx",
+    "lint-fix": "eslint ./src --ext .js,.svelte,.ts,.tsx --fix",
+    "test": "vitest run"
+  },
+  "source": "src/index.ts",
+  "type": "module",
+  "types": "dist/index.d.ts",
+  "typings": "./dist/index.d.ts",
+  "version": "0.36.0"
 }
