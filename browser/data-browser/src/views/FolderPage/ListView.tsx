@@ -28,7 +28,7 @@ export function ListView({
               <th>
                 <TitleHeaderWrapper>Title</TitleHeaderWrapper>
               </th>
-              <th>Class</th>
+              <ClassCell as='th'>Class</ClassCell>
               <AlignRight as='th'>Last Modified</AlignRight>
             </tr>
           </thead>
@@ -38,9 +38,9 @@ export function ListView({
                 <td>
                   <Title resource={resource} />
                 </td>
-                <td>
+                <ClassCell>
                   <ClassType resource={resource} />
-                </td>
+                </ClassCell>
                 <AlignRight>
                   <LastCommit resource={resource} />
                 </AlignRight>
@@ -173,6 +173,12 @@ const TableRow = styled.tr`
 
   td {
     padding: var(--cell-padding);
+  }
+`;
+
+const ClassCell = styled.td`
+  @container (max-width: 500px) {
+    display: none;
   }
 `;
 
