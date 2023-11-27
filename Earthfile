@@ -6,7 +6,8 @@ FROM rust:1.73.0-buster
 WORKDIR /code
 
 pipeline:
-  ARG tag=latest
+  BUILD browser+test
+  BUILD browser+lint
   BUILD +fmt
   BUILD +lint
   BUILD +test
@@ -37,7 +38,8 @@ source:
 
 build:
   FROM +source
-  DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
+  DO rust+CARGO --args="build --release --target=x86_64-unknown-linux-musl" --output="release/[^/\.]+"
+  # DO rust+CARGO --args="build --release --target=aarch64-unknown-linux-gnu" --output="release/[^/\.]+"
   SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target
 
 test:
@@ -53,6 +55,8 @@ lint:
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
 docker:
+  FROM scratch
+  ARG tag=latest
   COPY --chmod=0755 +build/target/atomic-server /atomic-server-bin
   # For a complete list of possible ENV vars or available flags, run with `--help`
   ENV ATOMIC_STORE_PATH="/atomic-storage/db"
@@ -64,7 +68,7 @@ docker:
   # Push to github container registry
   # SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:latest
   # Push to dockerhub
-  SAVE IMAGE --push joepmeneer/atomic-server:latest
+  SAVE IMAGE --push joepmeneer/atomic-server:${tag}
 
 setup-playwright:
   FROM mcr.microsoft.com/playwright:v1.38.0-jammy

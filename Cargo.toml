@@ -4,5 +4,6 @@ members = [
   "server",
   "cli",
   "lib",
-  "desktop",
+  # Disable to fix MUSL build
+  # "desktop",
 ]
