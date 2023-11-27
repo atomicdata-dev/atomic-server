@@ -132,10 +132,4 @@ export default defineConfig({
       port: 5174,
     },
   },
-  // resolve: {
-  //   alias: {
-  //     '@tomic/lib': path.resolve(__dirname, 'lib'),
-  //     '@tomic/react': path.resolve(__dirname, 'react'),
-  //   },
-  // },
 });
