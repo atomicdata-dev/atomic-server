@@ -1,7 +1,6 @@
-// eslint-disable-next-line no-undef
 module.exports = {
   root: true,
-  ignore: ['eslint.cjs', '**/vite.config.ts'],
+  ignorePatterns: ['./.eslint.cjs', '**/vite.config.ts'],
   extends: [
     'eslint:recommended',
     'plugin:prettier/recommended',
