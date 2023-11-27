@@ -8,9 +8,10 @@ export class CollectionBuilder {
   private params: CollectionParams = {
     page_size: '30',
   };
-  public constructor(store: Store, server: string) {
+
+  public constructor(store: Store, server?: string) {
     this.store = store;
-    this.server = server;
+    this.server = server ?? new URL(store.getServerUrl()).origin;
   }
 
   public setProperty(property: string): CollectionBuilder {
