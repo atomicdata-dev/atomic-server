@@ -45,7 +45,9 @@ export default function InputSwitcher(props: InputProps): JSX.Element {
     }
 
     // TODO: DateTime selector
-    // case Datatype.TIMESTAMP:
+    case Datatype.TIMESTAMP: {
+      return <InputNumber {...props} />;
+    }
 
     default: {
       return <InputString {...props} />;

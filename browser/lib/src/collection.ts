@@ -117,6 +117,30 @@ export class Collection {
     return collection;
   }
 
+  public async *[Symbol.asyncIterator]() {
+    await this.waitForReady();
+
+    for (let i = 0; i < this.totalMembers; i++) {
+      yield this.getMemberWithIndex(i);
+    }
+  }
+
+  public async getAllMembers(): Promise<string[]> {
+    const prevPageSize = this.params.page_size;
+    // Set page size to a high number for less request overhead.
+    this.params.page_size = '1000';
+
+    const members: string[] = [];
+
+    for await (const member of this) {
+      members.push(member);
+    }
+
+    this.params.page_size = prevPageSize;
+
+    return members;
+  }
+
   private buildSubject(page: number): string {
     const url = new URL(`${this.server}/query`);
 
