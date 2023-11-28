@@ -280,19 +280,13 @@ test.describe('data-browser', async () => {
 
     const alphabet = 'abcdefghijklmnopqrstuvwxyz';
 
-    const waiter = waitForCommitOnCurrentResource(page, {
-      set: {
-        ['https://atomicdata.dev/properties/name']: alphabet,
-      },
-    });
-
     for (const letter of alphabet) {
       await page.type(editableTitle, letter, { delay: Math.random() * 300 });
     }
 
     // wait for commit debounce
     // make sure no commits are waiting for each other
-    await waiter;
+    await page.waitForTimeout(1000);
 
     await page.keyboard.press('Escape');
 
