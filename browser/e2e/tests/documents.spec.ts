@@ -10,7 +10,6 @@ import {
   openNewSubjectWindow,
   timestamp,
   before,
-  waitForCommitOnCurrentResource,
 } from './test-utils';
 test.describe('documents', async () => {
   test.beforeEach(before);

@@ -12,7 +12,6 @@ pipeline:
   BUILD +lint
   BUILD +test
   BUILD +build
-  BUILD +docker --tag=$tag
   BUILD +e2e
 
 install:
