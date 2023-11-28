@@ -1,7 +1,7 @@
 VERSION --try --global-cache 0.7
 PROJECT ontola/atomic-server
 IMPORT ./browser AS browser
-IMPORT github.com/earthly/lib/rust:2.2.10 AS rust
+IMPORT github.com/earthly/lib/rust:2.2.11 AS rust
 FROM rust:1.73.0-buster
 WORKDIR /code
 
@@ -14,12 +14,10 @@ pipeline:
   BUILD +test
   BUILD +build
   BUILD +e2e
+  BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
 
-build-platforms:
-  BUILD \
-    --platform=linux/amd64 \
-    --platform=linux/arm/v7 \
-    +build
+build-all:
+  BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
 
 install:
   RUN apt-get update -qq
@@ -30,8 +28,7 @@ install:
   # RUN rustup target add x86_64-unknown-linux-musl
   # RUN apt update && apt install -y musl-tools musl-dev g++-x86-64-linux-gnu libc6-dev-amd64-cross libgtk-3-dev libsoup2.4-dev
   # Tauri deps
-  # RUN apt install -y libwebkit2gtk-4.0-dev
-  # RUN update-ca-certificates
+  RUN cargo install cross
   # Call +INIT before copying the source file to avoid installing depencies every time source code changes.
   # This parametrization will be used in future calls to UDCs of the library
   DO rust+INIT --keep_fingerprints=true
@@ -41,6 +38,16 @@ source:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir server lib cli desktop  ./
   COPY browser+build/dist /code/browser/data-browser/dist
+
+cross-build:
+  FROM +source
+  ARG --required TARGET
+  # This syntax is not supported
+  WITH DOCKER
+    DO rust+RUN_WITH_CACHE --command "cross build --target \$TARGET"
+  END
+  RUN wadoanw
+  SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target
 
 build:
   FROM +source
