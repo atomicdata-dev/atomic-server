@@ -56,7 +56,9 @@ lint:
 
 docker:
   FROM jeanblanchard/alpine-glibc:3.17.5
-  ARG tag=latest,$EARTHLY_GIT_SHORT_HASH
+  ARG tag="latest,\$EARTHLY_GIT_SHORT_HASH"
+  # Some glibc deps are missing, installing it errors so ignore.
+  RUN apk add gcompat 2>/dev/null || true
   COPY --chmod=0755 +build/target/atomic-server /atomic-server-bin
   RUN /atomic-server-bin --version
   # For a complete list of possible ENV vars or available flags, run with `--help`
