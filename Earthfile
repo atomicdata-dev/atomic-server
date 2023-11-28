@@ -38,8 +38,8 @@ source:
 
 build:
   FROM +source
-  DO rust+CARGO --args="build --release --target=x86_64-unknown-linux-musl" --output="release/[^/\.]+"
-  # DO rust+CARGO --args="build --release --target=aarch64-unknown-linux-gnu" --output="release/[^/\.]+"
+  DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
+  RUN ./target/release/atomic-server --version
   SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target
 
 test:
@@ -55,9 +55,10 @@ lint:
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
 docker:
-  FROM scratch
-  ARG tag=latest
+  FROM jeanblanchard/alpine-glibc:3.17.5
+  ARG tag=latest,$EARTHLY_GIT_SHORT_HASH
   COPY --chmod=0755 +build/target/atomic-server /atomic-server-bin
+  RUN /atomic-server-bin --version
   # For a complete list of possible ENV vars or available flags, run with `--help`
   ENV ATOMIC_STORE_PATH="/atomic-storage/db"
   ENV ATOMIC_CONFIG_PATH="/atomic-storage/config.toml"
