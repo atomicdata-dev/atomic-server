@@ -8,5 +8,6 @@
     "https://atomicdata.dev/ontology/collection",
     "https://atomicdata.dev/ontology/data-browser",
     "https://atomicdata.dev/ontology/server"
-  ]
+  ],
+  "_ISLIB_": true
 }

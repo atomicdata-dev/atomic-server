@@ -1,12 +1,16 @@
 import { __INTERNAL_GET_KNOWN_SUBJECT_MAPPING } from '@tomic/lib';
+import { atomicConfig } from './config.js';
 
 export class PropertyRecord {
   private knownProperties: Set<string>;
   private missingProperties = new Set<string>();
 
   public constructor() {
-    this.knownProperties = new Set();
-    // __INTERNAL_GET_KNOWN_SUBJECT_MAPPING().keys(),
+    this.knownProperties = new Set([
+      ...(atomicConfig._ISLIB_
+        ? []
+        : __INTERNAL_GET_KNOWN_SUBJECT_MAPPING().keys()),
+    ]);
   }
 
   public repordPropertyDefined(subject: string) {

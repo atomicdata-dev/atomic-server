@@ -1,5 +1,5 @@
 /* -----------------------------------
- * GENERATED WITH ATOMIC-GENERATE
+ * GENERATED WITH @tomic/cli
  * -------------------------------- */
 
 import { registerOntologies } from '../index.js';

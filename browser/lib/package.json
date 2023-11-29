@@ -1,4 +1,5 @@
 {
+  "version": "0.36.1",
   "author": "Joep Meindertsma",
   "dependencies": {
     "@noble/ed25519": "1.6.0",
@@ -40,6 +41,5 @@
   },
   "source": "src/index.ts",
   "type": "module",
-  "types": "dist/src/index.d.ts",
-  "version": "0.36.0"
+  "types": "dist/src/index.d.ts"
 }

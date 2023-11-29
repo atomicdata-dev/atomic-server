@@ -23,6 +23,7 @@ export interface AtomicConfig {
   /** The list of subjects of your ontologies */
 
   ontologies: string[];
+  _ISLIB_: boolean;
 }
 
 export const atomicConfig: AtomicConfig = JSON.parse(
