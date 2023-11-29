@@ -14,7 +14,7 @@ jobs:
           version: "latest"
       - uses: actions/checkout@v2
       - name: Log in to Docker Hub
-        uses: docker/login-action@f054a8b539a109f9f41c372932f1ae047eff08c9
+        uses: docker/login-action@v3
         with:
           username: joepmeneer
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -27,7 +27,7 @@ jobs:
             branch="${GITHUB_REF##*/}"
           fi
           git checkout -b "$branch" || true
-      - name: Earthly pipeline
+      - name: Earthly build, test
         run: earthly --org ontola --ci --sat henk -P +pipeline
-      - name: Earthly pipeline
-        run: earthly --org ontola --ci --sat henk -P +docker --push --tag="latest,${{ github.sha }}""
+      - name: Earthly build and push docker
+        run: earthly --org ontola --ci --sat henk -P --push +docker --tag="latest,${{ github.sha }}"

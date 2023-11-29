@@ -68,7 +68,7 @@ docker:
   VOLUME /atomic-storage
   ENTRYPOINT ["/atomic-server-bin"]
   # Push to github container registry
-  # SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:latest
+  # SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:${tag}
   # Push to dockerhub
   SAVE IMAGE --push joepmeneer/atomic-server:${tag}
 
