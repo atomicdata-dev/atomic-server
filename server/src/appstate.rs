@@ -89,6 +89,9 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
             .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
         // This means that editing the .env does _not_ grant you the rights to edit the Drive.
         tracing::info!("Setting rights to Drive {}", store.get_server_url());
+
+        tracing::info!("Adding all resources to search index");
+        crate::search::add_all_resources(&search_state, &store)?
     }
 
     Ok(AppState {

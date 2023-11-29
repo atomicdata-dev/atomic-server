@@ -1,5 +1,24 @@
 [
     {
+        "@id": "https://atomicdata.dev",
+        "https://atomicdata.dev/properties/read": [
+            "https://atomicdata.dev/agents/publicAgent"
+        ],
+        "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Drive"
+    },
+    {
+        "@id": "https://atomicdata.dev/properties",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev"
+    },
+    {
+        "@id": "https://atomicdata.dev/classes",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev"
+    },
+    {
+        "@id": "https://atomicdata.dev/datatypes",
+        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev"
+    },
+    {
         "@id": "https://atomicdata.dev/properties/endpoint/parameters",
         "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
         "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",

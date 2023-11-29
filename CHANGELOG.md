@@ -7,6 +7,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## UNRELEASED
 
+- Fix locally searching for atomicdata.dev resources in external servers #706
 - Use Earthly for CI: building, testing, pushing Docker images #576
 - Host @tomic NPM docs [on Netlify](https://atomic-lib.netlify.app/) #707
 
