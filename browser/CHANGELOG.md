@@ -18,6 +18,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 - `Collection` is now an async itterator
 - Added `getAllMembers` method to `Collection`
+- Fix `set` call with equal arrays #715
 
 ## 0.36.0
 

@@ -243,8 +243,9 @@ function DocumentPageEdit({
     }
 
     elements.splice(number, 1);
-    setElements(elements);
+    setElements([...elements]);
     focusElement(number - 1);
+    resource.save(store);
   }
 
   /** Sets the subject for a specific element and moves to the next element */
@@ -264,7 +265,7 @@ function DocumentPageEdit({
     const element = elements[from];
     elements.splice(from, 1);
     elements.splice(to, 0, element);
-    setElements(elements);
+    setElements([...elements]);
     focusElement(to);
     resource.save(store);
   }

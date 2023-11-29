@@ -600,11 +600,6 @@ export class Resource<C extends OptionalClass = any> {
      */
     validate = true,
   ): Promise<void> {
-    // If the value is the same, don't do anything. We don't want unnecessary commits.
-    if (this.equalsCurrentValue(prop, value)) {
-      return;
-    }
-
     if (store.isOffline()) {
       console.warn('Offline, not validating');
       validate = false;

@@ -53,7 +53,7 @@ test.describe('documents', async () => {
     ).toBeVisible();
 
     // Delete a row, cmd + backspace
-    await page.keyboard.down('Meta');
+    await page.keyboard.down('Alt');
     await page.keyboard.press('Backspace');
     await expect(
       page.locator(`text=${syncText}`),
