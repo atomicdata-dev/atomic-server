@@ -2,6 +2,9 @@
 mod test {
     use assert_cmd::Command;
 
+    const TEST_URL: &str =
+        "https://atomicdata.dev/agents/QmfpRIBn2JYEatT0MjSkMNoBJzstz19orwnT5oT2rcQ=";
+
     #[test]
     fn get_fail() {
         let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
@@ -19,15 +22,13 @@ mod test {
     #[test]
     fn get_url() {
         let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
-        cmd.args(["get", "https://atomicdata.dev/classes"])
-            .assert()
-            .success();
+        cmd.args(["get", TEST_URL]).assert().success();
     }
 
     #[test]
     fn get_path() {
         let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
-        cmd.args(["get", "https://atomicdata.dev/classes members"])
+        cmd.args(["get", &format!("{TEST_URL} name")])
             .assert()
             .success();
     }
@@ -35,7 +36,7 @@ mod test {
     #[test]
     fn get_path_array() {
         let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
-        cmd.args(["get", "https://atomicdata.dev/classes is-a 0"])
+        cmd.args(["get", &format!("{TEST_URL} is-a 0")])
             .assert()
             .success();
     }
@@ -43,7 +44,7 @@ mod test {
     #[test]
     fn get_path_array_non_existent() {
         let mut cmd = Command::cargo_bin(assert_cmd::crate_name!()).unwrap();
-        cmd.args(["get", "https://atomicdata.dev/classes is-a 1"])
+        cmd.args(["get", &format!("{TEST_URL} is-a 1")])
             .assert()
             .failure();
     }
