@@ -51,11 +51,11 @@ urlencoding = "2"
 
 [dependencies.instant-acme]
 optional = true
-version = "0.1"
+version = "0.4"
 
 [dependencies.rcgen]
 optional = true
-version = "0.10"
+version = "0.11"
 
 [dependencies.tracing-opentelemetry]
 optional = true

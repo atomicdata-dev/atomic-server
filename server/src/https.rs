@@ -190,13 +190,14 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
 
     info!("Creating LetsEncrypt account with email {}", email);
 
-    let account = instant_acme::Account::create(
+    let (account, _creds) = instant_acme::Account::create(
         &instant_acme::NewAccount {
             contact: &[&format!("mailto:{}", email)],
             terms_of_service_agreed: true,
             only_return_existing: false,
         },
         lets_encrypt_url,
+        None,
     )
     .await
     .map_err(|e| format!("Failed to create account: {}", e))?;
@@ -211,18 +212,21 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
         domain = format!("*.{}", domain);
     }
     let identifier = instant_acme::Identifier::Dns(domain);
-    let (mut order, state) = account
+    let mut order = account
         .new_order(&instant_acme::NewOrder {
             identifiers: &[identifier],
         })
         .await
         .unwrap();
 
-    assert!(matches!(state.status, instant_acme::OrderStatus::Pending));
+    assert!(matches!(
+        order.state().status,
+        instant_acme::OrderStatus::Pending
+    ));
 
     // Pick the desired challenge type and prepare the response.
 
-    let authorizations = order.authorizations(&state.authorizations).await.unwrap();
+    let authorizations = order.authorizations().await.unwrap();
     let mut challenges = Vec::with_capacity(authorizations.len());
 
     // if we have H11p01 challenges, we need to start a server to handle them, and eventually turn that off again
@@ -276,7 +280,7 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
     let url = authorizations.get(0).expect("Authorizations is empty");
     let state = loop {
         actix::clock::sleep(delay).await;
-        let state = order.state().await.unwrap();
+        let state = order.state();
         if let instant_acme::OrderStatus::Ready | instant_acme::OrderStatus::Invalid = state.status
         {
             info!("order state: {:#?}", state);
@@ -314,16 +318,18 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
 
     // Finalize the order and print certificate chain, private key and account credentials.
 
+    order.finalize(&csr).await.map_err(|e| e.to_string())?;
     let cert_chain_pem = order
-        .finalize(&csr, &state.finalize)
+        .certificate()
         .await
-        .map_err(|e| e.to_string())?;
-    info!("certficate chain:\n\n{}", cert_chain_pem,);
+        .map_err(|e| format!("Error getting certificate {}", e))?
+        .expect("No cert found");
+    info!("certficate chain:\n\n{}", cert_chain_pem);
     info!("private key:\n\n{}", cert.serialize_private_key_pem());
-    info!(
-        "account credentials:\n\n{}",
-        serde_json::to_string_pretty(&account.credentials()).map_err(|e| e.to_string())?
-    );
+    // info!(
+    //     "account credentials:\n\n{}",
+    //     serde_json::to_string_pretty(&account.credentials()).map_err(|e| e.to_string())?
+    // );
     write_certs(config, cert_chain_pem, cert)?;
 
     if let Some(hnd) = handle {
