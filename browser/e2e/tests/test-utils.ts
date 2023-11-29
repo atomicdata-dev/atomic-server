@@ -27,7 +27,11 @@ export const sideBarDriveSwitcher = '[title="Open Drive Settings"]';
 export const sideBarNewResource = '[data-test="sidebar-new-resource"]';
 export const currentDriveTitle = '[data-test=current-drive-title]';
 export const publicReadRightLocator = (page: Page) =>
-  page.locator('[data-test="right-public"] input[type="checkbox"]').first();
+  page
+    .locator(
+      '[data-test="right-public"] input[type="checkbox"]:not([disabled])',
+    )
+    .first();
 export const contextMenu = '[data-test="context-menu"]';
 export const addressBar = '[data-test="address-bar"]';
 export const newDriveMenuItem = '[data-test="menu-item-new-drive"]';
@@ -111,7 +115,10 @@ export async function makeDrivePublic(page: Page) {
   await page.click(currentDriveTitle);
   await page.click(contextMenu);
   await page.click('button:has-text("share")');
-  await expect(publicReadRightLocator(page)).not.toBeChecked();
+  await expect(
+    publicReadRightLocator(page),
+    'The drive was public from the start',
+  ).not.toBeChecked();
   await publicReadRightLocator(page).click();
   await page.locator('text=Save').click();
   await expect(page.locator('text="Share settings saved"')).toBeVisible();
