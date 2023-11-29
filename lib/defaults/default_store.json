@@ -403,7 +403,7 @@
     },
     {
         "@id": "https://atomicdata.dev/properties/collection/value",
-        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+        "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
         "https://atomicdata.dev/properties/description": "Filter collection by the Value of Atoms. The Value is the third field of an Atom. Similar to `object` in RDF.",
         "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
         "https://atomicdata.dev/properties/isA": [
