@@ -49,7 +49,33 @@ jobs:
             type=semver,pattern={{major}}
             type=sha
 
-      - name: Build and push Docker image
+      - name: Build Docker image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: false
+          provenance: false
+          load: true
+          tags: joepmeneer/atomic-server:local
+
+      - name: Run Docker image
+        run: nohup docker run -p 80:80 joepmeneer/atomic-server:local --initialize &
+
+      - uses: pnpm/action-setup@v2.0.1
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 7
+          run_install: false
+
+      - name: Setup and run end-to-end tests
+        working-directory: ./server/e2e_tests/
+        run: |
+          pnpm install
+          pnpm run install-playwright
+          pnpm run test
+
+      - name: Build + push multiplatform Docker images
         uses: docker/build-push-action@v4
         with:
           context: .
@@ -57,4 +83,4 @@ jobs:
           provenance: false
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          labels: ${{ steps.meta.outputs.labels }}e
