@@ -80,5 +80,10 @@
 			"isBackground": true,
 			"group": "test"
 		},
+		{
+			"type": "shell",
+			"label": "docs atomic data (mdbook serve)",
+			"command": "cd docs && mdbook serve",
+		}
 	]
 }

@@ -1,0 +1,19 @@
+[book]
+title = "Atomic Data Docs"
+authors = ["Joep Meindertsma"]
+description = "Documentation for the Atomic Data standard."
+language = "en"
+
+[output.html]
+git-repository-icon = "fa-github"
+git-repository-url = "https://github.com/atomicdata-dev/atomic-data-docs"
+additional-css = ["open-in.css"]
+
+[output.linkcheck]
+optional = true
+
+[preprocessor.open-on-gh]
+command = "mdbook-open-on-gh"
+renderer = ["html"]
+text = "mdbook-open-on-gh"
+open-on-text = "[Suggest edits for this page on GitHub.]"
