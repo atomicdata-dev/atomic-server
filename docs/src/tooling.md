@@ -6,41 +6,33 @@ Although Atomic Data is a specification, it also has reference implementations:
 Open source (MIT licenced) software for Atomic Data:
 
 - **Server + Database**: [atomic-server](https://github.com/atomicdata-dev/atomic-server)
-- **GUI**: [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser)
 - **CLI**: [atomic-cli](https://github.com/atomicdata-dev/atomic-server)
 
 Libraries (MIT licenced) to build apps with:
 
-- Typescript / javascript library: [@tomic/lib (npm)](https://www.npmjs.com/package/@tomic/lib)
-- React library: [@tomic/react (npm)](https://www.npmjs.com/package/@tomic/react)
+- Typescript / javascript library: [@tomic/lib](js.md)
+- React library: [@tomic/react](usecases/react.md)
+- Svelte library: [@tomic/svelte](svelte.md)
 - Rust library: [atomic-lib (crates.io)](https://crates.io/crates/atomic-lib)
 
 ## Applications
 
 ### `atomic-server`
 
-Server for hosting Atomic Data. Uses `atomic-lib`.
+Server for hosting Atomic Data. Uses `atomic-lib`, `@tomic/lib` and `@tomic/react`.
+
 
 - Responds to requests for created Atomic Resources, makes atomic data available at their URL.
 - Embedded database
 - Authorization, authentication, versioning, collections, pagination
 - Browser-friendly HTML presentation, JSON serialization, RDF serialization.
-
-One liner: `$ docker run -p 80:80 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
-
-[demo](https://atomicdata.dev/)
-
-[repository + issue tracker](https://github.com/atomicdata-dev/atomic-data-browser).
-
-### `atomic-data-browser`
-
-Data browser, powered by `@tomic/lib` and `@tomic/react`.
-
 - View & edit atomic data, using dynamic forms
 - Collections with pagination and sorting
 - Client-side full-text search
 
-[demo](https://atomicdata.dev/) (same as `atomic-server`)
+One liner: `$ docker run -p 80:80 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+
+[demo](https://atomicdata.dev/)
 
 [repository + issue tracker](https://github.com/atomicdata-dev/atomic-data-browser).
 
@@ -100,7 +92,7 @@ Library that powers `atomic-server` and `atomic-cli`. Features:
 - Path traversal
 - Basic validation
 
-[repository + issue tracker](https://github.com/atomicdata-dev/atomic-data-browser).
+[repository + issue tracker](https://github.com/atomicdata-dev/atomic-server).
 
 ## Want to add to this list? Some ideas for tooling
 

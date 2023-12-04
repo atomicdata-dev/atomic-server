@@ -1,5 +1,13 @@
 # AtomicServer FAQ & Troubleshooting
 
+## I can't find my question, I need support
+
+- Create an [issue on github](https://github.com/atomicdata-dev/atomic-server/issues) or [join the discord](https://discord.gg/a72Rv2P)!
+
+## Do I need NGINX or something?
+
+No, AtomicServer has its own HTTPS support. Just pass a `--https` flag!
+
 ## Can / should I create backups?
 
 You should.
