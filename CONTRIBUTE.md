@@ -199,9 +199,8 @@ So please first send an e-mail to joep@ontola.io describing the issue, and then 
 ## Releases, Versioning and Tagging
 
 1. Commit changes
-2. Update the `tauri.conf.json` manually to the new version.
-3. Make sure all tests run properly
-4. Use `cargo workspaces version patch` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
+1. Make sure all tests run properly
+1. Use `cargo workspaces version patch` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
 
 The following should be triggered automatically:
 
@@ -212,7 +211,6 @@ Note:
 
 - We use [semver](https://semver.org/), and are still quite far from 1.0.0.
 - The version for `atomic-lib` is the most important, and dictates the versions of `cli` and `server`. When `lib` changes minor version, `cli` and `server` should follow.
-- After publishing, update the `./desktop/latest-version.json` file. This is used for auto-updating desktop distributions. See [tauri docs](https://tauri.studio/docs/distribution/updater).
 
 ### CI situation
 
@@ -226,8 +224,7 @@ If the CI scripts for some reason do not do their job (buildin releases, docker 
 #### Building and publishing binaries
 
 1. `cargo build --release`
-2. `cargo tauri build` (on every OS!)
-3. Create a release on github, add the binaries and tauri builds
+1. Create a release on github, add the binaries
 
 #### Publishing to Cargo
 

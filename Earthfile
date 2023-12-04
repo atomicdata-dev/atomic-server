@@ -14,17 +14,23 @@ pipeline:
   BUILD +build
   BUILD +e2e
 
+build-platforms:
+  BUILD \
+    --platform=linux/amd64 \
+    --platform=linux/arm/v7 \
+    +build
+
 install:
   RUN apt-get update -qq
-  RUN apt-get install --no-install-recommends -qq autoconf autotools-dev libtool-bin clang cmake bsdmainutils
+  # RUN apt-get install --no-install-recommends -qq autoconf autotools-dev libtool-bin clang cmake bsdmainutils
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   # Atomic-Server deps
-  RUN rustup target add x86_64-unknown-linux-musl
-  RUN apt update && apt install -y musl-tools musl-dev g++-x86-64-linux-gnu libc6-dev-amd64-cross libgtk-3-dev libsoup2.4-dev
+  # RUN rustup target add x86_64-unknown-linux-musl
+  # RUN apt update && apt install -y musl-tools musl-dev g++-x86-64-linux-gnu libc6-dev-amd64-cross libgtk-3-dev libsoup2.4-dev
   # Tauri deps
-  RUN apt install -y libwebkit2gtk-4.0-dev
-  RUN update-ca-certificates
+  # RUN apt install -y libwebkit2gtk-4.0-dev
+  # RUN update-ca-certificates
   # Call +INIT before copying the source file to avoid installing depencies every time source code changes.
   # This parametrization will be used in future calls to UDCs of the library
   DO rust+INIT --keep_fingerprints=true

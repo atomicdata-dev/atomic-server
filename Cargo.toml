@@ -4,6 +4,7 @@ members = [
   "server",
   "cli",
   "lib",
-  # Disable to fix MUSL build
+  # Tauri build is deprecated, see
+  # https://github.com/atomicdata-dev/atomic-server/issues/718
   # "desktop",
 ]

@@ -1,5 +1,7 @@
 # Atomic-Server Desktop (powered by Tauri)
 
+[_WARNING: THIS SUB-PROJECT IS NOT ACTIVELY MAINTAINED_](https://github.com/atomicdata-dev/atomic-server/issues/718)
+
 Desktop release for Atomic-Server.
 [Tauri] takes care of native installers, app icons, system tray icons, menu items, self-update ([issue](https://github.com/atomicdata-dev/atomic-server/issues/158)) and more.
 
@@ -20,5 +22,5 @@ If you only want to work on the _server side_ of things, you can remove `devPath
 
 ## Limitations
 
-- No way to pass flags to `atomic-sever` using the Tauri executable (although you can set ENV varibles)
+- No way to pass flags to `atomic-sever` using the Tauri executable (although you can set ENV variables)
 - No HTTPS support
