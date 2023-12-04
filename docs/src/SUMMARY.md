@@ -1,9 +1,25 @@
 ## Table of contents
 
+# What is Atomic Data
+
 * [Atomic Data Overview](atomic-data-overview.md)
   * [Motivation](motivation.md)
   * [Strategy, history and roadmap](roadmap.md)
   * [When (not) to use it](when-to-use.md)
+
+# AtomicServer
+
+* [AtomicServer](atomicserver/intro.md)
+  * [Installation](atomicserver/installation.md)
+  * [FAQ & troubleshooting](atomicserver/faq.md)
+  * [GUI](atomicserver/gui.md)
+  * [API](atomicserver/API.md)
+  * [Create & publish data](atomizing.md)
+  * [Creating a JSON-AD file](create-json-ad.md)
+* [Software and libraries](tooling.md)
+  * [Upgrade your existing project](interoperability/upgrade.md)
+  * [With React](usecases/react.md)
+  * [With Svelte](svelte.md)
 
 # Specification (core)
 
@@ -32,13 +48,6 @@
   * [Collections, filtering, sorting](schema/collections.md)
   * [Uploading and downloading files](files.md)
 
-# Create Atomic Data
-
-* [Atomizing](atomizing.md)
-  * [Using Atomic-Server](atomic-server.md)
-  * [Creating a JSON-AD file](create-json-ad.md)
-  * [Upgrade your existing project](interoperability/upgrade.md)
-
 # Use Atomic Data
 
 * [Interoperability and comparisons](interoperability/intro.md)
@@ -59,7 +68,6 @@
   * [Data Catalog](usecases/data-catalog.md)
   * [Education](usecases/education.md)
   * [Food labels](usecases/food-labels.md)
-* [**Software and libraries**](tooling.md)
 
 -----------
 

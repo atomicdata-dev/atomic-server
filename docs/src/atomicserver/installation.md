@@ -1,0 +1,147 @@
+# Setup / installation
+
+You can run AtomicServer in different ways:
+
+1. Using docker (probably the quickest): `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+2. From a published [binary](https://github.com/atomicdata-dev/atomic-server/releases)
+3. Using [Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html) from crates.io: `cargo install atomic-server`
+4. Manually from source
+
+When you're running AtomicServer, go to [Initial setup and configuration](#Initial-setup-and-configuration).
+If you want to run this locally as a developer / contributor, check out [the Contributors guide](https://github.com/atomicdata-dev/atomic-server/blob/develop/CONTRIBUTE.md).
+
+## 1. Run using docker
+
+- Run: `docker run -p 80:80 -p 443:443 -v atomic-storage:/atomic-storage joepmeneer/atomic-server`
+The `dockerfile` is located in the project root, above this `server` folder.
+- If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
+- If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
+
+## 2. Run pre-compiled binary
+
+Get the binaries from the [releases page](https://github.com/atomicdata-dev/atomic-server/releases) and copy them to your `bin` folder.
+
+## 3. Install using cargo
+
+```sh
+# Make sure pnpm is installed and available in path! https://pnpm.io/
+pnpm --version
+# Install from source using cargo, and add it to your path
+# If things go wrong, check out `Troubleshooting compiling from source:` below
+cargo install atomic-server --locked
+# Check the available options and commands
+atomic-server --help
+# Run it!
+atomic-server
+```
+
+## 4. Compile from source
+
+```sh
+# make sure pnpm is installed and available in path! https://pnpm.io/
+pnpm --version
+git clone git@github.com:atomicdata-dev/atomic-server.git
+cd atomic-server/server
+cargo run
+```
+
+If things go wrong while compiling from source:
+
+```sh
+# If cc-linker, pkg-config or libssl-dev is not installed, make sure to install them
+sudo apt-get install -y build-essential pkg-config libssl-dev --fix-missing
+```
+
+## Initial setup and configuration
+
+- You can configure the server by passing arguments (see `atomic-server --help`), or by setting ENV variables.
+- The server loads the `.env` from the current path by default. Create a `.env` file from the default template in your current directory with `atomic-server generate-dotenv`
+- After running the server, check the logs and take note of the `Agent Subject` and `Private key`. You should use these in the [`atomic-cli`](https://crates.io/crates/atomic-cli) and [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser) clients for authorization.
+- A directory is made: `~/.config/atomic`, which stores your newly created Agent keys, the HTTPS certificates other configuration. Depending on your OS, the actual data is stored in different locations. See use the `show-config` command to find out where, if you need the files.
+- Visit `http://localhost:9883/setup` to **register your first (admin) user**. You can use an existing Agent, or create a new one. Note that if you create a `localhost` agent, it cannot be used on the web (since, well, it's local).
+
+## Running using a tunneling service (easy mode)
+
+If you want to make your -server available on the web, but don't want (or cannot) deal with setting up port-forwarding and DNS, you can use a tunneling service.
+It's the easiest way to get your server to run on the web, yet still have full control over your server.
+
+- Create an account on some tunneling service, such as [tunnelto.dev](https://tunnelto.dev/) (which we will use here). Make sure to reserve a subdomain, you want it to remain stable.
+- `tunnelto --port 9883 --subdomain joepio --key YOUR_API_KEY`
+- `atomic-server --domain joepio.tunnelto.dev --custom-server-url 'https://joepio.tunnelto.dev' --initialize`
+
+## HTTPS Setup on a VPS (static IP required)
+
+You'll probably want to make your Atomic Data available through HTTPS on some server.
+You can use the embedded HTTPS / TLS setup powered by [LetsEncrypt](https://letsencrypt.org/), [acme_lib](https://docs.rs/acme-lib/0.8.1/acme_lib/index.html) and [rustls](https://github.com/ctz/rustls).
+
+You can do this by passing these flags:
+
+Run the server: `atomic-server --https --email some@example.com --domain example.com`.
+
+You can also set these things using a `.env` or by setting them some other way.
+
+Make sure the server is accessible at `ATOMIC_DOMAIN` at port 80, because Let's Encrypt will send an HTTP request to this server's `/.well-known` directory to check the keys.
+The default Ports are `9883` for HTTP, and `9884` for HTTPS.
+If you're running the server publicly, set these to `80` and `433`: `atomic-server --https --port 80 --port-https 433`.
+It will now initialize the certificate.
+Read the logs, watch for errors.
+
+HTTPS certificates are automatically renewed when the server is restarted, and the certs are 4 weeks or older.
+They are stored in your `.config/atomic/` dir.
+
+## HTTPS Setup using external HTTPS proxy
+
+Atomic-server has built-in HTTPS support using letsencrypt, but there are usecases for using external TLS source (e.g. Traeffik / Nginx / Ingress).
+
+To do this, users need to set these ENVS:
+
+```ini
+ATOMIC_DOMAIN=example.com
+# We'll use this regular HTTP port, not the HTTPS one
+ATOMIC_PORT=80
+# Disable built-in letsencrypt
+ATOMIC_HTTPS=false
+# Since Atomic-server is no longer aware of the existence of the external HTTPS service, we need to set the full URL here:
+ATOMIC_SERVER_URL=https://example.com
+```
+
+## Using `systemd` to run Atomic-Server as a service
+
+In Linux operating systems, you can use `systemd` to manage running processes.
+You can configure it to restart automatically, and collect logs with `journalctl`.
+
+Create a service:
+
+```sh
+nano /etc/systemd/system/atomic.service
+```
+
+Add this to its contents, make changes if needed:
+
+```service
+[Unit]
+Description=Atomic-Server
+#After=network.targetdd
+StartLimitIntervalSec=0[Service]
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=1
+User=root
+ExecStart=/root/atomic-server
+WorkingDirectory=/root/
+EnvironmentFil=/root/.env
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```sh
+# start / status / restart commands:
+systemctl start atomic
+systemctl status atomic
+systemctl restart atomic
+# show recent logs, follow them on screen
+journalctl -u atomic.service --since "1 hour ago" -f
+```
