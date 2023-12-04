@@ -122,9 +122,11 @@ e2e:
 docs-pages:
   RUN cargo install mdbook
   RUN cargo install mdbook-linkcheck
+  RUN cargo install mdbook-sitemap-generator
   RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
   RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
   COPY --keep-ts docs /docs
   WORKDIR /docs
   RUN mdbook build
+  RUN mdbook-sitemap-generator -d docs.atomicdata.dev -o /docs/book/html/sitemap.xml
   RUN --secret NETLIFY_AUTH_TOKEN=NETLIFY_TOKEN bash -c "source $HOME/.nvm/nvm.sh && netlify deploy --dir /docs/book/html --prod --auth $NETLIFY_AUTH_TOKEN --site atomic-docs"

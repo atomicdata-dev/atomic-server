@@ -289,7 +289,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 ## v0.26.2
 
-- Add [Typedoc documentation](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules.html) #100
+- Add [Typedoc documentation](https://atomic-docs.netlify.app/) #100
 - Fix bug not showing resource form fields
 - Fix circular parent handling in `canWrite`
 - Update references to changed resources #102
