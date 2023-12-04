@@ -32,28 +32,28 @@ export const SettingsTheme: React.FunctionComponent = () => {
   return (
     <Main>
       <ContainerNarrow>
-        <h1>Theme Settings</h1>
+        <h1>Settings</h1>
         <Column>
-          <Heading>Dark mode</Heading>
+          <Heading>Theme</Heading>
           <Row>
             <Button
               subtle={!(darkModeSetting === DarkModeOption.auto)}
               onClick={() => setDarkMode(undefined)}
               title="Use the browser's / OS dark mode settings"
             >
-              🌓 auto
+              🌓 Auto
             </Button>
             <Button
               subtle={!(darkModeSetting === DarkModeOption.always)}
               onClick={() => setDarkMode(true)}
             >
-              🌑 on
+              🌑 Dark
             </Button>
             <Button
               subtle={!(darkModeSetting === DarkModeOption.never)}
               onClick={() => setDarkMode(false)}
             >
-              🌕 off
+              🌕 Light
             </Button>
           </Row>
           <Heading>Navigation bar position</Heading>
