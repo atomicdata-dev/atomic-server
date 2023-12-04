@@ -1,0 +1,14 @@
+# This format should allow for comments like these, since it's meant to be a human to machine language.
+# Should values require quotes? Or only if its multi-line?
+firstName: John
+lastName: McLovin
+# If a Property is not available in the Class, you can the URL of the property
+https://schema.org/birthDate: 1991-01-20
+# Perhaps support relative paths
+bestFriend: ./mary
+# This is a TranslationBox
+# It actually represents a new Resource with a unique URL
+# Its URL can be generated deterministically by using the Shortname of the Property
+lifeStory:
+  en: "John was born some day, and he will die some day!"
+  nl: "John was ooit geboren, en hij zal ooit sterven!"

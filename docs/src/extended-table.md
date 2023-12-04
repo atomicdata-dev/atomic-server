@@ -1,0 +1,9 @@
+- [Commits](commits/intro.md) communicate state changes. These Commits are signed using cryptographic keys, which ensures that every change can be audited. Commits are also used to construct a history of versions.
+- [Agents](agents.md) are Users that enable [authentication](authentication.md). They are Resources with their own Public and Private keys, which they use to identify themselves.
+- [Collections](schema/collections.md): querying, filtering, sorting and pagination.
+- [Paths](core/paths.md): traverse graphs.
+- [Hierarchies](hierarchy.md) used for authorization and keeping data organized. Similar to folder structures on file-systems.
+- [Invites](invitations.md): create new users and provide them with rights.
+- [WebSockets](websockets.md): real-time updates.
+- [Endpoints](endpoints.md): provide machine-readable descriptions of web services.
+- [Files](files.md): upload, download and metadata for files.

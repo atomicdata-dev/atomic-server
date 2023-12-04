@@ -11,6 +11,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Use Earthly for CI: building, testing, pushing Docker images #576
 - Host @tomic NPM docs [on Netlify](https://atomic-lib.netlify.app/) #707
 - Deprecate Tauri Desktop build #718
+- Merge Docs repository into this one #719
 
 ## [v0.36.0] - 2023-11-02
 
