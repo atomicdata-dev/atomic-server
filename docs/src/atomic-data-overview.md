@@ -7,6 +7,13 @@
 
 Atomic Data uses links to connect pieces of data, and therefore makes it easier to connect datasets to each other - even when these datasets exist on separate machines.
 
+## AtomicServer
+
+[AtomicServer](atomicserver/intro.md) is an open source, powerful graph database + headless CMS.
+It's the reference implementation for the Atomic Data specification, written in Rust.
+
+## Atomic Data Core
+
 Atomic Data has been designed with [the following goals in mind](motivation.md):
 
 - Give people more control over their data
@@ -27,15 +34,6 @@ These Properties are responsible for setting the `datatype` (to ensure type-safe
 Atomic Data Extended is a set of extra modules (on top of Atomic Data Core) that deal with data that changes over time, authentication, and authorization.
 
 {{#include extended-table.md}}
-
-## Atomizing: how to create, convert and host Atomic Data
-
-Atomic Data has been designed to be very easy to create and host.
-In the Atomizing section, we'll show you how you can create Atomic Data in three ways:
-
-- [Using Atomic Server, from your browser](atomicserver/intro.md)
-- [By creating JSON-AD (and optionally importing it)](create-json-ad.md)
-- [By upgrading your existing application](interoperability/upgrade.md)
 
 ## Tools & libraries
 

@@ -145,3 +145,140 @@ systemctl restart atomic
 # show recent logs, follow them on screen
 journalctl -u atomic.service --since "1 hour ago" -f
 ```
+
+## AtomicServer CLI options / ENV vars
+
+(run `atomic-server --help` to see the latest options)
+
+```
+Create, share and model Atomic Data with this graph database server. Run atomic-server without any arguments to start the server. Use --help to learn about the options.
+
+Usage: atomic-server [OPTIONS] [COMMAND]
+
+Commands:
+  export
+          Create and save a JSON-AD backup of the store
+  import
+          Import a JSON-AD file or stream to the store. By default creates Commits for all changes, maintaining version history. Use --force to allow importing other types of files
+  generate-dotenv
+          Creates a `.env` file in your current directory that shows various options that you can set
+  show-config
+          Returns the currently selected options, based on the passed flags and parsed environment variables
+  reset
+          Danger! Removes all data from the store
+  help
+          Print this message or the help of the given subcommand(s)
+
+Options:
+      --initialize
+          Recreates the `/setup` Invite for creating a new Root User. Also re-runs various populate commands, and re-builds the index
+
+          [env: ATOMIC_INITIALIZE=]
+
+      --rebuild-indexes
+          Re-builds the indexes. Parses all the resources. Do this when updating requires it, or if you have issues with Collections / Queries / Search
+
+          [env: ATOMIC_REBUILD_INDEX=]
+
+      --development
+          Use staging environments for services like LetsEncrypt
+
+          [env: ATOMIC_DEVELOPMENT=]
+
+      --domain <DOMAIN>
+          The origin domain where the app is hosted, without the port and schema values
+
+          [env: ATOMIC_DOMAIN=]
+          [default: localhost]
+
+  -p, --port <PORT>
+          The port where the HTTP app is available. Set to 80 if you want this to be available on the network
+
+          [env: ATOMIC_PORT=]
+          [default: 9883]
+
+      --port-https <PORT_HTTPS>
+          The port where the HTTPS app is available. Set to 443 if you want this to be available on the network
+
+          [env: ATOMIC_PORT_HTTPS=]
+          [default: 9884]
+
+      --ip <IP>
+          The IP address of the server. Set to :: if you want this to be available to other devices on your network
+
+          [env: ATOMIC_IP=]
+          [default: ::]
+
+      --https
+          Use HTTPS instead of HTTP. Will get certificates from LetsEncrypt fully automated
+
+          [env: ATOMIC_HTTPS=]
+
+      --https-dns
+          Initializes DNS-01 challenge for LetsEncrypt. Use this if you want to use subdomains
+
+          [env: ATOMIC_HTTPS_DNS=]
+
+      --email <EMAIL>
+          The contact mail address for Let's Encrypt HTTPS setup
+
+          [env: ATOMIC_EMAIL=]
+
+      --script <SCRIPT>
+          Custom JS script to include in the body of the HTML template
+
+          [env: ATOMIC_SCRIPT=]
+          [default: ]
+
+      --config-dir <CONFIG_DIR>
+          Path for atomic data config directory. Defaults to "~/.config/atomic/""
+
+          [env: ATOMIC_CONFIG_DIR=]
+
+      --data-dir <DATA_DIR>
+          Path for atomic data store folder. Contains your Store, uploaded files and more. Default value depends on your OS
+
+          [env: ATOMIC_DATA_DIR=]
+
+      --public-mode
+          CAUTION: Skip authentication checks, making all data publicly readable. Improves performance
+
+          [env: ATOMIC_PUBLIC_MODE=]
+
+      --server-url <SERVER_URL>
+          The full URL of the server. It should resolve to the home page. Set this if you use an external server or tunnel, instead of directly exposing atomic-server. If you leave this out, it will be generated from `domain`, `port` and `http` / `https`
+
+          [env: ATOMIC_SERVER_URL=]
+
+      --log-level <LOG_LEVEL>
+          How much logs you want. Also influences what is sent to your trace service, if you've set one (e.g. OpenTelemetry)
+
+          [env: RUST_LOG=trace]
+          [default: info]
+          [possible values: warn, info, debug, trace]
+
+      --trace <TRACE>
+          How you want to trace what's going on with the server. Useful for monitoring performance and errors in production. Combine with `log_level` to get more or less data (`trace` is the most verbose)
+
+          [env: ATOMIC_TRACING=opentelemetry]
+          [default: stdout]
+
+          Possible values:
+          - stdout:
+            Log to STDOUT in your terminal
+          - chrome:
+            Create a file in the current directory with tracing data, that can be opened with the chrome://tracing/ URL
+          - opentelemetry:
+            Log to a local OpenTelemetry service (e.g. Jaeger), using default ports
+
+      --slow-mode
+          Introduces random delays in the server, to simulate a slow connection. Useful for testing
+
+          [env: ATOMIC_SLOW_MODE=]
+
+  -h, --help
+          Print help information (use `-h` for a summary)
+
+  -V, --version
+          Print version information
+```

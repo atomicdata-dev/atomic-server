@@ -1,16 +1,28 @@
-# Using the GUI
+# Using the AtomicServer GUI
 
-Open your server in your browser.
-By default, that's [`http://localhost:9883`](http://localhost:9883).
-Fun fact: `&#9883;` is HTML entity code for the Atom icon: ⚛.
+## Creating the first Agent on AtomicData.dev
 
-The first screen should show you your [_Drive_](https://atomicdata.dev/classes/Drive).
+Before you can create new things on AtomicData.dev, you'll need an _Agent_.
+This is your virtual User, which can create, sign and own things.
+
+Simply open the [demo invite](https://atomicdata.dev/invites/1) and press accept.
+
+Copy the `secret` from the user settings page and save it somewhere safe, like in a password manager.
+
+## Using your local AtomicServer
+
+After [running the server](installation.md), open it in your browser.
+By default, that's at [`http://localhost:9883`](http://localhost:9883).
+<!-- (Fun fact: `&#9883;` is HTML entity code for the Atom icon: ⚛.) -->
+
+The first screen should show you your main [_Drive_](https://atomicdata.dev/classes/Drive).
 You can think of this as your root folder.
 It is the resource hosted at the root URL, effectively being the home page of your server.
 
 There's an instruction on the screen about the `/setup` page.
 Click this, and you'll get a screen showing an [_Invite_](https://atomicdata.dev/classes/Invite).
-Normally, you could `Accept as new user`, but since you're running on `localhost`, you won't be able to use the newly created Agent on non-local Atomic-Servers.
+Normally, you could `Accept as new user`, but **since you're running on `localhost`, you won't be able to use the newly created Agent on non-local Atomic-Servers**.
+
 Therefore, it may be best to create an Agent on some _other_ running server, such as the [demo Invite on AtomicData.dev](https://atomicdata.dev/invites/1).
 And after that, copy the Secret from the `User settings` panel from AtomicData.dev, go back to your `localhost` version, and press `sign in`.
 Paste the Secret, and voila! You're signed in.
@@ -28,17 +40,9 @@ Again, check out the [README](https://github.com/atomicdata-dev/atomic-server) f
 
 Now, let's create some data.
 
-## Creating an Agent
-
-Before you can create new things on AtomicData.dev, you'll need an _Agent_.
-This is your virtual User, which can create, sign and own things.
-
-Simply open the [demo invite](https://atomicdata.dev/invites/1) and press accept.
-And you're done!
-
 ## Creating your first Atomic Data
 
-Now let's create a [_Class_](https://atomicdata.dev/classes/Class).
+Now let's create a [_Table_](https://atomicdata.dev/classes/Table).
 A Class represents an abstract concept, such as a `BlogPost` (which we'll do here).
 We can do this in a couple of ways:
 
@@ -49,7 +53,6 @@ We can do this in a couple of ways:
 The result is the same: we end up with a form in which we can fill in some details.
 
 Let's add a shortname (singular), and then a description.
-
 After that, we'll add the `required` properties.
 This form you're looking at is constructed by using the `required` and `recommended` Properties defined in `Class`.
 We can use these same fields to generate our BlogPost resource!

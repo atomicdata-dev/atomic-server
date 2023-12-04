@@ -1,9 +1,10 @@
 # API
 
 The API of AtomicServer uses _Atomic Data_.
-This means that:
 
-- All resources have a unique URL, which van be fetched using HTTP
+All Atomic Data resources have a unique URL, which van be fetched using HTTP.
+Every single Class, Property or Endpoint also is a resource, which means you can visit these in the browser!
+This effectively makes most of the API **browsable** and **self-documenting**.
 
 ## Fetching resources
 

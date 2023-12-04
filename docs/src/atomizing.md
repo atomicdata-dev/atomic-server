@@ -1,6 +1,5 @@
 # Atomizing: How to create and publish Atomic Data
 
-Now that we're familiar with the basics of Atomic Data Core and its Schema, it's time to create some Atomic Data!
 We call the process of turning data into Atomic Data _Atomizing_.
 During this process, we **upgrade the data quality**.
 Our information becomes more valuable.

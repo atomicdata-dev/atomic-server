@@ -7,7 +7,8 @@
 
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 AtomicServer is a lightweight, yet powerful CMS / Graph Database.
-Demo on [atomicdata.dev](https://atomicdata.dev)**
+Demo on [atomicdata.dev](https://atomicdata.dev).
+Docs on [docs.atomicdata.dev](http://docs.atomicdata.dev/atomicserver/intro.html)**
 
 This repo also includes:
 
@@ -46,67 +47,9 @@ Powered by Rust, [atomic-lib](https://crates.io/crates/atomic-lib) and [more](Ca
 
 https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
 
-## Also in this Repo
-### [`atomic-cli`](cli/README.md)
+## Documentation
 
-[![crates.io](https://img.shields.io/crates/v/atomic-cli)](https://crates.io/crates/atomic-cli)
-
-A simple Command Line Interface tool to fetch, create and query Atomic Data.
-Especially useful for interacting with an AtomicServer.
-
-[→ Read more](cli/README.md)
-
-### [`atomic-lib`](lib/README)
-
-[![crates.io](https://img.shields.io/crates/v/atomic_lib)](https://crates.io/crates/atomic_lib)
-[![Released API docs](https://docs.rs/atomic_lib/badge.svg)](https://docs.rs/atomic_lib)
-
-A Rust library to serialize, parse, store, convert, validate, edit, fetch and store Atomic Data.
-Powers both `atomic-cli` and `atomic-server`.
-
-[→ Read more](lib/README.md)
-
-### [Atomic Data Browser](/browser/data-browser/README.md)
-
-Front-end for Atomic-Server, built with React.
-
-### [`@tomic/lib`](/browser/lib/README.md)
-
-<a href="https://www.npmjs.com/package\/@tomic/lib" target="_blank">
-  <img src="https://img.shields.io/npm/v/@tomic/lib?color=cc3534" />
-</a>
-<a href="https://www.npmjs.com/package/@tomic/lib" target="_blank">
-  <img src="https://img.shields.io/npm/dm/@tomic/lib?color=%2344cc10" />
-</a>
-<a href="https://bundlephobia.com/result?p=@tomic/lib" target="_blank">
-  <img src="https://img.shields.io/bundlephobia/min/@tomic/lib">
-</a>
-
-Library with `Store`, `Commit`, `JSON-AD` parsing, and more.
-
-[**docs**](https://atomic-lib.netlify.app/modules/_tomic_lib)
-
-### [`@tomic/react`](browser/react/README.md)
-
-<a href="https://www.npmjs.com/package/@tomic/react" target="_blank">
-  <img src="https://img.shields.io/npm/v/@tomic/react?color=cc3534" />
-</a>
-<a href="https://www.npmjs.com/package/@tomic/react" target="_blank">
-  <img src="https://img.shields.io/npm/dm/@tomic/react?color=%2344cc10" />
-</a>
-<a href="https://bundlephobia.com/result?p=@tomic/react" target="_blank">
-  <img src="https://img.shields.io/bundlephobia/min/@tomic/react">
-</a>
-
-React library with many useful hooks for rendering and editing Atomic Data.
-
-[**docs**](https://atomic-lib.netlify.app/modules/_tomic_react)
-
-## Also check out
-
-- [RayCast extension](https://www.raycast.com/joepio/atomic) for searching stuff
-- [Newsletter](http://eepurl.com/hHcRA1)
-- [Discord][discord-url]
+Check out the [documentation](http://docs.atomicdata.dev/atomicserver/intro.html) for installation instructions, API docs, and more.
 
 ## Contribute
 
