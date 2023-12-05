@@ -1,3 +1,4 @@
+{{#title Installing AtomicServer}}
 # Setup / installation
 
 You can run AtomicServer in different ways:
