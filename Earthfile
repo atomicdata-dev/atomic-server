@@ -14,10 +14,14 @@ pipeline:
   BUILD +test
   BUILD +build
   BUILD +e2e
-  BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
 
 build-all:
+  # x86_64-unknown-linux-gnu
+  BUILD +build
   BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
+  BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
+  #
+  # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
 install:
   RUN apt-get update -qq
@@ -36,24 +40,22 @@ install:
 source:
   FROM +install
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir server lib cli desktop  ./
+  COPY --keep-ts --dir server lib cli  ./
   COPY browser+build/dist /code/browser/data-browser/dist
 
 cross-build:
   FROM +source
   ARG --required TARGET
-  # This syntax is not supported
   WITH DOCKER
-    DO rust+RUN_WITH_CACHE --command "cross build --target \$TARGET"
+    RUN cross build --target $TARGET --release
   END
-  RUN wadoanw
-  SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target
+  SAVE ARTIFACT ./target/$TARGET/release/atomic-server target AS LOCAL artifact/target/$TARGET/atomic-server
 
 build:
   FROM +source
   DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
   RUN ./target/release/atomic-server --version
-  SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target
+  SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target/x86_64-unknown-linux-gnu
 
 test:
   FROM +source
