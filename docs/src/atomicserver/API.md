@@ -6,9 +6,9 @@ All Atomic Data resources have a unique URL, which van be fetched using HTTP.
 Every single Class, Property or Endpoint also is a resource, which means you can visit these in the browser!
 This effectively makes most of the API **browsable** and **self-documenting**.
 
-## Fetching resources
-
-You can fetch individual items by sending a GET request to their URL.
+Every individual resource URL can be fetched using a GET request using your favorite HTML tool or library.
+You can also simply open every resource in your browser!
+If you want some specific representation (e.g. `JSON`), you will need to add an `Accept` header to your request.
 
 ```sh
 # Fetch as JSON-AD (de facto standard for Atomic Data)
@@ -21,51 +21,15 @@ curl -i -H "Accept: application/json" https://atomicdata.dev/properties/shortnam
 curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 ```
 
-We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/atomicdata-dev/atomic-server/master/server/openapi.yml).
+## Endpoints
 
-## Example requests
+The various [Endpoints](../endpoints.md) in AtomicServer can be seen at `/endpoints` of your local instance.
+These include functionality to create changes using `/commits`, query data using `/query`, get `/versions`, or do full-text search queries using `/search`.
+Typically, you pass query parameters to these endpoints to specify what you want to do.
 
-```HTTP
-### Get a thing as JSON
-GET https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: application/json
 
-### Get a thing as JSON-AD
-GET https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: application/ad+json
+<!-- We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/atomicdata-dev/atomic-server/master/server/openapi.yml). -->
 
-### Get a thing as JSON-LD
-GET https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: application/ld+json
+## Libraries or API?
 
-### Get a thing as turtle
-GET https://atomicdata.dev/properties/isA HTTP/1.1
-Accept: text/turtle
-
-### Full text search
-GET http://localhost:9883/search?q=Foo HTTP/1.1
-Accept: application/ld+json
-
-### Full text search, return full resource bodies. A bit slower, but could actually result in a faster UX.
-GET http://localhost:9883/search?q=Foo&include=true HTTP/1.1
-Accept: application/ld+json
-
-### Send a Commit
-### The hard part here is setting the correct signature.
-### Use a library (@tomic/lib for JS, and atomic_lib for Rust).
-POST http://localhost:9883/commit HTTP/1.1
-Accept: application/json
-Content-Type: application/json
-
-{
-  "subject": "http://localhost:9883/test",
-  "created_at": 1601239744,
-  "signer": "http://localhost:9883/agents/root",
-  "set": {
-    "https://atomicdata.dev/properties/requires": "[\"http/properties/requires\"]"
-  },
-  "remove": ["https://atomicdata.dev/properties/shortname"],
-  "destroy": false,
-  "signature": "correct_signature"
-}
-```
+You can use the REST API if you want, but it's recommended to use one of our [libraries](../tooling.md).

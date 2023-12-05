@@ -1,4 +1,4 @@
-{{#@tomic/react: Using Atomic Data in a JS / TS React project}}
+{{#title @tomic/react: Using Atomic Data in a JS / TS React project}}
 # @tomic/react: Using Atomic Data in a JS / TS React project
 
 Atomic Data has been designed with front-end development in mind.
