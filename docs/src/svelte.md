@@ -1,3 +1,5 @@
+{{#@tomic/svelte: Using Atomic Data in a Svelte or SvelteKit project}}
+
 # @tomic/svelte
 
 An implementation of Atomic Data for [Svelte](https://svelte.dev/).

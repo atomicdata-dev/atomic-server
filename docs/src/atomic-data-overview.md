@@ -9,7 +9,7 @@ Atomic Data uses links to connect pieces of data, and therefore makes it easier 
 
 ## AtomicServer
 
-[AtomicServer](atomicserver/intro.md) is an open source, powerful graph database + headless CMS.
+[AtomicServer](atomic-server.md) is an open source, powerful graph database + headless CMS.
 It's the reference implementation for the Atomic Data specification, written in Rust.
 
 ## Atomic Data Core

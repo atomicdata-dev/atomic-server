@@ -9,7 +9,7 @@
 
 # AtomicServer
 
-* [AtomicServer](atomicserver/intro.md)
+* [AtomicServer](atomic-server.md)
   * [Installation](atomicserver/installation.md)
   * [Getting started with the GUI](atomicserver/gui.md)
   * [API - Atomic Data](atomicserver/API.md)
@@ -17,7 +17,7 @@
   * [Creating a JSON-AD file](create-json-ad.md)
   * [FAQ & troubleshooting](atomicserver/faq.md)
 * [Software and libraries](tooling.md)
-  * [Upgrade your existing project](interoperability/upgrade.md)
+  * [With JS / TS](js.md)
   * [With React](usecases/react.md)
   * [With Svelte](svelte.md)
 
@@ -51,6 +51,7 @@
 # Use Atomic Data
 
 * [Interoperability and comparisons](interoperability/intro.md)
+  * [Upgrade your existing project](interoperability/upgrade.md)
   * [RDF](interoperability/rdf.md)
   * [Solid](interoperability/solid.md)
   * [JSON](interoperability/json.md)
