@@ -6,8 +6,7 @@ There are multiple ways of getting Atomic Data into some system:
 - [**Subject Fetching**](#subject-fetching-http) requests a single subject right from its source
 - [**Atomic Collections**](../schema/collections.md) can filter, sort and paginate resources
 - [**Atomic Paths**](paths.md) is a simple way to traverse Atomic Graphs and target specific values
-- [**Triple Pattern Fragments**](#triple-pattern-fragments) allows querying for specific (combinations of) Subject, Property and Value.
-- [**SPARQL**](#SPARQL) is a powerful Query language for traversing linked data graphs
+- **Query endpoint** (`/query`) works virtually identical to `Collections`, but it does not require a Collection Resource be defined.
 
 ## Subject fetching (HTTP)
 
@@ -33,6 +32,9 @@ Connection: Closed
 ```
 
 The server MAY also include other resources, if they are deemed relevant.
+For example, a search result might include nested children to speed up rendering.
+
+Also note that AtomicServer supports other `Content-Type`s, such as `application/json`, `application/ld+json`, `text/turtle`.
 
 ## Atomic Collections
 
@@ -48,12 +50,3 @@ Use query parameters to traverse pages, filter, or sort.
 An Atomic Path is a string that consist of one or more URLs, which when traversed point to an item.
 
 [Read more about Atomic Paths](paths.md)
-
-## SPARQL
-
-[SPARQL](https://www.w3.org/TR/rdf-sparql-query/) is a powerful RDF query language.
-Since all Atomic Data is also valid RDF, it should be possible to query Atomic Data using SPARQL.
-None of the exsisting implementations support a SPARQL endpoint, though.
-
-- Convert / serialize Atomic Data to RDF (for example by using an `accept` header: `curl -i -H "Accept: text/turtle" "https://atomicdata.dev"`)
-- Load it into a SPARQL engine of your choice
