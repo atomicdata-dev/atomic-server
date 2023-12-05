@@ -1,4 +1,4 @@
-{{#@tomic/svelte: Using Atomic Data in a Svelte or SvelteKit project}}
+{{#title @tomic/svelte: Using Atomic Data in a Svelte or SvelteKit project}}
 
 # @tomic/svelte
 

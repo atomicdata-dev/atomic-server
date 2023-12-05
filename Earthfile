@@ -15,6 +15,7 @@ pipeline:
   BUILD +build
   BUILD +e2e
 
+# Creates a `./artifact/bin` folder with all the atomic-server binaries
 build-all:
   BUILD +build # x86_64-unknown-linux-gnu
   BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
@@ -41,13 +42,13 @@ cross-build:
   WITH DOCKER
     RUN cross build --target $TARGET --release
   END
-  SAVE ARTIFACT ./target/$TARGET/release/atomic-server target AS LOCAL artifact/target/$TARGET/atomic-server
+  SAVE ARTIFACT ./target/$TARGET/release/atomic-server AS LOCAL artifact/bin/atomic-server-$TARGET
 
 build:
   FROM +source
   DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
   RUN ./target/release/atomic-server --version
-  SAVE ARTIFACT ./target/release/ target AS LOCAL artifact/target/x86_64-unknown-linux-gnu
+  SAVE ARTIFACT ./target/release/atomic-server AS LOCAL artifact/bin/atomic-server-x86_64-unknown-linux-gnu
 
 test:
   FROM +source
@@ -66,7 +67,7 @@ docker:
   ARG tag="latest,\$EARTHLY_GIT_SHORT_HASH"
   # Some glibc deps are missing, installing it errors so ignore.
   RUN apk add gcompat 2>/dev/null || true
-  COPY --chmod=0755 +build/target/atomic-server /atomic-server-bin
+  COPY --chmod=0755 +build/atomic-server /atomic-server-bin
   RUN /atomic-server-bin --version
   # For a complete list of possible ENV vars or available flags, run with `--help`
   ENV ATOMIC_STORE_PATH="/atomic-storage/db"
@@ -127,6 +128,7 @@ docs-pages:
   RUN bash -c "source $HOME/.nvm/nvm.sh && nvm install 20 && npm install -g netlify-cli"
   COPY --keep-ts docs /docs
   WORKDIR /docs
+  RUN mdbook --version
   RUN mdbook build
   RUN mdbook-sitemap-generator -d docs.atomicdata.dev -o /docs/book/html/sitemap.xml
   RUN --secret NETLIFY_AUTH_TOKEN=NETLIFY_TOKEN bash -c "source $HOME/.nvm/nvm.sh && netlify deploy --dir /docs/book/html --prod --auth $NETLIFY_AUTH_TOKEN --site atomic-docs"

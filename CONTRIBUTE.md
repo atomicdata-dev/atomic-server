@@ -77,13 +77,15 @@ These can be used by Earthly to build all steps, including a full docker image.
 
 ### Cross compilation
 
-If you want to build `atomic-server` for some other target (e.g. building for linux from macOS), you can use the `cross` crate.
+If you want to build `atomic-server` for some other target (e.g. building for linux from macOS), you can use the `cross` crate, which requires `docker`.
 
 ```sh
 cargo install cross
 # make sure docker is running!
 cross build --target x86_64-unknown-linux-musl --bin atomic-server --release
 ```
+
+Note that this is also done in the `earthly` file.
 
 ## Git policy
 

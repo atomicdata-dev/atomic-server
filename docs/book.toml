@@ -6,14 +6,10 @@ language = "en"
 
 [output.html]
 git-repository-icon = "fa-github"
-git-repository-url = "https://github.com/atomicdata-dev/atomic-data-docs"
-additional-css = ["open-in.css"]
+git-repository-url = "https://github.com/atomicdata-dev/atomic-server"
+edit-url-template = "https://github.com/atomicdata-dev/atomic-server/edit/develop/docs/{path}"
+additional-css = ["atomic.css"]
+additional-js = ["discord.js"]
 
 [output.linkcheck]
 optional = true
-
-[preprocessor.open-on-gh]
-command = "mdbook-open-on-gh"
-renderer = ["html"]
-text = "mdbook-open-on-gh"
-open-on-text = "[Suggest edits for this page on GitHub.]"
