@@ -16,25 +16,17 @@ pipeline:
   BUILD +e2e
 
 build-all:
-  # x86_64-unknown-linux-gnu
-  BUILD +build
+  BUILD +build # x86_64-unknown-linux-gnu
   BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
   BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
-  #
+  # Errors
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
 install:
   RUN apt-get update -qq
-  # RUN apt-get install --no-install-recommends -qq autoconf autotools-dev libtool-bin clang cmake bsdmainutils
   RUN rustup component add clippy
   RUN rustup component add rustfmt
-  # Atomic-Server deps
-  # RUN rustup target add x86_64-unknown-linux-musl
-  # RUN apt update && apt install -y musl-tools musl-dev g++-x86-64-linux-gnu libc6-dev-amd64-cross libgtk-3-dev libsoup2.4-dev
-  # Tauri deps
   RUN cargo install cross
-  # Call +INIT before copying the source file to avoid installing depencies every time source code changes.
-  # This parametrization will be used in future calls to UDCs of the library
   DO rust+INIT --keep_fingerprints=true
 
 source:
