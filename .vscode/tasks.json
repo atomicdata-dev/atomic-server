@@ -57,6 +57,20 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "earthly pipeline locally",
+			"type": "shell",
+			"command": "earthly -i -P +pipeline",
+			"group": "none",
+			"problemMatcher": []
+		},
+		{
+			"label": "earthly cross-compile",
+			"type": "shell",
+			"command": "earthly -i -P +compile-all",
+			"group": "none",
+			"problemMatcher": []
+		},
+		{
 			"type": "npm",
 			"script": "start",
 			"problemMatcher": [
