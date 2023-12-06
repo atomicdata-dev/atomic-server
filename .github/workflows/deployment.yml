@@ -19,65 +19,28 @@ jobs:
   deploy:
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
+    env:
+      EARTHLY_TOKEN: ${{ secrets.EARTHLY_TOKEN }}
     steps:
       - uses: actions/checkout@v2
 
-      - uses: actions-rs/toolchain@v1
+      - uses: earthly/actions-setup@v1
         with:
-          toolchain: stable
-          target: x86_64-unknown-linux-musl
-
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-          cache-all-crates: true
-
-      - uses: pnpm/action-setup@v2.0.1
-        name: Install pnpm
-        id: pnpm-install
-        with:
-          version: 8
-          run_install: false
-
-      - name: Get pnpm store directory
-        id: pnpm-cache
-        run: |
-          echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
-
-      - uses: actions/cache@v3
-        name: Setup pnpm cache
-        with:
-          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_dir }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Install JS
-        working-directory: ./browser/
-        run: |
-          pnpm install
-
-      - name: Build JS
-        working-directory: ./browser/
-        run: |
-          pnpm run build
-
-      - uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --package atomic-server --target x86_64-unknown-linux-musl
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          version: "latest"
 
       - name: Set env
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
+
+      - name: Earthly build
+        run: earthly --org ontola --sat henk -P +build
 
       - name: Transfer binary rsync
         uses: easingthemes/ssh-deploy@v3
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
-          SOURCE: "target/x86_64-unknown-linux-musl/release/atomic-server"
+          SOURCE: "./artifact/bin/atomic-server-x86_64-unknown-linux-gnu"
           REMOTE_HOST: ${{ inputs.remote_host }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
