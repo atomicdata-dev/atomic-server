@@ -23,6 +23,10 @@ build-all:
   # Errors
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
+docker-all:
+  BUILD --platform=linux/amd64 +docker-musl --TARGET=x86_64-unknown-linux-musl
+  BUILD --platform=linux/arm/v7 +docker-musl --TARGET=armv7-unknown-linux-musleabihf
+
 install:
   RUN apt-get update -qq
   RUN rustup component add clippy
@@ -62,6 +66,19 @@ lint:
   FROM +source
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
+docker-musl:
+  ARG tag="latest,sha-\$EARTHLY_GIT_SHORT_HASH"
+  ARG --required TARGET
+  COPY --chmod=0755 (+build/atomic-server --TARGET=${TARGET}) /atomic-server-bin
+  RUN /atomic-server-bin --version
+  # For a complete list of possible ENV vars or available flags, run with `--help`
+  ENV ATOMIC_DATA_DIR="/atomic-storage/data"
+  ENV ATOMIC_CONFIG_DIR="/atomic-storage/config"
+  ENV ATOMIC_PORT="80"
+  EXPOSE 80
+  VOLUME /atomic-storage
+  ENTRYPOINT ["/atomic-server-bin"]
+
 docker:
   FROM jeanblanchard/alpine-glibc:3.17.5
   ARG tags="joepmeneer/atomic-server:develop"
@@ -77,7 +94,7 @@ docker:
   VOLUME /atomic-storage
   ENTRYPOINT ["/atomic-server-bin"]
   # Push to github container registry
-  # SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:${tag}
+  SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:${tag}
   # Push to dockerhub
   SAVE IMAGE --push ${tags}
 
