@@ -15,7 +15,6 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
 - [Table of contents](#table-of-contents)
 - [Running \& compiling](#running--compiling)
   - [Running locally (with local development browser)](#running-locally-with-local-development-browser)
-  - [Debugging](#debugging)
   - [IDE setup (VSCode)](#ide-setup-vscode)
   - [Compilation using Earthly](#compilation-using-earthly)
   - [Improve local compilation speed](#improve-local-compilation-speed)
@@ -51,15 +50,14 @@ TL;DR Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:5173/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you update JS assets in `browser`
 
-### Debugging
-
-- **VSCode Users**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
-
 ### IDE setup (VSCode)
 
 This project is primarily being developed in VSCode.
 That doesn't mean that you should, too, but it means you're less likely to run into issues.
-The `/.vscode` directory contains various tasks, recommended extensions, and some settings overwrites.
+
+- **Tasks**: The `/.vscode` directory contains various `tasks` (open command palette => search "run task")
+- **Debugging**: Install the `CodeLLDB` plugin, and press F5 to start debugging. Breakpoints, inspect... The good stuff.
+- **Extensions**: That same directory will give a couple of suggestions for extensions to install.
 
 ### Compilation using Earthly
 

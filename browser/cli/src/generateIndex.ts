@@ -14,7 +14,10 @@ const TEMPLATE = `
 * GENERATED WITH @tomic/cli
 * -------------------------------- */
 
-import { registerOntologies } from '${Inserts.MODULE_ALIAS}';
+import { registerOntologies } from '${
+  // Prevents a circular dependency
+  atomicConfig._ISLIB_ ? '../ontology.js' : Inserts.MODULE_ALIAS
+}';
 
 ${Inserts.IMPORTS}
 

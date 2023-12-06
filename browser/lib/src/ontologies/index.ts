@@ -2,7 +2,7 @@
  * GENERATED WITH @tomic/cli
  * -------------------------------- */
 
-import { registerOntologies } from '../index.js';
+import { registerOntologies } from '../ontology.js';
 
 import { core } from './core.js';
 import { commits } from './commits.js';
