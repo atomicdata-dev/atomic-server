@@ -1,9 +1,0 @@
-target
-Dockerfile
-dockerfile
-browser/node_modules
-.dockerignore
-.env
-.git
-**/.temp
-.gitignore
