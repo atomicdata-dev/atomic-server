@@ -98,7 +98,7 @@ e2e:
   ENV LANGUAGE="en_GB"
   ENV DELETE_PREVIOUS_TEST_DRIVES="false"
   ENV FRONTEND_URL=http://localhost:9883
-  COPY --chmod=0755 +build/target/atomic-server /atomic-server-bin
+  COPY --chmod=0755 +build/atomic-server /atomic-server-bin
   # We'll have to zip it https://github.com/earthly/earthly/issues/2817
   TRY
     RUN nohup /atomic-server-bin --initialize & pnpm run test-e2e ; zip -r test.zip /app/e2e/playwright-report
