@@ -20,12 +20,14 @@ build-all:
   BUILD +build # x86_64-unknown-linux-gnu
   BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
   BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
+  BUILD +cross-build --TARGET=aarch64-unknown-linux-musl
   # Errors
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
 docker-all:
   BUILD --platform=linux/amd64 +docker-musl --TARGET=x86_64-unknown-linux-musl
   BUILD --platform=linux/arm/v7 +docker-musl --TARGET=armv7-unknown-linux-musleabihf
+  BUILD --platform=linux/arm64/v8 +docker-musl --TARGET=aarch64-unknown-linux-musl
 
 install:
   RUN apt-get update -qq
@@ -43,6 +45,8 @@ source:
 cross-build:
   FROM +source
   ARG --required TARGET
+  # This does not yet cache properly
+  # https://github.com/earthly/lib/issues/34
   WITH DOCKER
     RUN cross build --target $TARGET --release
   END
@@ -67,9 +71,10 @@ lint:
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
 docker-musl:
-  ARG tag="latest,sha-\$EARTHLY_GIT_SHORT_HASH"
+  FROM alpine:3.18
+  ARG tags="joepmeneer/atomic-server:develop"
   ARG --required TARGET
-  COPY --chmod=0755 (+build/atomic-server --TARGET=${TARGET}) /atomic-server-bin
+  COPY --chmod=0755 --platform=linux/amd64 (+cross-build/atomic-server --TARGET=${TARGET}) /atomic-server-bin
   RUN /atomic-server-bin --version
   # For a complete list of possible ENV vars or available flags, run with `--help`
   ENV ATOMIC_DATA_DIR="/atomic-storage/data"
@@ -78,24 +83,6 @@ docker-musl:
   EXPOSE 80
   VOLUME /atomic-storage
   ENTRYPOINT ["/atomic-server-bin"]
-
-docker:
-  FROM jeanblanchard/alpine-glibc:3.17.5
-  ARG tags="joepmeneer/atomic-server:develop"
-  # Some glibc deps are missing, installing it errors so ignore.
-  RUN apk add gcompat 2>/dev/null || true
-  COPY --chmod=0755 +build/atomic-server /atomic-server-bin
-  RUN /atomic-server-bin --version
-  # For a complete list of possible ENV vars or available flags, run with `--help`
-  ENV ATOMIC_STORE_PATH="/atomic-storage/db"
-  ENV ATOMIC_CONFIG_PATH="/atomic-storage/config.toml"
-  ENV ATOMIC_PORT="80"
-  EXPOSE 80
-  VOLUME /atomic-storage
-  ENTRYPOINT ["/atomic-server-bin"]
-  # Push to github container registry
-  SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:${tag}
-  # Push to dockerhub
   SAVE IMAGE --push ${tags}
 
 setup-playwright:
