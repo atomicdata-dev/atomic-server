@@ -5,6 +5,12 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## UNRELEASED
+
+- Use `musl` + `alpine` builds for docker images, way smaller images #620
+- Support multi-platform docker builds #731
+- Remove deprecated ENV vars #732
+
 ## [v0.36.1] - 2023-12-06
 
 - Fix locally searching for atomicdata.dev resources in external servers #706

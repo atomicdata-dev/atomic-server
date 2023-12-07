@@ -230,7 +230,7 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
     } else {
         atomic_lib::config::default_config_dir_path()?
     };
-    let mut config_file_path = config_dir.join("config.toml");
+    let config_file_path = config_dir.join("config.toml");
 
     let mut https_path = config_dir.clone();
     https_path.push("https");
@@ -247,28 +247,6 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
 
     let mut search_index_path = cache_dir.to_owned();
     search_index_path.push("search_index");
-
-    for (key, value) in env::vars() {
-        match &*key {
-            "ATOMIC_CONFIG_FILE_PATH" => {
-                config_file_path = value.parse().map_err(|e| {
-                    format!(
-                        "Could not parse ATOMIC_CONFIG_FILE_PATH. Is {} a valid path? {}",
-                        value, e
-                    )
-                })?;
-            }
-            "ATOMIC_STORE_PATH" => {
-                store_path = value.parse().map_err(|e| {
-                    format!(
-                        "Could not parse ATOMIC_STORE_PATH. Is {} a valid path? {}",
-                        value, e
-                    )
-                })?;
-            }
-            _ => {}
-        }
-    }
 
     let initialize = !std::path::Path::exists(&store_path) || opts.initialize;
 
