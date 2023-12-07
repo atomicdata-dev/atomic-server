@@ -64,7 +64,7 @@ lint:
 
 docker:
   FROM jeanblanchard/alpine-glibc:3.17.5
-  ARG tag="latest,\$EARTHLY_GIT_SHORT_HASH"
+  ARG tags="joepmeneer/atomic-server:develop"
   # Some glibc deps are missing, installing it errors so ignore.
   RUN apk add gcompat 2>/dev/null || true
   COPY --chmod=0755 +build/atomic-server /atomic-server-bin
@@ -79,7 +79,7 @@ docker:
   # Push to github container registry
   # SAVE IMAGE --push ghcr.io/atomicdata-dev/atomic-server:${tag}
   # Push to dockerhub
-  SAVE IMAGE --push joepmeneer/atomic-server:${tag}
+  SAVE IMAGE --push ${tags}
 
 setup-playwright:
   FROM mcr.microsoft.com/playwright:v1.38.0-jammy

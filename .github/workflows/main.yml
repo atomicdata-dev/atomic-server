@@ -27,4 +27,4 @@ jobs:
       - name: Earthly build, test
         run: earthly --org ontola --ci --sat henk -P +pipeline
       - name: Earthly build and push docker
-        run: earthly --org ontola --ci --sat henk -P --push +docker --tag="${{ steps.meta.outputs.tags }}"
+        run: earthly --org ontola --ci --sat henk -P --push +docker --tags="${{ steps.meta.outputs.tags }}"
