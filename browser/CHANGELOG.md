@@ -2,6 +2,12 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
+## UNRELEASED
+
+### @tomic/lib
+
+- Always fetch all resources after setting + authenticating new agent with websockets #686
+
 ## v0.36.1
 
 ### @tomic/svelte

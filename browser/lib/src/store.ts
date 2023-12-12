@@ -616,12 +616,14 @@ export class Store {
       }
 
       this.webSockets.forEach(ws => {
-        ws.readyState === ws.OPEN && authenticate(ws, this);
-      });
-
-      this.resources.forEach(r => {
-        if (r.isUnauthorized() || r.loading) {
-          this.fetchResourceFromServer(r.getSubject());
+        // If WebSocket is already open, authenticate immediately
+        if (ws.readyState === ws.OPEN) {
+          authenticate(ws, this, true);
+        } else {
+          // Otherwise, wait for it to open before authenticating
+          ws.onopen = () => {
+            authenticate(ws, this, true);
+          };
         }
       });
     } else {

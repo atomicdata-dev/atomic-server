@@ -64,7 +64,11 @@ function parseResourceMessage(ev: MessageEvent): Resource[] {
  * Authenticates current Agent over current WebSocket. Doesn't do anything if
  * there is no agent
  */
-export async function authenticate(client: WebSocket, store: Store) {
+export async function authenticate(
+  client: WebSocket,
+  store: Store,
+  fetchAll = false,
+) {
   const agent = store.getAgent();
 
   if (!agent || !agent.subject) {
@@ -84,6 +88,14 @@ export async function authenticate(client: WebSocket, store: Store) {
 
   const json = await createAuthentication(client.url, agent);
   client.send('AUTHENTICATE ' + JSON.stringify(json));
+
+  // Maybe this should happen after the authentication is confirmed?
+  fetchAll &&
+    this.resources.forEach(r => {
+      if (r.isUnauthorized() || r.loading) {
+        this.fetchResourceFromServer(r.getSubject());
+      }
+    });
 }
 
 const defaultTimeout = 5000;
