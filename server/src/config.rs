@@ -3,7 +3,6 @@
 use crate::errors::AtomicServerResult;
 use clap::Parser;
 use dotenv::dotenv;
-use std::env;
 use std::net::IpAddr;
 use std::path::PathBuf;
 
