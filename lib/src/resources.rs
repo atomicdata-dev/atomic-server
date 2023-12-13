@@ -107,10 +107,15 @@ impl Resource {
 
     /// Returns the first item of the is_ array
     pub fn get_main_class(&self) -> AtomicResult<String> {
-        if let Ok(val) = self.get(crate::urls::IS_A) {
-            Ok(val.to_subjects(None)?[0].clone())
-        } else {
-            Err(format!("Resource {} has no class", self.subject).into())
+        match self.get(crate::urls::IS_A) {
+            Ok(val) => {
+                let subjects = val.to_subjects(None)?;
+                subjects
+                    .first()
+                    .cloned()
+                    .ok_or_else(|| format!("Resource {} has no class", self.subject).into())
+            }
+            Err(_) => Err(format!("Resource {} has no class", self.subject).into()),
         }
     }
 
