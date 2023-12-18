@@ -118,20 +118,21 @@ We can simply refer to the `localId`, instead of some URL that does not exist ye
   "https://atomicdata.dev/properties/description": "Hi! I'm a blogpost. I'm also machine readable!",
   "https://atomicdata.dev/properties/author": "jon",
   "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Article"],
-  "https://atomicdata.dev/properties/localId": "my-first-blogpost",
+  "https://atomicdata.dev/properties/localId": "my-first-blogpost"
 },{
   "https://atomicdata.dev/properties/name": "Another blogpost",
   "https://atomicdata.dev/properties/description": "I'm writing so much my hands hurt.",
   "https://atomicdata.dev/properties/author": "jon",
   "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Article"],
-  "https://atomicdata.dev/properties/localId": "another-blogpost",
+  "https://atomicdata.dev/properties/localId": "another-blogpost"
 },{
   "https://atomicdata.dev/properties/name": "Jon Author",
   "https://atomicdata.dev/properties/isA": ["https://atomicdata.dev/classes/Person"],
-  "https://atomicdata.dev/properties/localId": "jon",
+  "https://atomicdata.dev/properties/localId": "jon"
 }]
 ```
 
 ## Importing data using Atomic Sever
 
-_currently [under development](https://github.com/atomicdata-dev/atomic-server/issues/390)_
+Press the `import` button in the resource menu (at the bottom of the screen).
+Then you paste your JSON-AD in the text area, and press `import`.
