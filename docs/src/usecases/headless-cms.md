@@ -47,4 +47,3 @@ In the next section, we'll discuss how to use Atomic-Server in your React projec
 ## Compared to alternative open source headless CMS software
 
 - **Strapi**: Atomic-Server doesn't need an external database, is easier to setup, has live synchronization support and is way faster. However, Strapi has a plugin system, is more polished, and has GraphQL support.
-- **

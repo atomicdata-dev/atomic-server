@@ -33,7 +33,7 @@ Properties of a Property instance:
 }
 ```
 
-Visit https://atomicdata.dev/properties for a list of example Properties.
+Visit the [Properties Collection](https://atomicdata.dev/properties) for a list of example Properties.
 
 ## Datatype
 
@@ -52,7 +52,7 @@ Properties:
 - `binarySerialization` - (optional, AtomicURL, TranslationBox) how the datatype should be parsed / serialized as a byte array.
 - `binaryExample` - (optional, string) an example `binarySerialization` that should be parsed correctly. Should have the same contents as the stringExample. Required if binarySerialization is present on the DataType.
 
-Visit https://atomicdata.dev/collections/datatype for a list of example Datatypes.
+Visit [the Datatype collection](https://atomicdata.dev/collections/datatype) for a list of example Datatypes.
 
 ## Class
 
