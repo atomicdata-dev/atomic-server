@@ -5,21 +5,34 @@ const groupFormatter = new Intl.DateTimeFormat('default', {
   year: 'numeric',
 });
 
-/** Removes back to back duplicate versions */
 export function dedupeVersions(versions: Version[]): Version[] {
-  return versions.filter((v, i) => {
+  const filtered: Version[] = [];
+  let v: Version;
+  let prev: Version;
+
+  for (let i = 0; i < versions.length; i++) {
+    v = versions[i];
+
     if (i === 0) {
-      return true;
+      filtered.push(v);
+      continue;
     }
 
-    const prev = versions[i - 1];
+    prev = versions[i - 1];
 
     if (v.commit.signer !== prev.commit.signer) {
-      return true;
+      filtered.push(v);
+      continue;
     }
 
-    return resourceToString(v.resource) !== resourceToString(prev.resource);
-  });
+    if (compareMaps(v.resource.getPropVals(), prev.resource.getPropVals())) {
+      continue;
+    }
+
+    filtered.push(v);
+  }
+
+  return filtered;
 }
 
 export async function setResourceToVersion(
@@ -58,12 +71,30 @@ export function groupVersionsByMonth(
   }, {});
 }
 
-function resourceToString(resource: Resource) {
-  const obj = {};
+function compareMaps(map1: Map<string, unknown>, map2: Map<string, unknown>) {
+  // Reassigning to testVal uses less memory than redeclaring using const.
+  let testVal: unknown;
 
-  for (const [key, value] of resource.getPropVals().entries()) {
-    obj[key] = value;
+  if (map1.size !== map2.size) {
+    return false;
   }
 
-  return JSON.stringify(obj);
+  for (const [key, val] of map1) {
+    testVal = map2.get(key);
+
+    // in cases of an undefined value, make sure the key
+    // actually exists on the object so there are no false positives
+    if (testVal !== val || (testVal === undefined && !map2.has(key))) {
+      if (
+        Array.isArray(val) &&
+        JSON.stringify(val) === JSON.stringify(testVal)
+      ) {
+        continue;
+      }
+
+      return false;
+    }
+  }
+
+  return true;
 }

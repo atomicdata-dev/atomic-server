@@ -295,18 +295,23 @@ export class Resource<C extends OptionalClass = any> {
   }
 
   /** builds all versions using the Commits */
-  public async getHistory(store: Store): Promise<Version[]> {
+  public async getHistory(
+    store: Store,
+    progressCallback?: (percentage: number) => void,
+  ): Promise<Version[]> {
     const commitsCollection = await store.fetchResourceFromServer(
       this.getCommitsCollection(),
     );
-    const commits = commitsCollection.get(properties.collection.members);
+    const commits = commitsCollection.get(
+      properties.collection.members,
+    ) as string[];
 
     const builtVersions: Version[] = [];
 
     let previousResource = new Resource(this.subject);
 
-    for (const commit of commits as unknown as string[]) {
-      const commitResource = await store.getResourceAsync(commit);
+    for (let i = 0; i < commits.length; i++) {
+      const commitResource = await store.getResourceAsync(commits[i]);
       const parsedCommit = parseCommitResource(commitResource);
       const builtResource = applyCommitToResource(
         previousResource.clone(),
@@ -314,9 +319,15 @@ export class Resource<C extends OptionalClass = any> {
       );
       builtVersions.push({
         commit: parsedCommit,
-        resource: builtResource.clone(),
+        resource: builtResource,
       });
       previousResource = builtResource;
+
+      // Every 30 cycles we report the progress
+      if (progressCallback && i % 30 === 0) {
+        progressCallback(Math.round((i / commits.length) * 100));
+        await WaitForImmediate();
+      }
     }
 
     return builtVersions;
@@ -698,3 +709,5 @@ export function proxyResource<C extends OptionalClass = any>(
 
   return new Proxy(resource.__internalObject, {});
 }
+
+const WaitForImmediate = () => new Promise(resolve => setTimeout(resolve));

@@ -33,9 +33,11 @@ const VersionRow = styled(ButtonClean)<{ selected: boolean }>`
   background-color: ${p => (p.selected ? p.theme.colors.main : 'transparent')};
   color: ${p => (p.selected ? 'white' : p.theme.colors.text)};
   border-radius: ${p => p.theme.radius};
+  contain: paint;
 
-  :hover,
-  :focus-visible {
-    background: ${p => (p.selected ? p.theme.colors.main : p.theme.colors.bg1)};
+  &:hover,
+  &:focus-visible {
+    background-color: ${p =>
+      p.selected ? p.theme.colors.main : p.theme.colors.bg1};
   }
 `;
