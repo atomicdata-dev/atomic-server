@@ -13,6 +13,8 @@ import { constructOpenURL } from '../../helpers/navigation';
 import { HistoryDesktopView } from './HistoryDesktopView';
 import { HistoryMobileView } from './HistoryMobileView';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
+import { Column, Row } from '../../components/Row';
+import { ProgressBar } from '../../components/ProgressBar';
 
 /** Shows an activity log of previous versions */
 export function History(): JSX.Element {
@@ -21,7 +23,7 @@ export function History(): JSX.Element {
   const isSmallScreen = useMediaQuery('(max-width: 500px)');
   const [subject] = useCurrentSubject();
   const resource = useResource(subject);
-  const { versions, loading, error } = useVersions(resource);
+  const { versions, loading, error, progress } = useVersions(resource);
   const [selectedVersion, setSelectedVersion] = useState<Version | undefined>();
 
   const groupedVersions: {
@@ -67,7 +69,19 @@ export function History(): JSX.Element {
   const isCurrentVersion = selectedVersion === versions[versions.length - 1];
 
   if (loading) {
-    return <ContainerNarrow>Loading history of {subject}...</ContainerNarrow>;
+    return (
+      <ContainerNarrow>
+        <Centered>
+          <Column fullWidth>
+            <span>Building history of {resource.title}</span>
+            <Row center fullWidth>
+              <ProgressBar value={progress} />
+              <span>{progress}%</span>
+            </Row>
+          </Column>
+        </Centered>
+      </ContainerNarrow>
+    );
   }
 
   if (error) {
@@ -107,4 +121,11 @@ const SplitView = styled.main`
   & code {
     word-break: break-word;
   }
+`;
+
+const Centered = styled.div`
+  display: grid;
+  place-items: center;
+  height: 100dvh;
+  min-width: 100%;
 `;
