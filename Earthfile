@@ -72,6 +72,7 @@ lint:
 
 docker-musl:
   FROM alpine:3.18
+  # You can pass multiple tags, space separated
   ARG tags="joepmeneer/atomic-server:develop"
   ARG --required TARGET
   COPY --chmod=0755 --platform=linux/amd64 (+cross-build/atomic-server --TARGET=${TARGET}) /atomic-server-bin
