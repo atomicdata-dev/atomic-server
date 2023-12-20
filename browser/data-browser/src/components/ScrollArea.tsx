@@ -7,14 +7,15 @@ const SIZE = '0.8rem';
 
 export interface ScrollAreaProps {
   className?: string;
+  type?: 'hover' | 'scroll';
 }
 
 export const ScrollArea = forwardRef<
   HTMLDivElement,
   React.PropsWithChildren<ScrollAreaProps>
->(({ children, className }, ref): JSX.Element => {
+>(({ children, className, type = 'scroll' }, ref): JSX.Element => {
   return (
-    <RadixScrollArea.Root type='scroll' className={className}>
+    <RadixScrollArea.Root type={type} className={className}>
       <ScrollViewPort ref={ref}>{children}</ScrollViewPort>
       <ScrollBar orientation='vertical'>
         <Thumb />

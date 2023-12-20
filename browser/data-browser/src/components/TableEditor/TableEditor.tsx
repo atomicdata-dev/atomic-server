@@ -202,7 +202,7 @@ function FancyTableInner<T>({
         totalContentHeight={itemCount * rowHeight!}
         ref={tableRef}
       >
-        <RelativeScrollArea ref={scrollerRef}>
+        <RelativeScrollArea ref={scrollerRef} type='hover'>
           <PercentageInsanityFix>
             <TableHeader
               headerRef={headerRef}
