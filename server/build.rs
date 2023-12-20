@@ -1,4 +1,8 @@
-use std::{path::PathBuf, time::SystemTime};
+use std::{
+    fs::{self, Metadata},
+    path::PathBuf,
+    time::SystemTime,
+};
 
 macro_rules! p {
     ($($tokens: tt)*) => {
@@ -27,6 +31,7 @@ fn main() -> std::io::Result<()> {
 
     if should_build(&dirs) {
         build_js(&dirs);
+        let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
         dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
     } else if dirs.js_dist_tmp.exists() {
         p!("Found {}, skipping copy", dirs.js_dist_tmp.display());
@@ -61,38 +66,19 @@ fn should_build(dirs: &Dirs) -> bool {
     if let Ok(tmp_dist_index_html) =
         std::fs::metadata(format!("{}/index.html", dirs.js_dist_tmp.display()))
     {
-        let dist_time = tmp_dist_index_html
-            .modified()
-            .unwrap()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        for entry in walkdir::WalkDir::new(&dirs.src_browser)
+        let has_changes = walkdir::WalkDir::new(&dirs.src_browser)
             .into_iter()
-            .filter_map(|e| {
-                // ignore ds store
-                if let Ok(e) = e {
-                    if e.path().to_str().unwrap().contains(".DS_Store") {
-                        return None;
-                    }
-                    Some(e)
-                } else {
-                    None
-                }
+            .filter_entry(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .map(|s| !s.starts_with(".DS_Store"))
+                    .unwrap_or(false)
             })
-        {
-            if entry.path().is_file() {
-                let src_time = entry
-                    .metadata()
-                    .unwrap()
-                    .modified()
-                    .unwrap()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap();
-                if src_time >= dist_time {
-                    p!("Source file modified: {:?}, rebuilding...", entry.path());
-                    return true;
-                }
-            }
+            .any(|entry| is_older_than(&entry.unwrap(), &tmp_dist_index_html));
+
+        if has_changes {
+            return true;
         }
 
         p!("No changes in JS source files, skipping JS build.");
@@ -144,4 +130,30 @@ fn build_js(dirs: &Dirs) {
             String::from_utf8(out.stderr).unwrap()
         );
     }
+}
+
+fn is_older_than(dir_entry: &walkdir::DirEntry, dist_meta: &Metadata) -> bool {
+    let dist_time = dist_meta
+        .modified()
+        .unwrap()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap();
+
+    if dir_entry.path().is_file() {
+        let src_time = dir_entry
+            .metadata()
+            .unwrap()
+            .modified()
+            .unwrap()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
+        if src_time >= dist_time {
+            p!(
+                "Source file modified: {:?}, rebuilding...",
+                dir_entry.path()
+            );
+            return true;
+        }
+    }
+    false
 }
