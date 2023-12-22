@@ -4,7 +4,7 @@ import { removeCachedSearchResults, useResource, useStore } from '@tomic/react';
 import { DropdownPortalContext } from '../../Dropdown/dropdownContext';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { SearchBoxWindow } from './SearchBoxWindow';
-import { FaTimes } from 'react-icons/fa';
+import { FaSearch, FaTimes } from 'react-icons/fa';
 import { ErrorChip } from '../ErrorChip';
 import { useValidation } from '../formValidation/useValidation';
 
@@ -138,7 +138,10 @@ export function SearchBox({
                   : selectedResource.title}
               </ResourceTitle>
             ) : (
-              <PlaceholderText>{placeholderText}</PlaceholderText>
+              <>
+                <FaSearch />
+                <PlaceholderText>{placeholderText}</PlaceholderText>
+              </>
             )}
           </TriggerButton>
           {value && (
@@ -186,6 +189,7 @@ const TriggerButton = styled.button<{ $empty: boolean }>`
   border: none;
   text-align: start;
   height: 2rem;
+  gap: 0.5rem;
   width: 100%;
   overflow: hidden;
   cursor: text;

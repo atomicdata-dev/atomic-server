@@ -4,6 +4,9 @@ import { FaInfo } from 'react-icons/fa';
 import { AtomicLink } from '../../AtomicLink';
 import { Button } from '../../Button';
 import Markdown from '../../datatypes/Markdown';
+import { Column, Row } from '../../Row';
+import styled from 'styled-components';
+import { IconButton, IconButtonVariant } from '../../IconButton/IconButton';
 
 export enum NewFormTitleVariant {
   FullPage,
@@ -34,27 +37,32 @@ export const NewFormTitle: React.FC<NewFormTitleProps> = ({
   const [klassDescription] = useString(klass, properties.description);
   const [showDetails, setShowDetails] = useState(false);
 
-  const HeadingComp = variantHeaderMapping.get(variant!) ?? 'h2';
+  const headingType = variantHeaderMapping.get(variant!) ?? 'h2';
 
   return (
-    <>
-      <HeadingComp>
-        new{' '}
-        {classSubject ? (
-          <AtomicLink subject={classSubject}>{klassTitle}</AtomicLink>
-        ) : (
-          'Resource'
-        )}
-        <Button
+    <Column>
+      <Row center>
+        <Heading as={headingType}>
+          new{' '}
+          {classSubject ? (
+            <AtomicLink subject={classSubject}>{klassTitle}</AtomicLink>
+          ) : (
+            'Resource'
+          )}
+        </Heading>
+        <IconButton
+          variant={IconButtonVariant.Outline}
           onClick={() => setShowDetails(!showDetails)}
-          icon
-          subtle={!showDetails}
           title='Toggle show Class details'
         >
           <FaInfo />
-        </Button>
-      </HeadingComp>
+        </IconButton>
+      </Row>
       {showDetails && klassDescription && <Markdown text={klassDescription} />}
-    </>
+    </Column>
   );
 };
+
+const Heading = styled.h1`
+  margin: 0;
+`;

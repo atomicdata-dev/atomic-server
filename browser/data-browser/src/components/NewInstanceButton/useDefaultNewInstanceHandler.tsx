@@ -1,6 +1,8 @@
 import {
   classes,
-  properties,
+  core,
+  dataBrowser,
+  server,
   useResource,
   useStore,
   useString,
@@ -24,39 +26,48 @@ export function useDefaultNewInstanceHandler(klass: string, parent?: string) {
   const navigate = useNavigate();
 
   const classResource = useResource(klass);
-  const [shortname] = useString(classResource, properties.shortname);
+  const [shortname] = useString(classResource, core.properties.shortname);
 
-  const createResourceAndNavigate = useCreateAndNavigate(klass, parent);
+  const createResourceAndNavigate = useCreateAndNavigate();
 
   const onClick = useCallback(async () => {
     try {
       switch (klass) {
-        case classes.chatRoom: {
-          createResourceAndNavigate('chatRoom', {
-            [properties.name]: 'Untitled ChatRoom',
-            [properties.isA]: [classes.chatRoom],
-          });
+        case dataBrowser.classes.chatroom: {
+          createResourceAndNavigate(
+            dataBrowser.classes.chatroom,
+            {
+              [core.properties.name]: 'Untitled ChatRoom',
+            },
+            parent,
+          );
           break;
         }
 
-        case classes.document: {
-          createResourceAndNavigate('document', {
-            [properties.isA]: [classes.document],
-            [properties.name]: 'Untitled Document',
-          });
+        case dataBrowser.classes.document: {
+          createResourceAndNavigate(
+            dataBrowser.classes.document,
+            {
+              [core.properties.name]: 'Untitled Document',
+            },
+            parent,
+          );
           break;
         }
 
-        case classes.folder: {
-          createResourceAndNavigate('folder', {
-            [properties.isA]: [classes.folder],
-            [properties.name]: 'Untitled Folder',
-            [properties.displayStyle]: classes.displayStyles.list,
-          });
+        case dataBrowser.classes.folder: {
+          createResourceAndNavigate(
+            dataBrowser.classes.folder,
+            {
+              [core.properties.name]: 'Untitled Folder',
+              [dataBrowser.properties.displayStyle]: classes.displayStyles.list,
+            },
+            parent,
+          );
           break;
         }
 
-        case classes.drive: {
+        case server.classes.drive: {
           const agent = store.getAgent();
 
           if (!agent || agent.subject === undefined) {
@@ -66,18 +77,15 @@ export function useDefaultNewInstanceHandler(klass: string, parent?: string) {
           }
 
           const newResource = await createResourceAndNavigate(
-            'drive',
+            server.classes.drive,
             {
-              [properties.isA]: [classes.drive],
-              [properties.write]: [agent.subject],
-              [properties.read]: [agent.subject],
+              [core.properties.write]: [agent.subject],
+              [core.properties.read]: [agent.subject],
             },
-            undefined,
-            true,
           );
 
           const agentResource = await store.getResourceAsync(agent.subject);
-          agentResource.pushPropVal(properties.drives, [
+          agentResource.pushPropVal(server.properties.drives, [
             newResource.getSubject(),
           ]);
           agentResource.save(store);

@@ -69,6 +69,7 @@ if (isDev()) {
 }
 
 import isPropValid from '@emotion/is-prop-valid';
+import { NewResourceUIProvider } from './components/forms/NewForm/useNewResourceUI';
 
 // This implements the default behavior from styled-components v5
 function shouldForwardProp(propName, target) {
@@ -107,10 +108,12 @@ function App(): JSX.Element {
                           <DialogContainer>
                             <PopoverContainer>
                               <DropdownContainer>
-                                <SkipNav />
-                                <NavWrapper>
-                                  <AppRoutes />
-                                </NavWrapper>
+                                <NewResourceUIProvider>
+                                  <SkipNav />
+                                  <NavWrapper>
+                                    <AppRoutes />
+                                  </NavWrapper>
+                                </NewResourceUIProvider>
                               </DropdownContainer>
                             </PopoverContainer>
                             <NetworkIndicator />

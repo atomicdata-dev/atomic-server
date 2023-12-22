@@ -89,7 +89,7 @@ const IconButtonBase = styled.button<ButtonBaseProps>`
   color: ${p => p.theme.colors.text};
   font-size: ${p => p.size ?? '1em'};
   border: none;
-
+  user-select: none;
   padding: var(--button-padding);
   width: calc(${p => p.size} + var(--button-padding) * 2);
   height: calc(${p => p.size} + var(--button-padding) * 2);
@@ -115,7 +115,7 @@ const SimpleIconButton = styled(IconButtonBase)<ButtonStyleProps>`
       background-color: ${p => p.theme.colors.bg1};
     }
 
-    :active {
+    &:active {
       background-color: ${p => p.theme.colors.bg2};
     }
   }

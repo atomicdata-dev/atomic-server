@@ -26,6 +26,7 @@ interface SearchOptsHook extends SearchOpts {
    * respresents milliseconds.
    */
   debounce?: number;
+  allowEmptyQuery?: boolean;
 }
 
 const noResultsResult = {
@@ -88,7 +89,7 @@ export function useServerSearch(
     [results, resource.loading, resource.error],
   );
 
-  if (!query) {
+  if (!query && !opts.allowEmptyQuery) {
     return noResultsResult;
   }
 

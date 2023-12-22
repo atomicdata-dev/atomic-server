@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { FaSearch } from 'react-icons/fa';
 import { styled, css } from 'styled-components';
 import { ResourceResultLine, ResultLine } from './ResultLine';
 import { fadeIn } from '../../../helpers/commonAnimations';
@@ -173,16 +174,19 @@ export function SearchBoxWindow({
 
   return (
     <Wrapper onBlur={handleBlur} ref={wrapperRef} $above={isAboveTrigger}>
-      <Input
-        autoFocus
-        placeholder={placeholder}
-        value={searchValue}
-        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-          onChange(e.target.value)
-        }
-        onKeyDown={handleKeyDown}
-        onPaste={handlePaste}
-      />
+      <SearchInputWrapper>
+        <FaSearch />
+        <Input
+          autoFocus
+          placeholder={placeholder}
+          value={searchValue}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            onChange(e.target.value)
+          }
+          onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
+        />
+      </SearchInputWrapper>
       <ResultBox data-testid='searchbox-results'>
         {!searchValue && <CenteredMessage>Start Searching</CenteredMessage>}
         <StyledScrollArea>
@@ -215,14 +219,30 @@ export function SearchBoxWindow({
   );
 }
 
-const Input = styled.input`
+const SearchInputWrapper = styled.div`
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   border: solid 1px ${p => p.theme.colors.bg2};
-  padding: 0.5rem;
   height: var(--radix-popover-trigger-height);
+  padding-inline-start: 0.5rem;
   width: 100%;
 
-  &:focus-visible {
+  & svg {
+    color: ${p => p.theme.colors.textLight};
+  }
+  &:focus-within {
     border-color: ${p => p.theme.colors.main};
+    outline: none;
+  }
+`;
+
+const Input = styled.input`
+  padding: 0.5rem;
+  height: 100%;
+  flex: 1;
+  border: none;
+  &:focus-visible {
     outline: none;
   }
 `;
@@ -251,7 +271,7 @@ const Wrapper = styled.div<{ $above: boolean }>`
           bottom: 0;
           flex-direction: column-reverse;
 
-          ${Input} {
+          ${SearchInputWrapper}, ${Input} {
             border-bottom-left-radius: ${theme.radius};
             border-bottom-right-radius: ${theme.radius};
           }
@@ -266,7 +286,7 @@ const Wrapper = styled.div<{ $above: boolean }>`
           top: calc(var(--radix-popover-trigger-height) * -1);
           flex-direction: column;
 
-          ${Input} {
+          ${SearchInputWrapper}, ${Input} {
             border-top-left-radius: ${theme.radius};
             border-top-right-radius: ${theme.radius};
           }

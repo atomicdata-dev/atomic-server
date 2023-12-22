@@ -4,7 +4,7 @@ import { Route, Routes } from 'react-router-dom';
 
 import Show from './ShowRoute';
 import { Search } from './SearchRoute';
-import NewRoute from './NewRoute';
+import NewRoute from './NewResource/NewRoute';
 import { SettingsTheme } from './SettingsTheme';
 import { Edit } from './EditRoute';
 import Data from './DataRoute';

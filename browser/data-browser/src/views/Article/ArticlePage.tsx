@@ -26,18 +26,18 @@ export function ArticlePage({ resource }: ResourcePageProps): JSX.Element {
   const [canEdit] = useCanWrite(resource);
   const children = useChildren(resource);
 
-  const createAndNavigate = useCreateAndNavigate(
-    classes.article,
-    resource.getSubject(),
-  );
+  const createAndNavigate = useCreateAndNavigate();
 
   const createNewArticle = useCallback(() => {
-    createAndNavigate('article', {
-      [properties.isA]: [classes.article],
-      [properties.name]: 'New Article',
-      [properties.publishedAt]: getTimestampNow(),
-      [properties.description]: '',
-    });
+    createAndNavigate(
+      classes.article,
+      {
+        [properties.name]: 'New Article',
+        [properties.publishedAt]: getTimestampNow(),
+        [properties.description]: '',
+      },
+      resource.getSubject(),
+    );
   }, [createAndNavigate]);
 
   return (

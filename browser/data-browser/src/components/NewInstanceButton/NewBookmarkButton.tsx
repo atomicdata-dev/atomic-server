@@ -1,4 +1,4 @@
-import { classes, properties, useResource, useTitle } from '@tomic/react';
+import { dataBrowser, properties, useResource, useTitle } from '@tomic/react';
 import { FormEvent, useCallback, useState } from 'react';
 import { Button } from '../Button';
 import {
@@ -38,7 +38,7 @@ export function NewBookmarkButton({
 
   const [dialogProps, show, hide] = useDialog();
 
-  const createResourceAndNavigate = useCreateAndNavigate(klass, parent);
+  const createResourceAndNavigate = useCreateAndNavigate();
 
   const onDone = useCallback(
     (e: FormEvent) => {
@@ -46,11 +46,14 @@ export function NewBookmarkButton({
 
       const normalizedUrl = normalizeWebAddress(url);
 
-      createResourceAndNavigate('bookmark', {
-        [properties.name]: 'New Bookmark',
-        [properties.bookmark.url]: normalizedUrl,
-        [properties.isA]: [classes.bookmark],
-      });
+      createResourceAndNavigate(
+        dataBrowser.classes.bookmark,
+        {
+          [properties.name]: 'New Bookmark',
+          [properties.bookmark.url]: normalizedUrl,
+        },
+        parent,
+      );
     },
     [url],
   );

@@ -4,6 +4,7 @@ import { ResourceForm } from '../ResourceForm';
 import { NewFormTitle } from './NewFormTitle';
 import { SubjectField } from './SubjectField';
 import { useNewForm } from './useNewForm';
+import { Column } from '../../Row';
 
 export interface NewFormProps {
   classSubject: string;
@@ -28,7 +29,7 @@ export const NewFormFullPage = ({
   if (!initialized) return <>Initializing Resource</>;
 
   return (
-    <>
+    <Column>
       <NewFormTitle classSubject={classSubject} />
       <SubjectField
         error={subjectErr}
@@ -41,6 +42,6 @@ export const NewFormFullPage = ({
         classSubject={classSubject}
         key={`${classSubject}+${subject}`}
       />
-    </>
+    </Column>
   );
 };
