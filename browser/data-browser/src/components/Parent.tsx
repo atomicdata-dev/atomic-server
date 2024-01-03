@@ -1,5 +1,12 @@
 import { styled, css } from 'styled-components';
-import { useResource, useString, useTitle, Resource, core } from '@tomic/react';
+import {
+  useResource,
+  useString,
+  useTitle,
+  Resource,
+  core,
+  server,
+} from '@tomic/react';
 import { constructOpenURL } from '../helpers/navigation';
 import { FaSearch } from 'react-icons/fa';
 import { Row } from './Row';
@@ -69,6 +76,7 @@ function DriveMismatch({ subject }: { subject: string }) {
   const { drive, setDrive } = useSettings();
   const resource = useResource(subject, { allowIncomplete: true });
   const [title] = useTitle(resource);
+  const classes = resource.getClasses();
 
   const handleSetDrive = () => {
     setDrive(subject);
@@ -76,7 +84,7 @@ function DriveMismatch({ subject }: { subject: string }) {
 
   const mismatch = subject && subject !== drive;
 
-  if (mismatch) {
+  if (mismatch && classes[0] === server.classes.drive) {
     return (
       <Button
         title={`Set ${title} as current drive`}

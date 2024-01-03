@@ -10,6 +10,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Use `musl` + `alpine` builds for docker images, way smaller images #620
 - Support multi-platform docker builds #731
 - Remove deprecated ENV vars #732
+- Fix no Agent as drive
+- Add `clear` option to error component (resets all front-end state)
 
 ## [v0.36.1] - 2023-12-06
 
