@@ -57,6 +57,12 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
             Retry
           </Button>
           <Button
+            title='Clear all local data & refresh page'
+            onClick={clearAllLocalData}
+          >
+            Hard reset
+          </Button>
+          <Button
             onClick={() =>
               store.fetchResourceFromServer(subject, {
                 fromProxy: true,
