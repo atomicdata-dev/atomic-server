@@ -97,7 +97,7 @@ Library that powers `atomic-server` and `atomic-cli`. Features:
 ## Want to add to this list? Some ideas for tooling
 
 This document contains a set of ideas that would help achieve that success.
-Open a PR and [edit this file](https://github.com/ontola/atomic-data-docs/edit/master/src/tooling.md) to add your project!
+Open a PR and [edit this file](https://github.com/atomicdata-dev/atomic-server/edit/develop/docs/src/tooling.md) to add your project!
 
 ### Atomic Companion
 

@@ -11,11 +11,11 @@ There are multiple ways of getting Atomic Data into some system:
 ## Subject fetching (HTTP)
 
 The simplest way of getting Atomic Data when the Subject is an HTTP URL, is by sending a GET request to the subject URL.
-Set the `Content-Type` header to an Atomic Data compatible mime type, such as `application/ad+json`.
+Set the `accept` header to an Atomic Data compatible mime type, such as `application/ad+json`.
 
 ```HTTP
 GET https://atomicdata.dev/test HTTP/1.1
-Content-Type: application/ad+json
+accept: application/ad+json
 ```
 
 The server SHOULD respond with all the Atoms of which the requested URL is the subject:
@@ -50,3 +50,8 @@ Use query parameters to traverse pages, filter, or sort.
 An Atomic Path is a string that consist of one or more URLs, which when traversed point to an item.
 
 [Read more about Atomic Paths](paths.md)
+
+## Full text search
+
+AtomicServer supports a full text `/search` endpoint.
+Because this is an [Endpoint](../endpoints.md), you can simply [open it to see the available query parameters](https://atomicdata.dev/search).

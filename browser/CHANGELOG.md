@@ -2,12 +2,17 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
-## UNRELEASED
+## v0.36.2
+
+### Atomic Browser
+
+- Added persistent scrollbar to table
 
 ### @tomic/lib
 
 - Always fetch all resources after setting + authenticating new agent with websockets #686
 - Add progress callback to `resource.getHistory()` And increased its performance for resources with a large number of commits [#745](https://github.com/atomicdata-dev/atomic-server/issues/745)
+- Fix websocket bug on port localhost with port 80
 
 ## v0.36.1
 

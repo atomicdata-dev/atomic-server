@@ -1,4 +1,4 @@
-![Atomic Data](https://raw.githubusercontent.com/ontola/atomic-data-docs/master/src/assets/atomic_data_logo_stroke.svg)
+![Atomic Data](https://raw.githubusercontent.com/atomicdata-dev/atomic-server/master/docs/src/assets/atomic_data_logo_stroke.svg)
 
 *The easiest way to **create**, **share** and **model** linked data.*
 
