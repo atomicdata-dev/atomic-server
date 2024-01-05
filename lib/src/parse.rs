@@ -162,7 +162,7 @@ pub fn parse_json_ad_commit_resource(
         }
     };
     for (prop, val) in propvals {
-        resource.set_propval(prop, val, store)?
+        resource.set_propval(prop, val, store)?;
     }
     Ok(resource)
 }

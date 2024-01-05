@@ -104,9 +104,9 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
 
 /// Create a new agent if it does not yet exist.
 fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerResult<()> {
-    let ag_cfg: atomic_lib::config::Config = match atomic_lib::config::read_config(
+    let ag_cfg: atomic_lib::config::Config = match atomic_lib::config::read_config(Some(
         &config.config_file_path,
-    ) {
+    )) {
         Ok(agent_config) => {
             match store.get_resource(&agent_config.agent) {
                 Ok(_) => agent_config,

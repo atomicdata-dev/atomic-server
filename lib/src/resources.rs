@@ -437,7 +437,7 @@ impl Resource {
         property: String,
         value: Value,
         store: &impl Storelike,
-    ) -> AtomicResult<()> {
+    ) -> AtomicResult<&mut Self> {
         let full_prop = store.get_property(&property)?;
         if let Some(allowed) = full_prop.allows_only {
             let error = Err(format!(
@@ -463,7 +463,7 @@ impl Resource {
         }
         if full_prop.data_type == value.datatype() {
             self.set_propval_unsafe(property, value);
-            Ok(())
+            Ok(self)
         } else {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
                 self.get_subject(),
@@ -492,11 +492,11 @@ impl Resource {
         property: &str,
         value: &str,
         store: &impl Storelike,
-    ) -> AtomicResult<()> {
+    ) -> AtomicResult<&mut Self> {
         let fullprop = self.resolve_shortname_to_property(property, store)?;
         let fullval = Value::new(value, &fullprop.data_type)?;
         self.set_propval_unsafe(fullprop.subject, fullval);
-        Ok(())
+        Ok(self)
     }
 
     /// Overwrites all current PropVals. Does not perform validation.

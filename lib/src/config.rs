@@ -33,7 +33,10 @@ pub fn default_config_file_path() -> AtomicResult<PathBuf> {
 }
 
 /// Reads config file from a specified path
-pub fn read_config(path: &Path) -> AtomicResult<Config> {
+/// If you pass None, it will use the default config file path
+pub fn read_config(path: Option<&Path>) -> AtomicResult<Config> {
+    let default = default_config_file_path()?;
+    let path = path.unwrap_or(&default);
     let config_string = std::fs::read_to_string(path)
         .map_err(|e| format!("Error reading config from {:?}. {}", path, e))?;
     let config: Config = toml::from_str(&config_string)

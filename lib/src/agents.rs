@@ -3,6 +3,7 @@
 //! https://docs.atomicdata.dev/commits/concepts.html
 
 use base64::{engine::general_purpose, Engine};
+use serde_json::from_slice;
 
 use crate::{errors::AtomicResult, urls, Resource, Storelike, Value};
 
@@ -112,6 +113,21 @@ impl Agent {
             created_at: crate::utils::now(),
         })
     }
+
+    pub fn from_secret(secret_b64: &str) -> AtomicResult<Agent> {
+        let agent_bytes = decode_base64(secret_b64)?;
+        let parsed: serde_json::Value = from_slice(&agent_bytes)?;
+        let private_key = parsed["privateKey"].as_str().ok_or("Invalid private key")?;
+        let subject = parsed["subject"].as_str().ok_or("Invalid subject")?;
+        let agent = Agent {
+            private_key: Some(private_key.into()),
+            public_key: generate_public_key(private_key).public,
+            subject: subject.into(),
+            name: None,
+            created_at: crate::utils::now(),
+        };
+        Ok(agent)
+    }
 }
 
 /// keypair, serialized using base64
@@ -205,5 +221,19 @@ mod test {
         verify_public_key(valid_public_key).unwrap();
         verify_public_key(invalid_length).unwrap_err();
         verify_public_key(invalid_char).unwrap_err();
+    }
+
+    #[test]
+    fn creates_from_secret() {
+        let secret = "eyJjbGllbnQiOnt9LCJzdWJqZWN0IjoiaHR0cDovL2xvY2FsaG9zdDo5ODgzL2FnZW50cy9ScVB3cGdIditQSzdQbnovZFZhYjhobUhqWW52VEwxWXJsVmE2TDlHOVpnPSIsInByaXZhdGVLZXkiOiJTTXl4UmdGN1FoaUM3QzUwNnFYU1VLZkUrU0tBdENkTkZ1NVhlVGp6YWRBPSIsInB1YmxpY0tleSI6IlJxUHdwZ0h2K1BLN1Buei9kVmFiOGhtSGpZbnZUTDFZcmxWYTZMOUc5Wmc9In0=";
+        let agent = Agent::from_secret(secret).unwrap();
+        assert_eq!(
+            agent.private_key.unwrap(),
+            "SMyxRgF7QhiC7C506qXSUKfE+SKAtCdNFu5XeTjzadA="
+        );
+        assert_eq!(
+            agent.subject,
+            "http://localhost:9883/agents/RqPwpgHv+PK7Pnz/dVab8hmHjYnvTL1YrlVa6L9G9Zg="
+        );
     }
 }

@@ -116,6 +116,20 @@ pub fn post_commit_custom_endpoint(
     }
 }
 
+// /// Uses the `/search` endpoint (powered by Tantivy)
+// /// [search.rs](../../server/src/handlers/search.rs)
+// pub fn search(
+//     query: &str,
+//     store: &impl Storelike,
+//     for_agent: Option<Agent>,
+// ) -> AtomicResult<Vec<Resource>> {
+//     let server_url = crate::utils::server_url(query)?;
+//     let body = fetch_body(&server_url, crate::parse::JSON_AD_MIME, for_agent)?;
+//     let resources = crate::parse::parse_json_ad_resources(&body, store, &ParseOpts::default())
+//         .map_err(|e| format!("Error parsing body of {}. {}", server_url, e))?;
+//     Ok(resources)
+// }
+
 #[cfg(test)]
 mod test {
     use super::*;

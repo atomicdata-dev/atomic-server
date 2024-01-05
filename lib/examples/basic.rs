@@ -24,8 +24,10 @@ fn main() {
     // In order to change things in the store, we should use Commits,
     // which are signed pieces of data that contain state changes.
     // Because these are signed, we need an Agent, which has a private key to sign Commits.
+    // If you want to use an _existing_ agent, use atomic_lib::Agent::from_secret
     let agent = store.create_agent(Some("my_agent")).unwrap();
     store.set_default_agent(agent);
+    // Saving locally means it is _not_ send to the server. Use `.save` otherwise.
     let _fails = new_property.save_locally(&store);
     // But.. when we commit, we get an error!
     // Because we haven't set all the properties required for the Property class.
@@ -37,7 +39,7 @@ fn main() {
         .set_propval_shortname("datatype", atomic_lib::urls::INTEGER, &store)
         .unwrap();
     new_property.save_locally(&store).unwrap();
-    // Now the changes to the resource applied to the store, and we can fetch the newly created resource!
+    // Now the changes to the resource applied to the in-memory store, and we can fetch the newly created resource!
     let fetched_new_resource = store.get_resource(&subject).unwrap();
     assert!(
         fetched_new_resource
