@@ -65,6 +65,10 @@ fn set_certs_created_at_file(config: &crate::config::Config) {
 /// Will be true if there are no certs yet.
 pub fn should_renew_certs_check(config: &crate::config::Config) -> AtomicServerResult<bool> {
     if std::fs::File::open(&config.cert_path).is_err() {
+        warn!(
+            "No HTTPS certificates found in {:?}, requesting new ones...",
+            &config.https_path
+        );
         return Ok(true);
     }
     let path = certs_created_at_path(config);
@@ -120,6 +124,10 @@ async fn cert_init_server(
 
     std::thread::spawn(move || {
         actix_web::rt::System::new().block_on(async move {
+            info!(
+                "Starting HTTP server for HTTPS initialization at {}",
+                &address
+            );
             let init_server = HttpServer::new(move || {
                 App::new().service(
                     actix_files::Files::new("/.well-known", well_known_folder.clone())
@@ -168,8 +176,10 @@ async fn cert_init_server(
 /// Sends a request to LetsEncrypt to create a certificate
 pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<()> {
     let challenge_type = if config.opts.https_dns {
+        info!("Using DNS-01 challenge");
         instant_acme::ChallengeType::Dns01
     } else {
+        info!("Using HTTP-01 challenge");
         instant_acme::ChallengeType::Http01
     };
 
@@ -253,8 +263,6 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
                 handle = Some(cert_init_server(config, challenge, &key_auth).await?);
             }
             instant_acme::ChallengeType::Dns01 => {
-                // For DNS challenges, we need the user to set a TXT record.
-
                 println!("Please set the following DNS record then press any key:");
                 println!(
                     "_acme-challenge.{} IN TXT {}",
@@ -289,12 +297,13 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
 
         delay *= 2;
         tries += 1;
-        match tries < 100 {
+        match tries < 8 {
             true => info!("order is not ready, waiting {delay:?}"),
             false => {
-                return Err(
-                    format!("order is not ready. For details, see the url: {url:?}").into(),
-                );
+                return Err(format!(
+                    "Giving up: order is not ready. For details, see the url: {url:?}"
+                )
+                .into());
             }
         }
     };
