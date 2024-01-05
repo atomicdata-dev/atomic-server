@@ -8,6 +8,7 @@ import { useSettings } from '../helpers/AppSettings';
 import { ResourcePageProps } from './ResourcePage';
 import { Column, Row } from '../components/Row';
 import CrashPage from './CrashPage';
+import { clearAllLocalData } from '../helpers/clearData';
 
 /**
  * A View for Resource Errors. Not to be confused with the CrashPage, which is
