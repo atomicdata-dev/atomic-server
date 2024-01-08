@@ -1,18 +1,18 @@
 import { validateDatatype, Datatype, core } from '@tomic/react';
 import { useState, useCallback, FormEvent, FC, useEffect } from 'react';
-import styled from 'styled-components';
-import { stringToSlug } from '../../../../helpers/stringToSlug';
-import { Button } from '../../../Button';
+import { styled } from 'styled-components';
+import { stringToSlug } from '../../../../../helpers/stringToSlug';
+import { Button } from '../../../../Button';
 import {
   useDialog,
   Dialog,
   DialogContent,
   DialogActions,
-} from '../../../Dialog';
-import { useCreateAndNavigate } from '../../../NewInstanceButton';
-import Field from '../../Field';
-import { InputWrapper, InputStyled } from '../../InputStyles';
-import { CustomResourceDialogProps } from '../useNewResourceUI';
+} from '../../../../Dialog';
+import Field from '../../../Field';
+import { InputWrapper, InputStyled } from '../../../InputStyles';
+import { CustomResourceDialogProps } from '../../useNewResourceUI';
+import { useCreateAndNavigate } from '../../../../../hooks/useCreateAndNavigate';
 
 export const NewOntologyDialog: FC<CustomResourceDialogProps> = ({
   parent,

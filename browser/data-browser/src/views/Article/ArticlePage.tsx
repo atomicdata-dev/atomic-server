@@ -13,12 +13,12 @@ import { ContainerWide } from '../../components/Containers';
 import { EditableTitle } from '../../components/EditableTitle';
 import UploadForm from '../../components/forms/UploadForm';
 import { NewCard } from '../../components/NewCard';
-import { useCreateAndNavigate } from '../../components/NewInstanceButton';
 import { Column } from '../../components/Row';
 import ResourceCard from '../Card/ResourceCard';
 import { ResourcePageProps } from '../ResourcePage';
 import { ArticleCover } from './ArticleCover';
 import { ArticleDescription } from './ArticleDescription';
+import { useCreateAndNavigate } from '../../hooks/useCreateAndNavigate';
 
 export function ArticlePage({ resource }: ResourcePageProps): JSX.Element {
   const [lastCommit] = useString(resource, properties.commit.lastCommit);

@@ -1,17 +1,17 @@
 import { core, dataBrowser } from '@tomic/react';
 import { useState, useCallback, FormEvent, useEffect, FC } from 'react';
-import { Button } from '../../../Button';
+import { Button } from '../../../../Button';
 import {
   useDialog,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-} from '../../../Dialog';
-import { useCreateAndNavigate } from '../../../NewInstanceButton';
-import Field from '../../Field';
-import { InputWrapper, InputStyled } from '../../InputStyles';
-import { CustomResourceDialogProps } from '../useNewResourceUI';
+} from '../../../../Dialog';
+import Field from '../../../Field';
+import { InputWrapper, InputStyled } from '../../../InputStyles';
+import { CustomResourceDialogProps } from '../../useNewResourceUI';
+import { useCreateAndNavigate } from '../../../../../hooks/useCreateAndNavigate';
 
 function normalizeWebAddress(url: string) {
   if (/^[http://|https://]/i.test(url)) {

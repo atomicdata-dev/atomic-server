@@ -10,7 +10,7 @@ import { ClassDetail } from '../components/ClassDetail';
 import { CodeBlock } from '../components/CodeBlock';
 import { ContainerNarrow } from '../components/Containers';
 import { ValueForm } from '../components/forms/ValueForm';
-import NewInstanceButton from '../components/NewInstanceButton';
+import { NewInstanceButton } from '../components/NewInstanceButton';
 import { Title } from '../components/Title';
 import { Column, Row } from '../components/Row';
 import { ResourcePageProps } from './ResourcePage';

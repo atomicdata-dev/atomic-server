@@ -1,4 +1,4 @@
-import NewIntanceButton from '../../components/NewInstanceButton';
+import { NewInstanceButton } from '../../components/NewInstanceButton';
 import { Card, CardInsideFull, CardRow } from '../../components/Card';
 import { urls } from '@tomic/react';
 import { styled } from 'styled-components';
@@ -56,7 +56,7 @@ const ContainerCard = styled(Card)`
   padding-top: 0;
 `;
 
-const StyledNewInstanceButton = styled(NewIntanceButton)`
+const StyledNewInstanceButton = styled(NewInstanceButton)`
   border: none;
   box-shadow: none;
   padding: 0;

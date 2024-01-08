@@ -1,20 +1,20 @@
 import { useResource, Core, dataBrowser, core, useStore } from '@tomic/react';
 import { useState, useCallback, useEffect, FormEvent, FC } from 'react';
 import styled from 'styled-components';
-import { stringToSlug } from '../../../../helpers/stringToSlug';
-import { BetaBadge } from '../../../BetaBadge';
-import { Button } from '../../../Button';
+import { stringToSlug } from '../../../../../helpers/stringToSlug';
+import { BetaBadge } from '../../../../BetaBadge';
+import { Button } from '../../../../Button';
 import {
   useDialog,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-} from '../../../Dialog';
-import { useCreateAndNavigate } from '../../../NewInstanceButton';
-import Field from '../../Field';
-import { InputWrapper, InputStyled } from '../../InputStyles';
-import type { CustomResourceDialogProps } from '../useNewResourceUI';
+} from '../../../../Dialog';
+import Field from '../../../Field';
+import { InputWrapper, InputStyled } from '../../../InputStyles';
+import type { CustomResourceDialogProps } from '../../useNewResourceUI';
+import { useCreateAndNavigate } from '../../../../../hooks/useCreateAndNavigate';
 
 const instanceOpts = {
   newResource: true,

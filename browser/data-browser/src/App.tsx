@@ -1,6 +1,7 @@
 import { BrowserRouter } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { StoreContext, Store } from '@tomic/react';
+import { StyleSheetManager } from 'styled-components';
 
 import { GlobalStyle, ThemeWrapper } from './styling';
 import { AppRoutes } from './routes/Routes';
@@ -22,7 +23,7 @@ import { PopoverContainer } from './components/Popover';
 import { SkipNav } from './components/SkipNav';
 import { ControlLockProvider } from './hooks/useControlLock';
 import { FormValidationContextProvider } from './components/forms/formValidation/FormValidationContextProvider';
-import { StyleSheetManager } from 'styled-components';
+import { registerCustomCreateActions } from './components/forms/NewForm/CustomCreateActions';
 
 function fixDevUrl(url: string) {
   if (isDev()) {
@@ -60,6 +61,7 @@ const ErrBoundary = window.bugsnagApiKey
 // Fetch all the Properties and Classes - this helps speed up the app.
 store.preloadPropsAndClasses();
 
+registerCustomCreateActions();
 // Register global event handlers.
 registerHandlers(store);
 

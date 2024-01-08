@@ -2,18 +2,23 @@ import { Core, JSONValue, Resource, core, useStore } from '@tomic/react';
 import { useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
-import { constructOpenURL } from '../../helpers/navigation';
-import { getNamePartFromProps } from '../../helpers/getNamePartFromProps';
+import { constructOpenURL } from '../helpers/navigation';
+import { getNamePartFromProps } from '../helpers/getNamePartFromProps';
+
+export type CreateAndNavigate = (
+  isA: string,
+  propVals: Record<string, JSONValue>,
+  parent?: string,
+  extraParams?: Record<string, string>,
+) => Promise<Resource>;
 
 /**
  * Hook that builds a function that will create a new resource with the given
  * properties and then navigate to it.
  *
- * @param klass The type of resource to create a new instance of.
- * @param parent The parent resource of the new resource.
  * @returns A createAndNavigate function.
  */
-export function useCreateAndNavigate() {
+export function useCreateAndNavigate(): CreateAndNavigate {
   const store = useStore();
   const navigate = useNavigate();
 

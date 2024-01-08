@@ -1,6 +1,6 @@
 import { useResource, useTitle } from '@tomic/react';
 import { getIconForClass } from '../../views/FolderPage/iconMap';
-import NewIntanceButton from '../../components/NewInstanceButton';
+import { NewInstanceButton } from '../../components/NewInstanceButton';
 
 interface ClassButtonProps {
   classType: string;
@@ -15,7 +15,7 @@ export function ClassButton({
   const [label] = useTitle(classResource);
 
   return (
-    <NewIntanceButton
+    <NewInstanceButton
       icon
       IconComponent={getIconForClass(classType)}
       klass={classType}

@@ -1,4 +1,4 @@
-import { classes, Resource, urls, useResources } from '@tomic/react';
+import { Resource, core, server, useResources } from '@tomic/react';
 import { useMemo } from 'react';
 import {
   FaCog,
@@ -15,13 +15,13 @@ import { useSavedDrives } from '../../hooks/useSavedDrives';
 import { paths } from '../../routes/paths';
 import { DIVIDER, DropdownMenu } from '../Dropdown';
 import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
-import { useDefaultNewInstanceHandler } from '../NewInstanceButton';
+import { useNewResourceUI } from '../forms/NewForm/useNewResourceUI';
 
 const Trigger = buildDefaultTrigger(<FaHdd />, 'Open Drive Settings');
 
 function getTitle(resource: Resource): string {
   return (
-    (resource.get(urls.properties.name) as string) ?? resource.getSubject()
+    (resource.get(core.properties.name) as string) ?? resource.getSubject()
   );
 }
 
@@ -44,10 +44,7 @@ export function DriveSwitcher() {
     navigate(constructOpenURL(subject));
   };
 
-  const createNewDrive = useDefaultNewInstanceHandler(
-    classes.drive,
-    agent?.subject,
-  );
+  const createNewResource = useNewResourceUI();
 
   const items = useMemo(
     () => [
@@ -89,7 +86,8 @@ export function DriveSwitcher() {
         label: 'New Drive',
         icon: <FaPlus />,
         helper: 'Create a new drive',
-        onClick: createNewDrive,
+        onClick: () =>
+          createNewResource(server.classes.drive, agent?.subject ?? ''),
       },
     ],
     [savedDrivesMap, drive, historyMap],

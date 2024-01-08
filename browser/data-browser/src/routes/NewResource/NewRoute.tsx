@@ -2,11 +2,7 @@ import { useResource, urls } from '@tomic/react';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
 
-import {
-  constructOpenURL,
-  newURL,
-  useQueryString,
-} from '../../helpers/navigation';
+import { constructOpenURL, useQueryString } from '../../helpers/navigation';
 import { ContainerNarrow } from '../../components/Containers';
 import { ResourceSelector } from '../../components/forms/ResourceSelector';
 import { useSettings } from '../../helpers/AppSettings';
@@ -18,6 +14,7 @@ import { NewFormFullPage } from '../../components/forms/NewForm/NewFormPage';
 import { Main } from '../../components/Main';
 import { BaseButtons } from './BaseButtons';
 import { OntologySections } from './OntologySections';
+import { useNewResourceUI } from '../../components/forms/NewForm/useNewResourceUI';
 
 /** Start page for instantiating a new Resource from some Class */
 function NewRoute(): JSX.Element {
@@ -41,13 +38,14 @@ function NewResourceSelector() {
   const parentResource = useResource(calculatedParent);
 
   const navigate = useNavigate();
+  const showNewResourceUI = useNewResourceUI();
 
   function handleClassSet(subject: string | undefined) {
     if (!subject) {
       return;
     }
 
-    navigate(newURL(subject, calculatedParent));
+    showNewResourceUI(subject, calculatedParent);
   }
 
   const onUploadComplete = useCallback(

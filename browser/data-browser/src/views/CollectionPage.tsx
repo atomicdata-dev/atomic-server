@@ -22,7 +22,7 @@ import { useViewport } from '../helpers/useMedia';
 import { Button } from '../components/Button';
 import { ContainerFull } from '../components/Containers';
 import Markdown from '../components/datatypes/Markdown';
-import NewInstanceButton from '../components/NewInstanceButton';
+import { NewInstanceButton } from '../components/NewInstanceButton';
 import ResourceCard from './Card/ResourceCard';
 import Table from '../components/Table';
 import { useSubjectParam } from '../helpers/useCurrentSubject';

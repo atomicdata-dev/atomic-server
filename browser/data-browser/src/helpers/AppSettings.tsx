@@ -115,7 +115,7 @@ export const AppSettingsContextProvider = (
 };
 
 /** A bunch of getters and setters for client-side app settings */
-interface AppSettings {
+export interface AppSettings {
   /** Whether the App should render in dark mode. Checks user preferences. */
   darkMode: boolean;
   /** 'always', 'never' or 'auto' */
