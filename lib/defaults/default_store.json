@@ -1025,21 +1025,6 @@
         "https://atomicdata.dev/properties/shortname": "redirect"
     },
     {
-        "@id": "https://atomicdata.dev/classes/Tag",
-        "https://atomicdata.dev/properties/description": "A single tag / theme / category. This is used for categorizing information using the [tags](https://atomicdata.dev/properties/tags) property",
-        "https://atomicdata.dev/properties/isA": [
-            "https://atomicdata.dev/classes/Class"
-        ],
-        "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
-        "https://atomicdata.dev/properties/recommends": [
-            "https://atomicdata.dev/properties/description"
-        ],
-        "https://atomicdata.dev/properties/requires": [
-            "https://atomicdata.dev/properties/name"
-        ],
-        "https://atomicdata.dev/properties/shortname": "tag"
-    },
-    {
         "@id": "https://atomicdata.dev/datatypes/atomicURL",
         "https://atomicdata.dev/properties/description": "Every single page or thing that you look at in Atomic Data, is a Resource. The resource datatype can either be a link to a Resource (an HTTP URL) or a Nested Resource. When a HTTP(S) GET request is sent to that URL with an `Accept: application/ad+json` header, the server should reply with MIME type `application/ad+json`, and a body with valid [JSON-AD](https://docs.atomicdata.dev/core/json-ad.html) describing the entire resource. Contrary to regular Resources, Nested Resources don't have their own HTTP URL, and only exist in the context of their outer resource. However, you can use [Atomic Paths](https://docs.atomicdata.dev/core/paths.html) to provide resolvable identifiers to Nested Resources. In JSON, a Resource is either an HTTP URL string, or a nested Object.",
         "https://atomicdata.dev/properties/isA": [
