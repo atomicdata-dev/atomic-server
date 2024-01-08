@@ -78,7 +78,7 @@ pub fn should_renew_certs_check(config: &crate::config::Config) -> AtomicServerR
         .parse::<chrono::DateTime<chrono::Utc>>()
         .map_err(|_| format!("failed to parse {:?}", &path))?;
     let certs_age: chrono::Duration = chrono::Utc::now() - created_at;
-    // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX.
+    // Let's Encrypt certificates are valid for three months, but I think renewing earlier provides a better UX
     let expired = certs_age > chrono::Duration::weeks(4);
     if expired {
         warn!("HTTPS Certificates expired, requesting new ones...")

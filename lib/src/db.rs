@@ -442,7 +442,7 @@ impl Storelike for Db {
                 let resource = crate::resources::Resource::from_propvals(propvals, subject.into());
                 Ok(resource)
             }
-            Err(e) => self.handle_not_found(subject, e),
+            Err(e) => self.handle_not_found(subject, e, None),
         }
     }
 

@@ -131,11 +131,14 @@ pub trait Storelike: Sized {
     }
 
     /// Fetches a resource, makes sure its subject matches.
-    /// Uses the default agent to sign the request.
     /// Save to the store.
-    fn fetch_resource(&self, subject: &str) -> AtomicResult<Resource> {
-        let resource: Resource =
-            crate::client::fetch_resource(subject, self, self.get_default_agent().ok())?;
+    /// Uses `client_agent` for Authentication.
+    fn fetch_resource(
+        &self,
+        subject: &str,
+        client_agent: Option<&Agent>,
+    ) -> AtomicResult<Resource> {
+        let resource: Resource = crate::client::fetch_resource(subject, self, client_agent)?;
         self.add_resource_opts(&resource, true, true, true)?;
         Ok(resource)
     }
@@ -198,7 +201,12 @@ pub trait Storelike: Sized {
     /// Implement this if you want to have custom handlers for Commits.
     fn handle_commit(&self, _commit_response: &CommitResponse) {}
 
-    fn handle_not_found(&self, subject: &str, error: AtomicError) -> AtomicResult<Resource> {
+    fn handle_not_found(
+        &self,
+        subject: &str,
+        error: AtomicError,
+        for_agent: Option<&Agent>,
+    ) -> AtomicResult<Resource> {
         if let Some(self_url) = self.get_self_url() {
             if subject.starts_with(&self_url) {
                 return Err(AtomicError::not_found(format!(
@@ -207,7 +215,7 @@ pub trait Storelike: Sized {
                 )));
             }
         }
-        self.fetch_resource(subject)
+        self.fetch_resource(subject, for_agent)
     }
 
     /// Imports a JSON-AD string, returns the amount of imported resources.

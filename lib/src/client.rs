@@ -15,9 +15,9 @@ use crate::{
 pub fn fetch_resource(
     subject: &str,
     store: &impl Storelike,
-    for_agent: Option<Agent>,
+    client_agent: Option<&Agent>,
 ) -> AtomicResult<Resource> {
-    let body = fetch_body(subject, crate::parse::JSON_AD_MIME, for_agent)?;
+    let body = fetch_body(subject, crate::parse::JSON_AD_MIME, client_agent)?;
     let resource = parse_json_ad_resource(&body, store, &ParseOpts::default())
         .map_err(|e| format!("Error parsing body of {}. {}", subject, e))?;
     Ok(resource)
@@ -46,12 +46,16 @@ pub fn get_authentication_headers(url: &str, agent: &Agent) -> AtomicResult<Vec<
 /// Fetches a URL, returns its body.
 /// Uses the store's Agent agent (if set) to sign the request.
 #[tracing::instrument(level = "info")]
-pub fn fetch_body(url: &str, content_type: &str, for_agent: Option<Agent>) -> AtomicResult<String> {
+pub fn fetch_body(
+    url: &str,
+    content_type: &str,
+    client_agent: Option<&Agent>,
+) -> AtomicResult<String> {
     if !url.starts_with("http") {
         return Err(format!("Could not fetch url '{}', must start with http.", url).into());
     }
-    if let Some(agent) = for_agent {
-        get_authentication_headers(url, &agent)?;
+    if let Some(agent) = client_agent {
+        get_authentication_headers(url, agent)?;
     }
 
     let agent = ureq::builder()
