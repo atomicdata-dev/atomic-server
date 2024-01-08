@@ -16,7 +16,7 @@ export type CreateAndNavigate = (
  * Hook that builds a function that will create a new resource with the given
  * properties and then navigate to it.
  *
- * @returns A createAndNavigate function.
+ * @returns A {@link CreateAndNavigate} function.
  */
 export function useCreateAndNavigate(): CreateAndNavigate {
   const store = useStore();

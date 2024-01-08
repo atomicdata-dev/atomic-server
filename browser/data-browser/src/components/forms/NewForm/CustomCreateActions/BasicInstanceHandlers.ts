@@ -1,6 +1,10 @@
 import { dataBrowser, core, classes, server } from '@tomic/react';
 import { registerBasicInstanceHandler } from '../useNewResourceUI';
 
+/**
+ * These handlers do not show any UI / inputs when creating new instances.
+ * This is where they can have hardcoded default values or custom logic.
+ */
 export const registerBasicInstanceHandlers = () => {
   registerBasicInstanceHandler(
     dataBrowser.classes.folder,
@@ -23,20 +27,6 @@ export const registerBasicInstanceHandlers = () => {
         dataBrowser.classes.chatroom,
         {
           [core.properties.name]: 'Untitled ChatRoom',
-        },
-        parent,
-      );
-    },
-  );
-
-  registerBasicInstanceHandler(
-    dataBrowser.classes.folder,
-    async (parent, createAndNavigate) => {
-      await createAndNavigate(
-        dataBrowser.classes.folder,
-        {
-          [core.properties.name]: 'Untitled Folder',
-          [dataBrowser.properties.displayStyle]: classes.displayStyles.list,
         },
         parent,
       );

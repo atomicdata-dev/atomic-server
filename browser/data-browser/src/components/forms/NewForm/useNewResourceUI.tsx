@@ -21,6 +21,7 @@ export interface CustomResourceDialogProps {
   onClose: () => void;
 }
 
+/**  When creating a new resource, the matched handler is called */
 export type BasicInstanceHandler = (
   parent: string,
   createAndNavigate: CreateAndNavigate,
@@ -37,12 +38,18 @@ interface NewResourceUIContext {
 const dialogs = new Map<string, FC<CustomResourceDialogProps>>();
 const basicNewInstanceHandlers = new Map<string, BasicInstanceHandler>();
 
+/**
+ * Returns a function that when called, renders UI to create a new Resource of the given class.
+ *
+ * Use {@link registerNewResourceDialog} to register a custom dialog for a given class.
+ */
 export function useNewResourceUI() {
   const { showNewResourceUI } = useContext(NewResourceUIContext);
 
   return showNewResourceUI;
 }
 
+/** Call this when adding a new custom New Resource Form / Dialog. */
 export const registerNewResourceDialog = (
   classSubject: string,
   component: FC<CustomResourceDialogProps>,
@@ -50,6 +57,9 @@ export const registerNewResourceDialog = (
   dialogs.set(classSubject, component);
 };
 
+/** Call this when adding a new custom action for a New Resource that does _not_ require inputs.
+ * For example, creating a new Folder does not require any inputs, so it can be handled without any UI.
+ */
 export const registerBasicInstanceHandler = (
   classSubject: string,
   handler: BasicInstanceHandler,
@@ -61,6 +71,7 @@ const NewResourceUIContext = createContext<NewResourceUIContext>({
   showNewResourceUI: () => undefined,
 });
 
+/** Renders the Dialog used when creating new resources. */
 export function NewResourceUIProvider({ children }: PropsWithChildren) {
   const store = useStore();
   const settings = useSettings();

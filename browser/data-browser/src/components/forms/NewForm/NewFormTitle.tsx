@@ -2,7 +2,6 @@ import { properties, useResource, useString, useTitle } from '@tomic/react';
 import { useState } from 'react';
 import { FaInfo } from 'react-icons/fa';
 import { AtomicLink } from '../../AtomicLink';
-import { Button } from '../../Button';
 import Markdown from '../../datatypes/Markdown';
 import { Column, Row } from '../../Row';
 import styled from 'styled-components';
