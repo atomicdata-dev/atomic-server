@@ -237,7 +237,6 @@ export async function newResource(klass: string, page: Page) {
   if (klass.startsWith('https://')) {
     await fillSearchBox(page, 'Search for a class or enter a URL', klass);
     await page.keyboard.press('Enter');
-    await page.click(`button:has-text("new ")`);
   } else {
     await page.locator(`button:has-text("${klass}")`).click();
   }

@@ -2,6 +2,13 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
+## UNRELEASED
+
+### Atomic Browser
+
+- [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on new resource page.
+- Fix server not rebuilding client when files changed.
+
 ## v0.36.2
 
 ### Atomic Browser
