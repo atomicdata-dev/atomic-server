@@ -152,7 +152,7 @@ export const DragAreaBase = styled.div<DragAreaBaseProps>`
 
   backdrop-filter: ${({ isDragging }) => (isDragging ? 'blur(5px)' : 'none')};
 
-  :hover {
+  &:hover {
     transition: background-color 0.2s;
     background-color: var(--drag-color);
     backdrop-filter: blur(5px);
