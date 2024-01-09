@@ -1,6 +1,6 @@
 import { useResource, Core, dataBrowser, core, useStore } from '@tomic/react';
 import { useState, useCallback, useEffect, FormEvent, FC } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { stringToSlug } from '../../../../../helpers/stringToSlug';
 import { BetaBadge } from '../../../../BetaBadge';
 import { Button } from '../../../../Button';

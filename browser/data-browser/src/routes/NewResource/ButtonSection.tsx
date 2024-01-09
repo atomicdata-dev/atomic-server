@@ -1,6 +1,6 @@
 import { PropsWithChildren } from 'react';
 import { Row } from '../../components/Row';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 interface ButtonSectionProps {
   title: string;

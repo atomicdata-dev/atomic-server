@@ -4,7 +4,7 @@ import { FaInfo } from 'react-icons/fa';
 import { AtomicLink } from '../../AtomicLink';
 import Markdown from '../../datatypes/Markdown';
 import { Column, Row } from '../../Row';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { IconButton, IconButtonVariant } from '../../IconButton/IconButton';
 
 export enum NewFormTitleVariant {
