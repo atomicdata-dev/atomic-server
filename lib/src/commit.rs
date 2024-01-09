@@ -511,7 +511,9 @@ impl Commit {
         commit_resource.remove_propval(urls::SIGNATURE);
         let json_obj =
             crate::serialize::propvals_to_json_ad_map(commit_resource.get_propvals(), None)?;
-        serde_json::to_string(&json_obj).map_err(|_| "Could not serialize to JSON-AD".into())
+        let json = serde_jcs::to_string(&json_obj)
+            .map_err(|e| format!("Failed to serialize Commit: {}", e))?;
+        Ok(json)
     }
 }
 
