@@ -10,17 +10,23 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  DraggableAttributes,
   useDndMonitor,
 } from '@dnd-kit/core';
 import { createPortal } from 'react-dom';
 import { ColumnReorderHandler } from './types';
 import { ReorderDropArea } from './ReorderDropArea';
+import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 
-export type TableHeadingComponent<T> = ({
-  column,
-}: {
+type TableHeadingComponentProps<T> = {
   column: T;
-}) => JSX.Element;
+  dragListeners?: SyntheticListenerMap;
+  dragAttributes?: DraggableAttributes;
+};
+
+export type TableHeadingComponent<T> = (
+  props: TableHeadingComponentProps<T>,
+) => JSX.Element;
 
 export interface TableHeaderProps<T> {
   columns: T[];
@@ -100,9 +106,9 @@ export function TableHeader<T>({
             index={index}
             onResize={onResize}
             isReordering={activeIndex !== undefined}
-          >
-            <HeadingComponent column={column} />
-          </TableHeading>
+            column={column}
+            HeadingComponent={HeadingComponent}
+          />
         ))}
         <TableHeadingWrapper aria-colindex={columns.length + 2}>
           <ReorderDropArea index={columns.length} />

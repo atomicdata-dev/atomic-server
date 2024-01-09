@@ -6,22 +6,26 @@ import { useDraggable } from '@dnd-kit/core';
 import { ReorderDropArea } from './ReorderDropArea';
 import { transparentize } from 'polished';
 import { DEFAULT_SIZE_PX } from './hooks/useCellSizes';
+import type { TableHeadingComponent } from './TableHeader';
 
-interface TableHeadingProps {
+interface TableHeadingProps<T> {
   index: number;
   dragKey: string;
   onResize: (index: number, size: string) => void;
   isReordering: boolean;
+  HeadingComponent: TableHeadingComponent<T>;
+  column: T;
 }
 
 /** A single column header, mostly used to render Properties */
-export function TableHeading({
-  children,
+export function TableHeading<T>({
   dragKey,
   index,
   isReordering,
+  column,
   onResize,
-}: React.PropsWithChildren<TableHeadingProps>): JSX.Element {
+  HeadingComponent,
+}: TableHeadingProps<T>): JSX.Element {
   const {
     attributes,
     listeners,
@@ -57,8 +61,11 @@ export function TableHeading({
       role='columnheader'
       aria-colindex={index + 2}
     >
-      {children}
-      <ReorderHandle {...listeners} {...attributes} title='Reorder column' />
+      <HeadingComponent
+        column={column}
+        dragListeners={listeners}
+        dragAttributes={attributes}
+      />
       {isReordering && <ReorderDropArea index={index} />}
       <ResizeHandle isDragging={isDragging} ref={dragAreaRef} />
     </TableHeadingWrapper>
@@ -107,13 +114,4 @@ const ResizeHandle = styled(DragAreaBase)`
   margin-top: var(--handle-margin);
   z-index: 10;
   position: absolute;
-`;
-
-const ReorderHandle = styled.button`
-  border: none;
-  background: none;
-  position: absolute;
-  inset: 0;
-  cursor: grab;
-  z-index: -1;
 `;
