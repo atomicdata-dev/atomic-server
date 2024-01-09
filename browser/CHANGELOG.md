@@ -14,6 +14,8 @@ This changelog covers all three packages, as they are (for now) updated as a who
 ### Atomic Browser
 
 - Added persistent scrollbar to table
+- Improved table header UX
+- Numbers in tables now respect user locale
 
 ### @tomic/lib
 

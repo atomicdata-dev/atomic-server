@@ -10,22 +10,9 @@ import { styled } from 'styled-components';
 import { InputBase } from './InputBase';
 import { ProgressBar } from './ProgressBar';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
+import { formatNumber } from '../helpers/formatNumber';
 
 const { numberFormats } = urls.instances;
-
-function formatValue(
-  value: number | undefined,
-  numberFormatting: string | undefined,
-  decimalPlaces: number | undefined,
-) {
-  const isPercentage = numberFormatting === numberFormats.percentage;
-  const suffix = isPercentage ? ' %' : '';
-
-  const formattedValue =
-    decimalPlaces !== undefined ? value?.toFixed(decimalPlaces) : value;
-
-  return `${formattedValue}${suffix}`;
-}
 
 function FloatCellEdit({
   value,
@@ -65,10 +52,10 @@ function FloatCellDisplay({
 
   const isPercentage = numberFormatting === numberFormats.percentage;
 
-  const formattedValue = formatValue(
+  const formattedValue = formatNumber(
     value as number | undefined,
+    decimalPlaces ?? 2,
     numberFormatting,
-    decimalPlaces,
   );
 
   return (

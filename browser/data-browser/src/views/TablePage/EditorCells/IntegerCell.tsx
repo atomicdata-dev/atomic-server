@@ -4,6 +4,7 @@ import { styled } from 'styled-components';
 import { InputBase } from './InputBase';
 import { ProgressBar } from './ProgressBar';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
+import { formatNumber } from '../helpers/formatNumber';
 
 const { numberFormats } = urls.instances;
 
@@ -40,11 +41,12 @@ function IntegerCellDisplay({
   );
 
   const isPercentage = numberFormatting === numberFormats.percentage;
-  const suffix = isPercentage ? ' %' : '';
 
   return (
     <>
-      <Aligned>{value && `${value}${suffix}`}</Aligned>
+      <Aligned>
+        {formatNumber(value as number | undefined, 0, numberFormatting)}
+      </Aligned>
       {isPercentage && <ProgressBar percentage={value as number} />}
     </>
   );
