@@ -15,6 +15,7 @@ import { ErrMessage } from './InputStyles';
 import InputSwitcher from './InputSwitcher';
 import { useSettings } from '../../helpers/AppSettings';
 import toast from 'react-hot-toast';
+import { Column, Row } from '../Row';
 
 interface ValueFormProps {
   // Maybe pass Value instead of Resource?
@@ -55,6 +56,25 @@ export function ValueForm({
   const [err, setErr] = useState<Error | undefined>(undefined);
   const haveAgent = agent !== undefined;
 
+  function handleCancel() {
+    setErr(undefined);
+    setEditMode(false);
+    // Should this maybe also remove the edits to the resource?
+    // https://github.com/atomicdata-dev/atomic-data-browser/issues/36
+  }
+
+  async function handleSave() {
+    try {
+      await resource.save(store);
+      setEditMode(false);
+      toast.success('Resource saved');
+    } catch (e) {
+      setErr(e);
+      setEditMode(true);
+      toast.error('Could not save resource...');
+    }
+  }
+
   if (value === undefined) {
     return null;
   }
@@ -78,48 +98,33 @@ export function ValueForm({
     );
   }
 
-  function handleCancel() {
-    setErr(undefined);
-    setEditMode(false);
-    // Should this maybe also remove the edits to the resource?
-    // https://github.com/atomicdata-dev/atomic-data-browser/issues/36
-  }
-
-  async function handleSave() {
-    try {
-      await resource.save(store);
-      setEditMode(false);
-      toast.success('Resource saved');
-    } catch (e) {
-      setErr(e);
-      setEditMode(true);
-      toast.error('Could not save resource...');
-    }
-  }
-
   return (
     <ValueFormWrapper>
-      <InputSwitcher
-        data-test={`input-${property.subject}`}
-        resource={resource}
-        property={property}
-        autoFocus
-      />
-      {err && <ErrMessage>{err.message}</ErrMessage>}
-      <Button
-        disabled={!haveAgent}
-        title={
-          haveAgent
-            ? 'Save the edits'
-            : 'You cannot save - there is no Agent set. Go to settings.'
-        }
-        onClick={handleSave}
-      >
-        save
-      </Button>
-      <Button subtle onClick={handleCancel}>
-        cancel
-      </Button>
+      <Column gap='0.5rem'>
+        <InputSwitcher
+          data-test={`input-${property.subject}`}
+          resource={resource}
+          property={property}
+          autoFocus
+        />
+        {err && <ErrMessage>{err.message}</ErrMessage>}
+        <Row gap='0.5rem'>
+          <Button subtle onClick={handleCancel}>
+            cancel
+          </Button>
+          <Button
+            disabled={!haveAgent}
+            title={
+              haveAgent
+                ? 'Save the edits'
+                : 'You cannot save - there is no Agent set. Go to settings.'
+            }
+            onClick={handleSave}
+          >
+            save
+          </Button>
+        </Row>
+      </Column>
     </ValueFormWrapper>
   );
 }
