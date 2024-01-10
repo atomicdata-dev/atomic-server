@@ -2,6 +2,7 @@ import { Resource } from '@tomic/react';
 
 import { styled, css } from 'styled-components';
 import PropVal from './PropVal';
+import { ALL_PROPS_CONTAINER } from '../helpers/containers';
 
 type Props = {
   resource: Resource;
@@ -46,6 +47,8 @@ function AllProps({ resource, except = [], editable, columns, basic }: Props) {
 }
 
 const AllPropsWrapper = styled.div<{ basic: boolean | undefined }>`
+  container: ${ALL_PROPS_CONTAINER} / inline-size;
+
   display: flex;
   flex-direction: column;
   border-radius: ${p => p.theme.radius};

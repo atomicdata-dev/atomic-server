@@ -5,6 +5,7 @@ import { AtomicLink } from './AtomicLink';
 import { ErrorLook } from './ErrorLook';
 import { ValueForm } from './forms/ValueForm';
 import ValueComp from './ValueComp';
+import { ALL_PROPS_CONTAINER } from '../helpers/containers';
 
 type Props = {
   propertyURL: string;
@@ -14,25 +15,6 @@ type Props = {
   columns?: boolean;
   className?: string;
 };
-
-interface PropValRowProps {
-  columns?: boolean;
-}
-
-export const PropValRow = styled.div<PropValRowProps>`
-  word-break: break-word;
-
-  @media screen and (min-width: 500px) {
-    flex-direction: ${p => (p.columns ? 'row' : 'column')};
-    display: ${p => (p.columns ? 'flex' : 'block')};
-  }
-`;
-
-export const PropertyLabel = styled.span`
-  font-weight: bold;
-  display: block;
-  min-width: 8rem;
-`;
 
 /**
  * A single Property / Value renderer that shows a label on the left, and the
@@ -75,12 +57,7 @@ function PropVal({
     <PropValRow columns={columns} className={className}>
       <AtomicLink subject={propertyURL}>
         <PropertyLabel title={property.description}>
-          {property.error ? (
-            <ErrorLook>{truncated}</ErrorLook>
-          ) : (
-            property.shortname || truncated
-          )}
-          :
+          {property.shortname || truncated}
         </PropertyLabel>
       </AtomicLink>
       {editable ? (
@@ -96,3 +73,23 @@ function PropVal({
 }
 
 export default PropVal;
+
+export const PropValRow = styled.div<PropValRowProps>`
+  word-break: break-word;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+
+  @container ${ALL_PROPS_CONTAINER} (min-width: 500px) {
+    grid-template-columns: 23ch auto;
+    grid-template-rows: 1fr;
+  }
+`;
+
+export const PropertyLabel = styled.span`
+  font-weight: bold;
+`;
+
+interface PropValRowProps {
+  columns?: boolean;
+}

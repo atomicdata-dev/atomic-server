@@ -4,6 +4,7 @@ import { styled } from 'styled-components';
 import { transitionName } from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
 import { PARENT_PADDING_BLOCK } from './Parent';
+import { MAIN_CONTAINER } from '../helpers/containers';
 
 /** Main landmark. Every page should have one of these.
  * If the pages shows a resource a subject can be passed that enables view transitions to work. */
@@ -24,7 +25,7 @@ export function Main({
 }
 
 const StyledMain = memo(styled.main<ViewTransitionProps>`
-  container-type: inline-size;
+  container: ${MAIN_CONTAINER} / inline-size;
   /* Makes the contents fit the entire page */
   /* height: calc(
     100% - (${p => p.theme.heights.breadCrumbBar} + ${PARENT_PADDING_BLOCK} * 2)
