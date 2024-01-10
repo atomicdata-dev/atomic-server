@@ -21,7 +21,7 @@ export function DecimalPlacesInput({
     commit: true,
   });
 
-  const [__, setDecimalPlaces] = useNumber(
+  const [decimalPlaces, setDecimalPlaces] = useNumber(
     resource,
     urls.properties.constraints.decimalPlaces,
     { commit: true },
@@ -32,8 +32,10 @@ export function DecimalPlacesInput({
       const newValue = e.target.value;
       const num = Number.parseInt(newValue, 10);
 
-      if (num < 0) {
-        setError('Value must be eighter positive, zero or empty.');
+      if (num < 0 || num > 20) {
+        setError('Value must be between 0 and 20.', true);
+
+        return;
       } else {
         setError(undefined);
       }
@@ -63,7 +65,9 @@ export function DecimalPlacesInput({
           <InputStyled
             id={id}
             type='number'
+            defaultValue={decimalPlaces}
             min={0}
+            max={20}
             onBlur={onBlur}
             onChange={handleDecimalPointChange}
           />
