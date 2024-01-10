@@ -54,7 +54,7 @@ function FloatCellDisplay({
 
   const formattedValue = formatNumber(
     value as number | undefined,
-    decimalPlaces ?? 2,
+    decimalPlaces,
     numberFormatting,
   );
 
