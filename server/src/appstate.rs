@@ -31,6 +31,14 @@ pub struct AppState {
 pub fn init(config: Config) -> AtomicServerResult<AppState> {
     tracing::info!("Initializing AppState");
 
+    // We warn over here because tracing needs to be initialized first.
+    if config.opts.slow_mode {
+        tracing::warn!("Slow mode is enabled. This will introduce random delays in the server, to simulate a slow connection.");
+    }
+    if config.opts.development {
+        tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
+    }
+
     // Check if atomic-server is already running somewhere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
     if cfg!(feature = "process-management") {
         #[cfg(feature = "process-management")]

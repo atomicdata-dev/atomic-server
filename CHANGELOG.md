@@ -16,6 +16,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Make `set_propval` and `set_propval_shortname` chainable #785
 - Don't use default agent when fetching with Db #787
 - Deterministic serialization JSON AD #794
+- Fix HTTPS / TLS setup #768
 
 ## [v0.36.1] - 2023-12-06
 
