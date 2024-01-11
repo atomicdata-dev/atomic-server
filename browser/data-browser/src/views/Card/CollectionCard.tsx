@@ -1,5 +1,5 @@
 import { useArray, useString, core, collections } from '@tomic/react';
-import { useState } from 'react';
+import { FC, PropsWithChildren, useState } from 'react';
 
 import Markdown from '../../components/datatypes/Markdown';
 import { CardInsideFull, CardRow } from '../../components/Card';
@@ -7,6 +7,8 @@ import { ResourceInline } from '../ResourceInline';
 import { CardViewProps } from './CardViewProps';
 import { Button } from '../../components/Button';
 import { ResourceCardTitle } from './ResourceCardTitle';
+import { Column } from '../../components/Row';
+import { styled } from 'styled-components';
 
 const MAX_COUNT = 5;
 
@@ -27,31 +29,43 @@ function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
   }
 
   return (
-    <>
+    <Column gap='0.5rem'>
       <ResourceCardTitle resource={resource} />
       {description && <Markdown text={description} />}
-      {!small && (
-        <CardInsideFull>
-          {subjects.map(member => {
-            return (
-              <CardRow key={member}>
-                <ResourceInline subject={member} />
+      <Show show={!small}>
+        {subjects.length === 0 ? (
+          <Empty>No resources</Empty>
+        ) : (
+          <CardInsideFull>
+            {subjects.map(member => {
+              return (
+                <CardRow key={member}>
+                  <ResourceInline subject={member} />
+                </CardRow>
+              );
+            })}
+            {tooMany && (
+              <CardRow>
+                <Button clean onClick={() => setShowMore(!showAll)}>
+                  {showAll
+                    ? 'show less'
+                    : `show ${members.length - MAX_COUNT} more`}
+                </Button>
               </CardRow>
-            );
-          })}
-          {tooMany && (
-            <CardRow>
-              <Button clean onClick={() => setShowMore(!showAll)}>
-                {showAll
-                  ? 'show less'
-                  : `show ${members.length - MAX_COUNT} more`}
-              </Button>
-            </CardRow>
-          )}
-        </CardInsideFull>
-      )}
-    </>
+            )}
+          </CardInsideFull>
+        )}
+      </Show>
+    </Column>
   );
 }
+
+const Show: FC<PropsWithChildren<{ show: boolean }>> = ({ show, children }) => {
+  return show ? children : null;
+};
+
+const Empty = styled.span`
+  color: ${({ theme }) => theme.colors.textLight};
+`;
 
 export default CollectionCard;
