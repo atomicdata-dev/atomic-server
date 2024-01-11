@@ -38,6 +38,11 @@ export function usePasteCommand<T>(
         return;
       }
 
+      // Don't use custom paste logic when the user is focussed on an input
+      if (document.activeElement?.tagName === 'INPUT') {
+        return;
+      }
+
       const htmlData = event.clipboardData?.getData('text/html');
 
       if (htmlData) {
