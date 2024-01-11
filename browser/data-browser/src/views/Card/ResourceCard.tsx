@@ -8,6 +8,7 @@ import {
   server,
   dataBrowser,
   collections,
+  useArray,
 } from '@tomic/react';
 import AllProps from '../../components/AllProps';
 import { AtomicLink } from '../../components/AtomicLink';
@@ -24,6 +25,7 @@ import { ElementCard } from './ElementCard';
 import { ArticleCard } from '../Article';
 import { styled } from 'styled-components';
 import { ResourceCardTitle } from './ResourceCardTitle';
+import { Column } from '../../components/Row';
 
 interface ResourceCardProps extends CardViewPropsBase {
   /** The subject URL - the identifier of the resource. */
@@ -117,9 +119,14 @@ export function ResourceCardDefault({
   resource,
   small,
 }: CardViewProps): JSX.Element {
+  const [isA] = useArray(resource, core.properties.isA);
+  const isAResource = useResource(isA[0]);
+
   return (
-    <>
-      <ResourceCardTitle resource={resource} />
+    <Column gap='0.5rem'>
+      <ResourceCardTitle resource={resource}>
+        <ClassName>{isAResource.title}</ClassName>
+      </ResourceCardTitle>
       <DescriptionWrapper>
         <ValueForm
           resource={resource}
@@ -134,7 +141,7 @@ export function ResourceCardDefault({
           editable
         />
       )}
-    </>
+    </Column>
   );
 }
 
@@ -143,4 +150,8 @@ export default ResourceCard;
 const DescriptionWrapper = styled.div`
   max-height: 10rem;
   overflow: hidden;
+`;
+
+const ClassName = styled.span`
+  margin-left: auto;
 `;

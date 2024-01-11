@@ -8,13 +8,14 @@ import {
 } from '../../components/ExternalLink';
 import { CardViewProps } from './CardViewProps';
 import { ResourceCardTitle } from './ResourceCardTitle';
+import { Column } from '../../components/Row';
 
 export function BookmarkCard({ resource }: CardViewProps): JSX.Element {
   const [url] = useString(resource, urls.properties.bookmark.url);
   const [preview] = useString(resource, urls.properties.bookmark.preview);
 
   return (
-    <>
+    <Column gap='0.5rem'>
       <ResourceCardTitle resource={resource} />
       <ExternalLink to={url!} variant={ExternalLinkVariant.Button}>
         Open site
@@ -24,7 +25,7 @@ export function BookmarkCard({ resource }: CardViewProps): JSX.Element {
           <Markdown maxLength={1000} renderGFM text={preview} />
         </MarkdownWrapper>
       )}
-    </>
+    </Column>
   );
 }
 

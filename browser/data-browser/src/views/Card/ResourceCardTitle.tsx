@@ -39,7 +39,6 @@ const TitleRow = styled(Row)`
   max-width: 100%;
   height: 2rem;
   overflow: hidden;
-  margin-bottom: ${({ theme }) => theme.margin}rem;
   color: ${({ theme }) => theme.colors.textLight};
 
   svg {
