@@ -166,7 +166,6 @@ const NavBarBase = styled.div<NavBarStyledProps>`
 /** Width of the floating navbar in rem */
 const NavBarFloating = styled(NavBarBase)`
   box-shadow: ${props => props.theme.boxShadow};
-  box-sizing: border-box;
   border-radius: 999px;
   overflow: hidden;
   max-width: calc(100% - 2rem);
@@ -178,6 +177,11 @@ const NavBarFloating = styled(NavBarBase)`
   margin-right: -${props => (props.theme.containerWidth + 1) / 2}rem;
   top: ${props => (props.top ? '2rem' : 'auto')};
   bottom: ${props => (props.top ? 'auto' : '1rem')};
+
+  &:has(input:focus) {
+    box-shadow: 0px 0px 0px 1px ${props => props.theme.colors.main};
+    border-color: ${props => props.theme.colors.main};
+  }
 
   @media (max-width: ${props => props.theme.containerWidth}rem) {
     max-width: calc(100% - 1rem);
@@ -198,6 +202,10 @@ const NavBarFixed = styled(NavBarBase)`
     props.top ? 'solid 1px ' + props.theme.colors.bg2 : 'none'};
   border-top: ${props =>
     !props.top ? 'solid 1px ' + props.theme.colors.bg2 : 'none'};
+
+  &:has(input:focus) {
+    box-shadow: 0px 0px 0px 2px ${props => props.theme.colors.main};
+  }
 `;
 
 const SideBarWrapper = styled('div')`
