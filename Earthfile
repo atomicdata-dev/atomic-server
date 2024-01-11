@@ -1,7 +1,7 @@
 VERSION --try --global-cache 0.7
 PROJECT ontola/atomic-server
 IMPORT ./browser AS browser
-IMPORT github.com/earthly/lib/rust:2.2.11 AS rust
+IMPORT github.com/earthly/lib/rust AS rust
 FROM rust:1.73.0-buster
 WORKDIR /code
 
@@ -41,20 +41,20 @@ source:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir server lib cli  ./
   COPY browser+build/dist /code/browser/data-browser/dist
+  DO rust+CARGO --args=fetch
 
 cross-build:
   FROM +source
   ARG --required TARGET
-  # This does not yet cache properly
-  # https://github.com/earthly/lib/issues/34
+  DO rust+GET_RUST_CACHE_MOUNTS
   WITH DOCKER
-    RUN cross build --target $TARGET --release
+    RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
   SAVE ARTIFACT ./target/$TARGET/release/atomic-server AS LOCAL artifact/bin/atomic-server-$TARGET
 
 build:
   FROM +source
-  DO rust+CARGO --args="build --release" --output="release/[^/\.]+"
+  DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
   RUN ./target/release/atomic-server --version
   SAVE ARTIFACT ./target/release/atomic-server AS LOCAL artifact/bin/atomic-server-x86_64-unknown-linux-gnu
 

@@ -18,6 +18,7 @@ The `dockerfile` is located in the project root, above this `server` folder.
 - See dockerhub for a [list of all the available tags](https://hub.docker.com/repository/docker/joepmeneer/atomic-server/tags?page=1&ordering=last_updated) (e.g. the `develop` tag for the very latest version)
 - If you want to make changes (e.g. to the port), make sure to pass the relevant CLI options (e.g. `--port 9883`).
 - If you want to update, run `docker pull joepmeneer/atomic-server` and docker should fetch the latest version.
+- By default, docker downloads the `latest` tag. You can find other tags [here](https://hub.docker.com/repository/docker/joepmeneer/atomic-server/tags).
 
 ## 2. Run pre-compiled binary
 
