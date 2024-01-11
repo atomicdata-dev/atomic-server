@@ -23,8 +23,7 @@ import { CardViewProps, CardViewPropsBase } from './CardViewProps';
 import { ElementCard } from './ElementCard';
 import { ArticleCard } from '../Article';
 import { styled } from 'styled-components';
-import { ViewTransitionProps } from '../../helpers/ViewTransitionProps';
-import { transitionName } from '../../helpers/transitionName';
+import { ResourceCardTitle } from './ResourceCardTitle';
 
 interface ResourceCardProps extends CardViewPropsBase {
   /** The subject URL - the identifier of the resource. */
@@ -120,15 +119,13 @@ export function ResourceCardDefault({
 }: CardViewProps): JSX.Element {
   return (
     <>
-      <AtomicLink subject={resource.getSubject()}>
-        <DefaultCardTitle subject={resource.getSubject()}>
-          {resource.title}
-        </DefaultCardTitle>
-      </AtomicLink>
-      <ValueForm
-        resource={resource}
-        propertyURL={core.properties.description}
-      />
+      <ResourceCardTitle resource={resource} />
+      <DescriptionWrapper>
+        <ValueForm
+          resource={resource}
+          propertyURL={core.properties.description}
+        />
+      </DescriptionWrapper>
       {!small && (
         <AllProps
           basic
@@ -143,6 +140,7 @@ export function ResourceCardDefault({
 
 export default ResourceCard;
 
-const DefaultCardTitle = styled.h2<ViewTransitionProps>`
-  ${props => transitionName('page-title', props.subject)}
+const DescriptionWrapper = styled.div`
+  max-height: 10rem;
+  overflow: hidden;
 `;

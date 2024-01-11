@@ -142,7 +142,6 @@ export function Search(): JSX.Element {
               {results.map((subject, index) => (
                 <ResourceCard
                   initialInView={index < 5}
-                  small
                   subject={subject}
                   key={subject}
                   highlight={index === selectedIndex}

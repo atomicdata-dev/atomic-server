@@ -26,19 +26,13 @@ interface ValueFormProps {
    * also override it manually
    */
   datatype?: Datatype;
-  noMargin?: boolean;
 }
 
 /**
  * A form for a single Value. Presents a normal value, but let's the user click
  * on a button to turn it into an input.
  */
-export function ValueForm({
-  resource,
-  noMargin,
-  propertyURL,
-  datatype,
-}: ValueFormProps) {
+export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
   const [editMode, setEditMode] = useState(false);
   const property = useProperty(propertyURL);
   const [value] = useValue(resource, propertyURL);
@@ -86,11 +80,7 @@ export function ValueForm({
   if (!editMode) {
     return (
       <ValueFormWrapper>
-        <ValueComp
-          value={value}
-          datatype={datatype || property.datatype}
-          noMargin={noMargin}
-        />
+        <ValueComp value={value} datatype={datatype || property.datatype} />
         <EditButton title='Edit value'>
           <FaEdit onClick={() => setEditMode(!editMode)} />
         </EditButton>

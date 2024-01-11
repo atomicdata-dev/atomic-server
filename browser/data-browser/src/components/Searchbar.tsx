@@ -159,7 +159,8 @@ const Input = styled.input`
   flex: 1;
   min-width: 1rem;
   background-color: ${props => props.theme.colors.bg};
-  outline: 0;
+  // Outline is handled by the Navbar.
+  outline: none;
   color: ${p => p.theme.colors.textLight};
 `;
 
@@ -172,9 +173,7 @@ const Form = styled.form`
   border-radius: 999px;
 
   :hover {
-    box-shadow: inset 0 0 0 2px
-      ${props => transparentize(0.6, props.theme.colors.main)};
-
+    ${props => transparentize(0.6, props.theme.colors.main)};
     ${Input} {
       color: ${p => p.theme.colors.text};
     }
@@ -183,8 +182,9 @@ const Form = styled.form`
     ${Input} {
       color: ${p => p.theme.colors.text};
     }
+
+    // Outline is handled by the Navbar.
     outline: none;
-    box-shadow: inset 0 0 0 2px ${props => props.theme.colors.main};
   }
 `;
 

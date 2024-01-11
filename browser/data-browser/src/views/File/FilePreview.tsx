@@ -13,12 +13,14 @@ const PDFViewer = lazy(() => import('../../chunks/PDFViewer'));
 
 interface FilePreviewProps {
   resource: Resource;
+  hideTypes?: string[];
 }
 
-export function FilePreview({ resource }: FilePreviewProps) {
+export function FilePreview({ resource, hideTypes }: FilePreviewProps) {
   const { downloadUrl, mimeType, bytes } = useFileInfo(resource);
   const [ignoreSizeLimit, setIgnoreSizeLimit] = useState(false);
   const fileSizeLimit = useFilePreviewSizeLimit();
+  const shouldShowType = buildShouldShowType(mimeType, hideTypes);
 
   if (bytes > fileSizeLimit && !ignoreSizeLimit) {
     return (
@@ -26,13 +28,13 @@ export function FilePreview({ resource }: FilePreviewProps) {
     );
   }
 
-  if (mimeType.startsWith('image/')) {
+  if (shouldShowType('image/')) {
     return (
       <StyledImageViewer src={downloadUrl} subject={resource.getSubject()} />
     );
   }
 
-  if (mimeType.startsWith('video/')) {
+  if (shouldShowType('video/')) {
     return (
       // Don't know how to get captions here
       // eslint-disable-next-line jsx-a11y/media-has-caption
@@ -43,7 +45,7 @@ export function FilePreview({ resource }: FilePreviewProps) {
     );
   }
 
-  if (mimeType.startsWith('audio/')) {
+  if (shouldShowType('audio/')) {
     return (
       // eslint-disable-next-line jsx-a11y/media-has-caption
       <audio controls>
@@ -56,7 +58,7 @@ export function FilePreview({ resource }: FilePreviewProps) {
     return <StyledTextPreview downloadUrl={downloadUrl} mimeType={mimeType} />;
   }
 
-  if (mimeType === 'application/pdf') {
+  if (shouldShowType('application/pdf')) {
     return (
       <Suspense>
         <PDFViewer url={downloadUrl} />
@@ -110,3 +112,9 @@ function SizeWarning({ bytes, onClick }: SizeWarningProps): JSX.Element {
     </NoPreview>
   );
 }
+
+const buildShouldShowType =
+  (mimeType: string, hideTypes: string[] = []) =>
+  (testType: string) => {
+    return !hideTypes.includes(testType) && mimeType.startsWith(testType);
+  };

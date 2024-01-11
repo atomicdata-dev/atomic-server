@@ -3,30 +3,21 @@ import { styled } from 'styled-components';
 import remarkGFM from 'remark-gfm';
 import { Button } from '../Button';
 import { truncateMarkdown } from '../../helpers/markdown';
-import { useState } from 'react';
+import { FC, useState } from 'react';
 
 type Props = {
   text: string;
-  /**
-   * By default, all bottom Markdown elements have some margin (e.g. the last
-   * paragraph). If you set noMargin, this is corrected.
-   */
-  noMargin?: boolean;
   renderGFM?: boolean;
   /**
    * If this is set, and the markdown is more characters than this number, the
    * text will be truncated and a button will be shown
    */
   maxLength?: number;
+  className?: string;
 };
 
 /** Renders a markdown value */
-function Markdown({
-  text,
-  noMargin,
-  renderGFM,
-  maxLength,
-}: Props): JSX.Element | null {
+const Markdown: FC<Props> = ({ text, renderGFM, maxLength, className }) => {
   const [collapsed, setCollapsed] = useState(true);
 
   maxLength = maxLength || 5000;
@@ -36,7 +27,7 @@ function Markdown({
   }
 
   return (
-    <MarkdownWrapper noMargin={noMargin}>
+    <MarkdownWrapper className={className}>
       <ReactMarkdown remarkPlugins={renderGFM ? [remarkGFM] : []}>
         {collapsed ? truncateMarkdown(text, maxLength) : text}
       </ReactMarkdown>
@@ -47,19 +38,14 @@ function Markdown({
       )}
     </MarkdownWrapper>
   );
-}
+};
 
 Markdown.defaultProps = {
   renderGFM: true,
 };
 
-interface MarkdownWrapperProps {
-  noMargin?: boolean;
-}
-
-const MarkdownWrapper = styled.div<MarkdownWrapperProps>`
+const MarkdownWrapper = styled.div`
   /* Corrects the margin added by <p> and other HTML elements */
-  margin-bottom: -${p => (p.noMargin ? p.theme.margin : 0)}rem;
 
   width: 100%;
   overflow-x: hidden;

@@ -1,24 +1,21 @@
-import { urls, useString, useTitle } from '@tomic/react';
+import { urls, useString } from '@tomic/react';
 
 import { styled } from 'styled-components';
-import { AtomicLink } from '../../components/AtomicLink';
 import Markdown from '../../components/datatypes/Markdown';
 import {
   ExternalLink,
   ExternalLinkVariant,
 } from '../../components/ExternalLink';
 import { CardViewProps } from './CardViewProps';
+import { ResourceCardTitle } from './ResourceCardTitle';
 
 export function BookmarkCard({ resource }: CardViewProps): JSX.Element {
-  const [title] = useTitle(resource);
   const [url] = useString(resource, urls.properties.bookmark.url);
   const [preview] = useString(resource, urls.properties.bookmark.preview);
 
   return (
     <>
-      <AtomicLink subject={resource.getSubject()}>
-        <Title>{title}</Title>
-      </AtomicLink>
+      <ResourceCardTitle resource={resource} />
       <ExternalLink to={url!} variant={ExternalLinkVariant.Button}>
         Open site
       </ExternalLink>
@@ -30,13 +27,6 @@ export function BookmarkCard({ resource }: CardViewProps): JSX.Element {
     </>
   );
 }
-
-const Title = styled.h2`
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-`;
 
 const MarkdownWrapper = styled.div`
   margin-top: ${p => p.theme.margin}rem;

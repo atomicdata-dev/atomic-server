@@ -11,17 +11,19 @@ type CardProps = {
 /** A Card with a border. */
 export const Card = styled.div<CardProps>`
   background-color: ${props => props.theme.colors.bg};
-  /** Don't put side margins in this component - use a wrapping component */
-  border: solid 1px ${props => props.theme.colors.bg2};
-  box-shadow: ${props => props.theme.boxShadow};
+
+  border: solid 1px
+    ${props =>
+      props.highlight ? props.theme.colors.main : props.theme.colors.bg2};
+  box-shadow: ${props =>
+    props.highlight
+      ? `0 0 0 1px ${props.theme.colors.main}, ${props.theme.boxShadow}`
+      : props.theme.boxShadow};
+
   padding: ${props => props.theme.margin}rem;
-  /* margin-bottom: ${props => props.theme.margin}rem; */
-  padding-bottom: 0;
   border-radius: ${props => props.theme.radius};
   max-height: ${props => (props.small ? '10rem' : 'none')};
   overflow: ${props => (props.small ? 'hidden' : 'visible')};
-  border-color: ${props =>
-    props.highlight ? props.theme.colors.main : props.theme.colors.bg2};
 
   ${p => transitionName('resource-page', p.about)};
 `;

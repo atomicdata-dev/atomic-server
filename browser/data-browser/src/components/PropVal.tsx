@@ -61,7 +61,7 @@ function PropVal({
         </PropertyLabel>
       </AtomicLink>
       {editable ? (
-        <ValueForm resource={resource} propertyURL={propertyURL} noMargin />
+        <ValueForm resource={resource} propertyURL={propertyURL} />
       ) : (
         <ValueComp
           datatype={property.datatype}

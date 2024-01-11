@@ -1,12 +1,12 @@
-import { useArray, useString, useTitle, properties } from '@tomic/react';
+import { useArray, useString, core, collections } from '@tomic/react';
 import { useState } from 'react';
 
 import Markdown from '../../components/datatypes/Markdown';
-import { AtomicLink } from '../../components/AtomicLink';
 import { CardInsideFull, CardRow } from '../../components/Card';
 import { ResourceInline } from '../ResourceInline';
 import { CardViewProps } from './CardViewProps';
 import { Button } from '../../components/Button';
+import { ResourceCardTitle } from './ResourceCardTitle';
 
 const MAX_COUNT = 5;
 
@@ -15,9 +15,8 @@ const MAX_COUNT = 5;
  * (shortname) is rendered prominently at the top.
  */
 function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
-  const [title] = useTitle(resource);
-  const [description] = useString(resource, properties.description);
-  const [members] = useArray(resource, properties.collection.members);
+  const [description] = useString(resource, core.properties.description);
+  const [members] = useArray(resource, collections.properties.members);
   const [showAll, setShowMore] = useState(false);
 
   const tooMany = members.length > MAX_COUNT;
@@ -29,9 +28,7 @@ function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
 
   return (
     <>
-      <AtomicLink subject={resource.getSubject()}>
-        <h2>{title}</h2>
-      </AtomicLink>
+      <ResourceCardTitle resource={resource} />
       {description && <Markdown text={description} />}
       {!small && (
         <CardInsideFull>

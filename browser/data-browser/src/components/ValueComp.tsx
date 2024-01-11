@@ -16,11 +16,10 @@ import { ErrMessage } from './forms/InputStyles';
 type Props = {
   value: JSONValue;
   datatype: Datatype;
-  noMargin?: boolean;
 };
 
 /** Renders a value in a fitting way, depending on its DataType */
-function ValueComp({ value, datatype, noMargin }: Props): JSX.Element {
+function ValueComp({ value, datatype }: Props): JSX.Element {
   try {
     switch (datatype) {
       case Datatype.ATOMIC_URL: {
@@ -36,7 +35,7 @@ function ValueComp({ value, datatype, noMargin }: Props): JSX.Element {
       case (Datatype.DATE, Datatype.TIMESTAMP):
         return <DateTime date={valToDate(value)} />;
       case Datatype.MARKDOWN:
-        return <Markdown text={valToString(value)} noMargin={noMargin} />;
+        return <Markdown text={valToString(value)} />;
       case Datatype.RESOURCEARRAY:
         return <ResourceArray subjects={valToArray(value)} />;
       default:
