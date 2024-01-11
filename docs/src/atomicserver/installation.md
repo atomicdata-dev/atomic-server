@@ -107,6 +107,7 @@ ATOMIC_SERVER_URL=https://example.com
 ```
 
 ### Configuring S3 for File Storage
+
 You can configure atomic-server to use S3 (and compatible services) for file storage via environment variables or command line arguments when starting atomic-server.
 
 Credentials can either be found in the standard location for AWS credentials on your OS (e.g. `~/.aws/credentials` on UNIX systems) or by using the environment variables `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`.

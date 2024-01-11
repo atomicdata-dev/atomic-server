@@ -62,7 +62,7 @@ impl FileStore {
         if let FileStore::FS(config) = self {
             let fs_file_id = file_id.strip_prefix(Self::FS_PREFIX).unwrap_or(file_id);
             let mut file_path = config.path.clone();
-            file_path.push(fs_file_id.to_string());
+            file_path.push(fs_file_id);
             Ok(file_path)
         } else {
             Err("Wrong FileStore passed to get_fs_file_path".into())
@@ -82,8 +82,8 @@ impl FileStore {
 
     pub async fn upload_file(&self, file_id: &str, field: Field) -> AtomicServerResult<i64> {
         match self {
-            FileStore::S3(_) => s3_upload(self, &file_id, field).await,
-            FileStore::FS(config) => fs_upload(self, &config, &file_id, field).await,
+            FileStore::S3(_) => s3_upload(self, file_id, field).await,
+            FileStore::FS(config) => fs_upload(self, config, file_id, field).await,
         }
     }
 }
@@ -130,8 +130,8 @@ async fn s3_upload(
     if let FileStore::S3(config) = file_store {
         builder.bucket(&config.bucket);
         builder.root(&config.path);
-        config.region.as_ref().map(|r| builder.region(&r));
-        config.endpoint.as_ref().map(|e| builder.endpoint(&e));
+        config.region.as_ref().map(|r| builder.region(r));
+        config.endpoint.as_ref().map(|e| builder.endpoint(e));
     } else {
         return Err("Uploading to S3 but no S3 config provided".into());
     }
@@ -141,7 +141,7 @@ async fn s3_upload(
     let mut len = 0;
     while let Some(chunk) = field.next().await {
         let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
-        len = len + data.len();
+        len += data.len();
         w.write(data).await?;
     }
 
@@ -160,8 +160,8 @@ pub async fn get_s3_signed_url(
     if let FileStore::S3(config) = file_store {
         builder.bucket(&config.bucket);
         builder.root(&config.path);
-        config.region.as_ref().map(|r| builder.region(&r));
-        config.endpoint.as_ref().map(|e| builder.endpoint(&e));
+        config.region.as_ref().map(|r| builder.region(r));
+        config.endpoint.as_ref().map(|e| builder.endpoint(e));
     } else {
         return Err("Downloading from S3 but no S3 config provided".into());
     }

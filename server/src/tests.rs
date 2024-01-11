@@ -30,10 +30,9 @@ fn build_request_authenticated(path: &str, appstate: &AppState) -> TestRequest {
     prereq.insert_header(("Accept", "application/ad+json"))
 }
 
-#[actix_rt::test]
-async fn server_tests() {
-    let unique_string = atomic_lib::utils::random_string(10);
+fn build_test_config() -> crate::config::Config {
     use clap::Parser;
+    let unique_string = atomic_lib::utils::random_string(10);
     let opts = Opts::parse_from([
         "atomic-server",
         "--initialize",
@@ -46,8 +45,16 @@ async fn server_tests() {
     let mut config = config::build_config(opts)
         .map_err(|e| format!("Initialization failed: {}", e))
         .expect("failed init config");
+
     // This prevents folder access issues when running concurrent tests
     config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+    config
+}
+
+#[actix_rt::test]
+async fn server_tests() {
+    let unique_string = atomic_lib::utils::random_string(10);
+    let config = build_test_config();
 
     let appstate = crate::appstate::init(config.clone()).expect("failed init appstate");
     let data = Data::new(appstate.clone());
@@ -166,20 +173,7 @@ fn get_body(resp: ServiceResponse) -> String {
 
 #[actix_rt::test]
 async fn file_store_tests() {
-    let unique_string = atomic_lib::utils::random_string(10);
-    use clap::Parser;
-    let mut opts = Opts::parse_from([
-        "atomic-server",
-        "--initialize",
-        "--data-dir",
-        &format!("./.temp/{}/db", unique_string),
-        "--config-dir",
-        &format!("./.temp/{}/config", unique_string),
-    ]);
-
-    let mut config = config::build_config(opts.clone())
-        .map_err(|e| format!("Initialization failed: {}", e))
-        .expect("failed init config");
+    let mut config = build_test_config();
 
     let fs_store = FileStore::init_fs_from_config(&config);
     if let FileStore::FS(fs_config) = &fs_store {
@@ -206,9 +200,8 @@ async fn file_store_tests() {
         .contains("uploads/my-great-file"));
 
     // FileStore::S3 init
-    opts.s3_bucket = Some("test-bucket".to_string());
-    opts.s3_path = Some("uploads".to_string());
-    config.opts = opts;
+    config.opts.s3_bucket = Some("test-bucket".to_string());
+    config.opts.s3_path = Some("uploads".to_string());
     let appstate = crate::appstate::init(config.clone()).expect("failed init appstate");
 
     let s3_store = FileStore::init_from_config(&config, fs_store.clone());
