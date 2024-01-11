@@ -1,6 +1,6 @@
 import { Resource, core, useArray } from '@tomic/react';
 import { FC, PropsWithChildren } from 'react';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { AtomicLink } from '../../components/AtomicLink';
 import { ViewTransitionProps } from '../../helpers/ViewTransitionProps';
 import { transitionName } from '../../helpers/transitionName';

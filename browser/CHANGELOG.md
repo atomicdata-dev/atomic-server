@@ -7,6 +7,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 ### Atomic Browser
 
 - [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on new resource page.
+- [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on search result page.
 - Fix server not rebuilding client when files changed.
 
 ## v0.36.2
