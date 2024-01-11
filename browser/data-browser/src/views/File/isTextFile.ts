@@ -1,7 +1,7 @@
 const supportedApplicationFormats = new Set([
   'application/json',
   'application/ld+json',
-  'application/json-ad',
+  'application/ad+json',
   'application/x-httpd-php',
   'application/xhtml+xml',
   'application/xml',
