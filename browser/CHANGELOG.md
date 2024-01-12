@@ -9,6 +9,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on new resource page.
 - [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on search result page.
 - [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focussed on an input
+- [#758](https://github.com/atomicdata-dev/atomic-server/issues/758) Fix Relation column forms to close when clicking on the searchbox
 - Fix server not rebuilding client when files changed.
 
 ## v0.36.2
