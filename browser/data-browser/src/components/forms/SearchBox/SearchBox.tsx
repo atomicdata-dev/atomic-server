@@ -120,6 +120,7 @@ export function SearchBox({
           invalid={!!error}
         >
           <TriggerButton
+            type='button'
             autoFocus={autoFocus}
             disabled={disabled}
             ref={triggerRef}
