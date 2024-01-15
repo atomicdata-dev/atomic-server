@@ -13,28 +13,37 @@ npm install @tomic/lib
 ```
 
 ```ts
-// Import the Store
-import { Store, Agent, urls } from "@tomic/lib";
+import { Store, Agent, core } from "@tomic/lib";
 
-const opts = {
+// --------- Create a Store ---------.
+const store = new Store({
   // You can create a secret from the `User settings` page using the AtomicServer UI
   agent: Agent.fromSecret("my-secret-key"),
   // Set a default server URL
-  serverUrl: "https://atomicdata.dev",
-}
-const store = new Store(opts);
+  serverUrl: "https://my-atomic-server.dev",
+});
 
-// Get a resource
-const gotResource = store.getResourceLoading(subject);
-const atomString = gotResource!
-  .get(urls.properties.description)!
-  .toString();
+// --------- Get a resource ---------
+const gotResource = await store.getResourceAsync(subject);
 
-// Create & save a new resource
-const subject = 'https://atomicdata.dev/test';
-const newResource = new Resource(subject);
-await newResource.set(urls.properties.description, 'Hi world');
-newResource.save(store);
+const atomString = gotResource.get(core.properties.description)
+
+// --------- Create & save a new resource ---------
+const newResource = await store.newResource({
+  subject: 'https://my-atomic-server.dev/test',
+  propVals: {
+    [core.properties.description]: 'Hi World :)'
+  }
+});
+
+await newResource.save(store);
+
+// --------- Subscribe to changes (using websockets) ---------
+const unsub = store.subscribe('https://my-atomic-server.dev/test', (resource) => {
+  // This callback is called each time a change is made to the resource client or serverside.
+
+  // Do something with the changed resource...
+})
 ```
 
 ## Advanced usage
