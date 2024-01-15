@@ -12,6 +12,10 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#758](https://github.com/atomicdata-dev/atomic-server/issues/758) Fix Relation column forms to close when clicking on the searchbox
 - Fix server not rebuilding client when files changed.
 
+### @tomic/lib
+
+- [#798](https://github.com/atomicdata-dev/atomic-server/issues/798) Add `store.newResource()` to make creating new resources more easy.
+
 ## v0.36.2
 
 ### Atomic Browser

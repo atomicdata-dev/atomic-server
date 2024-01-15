@@ -21,6 +21,7 @@ import {
   core,
   commits,
   collections,
+  JSONValue,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
@@ -36,6 +37,17 @@ type Fetch = typeof fetch;
 
 type AddResourcesOpts = {
   skipCommitCompare?: boolean;
+};
+
+type CreateResourceOptions = {
+  /** Optional subject of the new resource, if not given the store will generate a random subject */
+  subject?: string;
+  /** Parent the subject belongs to, defaults to the serverUrl */
+  parent?: string;
+  /** Subject(s) of the resources class */
+  isA?: string | string[];
+  /** Any additional properties the resource should have */
+  propVals?: Record<string, JSONValue>;
 };
 
 export interface StoreOpts {
@@ -182,6 +194,39 @@ export class Store {
     this.resources.set(resource.getSubject(), resource.__internalObject);
 
     this.notify(resource.__internalObject);
+  }
+
+  /**
+   * A helper function for creating new resources.
+   * Options take:
+   * subject (optional) - defaults to random subject,
+   * parent (optional) - defaults to serverUrl,
+   * isA (optional),
+   * properties (optional) - any additional properties to be set on the resource.
+   */
+  public async newResource<C extends OptionalClass = UnknownClass>(
+    options: CreateResourceOptions = {},
+  ): Promise<Resource<C>> {
+    const { subject, parent, isA, propVals } = options;
+
+    const normalizedIsA = Array.isArray(isA) ? isA : [isA];
+    const newSubject = subject ?? this.createSubject(normalizedIsA[0], parent);
+
+    const resource = this.getResourceLoading(newSubject, { newResource: true });
+
+    if (normalizedIsA[0]) {
+      await resource.addClasses(this, ...(normalizedIsA as string[]));
+    }
+
+    await resource.set(core.properties.parent, parent ?? this.serverUrl, this);
+
+    if (propVals) {
+      for (const [key, value] of Object.entries(propVals)) {
+        await resource.set(key, value, this);
+      }
+    }
+
+    return resource;
   }
 
   /** Checks if a subject is free to use */
