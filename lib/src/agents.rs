@@ -44,11 +44,13 @@ impl<T: Into<String>> From<T> for ForAgent {
     }
 }
 
+/// An Agent can be thought of as a User. Agents are used for authentication and authorization.
+/// The private key of the Agent is used to sign [crate::Commit]s.
 #[derive(Clone, Debug)]
 pub struct Agent {
     /// Private key for signing commits
     pub private_key: Option<String>,
-    /// Private key for signing commits
+    /// Used for validating commit signatures and for the username.
     pub public_key: String,
     /// URL of the Agent
     pub subject: String,
@@ -86,6 +88,8 @@ impl Agent {
         Ok(Agent::new_from_private_key(name, store, &keypair.private))
     }
 
+    /// Creates a new Agent on this server, using the server's Server URL.
+    /// Derives the public key.
     pub fn new_from_private_key(
         name: Option<&str>,
         store: &impl Storelike,
@@ -102,6 +106,8 @@ impl Agent {
         }
     }
 
+    /// Creates a new Agent on this server, using the server's Server URL.
+    /// This will not be able to write, because there is no private key.
     pub fn new_from_public_key(store: &impl Storelike, public_key: &str) -> AtomicResult<Agent> {
         verify_public_key(public_key)?;
 
@@ -128,6 +134,18 @@ impl Agent {
         };
         Ok(agent)
     }
+
+    pub fn from_private_key_and_subject(private_key: &str, subject: &str) -> AtomicResult<Agent> {
+        let keypair = generate_public_key(private_key);
+
+        Ok(Agent {
+            private_key: Some(keypair.private),
+            public_key: keypair.public.clone(),
+            subject: subject.into(),
+            name: None,
+            created_at: crate::utils::now(),
+        })
+    }
 }
 
 /// keypair, serialized using base64
@@ -142,10 +160,10 @@ fn generate_keypair() -> AtomicResult<Pair> {
     let rng = ring::rand::SystemRandom::new();
     const SEED_LEN: usize = 32;
     let seed: [u8; SEED_LEN] = ring::rand::generate(&rng)
-        .map_err(|_| "Error generating random seed: {}")?
+        .map_err(|e| format!("Error generating random seed: {}", e))?
         .expose();
     let key_pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(&seed)
-        .map_err(|e| format!("Error generating keypair {}", e))
+        .map_err(|e| format!("Error generating keypair: {}", e))
         .unwrap();
     Ok(Pair {
         private: encode_base64(&seed),
@@ -158,7 +176,7 @@ pub fn generate_public_key(private_key: &str) -> Pair {
     use ring::signature::KeyPair;
     let private_key_bytes = decode_base64(private_key).unwrap();
     let key_pair = ring::signature::Ed25519KeyPair::from_seed_unchecked(private_key_bytes.as_ref())
-        .map_err(|_| "Error generating keypair")
+        .map_err(|e| format!("Error generating keypair: {e}"))
         .unwrap();
     Pair {
         private: encode_base64(&private_key_bytes),
