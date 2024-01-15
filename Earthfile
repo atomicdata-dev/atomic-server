@@ -46,7 +46,7 @@ source:
 cross-build:
   FROM +source
   ARG --required TARGET
-  DO rust+GET_RUST_CACHE_MOUNTS
+  DO rust+SET_CACHE_MOUNTS_ENV
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
