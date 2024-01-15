@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 import { jest } from '@jest/globals';
-import { Resource, urls, Store } from './index.js';
+import { Resource, urls, Store, core, Core } from './index.js';
 
 describe('Store', () => {
   it('renders the populate value', async () => {
@@ -55,5 +55,29 @@ describe('Store', () => {
     });
 
     expect(customFetch.mock.calls).to.have.length(1);
+  });
+
+  it('creates new resources using store.newResource()', async () => {
+    const store = new Store({ serverUrl: 'https://myserver.dev' });
+
+    const resource1 = await store.newResource<Core.Property>({
+      subject: 'https://myserver.dev/testthing',
+      parent: 'https://myserver.dev/properties',
+      isA: core.classes.property,
+      propVals: {
+        [core.properties.datatype]: urls.datatypes.slug,
+        [core.properties.shortname]: 'testthing',
+      },
+    });
+
+    expect(resource1.props.parent).to.equal('https://myserver.dev/properties');
+    expect(resource1.props.datatype).to.equal(urls.datatypes.slug);
+    expect(resource1.props.shortname).to.equal('testthing');
+    expect(resource1.hasClasses(core.classes.property)).to.equal(true);
+
+    const resource2 = await store.newResource();
+
+    expect(resource2.props.parent).to.equal(store.getServerUrl());
+    expect(resource2.get(core.properties.isA)).to.equal(undefined);
   });
 });
