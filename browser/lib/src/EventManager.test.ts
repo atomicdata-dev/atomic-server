@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { jest, describe, it, expect } from 'bun:test';
 import { EventManager } from './EventManager.js';
 enum Events {
   Click = 'click',

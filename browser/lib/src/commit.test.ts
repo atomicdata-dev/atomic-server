@@ -1,4 +1,3 @@
-import { expect } from 'chai';
 import { CommitBuilder } from './commit.js';
 import {
   generatePublicKeyFromPrivate,
@@ -20,7 +19,7 @@ describe('Commit signing and keys', () => {
 
   it('creates the right public key', async () => {
     const generatedPublickey = await generatePublicKeyFromPrivate(privateKey);
-    expect(generatedPublickey).to.equal(publicKey);
+    expect(generatedPublickey).toEqual(publicKey);
   });
 
   it('signs a commit with the right signature', async () => {
@@ -45,8 +44,8 @@ describe('Commit signing and keys', () => {
     );
     const sig = commit.signature;
     const serialized = serializeDeterministically(commit);
-    expect(serialized).to.equal(serializedCommitRust);
-    expect(sig).to.equal(signatureCorrect);
+    expect(serialized).toEqual(serializedCommitRust);
+    expect(sig).toEqual(signatureCorrect);
   });
 
   it('signs any string correctly', async () => {
@@ -54,7 +53,7 @@ describe('Commit signing and keys', () => {
     const correct_signature_rust =
       'YtDR/xo0272LHNBQtDer4LekzdkfUANFTI0eHxZhITXnbC3j0LCqDWhr6itNvo4tFnep6DCbev5OKAHH89+TDA==';
     const signature = await signToBase64(input, privateKey);
-    expect(signature).to.equal(correct_signature_rust);
+    expect(signature).toEqual(correct_signature_rust);
   });
 });
 
@@ -82,6 +81,6 @@ describe('Commit parse and apply', () => {
     const description = resource
       .get('https://atomicdata.dev/properties/description')!
       .toString();
-    expect(description).to.equal('My new string');
+    expect(description).toEqual('My new string');
   });
 });

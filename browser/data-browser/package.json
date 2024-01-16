@@ -57,7 +57,7 @@
   "homepage": "https://atomicdata.dev/",
   "husky": {
     "hooks": {
-      "pre-push": "pnpm lint && pnpm test"
+      "pre-push": "bun run lint && bun test"
     }
   },
   "license": "MIT",
@@ -74,7 +74,7 @@
     "predeploy": "build && touch build/.nojekyll",
     "preview": "vite preview",
     "start": "vite",
-    "test": "jest",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   }
 }

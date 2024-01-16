@@ -101,7 +101,7 @@ fn should_build(dirs: &Dirs) -> bool {
 
 /// Runs JS package manager to install packages and build the JS bundle
 fn build_js(dirs: &Dirs) {
-    let pkg_manager = "pnpm";
+    let pkg_manager = "bun";
 
     p!("install js packages...");
 
