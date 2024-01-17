@@ -1,7 +1,7 @@
 import { Resource, useValue } from '@tomic/react';
 
 import { InputWrapper } from './InputStyles';
-import { styled, css } from 'styled-components';
+import { styled } from 'styled-components';
 
 interface AtomicSelectInputProps {
   resource: Resource;
@@ -11,6 +11,7 @@ interface AtomicSelectInputProps {
     label: string;
   }[];
   commit?: boolean;
+  onChange?: (value: string) => void;
 }
 
 type Props = AtomicSelectInputProps &
@@ -21,12 +22,14 @@ export function AtomicSelectInput({
   property,
   options,
   commit = false,
+  onChange,
   ...props
 }: Props): JSX.Element {
   const [value, setValue] = useValue(resource, property, { commit });
 
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setValue(e.target.value);
+    onChange?.(e.target.value);
   };
 
   return (
@@ -51,20 +54,18 @@ const StyledInputWrapper = styled(InputWrapper)`
 const SelectWrapper = styled.span<{ disabled: boolean }>`
   width: 100%;
   padding-inline: 0.2rem;
-
-  ${p =>
-    p.disabled &&
-    css`
-      background-color: ${props => props.theme.colors.bg1};
-    `}
+  background-color: ${p =>
+    p.disabled ? p.theme.colors.bg1 : p.theme.colors.bg};
 `;
 
 const Select = styled.select`
+  cursor: pointer;
   width: 100%;
   border: none;
   outline: none;
   height: 2rem;
-
+  background-color: transparent;
+  color: ${p => p.theme.colors.text};
   &:disabled {
     color: ${props => props.theme.colors.textLight};
     background-color: transparent;

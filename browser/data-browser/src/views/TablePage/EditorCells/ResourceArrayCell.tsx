@@ -12,7 +12,7 @@ import * as RadixPopover from '@radix-ui/react-popover';
 import { styled } from 'styled-components';
 import { IconButton } from '../../../components/IconButton/IconButton';
 import { Popover } from '../../../components/Popover';
-import { SelectableTag, Tag } from '../PropertyForm/Tag';
+import { SelectableTag, Tag } from '../../../components/Tag';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
 import {
   InputStyled,

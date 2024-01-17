@@ -10,22 +10,15 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on search result page.
 - [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focussed on an input
 - [#758](https://github.com/atomicdata-dev/atomic-server/issues/758) Fix Relation column forms to close when clicking on the searchbox
+- [#780](https://github.com/atomicdata-dev/atomic-server/issues/780) Use tags in ontology editor to create enum properties.
 - Fix server not rebuilding client when files changed.
-
-### @tomic/lib
-
-- [#798](https://github.com/atomicdata-dev/atomic-server/issues/798) Add `store.newResource()` to make creating new resources more easy.
-
-## v0.36.2
-
-### Atomic Browser
-
 - Added persistent scrollbar to table
 - Improved table header UX
 - Numbers in tables now respect user locale
 
 ### @tomic/lib
 
+- [#798](https://github.com/atomicdata-dev/atomic-server/issues/798) Add `store.newResource()` to make creating new resources more easy.
 - Always fetch all resources after setting + authenticating new agent with websockets #686
 - Add progress callback to `resource.getHistory()` And increased its performance for resources with a large number of commits [#745](https://github.com/atomicdata-dev/atomic-server/issues/745)
 - Fix websocket bug on port localhost with port 80

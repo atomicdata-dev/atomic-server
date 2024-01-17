@@ -65,4 +65,8 @@ const Flex = styled.div<FlexProps>`
   & ${ButtonDefault} {
     align-self: flex-start;
   }
+
+  & > p {
+    margin: 0;
+  }
 `;

@@ -1,4 +1,4 @@
-import { Resource, Store, urls } from '@tomic/react';
+import { Resource, Store, core } from '@tomic/react';
 
 const DEFAULT_DESCRIPTION = 'Change me';
 
@@ -11,17 +11,20 @@ export async function newClass(
   store: Store,
 ): Promise<string> {
   const subject = subjectForClass(parent, shortName);
-  const resource = store.getResourceLoading(subject, { newResource: true });
 
-  await resource.addClasses(store, urls.classes.class);
-
-  await resource.set(urls.properties.shortname, shortName, store);
-  await resource.set(urls.properties.description, DEFAULT_DESCRIPTION, store);
-  await resource.set(urls.properties.parent, parent.getSubject(), store);
+  const resource = await store.newResource({
+    subject,
+    parent: parent.getSubject(),
+    isA: core.classes.class,
+    propVals: {
+      [core.properties.shortname]: shortName,
+      [core.properties.description]: DEFAULT_DESCRIPTION,
+    },
+  });
 
   await resource.save(store);
 
-  parent.pushPropVal(urls.properties.classes, [subject]);
+  parent.pushPropVal(core.properties.classes, [subject]);
 
   await parent.save(store);
 
