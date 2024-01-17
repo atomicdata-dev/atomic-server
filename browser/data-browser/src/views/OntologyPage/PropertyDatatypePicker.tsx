@@ -21,7 +21,10 @@ export function PropertyDatatypePicker({
   });
 
   const removeAllowsOnlyForNonResourceArray = (type: string) => {
-    if (type === urls.datatypes.resourceArray) {
+    if (
+      type === urls.datatypes.resourceArray ||
+      type === urls.datatypes.atomicUrl
+    ) {
       return;
     }
 
