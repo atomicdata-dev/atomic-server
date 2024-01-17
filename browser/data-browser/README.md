@@ -35,9 +35,9 @@ Designed for interacting with [`atomic-server`](https://github.com/atomicdata-de
 
 ```sh
 # Install dependencies
-pnpm
+bun
 # Run dev server
-pnpm start
+bun start
 # Open browser at http://localhost:5173
 ```
 
@@ -77,15 +77,15 @@ You can set the Agent on the `/app/agent` route.
 The tests are located in `tests` and have `.spec` in their filename.
 They use the PlayWright framework and run in the browser.
 
-- make sure the data-browser server is running (`pnpm start`) at `http://localhost:5173`
+- make sure the data-browser server is running (`bun start`) at `http://localhost:5173`
 - make sure an [`atomic-server`](https://crates.io/crates/atomic-server/) instance is running at `http://localhost:9883`
 - make sure the `http://localhost/setup` invite has at least one available usage. You can set a higher amount [here](http://localhost/app/edit?subject=http%3A%2F%2Flocalhost%2Fsetup), or run `atomic-server --inititalize` to reset it to 1.
-- Install the Playwright dependencies: `pnpm playwright-install`
-- `pnpm test` launches the E2E tests (make sure the dev server is running at `http://localhost:5173`)
-- `pnpm test-debug` launches the E2E tests in debug mode (a window opens with debug tools)
-- `pnpm test-new` create new tests by clicking through the app
+- Install the Playwright dependencies: `bun playwright-install`
+- `bun test` launches the E2E tests (make sure the dev server is running at `http://localhost:5173`)
+- `bun test-debug` launches the E2E tests in debug mode (a window opens with debug tools)
+- `bun test-new` create new tests by clicking through the app
 - Use the `data-test` attribute in HTML elements to make playwright tests more maintainable (and prevent failing tests on changing translations)
-- `pnpm test-query {word}` run e2e tests in debug mode containing `{word}`
+- `bun test-query {word}` run e2e tests in debug mode containing `{word}`
 
 ## CI
 

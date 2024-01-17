@@ -20,7 +20,7 @@
   "eslint.alwaysShowStatus": true,
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
-  "eslint.packageManager": "pnpm",
+  "eslint.packageManager": "bun",
   "eslint.quiet": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"

@@ -88,25 +88,25 @@ docker-musl:
 
 setup-playwright:
   FROM mcr.microsoft.com/playwright:v1.38.0-jammy
-  RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
+  RUN curl -fsSL https://bun.sh/install | bash
   RUN apt update && apt install -y zip
-  RUN pnpx playwright install --with-deps
-  RUN npm install -g netlify-cli
+  RUN bunx playwright install --with-deps
+  RUN npm install --global netlify-cli
 
 e2e:
   FROM +setup-playwright
   COPY --keep-ts browser/e2e/package.json /app/e2e/package.json
   WORKDIR /app/e2e
-  RUN pnpm install
+  RUN bun install
   COPY --keep-ts --dir browser/e2e /app
-  RUN pnpm install
+  RUN bun install
   ENV LANGUAGE="en_GB"
   ENV DELETE_PREVIOUS_TEST_DRIVES="false"
   ENV FRONTEND_URL=http://localhost:9883
   COPY --chmod=0755 +build/atomic-server /atomic-server-bin
   # We'll have to zip it https://github.com/earthly/earthly/issues/2817
   TRY
-    RUN nohup /atomic-server-bin --initialize & pnpm run test-e2e ; zip -r test.zip /app/e2e/playwright-report
+    RUN nohup /atomic-server-bin --initialize & bun run test-e2e ; zip -r test.zip /app/e2e/playwright-report
   FINALLY
     SAVE ARTIFACT test.zip AS LOCAL artifact/test-results.zip
   END
@@ -119,7 +119,7 @@ e2e:
   #   WITH DOCKER \
   #     --load test:latest=+docker
   #     RUN docker run -d -p 80:80 test:latest  & \
-  #     pnpm run test-e2e
+  #     bun run test-e2e
   #   END
   #   FINALLY
   #     SAVE ARTIFACT /app/data-browser/test-results AS LOCAL artifact/test-results

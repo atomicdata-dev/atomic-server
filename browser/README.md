@@ -17,8 +17,8 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 
 ```sh
 # To run, simply run the following commands:
-pnpm install # install dependencies
-pnpm start # run the server!
+bun install # install dependencies
+bun start # run the server!
 # visit http://localhost:5173
 ```
 

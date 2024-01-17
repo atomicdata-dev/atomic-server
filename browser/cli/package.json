@@ -19,9 +19,9 @@
     "build": "tsc",
     "lint": "eslint ./src --ext .js,.ts",
     "lint-fix": "eslint ./src --ext .js,.ts --fix",
-    "prepublishOnly": "pnpm run build && pnpm run lint-fix",
+    "prepublishOnly": "bun run build && bun run lint-fix",
     "watch": "tsc --build --watch",
-    "start": "pnpm watch",
+    "start": "bun watch",
     "tsc": "tsc --build",
     "typecheck": "tsc --noEmit"
   },

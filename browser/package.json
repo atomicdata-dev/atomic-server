@@ -1,5 +1,6 @@
 {
   "devDependencies": {
+    "@manypkg/cli": "^0.21.2",
     "@types/bun": "^1.0.1",
     "@types/node": "^16.11.4",
     "@types/react": "^18.2.34",
@@ -29,21 +30,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm run start",
-    "lint": "pnpm run -r lint",
-    "lint-fix": "pnpm run -r lint-fix",
-    "build": "pnpm --filter \"@tomic/lib\" run build && pnpm --filter=!./lib run -r build ",
+    "dev": "./run-all.sh start",
+    "lint": "./run-all.sh lint",
+    "lint-fix": "bun run -r lint-fix",
+    "build": "bun --filter \"@tomic/lib\" run build && bun --filter=!./lib run -r build ",
     "test": "bun test .test.ts",
-    "test-e2e": "pnpm run --filter @tomic/e2e test-e2e",
-    "test-query": "pnpm run --filter @tomic/e2e test-query",
-    "start": "pnpm run -r --parallel start",
+    "test-e2e": "bun run --filter @tomic/e2e test-e2e",
+    "test-query": "bun run --filter @tomic/e2e test-query",
+    "start": "bun run -r --parallel start",
     "typedoc": "typedoc --options ./typedoc.json",
-    "typedoc-publish": "pnpm run typedoc && netlify deploy --dir data-browser/publish/docs/ --prod --auth $NETLIFY_AUTH_TOKEN --site atomic-lib",
-    "typecheck": "pnpm run -r --parallel typecheck"
+    "typedoc-publish": "bun run typedoc && netlify deploy --dir data-browser/publish/docs/ --prod --auth $NETLIFY_AUTH_TOKEN --site atomic-lib",
+    "typecheck": "bun run -r --parallel typecheck"
   },
   "husky": {
     "hooks": {
-      "pre-commit": "pnpm run lint-fix"
+      "pre-commit": "bun run lint-fix"
     }
   },
   "workspaces": {
@@ -56,7 +57,7 @@
       "cli"
     ]
   },
-  "packageManager": "pnpm@8.6.12",
+  "packageManager": "bun@1.0.23",
   "dependencies": {
     "eslint-plugin-import": "^2.26.0"
   }

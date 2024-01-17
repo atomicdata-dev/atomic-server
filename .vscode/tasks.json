@@ -76,8 +76,8 @@
 			"problemMatcher": [
 				"$tsc-watch"
 			],
-			"label": "run data-browser dev server (pnpm start)",
-			"detail": "pnpm workspace @tomic/data-browser start",
+			"label": "run data-browser dev server (bun start)",
+			"detail": "bun workspace @tomic/data-browser start",
 			"isBackground": true,
 			"path": "browser",
 			"group": "build"
@@ -90,7 +90,7 @@
 			],
 			"label": "test data-browser e2e",
 			"path": "browser",
-			"detail": "pnpm test-e2e",
+			"detail": "bun test-e2e",
 			"isBackground": true,
 			"group": "test"
 		},

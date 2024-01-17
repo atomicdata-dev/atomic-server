@@ -1,4 +1,4 @@
-// This file is copied from `atomic-data-browser` to `atomic-data-server` when `pnpm build-server` is run.
+// This file is copied from `atomic-data-browser` to `atomic-data-server` when `bun build-server` is run.
 // This is why the `testConfig` is imported.
 import { test, expect } from '@playwright/test';
 import {

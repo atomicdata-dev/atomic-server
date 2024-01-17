@@ -25,8 +25,8 @@
     "build": "tsc",
     "lint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
     "lint-fix": "eslint ./src --ext .js,.jsx,.ts,.tsx --fix",
-    "prepublishOnly": "pnpm run lint-fix && pnpm run build",
-    "start": "pnpm watch",
+    "prepublishOnly": "bun run lint-fix && bun run build",
+    "start": "bun watch",
     "watch": "tsc --build --watch",
     "tsc": "tsc --build",
     "typecheck": "tsc --noEmit"

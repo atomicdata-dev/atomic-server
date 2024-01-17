@@ -10,24 +10,24 @@ Talk with other devs on our [Discord][discord-url]!
 
 ## Publishing
 
-- `pnpm lint-fix`
+- `bun lint-fix`
 - commit any changes (if they are there)
-- `pnpm build` to build typescript files (don't skip this!)
-- `pnpm build-server` builds and copies assets to `../atomic-data-rust` folder (.js builds and playwright end-to-end tests). Make sure that `atomic-data-rust` directory exists on your machine as a sibling of `atomic-data-browser`.
-- `pnpm test` (don't you publish a broken build!), make sure `atomic-server` is running on `localhost`.
+- `bun build` to build typescript files (don't skip this!)
+- `bun build-server` builds and copies assets to `../atomic-data-rust` folder (.js builds and playwright end-to-end tests). Make sure that `atomic-data-rust` directory exists on your machine as a sibling of `atomic-data-browser`.
+- `bun test` (don't you publish a broken build!), make sure `atomic-server` is running on `localhost`.
 - Update the `package.json` files for `lib`, `rust`, and `data-browser` with a new version number. Try to match the version number with `atomic-data-rust`
 - Check the [changelog](changelog.md), make sure the headers are correct
 - commit any changes, name it `vX.XX.XX`
-- `pnpm publish -r`
+- `bun publish -r`
   - Choose a new version. Versions should match `atomic-data-rs`.
   - This updates the `package.json` files, creates a commit, tags it, pushes it to github, and publishes the builds to npm.
-  - If this fails, try `pnpm version patch` and `pnpm publish`
-  - DONT run `pnpm npm publish`, as it will not resolve workspace dependencies correctly.
+  - If this fails, try `bun version patch` and `bun publish`
+  - DONT run `bun npm publish`, as it will not resolve workspace dependencies correctly.
 
-## Understanding vite and pnpm workspaces
+## Understanding vite and bun workspaces
 
-This monorepo is orchestrated with pnpm workspaces.
-pnpm workspaces are used to share dependencies.
+This monorepo is orchestrated with bun workspaces.
+bun workspaces are used to share dependencies.
 
 Vite hosts the data-browser and targets `.ts` files which enables hot reload / hot module replacement, which is great for developing the data browser and the libraries at the same time.
 
@@ -35,7 +35,7 @@ Vite hosts the data-browser and targets `.ts` files which enables hot reload / h
 
 If you're editing `@tomic/lib` or `@tomic/react`, you need to re-build the library, as `atomic-data-browser` imports the `.js` files.
 You can auto re-build using the `watch` commands in `@tomic/lib` and `@tomic/react`.
-If you run `pnpm start` from the root, these will be run automatically.
+If you run `bun start` from the root, these will be run automatically.
 Note that you may need to refresh your screen manually to show updates from these libraries.
 
 There are two possible solutions for improving this workflow:

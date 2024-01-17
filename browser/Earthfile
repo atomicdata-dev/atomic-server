@@ -10,28 +10,28 @@ all:
   BUILD +typedoc
 
 deps:
-  RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
-  COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .
+  RUN curl -fsSL https://bun.sh/install | bash
+  COPY package.json bun.lockb .
   COPY data-browser/package.json data-browser/.
   COPY lib/package.json lib/.
   COPY react/package.json react/.
   COPY svelte/package.json svelte/.
   COPY cli/package.json cli/.
-  RUN pnpm install --frozen-lockfile --shamefully-hoist
+  RUN bun install --frozen-lockfile
   COPY . .
 
 test:
   FROM +deps
-  RUN pnpm run build
-  RUN pnpm run test
+  RUN bun run build
+  RUN bun run test
 
 lint:
   FROM +deps
-  RUN pnpm run lint
+  RUN bun run lint
 
 build:
   FROM +deps
-  RUN pnpm run build
+  RUN bun run build
   SAVE ARTIFACT ./data-browser/dist
 
 typedoc:

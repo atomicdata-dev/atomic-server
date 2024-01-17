@@ -4,19 +4,19 @@ We use `playwright` to run end-to-end tests in the browser.
 
 ```sh
 # install deps
-pnpm i
+bun i
 # install chromium
-pnpm playwright-install
+bun playwright-install
 # run all tests, creates a `playwright-report` folder with HTML files + images
-pnpm test-e2e
+bun test-e2e
 # run all tests and updates snapshots
-pnpm test-update
+bun test-update
 # run all tests in debug mode
-pnpm test-debug
+bun test-debug
 # run a single test (e.g. 'table')
-pnpm test-query table
+bun test-query table
 # create a new test
-pnpm test-new
+bun test-new
 # deploy report to netlify
 netlify deploy --dir playwright-report --prod --site atomic-tests
 ```

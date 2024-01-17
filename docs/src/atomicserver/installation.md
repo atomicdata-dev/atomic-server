@@ -39,8 +39,8 @@ atomic-server
 ## 4. Compile from source
 
 ```sh
-# make sure pnpm is installed and available in path! https://pnpm.io/
-pnpm --version
+# make sure bun is installed and available in path! https://bun.sh/
+bun --version
 git clone git@github.com:atomicdata-dev/atomic-server.git
 cd atomic-server/server
 cargo run
