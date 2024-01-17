@@ -144,11 +144,13 @@ test.describe('Ontology', async () => {
 
     // arrow-kind class
 
+    const arrowKindCard = classCard('arrow-kind');
     await expect(
-      classCard('arrow-kind').locator('input[value="arrow-kind"]'),
+      arrowKindCard.locator('input[value="arrow-kind"]'),
     ).toBeVisible();
 
-    await classCard('arrow-kind').getByTitle('add required property').click();
+    // add name property to arrow-kind
+    await arrowKindCard.getByTitle('add required property').click();
 
     await page.getByPlaceholder('Search for a property').type('name');
 
@@ -158,13 +160,59 @@ test.describe('Ontology', async () => {
 
     await pickOption(page.getByText('name - The name'));
 
+    // add line-type property to arrow-kind
+    await arrowKindCard.getByTitle('add recommended property').click();
+    await page.getByPlaceholder('Search for a property').type('line-type');
+
+    await expect(page.getByText('Create line-type')).toBeVisible();
+
+    await pickOption(page.getByText('Create line-type'));
+
+    await page.getByTitle('Configure line-type').click();
+
+    await expect(
+      currentDialog(page).locator('input[value="line-type"]'),
+    ).toBeVisible();
+
+    await expect(
+      currentDialog(page).getByRole('button', { name: 'Enum' }),
+    ).not.toBeVisible();
+
+    await currentDialog(page)
+      .getByLabel('Datatype')
+      .selectOption('https://atomicdata.dev/datatypes/resourceArray');
+
+    await expect(
+      currentDialog(page).getByRole('tab', { name: 'Enum' }),
+    ).toBeVisible();
+
+    // Create two tags: dashed and solid
+    await currentDialog(page).getByPlaceholder('New tag').fill('dashed');
+    await currentDialog(page).getByRole('button', { name: 'Add tag' }).click();
+
+    await expect(currentDialog(page).getByPlaceholder('New tag')).toHaveValue(
+      '',
+    );
+
+    await expect(currentDialog(page).getByText('dashed')).toBeVisible();
+
+    await currentDialog(page).getByPlaceholder('New tag').fill('solid');
+    await currentDialog(page).getByRole('button', { name: 'Add tag' }).click();
+
+    await expect(currentDialog(page).getByPlaceholder('New tag')).toHaveValue(
+      '',
+    );
+
+    await expect(currentDialog(page).getByText('solid')).toBeVisible();
+
+    await currentDialog(page).getByRole('button', { name: 'close' }).click();
     // Create arrow-kind instances
 
     await page.waitForTimeout(REBUILD_INDEX_TIME);
 
     const createInstance = async (name: string) => {
       await page.getByRole('button', { name: 'New Instance' }).click();
-      await page.getByText('Search for a class').click();
+      await page.getByText('Search for a class').nth(1).click();
       await page.getByPlaceholder('Search for a class').type('arrow-kind');
 
       await expect(page.getByText('arrow-kind - Change me')).toBeVisible();
@@ -189,24 +237,27 @@ test.describe('Ontology', async () => {
       .getByRole('button', { name: 'add an item to the allows-only list' })
       .nth(1)
       .click();
-    await page.getByRole('button', { name: 'Search for a resource' }).click();
+    await page.getByRole('button', { name: 'Search for a arrow-kind' }).click();
     await page
-      .getByPlaceholder('Search for a resource or ')
+      .getByPlaceholder('Search for a arrow-kind ')
       .type('red arrow with circle');
     await pickOption(
-      page.getByRole('dialog').getByText('Red arrow with circle'),
+      page.getByRole('dialog').getByText('Red arrow with circle').nth(1),
     );
 
     await page
       .getByRole('button', { name: 'add an item to the allows-only list' })
       .nth(1)
       .click();
-    await page.getByRole('button', { name: 'Search for a resource' }).click();
+    await page.getByRole('button', { name: 'Search for a arrow-kind' }).click();
     await page
-      .getByPlaceholder('Search for a resource or ')
+      .getByPlaceholder('Search for a arrow-kind ')
       .type('green arrow with black border');
     await pickOption(
-      page.getByRole('dialog').getByText('Green arrow with black border'),
+      page
+        .getByRole('dialog')
+        .getByText('Green arrow with black border')
+        .nth(1),
     );
 
     expect(await page.getByText('Red arrow with circle').count()).toBe(3);

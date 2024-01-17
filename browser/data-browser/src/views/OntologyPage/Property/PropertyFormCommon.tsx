@@ -89,7 +89,8 @@ export function PropertyFormCommon({
   );
 
   const disableExtras = !datatypesWithExtraControls.has(datatype ?? '');
-  const showEnumForm = !classType && datatype === urls.datatypes.resourceArray;
+  const showEnumForm =
+    !classType && datatypesWithExtraControls.has(datatype ?? '');
 
   return (
     <Column>
