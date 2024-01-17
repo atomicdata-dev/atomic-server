@@ -1,0 +1,77 @@
+import { Resource, core, dataBrowser, useStore } from '@tomic/react';
+import { useState, useCallback, Suspense, lazy } from 'react';
+import { FaPlus } from 'react-icons/fa';
+import { randomItem } from '../../helpers/randomItem';
+import { randomString } from '../../helpers/randomString';
+import { stringToSlug } from '../../helpers/stringToSlug';
+import { Button } from '../Button';
+import { Row } from '../Row';
+import { InputWrapper, InputStyled } from '../forms/InputStyles';
+import { tagColours } from './tagColours';
+
+const EmojiInput = lazy(() => import('../../chunks/EmojiInput/EmojiInput'));
+
+interface CreateTagRowProps {
+  parent: string;
+  onNewTag: (tag: Resource) => void;
+}
+
+export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
+  const store = useStore();
+  const [tagName, setTagName] = useState<string>('');
+  const [emoji, setEmoji] = useState<string | undefined>();
+  const [resetKey, setResetKey] = useState<number>(0);
+
+  const createNewTag = useCallback(async () => {
+    const tag = await store.newResource({
+      subject: `${parent}/${randomString()}`,
+      parent,
+      isA: dataBrowser.classes.tag,
+      propVals: {
+        [core.properties.shortname]: tagName,
+        [dataBrowser.properties.color]: randomItem(tagColours),
+      },
+    });
+
+    if (emoji) {
+      await tag.set(dataBrowser.properties.emoji, emoji, store);
+    }
+
+    onNewTag(tag);
+    setTagName('');
+    setEmoji(undefined);
+    setResetKey(prev => prev + 1);
+  }, [parent, store, tagName, emoji, onNewTag]);
+
+  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setTagName(stringToSlug(e.target.value));
+  }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        createNewTag();
+      }
+    },
+    [createNewTag],
+  );
+
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <Row>
+        <InputWrapper>
+          <EmojiInput onChange={setEmoji} key={resetKey} />
+          <InputStyled
+            placeholder='New tag'
+            value={tagName}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+          />
+        </InputWrapper>
+        <Button title='Add tag' onClick={createNewTag} disabled={!tagName}>
+          <FaPlus />
+        </Button>
+      </Row>
+    </Suspense>
+  );
+}

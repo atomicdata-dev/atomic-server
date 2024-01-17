@@ -56,6 +56,8 @@ export function SearchBoxWindow({
         ...(isA ? { [core.properties.isA]: isA } : {}),
       },
       parents: scopes ?? [drive, 'https://atomicdata.dev'],
+      // If a classtype is given we want to prefill the searchbox with data.
+      allowEmptyQuery: !!isA,
     }),
     [isA, scopes],
   );
@@ -188,16 +190,18 @@ export function SearchBoxWindow({
         />
       </SearchInputWrapper>
       <ResultBox data-testid='searchbox-results'>
-        {!searchValue && <CenteredMessage>Start Searching</CenteredMessage>}
+        {!searchValue && results.length === 0 && (
+          <CenteredMessage>Start Searching</CenteredMessage>
+        )}
         <StyledScrollArea>
           <ul>
-            {onCreateItem ? (
+            {onCreateItem && searchValue ? (
               <ResultLine
                 selected={selectedIndex === 0}
                 onMouseOver={() => handleMouseMove(0)}
                 onClick={() => onCreateItem(searchValue)}
               >
-                Create {searchValue}
+                Create <CreateLineInputText>{searchValue}</CreateLineInputText>
               </ResultLine>
             ) : null}
             {results.map((result, i) => (
@@ -238,6 +242,8 @@ const SearchInputWrapper = styled.div`
 `;
 
 const Input = styled.input`
+  background-color: transparent;
+  color: ${p => p.theme.colors.text};
   padding: 0.5rem;
   height: 100%;
   flex: 1;
@@ -312,4 +318,9 @@ const CenteredMessage = styled.div`
 const StyledScrollArea = styled(ScrollArea)`
   overflow: hidden;
   height: 100%;
+`;
+
+const CreateLineInputText = styled.span`
+  color: ${p => p.theme.colors.textLight};
+  font-style: italic;
 `;

@@ -3,26 +3,18 @@ import { lighten, setLightness, setSaturation } from 'polished';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { useCallback, useMemo, useState } from 'react';
 import { styled } from 'styled-components';
-import { transition } from '../../../helpers/transition';
-import { Popover } from '../../../components/Popover';
-import { PalettePicker } from '../../../components/PalettePicker';
-import { Button } from '../../../components/Button';
-import { Column, Row } from '../../../components/Row';
+import { transition } from '../../helpers/transition';
+import { Popover } from '../Popover';
+import { PalettePicker } from '../PalettePicker';
+import { Button } from '../Button';
+import { Column, Row } from '../Row';
 import { FaTrash } from 'react-icons/fa';
-import { fadeIn } from '../../../helpers/commonAnimations';
+import { fadeIn } from '../../helpers/commonAnimations';
+import { tagColours } from './tagColours';
 
 interface TagProps {
   subject: string;
 }
-
-export const tagColors = [
-  '#FFBE0B',
-  '#FB5607',
-  '#FF006E',
-  '#8338EC',
-  '#3A86FF',
-  '#5FF56E',
-];
 
 const useTagData = (subject: string) => {
   const resource = useResource(subject);
@@ -74,11 +66,13 @@ const TagWrapper = styled.span<TagWrapperProps>`
   padding-block: 0.4rem;
   border-radius: 1em;
   border: 1px solid var(--tag-mid-color);
-  color: var(--tag-dark-color);
+  color: ${p =>
+    p.theme.darkMode ? 'var(--tag-light-color)' : 'var(--tag-dark-color)'};
   line-height: 1;
   text-align: center;
   min-width: 3rem;
-  background-color: var(--tag-light-color);
+  background-color: ${p =>
+    p.theme.darkMode ? 'var(--tag-dark-color)' : 'var(--tag-light-color)'};
 
   &.selected-tag {
     text-decoration: underline;
@@ -152,7 +146,7 @@ export function EditableTag({
     >
       <PopoverContent>
         <Column>
-          <PalettePicker palette={tagColors} onChange={handleColorChange} />
+          <PalettePicker palette={tagColours} onChange={handleColorChange} />
           <DeleteButton onClick={() => onDelete(subject)}>
             <Row gap='0.5rem'>
               <FaTrash />

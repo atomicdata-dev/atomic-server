@@ -1,6 +1,8 @@
 import {
   Resource,
+  core,
   urls,
+  useArray,
   useProperty,
   useResource,
   useStore,
@@ -11,11 +13,13 @@ import { Column, Row } from '../../../components/Row';
 import { SearchBox } from '../../../components/forms/SearchBox';
 import { OntologyDescription } from '../OntologyDescription';
 import { PropertyDatatypePicker } from '../PropertyDatatypePicker';
-import { styled } from 'styled-components';
 import { newClass } from '../newClass';
 import { toAnchorId } from '../toAnchorId';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
-import InputSwitcher from '../../../components/forms/InputSwitcher';
+import InputResourceArray from '../../../components/forms/InputResourceArray';
+import { EnumFormPart } from './EnumFormPart';
+import { LabelText } from '../LabelText';
+import { filterAllowsOnly } from './filterAllowsOnly';
 
 interface PropertyFormCommonProps {
   resource: Resource;
@@ -34,17 +38,22 @@ export function PropertyFormCommon({
   onClassCreated,
 }: PropertyFormCommonProps): JSX.Element {
   const store = useStore();
+
   const [classType, setClassType] = useString(
     resource,
-    urls.properties.classType,
+    core.properties.classtype,
     { commit: true },
   );
-  const [datatype] = useString(resource, urls.properties.datatype);
+  const [datatype] = useString(resource, core.properties.datatype);
+  const [_, setAllowsOnly] = useArray(resource, core.properties.allowsOnly, {
+    commit: true,
+  });
+
   const [ontologySubject] = useCurrentSubject();
   const ontologyResource = useResource(ontologySubject);
-  const allowsOnly = useProperty(urls.properties.allowsOnly);
+  const allowsOnlyProp = useProperty(core.properties.allowsOnly);
 
-  const handleCreateClass = useCallback(
+  const createClass = useCallback(
     async (shortname: string) => {
       const createdSubject = await newClass(shortname, ontologyResource, store);
       await setClassType(createdSubject);
@@ -59,7 +68,28 @@ export function PropertyFormCommon({
     [ontologyResource, store, onClassCreated],
   );
 
+  const filterNotAllowedTypesFromAllowsOnly = useCallback(
+    async (newType: string | undefined) => {
+      if (newType === undefined) {
+        return;
+      }
+
+      const filtered = await filterAllowsOnly(resource, newType, store);
+      setAllowsOnly(filtered);
+    },
+    [store, resource, setAllowsOnly],
+  );
+
+  const handleClassTypeChange = useCallback(
+    (newType: string | undefined) => {
+      setClassType(newType);
+      filterNotAllowedTypesFromAllowsOnly(newType);
+    },
+    [setClassType, filterNotAllowedTypesFromAllowsOnly],
+  );
+
   const disableExtras = !datatypesWithExtraControls.has(datatype ?? '');
+  const showEnumForm = !classType && datatype === urls.datatypes.resourceArray;
 
   return (
     <Column>
@@ -74,25 +104,25 @@ export function PropertyFormCommon({
           <SearchBox
             disabled={!canEdit || disableExtras}
             value={classType}
-            onChange={setClassType}
-            isA={urls.classes.class}
-            onCreateItem={handleCreateClass}
+            onChange={handleClassTypeChange}
+            isA={core.classes.class}
+            onCreateItem={createClass}
           />
         </Column>
       </Row>
-      <Column>
-        <LabelText>Allows Only</LabelText>
-        <InputSwitcher
-          resource={resource}
-          property={allowsOnly}
-          disabled={disableExtras}
-        />
-      </Column>
+      {showEnumForm && (
+        <EnumFormPart resource={resource} ontology={ontologyResource} />
+      )}
+      {classType && (
+        <Column>
+          <LabelText>Allows Only</LabelText>
+          <InputResourceArray
+            resource={resource}
+            property={allowsOnlyProp}
+            isA={classType}
+          />
+        </Column>
+      )}
     </Column>
   );
 }
-
-const LabelText = styled.span`
-  font-weight: bold;
-  color: ${p => p.theme.colors.textLight};
-`;

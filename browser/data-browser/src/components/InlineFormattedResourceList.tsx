@@ -12,9 +12,12 @@ const formatter = new Intl.ListFormat('en-GB', {
 export function InlineFormattedResourceList({
   subjects,
 }: InlineFormattedResourceListProps): JSX.Element {
+  // There are rare cases where a resource array can locally have an undefined value, we filter these out to prevent the formatter from throwing an error.
+  const filteredSubjects = subjects.filter(subject => subject !== undefined);
+
   return (
     <>
-      {formatter.formatToParts(subjects).map(({ type, value }) => {
+      {formatter.formatToParts(filteredSubjects).map(({ type, value }) => {
         if (type === 'literal') {
           return value;
         }

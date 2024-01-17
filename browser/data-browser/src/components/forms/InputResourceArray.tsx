@@ -9,12 +9,16 @@ import { Column, Row } from '../Row';
 import { styled } from 'styled-components';
 import { useIndexDependantCallback } from '../../hooks/useIndexDependantCallback';
 
+interface InputResourceArrayProps extends InputProps {
+  isA?: string;
+}
+
 export default function InputResourceArray({
   resource,
   property,
   commit,
   ...props
-}: InputProps): JSX.Element {
+}: InputResourceArrayProps): JSX.Element {
   const [err, setErr] = useState<ArrayError | undefined>(undefined);
   const [array, setArray] = useArray(resource, property.subject, {
     validate: false,

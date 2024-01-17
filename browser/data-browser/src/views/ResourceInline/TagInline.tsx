@@ -1,5 +1,5 @@
 import type { ResourceInlineInstanceProps } from './ResourceInline';
-import { Tag } from '../TablePage/PropertyForm/Tag';
+import { Tag } from '../../components/Tag';
 import { styled } from 'styled-components';
 
 export function TagInline({
