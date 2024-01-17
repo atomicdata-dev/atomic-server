@@ -2,7 +2,6 @@ import { Resource, core, dataBrowser, useStore } from '@tomic/react';
 import { useState, useCallback, Suspense, lazy } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { randomItem } from '../../helpers/randomItem';
-import { randomString } from '../../helpers/randomString';
 import { stringToSlug } from '../../helpers/stringToSlug';
 import { Button } from '../Button';
 import { Row } from '../Row';
@@ -23,8 +22,12 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
   const [resetKey, setResetKey] = useState<number>(0);
 
   const createNewTag = useCallback(async () => {
+    const subject = await store.buildUniqueSubjectFromParts(
+      ['tag', tagName],
+      parent,
+    );
     const tag = await store.newResource({
-      subject: `${parent}/${randomString()}`,
+      subject,
       parent,
       isA: dataBrowser.classes.tag,
       propVals: {
