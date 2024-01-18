@@ -50,6 +50,8 @@ cross-build:
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
+  DO rust+COPY_OUTPUT --output="*" # Keep all the files that don't have any extension.
+  RUN ./target/$TARGET/release/atomic-server --version
   SAVE ARTIFACT ./target/$TARGET/release/atomic-server AS LOCAL artifact/bin/atomic-server-$TARGET
 
 build:
