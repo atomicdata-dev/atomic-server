@@ -11,6 +11,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focussed on an input
 - [#758](https://github.com/atomicdata-dev/atomic-server/issues/758) Fix Relation column forms to close when clicking on the searchbox
 - [#780](https://github.com/atomicdata-dev/atomic-server/issues/780) Use tags in ontology editor to create enum properties.
+- [#810](https://github.com/atomicdata-dev/atomic-server/issues/810) Add button to resource selectors to navigate to the selected resource.
 - Fix server not rebuilding client when files changed.
 - Added persistent scrollbar to table
 - Improved table header UX
