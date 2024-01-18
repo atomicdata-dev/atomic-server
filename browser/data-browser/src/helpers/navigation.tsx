@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { paths } from '../routes/paths';
+import { unknownSubject } from '@tomic/react';
 
 /** Constructs a URL string with a route, a query Parameter and a value */
 function constructURL(
@@ -17,6 +18,10 @@ export function constructOpenURL(
   subject: string,
   extraParams: Record<string, string> = {},
 ): string {
+  if (subject === unknownSubject) {
+    return '#';
+  }
+
   const url = new URL(subject);
 
   if (window.location.origin === url.origin) {

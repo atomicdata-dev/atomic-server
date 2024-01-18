@@ -1,12 +1,21 @@
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  MouseEventHandler,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { styled } from 'styled-components';
 import { removeCachedSearchResults, useResource, useStore } from '@tomic/react';
 import { DropdownPortalContext } from '../../Dropdown/dropdownContext';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { SearchBoxWindow } from './SearchBoxWindow';
-import { FaSearch, FaTimes } from 'react-icons/fa';
+import { FaExternalLinkAlt, FaSearch, FaTimes } from 'react-icons/fa';
 import { ErrorChip } from '../ErrorChip';
 import { useValidation } from '../formValidation/useValidation';
+import { constructOpenURL } from '../../../helpers/navigation';
+import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransition';
 
 interface SearchBoxProps {
   autoFocus?: boolean;
@@ -37,6 +46,7 @@ export function SearchBox({
   onClose,
 }: React.PropsWithChildren<SearchBoxProps>): JSX.Element {
   const store = useStore();
+  const navigate = useNavigateWithTransition();
   const selectedResource = useResource(value);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [inputValue, setInputValue] = useState('');
@@ -111,6 +121,21 @@ export function SearchBox({
     setError(undefined);
   }, [setError, required, value, selectedResource]);
 
+  const openLink =
+    !value || selectedResource.error
+      ? '#'
+      : constructOpenURL(selectedResource.getSubject());
+
+  const navigateToSelectedResource: MouseEventHandler<HTMLAnchorElement> =
+    e => {
+      e.preventDefault();
+      navigate(openLink);
+    };
+
+  const title = selectedResource.error
+    ? selectedResource.getSubject()
+    : selectedResource.title;
+
   return (
     <RadixPopover.Root open={open}>
       <RadixPopover.Anchor>
@@ -133,11 +158,7 @@ export function SearchBox({
             }}
           >
             {value ? (
-              <ResourceTitle>
-                {selectedResource.error
-                  ? selectedResource.getSubject()
-                  : selectedResource.title}
-              </ResourceTitle>
+              <ResourceTitle>{title}</ResourceTitle>
             ) : (
               <>
                 <FaSearch />
@@ -146,13 +167,24 @@ export function SearchBox({
             )}
           </TriggerButton>
           {value && (
-            <SearchBoxButton
-              title='clear'
-              onClick={() => onChange(undefined)}
-              type='button'
-            >
-              <FaTimes />
-            </SearchBoxButton>
+            <>
+              <SearchBoxButton
+                as='a'
+                href={openLink}
+                title={`go to ${title}`}
+                onClick={navigateToSelectedResource}
+                type='button'
+              >
+                <FaExternalLinkAlt />
+              </SearchBoxButton>
+              <SearchBoxButton
+                title='clear'
+                onClick={() => onChange(undefined)}
+                type='button'
+              >
+                <FaTimes />
+              </SearchBoxButton>
+            </>
           )}
           {children}
           {error && (
