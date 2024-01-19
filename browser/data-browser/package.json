@@ -53,6 +53,7 @@
     "lint-staged": "^10.5.4",
     "types-wm": "^1.1.0",
     "vite-plugin-pwa": "^0.17.0",
+    "vite-plugin-webfont-dl": "^3.9.1",
     "workbox-cli": "^6.4.1"
   },
   "homepage": "https://atomicdata.dev/",

@@ -1,9 +1,11 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import webfontDownload from 'vite-plugin-webfont-dl';
 
 export default defineConfig({
   plugins: [
+    webfontDownload(),
     react({
       babel: {
         plugins: [
