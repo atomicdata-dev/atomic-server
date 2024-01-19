@@ -45,9 +45,10 @@
     "yamde": "^1.7.1"
   },
   "devDependencies": {
+    "@swc/plugin-styled-components": "^1.5.110",
     "@types/react-pdf": "^6.2.0",
     "@types/react-window": "^1.8.7",
-    "babel-plugin-styled-components": "^2.1.4",
+    "@vitejs/plugin-react-swc": "^3.5.0",
     "csstype": "^3.1.0",
     "gh-pages": "^3.1.0",
     "lint-staged": "^10.5.4",

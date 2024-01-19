@@ -1,23 +1,12 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
 import webfontDownload from 'vite-plugin-webfont-dl';
 
 export default defineConfig({
   plugins: [
     webfontDownload(),
-    react({
-      babel: {
-        plugins: [
-          [
-            'babel-plugin-styled-components',
-            {
-              fileName: false,
-            },
-          ],
-        ],
-      },
-    }),
+    react({ plugins: [['@swc/plugin-styled-components', {}]] }),
     VitePWA({
       registerType: 'autoUpdate',
       devOptions: {
