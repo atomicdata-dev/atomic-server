@@ -32,9 +32,7 @@ export function formatNumber(
 
       return formatter.format(value);
     } catch (e) {
-      console.error(e);
-
-      return value.toString();
+      // The browser doesn't support the currency so we'll just format it as a number.
     }
   }
 
