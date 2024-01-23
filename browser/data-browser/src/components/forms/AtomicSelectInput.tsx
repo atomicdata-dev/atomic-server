@@ -1,7 +1,6 @@
 import { Resource, useValue } from '@tomic/react';
 
-import { InputWrapper } from './InputStyles';
-import { styled } from 'styled-components';
+import { BasicSelect } from './BasicSelect';
 
 interface AtomicSelectInputProps {
   resource: Resource;
@@ -33,41 +32,12 @@ export function AtomicSelectInput({
   };
 
   return (
-    <StyledInputWrapper>
-      <SelectWrapper disabled={!!props.disabled}>
-        <Select {...props} onChange={handleChange} value={value as string}>
-          {options.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
-      </SelectWrapper>
-    </StyledInputWrapper>
+    <BasicSelect {...props} onChange={handleChange} value={value as string}>
+      {options.map(option => (
+        <option key={option.value} value={option.value}>
+          {option.label}
+        </option>
+      ))}
+    </BasicSelect>
   );
 }
-
-const StyledInputWrapper = styled(InputWrapper)`
-  min-width: 15ch;
-`;
-
-const SelectWrapper = styled.span<{ disabled: boolean }>`
-  width: 100%;
-  padding-inline: 0.2rem;
-  background-color: ${p =>
-    p.disabled ? p.theme.colors.bg1 : p.theme.colors.bg};
-`;
-
-const Select = styled.select`
-  cursor: pointer;
-  width: 100%;
-  border: none;
-  outline: none;
-  height: 2rem;
-  background-color: transparent;
-  color: ${p => p.theme.colors.text};
-  &:disabled {
-    color: ${props => props.theme.colors.textLight};
-    background-color: transparent;
-  }
-`;

@@ -25,6 +25,8 @@ export const dataBrowser = {
     formattedDate: 'https://atomicdata.dev/classes/FormattedDate',
     table: 'https://atomicdata.dev/classes/Table',
     tag: 'https://atomicdata.dev/classes/Tag',
+    currencyProperty:
+      'https://atomicdata.dev/ontology/data-browser/class/currency-property',
   },
   properties: {
     subResources: 'https://atomicdata.dev/properties/subresources',
@@ -50,6 +52,7 @@ export const dataBrowser = {
     color: 'https://atomicdata.dev/properties/color',
     emoji: 'https://atomicdata.dev/properties/emoji',
     tags: 'https://atomicdata.dev/properties/tags',
+    currency: 'https://atomicdata.dev/ontology/data-browser/property/currency',
   },
 } as const;
 
@@ -74,6 +77,7 @@ export namespace DataBrowser {
   export type FormattedDate = typeof dataBrowser.classes.formattedDate;
   export type Table = typeof dataBrowser.classes.table;
   export type Tag = typeof dataBrowser.classes.tag;
+  export type CurrencyProperty = typeof dataBrowser.classes.currencyProperty;
 }
 
 declare module '../index.js' {
@@ -142,7 +146,7 @@ declare module '../index.js' {
     };
     [dataBrowser.classes.numberFormat]: {
       requires: BaseProps | 'https://atomicdata.dev/properties/shortname';
-      recommends: typeof dataBrowser.properties.decimalPlaces;
+      recommends: never;
     };
     [dataBrowser.classes.rangeProperty]: {
       requires: BaseProps;
@@ -181,6 +185,10 @@ declare module '../index.js' {
         | typeof dataBrowser.properties.color
         | typeof dataBrowser.properties.emoji;
     };
+    [dataBrowser.classes.currencyProperty]: {
+      requires: BaseProps | typeof dataBrowser.properties.currency;
+      recommends: never;
+    };
   }
 
   interface PropTypeMapping {
@@ -206,6 +214,7 @@ declare module '../index.js' {
     [dataBrowser.properties.color]: string;
     [dataBrowser.properties.emoji]: string;
     [dataBrowser.properties.tags]: string[];
+    [dataBrowser.properties.currency]: string;
   }
 
   interface PropSubjectToNameMapping {
@@ -231,5 +240,6 @@ declare module '../index.js' {
     [dataBrowser.properties.color]: 'color';
     [dataBrowser.properties.emoji]: 'emoji';
     [dataBrowser.properties.tags]: 'tags';
+    [dataBrowser.properties.currency]: 'currency';
   }
 }
