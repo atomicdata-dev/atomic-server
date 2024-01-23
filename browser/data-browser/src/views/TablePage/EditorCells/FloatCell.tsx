@@ -1,5 +1,6 @@
 import {
   JSONValue,
+  dataBrowser,
   urls,
   useNumber,
   useResource,
@@ -50,12 +51,18 @@ function FloatCellDisplay({
     urls.properties.constraints.decimalPlaces,
   );
 
+  const [currency] = useString(
+    propertyResource,
+    dataBrowser.properties.currency,
+  );
+
   const isPercentage = numberFormatting === numberFormats.percentage;
 
   const formattedValue = formatNumber(
     value as number | undefined,
     decimalPlaces,
     numberFormatting,
+    currency,
   );
 
   return (

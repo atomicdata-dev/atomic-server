@@ -3,7 +3,8 @@ import { urls } from '@tomic/react';
 export function formatNumber(
   value: number | undefined,
   fractionDigits: number | undefined,
-  formatting?: string,
+  formatting: string | undefined,
+  currency?: string,
 ): string {
   if (value === undefined) {
     return '';
@@ -19,6 +20,22 @@ export function formatNumber(
     });
 
     return formatter.format(value / 100);
+  }
+
+  if (formatting === urls.instances.numberFormats.currency) {
+    try {
+      const formatter = new Intl.NumberFormat('default', {
+        style: 'currency',
+        currency,
+        currencyDisplay: 'narrowSymbol',
+      });
+
+      return formatter.format(value);
+    } catch (e) {
+      console.error(e);
+
+      return value.toString();
+    }
   }
 
   const formatter = new Intl.NumberFormat('default', {

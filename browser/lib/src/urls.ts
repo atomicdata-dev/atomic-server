@@ -177,6 +177,8 @@ export const instances = {
   numberFormats: {
     number: 'https://atomicdata.dev/classes/NumberFormat/number',
     percentage: 'https://atomicdata.dev/classes/NumberFormat/Percentage',
+    currency:
+      'https://atomicdata.dev/ontology/data-browser/number-format/vAikhI3z',
   },
   dateFormats: {
     localNumeric: 'https://atomicdata.dev/classes/DateFormat/localNumeric',
