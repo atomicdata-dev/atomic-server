@@ -28,6 +28,7 @@ export function formatNumber(
         style: 'currency',
         currency,
         currencyDisplay: 'narrowSymbol',
+        currencySign: 'accounting',
       });
 
       return formatter.format(value);
