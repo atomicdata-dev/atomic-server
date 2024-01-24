@@ -13,6 +13,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#780](https://github.com/atomicdata-dev/atomic-server/issues/780) Use tags in ontology editor to create enum properties.
 - [#810](https://github.com/atomicdata-dev/atomic-server/issues/810) Add button to resource selectors to navigate to the selected resource.
 - [#764](https://github.com/atomicdata-dev/atomic-server/issues/764) Add option to format numbers as currency in tables.
+- [#819](https://github.com/atomicdata-dev/atomic-server/issues/819) Fix number input always shows 'required' even when it's optional.
 - Fix server not rebuilding client when files changed.
 - Added persistent scrollbar to table
 - Improved table header UX
