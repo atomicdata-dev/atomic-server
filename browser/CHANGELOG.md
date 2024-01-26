@@ -14,6 +14,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#810](https://github.com/atomicdata-dev/atomic-server/issues/810) Add button to resource selectors to navigate to the selected resource.
 - [#764](https://github.com/atomicdata-dev/atomic-server/issues/764) Add option to format numbers as currency in tables.
 - [#819](https://github.com/atomicdata-dev/atomic-server/issues/819) Fix number input always shows 'required' even when it's optional.
+- [#816](https://github.com/atomicdata-dev/atomic-server/issues/816) Fix bug where editing a column in a table would not submit when pressing enter.
 - Fix server not rebuilding client when files changed.
 - Added persistent scrollbar to table
 - Improved table header UX

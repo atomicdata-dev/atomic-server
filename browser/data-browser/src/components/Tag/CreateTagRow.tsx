@@ -53,6 +53,7 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
+        e.preventDefault();
         createNewTag();
       }
     },
