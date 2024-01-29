@@ -78,7 +78,7 @@ pub fn construct_invite_redirect(
         let mut url = url::Url::parse(&requested_subject)?;
         url.set_query(None);
         invite_resource.set_subject(url.to_string());
-        invite_resource.set_propval(urls::USAGES_LEFT.into(), Value::Integer(num - 1), store)?;
+        invite_resource.set(urls::USAGES_LEFT.into(), Value::Integer(num - 1), store)?;
         invite_resource
             .save_locally(store)
             .map_err(|e| format!("Unable to save updated Invite. {}", e))?;
@@ -104,12 +104,12 @@ pub fn construct_invite_redirect(
 
     // Construct the Redirect Resource, which might provide the Client with a Subject for his Agent.
     let mut redirect = Resource::new_instance(urls::REDIRECT, store)?;
-    redirect.set_propval(
+    redirect.set(
         urls::DESTINATION.into(),
         invite_resource.get(urls::TARGET)?.to_owned(),
         store,
     )?;
-    redirect.set_propval(
+    redirect.set(
         urls::REDIRECT_AGENT.into(),
         crate::Value::AtomicUrl(agent),
         store,
@@ -135,7 +135,7 @@ pub fn add_rights(
     let mut target = store.get_resource(target)?;
     let right = if write { urls::WRITE } else { urls::READ };
 
-    target.push_propval(right, agent.into(), true)?;
+    target.push(right, agent.into(), true)?;
     target
         .save_locally(store)
         .map_err(|e| format!("Unable to save updated target resource. {}", e))?;

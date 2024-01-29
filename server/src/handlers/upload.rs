@@ -82,16 +82,16 @@ pub async fn upload_handler(
         let mut resource = atomic_lib::Resource::new_instance(urls::FILE, store)?;
         resource
             .set_subject(new_subject)
-            .set_propval_string(urls::PARENT.into(), &query.parent, store)?
-            .set_propval_string(urls::INTERNAL_ID.into(), &file_id, store)?
-            .set_propval(urls::FILESIZE.into(), Value::Integer(byte_count), store)?
-            .set_propval_string(
+            .set_string(urls::PARENT.into(), &query.parent, store)?
+            .set_string(urls::INTERNAL_ID.into(), &file_id, store)?
+            .set(urls::FILESIZE.into(), Value::Integer(byte_count), store)?
+            .set_string(
                 urls::MIMETYPE.into(),
                 &guess_mime_for_filename(filename),
                 store,
             )?
-            .set_propval_string(urls::FILENAME.into(), filename, store)?
-            .set_propval_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
+            .set_string(urls::FILENAME.into(), filename, store)?
+            .set_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
         commit_responses.push(resource.save(store)?);
         created_resources.push(resource);
     }
@@ -105,7 +105,7 @@ pub async fn upload_handler(
     let mut parent = store.get_resource(&query.parent)?;
     // parent.append_subjects(urls::ATTACHMENTS, created_file_subjects, false, store)?;
     for created in created_file_subjects {
-        parent.push_propval(urls::ATTACHMENTS, created.into(), false)?;
+        parent.push(urls::ATTACHMENTS, created.into(), false)?;
     }
     commit_responses.push(parent.save(store)?);
 

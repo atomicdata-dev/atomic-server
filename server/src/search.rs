@@ -260,7 +260,7 @@ mod tests {
             let mut resource = Resource::new(subject.clone());
             if let Some(prev_subject) = prev_subject.clone() {
                 resource
-                    .set_propval_string(urls::PARENT.into(), &prev_subject, &store)
+                    .set_string(urls::PARENT.into(), &prev_subject, &store)
                     .unwrap();
             }
 

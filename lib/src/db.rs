@@ -329,14 +329,14 @@ impl Storelike for Db {
                 // Resource exists in map
                 Some(resource) => {
                     resource
-                        .set_propval_string(atom.property.clone(), &atom.value.to_string(), self)
+                        .set_string(atom.property.clone(), &atom.value.to_string(), self)
                         .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
                     resource
-                        .set_propval_string(atom.property.clone(), &atom.value.to_string(), self)
+                        .set_string(atom.property.clone(), &atom.value.to_string(), self)
                         .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                     map.insert(atom.subject, resource);
                 }
@@ -454,13 +454,8 @@ impl Storelike for Db {
         for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
         let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
-
-        println!("subject: {subject}");
-
         // This might add a trailing slash
         let url = url::Url::parse(subject)?;
-
-        println!("url: {url}");
         let mut removed_query_params = {
             let mut url_altered = url.clone();
             url_altered.set_query(None);
@@ -560,7 +555,7 @@ impl Storelike for Db {
 
         // This lets clients know that the resource may have dynamic properties that are currently not included
         if has_dynamic && skip_dynamic {
-            resource.set_propval(
+            resource.set(
                 crate::urls::INCOMPLETE.into(),
                 crate::Value::Boolean(true),
                 self,

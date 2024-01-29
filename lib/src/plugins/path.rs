@@ -39,9 +39,9 @@ fn handle_path_request(context: HandleGetContext) -> AtomicResult<Resource> {
         }
         crate::storelike::PathReturn::Atom(atom) => {
             let mut resource = Resource::new(subject.to_string());
-            resource.set_propval_string(urls::ATOM_SUBJECT.into(), &atom.subject, store)?;
-            resource.set_propval_string(urls::ATOM_PROPERTY.into(), &atom.property, store)?;
-            resource.set_propval_string(urls::ATOM_VALUE.into(), &atom.value.to_string(), store)?;
+            resource.set_string(urls::ATOM_SUBJECT.into(), &atom.subject, store)?;
+            resource.set_string(urls::ATOM_PROPERTY.into(), &atom.property, store)?;
+            resource.set_string(urls::ATOM_VALUE.into(), &atom.value.to_string(), store)?;
             Ok(resource)
         }
     }

@@ -11,7 +11,7 @@ pub fn set(context: &Context) -> AtomicResult<()> {
         Ok(r) => r,
         Err(_) => atomic_lib::Resource::new(subject),
     };
-    resource.set_propval_shortname(&property, &value, &context.store)?;
+    resource.set_shortname(&property, &value, &context.store)?;
     resource.save(&context.store)?;
     Ok(())
 }
@@ -34,7 +34,7 @@ pub fn edit(context: &Context) -> AtomicResult<()> {
     let edited = edit::edit(current_val)?;
     // Remove newline - or else I can's save shortnames or numbers using vim;
     let trimmed = edited.trim_end_matches('\n');
-    resource.set_propval_shortname(&prop, trimmed, &context.store)?;
+    resource.set_shortname(&prop, trimmed, &context.store)?;
     resource.save(&context.store)?;
     Ok(())
 }

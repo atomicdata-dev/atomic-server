@@ -105,7 +105,7 @@ impl AtomicError {
     pub fn into_resource(self, subject: String) -> Resource {
         let mut r = Resource::new(subject);
         r.set_class(urls::ERROR);
-        r.set_propval_unsafe(urls::DESCRIPTION.into(), Value::String(self.message));
+        r.set_unsafe(urls::DESCRIPTION.into(), Value::String(self.message));
         r
     }
 

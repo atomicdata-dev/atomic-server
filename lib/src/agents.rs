@@ -66,15 +66,15 @@ impl Agent {
         resource.set_class(urls::AGENT);
         resource.set_subject(self.subject.clone());
         if let Some(name) = &self.name {
-            resource.set_propval_unsafe(crate::urls::NAME.into(), Value::String(name.into()));
+            resource.set_unsafe(crate::urls::NAME.into(), Value::String(name.into()));
         }
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             crate::urls::PUBLIC_KEY.into(),
             Value::String(self.public_key.clone()),
         );
         // Agents must be read by anyone when validating their keys
-        resource.push_propval(crate::urls::READ, urls::PUBLIC_AGENT.into(), true)?;
-        resource.set_propval_unsafe(
+        resource.push(crate::urls::READ, urls::PUBLIC_AGENT.into(), true)?;
+        resource.set_unsafe(
             crate::urls::CREATED_AT.into(),
             Value::Timestamp(self.created_at),
         );

@@ -43,40 +43,36 @@ impl CollectionBuilder {
         let mut resource = store.get_resource_new(&self.subject);
         resource.set_class(urls::COLLECTION);
         if let Some(val) = &self.property {
-            resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), val, store)?;
+            resource.set_string(crate::urls::COLLECTION_PROPERTY.into(), val, store)?;
         }
         if let Some(val) = &self.value {
-            resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
+            resource.set_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
         }
         if let Some(val) = &self.name {
-            resource.set_propval_string(crate::urls::NAME.into(), val, store)?;
+            resource.set_string(crate::urls::NAME.into(), val, store)?;
         }
         if let Some(val) = &self.sort_by {
-            resource.set_propval_string(crate::urls::COLLECTION_SORT_BY.into(), val, store)?;
+            resource.set_string(crate::urls::COLLECTION_SORT_BY.into(), val, store)?;
         }
         if self.include_nested {
-            resource.set_propval_string(
-                crate::urls::COLLECTION_INCLUDE_NESTED.into(),
-                "true",
-                store,
-            )?;
+            resource.set_string(crate::urls::COLLECTION_INCLUDE_NESTED.into(), "true", store)?;
         }
         if self.include_external {
-            resource.set_propval_string(
+            resource.set_string(
                 crate::urls::COLLECTION_INCLUDE_EXTERNAL.into(),
                 "true",
                 store,
             )?;
         }
         if self.sort_desc {
-            resource.set_propval_string(crate::urls::COLLECTION_SORT_DESC.into(), "true", store)?;
+            resource.set_string(crate::urls::COLLECTION_SORT_DESC.into(), "true", store)?;
         }
-        resource.set_propval_string(
+        resource.set_string(
             crate::urls::COLLECTION_CURRENT_PAGE.into(),
             &self.current_page.to_string(),
             store,
         )?;
-        resource.set_propval(
+        resource.set(
             crate::urls::COLLECTION_PAGE_SIZE.into(),
             self.page_size.into(),
             store,
@@ -259,7 +255,7 @@ impl Collection {
         resource: &mut Resource,
         store: &impl Storelike,
     ) -> AtomicResult<crate::Resource> {
-        resource.set_propval(
+        resource.set(
             crate::urls::COLLECTION_MEMBERS.into(),
             if let Some(nested_members) = &self.members_nested {
                 nested_members.clone().into()
@@ -269,46 +265,42 @@ impl Collection {
             store,
         )?;
         if let Some(prop) = &self.property {
-            resource.set_propval_string(crate::urls::COLLECTION_PROPERTY.into(), prop, store)?;
+            resource.set_string(crate::urls::COLLECTION_PROPERTY.into(), prop, store)?;
         }
         if self.include_nested {
-            resource.set_propval_string(
-                crate::urls::COLLECTION_INCLUDE_NESTED.into(),
-                "true",
-                store,
-            )?;
+            resource.set_string(crate::urls::COLLECTION_INCLUDE_NESTED.into(), "true", store)?;
         }
         if self.include_external {
-            resource.set_propval_string(
+            resource.set_string(
                 crate::urls::COLLECTION_INCLUDE_EXTERNAL.into(),
                 "true",
                 store,
             )?;
         }
         if let Some(val) = &self.value {
-            resource.set_propval_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
+            resource.set_string(crate::urls::COLLECTION_VALUE.into(), val, store)?;
         }
         if let Some(val) = &self.name {
-            resource.set_propval_string(crate::urls::NAME.into(), val, store)?;
+            resource.set_string(crate::urls::NAME.into(), val, store)?;
         }
-        resource.set_propval(
+        resource.set(
             crate::urls::COLLECTION_MEMBER_COUNT.into(),
             self.total_items.into(),
             store,
         )?;
         let classes: Vec<String> = vec![crate::urls::COLLECTION.into()];
-        resource.set_propval(crate::urls::IS_A.into(), classes.into(), store)?;
-        resource.set_propval(
+        resource.set(crate::urls::IS_A.into(), classes.into(), store)?;
+        resource.set(
             crate::urls::COLLECTION_TOTAL_PAGES.into(),
             self.total_pages.into(),
             store,
         )?;
-        resource.set_propval(
+        resource.set(
             crate::urls::COLLECTION_CURRENT_PAGE.into(),
             self.current_page.into(),
             store,
         )?;
-        resource.set_propval(
+        resource.set(
             crate::urls::COLLECTION_PAGE_SIZE.into(),
             self.page_size.into(),
             store,
@@ -429,9 +421,9 @@ pub fn create_collection_resource_for_class(
         format!("{}/collections", drive)
     };
 
-    collection_resource.set_propval_string(urls::PARENT.into(), &parent, store)?;
+    collection_resource.set_string(urls::PARENT.into(), &parent, store)?;
 
-    collection_resource.set_propval_string(urls::NAME.into(), &pluralized, store)?;
+    collection_resource.set_string(urls::NAME.into(), &pluralized, store)?;
 
     // Should we use save_locally, which creates commits, or add_resource_unsafe, which is faster?
     Ok(collection_resource)
@@ -607,9 +599,9 @@ mod test {
     fn sorting_resources() {
         let prop = urls::DESCRIPTION.to_string();
         let mut a = Resource::new("first".into());
-        a.set_propval_unsafe(prop.clone(), Value::Markdown("1".into()));
+        a.set_unsafe(prop.clone(), Value::Markdown("1".into()));
         let mut b = Resource::new("second".into());
-        b.set_propval_unsafe(prop.clone(), Value::Markdown("2".into()));
+        b.set_unsafe(prop.clone(), Value::Markdown("2".into()));
         let c = Resource::new("third_missing_property".into());
 
         let asc = vec![a.clone(), b.clone(), c.clone()];

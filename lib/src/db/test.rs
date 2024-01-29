@@ -23,13 +23,13 @@ fn basic() {
         crate::Resource::new_instance("https://atomicdata.dev/classes/Property", &store).unwrap();
     // And add a description for that Property
     new_resource
-        .set_propval_shortname("description", "the age of a person", &store)
+        .set_shortname("description", "the age of a person", &store)
         .unwrap();
     new_resource
-        .set_propval_shortname("shortname", "age", &store)
+        .set_shortname("shortname", "age", &store)
         .unwrap();
     new_resource
-        .set_propval_shortname("datatype", crate::urls::INTEGER, &store)
+        .set_shortname("datatype", crate::urls::INTEGER, &store)
         .unwrap();
     // Changes are only applied to the store after saving them explicitly.
     new_resource.save_locally(&store).unwrap();
@@ -240,19 +240,19 @@ fn queries() {
         // We make one resource public
         if _x == 1 {
             demo_resource
-                .set_propval(urls::READ.into(), vec![urls::PUBLIC_AGENT].into(), store)
+                .set(urls::READ.into(), vec![urls::PUBLIC_AGENT].into(), store)
                 .unwrap();
         } else if _x == 2 {
             subject_to_delete = demo_resource.get_subject().to_string();
         }
         demo_resource
-            .set_propval(urls::DESTINATION.into(), demo_reference.clone(), store)
+            .set(urls::DESTINATION.into(), demo_reference.clone(), store)
             .unwrap();
         demo_resource
-            .set_propval(urls::SHORTNAME.into(), demo_val.clone(), store)
+            .set(urls::SHORTNAME.into(), demo_val.clone(), store)
             .unwrap();
         demo_resource
-            .set_propval(
+            .set(
                 sort_by.into(),
                 Value::Markdown(crate::utils::random_string(10)),
                 store,
@@ -313,7 +313,7 @@ fn queries() {
         );
         // We change the order!
         if i == 4 {
-            r.set_propval(sort_by.into(), Value::Markdown("!first".into()), store)
+            r.set(sort_by.into(), Value::Markdown("!first".into()), store)
                 .unwrap();
             let resp = r.save(store).unwrap();
             resource_changed_order_opt = resp.resource_new.clone();
@@ -483,14 +483,14 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
         .map(|_num| {
             let mut demo_resource = Resource::new_generate_subject(store);
             demo_resource
-                .set_propval(property_url.into(), old_val.clone(), store)
+                .set(property_url.into(), old_val.clone(), store)
                 .unwrap();
             demo_resource
-                .set_propval(filter_prop.to_string(), filter_val.clone(), store)
+                .set(filter_prop.to_string(), filter_val.clone(), store)
                 .unwrap();
             // We're only using this value to remove it later on
             demo_resource
-                .set_propval_string(irrelevant_property_url.into(), "value", store)
+                .set_string(irrelevant_property_url.into(), "value", store)
                 .unwrap();
             demo_resource.save(store).unwrap();
             demo_resource
@@ -522,8 +522,7 @@ fn test_collection_update_value(store: &Db, property_url: &str, old_val: Value, 
     for (i, r) in res.resources.iter_mut().enumerate() {
         // We change the order!
         if i == 4 {
-            r.set_propval(property_url.into(), new_val.clone(), store)
-                .unwrap();
+            r.set(property_url.into(), new_val.clone(), store).unwrap();
             r.save(store).unwrap();
             resource_changed_order_opt = Some(r.clone());
         }
