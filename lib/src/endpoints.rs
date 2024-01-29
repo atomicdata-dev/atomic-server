@@ -60,12 +60,12 @@ impl Endpoint {
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
         let subject = format!("{}{}", store.get_server_url(), self.path);
         let mut resource = store.get_resource_new(&subject);
-        resource.set_propval_string(urls::DESCRIPTION.into(), &self.description, store)?;
-        resource.set_propval_string(urls::SHORTNAME.into(), &self.shortname, store)?;
+        resource.set_string(urls::DESCRIPTION.into(), &self.description, store)?;
+        resource.set_string(urls::SHORTNAME.into(), &self.shortname, store)?;
         let is_a = [urls::ENDPOINT.to_string()].to_vec();
-        resource.set_propval(urls::IS_A.into(), is_a.into(), store)?;
+        resource.set(urls::IS_A.into(), is_a.into(), store)?;
         let params_vec: Vec<String> = self.params.clone();
-        resource.set_propval(
+        resource.set(
             urls::ENDPOINT_PARAMETERS.into(),
             Value::from(params_vec),
             store,

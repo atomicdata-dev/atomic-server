@@ -95,7 +95,7 @@ pub async fn search_query(
 
     let resources = get_resources(req, &appstate, &subject, subjects, limit)?;
     timer.add("get_resources");
-    results_resource.set_propval(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
+    results_resource.set(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
     let mut builder = HttpResponse::Ok();
     builder.append_header(("Server-Timing", timer.header_value()));
 

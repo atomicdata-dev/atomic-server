@@ -112,12 +112,12 @@ impl Storelike for Store {
             match map.get_mut(&atom.subject) {
                 // Resource exists in map
                 Some(resource) => {
-                    resource.set_propval(atom.property, atom.value, self)?;
+                    resource.set(atom.property, atom.value, self)?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
-                    resource.set_propval(atom.property, atom.value, self)?;
+                    resource.set(atom.property, atom.value, self)?;
                     map.insert(atom.subject, resource);
                 }
             }

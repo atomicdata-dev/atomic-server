@@ -54,7 +54,7 @@ impl ResponseError for AtomicServerError {
             None => {
                 let mut r = Resource::new("subject".into());
                 r.set_class(urls::ERROR);
-                r.set_propval_unsafe(
+                r.set_unsafe(
                     urls::DESCRIPTION.into(),
                     Value::String(self.message.clone()),
                 );

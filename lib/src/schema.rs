@@ -54,21 +54,21 @@ impl Property {
     /// Convert to resource.
     pub fn to_resource(&self) -> Resource {
         let mut resource = Resource::new(self.subject.clone());
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             urls::IS_A.into(),
             Value::ResourceArray(vec![urls::PROPERTY.into()]),
         );
-        resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()));
-        resource.set_propval_unsafe(
+        resource.set_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()));
+        resource.set_unsafe(
             urls::DESCRIPTION.into(),
             Value::String(self.description.clone()),
         );
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             urls::DATATYPE_PROP.into(),
             Value::AtomicUrl(self.data_type.to_string()),
         );
         if let Some(classtype) = &self.class_type {
-            resource.set_propval_unsafe(
+            resource.set_unsafe(
                 urls::CLASSTYPE_PROP.into(),
                 Value::AtomicUrl(classtype.clone()),
             );
@@ -120,20 +120,20 @@ impl Class {
     /// Converts Class to a Resource
     pub fn to_resource(&self) -> Resource {
         let mut resource = Resource::new(self.subject.clone());
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             urls::IS_A.into(),
             Value::ResourceArray(vec![urls::CLASS.into()]),
         );
-        resource.set_propval_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()));
-        resource.set_propval_unsafe(
+        resource.set_unsafe(urls::SHORTNAME.into(), Value::Slug(self.shortname.clone()));
+        resource.set_unsafe(
             urls::DESCRIPTION.into(),
             Value::String(self.description.clone()),
         );
         if !self.requires.is_empty() {
-            resource.set_propval_unsafe(urls::REQUIRES.into(), Value::from(self.requires.clone()));
+            resource.set_unsafe(urls::REQUIRES.into(), Value::from(self.requires.clone()));
         }
         if !self.requires.is_empty() {
-            resource.set_propval_unsafe(
+            resource.set_unsafe(
                 urls::RECOMMENDS.into(),
                 Value::from(self.recommends.clone()),
             );

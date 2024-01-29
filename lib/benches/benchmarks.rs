@@ -16,7 +16,7 @@ fn random_atom() -> Atom {
 
 fn random_resource(atom: &Atom) -> Resource {
     let mut resource = Resource::new(atom.subject.clone());
-    resource.set_propval_unsafe(atom.property.clone(), atom.value.clone());
+    resource.set_unsafe(atom.property.clone(), atom.value.clone());
     resource
 }
 

@@ -132,7 +132,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 
     for p in properties {
         let mut resource = p.to_resource();
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             urls::PARENT.into(),
             Value::AtomicUrl("https://atomicdata.dev/properties".into()),
         );
@@ -141,7 +141,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 
     for c in classes {
         let mut resource = c.to_resource();
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             urls::PARENT.into(),
             Value::AtomicUrl("https://atomicdata.dev/classes".into()),
         );
@@ -159,7 +159,7 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
     let mut drive = store.get_resource_new(&self_url);
     drive.set_class(urls::DRIVE);
     let server_url = url::Url::parse(store.get_server_url())?;
-    drive.set_propval_string(
+    drive.set_string(
         urls::NAME.into(),
         server_url.host_str().ok_or("Can't use current base URL")?,
         store,
@@ -175,14 +175,14 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
     let write_agent = store.get_default_agent()?.subject;
     let read_agent = write_agent.clone();
 
-    drive.push_propval(urls::WRITE, write_agent.into(), true)?;
-    drive.push_propval(urls::READ, read_agent.into(), true)?;
+    drive.push(urls::WRITE, write_agent.into(), true)?;
+    drive.push(urls::READ, read_agent.into(), true)?;
     if public_read {
-        drive.push_propval(urls::READ, urls::PUBLIC_AGENT.into(), true)?;
+        drive.push(urls::READ, urls::PUBLIC_AGENT.into(), true)?;
     }
 
     if let Err(_no_description) = drive.get(urls::DESCRIPTION) {
-        drive.set_propval_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
+        drive.set_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
 
 Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
 
@@ -240,7 +240,7 @@ pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
     let endpoints_collection = format!("{}/endpoints", store.get_server_url());
     for endpoint in endpoints {
         let mut resource = endpoint.to_resource(store)?;
-        resource.set_propval(
+        resource.set(
             urls::PARENT.into(),
             Value::AtomicUrl(endpoints_collection.clone()),
             store,
@@ -259,8 +259,8 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
         .ok_or("No self URL in this Store - required for populating importer")?;
     let mut importer = crate::Resource::new(urls::construct_path_import(&base));
     importer.set_class(urls::IMPORTER);
-    importer.set_propval(urls::PARENT.into(), Value::AtomicUrl(base), store)?;
-    importer.set_propval(urls::NAME.into(), Value::String("Import".into()), store)?;
+    importer.set(urls::PARENT.into(), Value::AtomicUrl(base), store)?;
+    importer.set(urls::NAME.into(), Value::String("Import".into()), store)?;
     importer.save_locally(store)?;
     Ok(())
 }
@@ -277,7 +277,7 @@ pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
         format!("{}/collections", base),
     ];
     for item in arr {
-        drive.push_propval(urls::SUBRESOURCES, item.into(), true)?;
+        drive.push(urls::SUBRESOURCES, item.into(), true)?;
     }
     drive.save_locally(store)?;
     Ok(())

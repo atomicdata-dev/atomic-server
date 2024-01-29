@@ -234,18 +234,18 @@ impl Resource {
             commit: CommitBuilder::new(subject),
         };
         let class_urls = Vec::from([String::from(class_url)]);
-        resource.set_propval(crate::urls::IS_A.into(), class_urls.into(), store)?;
+        resource.set(crate::urls::IS_A.into(), class_urls.into(), store)?;
         Ok(resource)
     }
 
     /// Appends a Resource to a specific property through the commitbuilder.
     /// Useful if you want to have compact Commits that add things to existing ResourceArrays.
-    pub fn push_propval(
+    pub fn push(
         &mut self,
         property: &str,
         value: SubResource,
         skip_existing: bool,
-    ) -> AtomicResult<()> {
+    ) -> AtomicResult<&mut Self> {
         let mut vec = match self.propvals.get(property) {
             Some(some) => match some {
                 Value::ResourceArray(vec) => {
@@ -254,7 +254,7 @@ impl Resource {
                         for i in vec {
                             if i.to_string() == str_val {
                                 // Value already exists
-                                return Ok(());
+                                return Ok(self);
                             }
                         }
                     }
@@ -267,7 +267,7 @@ impl Resource {
         vec.push(value.clone());
         self.propvals.insert(property.into(), vec.into());
         self.commit.push_propval(property, value)?;
-        Ok(())
+        Ok(self)
     }
 
     /// Remove a propval from a resource by property URL.
@@ -400,7 +400,7 @@ impl Resource {
 
     /// Overwrites the is_a (Class) of the Resource.
     pub fn set_class(&mut self, is_a: &str) {
-        self.set_propval_unsafe(
+        self.set_unsafe(
             crate::urls::IS_A.into(),
             Value::ResourceArray([is_a.into()].into()),
         );
@@ -409,7 +409,7 @@ impl Resource {
     /// Insert a Property/Value combination.
     /// Overwrites existing Property/Value.
     /// Validates the datatype.
-    pub fn set_propval_string(
+    pub fn set_string(
         &mut self,
         property_url: String,
         value: &str,
@@ -424,7 +424,7 @@ impl Resource {
             )
         })?;
         let val = Value::new(value, &fullprop.data_type)?;
-        self.set_propval_unsafe(property_url, val);
+        self.set_unsafe(property_url, val);
         Ok(self)
     }
 
@@ -432,7 +432,7 @@ impl Resource {
     /// Checks datatype.
     /// Overwrites existing.
     /// Adds the change to the commit builder's `set` map.
-    pub fn set_propval(
+    pub fn set(
         &mut self,
         property: String,
         value: Value,
@@ -462,7 +462,7 @@ impl Resource {
             }
         }
         if full_prop.data_type == value.datatype() {
-            self.set_propval_unsafe(property, value);
+            self.set_unsafe(property, value);
             Ok(self)
         } else {
             Err(format!("Datatype for subject '{}', property '{}', value '{}' did not match. Wanted '{}', got '{}'",
@@ -479,15 +479,16 @@ impl Resource {
     /// Inserts a Property/Value combination.
     /// Overwrites existing.
     /// Adds it to the CommitBuilder.
-    pub fn set_propval_unsafe(&mut self, property: String, value: Value) {
+    pub fn set_unsafe(&mut self, property: String, value: Value) -> &mut Self {
         self.propvals.insert(property.clone(), value.clone());
         self.commit.set(property, value);
+        self
     }
 
     /// Sets a property / value combination.
     /// Property can be a shortname (e.g. 'description' instead of the full URL).
     /// Returns error if propval does not exist in this resource or its class.
-    pub fn set_propval_shortname(
+    pub fn set_shortname(
         &mut self,
         property: &str,
         value: &str,
@@ -495,7 +496,7 @@ impl Resource {
     ) -> AtomicResult<&mut Self> {
         let fullprop = self.resolve_shortname_to_property(property, store)?;
         let fullval = Value::new(value, &fullprop.data_type)?;
-        self.set_propval_unsafe(fullprop.subject, fullval);
+        self.set_unsafe(fullprop.subject, fullval);
         Ok(self)
     }
 
@@ -584,7 +585,7 @@ mod test {
                 == "class"
         );
         resource
-            .set_propval_shortname("shortname", "something-valid", &store)
+            .set_shortname("shortname", "something-valid", &store)
             .unwrap();
         assert!(
             resource
@@ -594,7 +595,7 @@ mod test {
                 == "something-valid"
         );
         resource
-            .set_propval_shortname("shortname", "should not contain spaces", &store)
+            .set_shortname("shortname", "should not contain spaces", &store)
             .unwrap_err();
     }
 
@@ -603,11 +604,11 @@ mod test {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_shortname("shortname", "should-fail", &store)
+            .set_shortname("shortname", "should-fail", &store)
             .unwrap();
         new_resource.check_required_props(&store).unwrap_err();
         new_resource
-            .set_propval_shortname("description", "Should succeed!", &store)
+            .set_shortname("description", "Should succeed!", &store)
             .unwrap();
         new_resource.check_required_props(&store).unwrap();
     }
@@ -617,7 +618,7 @@ mod test {
         let store = init_store();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_shortname("shortname", "person", &store)
+            .set_shortname("shortname", "person", &store)
             .unwrap();
         assert!(
             new_resource
@@ -627,10 +628,10 @@ mod test {
                 == "person"
         );
         new_resource
-            .set_propval_shortname("shortname", "human", &store)
+            .set_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
-            .set_propval_shortname("description", "A real human being", &store)
+            .set_shortname("description", "A real human being", &store)
             .unwrap();
         new_resource.save_locally(&store).unwrap();
         assert!(
@@ -668,7 +669,7 @@ mod test {
         let agent = store.get_default_agent().unwrap();
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval_shortname("shortname", "person", &store)
+            .set_shortname("shortname", "person", &store)
             .unwrap();
         assert!(
             new_resource
@@ -678,10 +679,10 @@ mod test {
                 == "person"
         );
         new_resource
-            .set_propval_shortname("shortname", "human", &store)
+            .set_shortname("shortname", "human", &store)
             .unwrap();
         new_resource
-            .set_propval_shortname("description", "A real human being", &store)
+            .set_shortname("description", "A real human being", &store)
             .unwrap();
         let commit = new_resource
             .get_commit_builder()
@@ -752,12 +753,12 @@ mod test {
         let value = Value::Markdown("joe".into());
         let mut new_resource = Resource::new_instance(urls::CLASS, &store).unwrap();
         new_resource
-            .set_propval(property.clone(), value.clone(), &store)
+            .set(property.clone(), value.clone(), &store)
             .unwrap();
         // Should fail, because a propval is missing
         assert!(new_resource.save_locally(&store).is_err());
         new_resource
-            .set_propval(urls::SHORTNAME.into(), Value::Slug("joe".into()), &store)
+            .set(urls::SHORTNAME.into(), Value::Slug("joe".into()), &store)
             .unwrap();
         let subject = new_resource.get_subject().clone();
         println!("subject new {}", new_resource.get_subject());
@@ -777,7 +778,7 @@ mod test {
         let append_value = "http://localhost/someURL";
         let mut resource = Resource::new_generate_subject(&store);
         resource
-            .push_propval(&property, append_value.into(), false)
+            .push(&property, append_value.into(), false)
             .unwrap();
         let vec = resource.get(&property).unwrap().to_subjects(None).unwrap();
         assert_eq!(
@@ -807,7 +808,7 @@ mod test {
 
         let mut resource2 = Resource::new_generate_subject(&store);
         resource2
-            .set_propval(urls::PARENT.into(), Value::AtomicUrl(subject1), &store)
+            .set(urls::PARENT.into(), Value::AtomicUrl(subject1), &store)
             .unwrap();
         let subject2 = resource2.get_subject().to_string();
         resource2.save_locally(&store).unwrap();
@@ -829,7 +830,7 @@ mod test {
 
         let mut resource2 = Resource::new_generate_subject(&store);
         resource2
-            .set_propval(
+            .set(
                 urls::PARENT.into(),
                 Value::AtomicUrl(subject1.clone()),
                 &store,
@@ -840,7 +841,7 @@ mod test {
 
         let mut resource3 = Resource::new_generate_subject(&store);
         resource3
-            .set_propval(
+            .set(
                 urls::PARENT.into(),
                 Value::AtomicUrl(subject2.clone()),
                 &store,

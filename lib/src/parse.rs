@@ -162,7 +162,7 @@ pub fn parse_json_ad_commit_resource(
         }
     };
     for (prop, val) in propvals {
-        resource.set_propval(prop, val, store)?;
+        resource.set(prop, val, store)?;
     }
     Ok(resource)
 }
@@ -334,7 +334,7 @@ fn parse_json_ad_map_to_resource(
                     Resource::new(subj)
                 };
                 for (prop, val) in propvals {
-                    r.set_propval(prop, val, store)?;
+                    r.set(prop, val, store)?;
                 }
                 let signer = parse_opts
                     .signer
@@ -603,7 +603,7 @@ mod test {
         let agent = store.get_default_agent().unwrap();
         let mut resource = Resource::new_generate_subject(&store);
         resource
-            .set_propval(
+            .set(
                 urls::WRITE.into(),
                 vec![agent.subject.clone()].into(),
                 &store,
