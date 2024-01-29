@@ -80,17 +80,18 @@ pub async fn upload_handler(
         let download_url = format!("{}/download/{}", store.get_server_url(), subject_path);
 
         let mut resource = atomic_lib::Resource::new_instance(urls::FILE, store)?;
-        resource.set_subject(new_subject);
-        resource.set_propval_string(urls::PARENT.into(), &query.parent, store)?;
-        resource.set_propval_string(urls::INTERNAL_ID.into(), &file_id, store)?;
-        resource.set_propval(urls::FILESIZE.into(), Value::Integer(byte_count), store)?;
-        resource.set_propval_string(
-            urls::MIMETYPE.into(),
-            &guess_mime_for_filename(filename),
-            store,
-        )?;
-        resource.set_propval_string(urls::FILENAME.into(), filename, store)?;
-        resource.set_propval_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
+        resource
+            .set_subject(new_subject)
+            .set_propval_string(urls::PARENT.into(), &query.parent, store)?
+            .set_propval_string(urls::INTERNAL_ID.into(), &file_id, store)?
+            .set_propval(urls::FILESIZE.into(), Value::Integer(byte_count), store)?
+            .set_propval_string(
+                urls::MIMETYPE.into(),
+                &guess_mime_for_filename(filename),
+                store,
+            )?
+            .set_propval_string(urls::FILENAME.into(), filename, store)?
+            .set_propval_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
         commit_responses.push(resource.save(store)?);
         created_resources.push(resource);
     }

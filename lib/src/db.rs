@@ -454,9 +454,13 @@ impl Storelike for Db {
         for_agent: &ForAgent,
     ) -> AtomicResult<Resource> {
         let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
+
+        println!("subject: {subject}");
+
         // This might add a trailing slash
         let url = url::Url::parse(subject)?;
 
+        println!("url: {url}");
         let mut removed_query_params = {
             let mut url_altered = url.clone();
             url_altered.set_query(None);
