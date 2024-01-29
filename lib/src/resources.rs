@@ -414,7 +414,7 @@ impl Resource {
         property_url: String,
         value: &str,
         store: &impl Storelike,
-    ) -> AtomicResult<()> {
+    ) -> AtomicResult<&mut Self> {
         let fullprop = store.get_property(&property_url).map_err(|e| {
             format!(
                 "Failed setting propval for '{}' because property '{}' could not be found. {}",
@@ -425,7 +425,7 @@ impl Resource {
         })?;
         let val = Value::new(value, &fullprop.data_type)?;
         self.set_propval_unsafe(property_url, val);
-        Ok(())
+        Ok(self)
     }
 
     /// Inserts a Property/Value combination.
@@ -507,9 +507,10 @@ impl Resource {
     /// Changes the subject of the Resource.
     /// Does not 'move' the Resource
     /// See https://github.com/atomicdata-dev/atomic-server/issues/44
-    pub fn set_subject(&mut self, url: String) {
+    pub fn set_subject(&mut self, url: String) -> &mut Self {
         self.commit.set_subject(url.clone());
         self.subject = url;
+        self
     }
 
     /// Converts Resource to JSON-AD string.
