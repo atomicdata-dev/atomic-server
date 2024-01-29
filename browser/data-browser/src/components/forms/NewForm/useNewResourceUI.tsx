@@ -94,10 +94,14 @@ export function NewResourceUIProvider({ children }: PropsWithChildren) {
 
     // If a basicInstanceHandler is registered for the class, create a resource of the given class with some default values.
     if (basicNewInstanceHandlers.has(isA)) {
-      basicNewInstanceHandlers.get(isA)?.(parent, createAndNavigate, {
-        store,
-        settings,
-      });
+      try {
+        await basicNewInstanceHandlers.get(isA)?.(parent, createAndNavigate, {
+          store,
+          settings,
+        });
+      } catch (e) {
+        store.notifyError(e);
+      }
 
       return;
     }
