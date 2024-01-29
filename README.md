@@ -49,13 +49,15 @@ https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a
 
 ## Documentation
 
-Check out the [documentation](http://docs.atomicdata.dev/atomicserver/intro.html) for installation instructions, API docs, and more.
+Check out the [documentation] for installation instructions, API docs, and more.
 
 ## Contribute
 
 Issues and PRs are welcome!
 And join our [Discord][discord-url]!
 [Read more in the Contributors guide.](CONTRIBUTE.md)
+
+[documentation]:https://docs.atomicdata.dev/atomicserver/installation
 
 [discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
 [discord-url]: https://discord.gg/a72Rv2P
