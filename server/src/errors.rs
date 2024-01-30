@@ -179,3 +179,13 @@ impl From<actix_web::Error> for AtomicServerError {
         }
     }
 }
+
+impl From<opendal::Error> for AtomicServerError {
+    fn from(error: opendal::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}

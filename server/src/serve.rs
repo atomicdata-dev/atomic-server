@@ -98,7 +98,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
         tracing::info!("Binding HTTP server to endpoint {}", endpoint);
         println!("{}", message);
         server
-            .bind(&format!("{}:{}", config.opts.ip, config.opts.port))
+            .bind(&endpoint)
             .map_err(|e| format!("Cannot bind to endpoint {}: {}", &endpoint, e))?
             .shutdown_timeout(TIMEOUT)
             .run()

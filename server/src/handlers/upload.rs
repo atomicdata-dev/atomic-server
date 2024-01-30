@@ -1,11 +1,12 @@
-use std::{ffi::OsStr, io::Write, path::Path};
+use std::{ffi::OsStr, path::Path};
 
 use actix_multipart::Multipart;
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
     commit::CommitResponse, hierarchy::check_write, urls, utils::now, Resource, Storelike, Value,
 };
-use futures::{StreamExt, TryStreamExt};
+
+use futures::TryStreamExt;
 use serde::Deserialize;
 
 use crate::{appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent};
@@ -15,7 +16,7 @@ pub struct UploadQuery {
     parent: String,
 }
 
-/// Allows the user to upload files tot the `/upload` endpoint.
+/// Allows the user to upload files to the `/upload` endpoint.
 /// A parent Query parameter is required for checking rights and for placing the file in a Hierarchy.
 /// Creates new File resources for every submitted file.
 /// Submission is done using multipart/form-data.
@@ -44,36 +45,21 @@ pub async fn upload_handler(
     let mut created_resources: Vec<Resource> = Vec::new();
     let mut commit_responses: Vec<CommitResponse> = Vec::new();
 
-    while let Ok(Some(mut field)) = body.try_next().await {
+    while let Ok(Some(field)) = body.try_next().await {
         let content_type = field.content_disposition().clone();
         let filename = content_type.get_filename().ok_or("Filename is missing")?;
 
-        std::fs::create_dir_all(&appstate.config.uploads_path)?;
-
+        let file_store = &appstate.file_store;
         let file_id = format!(
-            "{}-{}",
+            "{}{}-{}",
+            file_store.prefix(),
             now(),
             sanitize_filename::sanitize(filename)
                 // Spacebars lead to very annoying bugs in browsers
                 .replace(' ', "-")
         );
 
-        let mut file_path = appstate.config.uploads_path.clone();
-        file_path.push(&file_id);
-        let mut file = std::fs::File::create(file_path)?;
-
-        // Field in turn is stream of *Bytes* object
-        while let Some(chunk) = field.next().await {
-            let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
-            // TODO: Update a SHA256 hash here for checksum
-            file.write_all(&data)?;
-        }
-
-        let byte_count: i64 = file
-            .metadata()?
-            .len()
-            .try_into()
-            .map_err(|_e| "Too large")?;
+        let byte_count = file_store.upload_file(&file_id, field).await?;
 
         let subject_path = format!("files/{}", urlencoding::encode(&file_id));
         let new_subject = format!("{}/{}", store.get_server_url(), subject_path);

@@ -74,6 +74,22 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_DATA_DIR")]
     pub data_dir: Option<PathBuf>,
 
+    /// bucket name from s3-compatible storage service
+    #[clap(long, env = "ATOMIC_S3_BUCKET")]
+    pub s3_bucket: Option<String>,
+
+    /// region for s3-compatible storage service, defaults to "us-east-1"
+    #[clap(long, env = "ATOMIC_S3_REGION")]
+    pub s3_region: Option<String>,
+
+    /// endpoint for s3-compatible storage service, defaults to "https://s3.amazonaws.com"
+    #[clap(long, env = "ATOMIC_S3_ENDPOINT")]
+    pub s3_endpoint: Option<String>,
+
+    /// path where s3 uploads will be stored
+    #[clap(long, env = "ATOMIC_S3_PATH")]
+    pub s3_path: Option<String>,
+
     /// CAUTION: Skip authentication checks, making all data publicly readable. Improves performance.
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,

@@ -8,6 +8,7 @@ mod commit_monitor;
 pub mod config;
 mod content_types;
 mod errors;
+mod files;
 mod handlers;
 mod helpers;
 #[cfg(feature = "https")]
