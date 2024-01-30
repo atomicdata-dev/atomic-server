@@ -26,10 +26,22 @@ const SelectWrapper = styled.span<{ disabled: boolean }>`
   padding-inline: 0.2rem;
   background-color: ${p =>
     p.disabled ? p.theme.colors.bg1 : p.theme.colors.bg};
+
+  // Because we remove the appearance of the select for compatibility reasons, we have to add back the chevron.
+  position: relative;
+  &:after {
+    content: '▾';
+    position: absolute;
+    right: 0.5rem;
+    top: 0.5rem;
+    pointer-events: none;
+    color: ${p => p.theme.colors.textLight};
+  }
 `;
 
 const Select = styled.select`
   cursor: pointer;
+  appearance: none;
   width: 100%;
   border: none;
   outline: none;
