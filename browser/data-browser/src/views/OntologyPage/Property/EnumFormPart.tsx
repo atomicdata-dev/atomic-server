@@ -73,9 +73,12 @@ const TagPanel: FC<TagPanelProps> = ({ resource, ontology }) => {
     // We filter out anything that is not a tag.
     filterAllowsOnly(resource, dataBrowser.classes.tag, store).then(
       filteredTags => {
-        setTags(filteredTags);
+        setTags(filteredTags ?? []);
 
-        if (filteredTags.length === allowsOnly.length) {
+        if (
+          filteredTags === undefined ||
+          filteredTags.length === allowsOnly.length
+        ) {
           return;
         }
 

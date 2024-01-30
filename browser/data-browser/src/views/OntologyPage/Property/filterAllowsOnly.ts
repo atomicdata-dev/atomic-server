@@ -4,8 +4,13 @@ export async function filterAllowsOnly(
   resource: Resource<Core.Property>,
   isA: string,
   store: Store,
-): Promise<string[]> {
-  const allowsOnly = resource.props.allowsOnly ?? [];
+): Promise<string[] | undefined> {
+  const allowsOnly = resource.props.allowsOnly;
+
+  if (allowsOnly === undefined) {
+    return;
+  }
+
   const filteredTags: string[] = [];
 
   for (const line of allowsOnly) {
