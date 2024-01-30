@@ -43,6 +43,24 @@ source:
   COPY browser+build/dist /code/browser/data-browser/dist
   DO rust+CARGO --args=fetch
 
+fmt:
+  FROM +source
+  DO rust+CARGO --args="fmt --check"
+
+lint:
+  FROM +source
+  DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
+
+build:
+  FROM +source
+  DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
+  RUN ./target/release/atomic-server --version
+  SAVE ARTIFACT ./target/release/atomic-server AS LOCAL artifact/bin/atomic-server-x86_64-unknown-linux-gnu
+
+test:
+  FROM +build
+  DO rust+CARGO --args="test"
+
 cross-build:
   FROM +source
   ARG --required TARGET
@@ -53,24 +71,6 @@ cross-build:
   DO rust+COPY_OUTPUT --output=".*" # Copies all files to ./target
   RUN ./target/$TARGET/release/atomic-server --version
   SAVE ARTIFACT ./target/$TARGET/release/atomic-server AS LOCAL artifact/bin/atomic-server-$TARGET
-
-build:
-  FROM +source
-  DO rust+CARGO --args="build --offline --release" --output="release/[^/\.]+"
-  RUN ./target/release/atomic-server --version
-  SAVE ARTIFACT ./target/release/atomic-server AS LOCAL artifact/bin/atomic-server-x86_64-unknown-linux-gnu
-
-test:
-  FROM +source
-  DO rust+CARGO --args="test"
-
-fmt:
-  FROM +source
-  DO rust+CARGO --args="fmt --check"
-
-lint:
-  FROM +source
-  DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
 docker-musl:
   FROM alpine:3.18
