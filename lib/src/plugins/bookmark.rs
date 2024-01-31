@@ -383,18 +383,20 @@ impl Parser {
                     .get_attribute("href")
                     .unwrap_or_else(|| "link".to_string());
 
-                el.on_end_tag(move |end| {
-                    let s = buffer.borrow();
-                    let mut text = s.as_str().trim();
+                if let Some(handlers) = el.end_tag_handlers() {
+                    handlers.push(Box::new(move |end| {
+                        let s = buffer.borrow();
+                        let mut text = s.as_str().trim();
 
-                    if text.is_empty() {
-                        text = &href;
-                    }
+                        if text.is_empty() {
+                            text = &href;
+                        }
 
-                    end.before(text, lol_html::html_content::ContentType::Text);
+                        end.before(text, lol_html::html_content::ContentType::Text);
 
-                    Ok(())
-                })?;
+                        Ok(())
+                    }));
+                }
 
                 Ok(())
             }),

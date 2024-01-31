@@ -115,7 +115,8 @@ impl Display for MetaTags {
 <meta property=\"twitter:image\" content=\"{image}\">"
         )?;
         if let Some(json_unsafe) = &self.json {
-            let json_base64 = base64::encode(json_unsafe);
+            use base64::Engine;
+            let json_base64 = base64::engine::general_purpose::STANDARD.encode(json_unsafe);
             write!(
                 f,
                 "\n<meta property=\"json-ad-initial\" content=\"{}\">",

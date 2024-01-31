@@ -22,32 +22,31 @@ dircpy = "0.3.15"
 
 [dependencies]
 actix = ">= 0.12, < 0.14"
-actix-cors = "0.6"
+actix-cors = "0.7"
 actix-files = "0.6"
-actix-multipart = "0.4"
+actix-multipart = "0.6"
 actix-web-actors = "4"
-base64 = "0.13"
+base64 = "0.21"
 chrono = "0.4"
 colored = "2"
-dialoguer = "0.10"
+dialoguer = "0.11"
 directories = ">= 2, < 5"
 dotenv = "0.15"
 futures = "0.3"
 percent-encoding = "2.2.0"
 regex = "1"
-rio_api = "0.7"
-rio_turtle = "0.7"
-rustls-pemfile = "1"
-sanitize-filename = "0.4"
+rio_api = "0.8"
+rio_turtle = "0.8"
+sanitize-filename = "0.5"
 serde_json = "1"
 serde_with = "3.3.0"
 simple-server-timing-header = "0.1.0"
 static-files = "0.2"
 tantivy = "0.21"
 tracing = "0.1"
-tracing-actix-web = "0.6"
-tracing-chrome = "0.6"
-tracing-log = "0.1"
+tracing-actix-web = "0.7"
+tracing-chrome = "0.7"
+tracing-log = "0.2"
 ureq = "2"
 urlencoding = "2"
 
@@ -55,29 +54,33 @@ urlencoding = "2"
 optional = true
 version = "0.4"
 
+[dependencies.rustls-pemfile]
+optional = true
+version = "1"
+
 [dependencies.rcgen]
 optional = true
-version = "0.11"
+version = "0.12"
 
 [dependencies.tracing-opentelemetry]
 optional = true
-version = "0.18.0"
+version = "0.22.0"
 
 [dependencies.opentelemetry]
 optional = true
-version = "0.18.0"
+version = "0.21.0"
 
 [dependencies.opentelemetry-jaeger]
 optional = true
-version = "0.17.0"
+version = "0.20.0"
 
 [dependencies.sysinfo]
 optional = true
-version = "0.26"
+version = "0.30"
 
 [dependencies.actix-web]
 features = ["rustls"]
-version = "4"
+version = "4.4"
 
 [dependencies.actix-web-static-files]
 version = ">= 4.0.1"
@@ -116,7 +119,7 @@ assert_cmd = "2"
 
 [features]
 default = ["https", "telemetry"]
-https = ["rustls", "instant-acme", "rcgen"]
+https = ["rustls", "instant-acme", "rcgen", "rustls-pemfile"]
 process-management = ["sysinfo"]
 telemetry = ["tracing-opentelemetry", "opentelemetry", "opentelemetry-jaeger"]
 
