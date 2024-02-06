@@ -1,8 +1,8 @@
-VERSION --try --global-cache 0.7
+VERSION --try --global-cache 0.8
 PROJECT ontola/atomic-server
 IMPORT ./browser AS browser
 IMPORT github.com/earthly/lib/rust AS rust
-FROM rust:1.73.0-buster
+FROM rust:buster
 WORKDIR /code
 
 pipeline:
@@ -20,14 +20,16 @@ build-all:
   BUILD +build # x86_64-unknown-linux-gnu
   BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
   BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
-  BUILD +cross-build --TARGET=aarch64-unknown-linux-musl
+  # GLIBC issue, see #833
+  # BUILD +cross-build --TARGET=aarch64-unknown-linux-musl
   # Errors
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
 docker-all:
   BUILD --platform=linux/amd64 +docker-musl --TARGET=x86_64-unknown-linux-musl
   BUILD --platform=linux/arm/v7 +docker-musl --TARGET=armv7-unknown-linux-musleabihf
-  BUILD --platform=linux/arm64/v8 +docker-musl --TARGET=aarch64-unknown-linux-musl
+  # GLIBC issue, see #833
+  # BUILD --platform=linux/arm64/v8 +docker-musl --TARGET=aarch64-unknown-linux-musl
 
 install:
   RUN apt-get update -qq
@@ -40,7 +42,7 @@ source:
   FROM +install
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir server lib cli  ./
-  COPY browser+build/dist /code/browser/data-browser/dist
+  COPY browser+build/dist /code/server/assets_tmp
   DO rust+CARGO --args=fetch
 
 fmt:
@@ -65,6 +67,7 @@ cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
+  RUN cross --version
   WITH DOCKER
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
   END
