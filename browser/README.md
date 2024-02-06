@@ -72,7 +72,7 @@ React library with many useful hooks for rendering and editing Atomic Data.
 
 Issues and PR's are welcome!
 And join our [Discord][discord-url]!
-See [Contribute.md](CONTRIBUTE.md)
+See [Contributing.md](CONTRIBUTING.md)
 
 [discord-badge]: https://img.shields.io/discord/723588174747533393.svg?logo=discord
 [discord-url]: https://discord.gg/a72Rv2P

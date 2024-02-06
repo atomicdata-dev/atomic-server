@@ -9,7 +9,7 @@ You can run AtomicServer in different ways:
 4. Manually from source
 
 When you're running AtomicServer, go to [Initial setup and configuration](#Initial-setup-and-configuration).
-If you want to run this locally as a developer / contributor, check out [the Contributors guide](https://github.com/atomicdata-dev/atomic-server/blob/develop/CONTRIBUTE.md).
+If you want to run this locally as a developer / contributor, check out [the Contributors guide](https://github.com/atomicdata-dev/atomic-server/blob/develop/CONTRIBUTING.md).
 
 ## 1. Run using docker
 

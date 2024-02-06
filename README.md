@@ -55,7 +55,7 @@ Check out the [documentation] for installation instructions, API docs, and more.
 
 Issues and PRs are welcome!
 And join our [Discord][discord-url]!
-[Read more in the Contributors guide.](CONTRIBUTE.md)
+[Read more in the Contributors guide.](CONTRIBUTING.md)
 
 [documentation]:https://docs.atomicdata.dev/atomicserver/installation
 
