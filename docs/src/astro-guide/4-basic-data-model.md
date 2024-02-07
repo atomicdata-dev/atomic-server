@@ -35,6 +35,6 @@ Next create a property called `body-text` but change the datatype to `MARKDOWN`
 The last property we'll add is `header-image`. The datatype should be `Resource`, this means it will reference another resource. Since we want this to always be a file and not some other random class we are going to give it a classtype. To do this click on the configure button after the datatype selector. A dialog should appear with additional settings for the property. In the 'Classtype' field search for `file`. An option with the text `file - A single binary file` should appear, select it and close the dialog.
 
 Your ontology should look something like this now
-![](/assets/astro-guide//4-1.webp)
+![](img/4-1.webp)
 
 Alright our model is done for now, lets create the actual homepage resource and then we'll move on to generating types and fetching the data in the frontend.

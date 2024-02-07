@@ -15,11 +15,11 @@ For the required add: [name](https://atomicdata.dev/properties/name) and [descri
 For the recommended properties create one called `demo-url` with datatype `STRING` and one called `repo-url` with the same type. `demo-url` will be used to point to a demo of the project (if there is one), `repo-url` will point to a git repository if there is one.
 
 `project` should now look something like this:
-![](/assets/astro-guide//8-2.webp)
+![](img/8-2.webp)
 
 Now in your data folder create some projects and add them to your homepage resource like I did here:
 
-![](/assets/astro-guide//8-3.webp)
+![](img/8-3.webp)
 
 > **NOTE:** </br>
 > To edit a resource press `Cmd + e` or `Ctrl + e`, alternatively you can click the context menu on the right of the search bar and click `Edit`
@@ -143,4 +143,4 @@ Since a ResourceArray is just an array of subjects we can map through them pass 
 
 Our homepage is now complete and looks like this:
 
-![](/assets/astro-guide//8-4.webp)
+![](img/8-4.webp)
