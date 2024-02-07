@@ -25,7 +25,7 @@ Open the newly created folder in your favourite editor and navigate to the folde
 
 Check to see if everything went smoothly by testing out if it works. Run `npm run dev` and navigate to the address shown in the output (http://localhost:4321/)
 You should see a boring page that looks like this:
-![astro](/assets/astro-guide/3-1.webp)
+![astro](img/3-1.webp)
 
 ### About Astro
 
@@ -97,6 +97,6 @@ import Layout from '../layouts/Layout.astro';
 
 Our page should now look like this:
 
-![Browser with a basic webpage](/assets/astro-guide/3-2.webp)
+![Browser with a basic webpage](img/3-2.webp)
 
 Time to take a brake from Astro and create our data model in the Atomic Data Browser.

@@ -118,7 +118,7 @@ const homepage = await store.getResourceAsync<Homepage>(
 
 Check your browser and you should see the body text has changed!
 
-![](/assets/astro-guide/7-1.webp)
+![](img/7-1.webp)
 
 It's not rendered as markdown yet so lets quickly fix that by installing `marked` and updating our `index.astro`
 
@@ -126,7 +126,7 @@ It's not rendered as markdown yet so lets quickly fix that by installing `marked
 npm install marked
 ```
 
-```astro
+```jsx
 ---
 // src/pages/index.astro
 import { marked } from 'marked';
@@ -149,7 +149,7 @@ const bodyTextContent = marked.parse(homepage.props.bodyText);
 ```
 
 Beautiful 👌
-![](/assets/astro-guide/7-2.webp)
+![](img/7-2.webp)
 
 ## Updating the header
 
@@ -290,6 +290,6 @@ Now all that's left to do is update `src/pages/index.astro` to pass the homepage
 
 If all went according to plan you should now have something that looks like this:
 
-![](/assets/astro-guide/7-3.webp)
+![](img/7-3.webp)
 
 Now of course a portfolio is nothing without projects to show of so lets add those

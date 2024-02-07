@@ -1,5 +1,5 @@
-{{#title Software and libraries for Atomic Data}}
-# Software and libraries for Atomic Data
+{{#title Client libraries for Atomic Data}}
+# Client libraries for Atomic Data
 
 Libraries and clients (all MIT licenced) that work great with [atomic-server](atomic-server.md):
 

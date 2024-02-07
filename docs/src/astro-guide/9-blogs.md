@@ -16,7 +16,7 @@ Give it the following required properties:
 
 `name` is going to be used for the blog's title, `discription` will be the content of the blog, `title-slug` is the title in slug form that is used in the url, `image` is the cover image of the post and `published-at` will be the timestamp the post was published.
 
-![](/assets/astro-guide//9-1.webp)
+![](img/9-1.webp)
 
 Regenerate the types by running:
 
@@ -27,7 +27,7 @@ npx ad-generate ontologies
 Now create a folder called `Blogposts` inside your `Data` folder and add some blogposts to it.
 I just made some nonsense articles as dummy content
 
-![](/assets/astro-guide//9-2.webp)
+![](img/9-2.webp)
 
 ## Blog Cards
 
@@ -87,7 +87,7 @@ By setting `property` to `https://atomicdata.dev/properties/isA` (the subject of
 Additionally we can also set these properties on a collection to refine our query
 
 | Property                                                           | Description                                       | Datatype                                                       | Default |
-| ------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------- | ------- |
+|--------------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------------------|---------|
 | [sort-by](https://atomicdata.dev/properties/collection/sortBy)     | Sorts the collected members by the given property | Resource< [Property](https://atomicdata.dev/classes/Property)> | -       |
 | [sort-desc](https://atomicdata.dev/properties/collection/sortDesc) | Sorts the collected members in descending order   | Boolean                                                        | false   |
 | [page-size](https://atomicdata.dev/properties/collection/pageSize) | The maximum number of members per page            | Integer                                                        | 30      |
@@ -173,7 +173,7 @@ Then in the layout we map over this array and render a `<BlogCard />` for each o
 
 Save and navigate to `localhost:4321/blog` and you should see the new blog page.
 
-![](/assets/astro-guide//9-3.webp)
+![](img/9-3.webp)
 
 Clicking on the links brings you to a 404 page because we haven't actually made the blog content pages yet so lets do that now.
 
@@ -181,7 +181,7 @@ Our content pages will live on `https://<your domain>/blog/<title-slug>` so we n
 
 Create a file in `src/pages/blog` called `[slug].astro`. If you add some markup to the page and try to navigate to it you will get the following error:
 
-![](/assets/astro-guide//9-4.webp)
+![](img/9-4.webp)
 
 This is because by default Astro generates all pages at build time (called: Static Site Generation) and since this is a dynamic route it needs to know what pages there will be during the build process. This is fixed by exporting a `getStaticPaths` function that returns a list of all urls the route can have.
 
@@ -253,7 +253,7 @@ Then finally we return the paths array.
 
 Now when you click on one of the blogposts on your blog page you should no longer get an error or a 404 page.
 
-![](/assets/astro-guide//9-5.webp)
+![](img/9-5.webp)
 
 ### Building the rest of the page
 
@@ -363,7 +363,7 @@ const dateText = new Intl.DateTimeFormat('default', {
 
 The blog post page should now look something like this:
 
-![](/assets/astro-guide//9-6.webp)
+![](img/9-6.webp)
 
 The only thing left is a Header with the image and title of the blog post.
 
@@ -472,4 +472,4 @@ const { resource } = Astro.props;
 
 That should be it. Our blog post now has a beautiful header.
 
-![](/assets/astro-guide//9-7.webp)
+![](img/9-7.webp)
