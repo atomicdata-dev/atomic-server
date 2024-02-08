@@ -22,6 +22,9 @@ import {
   commits,
   collections,
   JSONValue,
+  SearchOpts,
+  buildSearchSubject,
+  server,
 } from './index.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
@@ -230,6 +233,16 @@ export class Store {
     }
 
     return resource;
+  }
+
+  public async search(query: string, opts: SearchOpts = {}): Promise<string[]> {
+    const searchSubject = buildSearchSubject(this.serverUrl, query, opts);
+    const searchResource = await this.fetchResourceFromServer(searchSubject, {
+      noWebSocket: true,
+    });
+    const results = searchResource.get(server.properties.results) ?? [];
+
+    return results;
   }
 
   /** Checks if a subject is free to use */
