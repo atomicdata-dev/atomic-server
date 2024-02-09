@@ -2,7 +2,6 @@ import { generateBaseObject } from './generateBaseObject.js';
 import { generateClasses } from './generateClasses.js';
 import { store } from './store.js';
 import { camelCaseify } from './utils.js';
-// TODO: Replace with actual project config file.
 import { generatePropTypeMapping } from './generatePropTypeMapping.js';
 import { generateSubjectToNameMapping } from './generateSubjectToNameMapping.js';
 import { generateClassExports } from './generateClassExports.js';
@@ -26,7 +25,7 @@ const TEMPLATE = `
 * For more info on how to use ontologies: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/cli/readme.md
 * -------------------------------- */
 
-import { BaseProps } from '${Inserts.MODULE_ALIAS}'
+import type { BaseProps } from '${Inserts.MODULE_ALIAS}'
 
 ${Inserts.BASE_OBJECT}
 
