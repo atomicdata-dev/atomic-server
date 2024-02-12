@@ -26,6 +26,8 @@ export const ontologiesCommand = async (_args: string[]) => {
     return;
   }
 
+  checkOrCreateFolder(atomicConfig.outputFolder);
+
   for (const subject of atomicConfig.ontologies) {
     await write(await generateOntology(subject, propertyRecord));
   }
@@ -78,4 +80,10 @@ const write = async ({
   fs.writeFileSync(filePath, formatted);
 
   console.log(chalk.blue('Wrote to'), chalk.cyan(filePath));
+};
+
+const checkOrCreateFolder = (relativePath: string): void => {
+  const fullPath = path.join(process.cwd(), relativePath);
+
+  fs.mkdirSync(fullPath, { recursive: true });
 };
