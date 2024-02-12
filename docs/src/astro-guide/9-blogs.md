@@ -1,10 +1,12 @@
 # Using Collections to build the blogs page
 
-Most databases have a way to query data, in Atomic this is done with Collections. A collection is a dynamic resource created by Atomic server based on the props we give it. @tomic/lib makes it very easy to create them and iterate over them.
+Most databases have a way to query data, in Atomic, this is done with Collections.
+A collection is a dynamic resource created by AtomicServer based on the props we give it.
+@tomic/lib makes it very easy to create them and iterate over them.
 
 ## Creating the model and data
 
-Lets first add a `blogpost` class to our ontology.
+Let's first add a `blogpost` class to our ontology.
 
 Give it the following required properties:
 
@@ -14,7 +16,7 @@ Give it the following required properties:
 - image - (you can reuse the image property you created for `project`)
 - published-at - datatype: `TIMESTAMP`
 
-`name` is going to be used for the blog's title, `discription` will be the content of the blog, `title-slug` is the title in slug form that is used in the url, `image` is the cover image of the post and `published-at` will be the timestamp the post was published.
+`name` is going to be used for the blog's title, `description` will be the content of the blog, `title-slug` is the title in slug form that is used in the URL, `image` is the cover image of the post and `published-at` will be the timestamp the post was published.
 
 ![](img/9-1.webp)
 
@@ -25,17 +27,19 @@ npx ad-generate ontologies
 ```
 
 Now create a folder called `Blogposts` inside your `Data` folder and add some blogposts to it.
-I just made some nonsense articles as dummy content
+I just made some nonsense articles as dummy content.
 
 ![](img/9-2.webp)
 
 ## Blog Cards
 
-Our blog page will have a list of blogposts sorted from newest to oldest. The blogs will be displayed as a card with their title and image.
+Our blog page will have a list of blog posts sorted from newest to oldest.
+The blogs will be displayed as a card with their title and image.
 
 We'll first make the blog card and then create the actual `/blog` route.
 
-Create a component called `BlogCard.astro` inside the `src/components` folder. This component looks and works a lot like the `<Project />` component.
+Create a component called `BlogCard.astro` inside the `src/components` folder.
+This component looks and works a lot like the `<Project />` component.
 
 ```jsx
 ---
@@ -70,7 +74,8 @@ const cover = await store.getResourceAsync<Server.File>(blogpost.props.image);
 
 ```
 
-Most of this code should be self explanatory by now, the only point of interest is the anchor tag where we point to the blogs content page by using `titleSlug`. These links won't work right away because we have yet to make these content pages.
+Most of this code should be self-explanatory by now, the only point of interest is the anchor tag where we point to the blog's content page by using `titleSlug`.
+These links won't work right away because we have yet to make these content pages.
 
 Now to display a list of blogposts we are going to query Atomic Server using collections, so how do these collections work?
 
@@ -82,12 +87,12 @@ The collection will collect all resources in the drive that have the specified p
 > **NOTE:** </br>
 > You can also leave `property` or `value` empty meaning 'give me all resources with this property' or 'give me all resources with a property that has this value'
 
-By setting `property` to `https://atomicdata.dev/properties/isA` (the subject of [is-a](https://atomicdata.dev/properties/isA)) and `value` to the subject of our blogpost class we tell the collection to collect all resources in our drive that are of class: `blogpost`
+By setting `property` to `https://atomicdata.dev/properties/isA` (the subject of [is-a](https://atomicdata.dev/properties/isA)) and `value` to the subject of our blog post class we tell the collection to collect all resources in our drive that are of class: `blogpost`.
 
-Additionally we can also set these properties on a collection to refine our query
+Additionally, we can also set these properties on a collection to refine our query
 
 | Property                                                           | Description                                       | Datatype                                                       | Default |
-|--------------------------------------------------------------------|---------------------------------------------------|----------------------------------------------------------------|---------|
+| ------------------------------------------------------------------ | ------------------------------------------------- | -------------------------------------------------------------- | ------- |
 | [sort-by](https://atomicdata.dev/properties/collection/sortBy)     | Sorts the collected members by the given property | Resource< [Property](https://atomicdata.dev/classes/Property)> | -       |
 | [sort-desc](https://atomicdata.dev/properties/collection/sortDesc) | Sorts the collected members in descending order   | Boolean                                                        | false   |
 | [page-size](https://atomicdata.dev/properties/collection/pageSize) | The maximum number of members per page            | Integer                                                        | 30      |
@@ -103,7 +108,8 @@ const blogCollection = new CollectionBuilder(store)
   .build();
 ```
 
-Iterating over a collection can be done in a couple of ways. If you just want an array of all members you can use:
+Iterating over a collection can be done in a couple of ways.
+If you just want an array of all members you can use:
 
 ```ts
 const members = await collection.getAllMembers(); // string[]
@@ -117,15 +123,17 @@ for await (const member of collection) {
 }
 ```
 
-Finally you can also ask the collection to return the member at a certain index, this is useful on the client when you want to let a child component handle the data fetching by passing the collection it self along with the index.
+Finally, you can also ask the collection to return the member at a certain index, this is useful on the client when you want to let a child component handle the data fetching by passing the collection itself along with the index.
 
 ```ts
 const member = await collection.getMemberWithIndex(10);
 ```
 
-## Creating the blogs content page
+## Creating the blog's content page
 
-Lets add the new blog list page to our website. Inside `src/pages` create a folder called `blog` and in there a file called `index.astro`. This page will live on `https://<your domain>/blog`. This will be a list of all our blogposts.
+Let's add the new blog list page to our website. Inside `src/pages` create a folder called `blog` and in there a file called `index.astro`.
+This page will live on `https://<your domain>/blog`.
+This will be a list of all our blog posts.
 
 ```jsx
 ---
@@ -166,28 +174,40 @@ const posts = await blogCollection.getAllMembers();
 </Layout>
 ```
 
-In this file we create a collection using the CollectionBuilder. We set property to `is-a` and value to `blogpost` to get a list of all blogposts in the drive. We set `sort-by` to `published-at` so the list is sorted by publish date. Then we `sort-desc` to true so the list is sorted from newest to oldest.
+In this file, we create a collection using the CollectionBuilder.
+We set `property` to `is-a` and value to `blogpost` to get a list of all blog posts in the drive.
+We set `sort-by` to `published-at` so the list is sorted by publish date.
+Then we set `sort-desc` to true so the list is sorted from newest to oldest.
 
 We get an array of the post subjects using the `blogCollection.getAllMembers()`.
-Then in the layout we map over this array and render a `<BlogCard />` for each of the subjects.
+Then in the layout, we map over this array and render a `<BlogCard />` for each of the subjects.
 
 Save and navigate to `localhost:4321/blog` and you should see the new blog page.
 
 ![](img/9-3.webp)
 
-Clicking on the links brings you to a 404 page because we haven't actually made the blog content pages yet so lets do that now.
+Clicking on the links brings you to a 404 page because we haven't actually made the blog content pages yet so let's do that now.
 
-Our content pages will live on `https://<your domain>/blog/<title-slug>` so we need to use a route parameter to determine what blog post to show. In Astro this is done with square brackets in the file name.
+Our content pages will live on `https://<your domain>/blog/<title-slug>` so we need to use a route parameter to determine what blog post to show.
+In Astro, this is done with square brackets in the file name.
 
-Create a file in `src/pages/blog` called `[slug].astro`. If you add some markup to the page and try to navigate to it you will get the following error:
+Create a file in `src/pages/blog` called `[slug].astro`.
+If you add some markup to the page and try to navigate to it you will get the following error:
 
 ![](img/9-4.webp)
 
-This is because by default Astro generates all pages at build time (called: Static Site Generation) and since this is a dynamic route it needs to know what pages there will be during the build process. This is fixed by exporting a `getStaticPaths` function that returns a list of all urls the route can have.
+This is because by default Astro generates all pages at build time (called: Static Site Generation) and since this is a dynamic route it needs to know what pages there will be during the build process.
+This is fixed by exporting a `getStaticPaths` function that returns a list of all URLs the route can have.
 
-The other downside of static site generation is that in order to see any changes made in your data the site needs to be rebuild. Most hosting providers like Netlify and Vercel make this very easy so this might not be a big problem for you but if you have a content team that is churning out multiple units of content a day rebuilding each time is not viable solution.
+The other downside of static site generation is that to see any changes made in your data the site needs to be rebuilt.
+Most hosting providers like Netlify and Vercel make this very easy so this might not be a big problem for you but if you have a content team that is churning out multiple units of content a day rebuilding each time is not a viable solution.
 
-Luckily Astro also supports Server side rendering (SSR). This means that it will render the page on the server when a user navigates to it. When SSR is enabled you won't have to tell Astro what pages to build and therefor the `getStaticPaths` function can be skipped. Changes in the data will also reflect on your website without needing to rebuild. This guide will continue to use Static Site Generation however but feel free to enable SSR if you want to, if you did you can skip the next section about `getStaticPaths`. For more info on SSR and how to enable it check out [The Astro Docs](https://docs.astro.build/en/guides/server-side-rendering/).
+Luckily Astro also supports Server side rendering (SSR).
+This means that it will render the page on the server when a user navigates to it.
+When SSR is enabled you won't have to tell Astro what pages to build and therefore the `getStaticPaths` function can be skipped.
+Changes in the data will also reflect on your website without needing to rebuild.
+This guide will continue to use Static Site Generation however but feel free to enable SSR if you want to, if you did you can skip the next section about `getStaticPaths`.
+For more info on SSR and how to enable it check out [The Astro Docs](https://docs.astro.build/en/guides/server-side-rendering/).
 
 ### Generating routes with getStaticPaths()
 
@@ -206,7 +226,7 @@ import { myPortfolio, type Blogpost } from '../../ontologies/myPortfolio';
 
 export const getStaticPaths = (async () => {
   const store = getStore();
-  // Build a collection of all blogposts on the drive
+  // Build a collection of all blog posts on the drive
   const collection = new CollectionBuilder(store)
     .setProperty(core.properties.isA)
     .setValue(myPortfolio.classes.blogpost)
@@ -243,15 +263,17 @@ const { subject } = Astro.props;
 
 ```
 
-Here we define and export a `getStaticPaths` function. In it we create a collection of all blogposts in our drive.
+Here we define and export a `getStaticPaths` function.
+In it, we create a collection of all blog posts in our drive.
 
 We create an empty array that will house all possible params.
 
-We then iterate over the collection, get the blog post from the store and push a new `GetStaticPathsItem` to the paths array. In this item we set the slug param to be the title-slug of the post and also add a `props` object with the subject of the post which we can access inside the component using `Astro.props`.
+We then iterate over the collection, get the blog post from the store and push a new `GetStaticPathsItem` to the paths array.
+In this item, we set the slug param to be the title-slug of the post and also add a `props` object with the subject of the post which we can access inside the component using `Astro.props`.
 
 Then finally we return the paths array.
 
-Now when you click on one of the blogposts on your blog page you should no longer get an error or a 404 page.
+Now when you click on one of the blog posts on your blog page you should no longer get an error or a 404 page.
 
 ![](img/9-5.webp)
 
@@ -277,7 +299,7 @@ if (!subject) {
 }
 ```
 
-The rest of the page is actually not very complex, we use the subject passed down from the getStaticPaths function to fetch the blog post and use marked to parse the markdown content
+The rest of the page is not very complex, we use the subject passed down from the getStaticPaths function to fetch the blog post and use marked to parse the markdown content:
 
 ```jsx
 ---
@@ -406,9 +428,9 @@ const cover = await store.getResourceAsync<Server.File>(resource.props.image);
 </style>
 ```
 
-The components expects a blogpost resource as prop and then fetches the cover image resource.
+The component expects a blog post resource as a prop and then fetches the cover image resource.
 
-We pass the images download-url to the stylesheet using CSS Variables, in Astro this is done using [define\:vars](https://docs.astro.build/en/guides/styling/#css-variables).
+We pass the image's `download-url` to the stylesheet using CSS Variables, in Astro this is done using [define\:vars](https://docs.astro.build/en/guides/styling/#css-variables).
 
 Now update `src/layouts/Layout.astro` to render a `<BlogPostHeader />` when the resource has a blogpost class:
 

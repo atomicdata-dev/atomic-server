@@ -1,8 +1,11 @@
 # Using ResourceArrays to show a list of projects
 
-We are going to edit our portfolio ontology and give the homepage a list projects to display.
+We are going to edit our portfolio ontology and give the homepage a list of projects to display.
 
-Go back to our ontology and add a **recommended** property to the `homepage` class called `projects`. Give it a nice description and set the datatype to `ResourceArray`. This is basically an array of subjects pointing to other resources. Click on the configure button next to datatype and in the classtype field type `project`, an option with the text `Create: project` should appear, click it and the new class will be added to the ontology.
+Go back to our ontology and add a **recommended** property to the `homepage` class called `projects`.
+Give it a nice description and set the datatype to `ResourceArray`.
+This is basically an array of subjects pointing to other resources.
+Click on the configure button next to datatype and in the classtype field type `project`, an option with the text `Create: project` should appear, click it and the new class will be added to the ontology.
 
 <video controls>
   <source src="/videos/8-1.mp4">
@@ -10,9 +13,9 @@ Go back to our ontology and add a **recommended** property to the `homepage` cla
 
 We are going to give `project` 3 required and 2 recommended properties.
 
-For the required add: [name](https://atomicdata.dev/properties/name) and [description](https://atomicdata.dev/properties/description)then create a property called `image` with datatype `RESOURCE` and a classtype of [file](https://atomicdata.dev/classes/File).
+For the required add: [name](https://atomicdata.dev/properties/name) and [description](https://atomicdata.dev/properties/description) then create a property called `image` with datatype `RESOURCE` and a classtype of [file](https://atomicdata.dev/classes/File).
 
-For the recommended properties create one called `demo-url` with datatype `STRING` and one called `repo-url` with the same type. `demo-url` will be used to point to a demo of the project (if there is one), `repo-url` will point to a git repository if there is one.
+For the recommended properties create one called `demo-url` with datatype `STRING` and one called `repo-url` with the same type. `demo-url` will be used to point to a demo of the project (if there is one), and `repo-url` will point to a git repository if there is one.
 
 `project` should now look something like this:
 ![](img/8-2.webp)
@@ -30,7 +33,7 @@ Since we changed the ontology we will have to generate our types again:
 npx ad-generate ontologies
 ```
 
-In your Astro code make a new Component in the `src/components` folder called `Project.astro`
+In your Astro code make a new Component in the `src/components` folder called `Project.astro`.
 
 ```jsx
 ---
@@ -95,14 +98,14 @@ const description = marked.parse(project.props.description);
 
 ```
 
-The component takes a subject as prop that we use to fetch the project resource using the `fetchResourceAsync` method.
+The component takes a subject as a prop that we use to fetch the project resource using the `fetchResourceAsync` method.
 We then fetch the image resource using the same method.
 
 The description is markdown so we have to parse that first like we did on the homepage.
 
 Finally the links. Because demoUrl and repoUrl are recommended properties and may therefore be undefined we use the short circuit `&&` operator here. This makes sure we don't render an empty link.
 
-Lets update the homepage to use this Project component:
+Let's update the homepage to use this Project component:
 
 ```jsx
 ---
@@ -139,7 +142,7 @@ const bodyTextContent = marked.parse(homepage.props.bodyText);
 </style>
 ```
 
-Since a ResourceArray is just an array of subjects we can map through them pass the subject over to the `<Project />` component.
+Since a ResourceArray is just an array of subjects we can map through them and pass the subject over to the `<Project />` component.
 
 Our homepage is now complete and looks like this:
 

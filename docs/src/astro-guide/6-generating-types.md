@@ -2,14 +2,15 @@
 
 It's time to generate some Typescript types and display our data in the Astro frontend.
 
-First things first, installing the `@tomic/lib` and `@tomic/cli` packages.
+First things first, install the `@tomic/lib` and `@tomic/cli` packages.
 
 ```
 npm install @tomic/lib
 npm install -D @tomic/cli
 ```
 
-To generate types based on the ontology we just created the cli needs to know where to get that data from. We can configure this using the `atomic.config.json` file.
+To generate types based on the ontology we just created the CLI needs to know where to get that data from.
+We can configure this using the `atomic.config.json` file.
 
 Run the following command to generate one at the current working directory (Make sure this is the root of the Astro project)
 
@@ -27,7 +28,9 @@ A config file called `atomic.config.json` has been generated, it should look som
 }
 ```
 
-Now lets add the subject of our ontology to the `ontologies` list. To get the subject go to your ontology in the browser and copy the url from the address bar or from the navigation/search bar at the bottom. Paste the url as string in the ontologies array like so:
+Now let's add the subject of our ontology to the `ontologies` list.
+To get the subject, go to your ontology in the browser and copy the URL from the address bar or the navigation/search bar at the bottom.
+Paste the URL as a string in the ontologies array like so:
 
 ```json
 "ontologies": [
@@ -48,4 +51,5 @@ npx ad-generate ontologies
 
 If everything went as planned we should now have an `ontologies` folder inside `src` with two files: our portfolio ontology and an index.ts
 
-Each time you rerun the ad-generate command it fetches the latest version of the ontologies specified in the config file and overwrites what's in `src/ontologies`. You'll have to rerun this command to update the types when you make changes in one of these ontologies.
+Each time you rerun the ad-generate command it fetches the latest version of the ontologies specified in the config file and overwrites what's in `src/ontologies`.
+You'll have to rerun this command to update the types when you make changes in one of these ontologies.
