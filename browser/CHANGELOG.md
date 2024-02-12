@@ -39,6 +39,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 - [#837](https://github.com/atomicdata-dev/atomic-server/issues/837) Fix timestamp is mapped to string instead of number.
 - [#831](https://github.com/atomicdata-dev/atomic-server/issues/831) Give clear error when trying to generate types from a non ontology resource
+- [#830](https://github.com/atomicdata-dev/atomic-server/issues/830) Create output folder if it doesn't exist
 - Use type import in generated files.
 
 ## v0.37.0
