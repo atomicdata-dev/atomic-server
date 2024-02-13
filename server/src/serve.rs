@@ -111,13 +111,6 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
         guard.flush()
     }
 
-    if cfg!(feature = "process-management") {
-        #[cfg(feature = "process-management")]
-        {
-            crate::process::remove_pid(&config)?;
-        }
-    }
-
     tracing::info!("Server stopped");
     Ok(())
 }

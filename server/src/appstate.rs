@@ -39,15 +39,6 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
     }
 
-    // Check if atomic-server is already running somewhere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
-    if cfg!(feature = "process-management") {
-        #[cfg(feature = "process-management")]
-        {
-            let _ = crate::process::terminate_existing_processes(&config)
-                .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
-        }
-    }
-
     tracing::info!("Opening database at {:?}", &config.store_path);
     let should_init = !&config.store_path.exists() || config.initialize;
     let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
