@@ -8,7 +8,7 @@ This is basically an array of subjects pointing to other resources.
 Click on the configure button next to datatype and in the classtype field type `project`, an option with the text `Create: project` should appear, click it and the new class will be added to the ontology.
 
 <video controls>
-  <source src="/videos/8-1.mp4">
+  <source src="videos/8-1.mp4">
 </video>
 
 We are going to give `project` 3 required and 2 recommended properties.
@@ -98,7 +98,7 @@ const description = marked.parse(project.props.description);
 
 ```
 
-The component takes a subject as a prop that we use to fetch the project resource using the `fetchResourceAsync` method.
+The component takes a subject as a prop that we use to fetch the project resource using the `.getResourceAsync()` method.
 We then fetch the image resource using the same method.
 
 The description is markdown so we have to parse that first like we did on the homepage.
@@ -142,7 +142,7 @@ const bodyTextContent = marked.parse(homepage.props.bodyText);
 </style>
 ```
 
-Since a ResourceArray is just an array of subjects we can map through them and pass the subject over to the `<Project />` component.
+Since a ResourceArray is just an array of subjects we can map through them and pass the subject to `<Project />`.
 
 Our homepage is now complete and looks like this:
 

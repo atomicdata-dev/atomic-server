@@ -10,7 +10,6 @@ git-repository-url = "https://github.com/atomicdata-dev/atomic-server"
 edit-url-template = "https://github.com/atomicdata-dev/atomic-server/edit/develop/docs/{path}"
 additional-css = ["atomic.css"]
 additional-js = ["discord.js"]
-fold.enable = true
 
 [output.html.fold]
 enable = true

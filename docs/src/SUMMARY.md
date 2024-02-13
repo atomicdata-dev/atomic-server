@@ -42,10 +42,12 @@
   - [Fetching data](astro-guide/7-fetching-data.md)
   - [Using ResourceArray to display a list of projects](astro-guide/8-pojects.md)
   - [Using Collections to build the blogs page](astro-guide/9-blogs.md)
+  - [Using the search API to build a search bar](astro-guide/10-search.md)
 
 # Specification
 
 - [Atomic Data Core](core/concepts.md)
+
   - [Serialization](core/serialization.md)
   - [JSON-AD](core/json-ad.md)
   - [Querying](core/querying.md)
