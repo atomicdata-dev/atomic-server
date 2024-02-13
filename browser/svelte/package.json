@@ -26,7 +26,6 @@
   "module": "./dist/index.js",
   "main-dev": "src/index.ts",
   "name": "@tomic/svelte",
-  "packageManager": "pnpm@7.13.3",
   "peerDependencies": {
     "@tomic/lib": "workspace:*"
   },

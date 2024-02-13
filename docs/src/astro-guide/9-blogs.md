@@ -129,9 +129,7 @@ Finally, you can also ask the collection to return the member at a certain index
 const member = await collection.getMemberWithIndex(10);
 ```
 
-## Creating the blog's content page
-
-Let's add the new blog list page to our website. Inside `src/pages` create a folder called `blog` and in there a file called `index.astro`.
+Let's add a new blog list page to our website. Inside `src/pages` create a folder called `blog` and in there create a file called `index.astro`.
 This page will live on `https://<your domain>/blog`.
 This will be a list of all our blog posts.
 
@@ -180,13 +178,15 @@ We set `sort-by` to `published-at` so the list is sorted by publish date.
 Then we set `sort-desc` to true so the list is sorted from newest to oldest.
 
 We get an array of the post subjects using the `blogCollection.getAllMembers()`.
-Then in the layout, we map over this array and render a `<BlogCard />` for each of the subjects.
+Then in the markup, we map over this array and render a `<BlogCard />` for each of the subjects.
 
 Save and navigate to `localhost:4321/blog` and you should see the new blog page.
 
 ![](img/9-3.webp)
 
 Clicking on the links brings you to a 404 page because we haven't actually made the blog content pages yet so let's do that now.
+
+## Creating the blog's content page
 
 Our content pages will live on `https://<your domain>/blog/<title-slug>` so we need to use a route parameter to determine what blog post to show.
 In Astro, this is done with square brackets in the file name.
@@ -200,13 +200,13 @@ This is because by default Astro generates all pages at build time (called: Stat
 This is fixed by exporting a `getStaticPaths` function that returns a list of all URLs the route can have.
 
 The other downside of static site generation is that to see any changes made in your data the site needs to be rebuilt.
-Most hosting providers like Netlify and Vercel make this very easy so this might not be a big problem for you but if you have a content team that is churning out multiple units of content a day rebuilding each time is not a viable solution.
+Most hosting providers like Netlify and Vercel make this very easy so this might not be a big problem for you but if you have a content team that is churning out multiple units of content a day, rebuilding each time is not a viable solution.
 
 Luckily Astro also supports Server side rendering (SSR).
 This means that it will render the page on the server when a user navigates to it.
 When SSR is enabled you won't have to tell Astro what pages to build and therefore the `getStaticPaths` function can be skipped.
 Changes in the data will also reflect on your website without needing to rebuild.
-This guide will continue to use Static Site Generation however but feel free to enable SSR if you want to, if you did you can skip the next section about `getStaticPaths`.
+This guide will continue to use Static Site Generation however but feel free to enable SSR if you want to, if you do you can skip the next section about `getStaticPaths`.
 For more info on SSR and how to enable it check out [The Astro Docs](https://docs.astro.build/en/guides/server-side-rendering/).
 
 ### Generating routes with getStaticPaths()
@@ -266,7 +266,7 @@ const { subject } = Astro.props;
 Here we define and export a `getStaticPaths` function.
 In it, we create a collection of all blog posts in our drive.
 
-We create an empty array that will house all possible params.
+We create the empty array: `paths` that will house all possible params.
 
 We then iterate over the collection, get the blog post from the store and push a new `GetStaticPathsItem` to the paths array.
 In this item, we set the slug param to be the title-slug of the post and also add a `props` object with the subject of the post which we can access inside the component using `Astro.props`.
@@ -279,7 +279,9 @@ Now when you click on one of the blog posts on your blog page you should no long
 
 ### Building the rest of the page
 
-If you opted to use SSR and skipped the `getStaticPaths` function replace `const {subject} = Astro.props` with:
+<div style="background-color: #86caf836; padding: 1rem; border: 1px solid #86caf8;">
+<strong>NOTE:</strong></br>
+If you opted to use SSR and skipped the <code>getStaticPaths</code> function replace <code>const {subject} = Astro.props</code> with:
 
 ```ts
 const { slug } = Astro.params;
@@ -298,6 +300,8 @@ if (!subject) {
   Astro.redirect('/404');
 }
 ```
+
+</div>
 
 The rest of the page is not very complex, we use the subject passed down from the getStaticPaths function to fetch the blog post and use marked to parse the markdown content:
 
@@ -389,7 +393,7 @@ The blog post page should now look something like this:
 
 The only thing left is a Header with the image and title of the blog post.
 
-Create a new component in the components folder called `BlogPostHeader.astro`
+Create a new component in the `src/components` folder called `BlogPostHeader.astro`
 
 ```jsx
 ---
@@ -495,3 +499,6 @@ const { resource } = Astro.props;
 That should be it. Our blog post now has a beautiful header.
 
 ![](img/9-7.webp)
+
+Our site is almost complete but it's missing that one killer feature that shows you're not a developer to be messed with.
+A real-time search bar 😎.

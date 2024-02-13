@@ -61,7 +61,7 @@
       "cli"
     ]
   },
-  "packageManager": "pnpm@8.6.12",
+  "packageManager": "pnpm@8.15.2",
   "dependencies": {
     "eslint-plugin-import": "^2.26.0"
   }

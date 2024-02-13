@@ -54,7 +54,7 @@ Now that we have a store we can start fetching data.
 ## Fetching
 
 To fetch data we are going to use the `store.getResourceAsync()` method.
-This is an async method on Store that takes a subject and returns a promise that resolves to the fetches resource.
+This is an async method on Store that takes a subject and returns a promise that resolves to a resource.
 When `getResourceAsync` is called again with the same subject the store will return the cached version of the resource instead so don't worry about fetching the same resource again in multiple components.
 
 `getResourceAsync` also accepts a type parameter, this type parameter is the subject of the resource's class.
