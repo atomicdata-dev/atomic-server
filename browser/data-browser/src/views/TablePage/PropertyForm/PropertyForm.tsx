@@ -80,7 +80,6 @@ export function PropertyForm({
   category,
 }: PropertyFormProps): JSX.Element {
   const [nameError, setNameError, onNameBlur] = useValidation('Required');
-
   const valueOptions = useMemo(
     () => ({
       handleValidationError(e: Error | undefined) {

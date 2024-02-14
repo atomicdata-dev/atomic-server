@@ -188,8 +188,8 @@ type useValueOptions = {
  * // Simple usage:
  * const resource = useResource('https://atomicdata.dev/classes/Agent');
  * const [shortname, setShortname] = useValue(
- *   'https://atomicdata.dev/properties/shortname',
  *   resource,
+ *   'https://atomicdata.dev/properties/shortname',
  * );
  * ```
  *
@@ -198,8 +198,8 @@ type useValueOptions = {
  * const resource = useResource('https://atomicdata.dev/classes/Agent');
  * const [error, setError] = useState(null);
  * const [shortname, setShortname] = useValue(
- *   'https://atomicdata.dev/properties/shortname',
  *   resource,
+ *   'https://atomicdata.dev/properties/shortname',
  *   {
  *     commit: true,
  *     validate: true,
@@ -220,10 +220,12 @@ export function useValue(
     commitDebounce = 100,
     handleValidationError,
   } = opts;
-  const [val, set] = useState<JSONValue>(undefined);
+  const [val, set] = useState<JSONValue>(resource.get(propertyURL));
+  const [prevResourceReference, setPrevResourceReference] = useState(resource);
+
   const store = useStore();
 
-  const [saveResource, isWaitingForDebounce] = useDebouncedCallback(
+  const [saveResource] = useDebouncedCallback(
     () => {
       if (!commit) {
         return;
@@ -269,22 +271,18 @@ export function useValue(
     [resource, handleValidationError, store, validate, saveResource],
   );
 
-  // If the hook is waiting to commit the changes return the current local value so the component using this hook shows the most recent value.
-  if (isWaitingForDebounce) {
-    return [val, validateAndSet];
+  // Update value when resource changes.
+  if (resource !== prevResourceReference) {
+    try {
+      set(resource.get(propertyURL));
+    } catch (e) {
+      store.notifyError(e);
+    }
+
+    setPrevResourceReference(resource);
   }
 
-  // Value hasn't been set in state yet, so get the value
-  let value: JSONValue = undefined;
-
-  // Try to actually get the value, log any error
-  try {
-    value = resource.get(propertyURL);
-  } catch (e) {
-    store.notifyError(e);
-  }
-
-  return [value, validateAndSet];
+  return [val, validateAndSet];
 }
 
 /**
