@@ -67,10 +67,8 @@ cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
-  RUN cross --version
-  WITH DOCKER
-    RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE  cross build --target $TARGET --release
-  END
+  DO rust+CROSS --target ${TARGET}
+  # DO rust+COPY_OUTPUT --output="release/[^\./]+"
   DO rust+COPY_OUTPUT --output=".*" # Copies all files to ./target
   RUN ./target/$TARGET/release/atomic-server --version
   SAVE ARTIFACT ./target/$TARGET/release/atomic-server AS LOCAL artifact/bin/atomic-server-$TARGET
@@ -89,6 +87,7 @@ docker-musl:
   EXPOSE 80
   VOLUME /atomic-storage
   ENTRYPOINT ["/atomic-server-bin"]
+  RUN echo "Pushing tags: ${tags}"
   SAVE IMAGE --push ${tags}
 
 setup-playwright:

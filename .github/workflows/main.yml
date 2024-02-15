@@ -26,12 +26,12 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Earthly build, test
         run: earthly --org ontola --ci --sat henk -P +pipeline
-      - name: Convert newline-separated list to space-separated
-        id: format_tags
-        run: |
-          SPACE_SEPARATED_TAGS=$(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ' ')
-          echo "steps.meta.output.tags=${{ steps.meta.outputs.tags }}"
-          echo "SPACE_SEPARATED_TAGS=$SPACE_SEPARATED_TAGS" >> $GITHUB_ENV
-          echo "Space-separated tags: "
+      # - name: Convert newline-separated list to space-separated
+      #   id: format_tags
+      #   run: |
+      #     SPACE_SEPARATED_TAGS=$(echo "${{ steps.meta.outputs.tags }}" | tr '\n' ' ')
+      #     echo "steps.meta.output.tags=${{ steps.meta.outputs.tags }}"
+      #     echo "SPACE_SEPARATED_TAGS=$SPACE_SEPARATED_TAGS" >> $GITHUB_ENV
+      #     echo "Space-separated tags: $SPACE_SEPARATED_TAGS"
       - name: Earthly build and push docker
-        run: earthly --org ontola --ci --sat henk -P --push +docker-all --tags="$SPACE_SEPARATED_TAGS"
+        run: earthly --org ontola --ci --sat henk -P --push +docker-all --tags="${{ steps.meta.outputs.tags }}"
