@@ -8,6 +8,8 @@ import InputMarkdown from './InputMarkdown';
 import InputNumber from './InputNumber';
 import InputBoolean from './InputBoolean';
 import InputSlug from './InputSlug';
+import { InputTimestamp } from './InputTimestamp';
+import { InputDate } from './InputDate';
 
 /** Renders a fitting HTML input depending on the Datatype */
 export default function InputSwitcher(props: InputProps): JSX.Element {
@@ -44,9 +46,12 @@ export default function InputSwitcher(props: InputProps): JSX.Element {
       return <InputBoolean {...props} />;
     }
 
-    // TODO: DateTime selector
     case Datatype.TIMESTAMP: {
-      return <InputNumber {...props} />;
+      return <InputTimestamp {...props} />;
+    }
+
+    case Datatype.DATE: {
+      return <InputDate {...props} />;
     }
 
     default: {

@@ -5,40 +5,17 @@ import {
   useResource,
   useString,
 } from '@tomic/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDate } from '../../../helpers/dates/formatDate';
 import { InputBase } from './InputBase';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
-
-const pad = (value: number): string => `${value}`.padStart(2, '0');
-
-const buildDateTimeLocalString = (date: Date): string => {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  const hours = date.getHours();
-  const minutes = date.getMinutes();
-
-  return `${year}-${pad(month)}-${pad(day)}T${pad(hours)}:${pad(minutes)}`;
-};
+import { useDateTimeInput } from '../../../components/forms/hooks/useDateTimeInput';
 
 function DateTimeCellEdit({
   value,
   onChange,
 }: EditCellProps<JSONValue>): JSX.Element {
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const date = new Date(e.target.value);
-      onChange(date.getTime());
-    },
-    [onChange],
-  );
-
-  let localDate: string | undefined = undefined;
-
-  if (isNumber(value)) {
-    localDate = buildDateTimeLocalString(new Date(value));
-  }
+  const [localDate, handleChange] = useDateTimeInput(value as number, onChange);
 
   return (
     <InputBase
