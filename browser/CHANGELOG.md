@@ -2,6 +2,12 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
+## Unreleased
+
+### Atomic Browser
+
+- [#841](https://github.com/atomicdata-dev/atomic-server/issues/841) Add better inputs for `Timestamp` and `Date` datatypes.
+
 ## v0.37.0
 
 ### Atomic Browser
