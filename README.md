@@ -8,7 +8,7 @@
 **Create, share, fetch and model [Atomic Data](https://docs.atomicdata.dev)!
 AtomicServer is a lightweight, yet powerful CMS / Graph Database.
 Demo on [atomicdata.dev](https://atomicdata.dev).
-Docs on [docs.atomicdata.dev](http://docs.atomicdata.dev/atomicserver/intro.html)**
+Docs on [docs.atomicdata.dev](https://docs.atomicdata.dev/atomic-data-overview)**
 
 This repo also includes:
 
