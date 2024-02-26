@@ -78,7 +78,7 @@ export const ResourceSelector = memo(function ResourceSelector({
         disabled={disabled}
         onCreateItem={handleCreateItem}
       >
-        {handleRemove && (
+        {handleRemove && !disabled && (
           <SearchBoxButton onClick={handleRemove} title='Remove' type='button'>
             <FaTrash />
           </SearchBoxButton>

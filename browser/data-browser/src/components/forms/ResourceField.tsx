@@ -5,8 +5,9 @@ import Markdown from '../datatypes/Markdown';
 import { InputWrapper, InputStyled } from './InputStyles';
 import InputSwitcher from './InputSwitcher';
 import { AtomicLink } from '../AtomicLink';
-import { useId, useState } from 'react';
-import { Button } from '../Button';
+import { useId } from 'react';
+import { Row } from '../Row';
+import { FaServer } from 'react-icons/fa6';
 
 function generateErrorPropName(prop: Property): string {
   if (prop.error) {
@@ -28,7 +29,6 @@ function ResourceField({
 }: IFieldProps): JSX.Element {
   const id = useId();
   const property = useProperty(propertyURL);
-  const [collapsedDynamic, setCollapsedDynamic] = useState(true);
 
   if (property === null) {
     return (
@@ -49,19 +49,29 @@ function ResourceField({
       ? generateErrorPropName(property)
       : property.shortname;
 
-  if (property.isDynamic && collapsedDynamic) {
+  if (property.isDynamic) {
     return (
       <Field
         helper={
           <HelperText text={property.description} link={property.subject} />
         }
         label={label}
-        disabled={disabled}
+        disabled
+        fieldId={id}
       >
-        {'This field is calculated server-side, edits will not be saved. '}
-        <Button subtle onClick={() => setCollapsedDynamic(false)}>
-          edit anyway
-        </Button>
+        <InputSwitcher
+          id={id}
+          key={propertyURL + ' input-switcher'}
+          data-test={`input-${property.shortname}`}
+          resource={resource}
+          property={property}
+          autoFocus={autoFocus}
+          disabled
+        />
+        <Extra center gap='1ch'>
+          <FaServer />
+          This field is calculated server-side.
+        </Extra>
       </Field>
     );
   }
@@ -99,6 +109,11 @@ interface HelperTextProps {
 const HelperTextWraper = styled.div`
   position: relative;
   margin-bottom: 0rem;
+`;
+
+const Extra = styled(Row)`
+  color: ${props => props.theme.colors.textLight};
+  margin-top: 0.5rem;
 `;
 
 function HelperText({ text, link }: HelperTextProps) {

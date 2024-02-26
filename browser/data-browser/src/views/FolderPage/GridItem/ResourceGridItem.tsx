@@ -18,11 +18,11 @@ import { GridItemViewProps } from './GridItemViewProps';
 import { FaFolder } from 'react-icons/fa';
 import { ChatRoomGridItem } from './ChatRoomGridItem';
 import { DocumentGridItem } from './DocumentGridItem';
-import { FileGridItem } from './FileGridItem';
 import { ErrorBoundary } from '../../ErrorPage';
 import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransition';
 import { LoaderBlock } from '../../../components/Loader';
 import { ArticleGridItem } from './ArticleGridItem';
+import { FilePreviewThumbnail } from '../../File/FilePreviewThumbnail';
 
 export interface ResourceGridItemProps {
   subject: string;
@@ -34,7 +34,7 @@ const gridItemMap = new Map<string, React.FC<GridItemViewProps>>([
   [core.classes.property, BasicGridItem],
   [dataBrowser.classes.chatroom, ChatRoomGridItem],
   [dataBrowser.classes.document, DocumentGridItem],
-  [server.classes.file, FileGridItem],
+  [server.classes.file, FilePreviewThumbnail],
   [dataBrowser.classes.article, ArticleGridItem],
 ]);
 

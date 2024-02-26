@@ -6,7 +6,7 @@ import { styled } from 'styled-components';
 import { TextPreview } from './TextPreview';
 import { displayFileSize } from './displayFileSize';
 import { Button } from '../../components/Button';
-import { isTextFile } from './isTextFile';
+import { isTextFile } from './fileTypeUtils';
 import { useFilePreviewSizeLimit } from '../../hooks/useFilePreviewSizeLimit';
 
 const PDFViewer = lazy(() => import('../../chunks/PDFViewer'));

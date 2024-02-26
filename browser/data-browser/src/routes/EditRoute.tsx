@@ -48,6 +48,7 @@ export function Edit(): JSX.Element {
                 <IconButton
                   title={`Back to ${resource.title}`}
                   size='1.4em'
+                  edgeAlign='start'
                   onClick={handleBackClick}
                 >
                   <FaArrowLeft />

@@ -1,4 +1,4 @@
-import { Datatype } from '@tomic/react';
+import { Datatype, server } from '@tomic/react';
 
 import { InputProps } from './ResourceField';
 import InputString from './InputString';
@@ -10,6 +10,7 @@ import InputBoolean from './InputBoolean';
 import InputSlug from './InputSlug';
 import { InputTimestamp } from './InputTimestamp';
 import { InputDate } from './InputDate';
+import { FilePicker } from './FilePicker/FilePicker';
 
 /** Renders a fitting HTML input depending on the Datatype */
 export default function InputSwitcher(props: InputProps): JSX.Element {
@@ -35,6 +36,10 @@ export default function InputSwitcher(props: InputProps): JSX.Element {
     }
 
     case Datatype.ATOMIC_URL: {
+      if (props.property.classType === server.classes.file) {
+        return <FilePicker {...props} />;
+      }
+
       return <InputResource {...props} />;
     }
 

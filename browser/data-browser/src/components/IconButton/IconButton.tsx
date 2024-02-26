@@ -24,6 +24,7 @@ type BaseProps = {
   color?: ColorProp;
   size?: string;
   title: string;
+  edgeAlign?: 'start' | 'end';
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   as?: string | ComponentType<any>;
 };
@@ -78,6 +79,7 @@ IconButtonLink.defaultProps = defaultProps as IconButtonLinkProps;
 
 interface ButtonBaseProps {
   size?: string;
+  edgeAlign?: 'start' | 'end';
 }
 
 const IconButtonBase = styled.button<ButtonBaseProps>`
@@ -94,6 +96,11 @@ const IconButtonBase = styled.button<ButtonBaseProps>`
   width: calc(${p => p.size} + var(--button-padding) * 2);
   height: calc(${p => p.size} + var(--button-padding) * 2);
 
+  margin-inline-start: ${p =>
+    p.edgeAlign === 'start' ? 'calc(var(--button-padding) * -1)' : '0'};
+
+  margin-inline-end: ${p =>
+    p.edgeAlign === 'end' ? 'calc(var(--button-padding) * -1)' : '0'};
   &[disabled] {
     opacity: 0.5;
     cursor: not-allowed;
