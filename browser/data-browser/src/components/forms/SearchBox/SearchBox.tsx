@@ -177,13 +177,15 @@ export function SearchBox({
               >
                 <FaExternalLinkAlt />
               </SearchBoxButton>
-              <SearchBoxButton
-                title='clear'
-                onClick={() => onChange(undefined)}
-                type='button'
-              >
-                <FaTimes />
-              </SearchBoxButton>
+              {!disabled && (
+                <SearchBoxButton
+                  title='clear'
+                  onClick={() => onChange(undefined)}
+                  type='button'
+                >
+                  <FaTimes />
+                </SearchBoxButton>
+              )}
             </>
           )}
           {children}

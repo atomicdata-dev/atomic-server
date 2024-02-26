@@ -98,32 +98,32 @@ export default function InputResourceArray({
           ))}
         </div>
       )}
-      <Row justify='space-between'>
-        <StyledButton
-          disabled={props.disabled}
-          title={`Add an item to the ${property.shortname} list`}
-          data-test={`input-${property.shortname}-add-resource`}
-          subtle
-          type='button'
-          onClick={handleAddRow}
-        >
-          <FaPlus />
-        </StyledButton>
-        {array.length > 1 && (
+      {!props.disabled && (
+        <Row justify='space-between'>
           <StyledButton
-            disabled={props.disabled}
-            title='Remove all items from this list'
-            data-test={`input-${property.shortname}-clear`}
+            title={`Add an item to the ${property.shortname} list`}
+            data-testid={`input-${property.shortname}-add-resource`}
             subtle
             type='button'
-            onClick={handleClear}
+            onClick={handleAddRow}
           >
-            <Row gap='.5rem'>
-              <FaTrash /> Clear
-            </Row>
+            <FaPlus />
           </StyledButton>
-        )}
-      </Row>
+          {array.length > 1 && (
+            <StyledButton
+              title='Remove all items from this list'
+              data-testid={`input-${property.shortname}-clear`}
+              subtle
+              type='button'
+              onClick={handleClear}
+            >
+              <Row gap='.5rem'>
+                <FaTrash /> Clear
+              </Row>
+            </StyledButton>
+          )}
+        </Row>
+      )}
       {!!err && <ErrMessage>{err?.message}</ErrMessage>}
     </Column>
   );

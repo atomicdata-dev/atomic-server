@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaTimes } from 'react-icons/fa';
 import { styled, keyframes } from 'styled-components';
+import * as CSS from 'csstype';
 import { effectTimeout } from '../../helpers/effectTimeout';
 import { Button } from '../Button';
 import { DropdownContainer } from '../Dropdown/DropdownContainer';
@@ -26,15 +27,16 @@ export interface InternalDialogProps {
   show: boolean;
   onClose: (success: boolean) => void;
   onClosed: () => void;
+  width?: CSS.Property.Width;
 }
-
-export type WrappedDialogType = React.FC<React.PropsWithChildren<unknown>>;
 
 export enum DialogSlot {
   Title = 'title',
   Content = 'content',
   Actions = 'actions',
 }
+
+export const DIALOG_MEDIA_BREAK_POINT = '640px';
 
 const ANIM_MS = 80;
 const ANIM_SPEED = `${ANIM_MS}ms`;
@@ -84,6 +86,7 @@ export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
 const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   children,
   show,
+  width,
   onClose,
   onClosed,
 }) => {
@@ -150,7 +153,11 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   }, [show, onClosed]);
 
   return (
-    <StyledDialog ref={dialogRef} onMouseDown={handleOutSideClick}>
+    <StyledDialog
+      ref={dialogRef}
+      onMouseDown={handleOutSideClick}
+      $width={width}
+    >
       <StyledInnerDialog ref={innerDialogRef}>
         <PopoverContainer>
           <DropdownContainer>
@@ -252,7 +259,7 @@ const fadeInBackground = keyframes`
   }
 `;
 
-const StyledDialog = styled.dialog`
+const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
   --animation-speed: 500ms;
   box-sizing: border-box;
   inset: 0px;
@@ -263,8 +270,8 @@ const StyledDialog = styled.dialog`
   background-color: ${props => props.theme.colors.bg};
   border-radius: ${props => props.theme.radius};
   border: solid 1px ${props => props.theme.colors.bg2};
-  max-inline-size: min(90vw, 100ch);
-  min-inline-size: min(90vw, 60ch);
+  max-inline-size: min(90vw, ${p => p.$width ?? '100ch'});
+  min-inline-size: min(90vw, ${p => p.$width ?? '60ch'});
   max-block-size: 100vh;
   height: fit-content;
   max-height: 90vh;
@@ -310,7 +317,7 @@ const StyledDialog = styled.dialog`
     backdrop-filter: blur(0px);
   }
 
-  @media (max-width: ${props => props.theme.containerWidth}rem) {
+  @media (max-width: ${DIALOG_MEDIA_BREAK_POINT}) {
     max-inline-size: 100%;
     max-block-size: 100vh;
   }

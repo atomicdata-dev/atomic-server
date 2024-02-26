@@ -2,6 +2,8 @@ import { styled } from 'styled-components';
 
 import { FaGithub, FaDiscord, FaBook } from 'react-icons/fa';
 import { IconButtonLink, IconButtonVariant } from '../IconButton/IconButton';
+import { FaRadiation } from 'react-icons/fa6';
+import { isDev } from '../../config';
 
 interface AboutItem {
   icon: React.ReactNode;
@@ -30,9 +32,6 @@ const aboutMenuItems: AboutItem[] = [
 export function About() {
   return (
     <>
-      {/* <SideBarHeader>
-        <Logo style={{ height: '1.1rem', maxWidth: '100%' }} />
-      </SideBarHeader> */}
       <AboutWrapper>
         {aboutMenuItems.map(({ href, icon, helper }) => (
           <IconButtonLink
@@ -48,6 +47,17 @@ export function About() {
             {icon}
           </IconButtonLink>
         ))}
+        {isDev() && (
+          <IconButtonLink
+            href='/sandbox'
+            title='Sandbox, test components in isolation'
+            size='1.2em'
+            color='textLight'
+            variant={IconButtonVariant.Square}
+          >
+            <FaRadiation />
+          </IconButtonLink>
+        )}
       </AboutWrapper>
     </>
   );

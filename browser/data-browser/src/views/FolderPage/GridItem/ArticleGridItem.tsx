@@ -2,7 +2,7 @@ import { Server, useResource, useSubject } from '@tomic/react';
 
 import { atomicArgu } from '../../../ontologies/atomic-argu';
 import { GridItemViewProps } from './GridItemViewProps';
-import { GridItemWithImage } from './GridItemWithImage';
+import { Thumbnail } from '../../../components/Thumbnail';
 
 export function ArticleGridItem({ resource }: GridItemViewProps): JSX.Element {
   const [coverImgSubject] = useSubject(
@@ -12,5 +12,5 @@ export function ArticleGridItem({ resource }: GridItemViewProps): JSX.Element {
 
   const coverImg = useResource<Server.File>(coverImgSubject);
 
-  return <GridItemWithImage src={coverImg.props.downloadUrl} />;
+  return <Thumbnail src={coverImg.props.downloadUrl} />;
 }

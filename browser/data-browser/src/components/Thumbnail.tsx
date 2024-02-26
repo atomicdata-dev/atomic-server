@@ -1,15 +1,12 @@
 import { styled } from 'styled-components';
-import { InnerWrapper } from './components';
+import { InnerWrapper } from '../views/FolderPage/GridItem/components';
 
-interface GridItemWithImageProps {
+interface ThumbnailProps {
   src: string | undefined;
   style?: React.CSSProperties | undefined;
 }
 
-export function GridItemWithImage({
-  src,
-  style,
-}: GridItemWithImageProps): JSX.Element {
+export function Thumbnail({ src, style }: ThumbnailProps): JSX.Element {
   if (src === undefined) {
     return <TextWrapper>No preview available</TextWrapper>;
   }

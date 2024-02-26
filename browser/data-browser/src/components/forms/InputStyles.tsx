@@ -22,6 +22,7 @@ export const LabelHelper = styled.label`
 
 export interface InputWrapperProps {
   $invalid?: boolean;
+  hasPrefix?: boolean;
 }
 
 /** A wrapper for inputs, for example when you want to add a button to some field */
@@ -33,6 +34,12 @@ export const InputWrapper = styled.div<InputWrapperProps>`
   border: solid 1px var(--border-color);
   border-radius: ${props => props.theme.radius};
   overflow: hidden;
+  align-items: center;
+  padding-inline-start: ${p =>
+    p.hasPrefix ? `${p.theme.margin / 2}rem` : '0'};
+  & svg {
+    color: ${p => p.theme.colors.textLight};
+  }
 
   &:hover:has(input:not(:disabled)) {
     border-color: ${props => props.theme.colors.main};

@@ -7,6 +7,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 ### Atomic Browser
 
 - [#841](https://github.com/atomicdata-dev/atomic-server/issues/841) Add better inputs for `Timestamp` and `Date` datatypes.
+- [#842](https://github.com/atomicdata-dev/atomic-server/issues/842) Add media picker for properties with classtype file.
 
 ## v0.37.0
 
