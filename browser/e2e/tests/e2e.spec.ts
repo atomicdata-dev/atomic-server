@@ -343,7 +343,7 @@ test.describe('data-browser', async () => {
     // Cleanup drives for signed in user
     await openAgentPage(page);
     await page.click('text=Edit profile');
-    await page.click('[data-test="input-drives-clear"]');
+    await page.getByTestId('input-drives-clear').click();
     await page.click('[data-test="save"]');
   });
 
