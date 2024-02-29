@@ -17,6 +17,7 @@ import {
 import { transition } from '../../helpers/transition';
 import { FaGripVertical, FaPlus, FaTrash } from 'react-icons/fa6';
 import { createPortal } from 'react-dom';
+import { transparentize } from 'polished';
 
 interface InputResourceArrayProps extends InputProps {
   isA?: string;
@@ -205,6 +206,7 @@ const DraggableResourceSelector = ({
 }: DraggableResourceSelectorProps) => {
   const { attributes, listeners, setNodeRef, active } = useDraggable({
     id: subject,
+    disabled: props.disabled,
   });
 
   if (subject === undefined) {
@@ -216,14 +218,17 @@ const DraggableResourceSelector = ({
       <ResourceSelector
         {...props}
         prefix={
-          <DragHandle
-            {...listeners}
-            {...attributes}
-            type='button'
-            title='Move item'
-          >
-            <FaGripVertical />
-          </DragHandle>
+          !props.disabled ? (
+            <DragHandle
+              {...listeners}
+              {...attributes}
+              disabled={props.disabled}
+              type='button'
+              title='Move item'
+            >
+              <FaGripVertical />
+            </DragHandle>
+          ) : null
         }
       />
     </DragWrapper>
@@ -246,8 +251,8 @@ const DummySelector = (props: ResourceSelectorProps) => {
 };
 
 const StyledDragOverlay = styled(DragOverlay)`
-  opacity: 0.8;
-  cursor: grabbing;
+  --search-box-bg: ${p => transparentize(0.5, p.theme.colors.bg)};
+  backdrop-filter: blur(3px);
 `;
 
 const RelativeContainer = styled.div`
@@ -258,7 +263,6 @@ const DragHandle = styled.button`
   display: flex;
   align-items: center;
   cursor: grab;
-  border-radius: ${p => p.theme.radius};
   appearance: none;
   background: transparent;
   border: none;
@@ -273,6 +277,7 @@ const DragHandle = styled.button`
     color: ${p => p.theme.colors.textLight2};
   }
 `;
+
 const DragWrapper = styled(Row)<{ active: boolean }>`
   position: relative;
   opacity: ${p => (p.active ? 0.4 : 1)};

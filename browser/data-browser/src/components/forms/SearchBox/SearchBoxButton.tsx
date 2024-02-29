@@ -1,7 +1,7 @@
 import { styled } from 'styled-components';
 
 export const SearchBoxButton = styled.button<{ ephimeral?: boolean }>`
-  background-color: ${p => p.theme.colors.bg};
+  background-color: transparent;
   border: none;
   border-left: ${p =>
     p.ephimeral ? 'none' : '1px solid ' + p.theme.colors.bg2};
@@ -16,11 +16,6 @@ export const SearchBoxButton = styled.button<{ ephimeral?: boolean }>`
     color: var(--search-box-hightlight);
     background-color: ${p => p.theme.colors.bg1};
     border-color: var(--search-box-hightlight);
-  }
-
-  &:last-of-type {
-    border-top-right-radius: ${p => p.theme.radius};
-    border-bottom-right-radius: ${p => p.theme.radius};
   }
 
   visibility: ${p => (p.ephimeral ? 'hidden' : 'visible')};

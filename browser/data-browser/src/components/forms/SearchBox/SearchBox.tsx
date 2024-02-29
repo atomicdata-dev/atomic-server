@@ -227,7 +227,7 @@ const TriggerButton = styled.button<{ $empty: boolean }>`
   align-items: center;
   padding: 0.5rem;
   border-radius: ${props => props.theme.radius};
-  background-color: ${props => props.theme.colors.bg};
+  background: transparent;
   border: none;
   text-align: start;
   height: 2rem;
@@ -236,10 +236,6 @@ const TriggerButton = styled.button<{ $empty: boolean }>`
   overflow: hidden;
   cursor: text;
   color: ${p => (p.$empty ? p.theme.colors.textLight : p.theme.colors.text)};
-
-  &:disabled {
-    background-color: ${props => props.theme.colors.bg1};
-  }
 `;
 
 const TriggerButtonWrapper = styled.div<{
@@ -250,15 +246,21 @@ const TriggerButtonWrapper = styled.div<{
     p.invalid ? p.theme.colors.alert : p.theme.colors.main};
   display: flex;
   position: relative;
-  padding: 1px;
+  overflow: hidden;
   border: 1px solid ${props => props.theme.colors.bg2};
   border-radius: ${props => props.theme.radius};
-  background-color: ${props => props.theme.colors.bg};
+  background-color: var(--search-box-bg, ${props => props.theme.colors.bg});
+  &:has(:disabled) {
+    background-color: ${props => props.theme.colors.bg1};
+  }
+
+  &:has(${TriggerButton}:hover(), ${TriggerButton}:focus-visible) {
+  }
   &:hover,
-  &:focus-within {
-    border-color: ${p =>
-      p.disabled ? 'none' : 'var(--search-box-hightlight)'};
-    box-shadow: 0 0 0 1px inset var(--search-box-hightlight);
+  &:focus-visible {
+    border-color: transparent;
+    box-shadow: 0 0 0 2px var(--search-box-hightlight);
+    z-index: 1000;
   }
 `;
 
