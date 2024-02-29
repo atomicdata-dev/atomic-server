@@ -16,6 +16,7 @@ import { ErrorChip } from '../ErrorChip';
 import { useValidation } from '../formValidation/useValidation';
 import { constructOpenURL } from '../../../helpers/navigation';
 import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransition';
+import { SearchBoxButton } from './SearchBoxButton';
 
 interface SearchBoxProps {
   autoFocus?: boolean;
@@ -26,6 +27,8 @@ interface SearchBoxProps {
   disabled?: boolean;
   required?: boolean;
   className?: string;
+  prefix?: React.ReactNode;
+  hideClearButton?: boolean;
   onChange: (value: string | undefined) => void;
   onCreateItem?: (name: string) => void;
   onClose?: () => void;
@@ -41,6 +44,8 @@ export function SearchBox({
   required,
   className,
   children,
+  prefix,
+  hideClearButton,
   onChange,
   onCreateItem,
   onClose,
@@ -144,6 +149,7 @@ export function SearchBox({
           className={className}
           invalid={!!error}
         >
+          {prefix}
           <TriggerButton
             type='button'
             autoFocus={autoFocus}
@@ -168,6 +174,16 @@ export function SearchBox({
           </TriggerButton>
           {value && (
             <>
+              {!disabled && !hideClearButton && (
+                <SearchBoxButton
+                  ephimeral
+                  title='clear'
+                  onClick={() => onChange(undefined)}
+                  type='button'
+                >
+                  <FaTimes />
+                </SearchBoxButton>
+              )}
               <SearchBoxButton
                 as='a'
                 href={openLink}
@@ -177,15 +193,6 @@ export function SearchBox({
               >
                 <FaExternalLinkAlt />
               </SearchBoxButton>
-              {!disabled && (
-                <SearchBoxButton
-                  title='clear'
-                  onClick={() => onChange(undefined)}
-                  type='button'
-                >
-                  <FaTimes />
-                </SearchBoxButton>
-              )}
             </>
           )}
           {children}
@@ -243,12 +250,15 @@ const TriggerButtonWrapper = styled.div<{
     p.invalid ? p.theme.colors.alert : p.theme.colors.main};
   display: flex;
   position: relative;
+  padding: 1px;
   border: 1px solid ${props => props.theme.colors.bg2};
   border-radius: ${props => props.theme.radius};
+  background-color: ${props => props.theme.colors.bg};
   &:hover,
   &:focus-within {
     border-color: ${p =>
       p.disabled ? 'none' : 'var(--search-box-hightlight)'};
+    box-shadow: 0 0 0 1px inset var(--search-box-hightlight);
   }
 `;
 
@@ -261,29 +271,6 @@ const ResourceTitle = styled.span`
 
 const PlaceholderText = styled.span`
   color: ${p => p.theme.colors.textLight};
-`;
-
-export const SearchBoxButton = styled.button`
-  background-color: ${p => p.theme.colors.bg};
-  border: none;
-  border-left: 1px solid ${p => p.theme.colors.bg2};
-  display: flex;
-  align-items: center;
-  padding: 0.5rem;
-  color: ${p => p.theme.colors.textLight};
-  cursor: pointer;
-
-  &:hover,
-  &:focus-visible {
-    color: var(--search-box-hightlight);
-    background-color: ${p => p.theme.colors.bg1};
-    border-color: var(--search-box-hightlight);
-  }
-
-  &:last-of-type {
-    border-top-right-radius: ${p => p.theme.radius};
-    border-bottom-right-radius: ${p => p.theme.radius};
-  }
 `;
 
 const PositionedErrorChip = styled(ErrorChip)`
