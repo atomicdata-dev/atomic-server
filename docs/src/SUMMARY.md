@@ -16,12 +16,13 @@
   * [API](atomicserver/API.md)
   * [Creating a JSON-AD file](create-json-ad.md)
   * [FAQ & troubleshooting](atomicserver/faq.md)
-* [Client libraries](tooling.md)
+* [Clients / SDKs](tooling.md)
   * [JS / TS](js.md)
   * [JS CLI](js-cli.md)
   * [React](usecases/react.md)
   * [Svelte](svelte.md)
-  * [Rust](rust-lib.md)
+  * [Rust lib](rust-lib.md)
+  * [Rust CLI](rust-cli.md)
 
 # Specification (core)
 
