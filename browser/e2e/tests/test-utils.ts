@@ -72,12 +72,12 @@ export async function setTitle(page: Page, title: string) {
 }
 
 export async function disableViewTransition(page: Page) {
-  await page.click('text=Settings');
-  const checkbox = page.getByLabel('Enable view transition');
+  await page.getByRole('link', { name: 'Settings' }).click();
+  const checkbox = page.getByLabel('Disable page transition animations');
 
   await expect(checkbox).toBeVisible();
 
-  await checkbox.uncheck();
+  await checkbox.check();
   await page.goBack();
 }
 

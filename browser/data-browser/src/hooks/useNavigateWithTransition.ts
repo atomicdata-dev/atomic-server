@@ -9,12 +9,12 @@ const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
  */
 export function useNavigateWithTransition() {
   const navigate = useNavigate();
-  const { viewTransitionsEnabled } = useSettings();
+  const { viewTransitionsDisabled } = useSettings();
 
   const navigateWithTransition = useCallback(
     (to: string | number) => {
       // @ts-ignore
-      if (!viewTransitionsEnabled || !document.startViewTransition) {
+      if (viewTransitionsDisabled || !document.startViewTransition) {
         //@ts-ignore
         navigate(to);
 

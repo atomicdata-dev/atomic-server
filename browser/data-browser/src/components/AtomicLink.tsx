@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, forwardRef } from 'react';
 import { styled } from 'styled-components';
 import { constructOpenURL, pathToURL } from '../helpers/navigation';
 import { FaExternalLinkAlt } from 'react-icons/fa';
@@ -26,80 +26,79 @@ export interface AtomicLinkProps
  * Renders a link. Either a subject or a href is required. You can wrap this
  * around other components and pass the `clean` prop to skip styling.
  */
-export const AtomicLink = ({
-  children,
-  clean,
-  subject,
-  path,
-  href,
-  untabbable,
-  className,
-  ...props
-}: AtomicLinkProps): JSX.Element => {
-  const navigate = useNavigateWithTransition();
+export const AtomicLink = forwardRef<HTMLAnchorElement, AtomicLinkProps>(
+  (
+    { children, clean, subject, path, href, untabbable, className, ...props },
+    ref,
+  ): JSX.Element => {
+    const navigate = useNavigateWithTransition();
 
-  if (!subject && !href && !path) {
-    return (
-      <ErrorLook>
-        No `subject`, `path` or `href` passed to this AtomicLink.
-      </ErrorLook>
-    );
-  }
-
-  let isOnCurrentPage: boolean;
-
-  try {
-    isOnCurrentPage = subject
-      ? window.location.toString() === constructOpenURL(subject)
-      : false;
-  } catch (e) {
-    return <span>{subject}</span>;
-  }
-
-  const handleClick = (e: React.MouseEvent<HTMLElement>) => {
-    if (href) {
-      // When there is a regular URL, let the browser handle it
-      return;
+    if (!subject && !href && !path) {
+      return (
+        <ErrorLook>
+          No `subject`, `path` or `href` passed to this AtomicLink.
+        </ErrorLook>
+      );
     }
 
-    e.preventDefault();
+    let isOnCurrentPage: boolean;
 
-    if (path) {
-      navigate(path);
-
-      return;
+    try {
+      isOnCurrentPage = subject
+        ? window.location.toString() === constructOpenURL(subject)
+        : false;
+    } catch (e) {
+      return <span>{subject}</span>;
     }
 
-    if (subject) {
-      if (isOnCurrentPage) {
+    const handleClick = (e: React.MouseEvent<HTMLElement>) => {
+      if (href) {
+        // When there is a regular URL, let the browser handle it
         return;
       }
 
-      navigate(constructOpenURL(subject));
-    }
-  };
+      e.preventDefault();
 
-  const hrefConstructed = href || subject || pathToURL(path!);
+      if (path) {
+        navigate(path);
 
-  return (
-    <LinkView
-      clean={clean}
-      className={className}
-      about={subject}
-      onClick={handleClick}
-      href={hrefConstructed}
-      disabled={isOnCurrentPage}
-      tabIndex={isOnCurrentPage || untabbable ? -1 : 0}
-      // Tauri always opens `_blank` in new tab, and ignores preventDefault() for some reason.
-      // https://github.com/tauri-apps/tauri/issues/1657
-      target={isRunningInTauri() && !href ? '' : '_blank'}
-      {...props}
-    >
-      {children}
-      {href && !clean && <FaExternalLinkAlt />}
-    </LinkView>
-  );
-};
+        return;
+      }
+
+      if (subject) {
+        if (isOnCurrentPage) {
+          return;
+        }
+
+        navigate(constructOpenURL(subject));
+      }
+    };
+
+    const hrefConstructed = href || subject || pathToURL(path!);
+
+    return (
+      <LinkView
+        clean={clean}
+        className={className}
+        about={subject}
+        onClick={handleClick}
+        href={hrefConstructed}
+        disabled={isOnCurrentPage}
+        tabIndex={isOnCurrentPage || untabbable ? -1 : 0}
+        // Tauri always opens `_blank` in new tab, and ignores preventDefault() for some reason.
+        // https://github.com/tauri-apps/tauri/issues/1657
+        target={isRunningInTauri() && !href ? '' : '_blank'}
+        {...props}
+        ref={ref}
+      >
+        {children}
+        {href && !clean && <FaExternalLinkAlt />}
+      </LinkView>
+    );
+  },
+);
+
+AtomicLink.displayName = 'AtomicLink';
 
 type LinkViewProps = {
   disabled?: boolean;

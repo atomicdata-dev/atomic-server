@@ -67,7 +67,7 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
       <SideBarMenuItem
         icon={<FaCog />}
         label='Settings'
-        helper='Edit the theme (t)'
+        helper='Change client settings (t)'
         path={paths.themeSettings}
         onClick={onItemClick}
       />

@@ -24,7 +24,7 @@ export const SideBarItem = styled('span')<SideBarItemProps>`
     color: ${p => (p.disabled ? p.theme.colors.main : p.theme.colors.text)};
   }
   &:active {
-    background-color: ${p => p.theme.colors.bg2};
+    opacity: 0.5;
   }
 
   svg {

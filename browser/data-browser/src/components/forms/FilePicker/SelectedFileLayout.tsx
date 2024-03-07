@@ -1,6 +1,6 @@
 import { PropsWithChildren } from 'react';
 import { FaTimes } from 'react-icons/fa';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 import { IconButton } from '../../IconButton/IconButton';
 import { Row } from '../../Row';
 

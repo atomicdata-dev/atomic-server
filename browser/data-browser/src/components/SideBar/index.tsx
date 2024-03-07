@@ -21,6 +21,8 @@ export const SIDEBAR_TOGGLE_WIDTH = 600;
 const SideBarDriveMemo = React.memo(SideBarDrive);
 
 export function SideBar(): JSX.Element {
+  const [isRearanging, setIsRearanging] = React.useState(false);
+
   const { drive, sideBarLocked, setSideBarLocked } = useSettings();
   const [ref, hoveringOverSideBar, listeners] = useHover<HTMLElement>();
   // Check if the window is small enough to hide the sidebar
@@ -29,11 +31,12 @@ export function SideBar(): JSX.Element {
     true,
   );
 
-  const { size, targetRef, dragAreaRef, isDragging } = useResizable({
-    initialSize: 300,
-    minSize: 200,
-    maxSize: 2000,
-  });
+  const { size, targetRef, dragAreaRef, isDragging, dragAreaListeners } =
+    useResizable({
+      initialSize: 300,
+      minSize: 200,
+      maxSize: 2000,
+    });
 
   const { enabledPanels } = usePanelList();
 
@@ -65,7 +68,11 @@ export function SideBar(): JSX.Element {
       >
         <NavBarSpacer position='top' />
         {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
-        <SideBarDriveMemo handleClickItem={closeSideBar} key={drive} />
+        <SideBarDriveMemo
+          handleClickItem={closeSideBar}
+          key={drive}
+          onIsRearangingChange={setIsRearanging}
+        />
         <MenuWrapper>
           <Column gap='0.5rem'>
             {enabledPanels.has(Panel.Ontologies) && (
@@ -83,7 +90,13 @@ export function SideBar(): JSX.Element {
         </MenuWrapper>
         <OverlapSpacer />
         <NavBarSpacer baseMargin='1rem' position='bottom' />
-        <SideBarDragArea ref={dragAreaRef} isDragging={isDragging} />
+        {!isRearanging && (
+          <SideBarDragArea
+            ref={dragAreaRef}
+            isDragging={isDragging}
+            {...dragAreaListeners}
+          />
+        )}
       </SideBarStyled>
       <SideBarOverlay
         onClick={() => setSideBarLocked(false)}

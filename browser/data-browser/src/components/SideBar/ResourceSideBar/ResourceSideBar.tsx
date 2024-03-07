@@ -1,18 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useString, useResource, useTitle, urls, useArray } from '@tomic/react';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
 import { SideBarItem } from '../SideBarItem';
 import { AtomicLink } from '../../AtomicLink';
 import { styled } from 'styled-components';
 import { Details } from '../../Details';
-import { FloatingActions, floatingHoverStyles } from './FloatingActions';
 import { errorLookStyle } from '../../ErrorLook';
 import { LoaderInline } from '../../Loader';
-import { getIconForClass } from '../../../views/FolderPage/iconMap';
 import { FaExclamationTriangle } from 'react-icons/fa';
+import { useDraggable } from '@dnd-kit/core';
+import { SidebarItemTitle } from './SidebarItemTitle';
+import { TextWrapper } from './shared';
+import { DropEdge } from './DropEdge';
+import { SideBarDragData } from '../useSidebarDnd';
+import { transparentize } from 'polished';
+import { transition } from '../../../helpers/transition';
 
 interface ResourceSideBarProps {
   subject: string;
+  renderedHierargy: string[];
   ancestry: string[];
   /** When a SideBar item is clicked, we should close the SideBar (on mobile devices) */
   onClick?: () => unknown;
@@ -21,13 +27,16 @@ interface ResourceSideBarProps {
 /** Renders a Resource as a nav item for in the sidebar. */
 export function ResourceSideBar({
   subject,
+  renderedHierargy,
   ancestry,
   onClick,
 }: ResourceSideBarProps): JSX.Element {
-  const spanRef = useRef<HTMLSpanElement>(null);
+  if (renderedHierargy.length === 0) {
+    throw new Error('renderedHierargy should not be empty');
+  }
+
   const resource = useResource(subject, { allowIncomplete: true });
   const [currentUrl] = useCurrentSubject();
-
   const [title] = useTitle(resource);
   const [description] = useString(resource, urls.properties.description);
 
@@ -37,8 +46,30 @@ export function ResourceSideBar({
   const [subResources] = useArray(resource, urls.properties.subResources);
   const hasSubResources = subResources.length > 0;
 
-  const [classType] = useArray(resource, urls.properties.isA);
-  const Icon = getIconForClass(classType[0]!);
+  const dragData: SideBarDragData = {
+    renderedUnder: renderedHierargy.at(-1)!,
+  };
+
+  const {
+    setNodeRef,
+    listeners,
+    attributes,
+    over,
+    active: draggingNode,
+  } = useDraggable({
+    id: subject,
+    data: dragData,
+  });
+
+  const isDragging = draggingNode?.id === subject;
+
+  useEffect(() => {
+    if (isDragging) {
+      setOpen(false);
+    }
+  }, [isDragging]);
+
+  const isHoveringOver = over?.data.current?.parent === subject;
 
   useEffect(() => {
     if (ancestry.includes(subject) && ancestry[0] !== subject) {
@@ -46,25 +77,18 @@ export function ResourceSideBar({
     }
   }, [ancestry]);
 
+  const hierarchyWithItself = [...renderedHierargy, subject];
+
   const TitleComp = useMemo(
     () => (
-      <ActionWrapper>
-        <StyledLink subject={subject} clean>
-          <SideBarItem
-            onClick={onClick}
-            disabled={active}
-            resource={subject}
-            title={description}
-            ref={spanRef}
-          >
-            <TextWrapper>
-              <Icon />
-              {title}
-            </TextWrapper>
-          </SideBarItem>
-        </StyledLink>
-        <FloatingActions subject={subject} />
-      </ActionWrapper>
+      <SidebarItemTitle
+        subject={subject}
+        active={active}
+        onClick={onClick}
+        ref={setNodeRef}
+        listeners={listeners}
+        attributes={attributes}
+      />
     ),
     [subject, active, onClick, description, title],
   );
@@ -85,12 +109,7 @@ export function ResourceSideBar({
   if (resource.error) {
     return (
       <StyledLink subject={subject} clean>
-        <SideBarItem
-          onClick={onClick}
-          disabled={active}
-          resource={subject}
-          ref={spanRef}
-        >
+        <SideBarItem onClick={onClick} disabled={active} resource={subject}>
           <SideBarErrorWrapper>
             <FaExclamationTriangle />
             Resource with error
@@ -101,40 +120,47 @@ export function ResourceSideBar({
   }
 
   return (
-    <Details
-      initialState={open}
-      open={open}
-      disabled={!hasSubResources}
-      onStateToggle={setOpen}
-      data-test='resource-sidebar'
-      title={TitleComp}
-    >
-      {hasSubResources &&
-        subResources.map(child => (
-          <ResourceSideBar subject={child} key={child} ancestry={ancestry} />
-        ))}
-    </Details>
+    <Wrapper highlight={isHoveringOver}>
+      <Details
+        initialState={open}
+        open={open}
+        disabled={!hasSubResources}
+        onStateToggle={setOpen}
+        data-test='resource-sidebar'
+        title={TitleComp}
+      >
+        <DropEdge parentHierarchy={hierarchyWithItself} position={0} />
+        {hasSubResources &&
+          subResources.map((child, index) => (
+            <Fragment key={child}>
+              <ResourceSideBar
+                subject={child}
+                renderedHierargy={hierarchyWithItself}
+                ancestry={ancestry}
+              />
+              <DropEdge
+                parentHierarchy={hierarchyWithItself}
+                position={index + 1}
+              />
+            </Fragment>
+          ))}
+      </Details>
+    </Wrapper>
   );
 }
 
-const ActionWrapper = styled.div`
-  position: relative;
-  display: flex;
-  width: 100%;
-  margin-left: -0.7rem;
-  ${floatingHoverStyles}
+const Wrapper = styled.div<{ highlight: boolean }>`
+  background-color: ${p =>
+    p.highlight ? transparentize(0.9, p.theme.colors.main) : 'none'};
+
+  border-radius: ${({ theme }) => theme.radius};
+  ${transition('background-color')}
 `;
 
 const StyledLink = styled(AtomicLink)`
   flex: 1;
   overflow: hidden;
   white-space: nowrap;
-`;
-
-const TextWrapper = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
 `;
 
 const SideBarErrorWrapper = styled(TextWrapper)`
