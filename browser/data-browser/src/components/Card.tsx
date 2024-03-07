@@ -1,5 +1,5 @@
 import { styled } from 'styled-components';
-import { transitionName } from '../helpers/transitionName';
+import { getTransitionStyle } from '../helpers/transitionName';
 
 type CardProps = {
   /** Adds a colorful border */
@@ -9,7 +9,10 @@ type CardProps = {
 };
 
 /** A Card with a border. */
-export const Card = styled.div<CardProps>`
+export const Card = styled.div.attrs<CardProps>(p => ({
+  // When we render a lot of cards it is more performant to use styles instead of classes when each card has a unique style
+  style: getTransitionStyle('resource-page', p.about),
+}))`
   background-color: ${props => props.theme.colors.bg};
 
   border: solid 1px
@@ -24,8 +27,6 @@ export const Card = styled.div<CardProps>`
   border-radius: ${props => props.theme.radius};
   max-height: ${props => (props.small ? '10rem' : 'none')};
   overflow: ${props => (props.small ? 'hidden' : 'visible')};
-
-  ${p => transitionName('resource-page', p.about)};
 `;
 
 export interface CardRowProps {

@@ -1,8 +1,10 @@
 import { styled } from 'styled-components';
-import { transitionName } from '../../../helpers/transitionName';
+import { getTransitionStyle } from '../../../helpers/transitionName';
 import { ViewTransitionProps } from '../../../helpers/ViewTransitionProps';
 
-export const GridCard = styled.div<ViewTransitionProps>`
+export const GridCard = styled.div.attrs<ViewTransitionProps>(p => ({
+  style: getTransitionStyle('resource-page', p.subject),
+}))`
   grid-area: card;
   background-color: ${p => p.theme.colors.bg1};
   border-radius: ${p => p.theme.radius};
@@ -10,7 +12,6 @@ export const GridCard = styled.div<ViewTransitionProps>`
   box-shadow: var(--shadow), var(--interaction-shadow);
   border: 1px solid ${p => p.theme.colors.bg2};
   transition: border 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
-  ${props => transitionName('resource-page', props.subject)};
 `;
 
 export const GridItemWrapper = styled.a`
@@ -44,7 +45,9 @@ export const GridItemWrapper = styled.a`
   }
 `;
 
-export const GridItemTitle = styled.div<ViewTransitionProps>`
+export const GridItemTitle = styled.div.attrs<ViewTransitionProps>(p => ({
+  style: getTransitionStyle('page-title', p.subject),
+}))`
   grid-area: title;
   font-size: 1rem;
   text-align: center;
@@ -53,7 +56,6 @@ export const GridItemTitle = styled.div<ViewTransitionProps>`
   text-overflow: ellipsis;
   padding-inline: 0.5rem;
   transition: color 0.1s ease-in-out;
-  ${props => transitionName('page-title', props.subject)};
 `;
 
 export const GridItemDescription = styled.div`

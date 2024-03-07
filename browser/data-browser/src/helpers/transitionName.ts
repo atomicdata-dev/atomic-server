@@ -36,3 +36,17 @@ export function transitionName(tag: string, subject: string | undefined) {
 
   return `view-transition-name: ${name}`;
 }
+
+export function getTransitionStyle(tag: string, subject: string | undefined) {
+  let name: string;
+
+  try {
+    name = getTransitionName(tag, subject);
+  } catch (e) {
+    return {};
+  }
+
+  return {
+    viewTransitionName: name,
+  };
+}

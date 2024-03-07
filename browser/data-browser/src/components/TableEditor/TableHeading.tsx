@@ -36,11 +36,12 @@ export function TableHeading<T>({
     data: { index },
   });
 
-  const { targetRef, dragAreaRef, isDragging } = useResizable<HTMLDivElement>({
-    initialSize: DEFAULT_SIZE_PX,
-    minSize: 100,
-    onResize: size => onResize(index, `${size}px`),
-  });
+  const { targetRef, dragAreaRef, isDragging, dragAreaListeners } =
+    useResizable<HTMLDivElement>({
+      initialSize: DEFAULT_SIZE_PX,
+      minSize: 100,
+      onResize: size => onResize(index, `${size}px`),
+    });
 
   const { setIsDragging } = useTableEditorContext();
 
@@ -67,7 +68,11 @@ export function TableHeading<T>({
         dragAttributes={attributes}
       />
       {isReordering && <ReorderDropArea index={index} />}
-      <ResizeHandle isDragging={isDragging} ref={dragAreaRef} />
+      <ResizeHandle
+        isDragging={isDragging}
+        ref={dragAreaRef}
+        {...dragAreaListeners}
+      />
     </TableHeadingWrapper>
   );
 }
