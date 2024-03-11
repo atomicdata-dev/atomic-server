@@ -11,7 +11,7 @@ mod val_prop_sub_index;
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::Arc,
     vec,
 };
 
@@ -91,7 +91,7 @@ pub struct Db {
     /// Function called whenever a Commit is applied.
     handle_commit: Option<Arc<HandleCommit>>,
     /// Email SMTP client for sending email.
-    smtp_client: Option<Arc<Mutex<Transport<'static, Connected>>>>,
+    smtp_client: Option<Arc<tokio::sync::Mutex<Transport<'static, Connected>>>>,
 }
 
 impl Db {
@@ -364,7 +364,7 @@ impl Db {
         &mut self,
         smtp_config: crate::email::SmtpConfig,
     ) -> AtomicResult<()> {
-        self.smtp_client = Some(Arc::new(Mutex::new(
+        self.smtp_client = Some(Arc::new(tokio::sync::Mutex::new(
             crate::email::get_smtp_client(smtp_config).await?,
         )));
         Ok(())
@@ -379,7 +379,8 @@ impl Db {
                     "No SMTP client configured. Please call set_smtp_config first.".into(),
                 )
             })?
-            .lock()?;
+            .lock()
+            .await;
         email::send_mail(&mut client, message).await?;
         Ok(())
     }

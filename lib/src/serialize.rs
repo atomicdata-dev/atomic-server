@@ -265,7 +265,7 @@ mod test {
 
     #[test]
     fn serialize_json_ad() {
-        let store = crate::Store::init().unwrap();
+        let mut store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let json = store
             .get_resource(crate::urls::AGENT)

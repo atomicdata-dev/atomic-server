@@ -265,7 +265,7 @@ mod test {
     use crate::{agents::ForAgent, urls, Value};
 
     fn init_store() -> Store {
-        let store = Store::init().unwrap();
+        let mut store = Store::init().unwrap();
         store.populate().unwrap();
         store
     }
