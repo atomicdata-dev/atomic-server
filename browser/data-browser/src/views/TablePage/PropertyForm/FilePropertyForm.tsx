@@ -1,15 +1,13 @@
-import { urls, useStore } from '@tomic/react';
+import { Datatype, core, server } from '@tomic/react';
 import { useEffect } from 'react';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
 
 export function FilePropertyForm({
   resource,
 }: PropertyCategoryFormProps): JSX.Element {
-  const store = useStore();
-
   useEffect(() => {
-    resource.set(urls.properties.datatype, urls.datatypes.atomicUrl, store);
-    resource.set(urls.properties.classType, urls.classes.file, store);
+    resource.set(core.properties.datatype, Datatype.ATOMIC_URL);
+    resource.set(core.properties.classtype, server.classes.file);
   }, []);
 
   return <></>;

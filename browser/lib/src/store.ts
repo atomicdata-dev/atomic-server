@@ -165,10 +165,13 @@ export class Store {
     resource: Resource,
     { skipCommitCompare }: AddResourcesOpts,
   ): void {
+    // The resource might be new and not have a store yet. We set it here.
+    resource.setStore(this);
+
     // Incomplete resources may miss some properties
     if (resource.get(urls.properties.incomplete)) {
       // If there is a resource with the same subject, we won't overwrite it with an incomplete one
-      const existing = this.resources.get(resource.getSubject());
+      const existing = this.resources.get(resource.subject);
 
       if (existing && !existing.loading) {
         return;
@@ -177,7 +180,7 @@ export class Store {
 
     // Check if the resource has the same last commit as the one already in the store, if so, we don't want to notify so we don't trigger rerenders.
     if (!skipCommitCompare) {
-      const storeResource = this.resources.get(resource.getSubject());
+      const storeResource = this.resources.get(resource.subject);
 
       if (
         storeResource &&
@@ -191,7 +194,7 @@ export class Store {
       }
     }
 
-    this.resources.set(resource.getSubject(), resource.__internalObject);
+    this.resources.set(resource.subject, resource.__internalObject);
 
     this.notify(resource.__internalObject);
   }
@@ -215,14 +218,14 @@ export class Store {
     const resource = this.getResourceLoading(newSubject, { newResource: true });
 
     if (normalizedIsA[0]) {
-      await resource.addClasses(this, ...(normalizedIsA as string[]));
+      await resource.addClasses(...(normalizedIsA as string[]));
     }
 
-    await resource.set(core.properties.parent, parent ?? this.serverUrl, this);
+    await resource.set(core.properties.parent, parent ?? this.serverUrl);
 
     if (propVals) {
       for (const [key, value] of Object.entries(propVals)) {
-        await resource.set(key, value, this);
+        await resource.set(key, value);
       }
     }
 
@@ -250,9 +253,7 @@ export class Store {
         },
       );
 
-      if (
-        createdResources.find(res => res.getSubject() === subject)?.isReady()
-      ) {
+      if (createdResources.find(res => res.subject === subject)?.isReady()) {
         return true;
       }
     } catch (e) {
@@ -327,6 +328,7 @@ export class Store {
     ) {
       // Use WebSocket
       await fetchWebSocket(ws, subject);
+      // Resource should now have been added to the store by the websocket client.
     } else {
       // Use HTTPS
       const signInfo = this.agent
@@ -400,6 +402,7 @@ export class Store {
     // This is needed because it can happen that the useResource react hook is called while there is no subject passed.
     if (subject === unknownSubject || subject === null) {
       const newR = new Resource<C>(unknownSubject, opts.newResource);
+      newR.setStore(this);
 
       return newR;
     }
@@ -430,11 +433,21 @@ export class Store {
   }
 
   /**
+   * @deprecated
+   * renamed to `getResource`
+   */
+  public async getResourceAsync<C extends OptionalClass = UnknownClass>(
+    subject: string,
+  ): Promise<Resource<C>> {
+    return this.getResource(subject);
+  }
+
+  /**
    * Gets a resource by URL. Fetches and parses it if it's not available in the
    * store. Not recommended to use this for rendering, because it might cause
    * resources to be fetched multiple times.
    */
-  public async getResourceAsync<C extends OptionalClass = UnknownClass>(
+  public async getResource<C extends OptionalClass = UnknownClass>(
     subject: string,
   ): Promise<Resource<C>> {
     const found = this.resources.get(subject);
@@ -466,7 +479,12 @@ export class Store {
       });
     }
 
-    return this.fetchResourceFromServer(subject);
+    const result = await this.fetchResourceFromServer(subject);
+
+    // If the resource was not in the store yet, subscripe to changes so we don't return stale results when the resource is updated.
+    this.subscribeWebSocket(subject);
+
+    return result;
   }
 
   /** Gets a property by URL. */
@@ -520,8 +538,7 @@ export class Store {
   }
 
   /**
-   * This is called when Errors occur in some of the library functions. Set your
-   * errorhandler function to `store.errorHandler`.
+   * This is called when Errors occur in some of the library functions.
    */
   public notifyError(e: Error | string): void {
     const error = e instanceof Error ? e : new Error(e);
@@ -630,7 +647,7 @@ export class Store {
     newSubject: string,
   ): Promise<void> {
     Client.tryValidSubject(newSubject);
-    const oldSubject = resource.getSubject();
+    const oldSubject = resource.subject;
 
     if (await this.checkSubjectTaken(newSubject)) {
       throw Error(`New subject name is already taken: ${newSubject}`);
@@ -807,7 +824,7 @@ export class Store {
 
     this.addResources(resources);
 
-    return resources.map(r => r.getSubject());
+    return resources.map(r => r.subject);
   }
 
   /** Posts a Commit to some endpoint. Returns the Commit created by the server. */
@@ -819,7 +836,7 @@ export class Store {
    * Returns the ancestry of a resource, starting with the resource itself.
    */
   public async getResourceAncestry(resource: Resource): Promise<string[]> {
-    const ancestry: string[] = [resource.getSubject()];
+    const ancestry: string[] = [resource.subject];
 
     let lastAncestor: string = resource.get(urls.properties.parent) as string;
     lastAncestor && ancestry.push(lastAncestor);
@@ -832,7 +849,7 @@ export class Store {
 
         if (ancestry.includes(lastAncestor)) {
           throw new Error(
-            `Resource ${resource.getSubject()} ancestry is cyclical. ${lastAncestor} is already in the ancestry}`,
+            `Resource ${resource.subject} ancestry is cyclical. ${lastAncestor} is already in the ancestry}`,
           );
         }
 
@@ -891,7 +908,7 @@ export class Store {
     for (const resourceSubject of subjects) {
       const resource = this._resources.get(resourceSubject);
 
-      await resource?.save(this);
+      await resource?.save();
     }
 
     this.batchedResources.delete(subject);
@@ -926,7 +943,7 @@ export class Store {
    * Make sure the resource is a new reference, otherwise React will not rerender.
    */
   private async notify(resource: Resource): Promise<void> {
-    const subject = resource.getSubject();
+    const subject = resource.subject;
     const callbacks = this.subscribers.get(subject);
 
     if (callbacks === undefined) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Resource, urls, useStore } from '@tomic/react';
+import { Resource, core } from '@tomic/react';
 import { styled } from 'styled-components';
 import { FaPlus } from 'react-icons/fa';
 import { ResourceSelector } from '../../components/forms/ResourceSelector';
@@ -12,7 +12,6 @@ interface CreateInstanceButtonProps {
 }
 
 export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
-  const store = useStore();
   const [active, setActive] = useState(false);
   const [classSubject, setClassSubject] = useState<string | undefined>();
   const [dialogProps, show, close, isOpen] = useDialog({
@@ -33,8 +32,8 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
   };
 
   const handleSave = (subject: string) => {
-    ontology.pushPropVal(urls.properties.instances, [subject], true);
-    ontology.save(store);
+    ontology.pushPropVal(core.properties.instances, [subject], true);
+    ontology.save();
   };
 
   return (
@@ -51,7 +50,7 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
               <strong>Select the class for this instance</strong>
               <ResourceSelector
                 autoFocus
-                isA={urls.classes.class}
+                isA={core.classes.class}
                 setSubject={handleClassSelect}
                 value={classSubject}
               />
@@ -63,7 +62,7 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
                 classSubject={classSubject}
                 closeDialog={close}
                 onSave={handleSave}
-                parent={ontology.getSubject()}
+                parent={ontology.subject}
               />
             )}
           </Dialog>

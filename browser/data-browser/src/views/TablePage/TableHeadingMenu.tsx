@@ -3,7 +3,6 @@ import {
   properties,
   useCanWrite,
   useResource,
-  useStore,
   useString,
   core,
 } from '@tomic/react';
@@ -39,7 +38,6 @@ const useIsExternalProperty = (property: Resource) => {
 export function TableHeadingMenu({
   resource,
 }: TableHeadingMenuProps): JSX.Element {
-  const store = useStore();
   const canWrite = useCanWrite(resource);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -59,24 +57,22 @@ export function TableHeadingMenu({
 
     await tableClassResource.set(
       core.properties.recommends,
-      recommends.filter(r => r !== resource.getSubject()),
-      store,
+      recommends.filter(r => r !== resource.subject),
     );
 
     await tableClassResource.set(
       core.properties.requires,
-      requires.filter(r => r !== resource.getSubject()),
-      store,
+      requires.filter(r => r !== resource.subject),
     );
 
-    await tableClassResource.save(store);
-  }, [store, tableClassResource, resource]);
+    await tableClassResource.save();
+  }, [tableClassResource, resource]);
 
   const deleteProperty = useCallback(async () => {
     await removeProperty();
 
-    resource.destroy(store);
-  }, [removeProperty, store]);
+    resource.destroy();
+  }, [removeProperty]);
 
   const onConfirm = useCallback(() => {
     if (isExternalProperty) {

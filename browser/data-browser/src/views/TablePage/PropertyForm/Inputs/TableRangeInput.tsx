@@ -1,4 +1,4 @@
-import { Resource, useNumber, useStore } from '@tomic/react';
+import { Resource, useNumber } from '@tomic/react';
 import { useCallback } from 'react';
 import { ErrorChip } from '../../../../components/forms/ErrorChip';
 import { useValidation } from '../../../../components/forms/formValidation/useValidation';
@@ -20,7 +20,6 @@ export function TableRangeInput({
   maxProp,
   constraintClass,
 }: TableRangeInputProps): JSX.Element {
-  const store = useStore();
   const [minLength, setMinLength] = useNumber(resource, minProp);
   const [maxLength, setMaxLength] = useNumber(resource, maxProp);
 
@@ -32,19 +31,19 @@ export function TableRangeInput({
       setMaxLength(max);
 
       if (min !== undefined || max !== undefined) {
-        resource.addClasses(store, constraintClass);
+        resource.addClasses(constraintClass);
       } else {
-        resource.removeClasses(store, constraintClass);
+        resource.removeClasses(constraintClass);
       }
 
       const err = validateRange(min, max, true);
       setError(err);
 
       if (!err) {
-        resource.save(store);
+        resource.save();
       }
     },
-    [setMinLength, setMaxLength, store, resource],
+    [setMinLength, setMaxLength, resource],
   );
 
   return (

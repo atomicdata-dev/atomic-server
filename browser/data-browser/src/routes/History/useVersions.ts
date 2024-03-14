@@ -1,4 +1,4 @@
-import { Resource, Version, unknownSubject, useStore } from '@tomic/react';
+import { Resource, Version, unknownSubject } from '@tomic/react';
 import { useState, useEffect, useRef, useTransition } from 'react';
 import { dedupeVersions } from './versionHelpers';
 
@@ -13,7 +13,6 @@ export function useVersions(resource: Resource): UseVersionsResult {
   const [versions, setVersions] = useState<Version[]>([]);
   const [progress, setProgress] = useState(0);
   const isRunning = useRef(false);
-  const store = useStore();
   const [_, startTransition] = useTransition();
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | undefined>(undefined);
@@ -31,7 +30,7 @@ export function useVersions(resource: Resource): UseVersionsResult {
       (async () => {
         try {
           isRunning.current = true;
-          const history = await resource.getHistory(store, setProgress);
+          const history = await resource.getHistory(setProgress);
           const dedupedVersions = dedupeVersions(history);
           setVersions(dedupedVersions);
         } catch (e) {

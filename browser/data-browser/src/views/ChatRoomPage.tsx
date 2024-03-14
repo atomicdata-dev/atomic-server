@@ -1,8 +1,8 @@
 import {
-  classes,
+  commits,
+  core,
+  dataBrowser,
   getTimestampNow,
-  properties,
-  Resource,
   useArray,
   useResource,
   useStore,
@@ -28,7 +28,7 @@ import { ResourcePageProps } from './ResourcePage';
 
 /** Full page ChatRoom that shows a message list and a form to add Messages. */
 export function ChatRoomPage({ resource }: ResourcePageProps) {
-  const [messages] = useArray(resource, properties.chatRoom.messages);
+  const [messages] = useArray(resource, dataBrowser.properties.messages);
   const [newMessageVal, setNewMessage] = useState('');
   const store = useStore();
   const [isReplyTo, setReplyTo] = useState<string | undefined>(undefined);
@@ -75,37 +75,21 @@ export function ChatRoomPage({ resource }: ResourcePageProps) {
 
       if (!disableSend) {
         const subject = store.createSubject('messages', resource.getSubject());
-        const msgResource = new Resource(subject, true);
-        await msgResource.set(
-          properties.parent,
-          resource.getSubject(),
-          store,
-          false,
-        );
-        await msgResource.set(properties.isA, [classes.message], store, false);
-        await msgResource.set(
-          properties.description,
-          newMessageVal,
-          store,
-          false,
-        );
-        await msgResource.set(
-          properties.commit.createdAt,
-          getTimestampNow(),
-          store,
-          false,
-        );
 
-        if (isReplyTo) {
-          await msgResource.set(
-            properties.chatRoom.replyTo,
-            isReplyTo,
-            store,
-            false,
-          );
-        }
+        const msgResource = await store.newResource({
+          subject,
+          parent: resource.subject,
+          isA: dataBrowser.classes.message,
+          propVals: {
+            [core.properties.description]: newMessageVal,
+            [commits.properties.createdAt]: getTimestampNow(),
+            ...(isReplyTo && {
+              [dataBrowser.properties.replyTo]: isReplyTo,
+            }),
+          },
+        });
 
-        await msgResource.save(store);
+        await msgResource.save();
         setReplyTo(undefined);
       }
     } catch (err) {
@@ -200,9 +184,9 @@ const MESSAGE_MAX_LEN = 500;
 /** Single message shown in a ChatRoom */
 const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
   const resource = useResource(subject);
-  const [description] = useString(resource, properties.description);
-  const [lastCommit] = useSubject(resource, properties.commit.lastCommit);
-  const [replyTo] = useSubject(resource, properties.chatRoom.replyTo);
+  const [description] = useString(resource, core.properties.description);
+  const [lastCommit] = useSubject(resource, commits.properties.lastCommit);
+  const [replyTo] = useSubject(resource, dataBrowser.properties.replyTo);
   const navigate = useNavigate();
 
   function handleCopyUrl() {
@@ -255,7 +239,7 @@ const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
           </Button>
         </MessageActions>
       </MessageDetails>
-      <Markdown noMargin text={description || ''} maxLength={MESSAGE_MAX_LEN} />
+      <Markdown text={description || ''} maxLength={MESSAGE_MAX_LEN} />
     </MessageComponent>
   );
 });
@@ -269,12 +253,12 @@ const MESSAGE_LINE_MAX_LEN = 50;
 /** Small single line preview of a message, useful in replies */
 function MessageLine({ subject }: MessageLineProps) {
   const resource = useResource(subject);
-  const [description] = useString(resource, properties.description);
-  const [lastCommit] = useSubject(resource, properties.commit.lastCommit);
+  const [description] = useString(resource, core.properties.description);
+  const [lastCommit] = useSubject(resource, commits.properties.lastCommit);
 
   // Traverse path to find the author
   const commitResource = useResource(lastCommit);
-  const [signer] = useSubject(commitResource, properties.commit.signer);
+  const [signer] = useSubject(commitResource, commits.properties.signer);
 
   if (!resource.isReady() || !commitResource.isReady()) {
     return <MessageLineStyled>loading...</MessageLineStyled>;
@@ -408,8 +392,8 @@ interface MessagesPageProps {
 /** Shows Messages for this page. Recursively fetches the next page, if in view */
 function MessagesPage({ subject, setReplyTo }: MessagesPageProps) {
   const resource = useResource(subject);
-  const [messages] = useArray(resource, properties.chatRoom.messages);
-  const [nextPage] = useString(resource, properties.chatRoom.nextPage);
+  const [messages] = useArray(resource, dataBrowser.properties.messages);
+  const [nextPage] = useString(resource, dataBrowser.properties.nextPage);
 
   if (!resource.isReady()) {
     return <>loading...</>;

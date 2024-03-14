@@ -3,12 +3,11 @@ import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import {
   Resource,
-  properties,
-  classes,
   useArray,
   useCanWrite,
   useStore,
-  useString,
+  dataBrowser,
+  core,
 } from '@tomic/react';
 import { styled } from 'styled-components';
 import { FaEdit, FaEye, FaGripVertical } from 'react-icons/fa';
@@ -71,7 +70,7 @@ function DocumentPageEdit({
 }: DocumentSubPageProps): JSX.Element {
   const [elements, setElements] = useArray(
     resource,
-    properties.document.elements,
+    dataBrowser.properties.elements,
     { commit: false, validate: false, commitDebounce: 0 },
   );
 
@@ -187,24 +186,24 @@ function DocumentPageEdit({
   async function addElement(position: number) {
     // When an element is created, it should be a Resource that has this document as its parent.
     // or maybe a nested resource?
-    const elementSubject = store.createSubject(
-      'element',
-      resource.getSubject(),
-    );
+    const elementSubject = store.createSubject('element', resource.subject);
     const newElements = [...elements];
     newElements.splice(position, 0, elementSubject);
 
     try {
-      const newElement = new Resource(elementSubject, true);
-      await Promise.all([
-        newElement.set(properties.isA, [classes.elements.paragraph], store),
-        newElement.set(properties.parent, resource.getSubject(), store),
-        newElement.set(properties.description, '', store),
-      ]);
+      const newElement = await store.newResource({
+        subject: elementSubject,
+        isA: dataBrowser.classes.paragraph,
+        parent: resource.subject,
+        propVals: {
+          [core.properties.description]: '',
+        },
+      });
+
       await setElements(newElements);
       focusElement(position);
-      await newElement.save(store);
-      await resource.save(store);
+      await newElement.save();
+      await resource.save();
     } catch (e) {
       setErr(e);
     }
@@ -237,7 +236,7 @@ function DocumentPageEdit({
     if (elements.length === 1) {
       setElements([]);
       focusElement(0);
-      resource.save(store);
+      resource.save();
 
       return;
     }
@@ -245,7 +244,7 @@ function DocumentPageEdit({
     elements.splice(number, 1);
     setElements([...elements]);
     focusElement(number - 1);
-    resource.save(store);
+    resource.save();
   }
 
   /** Sets the subject for a specific element and moves to the next element */
@@ -257,7 +256,7 @@ function DocumentPageEdit({
       addElement(index + 1);
     } else {
       focusElement(index + 1);
-      resource.save(store);
+      resource.save();
     }
   }
 
@@ -267,7 +266,7 @@ function DocumentPageEdit({
     elements.splice(to, 0, element);
     setElements([...elements]);
     focusElement(to);
-    resource.save(store);
+    resource.save();
   }
 
   function handleSortEnd(event: DragEndEvent): void {
@@ -290,15 +289,15 @@ function DocumentPageEdit({
     toast.success('Upload succeeded!');
     fileSubjects.map(subject => elements.push(subject));
     setElements([...elements]);
-    resource.save(store);
+    resource.save();
   }
 
   /** Add a new line, or move to the last line if it is empty */
   async function handleNewLineMaybe() {
     const lastSubject = elements[elements.length - 1];
-    const lastElem = await store.getResourceAsync(lastSubject);
+    const lastElem = await store.getResource(lastSubject);
 
-    if (lastElem.get(properties.description)?.toString()?.length === 0) {
+    if (lastElem.get(core.properties.description)?.toString()?.length === 0) {
       focusElement(elements.length - 1);
     } else {
       addElement(elements.length);
@@ -361,13 +360,12 @@ function DocumentPageShow({
   resource,
   setEditMode,
 }: DocumentSubPageProps): JSX.Element {
-  const [elements] = useArray(resource, properties.document.elements);
-  const [title] = useString(resource, properties.name);
+  const [elements] = useArray(resource, dataBrowser.properties.elements);
 
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'row' }}>
-        <h1 style={{ flex: 1 }}>{title}</h1>
+        <h1 style={{ flex: 1 }}>{resource.title}</h1>
         <Button
           data-test='document-edit'
           icon

@@ -4,7 +4,6 @@ import {
   Resource,
   urls,
   useDebouncedCallback,
-  useStore,
   useValue,
 } from '@tomic/react';
 import {
@@ -62,17 +61,15 @@ export function TableCell({
   property,
   invalidateTable,
 }: TableCell): JSX.Element {
-  const store = useStore();
-
   const [markForInvalidate, setMarkForInvalidate] = useState(false);
   const { setActiveCell } = useTableEditorContext();
   const { addItemsToHistoryStack } = useContext(TablePageContext);
   const [save, savePending] = useDebouncedCallback(
     async () => {
-      await resource.save(store);
+      await resource.save();
     },
     200,
-    [resource, store],
+    [resource],
   );
   const [value, setValue] = useValue(resource, property.subject, valueOpts);
 

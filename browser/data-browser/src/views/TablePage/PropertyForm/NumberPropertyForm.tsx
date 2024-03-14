@@ -1,9 +1,9 @@
 import {
+  Datatype,
   core,
   dataBrowser,
   urls,
   useNumber,
-  useStore,
   useString,
 } from '@tomic/react';
 import { Suspense, lazy, useEffect } from 'react';
@@ -21,7 +21,6 @@ const CurrencyPicker = lazy(
 export const NumberPropertyForm = ({
   resource,
 }: PropertyCategoryFormProps): JSX.Element => {
-  const store = useStore();
   const [numberFormatting, setNumberFormatting] = useString(
     resource,
     dataBrowser.properties.numberFormatting,
@@ -40,20 +39,20 @@ export const NumberPropertyForm = ({
     setNumberFormatting(e.target.value);
 
     if (e.target.value === numberFormats.currency) {
-      await resource.addClasses(store, dataBrowser.classes.currencyProperty);
-      await setDataType(urls.datatypes.float);
+      await resource.addClasses(dataBrowser.classes.currencyProperty);
+      await setDataType(Datatype.FLOAT);
     } else {
-      await resource.removeClasses(store, dataBrowser.classes.currencyProperty);
+      await resource.removeClasses(dataBrowser.classes.currencyProperty);
       resource.removePropVal(dataBrowser.properties.currency);
     }
   };
 
   useEffect(() => {
-    resource.addClasses(store, dataBrowser.classes.formattedNumber);
+    resource.addClasses(dataBrowser.classes.formattedNumber);
 
     // If decimal places is not set yet we assume it is a new property and should default to float.
     if (decimalPlaces === undefined) {
-      resource.set(core.properties.datatype, urls.datatypes.float, store);
+      resource.set(core.properties.datatype, Datatype.FLOAT);
     }
 
     if (numberFormatting === undefined) {

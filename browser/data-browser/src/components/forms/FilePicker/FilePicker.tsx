@@ -48,11 +48,11 @@ export function FilePicker({
           const thisUnsub = store.on(
             StoreEvents.ResourceSaved,
             async savedResource => {
-              if (savedResource.getSubject() === resource.getSubject()) {
+              if (savedResource.subject === resource.subject) {
                 thisUnsub();
                 const [subject] = await upload([selectedFile]);
                 await setValue(subject);
-                resource.save(store);
+                resource.save();
               }
             },
           );

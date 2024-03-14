@@ -1,13 +1,13 @@
 import { memo, useEffect, useState } from 'react';
 import {
   Collection,
+  DataBrowser,
   Property,
   Resource,
+  core,
   unknownSubject,
-  urls,
   useMemberFromCollection,
   useResource,
-  useStore,
 } from '@tomic/react';
 import { TableCell } from './TableCell';
 import { randomSubject } from '../../helpers/randomString';
@@ -28,7 +28,7 @@ export function TableRow({
 }: TableRowProps): JSX.Element {
   const resource = useMemberFromCollection(collection, index);
 
-  if (resource.getSubject() === unknownSubject) {
+  if (resource.subject === unknownSubject) {
     return (
       <>
         {columns.map((column, i) => (
@@ -54,7 +54,7 @@ export function TableRow({
 }
 
 type TableNewRowProps = Omit<TableRowProps, 'collection'> & {
-  parent: Resource;
+  parent: Resource<DataBrowser.Table>;
   invalidateTable: () => void;
 };
 
@@ -68,9 +68,8 @@ export function TableNewRow({
   parent,
   invalidateTable,
 }: TableNewRowProps): JSX.Element {
-  const store = useStore();
   const [subject] = useState<string>(() =>
-    randomSubject(parent.getSubject(), 'row'),
+    randomSubject(parent.subject, 'row'),
   );
 
   const [loading, setLoading] = useState(true);
@@ -78,23 +77,17 @@ export function TableNewRow({
   const resource = useResource(subject, resourceOpts);
 
   useEffect(() => {
-    if (resource.getSubject() === unknownSubject) {
+    if (resource.subject === unknownSubject) {
       return;
     }
 
     resource
-      .set(urls.properties.parent, parent.getSubject(), store)
-      .then(() =>
-        resource.set(
-          urls.properties.isA,
-          [parent.get(urls.properties.classType)],
-          store,
-        ),
-      )
+      .set(core.properties.parent, parent.subject)
+      .then(() => resource.set(core.properties.isA, [parent.props.classtype]))
       .then(() => {
         setLoading(false);
       });
-  }, [resource.getSubject()]);
+  }, [resource.subject]);
 
   if (loading) {
     return (

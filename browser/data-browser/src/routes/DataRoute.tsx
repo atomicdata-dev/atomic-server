@@ -1,10 +1,5 @@
 import { useState } from 'react';
-import {
-  useResource,
-  useStore,
-  signRequest,
-  HeadersObject,
-} from '@tomic/react';
+import { useResource, signRequest, HeadersObject } from '@tomic/react';
 
 import AllProps from '../components/AllProps';
 import { ContainerNarrow } from '../components/Containers';
@@ -35,7 +30,6 @@ function Data(): JSX.Element {
   const [textResponseLoading, setTextResponseLoading] = useState(false);
   const [err, setErr] = useState<Error | undefined>(undefined);
   const { agent } = useSettings();
-  const store = useStore();
   const navigate = useNavigate();
 
   if (!subject) {
@@ -110,7 +104,7 @@ function Data(): JSX.Element {
               {resource.commitError && (
                 <ErrMessage>{resource.commitError.message}</ErrMessage>
               )}
-              <Button onClick={() => resource.save(store)}>save</Button>
+              <Button onClick={() => resource.save()}>save</Button>
             </>
           ) : null}
           <h2>Code</h2>

@@ -1,4 +1,4 @@
-import { urls, useArray, useResource, useStore } from '@tomic/react';
+import { urls, useArray, useResource } from '@tomic/react';
 import { useCallback, useMemo } from 'react';
 import { isDev } from '../config';
 import { useSettings } from '../helpers/AppSettings';
@@ -19,7 +19,6 @@ export function useSavedDrives(): [
   remove: (drive: string) => void,
 ] {
   const { agent } = useSettings();
-  const store = useStore();
   const agentResource = useResource(agent?.subject);
   const [drives, setDrives] = useArray(
     agentResource,
@@ -38,7 +37,7 @@ export function useSavedDrives(): [
 
       if (!drives.includes(drive)) {
         setDrives([...drives, drive]).then(() => {
-          agentResource.save(store);
+          agentResource.save();
         });
       }
     },
@@ -54,7 +53,7 @@ export function useSavedDrives(): [
 
       if (drives.includes(drive)) {
         setDrives(drives.filter(d => d !== drive)).then(() => {
-          agentResource.save(store);
+          agentResource.save();
         });
       }
     },

@@ -107,7 +107,7 @@ export function NewResourceUIProvider({ children }: PropsWithChildren) {
     }
 
     // Default behaviour. Navigate to a new resource form for the given class.
-    const classResource = await store.getResourceAsync<Core.Class>(isA);
+    const classResource = await store.getResource<Core.Class>(isA);
     navigate(
       newURL(isA, parent, store.createSubject(classResource.props.shortname)),
     );

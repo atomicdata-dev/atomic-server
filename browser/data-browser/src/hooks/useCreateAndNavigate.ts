@@ -1,4 +1,4 @@
-import { Core, JSONValue, Resource, core, useStore } from '@tomic/react';
+import { Core, JSONValue, Resource, useStore } from '@tomic/react';
 import { useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +30,7 @@ export function useCreateAndNavigate(): CreateAndNavigate {
       /** Query parameters for the resource / endpoint */
       extraParams?: Record<string, string>,
     ): Promise<Resource> => {
-      const classResource = await store.getResourceAsync<Core.Class>(isA);
+      const classResource = await store.getResource<Core.Class>(isA);
 
       const namePart = getNamePartFromProps(propVals);
       const newSubject = await store.buildUniqueSubjectFromParts(
@@ -38,19 +38,15 @@ export function useCreateAndNavigate(): CreateAndNavigate {
         parent,
       );
 
-      const resource = new Resource(newSubject, true);
-
-      await resource.addClasses(store, isA);
-
-      await Promise.all([
-        ...Object.entries(propVals).map(([key, val]) =>
-          resource.set(key, val, store),
-        ),
-        !!parent && resource.set(core.properties.parent, parent, store),
-      ]);
+      const resource = await store.newResource({
+        subject: newSubject,
+        isA,
+        parent,
+        propVals,
+      });
 
       try {
-        await resource.save(store);
+        await resource.save();
         navigate(constructOpenURL(newSubject, extraParams));
         toast.success(`${classResource.title} created`);
         store.notifyResourceManuallyCreated(resource);

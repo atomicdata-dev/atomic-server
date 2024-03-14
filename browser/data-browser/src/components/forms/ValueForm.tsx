@@ -2,13 +2,7 @@ import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEdit } from 'react-icons/fa';
 import { styled } from 'styled-components';
-import {
-  useProperty,
-  useStore,
-  useValue,
-  Datatype,
-  Resource,
-} from '@tomic/react';
+import { useProperty, useValue, Datatype, Resource } from '@tomic/react';
 import { Button } from '../Button';
 import ValueComp from '../ValueComp';
 import { ErrMessage } from './InputStyles';
@@ -36,7 +30,6 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
   const [editMode, setEditMode] = useState(false);
   const property = useProperty(propertyURL);
   const [value] = useValue(resource, propertyURL);
-  const store = useStore();
   const { agent } = useSettings();
   useHotkeys(
     'esc',
@@ -59,7 +52,7 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
 
   async function handleSave() {
     try {
-      await resource.save(store);
+      await resource.save();
       setEditMode(false);
       toast.success('Resource saved');
     } catch (e) {
