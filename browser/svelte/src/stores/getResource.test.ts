@@ -22,7 +22,7 @@ describe('getResource', () => {
     const resource = get(resourceStore);
 
     expect(resource).not.toBe(undefined);
-    expect(resource.getSubject()).toBe(resource1Subject);
+    expect(resource.subject).toBe(resource1Subject);
   });
 
   it('should update when the resource changes', async () => {
@@ -51,10 +51,10 @@ describe('getResource', () => {
 
     const resource = getResource(writableSubject, { newResource: true });
 
-    expect(get(resource).getSubject()).toBe(resource1Subject);
+    expect(get(resource).subject).toBe(resource1Subject);
 
     writableSubject.set(resource2Subject);
 
-    expect(get(resource).getSubject()).toBe(resource2Subject);
+    expect(get(resource).subject).toBe(resource2Subject);
   });
 });

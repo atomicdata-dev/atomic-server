@@ -9,7 +9,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { Resource, Store, core, dataBrowser, useStore } from '@tomic/react';
+import { Resource, core, dataBrowser, useStore } from '@tomic/react';
 import { useCallback, useState } from 'react';
 import { getTransitionName } from '../../helpers/transitionName';
 import { useSettings } from '../../helpers/AppSettings';
@@ -24,7 +24,6 @@ export type SideBarDragData = {
 };
 
 async function moveItemInSameParent(
-  store: Store,
   parent: Resource,
   subject: string,
   toPosition: number,
@@ -40,13 +39,12 @@ async function moveItemInSameParent(
     removed,
   );
 
-  await parent.set(dataBrowser.properties.subResources, newArray, store);
+  await parent.set(dataBrowser.properties.subResources, newArray);
 
-  await parent.save(store);
+  await parent.save();
 }
 
 async function moveItemBetweenParents(
-  store: Store,
   oldParent: Resource,
   newParent: Resource,
   resource: Resource,
@@ -56,8 +54,7 @@ async function moveItemBetweenParents(
     oldParent.get(dataBrowser.properties.subResources) ?? [];
   await oldParent.set(
     dataBrowser.properties.subResources,
-    oldSubResources.filter(subject => subject !== resource.getSubject()),
-    store,
+    oldSubResources.filter(subject => subject !== resource.subject),
   );
 
   const newSubResources =
@@ -65,15 +62,14 @@ async function moveItemBetweenParents(
 
   await newParent.set(
     dataBrowser.properties.subResources,
-    newSubResources.toSpliced(position, 0, resource.getSubject()),
-    store,
+    newSubResources.toSpliced(position, 0, resource.subject),
   );
 
-  await resource.set(core.properties.parent, newParent.getSubject(), store);
+  await resource.set(core.properties.parent, newParent.subject);
 
-  await oldParent.save(store);
-  await newParent.save(store);
-  await resource.save(store);
+  await oldParent.save();
+  await newParent.save();
+  await resource.save();
 }
 
 export const useSidebarDnd = (
@@ -193,10 +189,9 @@ export const useSidebarDnd = (
     let promise: Promise<void>;
 
     if (renderedUnder === dropParent) {
-      promise = moveItemInSameParent(store, newParent, subject, position);
+      promise = moveItemInSameParent(newParent, subject, position);
     } else {
       promise = moveItemBetweenParents(
-        store,
         oldParent,
         newParent,
         resource,

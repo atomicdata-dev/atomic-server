@@ -11,13 +11,28 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - [#850](https://github.com/atomicdata-dev/atomic-server/issues/850) Add drag & drop sorting to ResourceArray inputs.
 - [#757](https://github.com/atomicdata-dev/atomic-server/issues/757) Add drag & drop sorting to sidebar.
 
+### @tomic/lib
+
+- Deprecated `resource.getSubject()` in favor of `resource.subject`.
+- Deprecated `store.getResouceAsync()` in favor of `store.getResource()`.
+- BREAKING CHANGE: Resource now keeps a reference to store internally, therefore all methods that required you to pass a store have been changed to not require a store.
+  These methods are:
+  - `resource.canWrite()`
+  - `resource.getHistory()`
+  - `resource.getRights()`
+  - `resource.destroy()`
+  - `resource.save()`
+  - `resource.set()`
+  - `resource.removeClasses()`
+  - `resource.addClasses()`
+
 ## v0.37.0
 
 ### Atomic Browser
 
-- [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on new resource page.
-- [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on search result page.
-- [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focussed on an input
+- [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on the new resource page.
+- [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on the search result page.
+- [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focused on an input
 - [#758](https://github.com/atomicdata-dev/atomic-server/issues/758) Fix Relation column forms to close when clicking on the searchbox
 - [#780](https://github.com/atomicdata-dev/atomic-server/issues/780) Use tags in ontology editor to create enum properties.
 - [#810](https://github.com/atomicdata-dev/atomic-server/issues/810) Add button to resource selectors to navigate to the selected resource.

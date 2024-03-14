@@ -1,7 +1,6 @@
 import {
   Resource,
   useString,
-  properties,
   useStore,
   useResource,
   useArray,
@@ -36,18 +35,18 @@ export const useNewForm = (args: UseNewForm) => {
 
   const [subjectErr, setSubjectErr] = useState<Error | undefined>(undefined);
   const resource = useResource(subjectValue, resourseOpts);
-  const [parentVal] = useString(resource, properties.parent);
-  const [isAVal] = useArray(resource, properties.isA);
+  const [parentVal] = useString(resource, core.properties.parent);
+  const [isAVal] = useArray(resource, core.properties.isA);
 
   // When the resource is created or updated, make sure that the parent and class are present
   useEffect(() => {
     (async () => {
       if (parentVal !== parent) {
-        await resource.set(core.properties.parent, parent, store);
+        await resource.set(core.properties.parent, parent);
       }
 
       if (isAVal.length === 0) {
-        await resource.addClasses(store, klass.getSubject());
+        await resource.addClasses(klass.getSubject());
       }
 
       setInitialized(true);
@@ -59,7 +58,7 @@ export const useNewForm = (args: UseNewForm) => {
     setSubjectErr(undefined);
     setSubject(newSubject);
 
-    if (resource.get(properties.parent) !== parent) {
+    if (resource.get(core.properties.parent) !== parent) {
       // This prevents that we move an empty temporary resource
       return;
     }

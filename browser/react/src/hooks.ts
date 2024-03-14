@@ -231,7 +231,7 @@ export function useValue(
         return;
       }
 
-      resource.save(store).catch(e => store.notifyError(e));
+      resource.save().catch(e => store.notifyError(e));
     },
     commitDebounce,
     [resource, store],
@@ -257,7 +257,7 @@ export function useValue(
       // Validates and sets a property / value combination. Will invoke the
       // callback if the value is not valid.
       try {
-        await resource.set(propertyURL, newVal, store, validate);
+        await resource.set(propertyURL, newVal, validate);
         saveResource();
         handleValidationError?.(undefined);
       } catch (e) {
@@ -395,7 +395,6 @@ export function useArray(
 ): [string[], SetValue<JSONArray>, (vals: string[]) => void] {
   const [value, set] = useValue(resource, propertyURL, opts);
   const stableEmptyArray = useRef<JSONArray>([]);
-  const store = useStore();
 
   const values = useMemo(() => {
     if (value === undefined) {
@@ -420,10 +419,10 @@ export function useArray(
       resource.pushPropVal(propertyURL, val);
 
       if (opts?.commit) {
-        resource.save(store);
+        resource.save();
       }
     },
-    [resource, propertyURL, store],
+    [resource, propertyURL],
   );
 
   return [values as string[], set, push];
@@ -532,10 +531,7 @@ export function useCanWrite(
     setMsg('Checking write rights...');
 
     async function tryCanWrite() {
-      const [canWriteAsync, canWriteMsg] = await resource.canWrite(
-        store,
-        agent,
-      );
+      const [canWriteAsync, canWriteMsg] = await resource.canWrite(agent);
       setCanWrite(canWriteAsync);
 
       if (canWriteAsync) {

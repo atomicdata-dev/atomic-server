@@ -1,4 +1,4 @@
-import { Resource, useString, properties, useStore } from '@tomic/react';
+import { Resource, useString, core } from '@tomic/react';
 import { useState } from 'react';
 
 import toast from 'react-hot-toast';
@@ -22,13 +22,12 @@ export function ArticleDescription({
   resource,
   canEdit,
 }: ArticleDescriptionProps): JSX.Element {
-  const store = useStore();
-  const [description] = useString(resource, properties.description);
+  const [description] = useString(resource, core.properties.description);
   const [editMode, setEditMode] = useState(false);
 
   const saveContent = async () => {
     try {
-      await resource.save(store);
+      await resource.save();
       setEditMode(false);
       toast.success('Content saved');
     } catch (e) {
@@ -67,7 +66,7 @@ export function ArticleDescription({
       <>
         <ResourceField
           resource={resource}
-          propertyURL={properties.description}
+          propertyURL={core.properties.description}
         />
         <div>
           <Button onClick={saveContent}>Save</Button>

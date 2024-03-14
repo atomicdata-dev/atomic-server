@@ -36,33 +36,22 @@ export const NewTableDialog: FC<CustomResourceDialogProps> = ({
   const createResourceAndNavigate = useCreateAndNavigate();
 
   const onCancel = useCallback(() => {
-    instanceResource.destroy(store);
+    instanceResource.destroy();
     onClose();
-  }, [onClose, instanceResource, store]);
+  }, [onClose, instanceResource]);
 
   const onSuccess = useCallback(async () => {
-    await instanceResource.set(
-      core.properties.shortname,
-      stringToSlug(name),
-      store,
-    );
+    await instanceResource.set(core.properties.shortname, stringToSlug(name));
     await instanceResource.set(
       core.properties.description,
       `Represents a row in the ${name} table`,
-      store,
     );
-    await instanceResource.set(
-      core.properties.isA,
-      [core.classes.class],
-      store,
-    );
-    await instanceResource.set(core.properties.parent, parent, store);
-    await instanceResource.set(
-      core.properties.recommends,
-      [core.properties.name],
-      store,
-    );
-    await instanceResource.save(store);
+    await instanceResource.set(core.properties.isA, [core.classes.class]);
+    await instanceResource.set(core.properties.parent, parent);
+    await instanceResource.set(core.properties.recommends, [
+      core.properties.name,
+    ]);
+    await instanceResource.save();
 
     createResourceAndNavigate(
       dataBrowser.classes.table,
@@ -74,7 +63,7 @@ export const NewTableDialog: FC<CustomResourceDialogProps> = ({
     );
 
     onClose();
-  }, [name, instanceResource, store, onClose, parent]);
+  }, [name, instanceResource, onClose, parent]);
 
   const [dialogProps, show, hide] = useDialog({ onCancel, onSuccess });
 

@@ -51,7 +51,7 @@ export function createValueChangedHistoryItem(
 ): ValueChangeItem {
   return {
     type: HistoryItemType.ValueChange,
-    subject: resource.getSubject(),
+    subject: resource.subject,
     property,
     previousValue: resource.get(property),
   };
@@ -62,7 +62,7 @@ export function createResourceCreatedHistoryItem(
 ): ResourceCreatedItem {
   return {
     type: HistoryItemType.ResourceCreated,
-    subject: resource.getSubject(),
+    subject: resource.subject,
   };
 }
 
@@ -71,7 +71,7 @@ export function createResourceDeletedHistoryItem(
 ): ResourceDeletedItem {
   return {
     type: HistoryItemType.ResourceDeleted,
-    subject: resource.getSubject(),
+    subject: resource.subject,
     propVals: resource.getPropVals(),
   };
 }
@@ -79,14 +79,14 @@ export function createResourceDeletedHistoryItem(
 async function undoValueChange(item: ValueChangeItem, store: Store) {
   const resource = store.getResourceLoading(item.subject);
 
-  await resource.set(item.property, item.previousValue, store, false);
-  await resource.save(store);
+  await resource.set(item.property, item.previousValue, false);
+  await resource.save();
 }
 
 async function undoResourceCreated(item: ResourceCreatedItem, store: Store) {
   const resource = store.getResourceLoading(item.subject);
 
-  await resource.destroy(store);
+  await resource.destroy();
 
   return true;
 }
@@ -97,10 +97,10 @@ async function undoResourceDeleted(item: ResourceDeletedItem, store: Store) {
   });
 
   for (const [prop, val] of item.propVals) {
-    await resource.set(prop, val, store, false);
+    await resource.set(prop, val, false);
   }
 
-  await resource.save(store);
+  await resource.save();
 
   return true;
 }

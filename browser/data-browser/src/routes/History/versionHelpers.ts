@@ -1,4 +1,4 @@
-import { Resource, Store, Version } from '@tomic/react';
+import { Resource, Version } from '@tomic/react';
 
 const groupFormatter = new Intl.DateTimeFormat('default', {
   month: 'long',
@@ -38,7 +38,6 @@ export function dedupeVersions(versions: Version[]): Version[] {
 export async function setResourceToVersion(
   resource: Resource,
   version: Version,
-  store: Store,
 ): Promise<void> {
   const versionPropvals = version.resource.getPropVals();
 
@@ -50,10 +49,10 @@ export async function setResourceToVersion(
   }
 
   for (const [key, value] of versionPropvals.entries()) {
-    await resource.set(key, value, store);
+    await resource.set(key, value);
   }
 
-  await resource.save(store);
+  await resource.save();
 }
 
 export function groupVersionsByMonth(

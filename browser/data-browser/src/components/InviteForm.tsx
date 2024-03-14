@@ -1,10 +1,11 @@
 import {
   useResource,
   useStore,
-  properties,
   Resource,
   urls,
   useCurrentAgent,
+  core,
+  server,
 } from '@tomic/react';
 import { useCallback, useState } from 'react';
 import toast from 'react-hot-toast';
@@ -35,41 +36,41 @@ export function InviteForm({ target }: InviteFormProps) {
 
   /** Stores the Invite, sends it to the server, shows the Subject to the User */
   const createInvite = useCallback(async () => {
-    await invite.set(properties.isA, [urls.classes.invite], store);
-    await invite.set(properties.read, [urls.instances.publicAgent], store);
-    await invite.set(properties.invite.target, target.getSubject(), store);
+    await invite.set(core.properties.isA, [server.classes.invite]);
+    await invite.set(core.properties.read, [urls.instances.publicAgent]);
+    await invite.set(server.properties.target, target.subject);
 
     try {
       if (!agent) {
         throw new Error('No agent found');
       }
 
-      await invite.set(properties.parent, agent.subject, store);
-      await invite.save(store);
-      await navigator.clipboard.writeText(invite.getSubject());
+      await invite.set(core.properties.parent, agent.subject);
+      await invite.save();
+      await navigator.clipboard.writeText(invite.subject);
       toast.success('Copied to clipboard');
       setSaved(true);
     } catch (e) {
       setErr(e);
     }
-  }, [invite, store, agent, target]);
+  }, [invite, agent, target]);
 
   if (!saved) {
     return (
       <Card>
         <ResourceField
           label={'Give edit rights'}
-          propertyURL={urls.properties.invite.write}
+          propertyURL={server.properties.write}
           resource={invite}
         />
         <ResourceField
           label={'Invite text (optional)'}
-          propertyURL={urls.properties.description}
+          propertyURL={core.properties.description}
           resource={invite}
         />
         <ResourceField
           label={'How many times this link can be used. No value = no limit.'}
-          propertyURL={urls.properties.invite.usagesLeft}
+          propertyURL={server.properties.usagesLeft}
           resource={invite}
         />
         <Button onClick={createInvite}>Create Invite</Button>
@@ -84,7 +85,7 @@ export function InviteForm({ target }: InviteFormProps) {
     return (
       <Card>
         <p>Invite created and copied to clipboard! Send it to your buddy:</p>
-        <CodeBlock content={invite.getSubject()} data-test='invite-code' />
+        <CodeBlock content={invite.subject} data-test='invite-code' />
       </Card>
     );
 }

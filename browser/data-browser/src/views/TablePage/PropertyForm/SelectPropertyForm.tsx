@@ -1,4 +1,11 @@
-import { Resource, urls, useArray, useStore } from '@tomic/react';
+import {
+  Datatype,
+  Resource,
+  core,
+  dataBrowser,
+  useArray,
+  useStore,
+} from '@tomic/react';
 import { useCallback, useEffect } from 'react';
 import { Row } from '../../../components/Row';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
@@ -20,30 +27,30 @@ export function SelectPropertyForm({
 
   const [allowOnly, setAllowOnly] = useArray(
     resource,
-    urls.properties.allowsOnly,
+    core.properties.allowsOnly,
     valueOpts,
   );
 
   const [subResources, setSubResources] = useArray(
     resource,
-    urls.properties.subResources,
+    dataBrowser.properties.subResources,
     valueOpts,
   );
 
   const handleNewTag = useCallback(
     async (tag: Resource) => {
-      await setAllowOnly([...allowOnly, tag.getSubject()]);
-      await setSubResources([...subResources, tag.getSubject()]);
+      await setAllowOnly([...allowOnly, tag.subject]);
+      await setSubResources([...subResources, tag.subject]);
 
-      await tag.save(store);
+      await tag.save();
     },
-    [allowOnly, setAllowOnly, subResources, setSubResources, store],
+    [allowOnly, setAllowOnly, subResources, setSubResources],
   );
 
   const handleDeleteTag = useCallback(
     async (subject: string) => {
       const tag = store.getResourceLoading(subject);
-      tag.destroy(store);
+      tag.destroy();
 
       await setAllowOnly(removeFromArray(allowOnly, subject));
       await setSubResources(removeFromArray(subResources, subject));
@@ -52,12 +59,9 @@ export function SelectPropertyForm({
   );
 
   useEffect(() => {
-    resource.addClasses(
-      store,
-      urls.classes.constraintProperties.selectProperty,
-    );
+    resource.addClasses(dataBrowser.classes.selectProperty);
 
-    resource.set(urls.properties.datatype, urls.datatypes.resourceArray, store);
+    resource.set(core.properties.datatype, Datatype.RESOURCEARRAY);
   }, []);
 
   return (
@@ -67,7 +71,7 @@ export function SelectPropertyForm({
           <EditableTag subject={tag} key={tag} onDelete={handleDeleteTag} />
         ))}
       </Row>
-      <CreateTagRow parent={resource.getSubject()} onNewTag={handleNewTag} />
+      <CreateTagRow parent={resource.subject} onNewTag={handleNewTag} />
     </>
   );
 }
