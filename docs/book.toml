@@ -11,5 +11,9 @@ edit-url-template = "https://github.com/atomicdata-dev/atomic-server/edit/develo
 additional-css = ["atomic.css"]
 additional-js = ["discord.js"]
 
+[output.html.fold]
+enable = true
+level = 2
+
 [output.linkcheck]
 optional = true

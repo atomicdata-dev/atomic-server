@@ -1,4 +1,5 @@
 {{#title @tomic/cli: Generate Typescript types from an Ontology}}
+
 # @tomic/cli: Generate Typescript types from an Ontology
 
 `@tomic/cli` is an NPM tool that helps the developer with creating a front-end for their atomic data project by providing typesafety on resources.
@@ -27,19 +28,22 @@ You can install the package globally or as a dev dependency of your project.
 npm install -g @tomic/cli
 ```
 
+You should now be able to run:
+
+```
+ad-generate
+```
+
 **Dev Dependency:**
 
 ```
 npm install -D @tomic/cli
 ```
 
-If you've installed it globally you can now run the `ad-generate` command in your command line.
-When installing as a dependancy your PATH won't know about the command and so you will have to make a script in your `package.json` and run it via `npm <script_name>` instead.
+To run:
 
-```json
-"scripts": {
-	"generate": "ad-generate"
-}
+```
+npx ad-generate
 ```
 
 ### Generating the files
