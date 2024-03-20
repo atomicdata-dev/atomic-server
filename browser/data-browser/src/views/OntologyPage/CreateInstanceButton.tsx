@@ -32,7 +32,7 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
   };
 
   const handleSave = (subject: string) => {
-    ontology.pushPropVal(core.properties.instances, [subject], true);
+    ontology.push(core.properties.instances, [subject], true);
     ontology.save();
   };
 

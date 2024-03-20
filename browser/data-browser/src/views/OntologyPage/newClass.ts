@@ -24,7 +24,7 @@ export async function newClass(
 
   await resource.save();
 
-  parent.pushPropVal(core.properties.classes, [subject]);
+  parent.push(core.properties.classes, [subject]);
 
   await parent.save();
 

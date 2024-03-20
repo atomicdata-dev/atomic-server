@@ -42,8 +42,8 @@ export const NumberPropertyForm = ({
       await resource.addClasses(dataBrowser.classes.currencyProperty);
       await setDataType(Datatype.FLOAT);
     } else {
-      await resource.removeClasses(dataBrowser.classes.currencyProperty);
-      resource.removePropVal(dataBrowser.properties.currency);
+      resource.removeClasses(dataBrowser.classes.currencyProperty);
+      resource.remove(dataBrowser.properties.currency);
     }
   };
 
