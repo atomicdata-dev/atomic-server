@@ -245,7 +245,7 @@ export function useValue(
     async (newVal: JSONValue): Promise<void> => {
       if (newVal === undefined) {
         // remove the value
-        resource.removePropVal(propertyURL);
+        resource.remove(propertyURL);
         set(undefined);
         saveResource();
 
@@ -416,7 +416,7 @@ export function useArray(
 
   const push = useCallback(
     (val: string[]) => {
-      resource.pushPropVal(propertyURL, val);
+      resource.push(propertyURL, val);
 
       if (opts?.commit) {
         resource.save();

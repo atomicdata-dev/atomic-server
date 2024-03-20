@@ -6,7 +6,7 @@ import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ErrorLook } from '../../components/ErrorLook';
 import { styled } from 'styled-components';
 import { useVersions } from './useVersions';
-import { groupVersionsByMonth, setResourceToVersion } from './versionHelpers';
+import { groupVersionsByMonth } from './versionHelpers';
 import { toast } from 'react-hot-toast';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
@@ -37,7 +37,8 @@ export function History(): JSX.Element {
 
   const setResourceToCurrentVersion = async () => {
     if (selectedVersion && subject) {
-      await setResourceToVersion(resource, selectedVersion);
+      await resource.setVersion(selectedVersion);
+
       toast.success('Resource version updated');
       navigate(constructOpenURL(subject));
     }

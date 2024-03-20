@@ -163,7 +163,7 @@ export function ResourceForm({
   }
 
   function handleDelete(propertyURL: string) {
-    resource.removePropVal(propertyURL);
+    resource.remove(propertyURL);
     setTempOtherProps(tempOtherProps.filter(prop => prop !== propertyURL));
   }
 

@@ -2,6 +2,8 @@ import {
   Core,
   JSONValue,
   Resource,
+  core,
+  server,
   unknownSubject,
   urls,
   useArray,
@@ -215,13 +217,18 @@ function AtomicURLCellDisplay({
   value,
 }: DisplayCellProps<JSONValue>): JSX.Element {
   const resource = useResource(value as string);
-  const [[classType]] = useArray(resource, urls.properties.isA);
 
   if (!value) {
     return <></>;
   }
 
-  const Comp = getCellComponent(classType);
+  const Comp = resource.matchClass(
+    {
+      [core.classes.agent]: AgentCell,
+      [server.classes.file]: FileCell,
+    },
+    BasicCell,
+  );
 
   return <Comp resource={resource} />;
 }
@@ -231,17 +238,6 @@ function BasicCell({ resource }: ResourceCellProps) {
 
   return <SimpleResourceLink resource={resource}>{title}</SimpleResourceLink>;
 }
-
-const getCellComponent = (classType: string) => {
-  switch (classType) {
-    case urls.classes.agent:
-      return AgentCell;
-    case urls.classes.file:
-      return FileCell;
-    default:
-      return BasicCell;
-  }
-};
 
 interface ResultProps {
   subject: string;

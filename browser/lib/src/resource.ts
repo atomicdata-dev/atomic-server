@@ -20,6 +20,8 @@ import {
   OptionalClass,
   core,
   server,
+  Collection,
+  CollectionBuilder,
 } from './index.js';
 
 /** Contains the PropertyURL / Value combinations */
@@ -267,7 +269,7 @@ export class Resource<C extends OptionalClass = any> {
 
   /** Returns a list of classes of this resource */
   public getClasses(): string[] {
-    return this.getSubjects(properties.isA);
+    return this.getSubjects(core.properties.isA);
   }
 
   /** Checks if the resource is all of the given classes */
@@ -277,13 +279,33 @@ export class Resource<C extends OptionalClass = any> {
     );
   }
 
+  /**
+   * `.matchClass()` takes an object that maps class subjects to values.
+   * If the resource has a class that is a key in the object, the corresponding value is returned.
+   * An optional fallback value can be provided as the second argument.
+   * The order of the classes in the object is important, as the first match is returned.
+   */
+  public matchClass<T>(obj: Record<string, T>): T | undefined;
+  public matchClass<T>(obj: Record<string, T>, fallback: T): T;
+  public matchClass<T>(obj: Record<string, T>, fallback?: T): T | undefined {
+    for (const [classSubject, value] of Object.entries(obj)) {
+      if (this.hasClasses(classSubject)) {
+        return value;
+      }
+    }
+
+    return fallback;
+  }
+
   /** Remove the given classes from the resource */
-  public removeClasses(...classSubjects: string[]): Promise<void> {
-    return this.set(
-      properties.isA,
+  public removeClasses(...classSubjects: string[]): void {
+    // Using .set on this somehow has other typescript rules than using resource.set. Casting to Resource seems to fix this.
+    (this as Resource).set(
+      core.properties.isA,
       this.getClasses().filter(
         classSubject => !classSubjects.includes(classSubject),
       ),
+      false,
     );
   }
 
@@ -291,7 +313,11 @@ export class Resource<C extends OptionalClass = any> {
   public addClasses(...classSubject: string[]): Promise<void> {
     const classesSet = new Set([...this.getClasses(), ...classSubject]);
 
-    return this.set(properties.isA, Array.from(classesSet));
+    // Using .set on this somehow has other typescript rules than using resource.set. Casting to Resource seems to fix this.
+    return (this as Resource).set(
+      core.properties.isA as string,
+      Array.from(classesSet),
+    );
   }
 
   /** Returns true if the resource has changes in it's commit builder that are not yet saved to the server. */
@@ -299,7 +325,7 @@ export class Resource<C extends OptionalClass = any> {
     return this.commitBuilder.hasUnsavedChanges();
   }
 
-  public getCommitsCollection(): string {
+  public getCommitsCollectionSubject(): string {
     const url = new URL(this.subject);
     url.pathname = '/commits';
     url.searchParams.append('property', urls.properties.commit.subject);
@@ -311,15 +337,15 @@ export class Resource<C extends OptionalClass = any> {
     return url.toString();
   }
 
-  /** Returns the subject of the list of Children */
-  public getChildrenCollection(): string {
-    // We create a collection that contains all children of the current Subject
-    const url = new URL(this.subject);
-    url.pathname = '/query';
-    url.searchParams.set('property', properties.parent);
-    url.searchParams.set('value', this.subject);
-
-    return url.toString();
+  /** Returns a Collection with all children of this resource
+   * @param pageSize The amount of children per page (default: 100)
+   */
+  public async getChildrenCollection(pageSize = 100): Promise<Collection> {
+    return await new CollectionBuilder(this.store)
+      .setPageSize(pageSize)
+      .setProperty(core.properties.parent)
+      .setValue(this.subject)
+      .buildAndFetch();
   }
 
   /** builds all versions using the Commits */
@@ -327,7 +353,7 @@ export class Resource<C extends OptionalClass = any> {
     progressCallback?: (percentage: number) => void,
   ): Promise<Version[]> {
     const commitsCollection = await this.store.fetchResourceFromServer(
-      this.getCommitsCollection(),
+      this.getCommitsCollectionSubject(),
     );
     const commits = commitsCollection.get(
       properties.collection.members,
@@ -358,6 +384,23 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     return builtVersions;
+  }
+
+  public async setVersion(version: Version): Promise<void> {
+    const versionPropvals = version.resource.getPropVals();
+
+    // Remove any prop that doesn't exist in the version
+    for (const prop of this.propvals.keys()) {
+      if (!versionPropvals.has(prop)) {
+        this.remove(prop);
+      }
+    }
+
+    for (const [key, value] of versionPropvals.entries()) {
+      await this.set(key, value);
+    }
+
+    await this.save();
   }
 
   /**
@@ -451,12 +494,13 @@ export class Resource<C extends OptionalClass = any> {
     this.store.removeResource(this.subject);
   }
 
+  /** @deprecated use `resource.push` */
+  public pushPropVal(propUrl: string, values: JSONArray, unique?: boolean) {
+    this.push(propUrl, values, unique);
+  }
+
   /** Appends a Resource to a ResourceArray */
-  public pushPropVal(
-    propUrl: string,
-    values: JSONArray,
-    unique?: boolean,
-  ): void {
+  public push(propUrl: string, values: JSONArray, unique?: boolean): void {
     const propVal = (this.get(propUrl) as JSONArray) ?? [];
 
     if (unique) {
@@ -471,8 +515,13 @@ export class Resource<C extends OptionalClass = any> {
     this.propvals.set(propUrl, [...propVal, ...values]);
   }
 
-  /** Removes a property value combination from the resource and adds it to the next Commit */
+  /** @deprecated use `resource.remove()` */
   public removePropVal(propertyUrl: string): void {
+    this.remove(propertyUrl);
+  }
+
+  /** Removes a property value combination from the resource and adds it to the next Commit */
+  public remove(propertyUrl: string): void {
     // Delete from this resource
     this.propvals.delete(propertyUrl);
 
@@ -636,7 +685,7 @@ export class Resource<C extends OptionalClass = any> {
      */
     validate = true,
   ): Promise<void> {
-    if (this.store.isOffline()) {
+    if (this.store.isOffline() && validate) {
       console.warn('Offline, not validating');
       validate = false;
     }
@@ -647,7 +696,7 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     if (value === undefined) {
-      this.removePropVal(prop);
+      this.remove(prop);
 
       return;
     }

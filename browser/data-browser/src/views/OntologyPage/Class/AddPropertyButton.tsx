@@ -1,4 +1,4 @@
-import { Resource, Store, core, urls, useStore } from '@tomic/react';
+import { Datatype, Resource, Store, core, useStore } from '@tomic/react';
 import { useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { transition } from '../../../helpers/transition';
@@ -24,7 +24,7 @@ async function newProperty(shortname: string, parent: Resource, store: Store) {
     propVals: {
       [core.properties.shortname]: shortname,
       [core.properties.description]: 'a property',
-      [core.properties.datatype]: urls.datatypes.string,
+      [core.properties.datatype]: Datatype.STRING,
     },
   });
 
@@ -53,9 +53,9 @@ export function AddPropertyButton({
 
     const creatorProp =
       type === 'required'
-        ? urls.properties.requires
-        : urls.properties.recommends;
-    creator.pushPropVal(creatorProp, [newValue]);
+        ? core.properties.requires
+        : core.properties.recommends;
+    creator.push(creatorProp, [newValue]);
     await creator.save();
   };
 
@@ -75,7 +75,7 @@ export function AddPropertyButton({
           autoFocus
           value=''
           onChange={handleSetValue}
-          isA={urls.classes.property}
+          isA={core.classes.property}
           onClose={() => setActive(false)}
           onCreateItem={handleCreateProperty}
         />

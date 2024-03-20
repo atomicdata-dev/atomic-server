@@ -48,7 +48,7 @@ export class CollectionBuilder {
     return new Collection(this.store, this.server, this.params);
   }
 
-  public async buildAndFetch() {
+  public async buildAndFetch(): Promise<Collection> {
     const collection = this.build();
 
     await collection.waitForReady();

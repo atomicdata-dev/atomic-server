@@ -1,4 +1,5 @@
 import { isNumber } from './datatypes.js';
+import { Collections, collections } from './ontologies/collections.js';
 import { Resource } from './resource.js';
 import { Store } from './store.js';
 import { urls } from './urls.js';
@@ -14,6 +15,11 @@ export interface CollectionParams extends QueryFilter {
   page_size: string;
 }
 
+export interface CollectionOptions {
+  noFetch?: boolean;
+  endpoint?: string;
+}
+
 /**
  * A collection is a dynamic resource that queries the server for a list of resources that meet it's criteria.
  * Checkout [the docs](https://docs.atomicdata.dev/schema/collections.html) for more information.
@@ -24,7 +30,7 @@ export interface CollectionParams extends QueryFilter {
 export class Collection {
   public readonly __internalObject = this;
   private store: Store;
-  private pages = new Map<number, Resource>();
+  private pages = new Map<number, Resource<Collections.Collection>>();
   private server: string;
   private params: CollectionParams;
 
@@ -73,6 +79,10 @@ export class Collection {
     return this._totalMembers;
   }
 
+  public get numberOfPages(): number {
+    return Math.ceil(this.totalMembers / this.pageSize);
+  }
+
   public waitForReady(): Promise<void> {
     return this._waitForReady;
   }
@@ -90,9 +100,7 @@ export class Collection {
     }
 
     const resource = this.pages.get(page)!;
-    const members = resource.getArray(
-      urls.properties.collection.members,
-    ) as string[];
+    const members = resource.getSubjects(collections.properties.members);
 
     return members[index % this.pageSize];
   }
@@ -121,7 +129,7 @@ export class Collection {
     await this.waitForReady();
 
     for (let i = 0; i < this.totalMembers; i++) {
-      yield this.getMemberWithIndex(i);
+      yield await this.getMemberWithIndex(i);
     }
   }
 
@@ -139,6 +147,16 @@ export class Collection {
     this.params.page_size = prevPageSize;
 
     return members;
+  }
+
+  public async getMembersOnPage(page: number): Promise<string[]> {
+    if (!this.pages.has(page)) {
+      await this.fetchPage(page);
+    }
+
+    const resource = this.pages.get(page)!;
+
+    return resource.props.members ?? [];
   }
 
   private buildSubject(page: number): string {
