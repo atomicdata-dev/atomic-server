@@ -2,7 +2,7 @@
 
 The `Store` class is a central component in the @tomic/lib library that provides a convenient interface for managing and interacting with atomic data resources. It allows you to fetch resources, subscribe to changes, create new resources, perform full-text searches, and more.
 
-## Setting up a store.
+## Setting up a store
 
 Creating a store is done with the Store constructor.
 
@@ -12,10 +12,10 @@ const store = new Store();
 
 It takes an object with the following options
 
-| Name      | Type                      | Description                                                                                                                              |
-| --------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| serverUrl | string                    | URL of your atomic server                                                                                                                |
-| agent     | [Agent](/js-lib/agent.md) | **(optional)** The agent the store should use to fetch resources and to sign commits when editting resources, defaults to a public agent |
+| Name      | Type                | Description                                                                                                                              |
+|-----------|---------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| serverUrl | string              | URL of your atomic server                                                                                                                |
+| agent     | [Agent](./agent.md) | **(optional)** The agent the store should use to fetch resources and to sign commits when editting resources, defaults to a public agent |
 
 ```typescript
 const store = new Store({
@@ -27,13 +27,13 @@ const store = new Store({
 > **NOTE** </br>
 > You can always change or set both the serverUrl and agent at a later time using `store.setServerUrl()` and `store.setAgent()` respectively.
 
-### One vs Many Stores.
+### One vs Many Stores
 
 Generally in a client application with one authenticated user, you'll want to have a single instance of a `Store` that is shared throughout the app.
 This way you'll never fetch resources more than once while still receiving updates via websocket messages.
 If `store` is used on the server however, you might want to consider creating a new store for each request as a store can only have a single agent associated with it and changing the agent will reauthenticate all websocket connections.
 
-## Fetching resources.
+## Fetching resources
 
 > **NOTE:** </br>
 > If you're using atomic in a frontend library like React or Svelte there might be other ways to fetch resources that are better suited to those libraries. Check [@tomic/react](../usecases/react.md) or [@tomic/svelte](../svelte.md)
@@ -47,7 +47,7 @@ const resource = await store.getResource('https://my-resource-subject');
 `getResource` takes the [subject](../core/concepts.md#subject-field) of the resource as a parameter and returns a promise that resolves to the requested resource.
 The store will cache the resource in memory and subscribe to the server for changes to the resource, subsequent requests for the resource will not fetch over the network but return the cached version.
 
-## Subscribe to changes.
+## Subscribe to changes
 
 Atomic makes it easy to build real-time applications.
 When you subscribe to a subject you get notified every time the resource changes on the server.
@@ -85,13 +85,13 @@ store.subscribe('https://my-resource-subject', callback);
 store.unsubscribe('https://my-resource-subject', callback);
 ```
 
-## Creating new resources.
+## Creating new resources
 
 Creating resources is done using the `store.newResource` method.
 It takes an options object with the following properties:
 
 | Name     | Type                      | Description                                                                                                                       |
-| -------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+|----------|---------------------------|-----------------------------------------------------------------------------------------------------------------------------------|
 | subject  | string                    | **(optional)** The subject the new resource should have, by default a random subject is generated                                 |
 | parent   | string                    | **(optional)** The parent of the new resource, defaults to the store's `serverUrl`                                                |
 | isA      | string \| string[]        | **(optional)** The 'type' of the resource. determines what class it is. Supports multiple classes.                                |
@@ -134,7 +134,7 @@ const results = await store.search('lorem ipsum');
 To further refine your query you can pass an options object with the following properties:
 
 | Name    | Type                   | Description                                                                                                                                       |
-| ------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+|---------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|
 | include | boolean                | **(optional)** If true sends full resources in the response instead of just the subjects                                                          |
 | limit   | number                 | **(optional)** The max number of results to return, defaults to 30.                                                                               |
 | parents | string[]               | **(optional)** Only include resources that have these given parents somewhere as an ancestor                                                      |
@@ -152,7 +152,7 @@ const results = store.search('holiday-1995', {
 });
 ```
 
-## (Advanced) Fetching resources in render code.
+## (Advanced) Fetching resources in render code
 
 > **NOTE:** </br>
 > The following is mostly intended for library authors.
@@ -198,7 +198,7 @@ store.on(StoreEvents.Error, error => {
 The following events are available
 
 | Event ID                      | Handler type                 | Description                                |
-| ----------------------------- | ---------------------------- | ------------------------------------------ |
+|-------------------------------|------------------------------|--------------------------------------------|
 | `StoreEvents.ResourceSaved`   | (resource: Resource) => void | Fired when any resource was saved          |
 | `StoreEvents.ResourceRemoved` | (resource: Resource) => void | Fired when any resource was deleted        |
 | `StoreEvents.AgentChanged`    | (agent: Agent) => void       | Fired when a new agent is set on the store |
