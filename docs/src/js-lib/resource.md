@@ -35,7 +35,7 @@ const resource = await store.getResource<Article>(
 ```
 
 Annotating resources opens up a lot of great dev experience improvements, such as autocompletion and type checking.
-Read more about generating ontologies with [@tomic/cli](../cli/README.md).
+Read more about generating ontologies with [@tomic/cli](../js-cli.md).
 
 ## Reading Data
 
@@ -91,11 +91,11 @@ You should await the method when validation is enabled because the property's re
 > Setting validate to false only disables validation on the client. The server will always validate the data and respond with an error if the data is invalid.
 
 **Parameters**
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| property | string | Subject of the property to set |
-| value | JSONValue\* | The value to set |
-| validate | boolean | Whether to validate the value against the property's datatype |
+| Name     | Type        | Description                                                   |
+|----------|-------------|---------------------------------------------------------------|
+| property | string      | Subject of the property to set                                |
+| value    | JSONValue\* | The value to set                                              |
+| validate | boolean     | Whether to validate the value against the property's datatype |
 
 \*When setting properties from known ontologies, you get automatic type-checking as a bonus.
 
@@ -121,11 +121,11 @@ await resource.save();
 ```
 
 **Parameters**
-| Name | Type | Description |
-| ---- | ---- | ----------- |
-| property | string | Subject of the property to push to |
-| values | JSONArray | list of values to push |
-| unique | boolean | **(Optional)** When true, does not push values already contained in the list. (Defaults to `false`) |
+| Name     | Type      | Description                                                                                         |
+|----------|-----------|-----------------------------------------------------------------------------------------------------|
+| property | string    | Subject of the property to push to                                                                  |
+| values   | JSONArray | list of values to push                                                                              |
+| unique   | boolean   | **(Optional)** When true, does not push values already contained in the list. (Defaults to `false`) |
 
 ### Removing properties
 

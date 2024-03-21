@@ -2,7 +2,7 @@
 
 If you want to work with data from your AtomicServer you can use the following libraries.
 
-## [@tomic/lib](js-lib.md)
+## [@tomic/lib](js.md)
 
 Core JS library for AtomicServer, handles data fetching, parsing, storing, signing commits, setting up websockets and full-text search and more.
 
