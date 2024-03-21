@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Serialization / formatting / encoding (JSON, RDF, N-Triples)
 
 use serde_json::Map;

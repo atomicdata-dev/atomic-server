@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Validate the Store and create a ValidationReport.
 //! Might be deprecated soon, as Validation hasn't been necessary since parsing has built-in data validation.
 

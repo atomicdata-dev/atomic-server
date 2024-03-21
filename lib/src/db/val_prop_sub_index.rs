@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Index sorted by {Value}-{Property}-{Subject}.
 use crate::{atoms::IndexAtom, errors::AtomicResult, Db, Value};
 use tracing::instrument;

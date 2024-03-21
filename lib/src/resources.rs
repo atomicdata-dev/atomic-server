@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! A [Resource] is a set of [Atom]s that share a URL.
 //! Has methods for saving resources and getting properties inside them.
 

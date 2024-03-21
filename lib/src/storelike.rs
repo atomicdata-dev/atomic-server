@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
 
 use crate::{

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 use crate::{endpoints::Endpoint, urls};
 
 pub fn upload_endpoint() -> Endpoint {

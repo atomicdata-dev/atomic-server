@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 /// Creates a populated Store with an agent (testman) and one test resource (_:test)
 #[cfg(test)]
 pub fn init_store() -> crate::Store {
