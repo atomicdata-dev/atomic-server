@@ -29,7 +29,7 @@ Now in your data folder create some projects and add them to your homepage resou
 
 Since we changed the ontology we will have to generate our types again:
 
-```
+```bash
 npx ad-generate ontologies
 ```
 
@@ -50,8 +50,8 @@ interface Props {
 const store = getStore();
 
 const { subject } = Astro.props;
-const project = await store.getResourceAsync<Project>(subject);
-const coverImg = await store.getResourceAsync<Server.File>(project.props.image);
+const project = await store.getResource<Project>(subject);
+const coverImg = await store.getResource<Server.File>(project.props.image);
 
 const description = marked.parse(project.props.description);
 ---
@@ -98,7 +98,7 @@ const description = marked.parse(project.props.description);
 
 ```
 
-The component takes a subject as a prop that we use to fetch the project resource using the `.getResourceAsync()` method.
+The component takes a subject as a prop that we use to fetch the project resource using the `.getResource()` method.
 We then fetch the image resource using the same method.
 
 The description is markdown so we have to parse that first like we did on the homepage.
@@ -118,7 +118,7 @@ import Project from '../components/Project.astro';
 
 const store = getStore();
 
-const homepage = await store.getResourceAsync<Homepage>(
+const homepage = await store.getResource<Homepage>(
   import.meta.env.ATOMIC_HOMEPAGE_SUBJECT,
 );
 

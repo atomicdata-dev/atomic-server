@@ -3,11 +3,11 @@
 Let's start with setting up Astro.
 
 > **NOTE:** </br>
-> I will use **npm** since that is the standard but you can of course use other package managers like pnpm (which I would normally choose)
+> I will use **npm** since that is the standard but you can of course use other package managers like pnpm.
 
 To create an Astro project open your terminal in the folder you'd like to house the projects folder and run the following command:
 
-```
+```bash
 npm create astro@latest
 ```
 
@@ -27,7 +27,7 @@ Check to see if everything went smoothly by testing out if it works. Run `npm ru
 You should see a boring page that looks like this:
 ![Astro](img/3-1.webp)
 
-### About Astro
+## About Astro
 
 If you've never used Astro before here is a short primer:
 
@@ -38,7 +38,7 @@ Routing is achieved via the filesystem so for example the file `pages/blog/how-t
 
 To share layouts like headers and footers between pages we use Layout components, these are placed in the `layouts` folder. Let's create a layout right now.
 
-### Layout
+## Layout
 
 In `src` create a folder called `layouts` and in there a file called `Layout.astro`.
 

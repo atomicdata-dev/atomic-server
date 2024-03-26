@@ -4,7 +4,7 @@ It's time to generate some Typescript types and display our data in the Astro fr
 
 First things first, install the `@tomic/lib` and `@tomic/cli` packages.
 
-```
+```bash
 npm install @tomic/lib
 npm install -D @tomic/cli
 ```
@@ -14,7 +14,7 @@ We can configure this using the `atomic.config.json` file.
 
 Run the following command to generate one at the current working directory (Make sure this is the root of the Astro project)
 
-```
+```bash
 npx ad-generate init
 ```
 
@@ -40,7 +40,7 @@ Paste the URL as a string in the ontologies array like so:
 
 We're ready to generate the types, Run the following command:
 
-```
+```bash
 npx ad-generate ontologies
 ```
 
