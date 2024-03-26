@@ -55,8 +55,8 @@ interface Props {
 const { subject } = Astro.props;
 const store = getStore();
 
-const blogpost = await store.getResourceAsync<Blogpost>(subject);
-const cover = await store.getResourceAsync<Server.File>(blogpost.props.image);
+const blogpost = await store.getResource<Blogpost>(subject);
+const cover = await store.getResource<Server.File>(blogpost.props.image);
 ---
 
 <a href={`/blog/${blogpost.props.titleSlug}`}>
@@ -144,7 +144,7 @@ import BlogCard from '../../components/BlogCard.astro';
 
 const store = getStore();
 
-const homepage = await store.getResourceAsync<Homepage>(
+const homepage = await store.getResource<Homepage>(
   import.meta.env.ATOMIC_HOMEPAGE_SUBJECT,
 );
 
@@ -237,7 +237,7 @@ export const getStaticPaths = (async () => {
 
   // Iterate over the collection and add the title-slug to the paths array
   for await (const subject of collection) {
-    const post = await store.getResourceAsync<Blogpost>(subject);
+    const post = await store.getResource<Blogpost>(subject);
 
     paths.push({
       params: {
@@ -330,7 +330,7 @@ export const getStaticPaths = (async () => {
 
   // Iterate over the collection and add the title-slug to the paths array
   for await (const subject of collection) {
-    const post = await store.getResourceAsync<Blogpost>(subject);
+    const post = await store.getResource<Blogpost>(subject);
 
     paths.push({
       params: {
@@ -353,7 +353,7 @@ const store = getStore();
 
 const { subject } = Astro.props;
 
-const post = await store.getResourceAsync<Blogpost>(subject);
+const post = await store.getResource<Blogpost>(subject);
 
 const content = marked.parse(post.props.description);
 ---
@@ -409,7 +409,7 @@ interface Props {
 
 const { resource } = Astro.props;
 const store = getStore();
-const cover = await store.getResourceAsync<Server.File>(resource.props.image);
+const cover = await store.getResource<Server.File>(resource.props.image);
 ---
 
 <header>

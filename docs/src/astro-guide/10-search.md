@@ -133,7 +133,7 @@ In `src/components` create a file called `Search.astro`.
      * Create a result link for the given blog post.
      */
     private async createResultItem(subject: string): Promise<HTMLAnchorElement> {
-      const post = await this.store.getResourceAsync<Blogpost>(subject);
+      const post = await this.store.getResource<Blogpost>(subject);
 
       const resultLine = document.createElement('a');
       resultLine.innerText = post.title;
@@ -181,7 +181,7 @@ Now all that's left to do is use the component to the blog page.
 And there it is! A working real-time search bar 🎉
 
 <video loop autoplay muted>
-<source src="videos/10-1.mp4">
+  <source src="videos/10-1.mp4">
 </video>
 
 ## The end, what's next?

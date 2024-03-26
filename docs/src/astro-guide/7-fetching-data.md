@@ -53,11 +53,11 @@ Now that we have a store we can start fetching data.
 
 ## Fetching
 
-To fetch data we are going to use the `store.getResourceAsync()` method.
+To fetch data we are going to use the `store.getResource()` method.
 This is an async method on Store that takes a subject and returns a promise that resolves to a resource.
-When `getResourceAsync` is called again with the same subject the store will return the cached version of the resource instead so don't worry about fetching the same resource again in multiple components.
+When `getResource` is called again with the same subject the store will return the cached version of the resource instead so don't worry about fetching the same resource again in multiple components.
 
-`getResourceAsync` also accepts a type parameter, this type parameter is the subject of the resource's class.
+`getResource` also accepts a type parameter, this type parameter is the subject of the resource's class.
 You could type out the whole URL each time but luckily `@tomic/cli` generated shorthands for us.
 
 Fetching our homepage will look something like this:
@@ -65,7 +65,7 @@ Fetching our homepage will look something like this:
 ```typescript
 import type { Homepage } from '../ontologies/myPortfolio';
 
-const homepage = await store.getResourceAsync<Homepage>('<homepage subject>'); // Resource<Homepage>
+const homepage = await store.getResource<Homepage>('<homepage subject>'); // Resource<Homepage>
 ```
 
 ## Reading data
@@ -112,7 +112,7 @@ import type { Homepage } from '../ontologies/myPortfolio';
 
 const store = getStore();
 
-const homepage = await store.getResourceAsync<Homepage>(
+const homepage = await store.getResource<Homepage>(
 	import.meta.env.ATOMIC_HOMEPAGE_SUBJECT,
 );
 ---
@@ -128,7 +128,7 @@ Check your browser and you should see the body text has changed!
 
 It's not rendered as markdown yet so let's quickly fix that by installing `marked` and updating our `index.astro`.
 
-```
+```bash
 npm install marked
 ```
 
@@ -142,7 +142,7 @@ import type { Homepage } from '../ontologies/myPortfolio';
 
 const store = getStore();
 
-const homepage = await store.getResourceAsync<Homepage>(
+const homepage = await store.getResource<Homepage>(
   import.meta.env.ATOMIC_HOMEPAGE_SUBJECT,
 );
 
@@ -184,7 +184,7 @@ interface Props {
 const store = getStore();
 const { resource } = Astro.props;
 
-const image = await store.getResourceAsync<Server.File>(
+const image = await store.getResource<Server.File>(
   resource.props.headerImage,
 );
 ---
@@ -217,7 +217,7 @@ const image = await store.getResourceAsync<Server.File>(
 To display the header image we can't just use `resource.props.headerImage` directly in the src of the image element because the value is a reference to another resource, not the image link.
 In most databases or CMSes, a reference would be some ID that you'd have to use in some type-specific endpoint or query language, not in Atomic.
 A reference is just a subject, a URL that points to the resource.
-If you wanted to you could open it in a browser or use the browser fetch API to get the resources JSON-AD and since it is a subject we can do the same we did to fetch the homepage, use `store.getResourceAsync()`.
+If you wanted to you could open it in a browser or use the browser fetch API to get the resources JSON-AD and since it is a subject we can do the same we did to fetch the homepage, use `store.getResource()`.
 
 Once we've fetched the image resource we can access the image URL through the `download-url` property e.g. `image.props.downloadUrl`.
 
