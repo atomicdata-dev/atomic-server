@@ -1,4 +1,5 @@
 {{#title @tomic/react: Using Atomic Data in a JS / TS React project}}
+
 # @tomic/react: Using Atomic Data in a JS / TS React project
 
 Atomic Data has been designed with front-end development in mind.
@@ -7,13 +8,60 @@ The open source [Atomic-Data-Browser](https://github.com/atomicdata-dev/atomic-d
 - `@tomic/lib` ([docs](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_lib.html)) is the core library, containing logic for fetching and storing data, keeping things in sync using websockets, and signing [commits](../commits/intro.md).
 - `@tomic/react` ([docs](https://atomicdata-dev.github.io/atomic-data-browser/docs/modules/_tomic_react.html)) is the react library, featuring various useful hooks that mimic `useState`, giving you real-time updates through your app.
 
-Check out the [template on CodeSandbox](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223):
+Check out the [template on CodeSandbox](https://codesandbox.io/s/atomic-data-react-template-4y9qu?file=/src/MyResource.tsx:0-1223).
 
-<iframe src="https://codesandbox.io/embed/atomic-data-react-template-4y9qu?fontsize=14&hidenavigation=1&theme=dark"
-  style="width:100%; height:500px; border:0; border-radius: 4px; overflow:hidden;"
-  title="Atomic Data - React Template"
-  allow="accelerometer; ambient-light-sensor; camera; encrypted-media; geolocation; gyroscope; hid; microphone; midi; payment; usb; vr; xr-spatial-tracking"
-  sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
-></iframe>
+This template is a very basic version of the Atomic Data Browser, where you can browse through resources, and see their properties.
+There is also some basic editing functionality for descriptions.
+
+<iframe src="https://codesandbox.io/embed/yyd8jx?view=Editor+%2B+Preview&module=%2Fsrc%2Fcomponents%2FBrowser.module.css&hidenavigation=1"
+     style="width:100%; height: 500px; border:0; border-radius: 4px; overflow:hidden;"
+     title="beautiful-marco-yyd8jx"
+     sandbox="allow-forms allow-modals allow-popups allow-presentation allow-same-origin allow-scripts"
+   ></iframe>
 
 Feeling stuck? [Post an issue](https://github.com/atomicdata-dev/atomic-data-browser/issues/new) or [join the discord](https://discord.gg/a72Rv2P).
+
+## Getting Started
+
+### Installation
+
+```bash
+npm install @tomic/react
+```
+
+### Setup
+
+For Atomic React to work, you need to wrap your app in a `StoreContext.Provider` and provide a [Store](../js-lib/store.md) instance.
+
+```jsx
+// App.tsx
+import { Store, StoreContext, Agent } from '@tomic/react';
+
+const store = new Store({
+  serverUrl: 'my-atomic-server-url',
+  agent: Agent.fromSecret('my-agent-secret');
+});
+
+
+export const App = () => {
+  return (
+    <StoreContext.Provider value={store}>
+      ...
+    </StoreContext.Provider>
+  );
+};
+```
+
+## Hooks
+
+Atomic React provides a few useful hooks to interact with your atomic data.
+Read more about them by clicking on their names
+
+- [useStore](../react/useStore.md)
+- useResource
+- useValue
+  - useString
+  - useNumber
+  - useBoolean
+  - useArray
+- useCollection
