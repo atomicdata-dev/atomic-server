@@ -9,7 +9,7 @@ document.body.appendChild(script);
 
 script.onload = function () {
   new Crate({
-    server: '299881420891881473',
-    channel: '355719584830980096',
+    server: '723588174747533393',
+    channel: '723588175351513152',
   });
 };
