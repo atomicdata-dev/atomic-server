@@ -255,7 +255,7 @@ impl Db {
 
         let mut subjects: Vec<String> = vec![];
         let mut resources: Vec<Resource> = vec![];
-        let mut total_count = 0;
+        let mut total_count = q.offset;
 
         let atoms = self.get_index_iterator_for_query(q);
 
