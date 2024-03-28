@@ -40,6 +40,8 @@ export function useCollection(
   queryFilter: QueryFilter,
   pageSize?: number,
 ): UseCollectionResult {
+  const [firstRun, setFirstRun] = useState(true);
+
   const store = useStore();
   const [server] = useServerURL();
 
@@ -56,6 +58,12 @@ export function useCollection(
   }, []);
 
   useEffect(() => {
+    if (firstRun) {
+      setFirstRun(false);
+
+      return;
+    }
+
     const newCollection = buildCollection(
       store,
       server,

@@ -91,9 +91,9 @@ export async function authenticate(
 
   // Maybe this should happen after the authentication is confirmed?
   fetchAll &&
-    this.resources.forEach(r => {
+    store.resources.forEach(r => {
       if (r.isUnauthorized() || r.loading) {
-        this.fetchResourceFromServer(r.getSubject());
+        store.fetchResourceFromServer(r.subject);
       }
     });
 }

@@ -2,7 +2,6 @@ import { isNumber } from './datatypes.js';
 import { Collections, collections } from './ontologies/collections.js';
 import { Resource } from './resource.js';
 import { Store } from './store.js';
-import { urls } from './urls.js';
 
 export interface QueryFilter {
   property?: string;
@@ -35,6 +34,8 @@ export class Collection {
   private params: CollectionParams;
 
   private _totalMembers = 0;
+
+  private _totalPages = 0;
 
   private _waitForReady: Promise<void>;
 
@@ -79,7 +80,7 @@ export class Collection {
     return this._totalMembers;
   }
 
-  public get numberOfPages(): number {
+  public get totalPages(): number {
     return Math.ceil(this.totalMembers / this.pageSize);
   }
 
@@ -134,17 +135,11 @@ export class Collection {
   }
 
   public async getAllMembers(): Promise<string[]> {
-    const prevPageSize = this.params.page_size;
-    // Set page size to a high number for less request overhead.
-    this.params.page_size = '1000';
-
     const members: string[] = [];
 
     for await (const member of this) {
       members.push(member);
     }
-
-    this.params.page_size = prevPageSize;
 
     return members;
   }
@@ -173,7 +168,8 @@ export class Collection {
 
   private async fetchPage(page: number): Promise<void> {
     const subject = this.buildSubject(page);
-    const resource = await this.store.fetchResourceFromServer(subject);
+    const resource =
+      await this.store.fetchResourceFromServer<Collections.Collection>(subject);
 
     if (!resource) {
       throw new Error('Invalid collection: resource does not exist');
@@ -187,13 +183,14 @@ export class Collection {
 
     this.pages.set(page, resource);
 
-    const totalMembers = resource.get(urls.properties.collection.totalMembers);
+    const totalMembers = resource.props.totalMembers;
 
     if (!isNumber(totalMembers)) {
       throw new Error('Invalid collection: total-members is not a number');
     }
 
     this._totalMembers = totalMembers;
+    this._totalPages = resource.props.totalPages ?? 0;
   }
 }
 

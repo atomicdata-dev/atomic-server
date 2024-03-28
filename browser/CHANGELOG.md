@@ -21,7 +21,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 - Added `resource.matchClass()` method.
 - Added `resource.setVersion()` method.
 - Added `collection.getMembersOnPage()` method.
-- Added `collection.numberOfPages`.
+- Added `collection.totalPages`.
 - BREAKING CHANGE: Renamed `resource.getCommitsCollection` to `resource.getCommitsCollectionSubject`.
 - BREAKING CHANGE: `resource.getChildrenCollection()` now returns a `Promise<Collection>` instead of a subject.
 - BREAKING CHANGE: Resource now keeps a reference to store internally, therefore all methods that required you to pass a store have been changed to not require a store.
@@ -34,6 +34,11 @@ This changelog covers all three packages, as they are (for now) updated as a who
   - `resource.set()`
   - `resource.removeClasses()`
   - `resource.addClasses()`
+
+# @tomic/react
+
+- Added `useCollectionPage` hook.
+- Fix bug where `useCollection` would fetch the collection twice on mount.
 
 ### @tomic/cli
 
