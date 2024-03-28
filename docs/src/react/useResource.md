@@ -61,7 +61,7 @@ const age = Date.now() - resource.props.yearOfBirth
 A common way to build interfaces with Atomic React is to make a *view* component.
 Views are a concept where the component is responsible for rendering a resource in a certain way to fit in the context of the view type.
 
-The view selects a component based on the resource's class or renders a default view if there is no component for that class.
+The view selects a component based on the resource's class or renders a default view when there is no component for that class.
 In this example, we have a `ResourceInline` view that renders a resource inline in some text.
 For most resources, it will just render the name but for a Person or Product, it will render a special component.
 

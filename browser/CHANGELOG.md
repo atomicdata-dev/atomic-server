@@ -35,6 +35,11 @@ This changelog covers all three packages, as they are (for now) updated as a who
   - `resource.removeClasses()`
   - `resource.addClasses()`
 
+# @tomic/react
+
+- Added `useCollectionPage` hook.
+- Fix bug where `useCollection` would fetch the collection twice on mount.
+
 ### @tomic/cli
 
 - [#837](https://github.com/atomicdata-dev/atomic-server/issues/837) Fix timestamp is mapped to string instead of number.

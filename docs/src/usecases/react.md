@@ -57,11 +57,34 @@ export const App = () => {
 Atomic React provides a few useful hooks to interact with your atomic data.
 Read more about them by clicking on their names
 
-- [useStore](../react/useStore.md)
-- useResource
-- useValue
-  - useString
-  - useNumber
-  - useBoolean
-  - useArray
-- useCollection
+### [useStore](../react/useStore.md)
+
+Easy access to the store instance.
+
+### [useResource](../react/useResource.md)
+
+Fetching and subscribing to resources
+
+### [useValue](../react/useValue.md)
+
+Reading and writing data.
+
+### [useCollection](../react/useCollection.md)
+
+Querying large sets of data.
+
+### [useServerSearch](../react/useServerSearch.md)
+
+Easy full text search.
+
+### [useCurrentAgent](../react/useCurrentAgent.md)
+
+Get the current agent and change it.
+
+### [useCanWrite](../react/useCanWrite.md)
+
+Check for write access to a resource.
+
+## Examples
+
+Find some examples [here](../react/examples.md).
