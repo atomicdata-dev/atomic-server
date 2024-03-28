@@ -255,24 +255,25 @@ impl Db {
 
         let mut subjects: Vec<String> = vec![];
         let mut resources: Vec<Resource> = vec![];
-        let mut total_count = q.offset;
+        let mut total_count = 0;
 
         let atoms = self.get_index_iterator_for_query(q);
 
         for (i, atom_res) in atoms.enumerate() {
             let atom = atom_res?;
+            if !q.include_external && !atom.subject.starts_with(&self_url) {
+                continue;
+            }
+
+            total_count += 1;
 
             if q.offset > i {
                 continue;
             }
 
-            if !q.include_external && !atom.subject.starts_with(&self_url) {
-                continue;
-            }
             if q.limit.is_none() || subjects.len() < q.limit.unwrap() {
                 if !should_include_resource(q) {
                     subjects.push(atom.subject.clone());
-                    total_count += 1;
                     continue;
                 }
 
@@ -282,8 +283,6 @@ impl Db {
                     resources.push(resource);
                 }
             }
-
-            total_count += 1;
         }
 
         Ok(QueryResult {
