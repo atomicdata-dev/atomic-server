@@ -524,6 +524,7 @@ export function useCanWrite(
 
     if (resource.new) {
       setCanWrite(true);
+      setMsg(undefined);
 
       return;
     }

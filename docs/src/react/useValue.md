@@ -51,97 +51,77 @@ The following value hooks are available:
 ### Returns
 
 Returns an array (tuple) with two items:
+
 - **value**: type depends on the hook used - The value of the property.
-- **setValue**: `function` - A function to set the value of the property.
+- **setValue**: `async function` - A function to set the value of the property.
 
-## Some Examples
+### Examples
 
-### Realtime Todo app
-
-In this example, we create a basic to-do app that persists on the server and updates in real-time when anyone makes changes.
-If you were to make this in vanilla react without any kind of persistence it would probably look almost the same.
-The main difference is the use of the `useArray` and `useBoolean` hooks instead of `useState`.
+Changing the name of some resource.
 
 ```jsx
-import { useArray, useBoolean, useResource } from '@tomic/react';
-import { useState } from 'react';
+  import { useString } from '@tomic/react';
 
- export const TodoList = () => {
-  const store = useStore();
-  const checklist = useResource<Checklist>('https://my-server/checklist/1');
-
-  const [todos, setTodos] = useArray(checklist, todoApp.properties.todos, {
-    commit: true,
-  });
-
-  const [inputValue, setInputValue] = useState('');
-
-  const removeTodo = (subject: string) => {
-    setTodos(todos.filter(todo => todo !== subject));
-  };
-
-  const addTodo = async () => {
-    const newTodo = await store.newResource({
-      isA: todoApp.classes.todoItem,
-      parent: checklist.subject,
-      propVals: {
-        [core.properties.name]: inputValue,
-        [todoApp.properties.done]: false,
-      },
+  const MyComponent = ({ subject }) => {
+    const resource = useResource(subject);
+    const [value, setValue] = useString(resource, core.properties.name, {
+      commit: true,
     });
 
-    await newTodo.save();
-
-    setTodos([...todos, newTodo.subject]);
-    setInputValue('');
+    return (
+      <div>
+        <input value={value} onChange={e => setValue(e.target.value)} />
+      </div>
+    );
   };
+```
+
+Adding tags to a ResourceArray property.
+Displays an error when the name is not a valid slug.
+
+```jsx
+const MyComponent = ({subject}) => {
+  const store = useStore();
+  const resource = useResource(subject);
+  // We might encounter validation errors so we should show these to the user.
+  const [error, setError] = useState<Error>();
+  // Value of the input field. Used to set the name of the tag.
+  const [inputValue, setInputValue] = useState('');
+
+  // The ResourceArray value of the resource.
+  const [tags, setItems] = useArray(resource, myOntology.properties.tags, {
+    commit: true,
+    handleValidationError: setError,
+  });
+
+
+  const addTag = async () => {
+    // Create a new tag resource.
+    const newTag = await store.newResource({
+      isA: dataBrowser.classes.tag,
+      parent: subject,
+      propVals: {
+        [core.properties.shortname]: inputValue,
+      }
+    });
+
+    // Add the new tag to the array.
+    await setItems([...tags, newTag]);
+    // Reset the input field.
+    setInputValue('');
+  }
 
   return (
     <div>
-      <ul>
-        {todos.map(subject => (
-          <li key={subject}>
-            <Todo subject={subject} onDelete={removeTodo} />
-          </li>
-        ))}
-      </ul>
-      <input
-        type='text'
-        placeholder='Add a new todo...'
-        value={inputValue}
-        onChange={e => setInputValue(e.target.value)}
-      />
-      <button onClick={addTodo}>Add</button>
+      {tags.map((item, index) => (
+        <Tag key={item.subject} subject={item.subject}/>
+      ))}
+      <input type="text" onChange={e => setInputValue(e.target.value)}>
+      <button onClick={addTag}>Add</button>
+      {error && (
+        <p>{error.message}</p>
+      )}
     </div>
-  );
-};
-
-interface TodoProps {
-  subject: string;
-  onDelete: (subject: string) => void;
-}
-
-const Todo = ({ subject, onDelete }: TodoProps) => {
-  const resource = useResource<Todo>(subject);
-  const [done, setDone] = useBoolean(resource, todoApp.properties.done, {
-    commit: true,
-  });
-
-  const deleteTodo = () => {
-    resource.destroy();
-    onDelete(subject);
-  };
-
-  return (
-    <span>
-      <input
-        type='checkbox'
-        checked={done}
-        onChange={e => setDone(e.target.checked)}
-      />
-      {resource.title}
-      <button onClick={deleteTodo}>Delete</button>
-    </span>
   );
 };
 ```

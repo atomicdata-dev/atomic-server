@@ -32,4 +32,5 @@ export * from './useMarkdown.js';
 export * from './useServerSearch.js';
 export * from './useCollection.js';
 export * from './useMemberFromCollection.js';
+export * from './useCollectionPage.js';
 export * from '@tomic/lib';
