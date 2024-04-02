@@ -24,6 +24,9 @@ import { SkipNav } from './components/SkipNav';
 import { ControlLockProvider } from './hooks/useControlLock';
 import { FormValidationContextProvider } from './components/forms/formValidation/FormValidationContextProvider';
 import { registerCustomCreateActions } from './components/forms/NewForm/CustomCreateActions';
+import isPropValid from '@emotion/is-prop-valid';
+import { NewResourceUIProvider } from './components/forms/NewForm/useNewResourceUI';
+import { serverURLStorage } from './helpers/serverURLStorage';
 
 function fixDevUrl(url: string) {
   if (isDev()) {
@@ -37,7 +40,8 @@ function fixDevUrl(url: string) {
  * Defaulting to the current URL's origin will make sense in most non-dev environments.
  * In dev envs, we want to default to port 9883
  */
-const serverUrl = fixDevUrl(window.location.origin);
+
+const serverUrl = fixDevUrl(serverURLStorage.get() ?? window.location.origin);
 const initalAgent = getAgentFromLocalStorage();
 
 // Initialize the store
@@ -69,9 +73,6 @@ if (isDev()) {
   // You can access the Store from your console in dev mode!
   window.store = store;
 }
-
-import isPropValid from '@emotion/is-prop-valid';
-import { NewResourceUIProvider } from './components/forms/NewForm/useNewResourceUI';
 
 // This implements the default behavior from styled-components v5
 function shouldForwardProp(propName, target) {

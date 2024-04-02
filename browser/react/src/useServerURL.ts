@@ -1,6 +1,6 @@
-import { Client } from '@tomic/lib';
-import { useCallback } from 'react';
-import { useLocalStorage, useStore } from './index.js';
+import { Client, StoreEvents } from '@tomic/lib';
+import { useCallback, useEffect, useState } from 'react';
+import { useStore } from './index.js';
 
 /**
  * A hook for using and adjusting the Server URL. Also saves to localStorage. If
@@ -9,10 +9,7 @@ import { useLocalStorage, useStore } from './index.js';
 export const useServerURL = (): [string, (serverUrl: string) => void] => {
   // Localstorage for cross-session persistence of JSON object
   const store = useStore();
-  const [serverUrl, setServerUrl] = useLocalStorage<string>(
-    'serverUrl',
-    store.getServerUrl(),
-  );
+  const [serverUrl, setServerUrl] = useState<string>(store.getServerUrl());
 
   const set = useCallback(
     (value: string) => {
@@ -26,15 +23,20 @@ export const useServerURL = (): [string, (serverUrl: string) => void] => {
         newValue = value;
       } else {
         store.notifyError(
-          new Error(`Invalid base URL: ${value}, defaulting to atomicdata.dev`),
+          new Error(
+            `Invalid Server URL: ${value}, defaulting to atomicdata.dev`,
+          ),
         );
       }
 
-      setServerUrl(newValue);
       store.setServerUrl(newValue);
     },
     [store],
   );
+
+  useEffect(() => {
+    return store.on(StoreEvents.ServerURLChanged, setServerUrl);
+  }, [store]);
 
   return [serverUrl, set];
 };

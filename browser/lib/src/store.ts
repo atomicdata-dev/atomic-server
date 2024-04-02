@@ -36,6 +36,7 @@ type ResourceCallback<C extends OptionalClass = UnknownClass> = (
 type AgentCallback = (agent: Agent | undefined) => void;
 type ErrorCallback = (e: Error) => void;
 
+type ServerURLCallback = (serverURL: string) => void;
 type Fetch = typeof fetch;
 
 type AddResourcesOpts = {
@@ -76,6 +77,8 @@ export enum StoreEvents {
   ResourceManuallyCreated = 'resource-manually-created',
   /** Event that gets called whenever the stores agent changes */
   AgentChanged = 'agent-changed',
+  /** Event that gets called whenever the server url changes */
+  ServerURLChanged = 'server-url-changed',
   /** Event that gets called whenever the store encounters an error */
   Error = 'error',
 }
@@ -88,6 +91,7 @@ type StoreEventHandlers = {
   [StoreEvents.ResourceRemoved]: ResourceCallback;
   [StoreEvents.ResourceManuallyCreated]: ResourceCallback;
   [StoreEvents.AgentChanged]: AgentCallback;
+  [StoreEvents.ServerURLChanged]: ServerURLCallback;
   [StoreEvents.Error]: ErrorCallback;
 };
 
@@ -719,6 +723,7 @@ export class Store {
     }
 
     this.serverUrl = url;
+    this.eventManager.emit(StoreEvents.ServerURLChanged, url);
     // TODO This is not the right place
     supportsWebSockets() && this.openWebSocket(url);
   }
