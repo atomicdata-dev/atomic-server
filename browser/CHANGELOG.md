@@ -39,6 +39,7 @@ This changelog covers all three packages, as they are (for now) updated as a who
 
 - Added `useCollectionPage` hook.
 - Fix bug where `useCollection` would fetch the collection twice on mount.
+- `useServerURL` no longer stores the server url in localstorage.
 
 ### @tomic/cli
 
