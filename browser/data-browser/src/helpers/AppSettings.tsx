@@ -15,6 +15,7 @@ import {
 import toast from 'react-hot-toast';
 import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
 import { handleError } from './loggingHandlers';
+import { serverURLStorage } from './serverURLStorage';
 
 interface ProviderProps {
   children: ReactNode;
@@ -52,6 +53,7 @@ export const AppSettingsContextProvider = (
       const url = new URL(newDrive);
       innerSetDrive(newDrive);
       setBaseURL(url.origin);
+      serverURLStorage.set(url.origin);
     },
     [innerSetDrive, setBaseURL],
   );
