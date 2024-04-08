@@ -1,20 +1,22 @@
 import { NewInstanceButton } from '../../components/NewInstanceButton';
 import { Card, CardInsideFull, CardRow } from '../../components/Card';
-import { urls } from '@tomic/react';
+import { server } from '@tomic/react';
 import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
 import { DriveRow } from './DriveRow';
 
 export interface DriveCardProps {
   drives: string[];
-  onDriveSelect: (drive: string) => void;
   showNewOption?: boolean;
+  onDriveSelect: (drive: string) => void;
+  onDriveRemove?: (drive: string) => void;
 }
 
 export function DrivesCard({
   drives,
-  onDriveSelect,
   showNewOption,
+  onDriveSelect,
+  onDriveRemove,
 }: DriveCardProps): JSX.Element {
   const { drive } = useSettings();
 
@@ -30,8 +32,9 @@ export function DrivesCard({
             <CardRow key={subject} noBorder={i === 0}>
               <DriveRow
                 subject={subject}
-                onClick={onDriveSelect}
                 disabled={subject === drive}
+                onRemove={onDriveRemove}
+                onClick={onDriveSelect}
               />
             </CardRow>
           );
@@ -39,7 +42,7 @@ export function DrivesCard({
         {showNewOption && (
           <CardRow>
             <StyledNewInstanceButton
-              klass={urls.classes.drive}
+              klass={server.classes.drive}
               subtle
               icon
               label='New Drive'
@@ -53,7 +56,7 @@ export function DrivesCard({
 
 const ContainerCard = styled(Card)`
   container-type: inline-size;
-  padding-top: 0;
+  padding-block: 0;
 `;
 
 const StyledNewInstanceButton = styled(NewInstanceButton)`
