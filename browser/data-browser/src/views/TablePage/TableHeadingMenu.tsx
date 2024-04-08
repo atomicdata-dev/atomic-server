@@ -6,10 +6,10 @@ import {
   useString,
   core,
 } from '@tomic/react';
-import { useCallback, useContext, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { DropdownMenu, Item } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
-import { FaEdit, FaEllipsisV, FaEye, FaTimes, FaTrash } from 'react-icons/fa';
+import { FaEdit, FaEllipsisV, FaEye, FaTimes } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { EditPropertyDialog } from './PropertyForm/EditPropertyDialog';
 import { TablePageContext } from './tablePageContext';
@@ -21,6 +21,8 @@ import { ResourceInline } from '../ResourceInline';
 import { ResourceUsage } from '../../components/ResourceUsage';
 import { useNavigate } from 'react-router';
 import { constructOpenURL } from '../../helpers/navigation';
+import { Checkbox, CheckboxLabel } from '../../components/forms/Checkbox';
+import { Column } from '../../components/Row';
 
 interface TableHeadingMenuProps {
   resource: Resource;
@@ -38,11 +40,14 @@ const useIsExternalProperty = (property: Resource) => {
 export function TableHeadingMenu({
   resource,
 }: TableHeadingMenuProps): JSX.Element {
-  const canWrite = useCanWrite(resource);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [fullDelete, setFullDelete] = useState(false);
+
   const { tableClassSubject } = useContext(TablePageContext);
   const tableClassResource = useResource(tableClassSubject);
+  const [canWriteClass] = useCanWrite(tableClassResource);
+  const [canWriteProperty] = useCanWrite(resource);
   const navigate = useNavigate();
 
   const isExternalProperty = useIsExternalProperty(resource);
@@ -82,45 +87,40 @@ export function TableHeadingMenu({
     }
   }, [deleteProperty, removeProperty, isExternalProperty]);
 
-  const items = useMemo((): Item[] => {
-    const initialItems = [
+  const items = useMemo(
+    (): Item[] => [
+      {
+        id: 'view',
+        label: 'View',
+        onClick: () => {
+          navigate(constructOpenURL(resource.subject));
+        },
+        icon: <FaEye />,
+      },
       {
         id: 'edit',
         label: 'Edit',
         onClick: () => setShowEditDialog(true),
         icon: <FaEdit />,
-        disabled: !canWrite || isExternalProperty,
+        disabled: !canWriteProperty,
       },
       {
-        id: 'view',
-        label: 'View',
-        onClick: () => {
-          navigate(constructOpenURL(resource.getSubject()));
-        },
-        icon: <FaEye />,
-      },
-    ];
-
-    if (isExternalProperty) {
-      initialItems.push({
         id: 'remove',
         label: 'Remove',
         onClick: () => setShowDeleteDialog(true),
         icon: <FaTimes />,
-        disabled: !canWrite,
-      });
-    } else {
-      initialItems.push({
-        id: 'delete',
-        label: 'Delete',
-        onClick: () => setShowDeleteDialog(true),
-        icon: <FaTrash />,
-        disabled: !canWrite,
-      });
-    }
+        disabled: !canWriteClass,
+      },
+    ],
+    [canWriteClass, canWriteProperty, navigate, resource],
+  );
 
-    return initialItems;
-  }, []);
+  // Reset fullDelete when dialog is closed
+  useEffect(() => {
+    if (!showDeleteDialog) {
+      setFullDelete(false);
+    }
+  }, [showDeleteDialog]);
 
   return (
     <Wrapper>
@@ -131,30 +131,24 @@ export function TableHeadingMenu({
         bindShow={setShowEditDialog}
       />
       <ConfirmationDialog
-        title={isExternalProperty ? 'Remove column' : 'Delete column'}
-        confirmLabel={isExternalProperty ? 'Remove' : 'Delete'}
+        title={fullDelete ? 'Delete property' : 'Remove column'}
+        confirmLabel={fullDelete ? 'Delete' : 'Remove'}
         show={showDeleteDialog}
         bindShow={setShowDeleteDialog}
         theme={ConfirmationDialogTheme.Alert}
         onConfirm={onConfirm}
       >
-        {isExternalProperty ? (
+        <Column>
           <p>
-            Remove <ResourceInline subject={resource.getSubject()} /> from this
-            table
+            Remove <ResourceInline subject={resource.subject} /> from{' '}
+            <ResourceInline subject={tableClassSubject} />
           </p>
-        ) : (
-          <>
-            <p>
-              Are you sure you want to delete this column?
-              <br />
-              This will delete the{' '}
-              <ResourceInline subject={resource.getSubject()} /> property and
-              its children.
-            </p>
-            <ResourceUsage resource={resource} />
-          </>
-        )}
+          <ResourceUsage resource={resource} />
+          <CheckboxLabel>
+            <Checkbox checked={fullDelete} onChange={setFullDelete} />
+            Delete property and its children
+          </CheckboxLabel>
+        </Column>
       </ConfirmationDialog>
     </Wrapper>
   );

@@ -1,4 +1,5 @@
 import {
+  Core,
   Datatype,
   Property,
   Resource,
@@ -43,12 +44,16 @@ export const TableHeading: TableHeadingComponent<Property> = ({
 
   const propResource = useResource(column.subject);
   const [title] = useTitle(propResource);
-  const { setSortBy, sorting } = useContext(TablePageContext);
+  const { setSortBy, sorting, tableClassSubject } =
+    useContext(TablePageContext);
+  const tableClass = useResource<Core.Class>(tableClassSubject);
+
+  const isRequired = (tableClass.props.requires ?? []).includes(column.subject);
 
   const Icon = getIcon(propResource, sorting, hoverOrFocus, column.datatype);
-  const isSorted = sorting.prop === propResource.getSubject();
+  const isSorted = sorting.prop === propResource.subject;
 
-  const text = title || column.shortname;
+  const text = `${title || column.shortname}${isRequired ? '*' : ''}`;
 
   return (
     <>
@@ -62,7 +67,7 @@ export const TableHeading: TableHeadingComponent<Property> = ({
           <Icon title='Drag column' />
         </DragIconButton>
         <NameButton
-          onClick={() => setSortBy(propResource.getSubject())}
+          onClick={() => setSortBy(propResource.subject)}
           bold={isSorted}
           title={text}
         >

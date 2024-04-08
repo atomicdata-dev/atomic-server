@@ -1,4 +1,5 @@
 import {
+  Core,
   Datatype,
   Resource,
   Store,
@@ -22,7 +23,7 @@ import { PropertyForm, PropertyFormCategory } from './PropertyForm';
 
 interface NewPropertyDialogProps {
   showDialog: boolean;
-  tableClassResource: Resource;
+  tableClassResource: Resource<Core.Class>;
   bindShow: React.Dispatch<boolean>;
   selectedCategory?: string;
 }
@@ -35,10 +36,10 @@ const createSubjectWithBase = (base: string) => {
 
 const populatePropertyWithDefaults = async (
   property: Resource,
-  tableClass: Resource,
+  tableClass: Resource<Core.Class>,
 ) => {
   await property.set(core.properties.isA, [core.classes.property]);
-  await property.set(core.properties.parent, tableClass.subject);
+  await property.set(core.properties.parent, tableClass.props.parent);
   await property.set(core.properties.shortname, 'new-column', false);
   await property.set(core.properties.name, '', false);
   await property.set(core.properties.description, 'A column in a table');
@@ -108,9 +109,24 @@ export function NewPropertyDialog({
       return;
     }
 
+    const tableClassParent = await store.getResource(
+      tableClassResource.props.parent,
+    );
+
+    if (tableClassParent.hasClasses(core.classes.ontology)) {
+      await resource.set(core.properties.parent, tableClassParent.subject);
+
+      tableClassParent.push(
+        core.properties.properties,
+        [resource.subject],
+        true,
+      );
+
+      await tableClassParent.save();
+    }
+
     await resource.save();
     await saveChildren(store, resource);
-    await store.notifyResourceManuallyCreated(resource);
 
     pushProp([resource.subject]);
     setResource(null);

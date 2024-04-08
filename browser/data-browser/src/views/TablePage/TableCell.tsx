@@ -1,8 +1,8 @@
 import {
+  commits,
   JSONValue,
   Property,
   Resource,
-  urls,
   useDebouncedCallback,
   useValue,
 } from '@tomic/react';
@@ -75,7 +75,7 @@ export function TableCell({
 
   const [createdAt, setCreatedAt] = useValue(
     resource,
-    urls.properties.commit.createdAt,
+    commits.properties.createdAt,
     { commit: false, commitDebounce: 0 },
   );
 

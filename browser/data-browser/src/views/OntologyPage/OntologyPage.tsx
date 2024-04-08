@@ -1,5 +1,5 @@
 import { ResourcePageProps } from '../ResourcePage';
-import { urls, useArray, useCanWrite } from '@tomic/react';
+import { core, useArray, useCanWrite } from '@tomic/react';
 import { OntologySidebar } from './OntologySidebar';
 import { styled } from 'styled-components';
 import { ClassCardRead } from './Class/ClassCardRead';
@@ -19,9 +19,9 @@ import { CreateInstanceButton } from './CreateInstanceButton';
 import { useState } from 'react';
 
 export function OntologyPage({ resource }: ResourcePageProps) {
-  const [classes] = useArray(resource, urls.properties.classes);
-  const [properties] = useArray(resource, urls.properties.properties);
-  const [instances] = useArray(resource, urls.properties.instances);
+  const [classes] = useArray(resource, core.properties.classes);
+  const [properties] = useArray(resource, core.properties.properties);
+  const [instances] = useArray(resource, core.properties.instances);
   const [canWrite] = useCanWrite(resource);
 
   const [editMode, setEditMode] = useState(false);

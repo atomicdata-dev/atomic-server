@@ -3,7 +3,7 @@
  * For more info on how to use ontologies: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/cli/readme.md
  * -------------------------------- */
 
-import { BaseProps } from '../index.js';
+import type { BaseProps } from '../index.js';
 
 export const server = {
   classes: {
@@ -41,6 +41,8 @@ export const server = {
     status: 'https://atomicdata.dev/ontology/server/property/status',
     responseMessage:
       'https://atomicdata.dev/ontology/server/property/response-message',
+    defaultOntology:
+      'https://atomicdata.dev/ontology/server/property/default-ontology',
   },
 } as const;
 
@@ -75,7 +77,8 @@ declare module '../index.js' {
         | typeof server.properties.children
         | 'https://atomicdata.dev/properties/description'
         | 'https://atomicdata.dev/properties/subresources'
-        | 'https://atomicdata.dev/properties/write';
+        | 'https://atomicdata.dev/properties/write'
+        | typeof server.properties.defaultOntology;
     };
     [server.classes.redirect]: {
       requires: BaseProps | typeof server.properties.destination;
@@ -132,6 +135,7 @@ declare module '../index.js' {
     [server.properties.destination]: string;
     [server.properties.status]: number;
     [server.properties.responseMessage]: string;
+    [server.properties.defaultOntology]: string;
   }
 
   interface PropSubjectToNameMapping {
@@ -158,5 +162,6 @@ declare module '../index.js' {
     [server.properties.destination]: 'destination';
     [server.properties.status]: 'status';
     [server.properties.responseMessage]: 'responseMessage';
+    [server.properties.defaultOntology]: 'defaultOntology';
   }
 }
