@@ -1,15 +1,16 @@
-import { urls, useArray, useResource, useString } from '@tomic/react';
+import { core, useArray, useResource, useString } from '@tomic/react';
 
 import { Card } from '../../../components/Card';
 import { PropertyLineRead } from '../Property/PropertyLineRead';
 import { styled } from 'styled-components';
 import { FaCube } from 'react-icons/fa';
-import { Column } from '../../../components/Row';
+import { Column, Row } from '../../../components/Row';
 import Markdown from '../../../components/datatypes/Markdown';
 import { AtomicLink } from '../../../components/AtomicLink';
 import { toAnchorId } from '../toAnchorId';
 import { ViewTransitionProps } from '../../../helpers/ViewTransitionProps';
 import { transitionName } from '../../../helpers/transitionName';
+import { NewClassInstanceButton } from './NewClassInstanceButton';
 
 interface ClassCardReadProps {
   subject: string;
@@ -17,17 +18,20 @@ interface ClassCardReadProps {
 
 export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
   const resource = useResource(subject);
-  const [description] = useString(resource, urls.properties.description);
-  const [requires] = useArray(resource, urls.properties.requires);
-  const [recommends] = useArray(resource, urls.properties.recommends);
+  const [description] = useString(resource, core.properties.description);
+  const [requires] = useArray(resource, core.properties.requires);
+  const [recommends] = useArray(resource, core.properties.recommends);
 
   return (
     <StyledCard subject={subject}>
       <Column>
-        <StyledH3 id={toAnchorId(subject)}>
-          <FaCube />
-          <AtomicLink subject={subject}>{resource.title}</AtomicLink>
-        </StyledH3>
+        <Row center justify='space-between'>
+          <StyledH3 id={toAnchorId(subject)}>
+            <FaCube />
+            <AtomicLink subject={subject}>{resource.title}</AtomicLink>
+          </StyledH3>
+          <NewClassInstanceButton resource={resource} />
+        </Row>
         <Markdown text={description ?? ''} maxLength={1500} />
         <StyledH4>Requires</StyledH4>
         <StyledTable>

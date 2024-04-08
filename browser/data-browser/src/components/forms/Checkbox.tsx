@@ -40,11 +40,11 @@ const InputCheckBox = styled.input`
 
   position: relative;
 
-  :checked {
+  &:checked {
     border: none;
   }
 
-  :checked::before {
+  &:checked::before {
     content: '';
     position: absolute;
     inset: 0;
@@ -54,7 +54,7 @@ const InputCheckBox = styled.input`
     background-color: ${p => p.theme.colors.main};
   }
 
-  :checked::after {
+  &:checked::after {
     --inset: 3px;
     --size: calc(100% - (var(--inset) * 2));
     content: '';

@@ -7,7 +7,7 @@ import {
   core,
 } from '@tomic/react';
 import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { DropdownMenu, Item } from '../../components/Dropdown';
+import { DropdownMenu, DropdownItem } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
 import { FaEdit, FaEllipsisV, FaEye, FaTimes } from 'react-icons/fa';
 import { styled } from 'styled-components';
@@ -88,7 +88,7 @@ export function TableHeadingMenu({
   }, [deleteProperty, removeProperty, isExternalProperty]);
 
   const items = useMemo(
-    (): Item[] => [
+    (): DropdownItem[] => [
       {
         id: 'view',
         label: 'View',

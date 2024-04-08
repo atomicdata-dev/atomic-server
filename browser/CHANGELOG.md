@@ -1,11 +1,13 @@
 # Changelog
 
-This changelog covers all three packages, as they are (for now) updated as a whole
+This changelog covers all five packages, as they are (for now) updated as a whole
 
 ## Unreleased
 
 ### Atomic Browser
 
+- [#845](https://github.com/atomicdata-dev/atomic-server/issues/845) Add option to create instances and tables from the ontology view.
+- [#845](https://github.com/atomicdata-dev/atomic-server/issues/845) Add default Ontology option to drives.
 - [#841](https://github.com/atomicdata-dev/atomic-server/issues/841) Add better inputs for `Timestamp` and `Date` datatypes.
 - [#842](https://github.com/atomicdata-dev/atomic-server/issues/842) Add media picker for properties with classtype file.
 - [#850](https://github.com/atomicdata-dev/atomic-server/issues/850) Add drag & drop sorting to ResourceArray inputs.
