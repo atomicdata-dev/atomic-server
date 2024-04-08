@@ -3,7 +3,7 @@
  * For more info on how to use ontologies: https://github.com/atomicdata-dev/atomic-server/blob/develop/browser/cli/readme.md
  * -------------------------------- */
 
-import { BaseProps } from '../index.js';
+import type { BaseProps } from '../index.js';
 
 export const dataBrowser = {
   classes: {
@@ -194,7 +194,7 @@ declare module '../index.js' {
   interface PropTypeMapping {
     [dataBrowser.properties.subResources]: string[];
     [dataBrowser.properties.displayStyle]: string;
-    [dataBrowser.properties.publishedAt]: string;
+    [dataBrowser.properties.publishedAt]: number;
     [dataBrowser.properties.elements]: string[];
     [dataBrowser.properties.messages]: string[];
     [dataBrowser.properties.nextPage]: string;

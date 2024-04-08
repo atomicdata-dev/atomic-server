@@ -412,6 +412,9 @@ const MenuItemStyled = styled(Button)<MenuItemStyledProps>`
     p.selected ? p.theme.colors.bg1 : p.theme.colors.bg};
   text-decoration: ${p => (p.selected ? 'underline' : 'none')};
 
+  & svg {
+    color: ${p => p.theme.colors.textLight};
+  }
   &:hover {
     background-color: ${p => p.theme.colors.bg1};
   }
@@ -419,12 +422,17 @@ const MenuItemStyled = styled(Button)<MenuItemStyledProps>`
     background-color: ${p => p.theme.colors.bg2};
   }
   &:disabled {
-    color: ${p => p.theme.colors.textLight};
+    color: ${p => p.theme.colors.textLight2};
     cursor: default;
+    background-color: ${p => p.theme.colors.bg};
+
     &:hover {
       cursor: 'default';
     }
-    background-color: ${p => p.theme.colors.bg};
+
+    & svg {
+      color: ${p => p.theme.colors.textLight2};
+    }
   }
 
   svg {

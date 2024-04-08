@@ -9,7 +9,9 @@ export type CreateAndNavigate = (
   isA: string,
   propVals: Record<string, JSONValue>,
   parent?: string,
+  /** Query parameters for the resource / endpoint */
   extraParams?: Record<string, string>,
+  onCreated?: (resource: Resource) => Promise<void>,
 ) => Promise<Resource>;
 
 /**
@@ -22,13 +24,13 @@ export function useCreateAndNavigate(): CreateAndNavigate {
   const store = useStore();
   const navigate = useNavigate();
 
-  return useCallback(
+  const createAndNavigate: CreateAndNavigate = useCallback(
     async (
-      isA: string,
-      propVals: Record<string, JSONValue>,
-      parent?: string,
-      /** Query parameters for the resource / endpoint */
-      extraParams?: Record<string, string>,
+      isA,
+      propVals,
+      parent,
+      extraParams,
+      onCreated,
     ): Promise<Resource> => {
       const classResource = await store.getResource<Core.Class>(isA);
 
@@ -47,6 +49,11 @@ export function useCreateAndNavigate(): CreateAndNavigate {
 
       try {
         await resource.save();
+
+        if (onCreated) {
+          await onCreated(resource);
+        }
+
         navigate(constructOpenURL(newSubject, extraParams));
         toast.success(`${classResource.title} created`);
         store.notifyResourceManuallyCreated(resource);
@@ -58,4 +65,6 @@ export function useCreateAndNavigate(): CreateAndNavigate {
     },
     [store, navigate, parent],
   );
+
+  return createAndNavigate;
 }

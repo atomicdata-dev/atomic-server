@@ -1,4 +1,4 @@
-import { useResource, Core, dataBrowser, core, useStore } from '@tomic/react';
+import { dataBrowser, core, useStore } from '@tomic/react';
 import { useState, useCallback, useEffect, FormEvent, FC } from 'react';
 import { styled } from 'styled-components';
 import { stringToSlug } from '../../../../../helpers/stringToSlug';
@@ -15,61 +15,79 @@ import Field from '../../../Field';
 import { InputWrapper, InputStyled } from '../../../InputStyles';
 import type { CustomResourceDialogProps } from '../../useNewResourceUI';
 import { useCreateAndNavigate } from '../../../../../hooks/useCreateAndNavigate';
-
-const instanceOpts = {
-  newResource: true,
-};
+import { ResourceSelector } from '../../../ResourceSelector';
+import { Checkbox, CheckboxLabel } from '../../../Checkbox';
+import { useAddToOntology } from '../../../../../hooks/useAddToOntology';
 
 export const NewTableDialog: FC<CustomResourceDialogProps> = ({
   parent,
   onClose,
 }) => {
   const store = useStore();
-  const [instanceSubject] = useState(() => store.createSubject('class'));
-  const instanceResource = useResource<Core.Class>(
-    instanceSubject,
-    instanceOpts,
-  );
-
+  const [useExistingClass, setUseExistingClass] = useState(false);
+  const [existingClass, setExistingClass] = useState<string | undefined>();
   const [name, setName] = useState('');
 
+  const addToOntology = useAddToOntology();
   const createResourceAndNavigate = useCreateAndNavigate();
 
   const onCancel = useCallback(() => {
-    instanceResource.destroy();
     onClose();
-  }, [onClose, instanceResource]);
+  }, [onClose]);
 
   const onSuccess = useCallback(async () => {
-    await instanceResource.set(core.properties.shortname, stringToSlug(name));
-    await instanceResource.set(
-      core.properties.description,
-      `Represents a row in the ${name} table`,
-    );
-    await instanceResource.set(core.properties.isA, [core.classes.class]);
-    await instanceResource.set(core.properties.parent, parent);
-    await instanceResource.set(core.properties.recommends, [
-      core.properties.name,
-    ]);
-    await instanceResource.save();
+    let classSubject: string;
+
+    if (!useExistingClass) {
+      const instanceResource = await store.newResource({
+        subject: store.createSubject('class'),
+        isA: core.classes.class,
+        propVals: {
+          [core.properties.shortname]: stringToSlug(name),
+          [core.properties
+            .description]: `Represents a row in the ${name} table`,
+          [core.properties.recommends]: [core.properties.name],
+        },
+      });
+
+      await addToOntology(instanceResource);
+      classSubject = instanceResource.subject;
+    } else {
+      if (existingClass === undefined) {
+        throw new Error('Existing class is undefined');
+      }
+
+      classSubject = existingClass;
+    }
 
     createResourceAndNavigate(
       dataBrowser.classes.table,
       {
         [core.properties.name]: name,
-        [core.properties.classtype]: instanceResource.getSubject(),
+        [core.properties.classtype]: classSubject,
       },
       parent,
     );
 
     onClose();
-  }, [name, instanceResource, onClose, parent]);
+  }, [
+    name,
+    onClose,
+    parent,
+    useExistingClass,
+    existingClass,
+    addToOntology,
+    createResourceAndNavigate,
+  ]);
 
   const [dialogProps, show, hide] = useDialog({ onCancel, onSuccess });
 
   useEffect(() => {
     show();
   }, []);
+
+  const hasName = name.trim() !== '';
+  const saveDisabled = useExistingClass ? !hasName || !existingClass : !hasName;
 
   return (
     <Dialog {...dialogProps}>
@@ -94,13 +112,31 @@ export const NewTableDialog: FC<CustomResourceDialogProps> = ({
               />
             </InputWrapper>
           </Field>
+          <CheckboxLabel>
+            <Checkbox
+              checked={useExistingClass}
+              onChange={setUseExistingClass}
+            />
+            Use existing class
+          </CheckboxLabel>
+          <Field>
+            {useExistingClass && (
+              <ResourceSelector
+                hideCreateOption
+                disabled={!useExistingClass}
+                isA={core.classes.class}
+                setSubject={setExistingClass}
+                value={existingClass}
+              />
+            )}
+          </Field>
         </form>
       </WiderDialogContent>
       <DialogActions>
         <Button onClick={() => hide(false)} subtle>
           Cancel
         </Button>
-        <Button onClick={() => hide(true)} disabled={name.trim() === ''}>
+        <Button onClick={() => hide(true)} disabled={saveDisabled}>
           Create
         </Button>
       </DialogActions>
@@ -109,7 +145,7 @@ export const NewTableDialog: FC<CustomResourceDialogProps> = ({
 };
 
 const WiderDialogContent = styled(DialogContent)`
-  width: min(80vw, 20rem);
+  /* width: min(80vw, 20rem); */
 `;
 
 const RelativeDialogTitle = styled(DialogTitle)`

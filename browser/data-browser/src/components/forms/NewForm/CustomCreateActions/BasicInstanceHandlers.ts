@@ -1,4 +1,4 @@
-import { dataBrowser, core, classes, server } from '@tomic/react';
+import { dataBrowser, core, classes } from '@tomic/react';
 import { registerBasicInstanceHandler } from '../useNewResourceUI';
 
 /**
@@ -12,7 +12,7 @@ export const registerBasicInstanceHandlers = () => {
       await createAndNavigate(
         dataBrowser.classes.folder,
         {
-          [core.properties.name]: 'Untitled Folder',
+          [core.properties.name]: 'untitled-folder',
           [dataBrowser.properties.displayStyle]: classes.displayStyles.list,
         },
         parent,
@@ -43,32 +43,6 @@ export const registerBasicInstanceHandlers = () => {
         },
         parent,
       );
-    },
-  );
-
-  registerBasicInstanceHandler(
-    server.classes.drive,
-    async (_parent, createAndNavigate, { store, settings }) => {
-      const agent = store.getAgent();
-
-      if (!agent || agent.subject === undefined) {
-        throw new Error(
-          'No agent set in the Store, required when creating a Drive',
-        );
-      }
-
-      const newResource = await createAndNavigate(server.classes.drive, {
-        [core.properties.write]: [agent.subject],
-        [core.properties.read]: [agent.subject],
-      });
-
-      // resources created with createAndNavigate have a parent by default which we don't want for drives.
-      newResource.remove(core.properties.parent);
-
-      const agentResource = await store.getResource(agent.subject);
-      agentResource.push(server.properties.drives, [newResource.subject]);
-      agentResource.save();
-      settings.setDrive(newResource.subject);
     },
   );
 };

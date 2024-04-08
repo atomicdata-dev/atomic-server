@@ -1,29 +1,35 @@
 import { styled } from 'styled-components';
-import {
-  Collection,
-  unknownSubject,
-  urls,
-  useCollection,
-  useMemberFromCollection,
-} from '@tomic/react';
+import { core, unknownSubject, useResource, useStore } from '@tomic/react';
 import { SideBarItem } from '../SideBarItem';
 import { Row } from '../../Row';
 import { AtomicLink } from '../../AtomicLink';
 import { getIconForClass } from '../../../views/FolderPage/iconMap';
 import { ScrollArea } from '../../ScrollArea';
 import { ErrorLook } from '../../ErrorLook';
+import { useEffect, useState } from 'react';
+import { useSettings } from '../../../helpers/AppSettings';
 
 export function OntologiesPanel(): JSX.Element | null {
-  const { collection } = useCollection({
-    property: urls.properties.isA,
-    value: urls.classes.ontology,
-  });
+  const store = useStore();
+  const [ontologies, setOntologies] = useState<string[]>([]);
+  const { drive } = useSettings();
+
+  useEffect(() => {
+    store
+      .search('', {
+        filters: {
+          [core.properties.isA]: core.classes.ontology,
+        },
+        parents: drive,
+      })
+      .then(setOntologies);
+  }, [store]);
 
   return (
     <Wrapper>
       <StyledScrollArea>
-        {[...Array(collection.totalMembers).keys()].map(index => (
-          <Item key={index} collection={collection} index={index} />
+        {ontologies.map(subject => (
+          <Item key={subject} subject={subject} />
         ))}
       </StyledScrollArea>
     </Wrapper>
@@ -37,25 +43,24 @@ const Wrapper = styled.div`
 `;
 
 const StyledScrollArea = styled(ScrollArea)`
-  height: 10rem;
+  max-height: 10rem;
   overflow-x: hidden;
 `;
 
 interface ItemProps {
-  index: number;
-  collection: Collection;
+  subject: string;
 }
 
-function Item({ index, collection }: ItemProps): JSX.Element {
-  const resource = useMemberFromCollection(collection, index);
+function Item({ subject }: ItemProps): JSX.Element {
+  const resource = useResource(subject);
 
-  const Icon = getIconForClass(urls.classes.ontology);
+  const Icon = getIconForClass(core.classes.ontology);
 
   if (resource.loading) {
     return <div>loading</div>;
   }
 
-  if (resource.error || resource.getSubject() === unknownSubject) {
+  if (resource.error || resource.subject === unknownSubject) {
     return (
       <SideBarItem>
         <ErrorLook>Invalid Resource</ErrorLook>
@@ -64,7 +69,7 @@ function Item({ index, collection }: ItemProps): JSX.Element {
   }
 
   return (
-    <StyledLink subject={resource.getSubject()} clean>
+    <StyledLink subject={subject} clean>
       <SideBarItem>
         <Row gap='1ch' center>
           <Icon />
