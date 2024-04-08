@@ -25,7 +25,8 @@ export function SettingsServer(): JSX.Element {
 
   const [savedDrives] = useSavedDrives();
 
-  const [history, addDriveToHistory] = useDriveHistory(savedDrives);
+  const [history, addDriveToHistory, removeFromHistory] =
+    useDriveHistory(savedDrives);
 
   function handleSetBaseUrl(url: string) {
     try {
@@ -71,6 +72,7 @@ export function SettingsServer(): JSX.Element {
           <DrivesCard
             drives={history}
             onDriveSelect={subject => handleSetBaseUrl(subject)}
+            onDriveRemove={subject => removeFromHistory(subject)}
           />
         </Column>
       </ContainerWide>

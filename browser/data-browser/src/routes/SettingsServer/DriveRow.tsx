@@ -4,17 +4,33 @@ import { Button } from '../../components/Button';
 import { WSIndicator } from './WSIndicator';
 import { ResourceInline } from '../../views/ResourceInline';
 import { FavoriteButton } from './FavoriteButton';
+import { IconButton } from '../../components/IconButton/IconButton';
+import { FaTimes } from 'react-icons/fa';
 
 export interface DriveRowProps {
   subject: string;
-  onClick: (subject: string) => void;
   disabled?: boolean;
+  onClick: (subject: string) => void;
+  onRemove?: (subject: string) => void;
 }
 
-export function DriveRow({ subject, onClick, disabled }: DriveRowProps) {
+export function DriveRow({
+  subject,
+  disabled,
+  onClick,
+  onRemove,
+}: DriveRowProps) {
   return (
     <DriveRowWrapper>
       <TitleWrapper>
+        {onRemove && (
+          <IconButton
+            title='Remove drive from list'
+            onClick={() => onRemove(subject)}
+          >
+            <FaTimes />
+          </IconButton>
+        )}
         <ResourceInline subject={subject} />
       </TitleWrapper>
       <Subject>{subject}</Subject>
@@ -73,4 +89,11 @@ const TitleWrapper = styled.div`
   white-space: nowrap;
   text-overflow: ellipsis;
   font-weight: var(--title-font-weight);
+  display: flex;
+  align-items: center;
+  gap: 1ch;
+
+  & svg {
+    color: ${p => p.theme.colors.textLight};
+  }
 `;
