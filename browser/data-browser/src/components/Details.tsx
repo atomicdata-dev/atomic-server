@@ -1,7 +1,7 @@
 import { PropsWithChildren, useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { FaCaretRight } from 'react-icons/fa';
-import { Collapse } from '../Collapse';
+import { Collapse } from './Collapse';
 
 export interface DetailsProps {
   open?: boolean;

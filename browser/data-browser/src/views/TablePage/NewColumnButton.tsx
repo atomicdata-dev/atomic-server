@@ -1,7 +1,7 @@
 import { Datatype, useResource } from '@tomic/react';
 import { useCallback, useContext, useMemo, useState } from 'react';
 import { FaChevronCircleDown, FaFile, FaHashtag, FaPlus } from 'react-icons/fa';
-import { DIVIDER, DropdownMenu, Item } from '../../components/Dropdown';
+import { DIVIDER, DropdownMenu, DropdownItem } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
 import { dataTypeIconMap } from './dataTypeMaps';
 import { NewPropertyDialog } from './PropertyForm/NewPropertyDialog';
@@ -34,7 +34,7 @@ export function NewColumnButton(): JSX.Element {
     [],
   );
 
-  const items = useMemo((): Item[] => {
+  const items = useMemo((): DropdownItem[] => {
     return [
       {
         id: 'text',

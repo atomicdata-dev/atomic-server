@@ -19,13 +19,22 @@ import { ResourceSelector } from '../../../ResourceSelector';
 import { Checkbox, CheckboxLabel } from '../../../Checkbox';
 import { useAddToOntology } from '../../../../../hooks/useAddToOntology';
 
-export const NewTableDialog: FC<CustomResourceDialogProps> = ({
+interface NewTableDialogProps extends CustomResourceDialogProps {
+  initialExistingClass?: string;
+}
+
+export const NewTableDialog: FC<NewTableDialogProps> = ({
   parent,
+  initialExistingClass,
   onClose,
 }) => {
   const store = useStore();
-  const [useExistingClass, setUseExistingClass] = useState(false);
-  const [existingClass, setExistingClass] = useState<string | undefined>();
+  const [useExistingClass, setUseExistingClass] = useState(
+    !!initialExistingClass,
+  );
+  const [existingClass, setExistingClass] = useState<string | undefined>(
+    initialExistingClass,
+  );
   const [name, setName] = useState('');
 
   const addToOntology = useAddToOntology();
@@ -80,7 +89,7 @@ export const NewTableDialog: FC<CustomResourceDialogProps> = ({
     createResourceAndNavigate,
   ]);
 
-  const [dialogProps, show, hide] = useDialog({ onCancel, onSuccess });
+  const [dialogProps, show, hide, isOpen] = useDialog({ onCancel, onSuccess });
 
   useEffect(() => {
     show();
@@ -91,55 +100,59 @@ export const NewTableDialog: FC<CustomResourceDialogProps> = ({
 
   return (
     <Dialog {...dialogProps}>
-      <RelativeDialogTitle>
-        <h1>New Table</h1>
-        <BetaBadge />
-      </RelativeDialogTitle>
-      <WiderDialogContent>
-        <form
-          onSubmit={(e: FormEvent) => {
-            e.preventDefault();
-            hide(true);
-          }}
-        >
-          <Field required label='Name'>
-            <InputWrapper>
-              <InputStyled
-                placeholder='New Table'
-                value={name}
-                autoFocus={true}
-                onChange={e => setName(e.target.value)}
-              />
-            </InputWrapper>
-          </Field>
-          <CheckboxLabel>
-            <Checkbox
-              checked={useExistingClass}
-              onChange={setUseExistingClass}
-            />
-            Use existing class
-          </CheckboxLabel>
-          <Field>
-            {useExistingClass && (
-              <ResourceSelector
-                hideCreateOption
-                disabled={!useExistingClass}
-                isA={core.classes.class}
-                setSubject={setExistingClass}
-                value={existingClass}
-              />
-            )}
-          </Field>
-        </form>
-      </WiderDialogContent>
-      <DialogActions>
-        <Button onClick={() => hide(false)} subtle>
-          Cancel
-        </Button>
-        <Button onClick={() => hide(true)} disabled={saveDisabled}>
-          Create
-        </Button>
-      </DialogActions>
+      {isOpen && (
+        <>
+          <RelativeDialogTitle>
+            <h1>New Table</h1>
+            <BetaBadge />
+          </RelativeDialogTitle>
+          <WiderDialogContent>
+            <form
+              onSubmit={(e: FormEvent) => {
+                e.preventDefault();
+                hide(true);
+              }}
+            >
+              <Field required label='Name'>
+                <InputWrapper>
+                  <InputStyled
+                    placeholder='New Table'
+                    value={name}
+                    autoFocus={true}
+                    onChange={e => setName(e.target.value)}
+                  />
+                </InputWrapper>
+              </Field>
+              <CheckboxLabel>
+                <Checkbox
+                  checked={useExistingClass}
+                  onChange={setUseExistingClass}
+                />
+                Use existing class
+              </CheckboxLabel>
+              <Field>
+                {useExistingClass && (
+                  <ResourceSelector
+                    hideCreateOption
+                    disabled={!useExistingClass}
+                    isA={core.classes.class}
+                    setSubject={setExistingClass}
+                    value={existingClass}
+                  />
+                )}
+              </Field>
+            </form>
+          </WiderDialogContent>
+          <DialogActions>
+            <Button onClick={() => hide(false)} subtle>
+              Cancel
+            </Button>
+            <Button onClick={() => hide(true)} disabled={saveDisabled}>
+              Create
+            </Button>
+          </DialogActions>
+        </>
+      )}
     </Dialog>
   );
 };

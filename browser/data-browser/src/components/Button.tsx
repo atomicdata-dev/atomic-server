@@ -79,6 +79,7 @@ export const ButtonClean = styled.button<ButtonPropsStyled>`
   appearance: none;
   background-color: initial;
   -webkit-tap-highlight-color: transparent; /* Remove the tap / click effect on touch devices */
+  user-select: none;
 `;
 
 /** Base button style. You're likely to want to use ButtonMargin in most places */

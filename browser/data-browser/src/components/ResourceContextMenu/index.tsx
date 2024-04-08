@@ -9,7 +9,7 @@ import {
   shareURL,
   importerURL,
 } from '../../helpers/navigation';
-import { DIVIDER, DropdownMenu, isItem, Item } from '../Dropdown';
+import { DIVIDER, DropdownMenu, isItem, DropdownItem } from '../Dropdown';
 import toast from 'react-hot-toast';
 import { paths } from '../../routes/paths';
 import { shortcuts } from '../HotKeyWrapper';
@@ -105,7 +105,7 @@ function ResourceContextMenu({
     return null;
   }
 
-  const items: Item[] = [
+  const items: DropdownItem[] = [
     ...(simple
       ? []
       : [

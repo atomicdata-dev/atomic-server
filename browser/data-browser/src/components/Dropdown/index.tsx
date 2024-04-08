@@ -35,11 +35,11 @@ export type MenuItemMinimial = {
   shortcut?: string;
 };
 
-export type Item = typeof DIVIDER | MenuItemMinimial;
+export type DropdownItem = typeof DIVIDER | MenuItemMinimial;
 
 interface DropdownMenuProps {
   /** The list of menu items */
-  items: Item[];
+  items: DropdownItem[];
   trigger: DropdownTriggerRenderFunction;
   /** Enables the keyboard shortcut */
   isMainMenu?: boolean;
@@ -51,7 +51,7 @@ export const isItem = (
 ): item is MenuItemMinimial =>
   typeof item !== 'string' && typeof item?.label === 'string';
 
-const shouldSkip = (item?: Item) => !isItem(item) || item.disabled;
+const shouldSkip = (item?: DropdownItem) => !isItem(item) || item.disabled;
 
 const getAdditionalOffest = (increment: number) =>
   increment === 0 ? 1 : Math.sign(increment);
@@ -62,7 +62,7 @@ const getAdditionalOffest = (increment: number) =>
  * Returns 0 when no suitable index is found.
  */
 const createIndexOffset =
-  (items: Item[]) => (startingPoint: number, offset: number) => {
+  (items: DropdownItem[]) => (startingPoint: number, offset: number) => {
     const findNextAvailable = (
       scopedStartingPoint: number,
       scopedOffset: number,
@@ -84,8 +84,8 @@ const createIndexOffset =
     return findNextAvailable(startingPoint, offset);
   };
 
-function normalizeItems(items: Item[]) {
-  return items.reduce((acc: Item[], current, i) => {
+function normalizeItems(items: DropdownItem[]) {
+  return items.reduce((acc: DropdownItem[], current, i) => {
     // If the item is a divider at the start or end of the list, remove it.
     if ((i === 0 || i === items.length - 1) && !isItem(current)) {
       return acc;
@@ -136,7 +136,6 @@ export function DropdownMenu({
 
   useClickAwayListener([triggerRef, dropdownRef], handleClose, isActive, [
     'click',
-    'mouseout',
   ]);
 
   const normalizedItems = useMemo(() => normalizeItems(items), [items]);
