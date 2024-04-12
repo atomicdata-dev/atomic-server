@@ -219,22 +219,26 @@ export function IndexCell({
   onExpand,
   ...props
 }: React.PropsWithChildren<IndexCellProps>): JSX.Element {
+  const { markings } = useTableEditorContext();
+
+  const marking = markings.get(props.rowIndex);
+
   return (
-    <StyledIndexCell role='rowheader' {...props}>
+    <StyledIndexCell role='rowheader' {...props} hasMarking={!!marking}>
       <IconButton
         title='Open resource'
         onClick={() => onExpand(props.rowIndex)}
       >
         <FaExpandAlt />
       </IconButton>
-      <IndexNumber>{children}</IndexNumber>
+      {marking ? marking : <IndexNumber>{children}</IndexNumber>}
     </StyledIndexCell>
   );
 }
 
 const IndexNumber = styled.span``;
 
-const StyledIndexCell = styled(Cell)`
+const StyledIndexCell = styled(Cell)<{ hasMarking: boolean }>`
   justify-content: flex-end !important;
   color: ${p => p.theme.colors.textLight};
 
@@ -246,9 +250,9 @@ const StyledIndexCell = styled(Cell)`
     display: none;
   }
 
-  &:hover button,
-  &:focus-within button {
-    display: block;
+  &:not([data-hasmarking='true']):hover button,
+  &:not([data-hasmarking='true']):focus-within button {
+    display: ${p => (p.hasMarking ? 'none' : 'block')};
   }
 `;
 

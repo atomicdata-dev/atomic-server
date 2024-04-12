@@ -11,7 +11,7 @@ import {
 import { Details } from '../Details';
 import { useEffect, useState } from 'react';
 import { getIconForClass } from '../../views/FolderPage/iconMap';
-import styled from 'styled-components';
+import { styled } from 'styled-components';
 
 const shouldBeRendered = (resource: Resource) =>
   resource.hasClasses(dataBrowser.classes.folder) ||

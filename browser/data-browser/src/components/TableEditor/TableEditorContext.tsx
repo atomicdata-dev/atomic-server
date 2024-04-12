@@ -5,6 +5,7 @@ import {
   useState,
   createContext,
   useContext,
+  ReactElement,
 } from 'react';
 import { FixedSizeList } from 'react-window';
 import { EventManager } from '../../helpers/EventManager';
@@ -63,6 +64,8 @@ export interface TableEditorContext {
   clearCell: () => void;
   clearRow: (index: number) => void;
   enterEditModeWithCharacter: (key: string) => void;
+  markings: Map<number, ReactElement>;
+  setMarkings: React.Dispatch<React.SetStateAction<Map<number, ReactElement>>>;
   registerEventListener<T extends TableEvent>(
     event: T,
     cb: TableEventHandlers[T],
@@ -70,7 +73,7 @@ export interface TableEditorContext {
   emitInteractionsFired(interactions: KeyboardInteraction[]): void;
 }
 
-const initial = {
+const initial: TableEditorContext = {
   mouseDown: false,
   setMouseDown: emptySetState,
   tableRef: { current: null },
@@ -94,6 +97,8 @@ const initial = {
   clearCell: () => undefined,
   clearRow: (_: number) => undefined,
   enterEditModeWithCharacter: (_: string) => undefined,
+  markings: new Map<number, ReactElement>(),
+  setMarkings: emptySetState,
   registerEventListener: () => () => undefined,
   emitInteractionsFired: () => undefined,
 };
@@ -124,6 +129,10 @@ export function TableEditorContextProvider({
   const [cursorMode, setCursorMode] = useState(CursorMode.Visual);
 
   const [indicatorHidden, setIndicatorHidden] = useState(false);
+
+  const [markings, setMarkings] = useState<Map<number, ReactElement>>(
+    new Map(),
+  );
 
   const activeCellRef = useRef<HTMLDivElement | null>(null);
   const multiSelectCornerCellRef = useRef<HTMLDivElement | null>(null);
@@ -196,6 +205,8 @@ export function TableEditorContextProvider({
       clearRow,
       enterEditModeWithCharacter,
       emitInteractionsFired,
+      markings,
+      setMarkings,
     }),
     [
       disabledKeyboardInteractions,
@@ -210,6 +221,7 @@ export function TableEditorContextProvider({
       cursorMode,
       emitInteractionsFired,
       mouseDown,
+      markings,
     ],
   );
 
