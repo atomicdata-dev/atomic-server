@@ -6,14 +6,7 @@ import {
   useDebouncedCallback,
   useValue,
 } from '@tomic/react';
-import {
-  startTransition,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import { useCallback, useContext, useMemo } from 'react';
 import { Cell } from '../../components/TableEditor';
 import { CellAlign } from '../../components/TableEditor/Cell';
 import {
@@ -34,7 +27,7 @@ interface TableCell {
   rowIndex: number;
   resource: Resource;
   property: Property;
-  invalidateTable?: () => void;
+  onEditNextRow?: () => void;
 }
 
 function useIsEditing(row: number, column: number) {
@@ -59,9 +52,8 @@ export function TableCell({
   rowIndex,
   resource,
   property,
-  invalidateTable,
+  onEditNextRow,
 }: TableCell): JSX.Element {
-  const [markForInvalidate, setMarkForInvalidate] = useState(false);
   const { setActiveCell } = useTableEditorContext();
   const { addItemsToHistoryStack } = useContext(TablePageContext);
   const [save, savePending] = useDebouncedCallback(
@@ -93,7 +85,6 @@ export function TableCell({
     async (v: JSONValue) => {
       if (!createdAt) {
         await setCreatedAt(Date.now());
-        setMarkForInvalidate(true);
       }
 
       addItemsToHistoryStack(
@@ -115,32 +106,13 @@ export function TableCell({
   );
 
   const handleEditNextRow = useCallback(() => {
-    if (markForInvalidate && !savePending) {
-      startTransition(() => {
-        setMarkForInvalidate(false);
-        invalidateTable?.();
-        setTimeout(() => {
-          setActiveCell(rowIndex + 1, columnIndex);
-        }, 0);
-      });
+    if (!savePending) {
+      onEditNextRow?.();
+      setTimeout(() => {
+        setActiveCell(rowIndex + 1, columnIndex);
+      }, 0);
     }
-  }, [
-    markForInvalidate,
-    savePending,
-    invalidateTable,
-    setActiveCell,
-    rowIndex,
-    columnIndex,
-  ]);
-
-  useEffect(() => {
-    if (markForInvalidate && !isEditing && !savePending) {
-      startTransition(() => {
-        setMarkForInvalidate(false);
-        invalidateTable?.();
-      });
-    }
-  }, [isEditing, markForInvalidate, savePending, invalidateTable]);
+  }, [savePending, setActiveCell, rowIndex, columnIndex]);
 
   return (
     <Cell

@@ -12,6 +12,9 @@ import {
 import { TableCell } from './TableCell';
 import { randomSubject } from '../../helpers/randomString';
 import { styled, keyframes } from 'styled-components';
+import { useTableEditorContext } from '../../components/TableEditor/TableEditorContext';
+import { FaTriangleExclamation } from 'react-icons/fa6';
+import { useTableInvalidation } from './useTableInvalidation';
 
 interface TableRowProps {
   collection: Collection;
@@ -19,7 +22,39 @@ interface TableRowProps {
   columns: Property[];
 }
 
+const WarningIcon = styled(FaTriangleExclamation)`
+  color: ${p => p.theme.colors.warning};
+`;
+
+const saveWarning = (
+  <WarningIcon title='Row is incomplete or has invalid data' />
+);
+
 const TableCellMemo = memo(TableCell);
+
+function useMarkings(row: Resource, index: number) {
+  const { setMarkings } = useTableEditorContext();
+
+  useEffect(() => {
+    if (row.commitError) {
+      setMarkings(markings => {
+        const newMap = new Map(markings);
+        newMap.set(index, saveWarning);
+
+        return newMap;
+      });
+    }
+
+    return () => {
+      setMarkings(markings => {
+        const newMap = new Map(markings);
+        newMap.delete(index);
+
+        return newMap;
+      });
+    };
+  }, [row, index]);
+}
 
 export function TableRow({
   collection,
@@ -27,6 +62,8 @@ export function TableRow({
   columns,
 }: TableRowProps): JSX.Element {
   const resource = useMemberFromCollection(collection, index);
+
+  useMarkings(resource, index);
 
   if (resource.subject === unknownSubject) {
     return (
@@ -76,6 +113,10 @@ export function TableNewRow({
 
   const resource = useResource(subject, resourceOpts);
 
+  const onEditNextRow = useTableInvalidation(resource, invalidateTable);
+
+  useMarkings(resource, index);
+
   useEffect(() => {
     if (resource.subject === unknownSubject) {
       return;
@@ -108,7 +149,7 @@ export function TableNewRow({
           columnIndex={cIndex + 1}
           resource={resource}
           property={column}
-          invalidateTable={invalidateTable}
+          onEditNextRow={onEditNextRow}
         />
       ))}
     </>

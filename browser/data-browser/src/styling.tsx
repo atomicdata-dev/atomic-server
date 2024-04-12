@@ -95,6 +95,7 @@ export const buildTheme = (darkMode: boolean, mainIn: string): DefaultTheme => {
       textLight2: darkMode ? darken(0.8)(text) : lighten(0.8)(text),
       alert: '#cf5b5b',
       alertLight: '#e66f6f',
+      warning: '#f5a623',
     },
     animation: {
       duration: `${animationDuration}ms`,
@@ -159,6 +160,7 @@ declare module 'styled-components' {
       /** Error / warning color */
       alert: string;
       alertLight: string;
+      warning: string;
     };
     animation: {
       duration: string;
