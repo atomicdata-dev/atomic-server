@@ -1,9 +1,9 @@
 import {
   Property,
   Resource,
-  properties,
   useStore,
   Collection,
+  commits,
 } from '@tomic/react';
 import { useCallback } from 'react';
 import { CellPasteData } from '../../../components/TableEditor';
@@ -44,20 +44,19 @@ export function useHandlePaste(
           }
 
           if (rowSubject) {
-            row = await store.getResourceAsync(rowSubject);
+            row = await store.getResource(rowSubject);
           } else {
             // Row does not exist yet, create it
             shouldInvalidate = true;
-            row = store.getResourceLoading(
-              randomSubject(table.getSubject(), 'row'),
-              {
-                newResource: true,
-              },
-            );
 
-            await row.set(properties.isA, [tableClass.getSubject()], store);
-            await row.set(properties.commit.createdAt, Date.now(), store);
-            await row.set(properties.parent, table.getSubject(), store);
+            row = await store.newResource({
+              subject: randomSubject(table.subject, 'row'),
+              isA: tableClass.subject,
+              parent: table.subject,
+              propVals: {
+                [commits.properties.createdAt]: Date.now(),
+              },
+            });
 
             historyItemBatch.push(createResourceCreatedHistoryItem(row));
           }
@@ -75,8 +74,8 @@ export function useHandlePaste(
           property.datatype,
         );
 
-        await row.set(property.subject, value, store);
-        await row.save(store);
+        await row.set(property.subject, value);
+        await row.save();
         resourceMemos.set(cell.index[0], row);
       }
 

@@ -1,4 +1,4 @@
-import { Resource, Store, Version } from '@tomic/react';
+import { Version } from '@tomic/react';
 
 const groupFormatter = new Intl.DateTimeFormat('default', {
   month: 'long',
@@ -33,27 +33,6 @@ export function dedupeVersions(versions: Version[]): Version[] {
   }
 
   return filtered;
-}
-
-export async function setResourceToVersion(
-  resource: Resource,
-  version: Version,
-  store: Store,
-): Promise<void> {
-  const versionPropvals = version.resource.getPropVals();
-
-  // Remove any prop that doesn't exist in the version
-  for (const prop of resource.getPropVals().keys()) {
-    if (!versionPropvals.has(prop)) {
-      resource.removePropVal(prop);
-    }
-  }
-
-  for (const [key, value] of versionPropvals.entries()) {
-    await resource.set(key, value, store);
-  }
-
-  await resource.save(store);
 }
 
 export function groupVersionsByMonth(

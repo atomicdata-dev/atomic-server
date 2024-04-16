@@ -188,8 +188,8 @@ type useValueOptions = {
  * // Simple usage:
  * const resource = useResource('https://atomicdata.dev/classes/Agent');
  * const [shortname, setShortname] = useValue(
- *   'https://atomicdata.dev/properties/shortname',
  *   resource,
+ *   'https://atomicdata.dev/properties/shortname',
  * );
  * ```
  *
@@ -198,8 +198,8 @@ type useValueOptions = {
  * const resource = useResource('https://atomicdata.dev/classes/Agent');
  * const [error, setError] = useState(null);
  * const [shortname, setShortname] = useValue(
- *   'https://atomicdata.dev/properties/shortname',
  *   resource,
+ *   'https://atomicdata.dev/properties/shortname',
  *   {
  *     commit: true,
  *     validate: true,
@@ -220,16 +220,18 @@ export function useValue(
     commitDebounce = 100,
     handleValidationError,
   } = opts;
-  const [val, set] = useState<JSONValue>(undefined);
+  const [val, set] = useState<JSONValue>(resource.get(propertyURL));
+  const [prevResourceReference, setPrevResourceReference] = useState(resource);
+
   const store = useStore();
 
-  const [saveResource, isWaitingForDebounce] = useDebouncedCallback(
+  const [saveResource] = useDebouncedCallback(
     () => {
       if (!commit) {
         return;
       }
 
-      resource.save(store).catch(e => store.notifyError(e));
+      resource.save().catch(e => store.notifyError(e));
     },
     commitDebounce,
     [resource, store],
@@ -243,7 +245,7 @@ export function useValue(
     async (newVal: JSONValue): Promise<void> => {
       if (newVal === undefined) {
         // remove the value
-        resource.removePropVal(propertyURL);
+        resource.remove(propertyURL);
         set(undefined);
         saveResource();
 
@@ -255,7 +257,7 @@ export function useValue(
       // Validates and sets a property / value combination. Will invoke the
       // callback if the value is not valid.
       try {
-        await resource.set(propertyURL, newVal, store, validate);
+        await resource.set(propertyURL, newVal, validate);
         saveResource();
         handleValidationError?.(undefined);
       } catch (e) {
@@ -269,22 +271,18 @@ export function useValue(
     [resource, handleValidationError, store, validate, saveResource],
   );
 
-  // If the hook is waiting to commit the changes return the current local value so the component using this hook shows the most recent value.
-  if (isWaitingForDebounce) {
-    return [val, validateAndSet];
+  // Update value when resource changes.
+  if (resource !== prevResourceReference) {
+    try {
+      set(resource.get(propertyURL));
+    } catch (e) {
+      store.notifyError(e);
+    }
+
+    setPrevResourceReference(resource);
   }
 
-  // Value hasn't been set in state yet, so get the value
-  let value: JSONValue = undefined;
-
-  // Try to actually get the value, log any error
-  try {
-    value = resource.get(propertyURL);
-  } catch (e) {
-    store.notifyError(e);
-  }
-
-  return [value, validateAndSet];
+  return [val, validateAndSet];
 }
 
 /**
@@ -397,7 +395,6 @@ export function useArray(
 ): [string[], SetValue<JSONArray>, (vals: string[]) => void] {
   const [value, set] = useValue(resource, propertyURL, opts);
   const stableEmptyArray = useRef<JSONArray>([]);
-  const store = useStore();
 
   const values = useMemo(() => {
     if (value === undefined) {
@@ -419,13 +416,13 @@ export function useArray(
 
   const push = useCallback(
     (val: string[]) => {
-      resource.pushPropVal(propertyURL, val);
+      resource.push(propertyURL, val);
 
       if (opts?.commit) {
-        resource.save(store);
+        resource.save();
       }
     },
-    [resource, propertyURL, store],
+    [resource, propertyURL],
   );
 
   return [values as string[], set, push];
@@ -527,6 +524,7 @@ export function useCanWrite(
 
     if (resource.new) {
       setCanWrite(true);
+      setMsg(undefined);
 
       return;
     }
@@ -534,10 +532,7 @@ export function useCanWrite(
     setMsg('Checking write rights...');
 
     async function tryCanWrite() {
-      const [canWriteAsync, canWriteMsg] = await resource.canWrite(
-        store,
-        agent,
-      );
+      const [canWriteAsync, canWriteMsg] = await resource.canWrite(agent);
       setCanWrite(canWriteAsync);
 
       if (canWriteAsync) {

@@ -261,18 +261,19 @@ impl Db {
 
         for (i, atom_res) in atoms.enumerate() {
             let atom = atom_res?;
+            if !q.include_external && !atom.subject.starts_with(&self_url) {
+                continue;
+            }
+
+            total_count += 1;
 
             if q.offset > i {
                 continue;
             }
 
-            if !q.include_external && !atom.subject.starts_with(&self_url) {
-                continue;
-            }
             if q.limit.is_none() || subjects.len() < q.limit.unwrap() {
                 if !should_include_resource(q) {
                     subjects.push(atom.subject.clone());
-                    total_count += 1;
                     continue;
                 }
 
@@ -282,8 +283,6 @@ impl Db {
                     resources.push(resource);
                 }
             }
-
-            total_count += 1;
         }
 
         Ok(QueryResult {
@@ -329,14 +328,14 @@ impl Storelike for Db {
                 // Resource exists in map
                 Some(resource) => {
                     resource
-                        .set_propval_string(atom.property.clone(), &atom.value.to_string(), self)
+                        .set_string(atom.property.clone(), &atom.value.to_string(), self)
                         .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                 }
                 // Resource does not exist
                 None => {
                     let mut resource = Resource::new(atom.subject.clone());
                     resource
-                        .set_propval_string(atom.property.clone(), &atom.value.to_string(), self)
+                        .set_string(atom.property.clone(), &atom.value.to_string(), self)
                         .map_err(|e| format!("Failed adding attom {}. {}", atom, e))?;
                     map.insert(atom.subject, resource);
                 }
@@ -456,7 +455,6 @@ impl Storelike for Db {
         let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
         // This might add a trailing slash
         let url = url::Url::parse(subject)?;
-
         let mut removed_query_params = {
             let mut url_altered = url.clone();
             url_altered.set_query(None);
@@ -556,7 +554,7 @@ impl Storelike for Db {
 
         // This lets clients know that the resource may have dynamic properties that are currently not included
         if has_dynamic && skip_dynamic {
-            resource.set_propval(
+            resource.set(
                 crate::urls::INCOMPLETE.into(),
                 crate::Value::Boolean(true),
                 self,

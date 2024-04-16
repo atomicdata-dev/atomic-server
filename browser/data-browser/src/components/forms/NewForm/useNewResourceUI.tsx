@@ -94,16 +94,20 @@ export function NewResourceUIProvider({ children }: PropsWithChildren) {
 
     // If a basicInstanceHandler is registered for the class, create a resource of the given class with some default values.
     if (basicNewInstanceHandlers.has(isA)) {
-      basicNewInstanceHandlers.get(isA)?.(parent, createAndNavigate, {
-        store,
-        settings,
-      });
+      try {
+        await basicNewInstanceHandlers.get(isA)?.(parent, createAndNavigate, {
+          store,
+          settings,
+        });
+      } catch (e) {
+        store.notifyError(e);
+      }
 
       return;
     }
 
     // Default behaviour. Navigate to a new resource form for the given class.
-    const classResource = await store.getResourceAsync<Core.Class>(isA);
+    const classResource = await store.getResource<Core.Class>(isA);
     navigate(
       newURL(isA, parent, store.createSubject(classResource.props.shortname)),
     );

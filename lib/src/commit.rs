@@ -176,7 +176,7 @@ impl Commit {
                 // Unless it's a Drive!
                 if resource_old.get(urls::PARENT).is_err() {
                     let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
-                    resource_old.set_propval(
+                    resource_old.set(
                         urls::PARENT.into(),
                         Value::AtomicUrl(default_parent),
                         store,
@@ -192,7 +192,7 @@ impl Commit {
         }
 
         // Set the `lastCommit` to the newly created Commit
-        resource_new.set_propval(
+        resource_new.set(
             urls::LAST_COMMIT.to_string(),
             Value::AtomicUrl(commit_resource.get_subject().into()),
             store,
@@ -300,7 +300,7 @@ impl Commit {
         if let Some(set) = self.set.clone() {
             for (prop, new_val) in set.iter() {
                 resource
-                    .set_propval(prop.into(), new_val.to_owned(), store)
+                    .set(prop.into(), new_val.to_owned(), store)
                     .map_err(|e| {
                         format!(
                             "Failed to set property '{}' to '{}' in Commit. Error: {}",
@@ -334,7 +334,7 @@ impl Commit {
                     _other => return Err("Wrong datatype when pushing to array".into()),
                 };
                 old_vec.append(&mut new_vec.clone());
-                resource.set_propval_unsafe(prop.into(), old_vec.into());
+                resource.set_unsafe(prop.into(), old_vec.into());
                 if update_index {
                     for added_resource in new_vec {
                         let atom = Atom::new(
@@ -443,17 +443,17 @@ impl Commit {
         };
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
         resource.set_subject(commit_subject);
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             urls::SUBJECT.into(),
             Value::new(&self.subject, &DataType::AtomicUrl)?,
         );
         let classes = vec![urls::COMMIT.to_string()];
-        resource.set_propval_unsafe(urls::IS_A.into(), classes.into());
-        resource.set_propval_unsafe(
+        resource.set_unsafe(urls::IS_A.into(), classes.into());
+        resource.set_unsafe(
             urls::CREATED_AT.into(),
             Value::new(&self.created_at.to_string(), &DataType::Timestamp)?,
         );
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
         );
@@ -462,34 +462,34 @@ impl Commit {
             for (prop, val) in set {
                 newset.insert(prop.into(), val.clone());
             }
-            resource.set_propval_unsafe(urls::SET.into(), newset.into());
+            resource.set_unsafe(urls::SET.into(), newset.into());
         };
         if let Some(remove) = &self.remove {
             if !remove.is_empty() {
-                resource.set_propval_unsafe(urls::REMOVE.into(), remove.clone().into());
+                resource.set_unsafe(urls::REMOVE.into(), remove.clone().into());
             }
         };
         if let Some(destroy) = self.destroy {
             if destroy {
-                resource.set_propval_unsafe(urls::DESTROY.into(), true.into());
+                resource.set_unsafe(urls::DESTROY.into(), true.into());
             }
         }
         if let Some(previous_commit) = &self.previous_commit {
-            resource.set_propval_unsafe(
+            resource.set_unsafe(
                 urls::PREVIOUS_COMMIT.into(),
                 Value::AtomicUrl(previous_commit.into()),
             );
         }
-        resource.set_propval_unsafe(
+        resource.set_unsafe(
             SIGNER.into(),
             Value::new(&self.signer, &DataType::AtomicUrl)?,
         );
         if let Some(signature) = &self.signature {
-            resource.set_propval_unsafe(urls::SIGNATURE.into(), signature.clone().into());
+            resource.set_unsafe(urls::SIGNATURE.into(), signature.clone().into());
         }
         if let Some(push) = &self.push {
             if !push.is_empty() {
-                resource.set_propval_unsafe(urls::PUSH.into(), push.clone().into());
+                resource.set_unsafe(urls::PUSH.into(), push.clone().into());
             }
         }
         Ok(resource)

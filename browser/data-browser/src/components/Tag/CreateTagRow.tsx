@@ -37,7 +37,7 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
     });
 
     if (emoji) {
-      await tag.set(dataBrowser.properties.emoji, emoji, store);
+      await tag.set(dataBrowser.properties.emoji, emoji);
     }
 
     onNewTag(tag);
@@ -53,6 +53,7 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
+        e.preventDefault();
         createNewTag();
       }
     },

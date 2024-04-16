@@ -85,7 +85,7 @@ function ResourceContextMenu({
     const parent = resource.get(core.properties.parent);
 
     try {
-      await resource.destroy(store);
+      await resource.destroy();
       onAfterDelete?.();
       toast.success('Resource deleted!');
 

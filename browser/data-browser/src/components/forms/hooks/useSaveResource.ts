@@ -29,7 +29,7 @@ export const useSaveResource = (
       setErr(undefined);
 
       try {
-        await resource.save(store);
+        await resource.save();
         setSaving(false);
         onSaveSucces?.();
         toast.success('Resource saved');

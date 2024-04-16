@@ -61,7 +61,7 @@ pub fn construct_chatroom(
             resource.get_subject(),
             &[("before-timestamp", last_timestamp.to_string())],
         )?;
-        resource.set_propval(
+        resource.set(
             urls::NEXT_PAGE.into(),
             Value::AtomicUrl(next_page_url.to_string()),
             store,
@@ -71,7 +71,7 @@ pub fn construct_chatroom(
     // Clients expect messages to appear from old to new
     messages_unfiltered.reverse();
 
-    resource.set_propval(urls::MESSAGES.into(), messages_unfiltered.into(), store)?;
+    resource.set(urls::MESSAGES.into(), messages_unfiltered.into(), store)?;
     Ok(resource.to_owned())
 }
 

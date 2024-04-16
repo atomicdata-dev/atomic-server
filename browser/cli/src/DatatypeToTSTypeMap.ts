@@ -5,7 +5,7 @@ export const DatatypeToTSTypeMap = {
   [Datatype.RESOURCEARRAY]: 'string[]',
   [Datatype.BOOLEAN]: 'boolean',
   [Datatype.DATE]: 'string',
-  [Datatype.TIMESTAMP]: 'string',
+  [Datatype.TIMESTAMP]: 'number',
   [Datatype.INTEGER]: 'number',
   [Datatype.FLOAT]: 'number',
   [Datatype.STRING]: 'string',

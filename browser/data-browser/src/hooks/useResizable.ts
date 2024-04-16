@@ -1,11 +1,19 @@
 import { transparentize } from 'polished';
-import { useEffect, useId, useRef, useState } from 'react';
+import {
+  MouseEventHandler,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from 'react';
 import { styled } from 'styled-components';
 
 interface UseResizeResult<E extends HTMLElement> {
   size: string;
   targetRef: React.RefObject<E>;
   dragAreaRef: React.RefObject<HTMLDivElement>;
+  dragAreaListeners: Pick<React.DOMAttributes<HTMLDivElement>, 'onMouseDown'>;
   isDragging: boolean;
 }
 
@@ -86,6 +94,14 @@ export function useResizable<E extends HTMLElement>({
     });
   });
 
+  const onMouseDown: MouseEventHandler<HTMLDivElement> = useCallback(e => {
+    e.stopPropagation();
+
+    if (e.target !== dragAreaRef.current) return;
+
+    setDragging(true);
+  }, []);
+
   useEffect(() => {
     if (!targetRef.current || !dragAreaRef.current) {
       return () => {
@@ -93,24 +109,13 @@ export function useResizable<E extends HTMLElement>({
       };
     }
 
-    const mouseDown = (e: MouseEvent) => {
-      e.stopPropagation();
-
-      if (e.target !== dragAreaRef.current) return;
-
-      setDragging(true);
-    };
-
     const mouseUp = () => {
       setDragging(false);
     };
 
-    dragAreaRef.current.addEventListener('mousedown', mouseDown);
-
     window.addEventListener('mouseup', mouseUp);
 
     return () => {
-      dragAreaRef.current?.removeEventListener('mousedown', mouseDown);
       window.removeEventListener('mouseup', mouseUp);
       cleanup(styleId);
     };
@@ -135,6 +140,9 @@ export function useResizable<E extends HTMLElement>({
     targetRef,
     dragAreaRef,
     isDragging: dragging,
+    dragAreaListeners: {
+      onMouseDown,
+    },
   };
 }
 

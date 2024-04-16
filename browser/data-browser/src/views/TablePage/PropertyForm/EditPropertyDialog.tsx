@@ -1,4 +1,4 @@
-import { Resource, properties, useStore, useString } from '@tomic/react';
+import { Resource, core, useString } from '@tomic/react';
 import { useCallback, useEffect, useState } from 'react';
 import { PropertyForm, getCategoryFromDatatype } from './PropertyForm';
 import { FormValidationContextProvider } from '../../../components/forms/formValidation/FormValidationContextProvider';
@@ -22,15 +22,14 @@ export function EditPropertyDialog({
   showDialog,
   bindShow,
 }: EditPropertyDialogProps): JSX.Element {
-  const store = useStore();
   const [valid, setValid] = useState(true);
 
-  const [datatype] = useString(resource, properties.datatype);
+  const [datatype] = useString(resource, core.properties.datatype);
 
   const category = getCategoryFromDatatype(datatype);
 
   const onSuccess = useCallback(() => {
-    resource.save(store);
+    resource.save();
   }, [resource]);
 
   const [dialogProps, show, hide] = useDialog({ bindShow, onSuccess });

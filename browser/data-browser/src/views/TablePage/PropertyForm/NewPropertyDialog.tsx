@@ -1,4 +1,11 @@
-import { Resource, Store, urls, useArray, useStore } from '@tomic/react';
+import {
+  Datatype,
+  Resource,
+  Store,
+  core,
+  useArray,
+  useStore,
+} from '@tomic/react';
 import { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import { Button } from '../../../components/Button';
@@ -29,21 +36,20 @@ const createSubjectWithBase = (base: string) => {
 const populatePropertyWithDefaults = async (
   property: Resource,
   tableClass: Resource,
-  store: Store,
 ) => {
-  await property.set(urls.properties.isA, [urls.classes.property], store);
-  await property.set(urls.properties.parent, tableClass.getSubject(), store);
-  await property.set(urls.properties.shortname, 'new-column', store, false);
-  await property.set(urls.properties.name, '', store, false);
-  await property.set(urls.properties.description, 'A column in a table', store);
-  await property.set(urls.properties.datatype, urls.datatypes.string, store);
+  await property.set(core.properties.isA, [core.classes.property]);
+  await property.set(core.properties.parent, tableClass.subject);
+  await property.set(core.properties.shortname, 'new-column', false);
+  await property.set(core.properties.name, '', false);
+  await property.set(core.properties.description, 'A column in a table');
+  await property.set(core.properties.datatype, Datatype.STRING);
 
-  await property.save(store);
+  await property.save();
 };
 
 const getChildren = (store: Store, resource: Resource) =>
   store.clientSideQuery(
-    res => res.get(urls.properties.parent) === resource?.getSubject(),
+    res => res.get(core.properties.parent) === resource?.subject,
   );
 
 const destroyChildren = async (store: Store, resource: Resource) => {
@@ -52,7 +58,7 @@ const destroyChildren = async (store: Store, resource: Resource) => {
   await Promise.all(
     children.map(child => {
       try {
-        child.destroy(store);
+        child.destroy();
       } catch (e) {
         return;
       }
@@ -62,7 +68,7 @@ const destroyChildren = async (store: Store, resource: Resource) => {
 
 const saveChildren = async (store: Store, resource: Resource) => {
   const children = getChildren(store, resource);
-  await Promise.all(children.map(child => child.save(store)));
+  await Promise.all(children.map(child => child.save()));
 };
 
 export function NewPropertyDialog({
@@ -77,7 +83,7 @@ export function NewPropertyDialog({
   const [resource, setResource] = useState<Resource | null>(null);
   const [_properties, _setProperties, pushProp] = useArray(
     tableClassResource,
-    urls.properties.recommends,
+    core.properties.recommends,
     {
       commit: true,
     },
@@ -90,7 +96,7 @@ export function NewPropertyDialog({
 
     try {
       await destroyChildren(store, resource);
-      await resource.destroy(store);
+      await resource.destroy();
     } finally {
       // Server does not have this resource yet so it will nag at us. We set the state to null anyway.
       setResource(null);
@@ -102,11 +108,11 @@ export function NewPropertyDialog({
       return;
     }
 
-    await resource.save(store);
+    await resource.save();
     await saveChildren(store, resource);
     await store.notifyResourceManuallyCreated(resource);
 
-    await pushProp([resource.getSubject()]);
+    pushProp([resource.subject]);
     setResource(null);
   }, [resource, store, tableClassResource, pushProp]);
 
@@ -117,16 +123,12 @@ export function NewPropertyDialog({
   });
 
   const createProperty = async () => {
-    const subject = createSubjectWithBase(tableClassResource.getSubject());
+    const subject = createSubjectWithBase(tableClassResource.subject);
     const propertyResource = store.getResourceLoading(subject, {
       newResource: true,
     });
 
-    await populatePropertyWithDefaults(
-      propertyResource,
-      tableClassResource,
-      store,
-    );
+    await populatePropertyWithDefaults(propertyResource, tableClassResource);
 
     setResource(propertyResource);
   };

@@ -44,15 +44,6 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
     }
 
-    // Check if atomic-server is already running somewhere, and try to stop it. It's not a problem if things go wrong here, so errors are simply logged.
-    if cfg!(feature = "process-management") {
-        #[cfg(feature = "process-management")]
-        {
-            let _ = crate::process::terminate_existing_processes(&config)
-                .map_err(|e| tracing::error!("Could not check for running instance: {}", e));
-        }
-    }
-
     tracing::info!("Opening database at {:?}", &config.store_path);
     let should_init = !&config.store_path.exists() || config.initialize;
     let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
@@ -188,32 +179,32 @@ fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     invite.set_class(atomic_lib::urls::INVITE);
     invite.set_subject(subject);
     // This invite can be used only once
-    invite.set_propval(
+    invite.set(
         atomic_lib::urls::USAGES_LEFT.into(),
         atomic_lib::Value::Integer(1),
         store,
     )?;
-    invite.set_propval(
+    invite.set(
         atomic_lib::urls::WRITE_BOOL.into(),
         atomic_lib::Value::Boolean(true),
         store,
     )?;
-    invite.set_propval(
+    invite.set(
         atomic_lib::urls::TARGET.into(),
         atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
         store,
     )?;
-    invite.set_propval(
+    invite.set(
         atomic_lib::urls::PARENT.into(),
         atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
         store,
     )?;
-    invite.set_propval(
+    invite.set(
         atomic_lib::urls::NAME.into(),
         atomic_lib::Value::String("Setup".into()),
         store,
     )?;
-    invite.set_propval_string(
+    invite.set_string(
         atomic_lib::urls::DESCRIPTION.into(),
         "Use this Invite to create an Agent, or use an existing one. Accepting will grant your Agent the necessary rights to edit the data in your Atomic Server. This can only be used once. If you, for whatever reason, need a new `/setup` invite, you can pass the `--initialize` flag to `atomic-server`.",
         store,

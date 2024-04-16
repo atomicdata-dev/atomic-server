@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useResource, useStore, Version } from '@tomic/react';
+import { useResource, Version } from '@tomic/react';
 
 import { ContainerNarrow } from '../../components/Containers';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ErrorLook } from '../../components/ErrorLook';
 import { styled } from 'styled-components';
 import { useVersions } from './useVersions';
-import { groupVersionsByMonth, setResourceToVersion } from './versionHelpers';
+import { groupVersionsByMonth } from './versionHelpers';
 import { toast } from 'react-hot-toast';
 import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
 import { constructOpenURL } from '../../helpers/navigation';
@@ -18,7 +18,6 @@ import { ProgressBar } from '../../components/ProgressBar';
 
 /** Shows an activity log of previous versions */
 export function History(): JSX.Element {
-  const store = useStore();
   const navigate = useNavigateWithTransition();
   const isSmallScreen = useMediaQuery('(max-width: 500px)');
   const [subject] = useCurrentSubject();
@@ -38,7 +37,8 @@ export function History(): JSX.Element {
 
   const setResourceToCurrentVersion = async () => {
     if (selectedVersion && subject) {
-      await setResourceToVersion(resource, selectedVersion, store);
+      await resource.setVersion(selectedVersion);
+
       toast.success('Resource version updated');
       navigate(constructOpenURL(subject));
     }

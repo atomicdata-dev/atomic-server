@@ -1,7 +1,9 @@
-import { useState } from 'react';
-import { Datatype, useNumber } from '@tomic/react';
+import { Datatype, useNumber, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
-import { ErrMessage, InputStyled, InputWrapper } from './InputStyles';
+import { InputStyled, InputWrapper } from './InputStyles';
+import { useValidation } from './formValidation/useValidation';
+import { ErrorChipInput } from './ErrorChip';
+import { styled } from 'styled-components';
 
 export default function InputNumber({
   resource,
@@ -9,7 +11,7 @@ export default function InputNumber({
   commit,
   ...props
 }: InputProps): JSX.Element {
-  const [err, setErr] = useState<Error | undefined>(undefined);
+  const [err, setErr, onBlur] = useValidation();
   const [value, setValue] = useNumber(resource, property.subject, {
     handleValidationError: setErr,
     validate: false,
@@ -17,30 +19,48 @@ export default function InputNumber({
   });
 
   function handleUpdate(e: React.ChangeEvent<HTMLInputElement>) {
-    if (e.target.value === '') {
-      setValue(undefined);
+    setErr(undefined);
 
-      return;
+    if (e.target.value === '') {
+      if (props.required) {
+        setErr('Required');
+      }
+
+      setValue(undefined);
+    } else {
+      try {
+        const newVal = +e.target.value;
+        validateDatatype(newVal, property.datatype);
+        setValue(newVal);
+      } catch (er) {
+        setErr('Invalid Number');
+      }
     }
 
-    const newval = +e.target.value;
-    setValue(newval);
+    if (props.required && e.target.value === '') {
+      setErr('Required');
+    }
   }
 
   return (
-    <>
-      <InputWrapper>
+    <Wrapper>
+      <InputWrapper $invalid={!!err}>
         <InputStyled
           placeholder='Enter a number...'
           type='number'
           value={value === undefined ? '' : Number.isNaN(value) ? '' : value}
           step={property.datatype === Datatype.INTEGER ? 1 : 'any'}
           onChange={handleUpdate}
+          onBlur={onBlur}
           {...props}
         />
       </InputWrapper>
-      {value !== undefined && err && <ErrMessage>{err.message}</ErrMessage>}
-      {value === undefined && <ErrMessage>Required</ErrMessage>}
-    </>
+      {err && <ErrorChipInput top='2rem'>{err}</ErrorChipInput>}
+    </Wrapper>
   );
 }
+
+const Wrapper = styled.div`
+  flex: 1;
+  position: relative;
+`;

@@ -64,7 +64,7 @@ fn handle_prune_tests_request(context: HandlePostContext) -> AtomicResult<Resour
 fn build_response(store: &impl Storelike, status: i32, message: String) -> Resource {
     let mut resource = Resource::new_generate_subject(store);
     resource.set_class(urls::ENDPOINT_RESPONSE);
-    resource.set_propval_unsafe(urls::STATUS.to_string(), status.into());
-    resource.set_propval_unsafe(urls::RESPONSE_MESSAGE.to_string(), message.into());
+    resource.set_unsafe(urls::STATUS.to_string(), status.into());
+    resource.set_unsafe(urls::RESPONSE_MESSAGE.to_string(), message.into());
     resource
 }

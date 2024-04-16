@@ -101,7 +101,7 @@ async fn server_tests() {
     // Edit the main drive, make it hidden to the public agent
     let mut drive = store.get_resource(&appstate.config.server_url).unwrap();
     drive
-        .set_propval(
+        .set(
             urls::READ.into(),
             vec![appstate.store.get_default_agent().unwrap().subject].into(),
             &appstate.store,

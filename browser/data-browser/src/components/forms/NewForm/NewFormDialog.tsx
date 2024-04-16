@@ -42,7 +42,7 @@ export const NewFormDialog = ({
   });
 
   const onResourceSave = useCallback(() => {
-    onSave(resource.getSubject());
+    onSave(resource.subject);
     closeDialog(true);
   }, [onSave, closeDialog, resource]);
 
@@ -59,7 +59,7 @@ export const NewFormDialog = ({
       await setSubjectValue(uniqueSubject);
 
       for (const [prop, value] of Object.entries(initialProps ?? {})) {
-        await resource.set(prop, value, store);
+        await resource.set(prop, value);
       }
     })();
   });

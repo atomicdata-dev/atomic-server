@@ -1,5 +1,5 @@
 import { AtomicError, ErrorType } from './../../../../lib/src/error';
-import { Resource, Store, urls, useStore, useString } from '@tomic/react';
+import { Resource, urls, useStore, useString } from '@tomic/react';
 import { startTransition, useCallback, useEffect, useState } from 'react';
 import { debounce } from '../../helpers/debounce';
 import { paths } from '../../routes/paths';
@@ -12,8 +12,8 @@ type UsePreviewReturnType = {
   loading: boolean;
 };
 
-async function fetchBookmarkData(url: string, name = '', store: Store) {
-  const bookmarkRoute = new URL(paths.fetchBookmark, store.getServerUrl());
+async function fetchBookmarkData(url: string, name = '', baseUrl: string) {
+  const bookmarkRoute = new URL(paths.fetchBookmark, baseUrl);
 
   const searchParams = new URLSearchParams({
     name,
@@ -42,7 +42,7 @@ const debouncedFetch = debounce(
   (
     url: string,
     name: string | undefined,
-    store: Store,
+    baseUrl: string,
     resource: Resource,
     setPreview: AtomicSetter<string>,
     setName: AtomicSetter<string>,
@@ -52,7 +52,7 @@ const debouncedFetch = debounce(
     setDescription: AtomicSetter<string | undefined>,
   ) => {
     startTransition(() => {
-      fetchBookmarkData(url, name, store)
+      fetchBookmarkData(url, name, baseUrl)
         .then(async res => {
           await Promise.all([
             setPreview(res.preview),
@@ -63,7 +63,7 @@ const debouncedFetch = debounce(
 
           setError(undefined);
           setLoading(false);
-          resource.save(store);
+          resource.save();
         })
         .catch(err => {
           console.error(err);
@@ -107,7 +107,7 @@ export function usePreview(resource: Resource): UsePreviewReturnType {
       debouncedFetch(
         websiteURL,
         name,
-        store,
+        store.getServerUrl(),
         resource,
         setPreview,
         setName,

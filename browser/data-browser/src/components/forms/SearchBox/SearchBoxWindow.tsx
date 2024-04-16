@@ -237,6 +237,7 @@ const SearchInputWrapper = styled.div`
   }
   &:focus-within {
     border-color: ${p => p.theme.colors.main};
+    box-shadow: 0 0 0 1px ${p => p.theme.colors.main};
     outline: none;
   }
 `;

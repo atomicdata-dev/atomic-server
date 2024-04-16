@@ -3,7 +3,7 @@ import { Resource, Store, core } from '@tomic/react';
 const DEFAULT_DESCRIPTION = 'Change me';
 
 export const subjectForClass = (parent: Resource, shortName: string): string =>
-  `${parent.getSubject()}/class/${shortName}`;
+  `${parent.subject}/class/${shortName}`;
 
 export async function newClass(
   shortName: string,
@@ -14,7 +14,7 @@ export async function newClass(
 
   const resource = await store.newResource({
     subject,
-    parent: parent.getSubject(),
+    parent: parent.subject,
     isA: core.classes.class,
     propVals: {
       [core.properties.shortname]: shortName,
@@ -22,11 +22,11 @@ export async function newClass(
     },
   });
 
-  await resource.save(store);
+  await resource.save();
 
-  parent.pushPropVal(core.properties.classes, [subject]);
+  parent.push(core.properties.classes, [subject]);
 
-  await parent.save(store);
+  await parent.save();
 
   return subject;
 }

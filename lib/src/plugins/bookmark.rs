@@ -59,7 +59,7 @@ fn handle_bookmark_request(context: HandleGetContext) -> AtomicResult<Resource> 
 
     let mut resource = Resource::new(subject.to_string());
     resource.set_class(urls::BOOKMARK);
-    resource.set_propval_string(urls::URL.into(), &path, store)?;
+    resource.set_string(urls::URL.into(), &path, store)?;
 
     // Fetch the data and create a parser from it.
     let content = fetch_data(&path)?;
@@ -69,17 +69,17 @@ fn handle_bookmark_request(context: HandleGetContext) -> AtomicResult<Resource> 
     let site_meta = parser.get_meta();
 
     if let Some(title) = site_meta.title {
-        resource.set_propval_string(urls::NAME.into(), &title, store)?;
+        resource.set_string(urls::NAME.into(), &title, store)?;
     } else {
-        resource.set_propval_string(urls::NAME.into(), &name, store)?;
+        resource.set_string(urls::NAME.into(), &name, store)?;
     }
 
     if let Some(description) = site_meta.description {
-        resource.set_propval_string(urls::DESCRIPTION.into(), &description, store)?;
+        resource.set_string(urls::DESCRIPTION.into(), &description, store)?;
     }
 
     if let Some(image) = site_meta.image {
-        resource.set_propval_string(urls::IMAGE_URL.into(), &image, store)?;
+        resource.set_string(urls::IMAGE_URL.into(), &image, store)?;
     }
 
     // Clean and transform the HTML to markdown.
@@ -89,7 +89,7 @@ fn handle_bookmark_request(context: HandleGetContext) -> AtomicResult<Resource> 
     // https://github.com/atomicdata-dev/atomic-server/issues/474
     let md = regex::Regex::new(r"\s{5,}").unwrap().replace_all(&md, "");
 
-    resource.set_propval(urls::PREVIEW.into(), Value::Markdown(md.into()), store)?;
+    resource.set(urls::PREVIEW.into(), Value::Markdown(md.into()), store)?;
 
     Ok(resource)
 }
@@ -383,18 +383,20 @@ impl Parser {
                     .get_attribute("href")
                     .unwrap_or_else(|| "link".to_string());
 
-                el.on_end_tag(move |end| {
-                    let s = buffer.borrow();
-                    let mut text = s.as_str().trim();
+                if let Some(handlers) = el.end_tag_handlers() {
+                    handlers.push(Box::new(move |end| {
+                        let s = buffer.borrow();
+                        let mut text = s.as_str().trim();
 
-                    if text.is_empty() {
-                        text = &href;
-                    }
+                        if text.is_empty() {
+                            text = &href;
+                        }
 
-                    end.before(text, lol_html::html_content::ContentType::Text);
+                        end.before(text, lol_html::html_content::ContentType::Text);
 
-                    Ok(())
-                })?;
+                        Ok(())
+                    }));
+                }
 
                 Ok(())
             }),

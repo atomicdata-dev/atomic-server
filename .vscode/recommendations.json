@@ -5,6 +5,7 @@
     "ms-vscode.vscode-typescript-next",
     "dbaeumer.vscode-eslint",
     "antfu.vite",
+    "DavidAnson.vscode-markdownlint",
     "ms-playwright.playwright"
   ]
 }

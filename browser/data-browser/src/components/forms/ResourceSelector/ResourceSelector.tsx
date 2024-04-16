@@ -2,15 +2,15 @@ import { useState, useMemo, memo } from 'react';
 import { Dialog, useDialog } from '../../Dialog';
 import { useDialogTreeContext } from '../../Dialog/dialogContext';
 import { useSettings } from '../../../helpers/AppSettings';
-import { styled } from 'styled-components';
+import { css, styled } from 'styled-components';
 import { NewFormDialog } from '../NewForm/NewFormDialog';
 import { SearchBox } from '../SearchBox';
-import { SearchBoxButton } from '../SearchBox/SearchBox';
 import { FaTrash } from 'react-icons/fa';
 import { ErrorChip } from '../ErrorChip';
 import { urls } from '@tomic/react';
+import { SearchBoxButton } from '../SearchBox/SearchBoxButton';
 
-interface ResourceSelectorProps {
+export interface ResourceSelectorProps {
   /**
    * This callback is called when the Subject Changes. You can pass an Error
    * Handler as the second argument to set an error message. Take the second
@@ -34,6 +34,15 @@ interface ResourceSelectorProps {
   /** Is used when a new item is created using the ResourceSelector */
   parent?: string;
   hideCreateOption?: boolean;
+  hideClearButton?: boolean;
+
+  /** If true, this is the first item in a list, default=true*/
+  first?: boolean;
+  /** If true, this is the last item in a list, default=true*/
+  last?: boolean;
+
+  /** Some react node that is displayed in front of the text inside the input wrapper*/
+  prefix?: React.ReactNode;
 }
 
 /**
@@ -49,7 +58,11 @@ export const ResourceSelector = memo(function ResourceSelector({
   isA,
   disabled,
   parent,
+  hideClearButton,
   hideCreateOption,
+  first = true,
+  last = true,
+  prefix,
 }: ResourceSelectorProps): JSX.Element {
   const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog();
   const [initialNewTitle, setInitialNewTitle] = useState('');
@@ -69,16 +82,18 @@ export const ResourceSelector = memo(function ResourceSelector({
   }, [hideCreateOption, setSubject, showDialog, isA]);
 
   return (
-    <Wrapper>
+    <Wrapper first={first} last={last}>
       <StyledSearchBox
+        prefix={prefix}
         value={value}
         onChange={setSubject}
         isA={isA}
         required={required}
         disabled={disabled}
+        hideClearButton={hideClearButton}
         onCreateItem={handleCreateItem}
       >
-        {handleRemove && (
+        {handleRemove && !disabled && (
           <SearchBoxButton onClick={handleRemove} title='Remove' type='button'>
             <FaTrash />
           </SearchBoxButton>
@@ -107,26 +122,28 @@ export const ResourceSelector = memo(function ResourceSelector({
 // We need Wrapper to be able to target this component.
 const StyledSearchBox = styled(SearchBox)``;
 
-const Wrapper = styled.div`
+const Wrapper = styled.div<{ first?: boolean; last?: boolean }>`
+  --top-radius: ${p => (p.first ? p.theme.radius : 0)};
+  --bottom-radius: ${p => (p.last ? p.theme.radius : 0)};
+
   flex: 1;
+  max-width: 100%;
   position: relative;
-  --radius: ${props => props.theme.radius};
   ${StyledSearchBox} {
     border-radius: 0;
   }
 
-  &:first-of-type ${StyledSearchBox} {
-    border-top-left-radius: var(--radius);
-    border-top-right-radius: var(--radius);
-  }
+  & ${StyledSearchBox} {
+    border-top-left-radius: var(--top-radius);
+    border-top-right-radius: var(--top-radius);
+    border-bottom-left-radius: var(--bottom-radius);
+    border-bottom-right-radius: var(--bottom-radius);
 
-  &:last-of-type ${StyledSearchBox} {
-    border-bottom-left-radius: var(--radius);
-    border-bottom-right-radius: var(--radius);
-  }
-
-  &:not(:last-of-type) ${StyledSearchBox} {
-    border-bottom: none;
+    ${p =>
+      !p.last &&
+      css`
+        border-bottom: none;
+      `}
   }
 `;
 

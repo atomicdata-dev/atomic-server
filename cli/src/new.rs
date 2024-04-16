@@ -60,7 +60,7 @@ fn prompt_instance(
 
     let mut new_resource: Resource = Resource::new(subject.clone());
 
-    new_resource.set_propval(
+    new_resource.set(
         "https://atomicdata.dev/properties/isA".into(),
         Value::from(vec![class.subject.clone()]),
         &context.store,
@@ -69,7 +69,7 @@ fn prompt_instance(
     for prop_subject in &class.requires {
         let field = context.store.get_property(prop_subject)?;
         if field.subject == atomic_lib::urls::SHORTNAME && preferred_shortname.clone().is_some() {
-            new_resource.set_propval_string(
+            new_resource.set_string(
                 field.subject.clone(),
                 &preferred_shortname.clone().unwrap(),
                 &context.store,
@@ -86,7 +86,7 @@ fn prompt_instance(
         let mut input = prompt_field(&field, false, context)?;
         loop {
             if let Some(i) = input {
-                new_resource.set_propval_string(field.subject.clone(), &i, &context.store)?;
+                new_resource.set_string(field.subject.clone(), &i, &context.store)?;
                 break;
             } else {
                 println!("Required field, please enter a value.");
@@ -100,7 +100,7 @@ fn prompt_instance(
         println!("{}: {}", field.shortname.bold().blue(), field.description);
         let input = prompt_field(&field, true, context)?;
         if let Some(i) = input {
-            new_resource.set_propval_string(field.subject.clone(), &i, &context.store)?;
+            new_resource.set_string(field.subject.clone(), &i, &context.store)?;
         }
     }
 

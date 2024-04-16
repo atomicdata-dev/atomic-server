@@ -190,14 +190,14 @@ mod test {
         let mut resource = Resource::new(subject.to_string());
         let first_val = "Hi world";
         resource
-            .set_propval_string(crate::urls::DESCRIPTION.into(), first_val, &store)
+            .set_string(crate::urls::DESCRIPTION.into(), first_val, &store)
             .unwrap();
         let first_result = resource.save_locally(&store).unwrap();
         let first_commit = first_result.commit_resource;
 
         let second_val = "Hello universe";
         resource
-            .set_propval_string(crate::urls::DESCRIPTION.into(), second_val, &store)
+            .set_string(crate::urls::DESCRIPTION.into(), second_val, &store)
             .unwrap();
         let second_commit = resource.save_locally(&store).unwrap().commit_resource;
         let commits = get_commits_for_resource(subject, &store).unwrap();

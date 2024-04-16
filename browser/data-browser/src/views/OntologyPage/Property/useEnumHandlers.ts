@@ -28,15 +28,15 @@ export function useEnumHandlers(
 
   const addTag = useCallback(
     async (tag: Resource) => {
-      const newTags = [...allowsOnly, tag.getSubject()];
-      const newInstances = [...(instances ?? []), tag.getSubject()];
+      const newTags = [...allowsOnly, tag.subject];
+      const newInstances = [...(instances ?? []), tag.subject];
 
       await setAllowsOnly(newTags);
       await setInstances(newInstances);
 
-      await tag.save(store);
+      await tag.save();
     },
-    [instances, allowsOnly, setAllowsOnly, setInstances, store],
+    [instances, allowsOnly, setAllowsOnly, setInstances],
   );
 
   const removeTag = useCallback(
@@ -51,7 +51,7 @@ export function useEnumHandlers(
         );
 
         await setInstances(filteredInstances);
-        await store.getResourceLoading(subject).destroy(store);
+        await store.getResourceLoading(subject).destroy();
       }
     },
     [allowsOnly, setAllowsOnly, instances, setInstances, store],
@@ -70,12 +70,12 @@ const isTagUsed = async (
 ) => {
   const tag = store.getResourceLoading<DataBrowser.Tag>(tagSubject);
 
-  if (tag.props.parent !== ontology.getSubject()) {
+  if (tag.props.parent !== ontology.subject) {
     return true;
   }
 
   for (const property of ontology.props.properties ?? []) {
-    const propertyResource = await store.getResourceAsync(property);
+    const propertyResource = await store.getResource(property);
 
     if (propertyResource.props.allowsOnly?.includes(tagSubject)) {
       return true;

@@ -5,6 +5,7 @@ publish
 .env
 .husky
 .nohup
+.swc
 */lib
 */dist
 */dev-dist

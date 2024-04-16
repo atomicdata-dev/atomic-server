@@ -24,7 +24,7 @@ export function useHandleClearCells(
       const historyItemBatch: HistoryItemBatch = [];
 
       const removePropvals = async ([subject, props]: [string, Property[]]) => {
-        const res = await store.getResourceAsync(subject);
+        const res = await store.getResource(subject);
 
         await Promise.all(
           props.map(prop => {
@@ -32,11 +32,11 @@ export function useHandleClearCells(
               createValueChangedHistoryItem(res, prop.subject),
             );
 
-            return res.set(prop.subject, undefined, store, false);
+            return res.set(prop.subject, undefined, false);
           }),
         );
 
-        await res.save(store);
+        await res.save();
       };
 
       await Promise.all(

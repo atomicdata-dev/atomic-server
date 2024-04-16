@@ -1,5 +1,12 @@
-import { urls, useNumber, useStore, useString } from '@tomic/react';
-import { useEffect } from 'react';
+import {
+  Datatype,
+  core,
+  dataBrowser,
+  urls,
+  useNumber,
+  useString,
+} from '@tomic/react';
+import { Suspense, lazy, useEffect } from 'react';
 import { RadioGroup, RadioInput } from '../../../components/forms/RadioInput';
 import { FormGroupHeading } from './FormGroupHeading';
 import { DecimalPlacesInput } from './Inputs/DecimalPlacesInput';
@@ -7,34 +14,45 @@ import { TableRangeInput } from './Inputs/TableRangeInput';
 import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
 
 const { numberFormats } = urls.instances;
+const CurrencyPicker = lazy(
+  () => import('../../../chunks/CurrencyPicker/CurrencyPicker'),
+);
 
 export const NumberPropertyForm = ({
   resource,
 }: PropertyCategoryFormProps): JSX.Element => {
-  const store = useStore();
   const [numberFormatting, setNumberFormatting] = useString(
     resource,
-    urls.properties.constraints.numberFormatting,
+    dataBrowser.properties.numberFormatting,
   );
 
   const [decimalPlaces] = useNumber(
     resource,
-    urls.properties.constraints.decimalPlaces,
+    dataBrowser.properties.decimalPlaces,
   );
 
-  const handleNumberFormatChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [_, setDataType] = useString(resource, core.properties.datatype);
+
+  const handleNumberFormatChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
     setNumberFormatting(e.target.value);
+
+    if (e.target.value === numberFormats.currency) {
+      await resource.addClasses(dataBrowser.classes.currencyProperty);
+      await setDataType(Datatype.FLOAT);
+    } else {
+      resource.removeClasses(dataBrowser.classes.currencyProperty);
+      resource.remove(dataBrowser.properties.currency);
+    }
   };
 
   useEffect(() => {
-    resource.addClasses(
-      store,
-      urls.classes.constraintProperties.formattedNumber,
-    );
+    resource.addClasses(dataBrowser.classes.formattedNumber);
 
     // If decimal places is not set yet we assume it is a new property and should default to float.
     if (decimalPlaces === undefined) {
-      resource.set(urls.properties.datatype, urls.datatypes.float, store);
+      resource.set(core.properties.datatype, Datatype.FLOAT);
     }
 
     if (numberFormatting === undefined) {
@@ -43,7 +61,7 @@ export const NumberPropertyForm = ({
   }, []);
 
   return (
-    <>
+    <Suspense fallback={<div>loading...</div>}>
       <FormGroupHeading>Number Format</FormGroupHeading>
       <RadioGroup>
         <RadioInput
@@ -62,15 +80,27 @@ export const NumberPropertyForm = ({
         >
           Percentage
         </RadioInput>
+        <RadioInput
+          name='number-format'
+          value={numberFormats.currency}
+          checked={numberFormatting === numberFormats.currency}
+          onChange={handleNumberFormatChange}
+        >
+          Currency
+        </RadioInput>
       </RadioGroup>
-      <DecimalPlacesInput resource={resource} />
+      {resource.hasClasses(dataBrowser.classes.currencyProperty) ? (
+        <CurrencyPicker resource={resource} />
+      ) : (
+        <DecimalPlacesInput resource={resource} />
+      )}
       <FormGroupHeading>Range</FormGroupHeading>
       <TableRangeInput
         resource={resource}
-        minProp={urls.properties.constraints.min}
-        maxProp={urls.properties.constraints.max}
-        constraintClass={urls.classes.constraintProperties.rangeProperty}
+        minProp={dataBrowser.properties.min}
+        maxProp={dataBrowser.properties.max}
+        constraintClass={dataBrowser.classes.rangeProperty}
       />
-    </>
+    </Suspense>
   );
 };

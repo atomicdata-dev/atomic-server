@@ -204,14 +204,14 @@ pub trait Storelike: Sized {
     fn handle_not_found(
         &self,
         subject: &str,
-        error: AtomicError,
+        _error: AtomicError,
         for_agent: Option<&Agent>,
     ) -> AtomicResult<Resource> {
         if let Some(self_url) = self.get_self_url() {
             if subject.starts_with(&self_url) {
                 return Err(AtomicError::not_found(format!(
-                    "Failed to retrieve locally: '{}'. {}",
-                    subject, error
+                    "Failed to retrieve locally: '{}'",
+                    subject
                 )));
             }
         }

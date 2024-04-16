@@ -46,7 +46,7 @@ declare module '../index.js' {
 
   interface PropTypeMapping {
     [commits.properties.subject]: string;
-    [commits.properties.createdAt]: string;
+    [commits.properties.createdAt]: number;
     [commits.properties.lastCommit]: string;
     [commits.properties.previousCommit]: string;
     [commits.properties.signer]: string;

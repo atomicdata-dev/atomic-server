@@ -19,6 +19,9 @@ import {
   getKnownNameBySubject,
   OptionalClass,
   core,
+  server,
+  Collection,
+  CollectionBuilder,
 } from './index.js';
 
 /** Contains the PropertyURL / Value combinations */
@@ -33,6 +36,8 @@ export const unknownSubject = 'unknown-subject';
 /**
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
  * / Value combinations.
+ *
+ * Create new resources using `store.createResource()`.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export class Resource<C extends OptionalClass = any> {
@@ -48,43 +53,53 @@ export class Resource<C extends OptionalClass = any> {
    * Is true when the Resource is currently being fetched, awaiting a response
    * from the Server
    */
-  public loading: boolean;
+  public loading = false;
   /**
    * Every commit that has been applied should be stored here, which prevents
    * applying the same commit twice
    */
-  public appliedCommitSignatures: Set<string>;
+  public appliedCommitSignatures: Set<string> = new Set();
   public readonly __internalObject = this;
 
   private commitBuilder: CommitBuilder;
-  private subject: string;
-  private propvals: PropVals;
+  private _subject: string;
+  private propvals: PropVals = new Map();
 
   private inProgressCommit: Promise<void> | undefined;
   private hasQueue = false;
 
+  private _store?: Store;
+
   public constructor(subject: string, newResource?: boolean) {
     if (typeof subject !== 'string') {
       throw new Error(
-        'Invalid subject given to resource, must be a string, found ' + subject,
+        'Invalid subject given to resource, must be a string, found ' +
+          typeof subject,
       );
     }
 
-    this.new = newResource ? true : false;
-    this.loading = false;
-    this.subject = subject;
-    this.propvals = new Map();
-    this.appliedCommitSignatures = new Set();
+    this.new = !!newResource;
+    this._subject = subject;
     this.commitBuilder = new CommitBuilder(subject);
   }
 
+  /** The subject URL of the resource */
+  public get subject(): string {
+    return this._subject;
+  }
+
+  /** A human readable title for the resource, returns first of eighter: name, shortname, filename or subject */
   public get title(): string {
-    return (this.get(properties.name) ??
-      this.get(properties.shortname) ??
-      this.get(properties.file.filename) ??
+    return (this.get(core.properties.name) ??
+      this.get(core.properties.shortname) ??
+      this.get(server.properties.filename) ??
       this.subject) as string;
   }
 
+  /**
+   * Dynamic prop accessor, only works for known properties registered via an ontology.
+   * @example const description = resource.props.description
+   */
   public get props(): QuickAccesPropType<C> {
     const props: QuickAccesPropType<C> = {} as QuickAccesPropType<C>;
 
@@ -99,13 +114,27 @@ export class Resource<C extends OptionalClass = any> {
     return props;
   }
 
+  private get store(): Store {
+    if (!this._store) {
+      console.error(`Resource ${this.title} has no store`);
+      throw new Error('Resource has no store');
+    }
+
+    return this._store;
+  }
+
+  /** @internal */
+  public setStore(store: Store): void {
+    this._store = store;
+  }
+
   /** Checks if the content of two Resource instances is equal */
   public equals(resourceB: Resource): boolean {
     if (this === resourceB.__internalObject) {
       return true;
     }
 
-    if (this.getSubject() !== resourceB.getSubject()) {
+    if (this.subject !== resourceB.subject) {
       return false;
     }
 
@@ -140,7 +169,6 @@ export class Resource<C extends OptionalClass = any> {
 
   /** Checks if the agent has write rights by traversing the graph. Recursive function. */
   public async canWrite(
-    store: Store,
     agent?: string,
     child?: string,
   ): Promise<[boolean, string | undefined]> {
@@ -161,7 +189,7 @@ export class Resource<C extends OptionalClass = any> {
     const parentSubject = this.get(properties.parent) as string;
 
     if (!parentSubject) {
-      return [false, `No write right or parent in ${this.getSubject()}`];
+      return [false, `No write right or parent in ${this.subject}`];
     }
 
     // Agents can always edit themselves
@@ -173,13 +201,13 @@ export class Resource<C extends OptionalClass = any> {
     if (child === parentSubject) {
       console.warn('Circular parent', child);
 
-      return [true, `Circular parent in ${this.getSubject()}`];
+      return [true, `Circular parent in ${this.subject}`];
     }
 
-    const parent: Resource = await store.getResourceAsync(parentSubject);
+    const parent: Resource = await this.store.getResource(parentSubject);
 
     // The recursive part
-    return await parent.canWrite(store, agent, this.getSubject());
+    return await parent.canWrite(agent, this.subject);
   }
 
   /**
@@ -204,7 +232,13 @@ export class Resource<C extends OptionalClass = any> {
     return !this.loading && this.error === undefined;
   }
 
-  /** Get a Value by its property */
+  /** Get a Value by its property
+   * @param propUrl The subject of the property
+   * @example
+   * import { core } from '@tomic/lib'
+   * const description = resource.get(core.properties.description)
+   * const publishedAt = resource.get('https://my-atomicserver.dev/properties/published-at')
+   */
   public get<Prop extends string, Returns = InferTypeOfValueInTriple<C, Prop>>(
     propUrl: Prop,
   ): Returns {
@@ -235,7 +269,7 @@ export class Resource<C extends OptionalClass = any> {
 
   /** Returns a list of classes of this resource */
   public getClasses(): string[] {
-    return this.getSubjects(properties.isA);
+    return this.getSubjects(core.properties.isA);
   }
 
   /** Checks if the resource is all of the given classes */
@@ -245,25 +279,45 @@ export class Resource<C extends OptionalClass = any> {
     );
   }
 
+  /**
+   * `.matchClass()` takes an object that maps class subjects to values.
+   * If the resource has a class that is a key in the object, the corresponding value is returned.
+   * An optional fallback value can be provided as the second argument.
+   * The order of the classes in the object is important, as the first match is returned.
+   */
+  public matchClass<T>(obj: Record<string, T>): T | undefined;
+  public matchClass<T>(obj: Record<string, T>, fallback: T): T;
+  public matchClass<T>(obj: Record<string, T>, fallback?: T): T | undefined {
+    for (const [classSubject, value] of Object.entries(obj)) {
+      if (this.hasClasses(classSubject)) {
+        return value;
+      }
+    }
+
+    return fallback;
+  }
+
   /** Remove the given classes from the resource */
-  public removeClasses(
-    store: Store,
-    ...classSubjects: string[]
-  ): Promise<void> {
-    return this.set(
-      properties.isA,
+  public removeClasses(...classSubjects: string[]): void {
+    // Using .set on this somehow has other typescript rules than using resource.set. Casting to Resource seems to fix this.
+    (this as Resource).set(
+      core.properties.isA,
       this.getClasses().filter(
         classSubject => !classSubjects.includes(classSubject),
       ),
-      store,
+      false,
     );
   }
 
   /** Adds the given classes to the resource */
-  public addClasses(store: Store, ...classSubject: string[]): Promise<void> {
+  public addClasses(...classSubject: string[]): Promise<void> {
     const classesSet = new Set([...this.getClasses(), ...classSubject]);
 
-    return this.set(properties.isA, Array.from(classesSet), store);
+    // Using .set on this somehow has other typescript rules than using resource.set. Casting to Resource seems to fix this.
+    return (this as Resource).set(
+      core.properties.isA as string,
+      Array.from(classesSet),
+    );
   }
 
   /** Returns true if the resource has changes in it's commit builder that are not yet saved to the server. */
@@ -271,7 +325,7 @@ export class Resource<C extends OptionalClass = any> {
     return this.commitBuilder.hasUnsavedChanges();
   }
 
-  public getCommitsCollection(): string {
+  public getCommitsCollectionSubject(): string {
     const url = new URL(this.subject);
     url.pathname = '/commits';
     url.searchParams.append('property', urls.properties.commit.subject);
@@ -283,24 +337,23 @@ export class Resource<C extends OptionalClass = any> {
     return url.toString();
   }
 
-  /** Returns the subject of the list of Children */
-  public getChildrenCollection(): string {
-    // We create a collection that contains all children of the current Subject
-    const url = new URL(this.subject);
-    url.pathname = '/query';
-    url.searchParams.set('property', properties.parent);
-    url.searchParams.set('value', this.subject);
-
-    return url.toString();
+  /** Returns a Collection with all children of this resource
+   * @param pageSize The amount of children per page (default: 100)
+   */
+  public async getChildrenCollection(pageSize = 100): Promise<Collection> {
+    return await new CollectionBuilder(this.store)
+      .setPageSize(pageSize)
+      .setProperty(core.properties.parent)
+      .setValue(this.subject)
+      .buildAndFetch();
   }
 
   /** builds all versions using the Commits */
   public async getHistory(
-    store: Store,
     progressCallback?: (percentage: number) => void,
   ): Promise<Version[]> {
-    const commitsCollection = await store.fetchResourceFromServer(
-      this.getCommitsCollection(),
+    const commitsCollection = await this.store.fetchResourceFromServer(
+      this.getCommitsCollectionSubject(),
     );
     const commits = commitsCollection.get(
       properties.collection.members,
@@ -311,7 +364,7 @@ export class Resource<C extends OptionalClass = any> {
     let previousResource = new Resource(this.subject);
 
     for (let i = 0; i < commits.length; i++) {
-      const commitResource = await store.getResourceAsync(commits[i]);
+      const commitResource = await this.store.getResource(commits[i]);
       const parsedCommit = parseCommitResource(commitResource);
       const builtResource = applyCommitToResource(
         previousResource.clone(),
@@ -333,7 +386,26 @@ export class Resource<C extends OptionalClass = any> {
     return builtVersions;
   }
 
-  /** Returns the subject URL of the Resource */
+  public async setVersion(version: Version): Promise<void> {
+    const versionPropvals = version.resource.getPropVals();
+
+    // Remove any prop that doesn't exist in the version
+    for (const prop of this.propvals.keys()) {
+      if (!versionPropvals.has(prop)) {
+        this.remove(prop);
+      }
+    }
+
+    for (const [key, value] of versionPropvals.entries()) {
+      await this.set(key, value);
+    }
+
+    await this.save();
+  }
+
+  /**
+   * @deprecated use resource.subject
+   */
   public getSubject(): string {
     return this.subject;
   }
@@ -354,7 +426,7 @@ export class Resource<C extends OptionalClass = any> {
    * Iterates over the parents of the resource, returns who has read / write
    * rights for this resource
    */
-  public async getRights(store: Store): Promise<Right[]> {
+  public async getRights(): Promise<Right[]> {
     const rights: Right[] = [];
     const write: string[] = this.getSubjects(properties.write);
     write.forEach((subject: string) => {
@@ -376,14 +448,14 @@ export class Resource<C extends OptionalClass = any> {
     const parentSubject = this.get(properties.parent) as string;
 
     if (parentSubject) {
-      if (parentSubject === this.getSubject()) {
+      if (parentSubject === this.subject) {
         console.warn('Circular parent', parentSubject);
 
         return rights;
       }
 
-      const parent = await store.getResourceAsync(parentSubject);
-      const parentRights = await parent.getRights(store);
+      const parent = await this.store.getResource(parentSubject);
+      const parentRights = await parent.getRights();
       rights.push(...parentRights);
     }
 
@@ -396,18 +468,18 @@ export class Resource<C extends OptionalClass = any> {
   }
 
   /** Removes the resource form both the server and locally */
-  public async destroy(store: Store, agent?: Agent): Promise<void> {
+  public async destroy(agent?: Agent): Promise<void> {
     if (this.new) {
-      store.removeResource(this.getSubject());
+      this.store.removeResource(this.subject);
 
       return;
     }
 
-    const newCommitBuilder = new CommitBuilder(this.getSubject());
+    const newCommitBuilder = new CommitBuilder(this.subject);
     newCommitBuilder.setDestroy(true);
 
     if (agent === undefined) {
-      agent = store.getAgent();
+      agent = this.store.getAgent();
     }
 
     if (agent?.subject === undefined) {
@@ -417,17 +489,18 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     const commit = await newCommitBuilder.sign(agent.privateKey, agent.subject);
-    const endpoint = new URL(this.getSubject()).origin + `/commit`;
-    await store.postCommit(commit, endpoint);
-    store.removeResource(this.getSubject());
+    const endpoint = new URL(this.subject).origin + `/commit`;
+    await this.store.postCommit(commit, endpoint);
+    this.store.removeResource(this.subject);
+  }
+
+  /** @deprecated use `resource.push` */
+  public pushPropVal(propUrl: string, values: JSONArray, unique?: boolean) {
+    this.push(propUrl, values, unique);
   }
 
   /** Appends a Resource to a ResourceArray */
-  public pushPropVal(
-    propUrl: string,
-    values: JSONArray,
-    unique?: boolean,
-  ): void {
+  public push(propUrl: string, values: JSONArray, unique?: boolean): void {
     const propVal = (this.get(propUrl) as JSONArray) ?? [];
 
     if (unique) {
@@ -442,8 +515,13 @@ export class Resource<C extends OptionalClass = any> {
     this.propvals.set(propUrl, [...propVal, ...values]);
   }
 
-  /** Removes a property value combination from the resource and adds it to the next Commit */
+  /** @deprecated use `resource.remove()` */
   public removePropVal(propertyUrl: string): void {
+    this.remove(propertyUrl);
+  }
+
+  /** Removes a property value combination from the resource and adds it to the next Commit */
+  public remove(propertyUrl: string): void {
     // Delete from this resource
     this.propvals.delete(propertyUrl);
 
@@ -465,17 +543,14 @@ export class Resource<C extends OptionalClass = any> {
    * explicitly, the default Agent of the Store is used.
    * When there are no changes no commit is made and the function returns Promise<undefined>.
    */
-  public async save(
-    store: Store,
-    differentAgent?: Agent,
-  ): Promise<string | undefined> {
+  public async save(differentAgent?: Agent): Promise<string | undefined> {
     if (!this.commitBuilder.hasUnsavedChanges()) {
       console.warn(`No changes to ${this.subject}, not saving`);
 
       return undefined;
     }
 
-    const agent = store.getAgent() ?? differentAgent;
+    const agent = this.store.getAgent() ?? differentAgent;
 
     if (!agent) {
       throw new Error('No agent has been set or passed, you cannot save.');
@@ -486,8 +561,8 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     // If the parent of this resource is new we can't save yet so we add it to a batched that gets saved when the parent does.
-    if (this.isParentNew(store)) {
-      store.batchResource(this.getSubject());
+    if (this.isParentNew()) {
+      this.store.batchResource(this.subject);
 
       return;
     }
@@ -498,7 +573,7 @@ export class Resource<C extends OptionalClass = any> {
       this.hasQueue = false;
       this.inProgressCommit = undefined;
 
-      return this.save(store, differentAgent);
+      return this.save(differentAgent);
     }
 
     // The previousCommit is required in Commits. We should use the `lastCommit` value on the resource.
@@ -521,7 +596,7 @@ export class Resource<C extends OptionalClass = any> {
 
     // Cloning the CommitBuilder to prevent race conditions, and keeping a back-up of current state for when things go wrong during posting.
     const oldCommitBuilder = this.commitBuilder.clone();
-    this.commitBuilder = new CommitBuilder(this.getSubject());
+    this.commitBuilder = new CommitBuilder(this.subject);
     const commit = await oldCommitBuilder.sign(
       agent.privateKey,
       agent.subject!,
@@ -532,27 +607,27 @@ export class Resource<C extends OptionalClass = any> {
     this.new = false;
 
     // TODO: Check if all required props are there
-    const endpoint = new URL(this.getSubject()).origin + `/commit`;
+    const endpoint = new URL(this.subject).origin + `/commit`;
 
     try {
       this.commitError = undefined;
-      store.addResources(this, { skipCommitCompare: true });
-      const createdCommit = await store.postCommit(commit, endpoint);
+      this.store.addResources(this, { skipCommitCompare: true });
+      const createdCommit = await this.store.postCommit(commit, endpoint);
       // const res = store.getResourceLoading(this.subject);
       this.setUnsafe(properties.commit.lastCommit, createdCommit.id!);
 
       // Let all subscribers know that the commit has been applied
       // store.addResources(this);
-      store.notifyResourceSaved(this);
+      this.store.notifyResourceSaved(this);
 
       if (wasNew) {
         // The first `SUBSCRIBE` message will not have worked, because the resource didn't exist yet.
         // That's why we need to repeat the process
         // https://github.com/atomicdata-dev/atomic-data-rust/issues/486
-        store.subscribeWebSocket(this.subject);
+        this.store.subscribeWebSocket(this.subject);
 
         // Save any children that have been batched while creating this resource
-        await store.saveBatchForParent(this.getSubject());
+        await this.store.saveBatchForParent(this.subject);
       }
 
       reportDone();
@@ -564,8 +639,8 @@ export class Resource<C extends OptionalClass = any> {
       if (e.message.includes('previousCommit')) {
         console.warn('previousCommit missing or mismatch, retrying...');
         // We try again, but first we fetch the latest version of the resource to get its `lastCommit`
-        const resourceFetched = await store.fetchResourceFromServer(
-          this.getSubject(),
+        const resourceFetched = await this.store.fetchResourceFromServer(
+          this.subject,
         );
 
         const fixedLastCommit = resourceFetched!
@@ -579,13 +654,13 @@ export class Resource<C extends OptionalClass = any> {
         // Try again!
         reportDone();
 
-        return await this.save(store, agent);
+        return await this.save(agent);
       }
 
       // If it fails, revert to the old resource with the old CommitBuilder
       this.commitBuilder = oldCommitBuilder;
       this.commitError = e;
-      store.addResources(this, { skipCommitCompare: true });
+      this.store.addResources(this, { skipCommitCompare: true });
       reportDone();
       throw e;
     }
@@ -604,25 +679,24 @@ export class Resource<C extends OptionalClass = any> {
   >(
     prop: Prop,
     value: Value,
-    store: Store,
     /**
      * Disable validation if you don't need it. It might cause a fetch if the
      * Property is not present when set is called
      */
     validate = true,
   ): Promise<void> {
-    if (store.isOffline()) {
+    if (this.store.isOffline() && validate) {
       console.warn('Offline, not validating');
       validate = false;
     }
 
     if (validate) {
-      const fullProp = await store.getProperty(prop);
+      const fullProp = await this.store.getProperty(prop);
       validateDatatype(value, fullProp.datatype);
     }
 
     if (value === undefined) {
-      this.removePropVal(prop);
+      this.remove(prop);
 
       return;
     }
@@ -649,7 +723,7 @@ export class Resource<C extends OptionalClass = any> {
   public setSubject(subject: string): void {
     Client.tryValidSubject(subject);
     this.commitBuilder.setSubject(subject);
-    this.subject = subject;
+    this._subject = subject;
   }
 
   /** Returns true if the value has not changed */
@@ -663,14 +737,14 @@ export class Resource<C extends OptionalClass = any> {
     return ownValue === value;
   }
 
-  private isParentNew(store: Store) {
+  private isParentNew() {
     const parentSubject = this.propvals.get(core.properties.parent) as string;
 
     if (!parentSubject) {
       return false;
     }
 
-    const parent = store.getResourceLoading(parentSubject);
+    const parent = this.store.getResourceLoading(parentSubject);
 
     return parent.new;
   }
@@ -704,7 +778,7 @@ export function proxyResource<C extends OptionalClass = any>(
   resource: Resource<C>,
 ): Resource<C> {
   if (resource.__internalObject !== resource) {
-    console.warn('Attempted to proxy a proxy for ' + resource.getSubject());
+    console.warn('Attempted to proxy a proxy for ' + resource.subject);
   }
 
   return new Proxy(resource.__internalObject, {});

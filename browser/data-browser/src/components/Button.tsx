@@ -20,6 +20,7 @@ export interface ButtonProps
   gutter?: boolean;
   onClick?: (e: React.MouseEvent) => unknown;
   className?: string;
+  as?: keyof HTMLElementTagNameMap;
 }
 
 interface ButtonPropsStyled {

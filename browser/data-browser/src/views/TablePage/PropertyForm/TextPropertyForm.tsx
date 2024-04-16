@@ -1,4 +1,4 @@
-import { Datatype, urls, useStore } from '@tomic/react';
+import { Datatype, core, dataBrowser } from '@tomic/react';
 import { useState } from 'react';
 import { RadioGroup, RadioInput } from '../../../components/forms/RadioInput';
 import { FormGroupHeading } from './FormGroupHeading';
@@ -8,7 +8,6 @@ import { PropertyCategoryFormProps } from './PropertyCategoryFormProps';
 export const TextPropertyForm = ({
   resource,
 }: PropertyCategoryFormProps): JSX.Element => {
-  const store = useStore();
   const [textFormat, setTextFormat] = useState<Datatype>(Datatype.STRING);
 
   const handleTextFormatChange = async (
@@ -16,8 +15,8 @@ export const TextPropertyForm = ({
   ) => {
     setTextFormat(e.target.value as Datatype);
 
-    await resource.set(urls.properties.datatype, e.target.value, store, false);
-    await resource.save(store);
+    await resource.set(core.properties.datatype, e.target.value, false);
+    await resource.save();
   };
 
   return (
@@ -52,9 +51,9 @@ export const TextPropertyForm = ({
       <FormGroupHeading>Length</FormGroupHeading>
       <TableRangeInput
         resource={resource}
-        minProp={urls.properties.constraints.min}
-        maxProp={urls.properties.constraints.max}
-        constraintClass={urls.classes.constraintProperties.rangeProperty}
+        minProp={dataBrowser.properties.min}
+        maxProp={dataBrowser.properties.max}
+        constraintClass={dataBrowser.classes.rangeProperty}
       />
     </>
   );

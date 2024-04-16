@@ -8,19 +8,27 @@ import { atomicConfig } from '../config.js';
 import { generateIndex } from '../generateIndex.js';
 import { PropertyRecord } from '../PropertyRecord.js';
 import { generateExternals } from '../generateExternals.js';
+import { validateOntologies } from '../validateOntologies.js';
 
 export const ontologiesCommand = async (_args: string[]) => {
   const propertyRecord = new PropertyRecord();
 
   console.log(
-    chalk.blue(
-      `Found ${chalk.red(
-        Object.keys(atomicConfig.ontologies).length,
-      )} ontologies`,
-    ),
+    chalk.blue(`Found ${chalk.red(atomicConfig.ontologies.length)} ontologies`),
   );
 
-  for (const subject of Object.values(atomicConfig.ontologies)) {
+  const [valid, report] = await validateOntologies(atomicConfig.ontologies);
+
+  if (!valid) {
+    console.log(chalk.red('Could not generate ontologies'));
+    console.log(report);
+
+    return;
+  }
+
+  checkOrCreateFolder(atomicConfig.outputFolder);
+
+  for (const subject of atomicConfig.ontologies) {
     await write(await generateOntology(subject, propertyRecord));
   }
 
@@ -72,4 +80,10 @@ const write = async ({
   fs.writeFileSync(filePath, formatted);
 
   console.log(chalk.blue('Wrote to'), chalk.cyan(filePath));
+};
+
+const checkOrCreateFolder = (relativePath: string): void => {
+  const fullPath = path.join(process.cwd(), relativePath);
+
+  fs.mkdirSync(fullPath, { recursive: true });
 };

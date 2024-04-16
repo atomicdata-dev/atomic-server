@@ -50,11 +50,11 @@ export const getValue = <Prop extends string, C extends OptionalClass = never>(
     if (val === undefined) {
       resource.removePropVal(property);
     } else {
-      resource.set(property, val, adStore, false);
+      resource.set(property, val, false);
     }
 
     if (commit) {
-      await resource.save(adStore);
+      await resource.save();
     }
 
     adStore.addResources(resource);
@@ -68,7 +68,7 @@ export const getValue = <Prop extends string, C extends OptionalClass = never>(
 
     subscribe(subscriber: ValueSubscriber<Prop, C>): () => void {
       if (!subscribedToStore) {
-        adStore.subscribe(resource.getSubject(), storeSubscriber);
+        adStore.subscribe(resource.subject, storeSubscriber);
         subscribedToStore = true;
       }
 
@@ -81,7 +81,7 @@ export const getValue = <Prop extends string, C extends OptionalClass = never>(
         subscriptions.delete(subscriber);
 
         if (subscriptions.size === 0) {
-          adStore.unsubscribe(resource.getSubject(), storeSubscriber);
+          adStore.unsubscribe(resource.subject, storeSubscriber);
           subscribedToStore = false;
         }
       };

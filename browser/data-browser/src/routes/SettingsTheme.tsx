@@ -15,8 +15,10 @@ export const SettingsTheme: React.FunctionComponent = () => {
   const {
     darkModeSetting,
     setDarkMode,
-    viewTransitionsEnabled,
-    setViewTransitionsEnabled,
+    viewTransitionsDisabled,
+    setViewTransitionsDisabled,
+    sidebarKeyboardDndEnabled,
+    setSidebarKeyboardDndEnabled,
   } = useSettings();
 
   const { enabledPanels, enablePanel, disablePanel } = usePanelList();
@@ -72,13 +74,20 @@ export const SettingsTheme: React.FunctionComponent = () => {
             />{' '}
             Enable Ontology panel
           </CheckboxLabel>
-          <Heading>Animations</Heading>
+          <Heading>Accessibility</Heading>
           <CheckboxLabel>
             <Checkbox
-              checked={viewTransitionsEnabled}
-              onChange={checked => setViewTransitionsEnabled(checked)}
+              checked={viewTransitionsDisabled}
+              onChange={checked => setViewTransitionsDisabled(checked)}
             />{' '}
-            Enable view transitions
+            Disable page transition animations
+          </CheckboxLabel>
+          <CheckboxLabel>
+            <Checkbox
+              checked={sidebarKeyboardDndEnabled}
+              onChange={checked => setSidebarKeyboardDndEnabled(checked)}
+            />{' '}
+            Enable keyboard drag & drop in sidebar
           </CheckboxLabel>
         </Column>
       </ContainerNarrow>

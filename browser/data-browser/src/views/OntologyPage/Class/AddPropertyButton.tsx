@@ -1,4 +1,4 @@
-import { Resource, Store, urls, useStore } from '@tomic/react';
+import { Datatype, Resource, Store, core, useStore } from '@tomic/react';
 import { useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { transition } from '../../../helpers/transition';
@@ -15,15 +15,20 @@ interface AddPropertyButtonProps {
 const BUTTON_WIDTH = 'calc(100% - 5.6rem + 4px)'; //Width is 100% - (2 * 1.8rem for button width) + (2rem for gaps) + (4px for borders)
 
 async function newProperty(shortname: string, parent: Resource, store: Store) {
-  const subject = `${parent.getSubject()}/property/${shortname}`;
-  const resource = store.getResourceLoading(subject, { newResource: true });
+  const subject = `${parent.subject}/property/${shortname}`;
 
-  await resource.addClasses(store, urls.classes.property);
-  await resource.set(urls.properties.shortname, shortname, store);
-  await resource.set(urls.properties.description, 'a property', store);
-  await resource.set(urls.properties.datatype, urls.datatypes.string, store);
-  await resource.set(urls.properties.parent, parent.getSubject(), store);
-  await resource.save(store);
+  const resource = await store.newResource({
+    subject,
+    parent: parent.subject,
+    isA: core.classes.property,
+    propVals: {
+      [core.properties.shortname]: shortname,
+      [core.properties.description]: 'a property',
+      [core.properties.datatype]: Datatype.STRING,
+    },
+  });
+
+  await resource.save();
 
   return subject;
 }
@@ -48,10 +53,10 @@ export function AddPropertyButton({
 
     const creatorProp =
       type === 'required'
-        ? urls.properties.requires
-        : urls.properties.recommends;
-    creator.pushPropVal(creatorProp, [newValue]);
-    await creator.save(store);
+        ? core.properties.requires
+        : core.properties.recommends;
+    creator.push(creatorProp, [newValue]);
+    await creator.save();
   };
 
   const handleCreateProperty = async (shortname: string) => {
@@ -70,7 +75,7 @@ export function AddPropertyButton({
           autoFocus
           value=''
           onChange={handleSetValue}
-          isA={urls.classes.property}
+          isA={core.classes.property}
           onClose={() => setActive(false)}
           onCreateItem={handleCreateProperty}
         />

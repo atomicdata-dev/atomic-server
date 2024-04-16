@@ -10,16 +10,18 @@ export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 export const INITIAL_TEST = false;
 export const DEMO_INVITE_NAME = 'document demo';
 
-export const demoFile = () => {
+export const testFilePath = (filename: string) => {
   const processPath = process.cwd();
 
   // In the CI, the tests dir is missing for some reason?
   if (processPath.endsWith('tests')) {
-    return `${processPath}/${DEMO_FILENAME}`;
+    return `${processPath}/${filename}`;
   } else {
-    return `${processPath}/tests/${DEMO_FILENAME}`;
+    return `${processPath}/tests/${filename}`;
   }
 };
+
+export const demoFile = () => testFilePath(DEMO_FILENAME);
 
 export const timestamp = () => new Date().toLocaleTimeString();
 export const editableTitle = '[data-test="editable-title"]';
@@ -70,12 +72,12 @@ export async function setTitle(page: Page, title: string) {
 }
 
 export async function disableViewTransition(page: Page) {
-  await page.click('text=Settings');
-  const checkbox = page.getByLabel('Enable view transition');
+  await page.getByRole('link', { name: 'Settings' }).click();
+  const checkbox = page.getByLabel('Disable page transition animations');
 
   await expect(checkbox).toBeVisible();
 
-  await checkbox.uncheck();
+  await checkbox.check();
   await page.goBack();
 }
 
@@ -203,21 +205,25 @@ export async function editProfileAndCommit(page: Page) {
 }
 
 export async function fillSearchBox(
-  page: Page,
+  page: Page | Locator,
   placeholder: string,
   fillText: string,
   options: {
     nth?: number;
     container?: Locator;
+    label?: string;
   } = {},
 ) {
-  const { nth, container } = options;
+  const { nth, container, label } = options;
   const selector = container ?? page;
 
   if (nth !== undefined) {
-    await selector.getByRole('button', { name: placeholder }).nth(nth).click();
+    await selector
+      .getByRole('button', { name: label ?? placeholder })
+      .nth(nth)
+      .click();
   } else {
-    await selector.getByRole('button', { name: placeholder }).click();
+    await selector.getByRole('button', { name: label ?? placeholder }).click();
   }
 
   await selector.getByPlaceholder(placeholder).type(fillText);
@@ -295,7 +301,7 @@ export async function clickSidebarItem(text: string, page: Page) {
 
 export async function fillInput(
   propertyShortname: string,
-  page: Page,
+  page: Page | Locator,
   value?: string,
 ) {
   let locator = `[data-test="input-${propertyShortname}"]`;
@@ -305,7 +311,7 @@ export async function fillInput(
   }
 
   await page.click(locator);
-  await page.fill(locator, value || `test-${propertyShortname}`);
+  await page.locator(locator).fill(value || `test-${propertyShortname}`);
 }
 
 /** Click an item from the main, visible context menu */

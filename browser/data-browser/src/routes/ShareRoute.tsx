@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Right,
-  urls,
-  useArray,
-  useCanWrite,
-  useResource,
-  useStore,
-} from '@tomic/react';
+import { Right, urls, useArray, useCanWrite, useResource } from '@tomic/react';
 import { ContainerNarrow } from '../components/Containers';
 import { useCurrentSubject } from '../helpers/useCurrentSubject';
 import { ResourceInline } from '../views/ResourceInline';
@@ -27,7 +20,6 @@ import { Main } from '../components/Main';
 export function ShareRoute(): JSX.Element {
   const [subject] = useCurrentSubject();
   const resource = useResource(subject);
-  const store = useStore();
   const [canWrite] = useCanWrite(resource);
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [err, setErr] = useState<Error | undefined>(undefined);
@@ -53,7 +45,7 @@ export function ShareRoute(): JSX.Element {
 
   useEffect(() => {
     async function getTheRights() {
-      const allRights = await resource.getRights(store);
+      const allRights = await resource.getRights();
       const inherited = allRights.filter(r => r.setIn !== subject);
 
       // Make sure the public agent is always the top of the list
@@ -130,7 +122,7 @@ export function ShareRoute(): JSX.Element {
 
   async function handleSave() {
     try {
-      await resource.save(store);
+      await resource.save();
       toast.success('Share settings saved');
       navigate(constructOpenURL(subject!));
     } catch (e) {

@@ -52,8 +52,8 @@ function NewResourceSelector() {
     (files: string[]) => {
       toast.success(`Uploaded ${files.length} files.`);
 
-      if (parentSubject) {
-        navigate(constructOpenURL(parentSubject));
+      if (calculatedParent) {
+        navigate(constructOpenURL(calculatedParent));
       }
     },
     [parentSubject, navigate],
@@ -64,10 +64,10 @@ function NewResourceSelector() {
       <StyledForm>
         <h1>
           Create new resource{' '}
-          {parentSubject && (
+          {calculatedParent && (
             <>
               {`under `}
-              <ResourceInline subject={parentSubject} />
+              <ResourceInline subject={calculatedParent} />
             </>
           )}
         </h1>

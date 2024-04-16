@@ -3,6 +3,7 @@
 ## Authors:
 
 - **Joep Meindertsma** ([joepio](https://github.com/joepio/) from [Ontola.io](https://ontola.io/))
+- **Polle Pas** ([polleps](https://github.com/polleps/) from [Ontola.io](https://ontola.io/))
 
 ## Special thanks to:
 

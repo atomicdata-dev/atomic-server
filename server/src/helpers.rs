@@ -106,11 +106,15 @@ pub fn get_auth_from_cookie(
 static WRONG_SUBJECT_ERR: &str = "Wrong requested subject in auth token";
 
 fn get_auth_from_base64(base64: &str, requested_subject: &str) -> AtomicServerResult<AuthValues> {
-    let session = base64::decode(base64).map_err(|_| {
-        AtomicError::unauthorized(
-            "Malformed authentication resource - unable to decode base64".to_string(),
-        )
-    })?;
+    use base64::Engine;
+
+    let session = base64::engine::general_purpose::STANDARD
+        .decode(base64)
+        .map_err(|_| {
+            AtomicError::unauthorized(
+                "Malformed authentication resource - unable to decode base64".to_string(),
+            )
+        })?;
 
     let session_str = std::str::from_utf8(&session).map_err(|_| AtomicServerError {
         message: "Malformed authentication resource - unable to parse from utf_8".to_string(),

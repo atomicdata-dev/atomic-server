@@ -15,6 +15,7 @@ import {
 import toast from 'react-hot-toast';
 import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
 import { handleError } from './loggingHandlers';
+import { serverURLStorage } from './serverURLStorage';
 
 interface ProviderProps {
   children: ReactNode;
@@ -27,9 +28,9 @@ export const AppSettingsContextProvider = (
   const [darkMode, setDarkMode, darkModeSetting] = useDarkMode();
   const [mainColor, setMainColor] = useLocalStorage('mainColor', '#1b50d8');
   const [navbarTop, setNavbarTop] = useLocalStorage('navbarTop', false);
-  const [viewTransitionsEnabled, setViewTransitionsEnabled] = useLocalStorage(
-    'viewTransitionsEnabled',
-    true,
+  const [viewTransitionsDisabled, setViewTransitionsDisabled] = useLocalStorage(
+    'viewTransitionsDisabled',
+    false,
   );
   const [navbarFloating, setNavbarFloating] = useLocalStorage(
     'navbarFloating',
@@ -40,6 +41,9 @@ export const AppSettingsContextProvider = (
     window.innerWidth > SIDEBAR_TOGGLE_WIDTH,
   );
 
+  const [sidebarKeyboardDndEnabled, setSidebarKeyboardDndEnabled] =
+    useLocalStorage('sidebarKeyboardDndEnabled', false);
+
   const [agent, setAgent] = useCurrentAgent();
   const [baseURL, setBaseURL] = useServerURL();
   const [drive, innerSetDrive] = useLocalStorage('drive', baseURL);
@@ -49,6 +53,7 @@ export const AppSettingsContextProvider = (
       const url = new URL(newDrive);
       innerSetDrive(newDrive);
       setBaseURL(url.origin);
+      serverURLStorage.set(url.origin);
     },
     [innerSetDrive, setBaseURL],
   );
@@ -83,8 +88,10 @@ export const AppSettingsContextProvider = (
       setSideBarLocked,
       agent,
       setAgent: setAgentAndShowToast,
-      viewTransitionsEnabled,
-      setViewTransitionsEnabled,
+      viewTransitionsDisabled,
+      setViewTransitionsDisabled,
+      sidebarKeyboardDndEnabled,
+      setSidebarKeyboardDndEnabled,
     }),
     [
       drive,
@@ -102,8 +109,10 @@ export const AppSettingsContextProvider = (
       setSideBarLocked,
       agent,
       setAgentAndShowToast,
-      viewTransitionsEnabled,
-      setViewTransitionsEnabled,
+      viewTransitionsDisabled,
+      setViewTransitionsDisabled,
+      sidebarKeyboardDndEnabled,
+      setSidebarKeyboardDndEnabled,
     ],
   );
 
@@ -142,8 +151,10 @@ export interface AppSettings {
   agent: Agent | undefined;
   setAgent: (a: Agent | undefined) => void;
   /** If the app should use view transitions */
-  viewTransitionsEnabled: boolean;
-  setViewTransitionsEnabled: (b: boolean) => void;
+  viewTransitionsDisabled: boolean;
+  setViewTransitionsDisabled: (b: boolean) => void;
+  sidebarKeyboardDndEnabled: boolean;
+  setSidebarKeyboardDndEnabled: (b: boolean) => void;
 }
 
 const initialState: AppSettings = {
@@ -162,8 +173,10 @@ const initialState: AppSettings = {
   setSideBarLocked: () => undefined,
   agent: undefined,
   setAgent: () => undefined,
-  viewTransitionsEnabled: true,
-  setViewTransitionsEnabled: () => undefined,
+  viewTransitionsDisabled: true,
+  setViewTransitionsDisabled: () => undefined,
+  sidebarKeyboardDndEnabled: false,
+  setSidebarKeyboardDndEnabled: () => undefined,
 };
 
 /** Hook for using App Settings, such as theme and darkmode */

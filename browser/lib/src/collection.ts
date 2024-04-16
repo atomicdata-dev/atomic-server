@@ -1,7 +1,7 @@
 import { isNumber } from './datatypes.js';
+import { Collections, collections } from './ontologies/collections.js';
 import { Resource } from './resource.js';
 import { Store } from './store.js';
-import { urls } from './urls.js';
 
 export interface QueryFilter {
   property?: string;
@@ -14,6 +14,11 @@ export interface CollectionParams extends QueryFilter {
   page_size: string;
 }
 
+export interface CollectionOptions {
+  noFetch?: boolean;
+  endpoint?: string;
+}
+
 /**
  * A collection is a dynamic resource that queries the server for a list of resources that meet it's criteria.
  * Checkout [the docs](https://docs.atomicdata.dev/schema/collections.html) for more information.
@@ -24,11 +29,13 @@ export interface CollectionParams extends QueryFilter {
 export class Collection {
   public readonly __internalObject = this;
   private store: Store;
-  private pages = new Map<number, Resource>();
+  private pages = new Map<number, Resource<Collections.Collection>>();
   private server: string;
   private params: CollectionParams;
 
   private _totalMembers = 0;
+
+  private _totalPages = 0;
 
   private _waitForReady: Promise<void>;
 
@@ -73,6 +80,10 @@ export class Collection {
     return this._totalMembers;
   }
 
+  public get totalPages(): number {
+    return Math.ceil(this.totalMembers / this.pageSize);
+  }
+
   public waitForReady(): Promise<void> {
     return this._waitForReady;
   }
@@ -90,9 +101,7 @@ export class Collection {
     }
 
     const resource = this.pages.get(page)!;
-    const members = resource.getArray(
-      urls.properties.collection.members,
-    ) as string[];
+    const members = resource.getSubjects(collections.properties.members);
 
     return members[index % this.pageSize];
   }
@@ -121,24 +130,28 @@ export class Collection {
     await this.waitForReady();
 
     for (let i = 0; i < this.totalMembers; i++) {
-      yield this.getMemberWithIndex(i);
+      yield await this.getMemberWithIndex(i);
     }
   }
 
   public async getAllMembers(): Promise<string[]> {
-    const prevPageSize = this.params.page_size;
-    // Set page size to a high number for less request overhead.
-    this.params.page_size = '1000';
-
     const members: string[] = [];
 
     for await (const member of this) {
       members.push(member);
     }
 
-    this.params.page_size = prevPageSize;
-
     return members;
+  }
+
+  public async getMembersOnPage(page: number): Promise<string[]> {
+    if (!this.pages.has(page)) {
+      await this.fetchPage(page);
+    }
+
+    const resource = this.pages.get(page)!;
+
+    return resource.props.members ?? [];
   }
 
   private buildSubject(page: number): string {
@@ -155,7 +168,8 @@ export class Collection {
 
   private async fetchPage(page: number): Promise<void> {
     const subject = this.buildSubject(page);
-    const resource = await this.store.fetchResourceFromServer(subject);
+    const resource =
+      await this.store.fetchResourceFromServer<Collections.Collection>(subject);
 
     if (!resource) {
       throw new Error('Invalid collection: resource does not exist');
@@ -169,13 +183,14 @@ export class Collection {
 
     this.pages.set(page, resource);
 
-    const totalMembers = resource.get(urls.properties.collection.totalMembers);
+    const totalMembers = resource.props.totalMembers;
 
     if (!isNumber(totalMembers)) {
       throw new Error('Invalid collection: total-members is not a number');
     }
 
     this._totalMembers = totalMembers;
+    this._totalPages = resource.props.totalPages ?? 0;
   }
 }
 

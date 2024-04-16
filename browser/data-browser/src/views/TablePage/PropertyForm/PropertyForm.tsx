@@ -80,7 +80,6 @@ export function PropertyForm({
   category,
 }: PropertyFormProps): JSX.Element {
   const [nameError, setNameError, onNameBlur] = useValidation('Required');
-
   const valueOptions = useMemo(
     () => ({
       handleValidationError(e: Error | undefined) {
@@ -116,6 +115,14 @@ export function PropertyForm({
     [setName, setShortName],
   );
 
+  const handleSubmit: React.FormEventHandler<HTMLFormElement> = useCallback(
+    e => {
+      e.preventDefault();
+      onSubmit();
+    },
+    [onSubmit],
+  );
+
   // If name was already set remove the error.
   useEffect(() => {
     if (name) {
@@ -126,15 +133,11 @@ export function PropertyForm({
   const CategoryForm = categoryFormFactory(category);
 
   return (
-    <Form
-      onSubmit={e => {
-        e.preventDefault();
-        onSubmit();
-      }}
-    >
+    <Form onSubmit={handleSubmit}>
       <div>
         <InputWrapper $invalid={!!nameError}>
           <InputStyled
+            id='name-form'
             type='text'
             value={name}
             onChange={handleNameChange}
@@ -145,6 +148,8 @@ export function PropertyForm({
         {nameError && <ErrorChip>{nameError}</ErrorChip>}
       </div>
       <CategoryForm resource={resource} />
+      {/* Needed for inputs to submit on enter */}
+      <HiddenSubmitButton type='submit' />
     </Form>
   );
 }
@@ -153,4 +158,8 @@ const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 1rem;
+`;
+
+const HiddenSubmitButton = styled.button`
+  display: none;
 `;

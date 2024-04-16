@@ -62,12 +62,13 @@ export const registerBasicInstanceHandlers = () => {
         [core.properties.read]: [agent.subject],
       });
 
-      const agentResource = await store.getResourceAsync(agent.subject);
-      agentResource.pushPropVal(server.properties.drives, [
-        newResource.getSubject(),
-      ]);
-      agentResource.save(store);
-      settings.setDrive(newResource.getSubject());
+      // resources created with createAndNavigate have a parent by default which we don't want for drives.
+      newResource.remove(core.properties.parent);
+
+      const agentResource = await store.getResource(agent.subject);
+      agentResource.push(server.properties.drives, [newResource.subject]);
+      agentResource.save();
+      settings.setDrive(newResource.subject);
     },
   );
 };

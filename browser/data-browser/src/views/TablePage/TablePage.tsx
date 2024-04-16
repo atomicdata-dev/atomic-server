@@ -75,7 +75,7 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
       const rowResource = store.getResourceLoading(row);
       addItemsToHistoryStack(createResourceDeletedHistoryItem(rowResource));
 
-      await rowResource.destroy(store);
+      await rowResource.destroy();
 
       invalidateCollection();
     },

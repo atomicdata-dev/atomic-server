@@ -2,16 +2,65 @@
 
 This changelog covers all three packages, as they are (for now) updated as a whole
 
-## UNRELEASED
+## Unreleased
 
 ### Atomic Browser
 
-- [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on new resource page.
-- [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on search result page.
-- [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focussed on an input
+- [#841](https://github.com/atomicdata-dev/atomic-server/issues/841) Add better inputs for `Timestamp` and `Date` datatypes.
+- [#842](https://github.com/atomicdata-dev/atomic-server/issues/842) Add media picker for properties with classtype file.
+- [#850](https://github.com/atomicdata-dev/atomic-server/issues/850) Add drag & drop sorting to ResourceArray inputs.
+- [#757](https://github.com/atomicdata-dev/atomic-server/issues/757) Add drag & drop sorting to sidebar.
+
+### @tomic/lib
+
+- [#840](https://github.com/atomicdata-dev/atomic-server/issues/840) Added `store.search()`.
+- Deprecated `resource.getSubject()` in favor of `resource.subject`.
+- Deprecated `store.getResouceAsync()` in favor of `store.getResource()`.
+- Deprecated `resource.pushPropval()` in favor of `resource.push()`.
+- Deprecated `resource.removePropval()` in favor of `resource.remove()`.
+- Added `resource.matchClass()` method.
+- Added `resource.setVersion()` method.
+- Added `collection.getMembersOnPage()` method.
+- Added `collection.totalPages`.
+- BREAKING CHANGE: Renamed `resource.getCommitsCollection` to `resource.getCommitsCollectionSubject`.
+- BREAKING CHANGE: `resource.getChildrenCollection()` now returns a `Promise<Collection>` instead of a subject.
+- BREAKING CHANGE: Resource now keeps a reference to store internally, therefore all methods that required you to pass a store have been changed to not require a store.
+  These methods are:
+  - `resource.canWrite()`
+  - `resource.getHistory()`
+  - `resource.getRights()`
+  - `resource.destroy()`
+  - `resource.save()`
+  - `resource.set()`
+  - `resource.removeClasses()`
+  - `resource.addClasses()`
+
+# @tomic/react
+
+- Added `useCollectionPage` hook.
+- Fix bug where `useCollection` would fetch the collection twice on mount.
+- `useServerURL` no longer stores the server url in localstorage.
+
+### @tomic/cli
+
+- [#837](https://github.com/atomicdata-dev/atomic-server/issues/837) Fix timestamp is mapped to string instead of number.
+- [#831](https://github.com/atomicdata-dev/atomic-server/issues/831) Give clear error when trying to generate types from a non ontology resource
+- [#830](https://github.com/atomicdata-dev/atomic-server/issues/830) Create output folder if it doesn't exist
+- Use type import in generated files.
+
+## v0.37.0
+
+### Atomic Browser
+
+- [#747](https://github.com/atomicdata-dev/atomic-server/issues/747) Show ontology classes on the new resource page.
+- [#770](https://github.com/atomicdata-dev/atomic-server/issues/770) Display more info on the search result page.
+- [#771](https://github.com/atomicdata-dev/atomic-server/issues/771) Tables: Don't paste in multiple rows when focused on an input
 - [#758](https://github.com/atomicdata-dev/atomic-server/issues/758) Fix Relation column forms to close when clicking on the searchbox
 - [#780](https://github.com/atomicdata-dev/atomic-server/issues/780) Use tags in ontology editor to create enum properties.
 - [#810](https://github.com/atomicdata-dev/atomic-server/issues/810) Add button to resource selectors to navigate to the selected resource.
+- [#764](https://github.com/atomicdata-dev/atomic-server/issues/764) Add option to format numbers as currency in tables.
+- [#819](https://github.com/atomicdata-dev/atomic-server/issues/819) Fix number input always shows 'required' even when it's optional.
+- [#816](https://github.com/atomicdata-dev/atomic-server/issues/816) Fix bug where editing a column in a table would not submit when pressing enter.
 - Fix server not rebuilding client when files changed.
 - Added persistent scrollbar to table
 - Improved table header UX

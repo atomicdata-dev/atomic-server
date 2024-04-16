@@ -5,8 +5,8 @@ describe('resource.ts', () => {
   it('push propvals', () => {
     const resource = new Resource('test');
     const testsubject = 'https://example.com/testsubject';
-    resource.pushPropVal(urls.properties.subResources, [testsubject], true);
-    resource.pushPropVal(urls.properties.subResources, [testsubject], true);
+    resource.push(urls.properties.subResources, [testsubject], true);
+    resource.push(urls.properties.subResources, [testsubject], true);
 
     expect(resource.get(urls.properties.subResources)).toStrictEqual([
       testsubject,
@@ -14,7 +14,7 @@ describe('resource.ts', () => {
 
     const testsubject2 = 'https://example.com/testsubject2';
 
-    resource.pushPropVal(
+    resource.push(
       urls.properties.subResources,
       [testsubject2, testsubject2],
       true,
@@ -25,10 +25,7 @@ describe('resource.ts', () => {
       testsubject2,
     ]);
 
-    resource.pushPropVal(urls.properties.subResources, [
-      testsubject,
-      testsubject,
-    ]);
+    resource.push(urls.properties.subResources, [testsubject, testsubject]);
 
     expect(resource.get(urls.properties.subResources)).toStrictEqual([
       testsubject,

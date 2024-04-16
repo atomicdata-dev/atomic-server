@@ -6,7 +6,7 @@ import {
   useStore,
   useTitle,
 } from '@tomic/react';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'styled-components';
@@ -23,18 +23,34 @@ import { IconButton } from '../IconButton/IconButton';
 import { Row } from '../Row';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ScrollArea } from '../ScrollArea';
+import { useSidebarDnd } from './useSidebarDnd';
+import { DndContext, DragOverlay } from '@dnd-kit/core';
+import { SidebarItemTitle } from './ResourceSideBar/SidebarItemTitle';
+import { DropEdge } from './ResourceSideBar/DropEdge';
+import { createPortal } from 'react-dom';
 
 interface SideBarDriveProps {
   /** Closes the sidebar on small screen devices */
   handleClickItem: () => unknown;
+  onIsRearangingChange: (isRearanging: boolean) => void;
 }
 
 /** Shows the current Drive, it's children and an option to change to a different Drive */
 export function SideBarDrive({
   handleClickItem,
+  onIsRearangingChange,
 }: SideBarDriveProps): JSX.Element {
   const store = useStore();
   const { drive, agent } = useSettings();
+  const {
+    handleDragStart,
+    handleDragEnd,
+    draggingResource,
+    sensors,
+    animateDrop,
+    dndExplanation,
+    announcements,
+  } = useSidebarDnd(onIsRearangingChange);
   const driveResource = useResource(drive);
   const [subResources] = useArray(driveResource, urls.properties.subResources);
   const [title] = useTitle(driveResource);
@@ -79,31 +95,59 @@ export function SideBarDrive({
           <DriveSwitcher />
         </HeadingButtonWrapper>
       </SideBarHeader>
-      <StyledScrollArea>
-        <ListWrapper>
-          {driveResource.isReady() ? (
-            subResources.map(child => {
-              return (
-                <ResourceSideBar
-                  key={child}
-                  subject={child}
-                  ancestry={ancestry}
-                  onClick={handleClickItem}
-                />
-              );
-            })
-          ) : driveResource.loading ? null : (
-            <SideBarErr>
-              {driveResource.error &&
-                (driveResource.isUnauthorized()
-                  ? agent
-                    ? 'unauthorized'
-                    : driveResource.error.message
-                  : driveResource.error.message)}
-            </SideBarErr>
-          )}
-        </ListWrapper>
-      </StyledScrollArea>
+      <DndContext
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        sensors={sensors}
+        accessibility={{
+          announcements,
+          screenReaderInstructions: {
+            draggable: dndExplanation,
+          },
+        }}
+      >
+        <StyledScrollArea>
+          <ListWrapper>
+            <DropEdge parentHierarchy={[drive]} position={0} />
+            {driveResource.isReady() ? (
+              subResources.map((child, index) => {
+                return (
+                  <Fragment key={child}>
+                    <ResourceSideBar
+                      subject={child}
+                      renderedHierargy={[drive]}
+                      ancestry={ancestry}
+                      onClick={handleClickItem}
+                    />
+                    <DropEdge parentHierarchy={[drive]} position={index + 1} />
+                  </Fragment>
+                );
+              })
+            ) : driveResource.loading ? null : (
+              <SideBarErr>
+                {driveResource.error &&
+                  (driveResource.isUnauthorized()
+                    ? agent
+                      ? 'unauthorized'
+                      : driveResource.error.message
+                    : driveResource.error.message)}
+              </SideBarErr>
+            )}
+          </ListWrapper>
+        </StyledScrollArea>
+        {createPortal(
+          <DragOverlay dropAnimation={animateDrop}>
+            {draggingResource && (
+              <SidebarItemTitle
+                subject={draggingResource}
+                hideActionButtons
+                isDragging
+              />
+            )}
+          </DragOverlay>,
+          document.body,
+        )}
+      </DndContext>
     </>
   );
 }
@@ -126,6 +170,7 @@ const SideBarErr = styled(ErrorLook)`
 
 const ListWrapper = styled.div`
   overflow-x: hidden;
+  position: relative;
   margin-left: 0.5rem;
 `;
 
