@@ -108,9 +108,12 @@ export function TableCell({
   const handleEditNextRow = useCallback(() => {
     if (!savePending) {
       onEditNextRow?.();
-      setTimeout(() => {
+
+      // Only go to the next row if the resource has any properties set (It has two by default, isA and parent)
+      // This prevents triggering a rerender and losing focus on the input.
+      if (resource.getPropVals().size > 2) {
         setActiveCell(rowIndex + 1, columnIndex);
-      }, 0);
+      }
     }
   }, [savePending, setActiveCell, rowIndex, columnIndex]);
 

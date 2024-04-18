@@ -26,6 +26,7 @@ import {
   buildSearchSubject,
   server,
 } from './index.js';
+import { stringToSlug } from './stringToSlug.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
 /** Function called when a resource is updated or removed */
@@ -288,7 +289,7 @@ export class Store {
     parts: string[],
     parent?: string,
   ): Promise<string> {
-    const path = parts.join('/');
+    const path = parts.map(part => stringToSlug(part)).join('/');
     const parentUrl = parent ?? this.getServerUrl();
 
     return this.findAvailableSubject(path, parentUrl);
@@ -941,7 +942,7 @@ export class Store {
     parent: string,
     firstTry = true,
   ): Promise<string> {
-    let url = `${parent}/${path}`;
+    let url = new URL(`${parent}/${path}`).toString();
 
     if (!firstTry) {
       const randomPart = this.randomPart();
@@ -968,7 +969,6 @@ export class Store {
       return;
     }
 
-    // We clone for react, because otherwise it won't rerender
     Promise.allSettled(callbacks.map(async cb => cb(resource)));
   }
 }

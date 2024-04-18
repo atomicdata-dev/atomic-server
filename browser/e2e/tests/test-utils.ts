@@ -101,14 +101,20 @@ export async function signIn(page: Page) {
  */
 export async function newDrive(page: Page) {
   // Create new drive to prevent polluting the main drive
+  const driveTitle = `testdrive-${timestamp()}`;
   await page.locator(sideBarDriveSwitcher).click();
   await page.locator('button:has-text("New Drive")').click();
+  await expect(
+    currentDialog(page).getByRole('heading', { name: 'New Drive' }),
+  ).toBeVisible();
+
+  await currentDialog(page).getByLabel('Name').fill(driveTitle);
+
+  await currentDialog(page).getByRole('button', { name: 'Create' }).click();
   expect(page.locator(`${currentDriveTitle} > localhost`)).not.toBeVisible();
   await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   expect(driveURL).toContain('localhost');
-  const driveTitle = `testdrive-${timestamp()}`;
-  await editTitle(driveTitle, page);
 
   return { driveURL: driveURL as string, driveTitle };
 }

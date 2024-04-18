@@ -20,6 +20,10 @@ export function isUnauthorized(error?: Error): boolean {
   return false;
 }
 
+export function isAtomicError(error: Error): error is AtomicError {
+  return error instanceof AtomicError;
+}
+
 /**
  * Atomic Data Errors have an additional Type, which tells the client what kind
  * of error to render.

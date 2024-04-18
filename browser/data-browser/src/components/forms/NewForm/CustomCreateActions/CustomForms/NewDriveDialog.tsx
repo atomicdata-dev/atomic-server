@@ -1,5 +1,5 @@
 import { core, useStore, server, dataBrowser } from '@tomic/react';
-import { useState, useCallback, FormEvent, FC, useEffect } from 'react';
+import { useState, useCallback, FormEvent, FC, useEffect, useId } from 'react';
 import { styled } from 'styled-components';
 import { stringToSlug } from '../../../../../helpers/stringToSlug';
 import { Button } from '../../../../Button';
@@ -20,6 +20,7 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
   onClose,
 }) => {
   const store = useStore();
+  const nameFieldId = useId();
   const { setDrive } = useSettings();
   const [name, setName] = useState('');
 
@@ -105,9 +106,10 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
             hide(true);
           }}
         >
-          <Field required label='Name'>
+          <Field required label='Name' fieldId={nameFieldId}>
             <InputWrapper>
               <InputStyled
+                id={nameFieldId}
                 placeholder='My Drive'
                 value={name}
                 autoFocus={true}

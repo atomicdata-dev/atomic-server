@@ -12,7 +12,7 @@ export const registerBasicInstanceHandlers = () => {
       await createAndNavigate(
         dataBrowser.classes.folder,
         {
-          [core.properties.name]: 'untitled-folder',
+          [core.properties.name]: 'Untitled Folder',
           [dataBrowser.properties.displayStyle]: classes.displayStyles.list,
         },
         parent,
