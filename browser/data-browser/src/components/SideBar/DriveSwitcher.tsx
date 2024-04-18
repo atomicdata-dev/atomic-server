@@ -48,17 +48,19 @@ export function DriveSwitcher() {
 
   const items = useMemo(
     () => [
-      ...Array.from(savedDrivesMap.entries()).map(([subject, resource]) => ({
-        id: subject,
-        label: getTitle(resource),
-        helper: `Switch to ${getTitle(resource)}`,
-        disabled: subject === drive,
-        onClick: () => {
-          setDrive(subject);
-          navigate(constructOpenURL(subject));
-        },
-        icon: subject === drive ? <FaRegCheckCircle /> : <FaRegCircle />,
-      })),
+      ...Array.from(savedDrivesMap.entries())
+        .filter(([_, resource]) => !resource.error)
+        .map(([subject, resource]) => ({
+          id: subject,
+          label: getTitle(resource),
+          helper: `Switch to ${getTitle(resource)}`,
+          disabled: subject === drive,
+          onClick: () => {
+            setDrive(subject);
+            navigate(constructOpenURL(subject));
+          },
+          icon: subject === drive ? <FaRegCheckCircle /> : <FaRegCircle />,
+        })),
       DIVIDER,
       // Dedupe history from savedDrives bause not all savedDrives might be loaded yet.
       ...Array.from(dedupeAFromB(historyMap, savedDrivesMap))

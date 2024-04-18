@@ -4,13 +4,14 @@ import {
   CursorMode,
   useTableEditorContext,
 } from '../../components/TableEditor/TableEditorContext';
+import { useOnValueChange } from '../../helpers/useOnValueChange';
 
 export function useTableInvalidation(
   resource: Resource,
   invalidateTable: () => void,
 ) {
   const store = useStore();
-  const { cursorMode } = useTableEditorContext();
+  const { cursorMode, selectedColumn, selectedRow } = useTableEditorContext();
 
   const [markedForInvalidation, setMarkedForInvalidation] = useState(false);
 
@@ -19,6 +20,12 @@ export function useTableInvalidation(
       invalidateTable();
     }
   }, [invalidateTable, markedForInvalidation]);
+
+  useOnValueChange(() => {
+    if (markedForInvalidation) {
+      invalidateTable();
+    }
+  }, [selectedRow, selectedColumn]);
 
   useEffect(() => {
     if (markedForInvalidation && cursorMode !== CursorMode.Edit) {

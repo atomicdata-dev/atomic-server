@@ -1,4 +1,14 @@
-import { useString, useResource, urls, Client, useArray } from '@tomic/react';
+import {
+  useString,
+  useResource,
+  Client,
+  useArray,
+  isAtomicError,
+  ErrorType,
+  core,
+  dataBrowser,
+  server,
+} from '@tomic/react';
 import { AtomicLink } from '../../components/AtomicLink';
 import { ErrorLook } from '../../components/ErrorLook';
 import { LoaderInline } from '../../components/Loader';
@@ -15,6 +25,23 @@ type ResourceInlineProps = {
   basic?: boolean;
 } & ResourceInlineInstanceProps;
 
+function getMessageForErrorType(error: Error) {
+  if (isAtomicError(error)) {
+    switch (error.type) {
+      case ErrorType.NotFound:
+        return 'Resource not found';
+      case ErrorType.Unauthorized:
+        return 'Unauthorized';
+      case ErrorType.Server:
+        return 'Server error';
+      case ErrorType.Client:
+        return 'Something went wrong';
+    }
+  } else {
+    return 'Error loading resource';
+  }
+}
+
 /** Renders a Resource in a compact, inline link. Shows tooltip on hover. */
 export function ResourceInline({
   subject,
@@ -23,7 +50,7 @@ export function ResourceInline({
   className,
 }: ResourceInlineProps): JSX.Element {
   const resource = useResource(subject, { allowIncomplete: true });
-  const [isA] = useArray(resource, urls.properties.isA);
+  const [isA] = useArray(resource, core.properties.isA);
 
   const Comp = basic ? DefaultInline : classMap.get(isA[0]) ?? DefaultInline;
 
@@ -35,7 +62,7 @@ export function ResourceInline({
     return (
       <AtomicLink subject={subject} untabbable={untabbable}>
         <ErrorLook about={subject} title={resource.error.message}>
-          Unknown Resource
+          {getMessageForErrorType(resource.error)}
         </ErrorLook>
       </AtomicLink>
     );
@@ -58,7 +85,7 @@ export function ResourceInline({
 
 function DefaultInline({ subject }: ResourceInlineInstanceProps): JSX.Element {
   const resource = useResource(subject);
-  const [description] = useString(resource, urls.properties.description);
+  const [description] = useString(resource, core.properties.description);
 
   return <span title={description ? description : ''}>{resource.title}</span>;
 }
@@ -67,6 +94,6 @@ const classMap = new Map<
   string,
   (props: ResourceInlineInstanceProps) => JSX.Element
 >([
-  [urls.classes.tag, TagInline],
-  [urls.classes.file, FileInline],
+  [dataBrowser.classes.tag, TagInline],
+  [server.classes.file, FileInline],
 ]);

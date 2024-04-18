@@ -56,6 +56,7 @@ function DrivePage({ resource }: ResourcePageProps): JSX.Element {
         <div>
           <Heading>Default Ontology</Heading>
           <InputSwitcher
+            commit
             resource={resource}
             property={defaultOntologyProp}
             disabled={!canEdit}

@@ -726,17 +726,6 @@ export class Resource<C extends OptionalClass = any> {
     this._subject = subject;
   }
 
-  /** Returns true if the value has not changed */
-  private equalsCurrentValue(prop: string, value: JSONValue) {
-    const ownValue = this.get(prop);
-
-    if (value === Object(value)) {
-      return JSON.stringify(ownValue) === JSON.stringify(value);
-    }
-
-    return ownValue === value;
-  }
-
   private isParentNew() {
     const parentSubject = this.propvals.get(core.properties.parent) as string;
 

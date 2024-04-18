@@ -45,10 +45,11 @@ test.describe('tables', async () => {
       await page.keyboard.press('Enter');
       await expect(
         page.locator(
-          `[aria-rowindex="${rowIndex}"] > [aria-colindex="${2}"] > input`,
+          `[aria-rowindex="${rowIndex}"] > [aria-colindex="2"] > input`,
         ),
       ).toBeFocused();
       await page.keyboard.type(name);
+      await page.waitForTimeout(300);
       await tab();
       // Flay newline
       await page.waitForTimeout(300);
@@ -86,7 +87,7 @@ test.describe('tables', async () => {
       ).toBeVisible();
       await expect(
         page.locator(
-          `[aria-rowindex="${rowIndex + 1}"] > [aria-colindex="${2}"] > input`,
+          `[aria-rowindex="${rowIndex + 1}"] > [aria-colindex="2"] > input`,
         ),
         "Next row's first cell isn't focused",
       ).toBeFocused();
