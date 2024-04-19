@@ -59,6 +59,7 @@ impl FileStore {
     }
 
     pub fn get_fs_file_path(&self, file_id: &str) -> AtomicServerResult<PathBuf> {
+        tracing::info!("fs_file_path: {}", file_id);
         if let FileStore::FS(config) = self {
             let fs_file_id = file_id.strip_prefix(Self::FS_PREFIX).unwrap_or(file_id);
             let mut file_path = config.path.clone();
