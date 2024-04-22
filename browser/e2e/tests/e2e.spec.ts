@@ -178,9 +178,9 @@ test.describe('data-browser', async () => {
     await expect(page2.locator('text=Unauthorized').first()).toBeVisible();
 
     // Create invite
-    await page.click('button:has-text("Send invite")');
-    context.grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.click('button:has-text("Create Invite")');
+    context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.click('button:has-text("Create")');
     await expect(page.locator('text=Invite created and copied ')).toBeVisible();
     const inviteUrl = await page.evaluate(() =>
       document
