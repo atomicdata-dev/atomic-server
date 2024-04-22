@@ -26,7 +26,7 @@ interface InviteFormProps {
  */
 export function InviteForm({ target }: InviteFormProps) {
   const store = useStore();
-  const [subject] = useState(() => store.createSubject('invite'));
+  const [subject] = useState(() => store.createSubject());
   const invite = useResource(subject, {
     newResource: true,
   });
@@ -59,7 +59,7 @@ export function InviteForm({ target }: InviteFormProps) {
     return (
       <Card>
         <ResourceField
-          label={'Give edit rights'}
+          label={'Allow edits'}
           propertyURL={server.properties.write}
           resource={invite}
         />
@@ -69,11 +69,11 @@ export function InviteForm({ target }: InviteFormProps) {
           resource={invite}
         />
         <ResourceField
-          label={'How many times this link can be used. No value = no limit.'}
+          label={'Limit Usages (optional)'}
           propertyURL={server.properties.usagesLeft}
           resource={invite}
         />
-        <Button onClick={createInvite}>Create Invite</Button>
+        <Button onClick={createInvite}>Create</Button>
         {err && (
           <p>
             <ErrorLook>{err.message}</ErrorLook>
@@ -84,7 +84,7 @@ export function InviteForm({ target }: InviteFormProps) {
   } else
     return (
       <Card>
-        <p>Invite created and copied to clipboard! Send it to your buddy:</p>
+        <p>Invite created and copied to clipboard! 🚀</p>
         <CodeBlock content={invite.subject} data-test='invite-code' />
       </Card>
     );

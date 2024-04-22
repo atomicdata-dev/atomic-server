@@ -15,6 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { ErrorLook } from '../components/ErrorLook';
 import { Column } from '../components/Row';
 import { Main } from '../components/Main';
+import { FaShare } from 'react-icons/fa6';
 
 /** Form for managing and viewing rights for this resource */
 export function ShareRoute(): JSX.Element {
@@ -138,13 +139,14 @@ export function ShareRoute(): JSX.Element {
           {canWrite && !showInviteForm && (
             <span>
               <Button onClick={() => setShowInviteForm(true)}>
-                Send Invite...
+                <FaShare />
+                Create Invite
               </Button>
             </span>
           )}
           {showInviteForm && <InviteForm target={resource} />}
           <Card>
-            <RightsHeader text='rights set here:' />
+            <RightsHeader text='Rights set here:' />
             <CardInsideFull>
               {/* This key might be a bit too much, but the component wasn't properly re-rendering before */}
               {constructAgentProps().map(right => (
@@ -171,7 +173,7 @@ export function ShareRoute(): JSX.Element {
           {err && <ErrorLook>{err.message}</ErrorLook>}
           {inheritedRights.length > 0 && (
             <Card>
-              <RightsHeader text='inherited rights:' />
+              <RightsHeader text='Inherited rights:' />
               <CardInsideFull>
                 {inheritedRights.map(right => (
                   <AgentRights

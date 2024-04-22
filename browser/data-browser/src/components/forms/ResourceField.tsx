@@ -45,9 +45,8 @@ function ResourceField({
   }
 
   const label =
-    labelProp || property.error
-      ? generateErrorPropName(property)
-      : property.shortname;
+    labelProp ??
+    (property.error ? generateErrorPropName(property) : property.shortname);
 
   if (property.isDynamic) {
     return (

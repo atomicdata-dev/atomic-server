@@ -122,6 +122,26 @@ const resource = await store.newResource({
 await resource.save();
 ```
 
+## Generating random subjects
+
+In some cases you might need a subject before you have created the resource with that subject.
+To generate a random subject, use the `store.createSubject()` method.
+This method generates a new subject with the current serverURL as hostname and a random lowercased [ULID](https://github.com/ulid/spec) string as the path.
+
+The method also allows you to pass a parent subject to generate a subject under that parent.
+
+```typescript
+const subject = store.createSubject();
+// Result: https://myserver.com/01hw30e1w6t9y0y5aqg0aghhf4
+
+
+// With parent subject
+const subject = store.createSubject(parent.subject);
+```
+
+Keep in mind that subjects never change once they are set, even if the parent changes.
+This means you can't reliably infer the parent from the subject.
+
 ## Full-Text Search
 
 AtomicServer comes included with a full-text search API.

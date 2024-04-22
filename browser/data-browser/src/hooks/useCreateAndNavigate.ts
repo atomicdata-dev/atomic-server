@@ -3,7 +3,6 @@ import { useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 import { constructOpenURL } from '../helpers/navigation';
-import { getNamePartFromProps } from '../helpers/getNamePartFromProps';
 
 export type CreateAndNavigate = (
   isA: string,
@@ -34,14 +33,7 @@ export function useCreateAndNavigate(): CreateAndNavigate {
     ): Promise<Resource> => {
       const classResource = await store.getResource<Core.Class>(isA);
 
-      const namePart = getNamePartFromProps(propVals);
-      const newSubject = await store.buildUniqueSubjectFromParts(
-        [classResource.props.shortname, namePart],
-        parent,
-      );
-
       const resource = await store.newResource({
-        subject: newSubject,
         isA,
         parent,
         propVals,
@@ -54,7 +46,7 @@ export function useCreateAndNavigate(): CreateAndNavigate {
           await onCreated(resource);
         }
 
-        navigate(constructOpenURL(newSubject, extraParams));
+        navigate(constructOpenURL(resource.subject, extraParams));
         toast.success(`${classResource.title} created`);
         store.notifyResourceManuallyCreated(resource);
       } catch (e) {

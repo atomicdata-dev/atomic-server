@@ -27,7 +27,7 @@ export const useNewForm = (args: UseNewForm) => {
 
   const [subjectValue, setSubjectValueInternal] = useState<string>(() => {
     if (initialSubject === undefined) {
-      return store.createSubject(klass.props.shortname);
+      return store.createSubject();
     }
 
     return initialSubject;
@@ -46,7 +46,7 @@ export const useNewForm = (args: UseNewForm) => {
       }
 
       if (isAVal.length === 0) {
-        await resource.addClasses(klass.getSubject());
+        await resource.addClasses(klass.subject);
       }
 
       setInitialized(true);

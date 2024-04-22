@@ -1,4 +1,4 @@
-import { Core, JSONValue, useResource, useStore, useTitle } from '@tomic/react';
+import { Core, JSONValue, useResource, useStore } from '@tomic/react';
 import { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
@@ -11,7 +11,6 @@ import { NewFormProps } from './NewFormPage';
 import { NewFormTitle, NewFormTitleVariant } from './NewFormTitle';
 import { SubjectField } from './SubjectField';
 import { useNewForm } from './useNewForm';
-import { getNamePartFromProps } from '../../../helpers/getNamePartFromProps';
 
 export interface NewFormDialogProps extends NewFormProps {
   closeDialog: (success?: boolean) => void;
@@ -29,7 +28,6 @@ export const NewFormDialog = ({
   parent,
 }: NewFormDialogProps): JSX.Element => {
   const klass = useResource<Core.Class>(classSubject);
-  const [className] = useTitle(klass);
   const store = useStore();
 
   const [subject, setSubject] = useState<string>();
@@ -49,14 +47,7 @@ export const NewFormDialog = ({
   // Onmount we generate a new subject based on the classtype and the user input.
   useEffectOnce(() => {
     (async () => {
-      const namePart = getNamePartFromProps(initialProps ?? {});
-
-      const uniqueSubject = await store.buildUniqueSubjectFromParts(
-        [className, namePart],
-        parent,
-      );
-
-      await setSubjectValue(uniqueSubject);
+      await setSubjectValue(store.createSubject());
 
       for (const [prop, value] of Object.entries(initialProps ?? {})) {
         await resource.set(prop, value);

@@ -1,4 +1,4 @@
-import { Core, Store, useStore } from '@tomic/react';
+import { Store, useStore } from '@tomic/react';
 import {
   FC,
   PropsWithChildren,
@@ -107,10 +107,7 @@ export function NewResourceUIProvider({ children }: PropsWithChildren) {
     }
 
     // Default behaviour. Navigate to a new resource form for the given class.
-    const classResource = await store.getResource<Core.Class>(isA);
-    navigate(
-      newURL(isA, parent, store.createSubject(classResource.props.shortname)),
-    );
+    navigate(newURL(isA, parent, store.createSubject()));
   }, []);
 
   const context = useMemo(

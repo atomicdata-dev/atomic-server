@@ -26,6 +26,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Added `collection.totalPages`.
 - BREAKING CHANGE: Renamed `resource.getCommitsCollection` to `resource.getCommitsCollectionSubject`.
 - BREAKING CHANGE: `resource.getChildrenCollection()` now returns a `Promise<Collection>` instead of a subject.
+- BREAKING CHANGE: `resource.createSubject()` no longer accepts a class name as an argument and defaults to a fully random subject.
 - BREAKING CHANGE: Resource now keeps a reference to store internally, therefore all methods that required you to pass a store have been changed to not require a store.
   These methods are:
   - `resource.canWrite()`

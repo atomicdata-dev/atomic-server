@@ -49,7 +49,6 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
 
     if (!useExistingClass) {
       const instanceResource = await store.newResource({
-        subject: store.createSubject('class'),
         isA: core.classes.class,
         propVals: {
           [core.properties.shortname]: stringToSlug(name),
