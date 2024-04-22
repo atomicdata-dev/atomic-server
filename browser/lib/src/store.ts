@@ -1,3 +1,4 @@
+import { ulid } from 'ulid';
 import {
   removeCookieAuthentication,
   setCookieAuthentication,
@@ -221,7 +222,7 @@ export class Store {
     const { subject, parent, isA, propVals } = options;
 
     const normalizedIsA = Array.isArray(isA) ? isA : [isA];
-    const newSubject = subject ?? this.createSubject(normalizedIsA[0], parent);
+    const newSubject = subject ?? this.createSubject();
 
     const resource = this.getResourceLoading(newSubject, { newResource: true });
 
@@ -295,16 +296,13 @@ export class Store {
     return this.findAvailableSubject(path, parentUrl);
   }
 
-  /** Creates a random URL. Add a classnme (e.g. 'persons') to make a nicer name */
-  public createSubject(className?: string, parentSubject?: string): string {
-    const random = this.randomPart();
-    className = className ? className : 'things';
-
+  /** Creates a random subject url. You can pass a parent subject if you want that to be included in the url. */
+  public createSubject(parentSubject?: string): string {
     if (parentSubject) {
-      return `${parentSubject}/${className}/${random}`;
+      return `${parentSubject}/${this.randomPart()}`;
     }
 
-    return `${this.getServerUrl()}/${className}/${random}`;
+    return new URL(`/${this.randomPart()}`, this.serverUrl).toString();
   }
 
   /**
@@ -508,7 +506,7 @@ export class Store {
   /** Gets a property by URL. */
   public async getProperty(subject: string): Promise<Property> {
     // This leads to multiple fetches!
-    const resource = await this.getResourceAsync(subject);
+    const resource = await this.getResource(subject);
 
     if (resource === undefined) {
       throw Error(`Property ${subject} is not found`);
@@ -518,7 +516,7 @@ export class Store {
       throw Error(`Property ${subject} cannot be loaded: ${resource.error}`);
     }
 
-    const datatypeUrl = resource.get(urls.properties.datatype);
+    const datatypeUrl = resource.get(core.properties.datatype);
 
     if (datatypeUrl === undefined) {
       throw Error(
@@ -526,7 +524,7 @@ export class Store {
       );
     }
 
-    const shortname = resource.get(urls.properties.shortname);
+    const shortname = resource.get(core.properties.shortname);
 
     if (shortname === undefined) {
       throw Error(
@@ -534,7 +532,7 @@ export class Store {
       );
     }
 
-    const description = resource.get(urls.properties.description);
+    const description = resource.get(core.properties.description);
 
     if (description === undefined) {
       throw Error(
@@ -542,7 +540,7 @@ export class Store {
       );
     }
 
-    const classTypeURL = resource.get(urls.properties.classType)?.toString();
+    const classTypeURL = resource.get(core.properties.classtype)?.toString();
 
     const propery: Property = {
       subject,
@@ -934,7 +932,7 @@ export class Store {
   }
 
   private randomPart(): string {
-    return Math.random().toString(36).substring(2);
+    return ulid().toLowerCase();
   }
 
   private async findAvailableSubject(

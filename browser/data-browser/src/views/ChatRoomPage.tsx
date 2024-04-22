@@ -74,7 +74,7 @@ export function ChatRoomPage({ resource }: ResourcePageProps) {
       e && e.preventDefault();
 
       if (!disableSend) {
-        const subject = store.createSubject('messages', resource.getSubject());
+        const subject = store.createSubject(resource.subject);
 
         const msgResource = await store.newResource({
           subject,
