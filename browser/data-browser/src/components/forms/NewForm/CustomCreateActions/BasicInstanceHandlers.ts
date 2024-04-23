@@ -15,7 +15,9 @@ export const registerBasicInstanceHandlers = () => {
           [core.properties.name]: 'Untitled Folder',
           [dataBrowser.properties.displayStyle]: classes.displayStyles.list,
         },
-        parent,
+        {
+          parent,
+        },
       );
     },
   );
@@ -28,7 +30,9 @@ export const registerBasicInstanceHandlers = () => {
         {
           [core.properties.name]: 'Untitled ChatRoom',
         },
-        parent,
+        {
+          parent,
+        },
       );
     },
   );
@@ -41,7 +45,9 @@ export const registerBasicInstanceHandlers = () => {
         {
           [core.properties.name]: 'Untitled Document',
         },
-        parent,
+        {
+          parent,
+        },
       );
     },
   );
