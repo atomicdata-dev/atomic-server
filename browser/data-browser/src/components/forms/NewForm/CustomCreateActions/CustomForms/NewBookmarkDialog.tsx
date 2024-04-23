@@ -43,7 +43,9 @@ export const NewBookmarkDialog: FC<CustomResourceDialogProps> = ({
           [core.properties.name]: 'New Bookmark',
           [dataBrowser.properties.url]: normalizedUrl,
         },
-        parent,
+        {
+          parent,
+        },
       );
 
       onClose();

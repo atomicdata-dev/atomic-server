@@ -5,6 +5,7 @@ import { NewOntologyDialog } from './NewOntologyDialog';
 import { NewTableDialog } from './NewTableDialog';
 import { NewCollectionDialog } from './NewCollectionDialog';
 import { NewDriveDialog } from './NewDriveDialog';
+import { NewArticleDialog } from './NewArticleDialog';
 
 export const registerCustomForms = () => {
   registerNewResourceDialog(dataBrowser.classes.bookmark, NewBookmarkDialog);
@@ -15,4 +16,5 @@ export const registerCustomForms = () => {
     NewCollectionDialog,
   );
   registerNewResourceDialog(server.classes.drive, NewDriveDialog);
+  registerNewResourceDialog(dataBrowser.classes.article, NewArticleDialog);
 };

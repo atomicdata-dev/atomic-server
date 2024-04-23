@@ -74,7 +74,9 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
         [core.properties.name]: name,
         [core.properties.classtype]: classSubject,
       },
-      parent,
+      {
+        parent,
+      },
     );
 
     onClose();

@@ -1,4 +1,4 @@
-import { validateDatatype, Datatype, core } from '@tomic/react';
+import { validateDatatype, Datatype, core, dataBrowser } from '@tomic/react';
 import { useState, useCallback, FormEvent, FC, useEffect } from 'react';
 import { styled } from 'styled-components';
 import { stringToSlug } from '../../../../../helpers/stringToSlug';
@@ -14,38 +14,41 @@ import { InputWrapper, InputStyled } from '../../../InputStyles';
 import { CustomResourceDialogProps } from '../../useNewResourceUI';
 import { useCreateAndNavigate } from '../../../../../hooks/useCreateAndNavigate';
 
-export const NewOntologyDialog: FC<CustomResourceDialogProps> = ({
+export const NewArticleDialog: FC<CustomResourceDialogProps> = ({
   parent,
   onClose,
 }) => {
-  const [shortname, setShortname] = useState('');
+  const [name, setName] = useState('');
   const [valid, setValid] = useState(false);
 
   const createResourceAndNavigate = useCreateAndNavigate();
 
   const onSuccess = useCallback(async () => {
+    const shortName = stringToSlug(name);
+
+    const subject = `${parent}/${shortName}`;
+
+    // TODO: make subject and stuff.
     createResourceAndNavigate(
-      core.classes.ontology,
+      dataBrowser.classes.article,
       {
-        [core.properties.shortname]: shortname,
-        [core.properties.description]: 'description',
-        [core.properties.classes]: [],
-        [core.properties.properties]: [],
-        [core.properties.instances]: [],
+        [core.properties.name]: name,
+        [core.properties.description]: '',
       },
       {
         parent,
+        subject,
       },
     );
 
     onClose();
-  }, [shortname, createResourceAndNavigate, onClose, parent]);
+  }, [name, createResourceAndNavigate, onClose, parent]);
 
   const [dialogProps, show, hide] = useDialog({ onSuccess, onCancel: onClose });
 
-  const onShortnameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
     const value = stringToSlug(e.target.value);
-    setShortname(value);
 
     try {
       validateDatatype(value, Datatype.SLUG);
@@ -61,7 +64,7 @@ export const NewOntologyDialog: FC<CustomResourceDialogProps> = ({
 
   return (
     <Dialog {...dialogProps}>
-      <H1>New Ontology</H1>
+      <H1>New Article</H1>
       <DialogContent>
         <form
           onSubmit={(e: FormEvent) => {
@@ -69,20 +72,20 @@ export const NewOntologyDialog: FC<CustomResourceDialogProps> = ({
             hide(true);
           }}
         >
-          <Explanation>
-            An ontology is a collection of classes and properties that together
-            describe a concept. Great for data models.
-          </Explanation>
-          <Field required label='Shortname'>
+          <Field required label='Title'>
             <InputWrapper>
               <InputStyled
-                placeholder='my-ontology'
-                value={shortname}
+                placeholder='New Article'
+                value={name}
                 autoFocus={true}
-                onChange={onShortnameChange}
+                onChange={onNameChange}
               />
             </InputWrapper>
           </Field>
+          <Explanation>
+            Title is used to construct the subject, keep in mind that the
+            subject cannot be changed later.
+          </Explanation>
         </form>
       </DialogContent>
       <DialogActions>
