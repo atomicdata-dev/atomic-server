@@ -1,7 +1,6 @@
 import {
-  classes,
-  getTimestampNow,
-  properties,
+  commits,
+  dataBrowser,
   useCanWrite,
   useChildren,
   useString,
@@ -18,27 +17,19 @@ import ResourceCard from '../Card/ResourceCard';
 import { ResourcePageProps } from '../ResourcePage';
 import { ArticleCover } from './ArticleCover';
 import { ArticleDescription } from './ArticleDescription';
-import { useCreateAndNavigate } from '../../hooks/useCreateAndNavigate';
+import { useNewResourceUI } from '../../components/forms/NewForm/useNewResourceUI';
 
 export function ArticlePage({ resource }: ResourcePageProps): JSX.Element {
-  const [lastCommit] = useString(resource, properties.commit.lastCommit);
+  const [lastCommit] = useString(resource, commits.properties.lastCommit);
 
   const [canEdit] = useCanWrite(resource);
   const children = useChildren(resource);
 
-  const createAndNavigate = useCreateAndNavigate();
+  const showNewResourceUI = useNewResourceUI();
 
   const createNewArticle = useCallback(() => {
-    createAndNavigate(
-      classes.article,
-      {
-        [properties.name]: 'New Article',
-        [properties.publishedAt]: getTimestampNow(),
-        [properties.description]: '',
-      },
-      resource.getSubject(),
-    );
-  }, [createAndNavigate]);
+    showNewResourceUI(dataBrowser.classes.article, resource.subject);
+  }, [showNewResourceUI, resource]);
 
   return (
     <>

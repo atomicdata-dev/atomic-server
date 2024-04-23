@@ -7,10 +7,14 @@ import { constructOpenURL } from '../helpers/navigation';
 export type CreateAndNavigate = (
   isA: string,
   propVals: Record<string, JSONValue>,
-  parent?: string,
-  /** Query parameters for the resource / endpoint */
-  extraParams?: Record<string, string>,
-  onCreated?: (resource: Resource) => Promise<void>,
+  options: {
+    parent?: string;
+    extraParams?: Record<string, string>;
+    /** Query parameters for the resource / endpoint */
+    onCreated?: (resource: Resource) => Promise<void>;
+    /** Only pass subject if you really need a custom subject. Random ULID are prefered in most cases. */
+    subject?: string;
+  },
 ) => Promise<Resource>;
 
 /**
@@ -27,13 +31,12 @@ export function useCreateAndNavigate(): CreateAndNavigate {
     async (
       isA,
       propVals,
-      parent,
-      extraParams,
-      onCreated,
+      { parent, extraParams, onCreated, subject },
     ): Promise<Resource> => {
       const classResource = await store.getResource<Core.Class>(isA);
 
       const resource = await store.newResource({
+        subject,
         isA,
         parent,
         propVals,

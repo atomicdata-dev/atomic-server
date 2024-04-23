@@ -39,7 +39,9 @@ export const NewCollectionDialog: FC<CustomResourceDialogProps> = ({
           [collections.properties.pageSize]: 30,
           [collections.properties.currentPage]: 0,
         },
-        parent,
+        {
+          parent,
+        },
       );
 
       onClose();

@@ -44,43 +44,46 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
         [core.properties.write]: [agent.subject],
         [core.properties.read]: [agent.subject],
       },
-      undefined,
-      undefined,
-      async resource => {
-        // resources created with createAndNavigate have a parent by default which we don't want for drives.
-        resource.remove(core.properties.parent);
+      {
+        onCreated: async resource => {
+          // resources created with createAndNavigate have a parent by default which we don't want for drives.
+          resource.remove(core.properties.parent);
 
-        // Add drive to the agents drive list.
-        const agentResource = await store.getResource(agent.subject!);
-        agentResource.push(server.properties.drives, [resource.subject]);
-        await agentResource.save();
+          // Add drive to the agents drive list.
+          const agentResource = await store.getResource(agent.subject!);
+          agentResource.push(server.properties.drives, [resource.subject]);
+          await agentResource.save();
 
-        // Create a default ontology.
-        const ontologyName = stringToSlug(name);
-        const ontology = await store.newResource({
-          subject: await store.buildUniqueSubjectFromParts(
-            ['defaultOntology'],
-            resource.subject,
-          ),
-          isA: core.classes.ontology,
-          parent: resource.subject,
-          propVals: {
-            [core.properties.shortname]: ontologyName,
-            [core.properties
-              .description]: `Default ontology for the ${name} drive`,
-            [core.properties.classes]: [],
-            [core.properties.properties]: [],
-            [core.properties.instances]: [],
-          },
-        });
+          // Create a default ontology.
+          const ontologyName = stringToSlug(name);
+          const ontology = await store.newResource({
+            subject: await store.buildUniqueSubjectFromParts(
+              ['defaultOntology'],
+              resource.subject,
+            ),
+            isA: core.classes.ontology,
+            parent: resource.subject,
+            propVals: {
+              [core.properties.shortname]: ontologyName,
+              [core.properties
+                .description]: `Default ontology for the ${name} drive`,
+              [core.properties.classes]: [],
+              [core.properties.properties]: [],
+              [core.properties.instances]: [],
+            },
+          });
 
-        await ontology.save();
+          await ontology.save();
 
-        await resource.set(server.properties.defaultOntology, ontology.subject);
-        await resource.set(dataBrowser.properties.subResources, [
-          ontology.subject,
-        ]);
-        await resource.save();
+          await resource.set(
+            server.properties.defaultOntology,
+            ontology.subject,
+          );
+          await resource.set(dataBrowser.properties.subResources, [
+            ontology.subject,
+          ]);
+          await resource.save();
+        },
       },
     );
 
