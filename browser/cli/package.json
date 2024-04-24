@@ -23,7 +23,7 @@
     "watch": "tsc --build --watch",
     "start": "pnpm watch",
     "tsc": "tsc --build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm exec tsc --noEmit"
   },
   "bin": {
     "ad-generate": "./bin/src/index.js"
