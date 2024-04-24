@@ -88,6 +88,7 @@ export function DriveSwitcher() {
         helper: 'Create a new drive',
         onClick: () =>
           createNewResource(server.classes.drive, agent?.subject ?? ''),
+        disabled: !agent,
       },
     ],
     [savedDrivesMap, drive, historyMap],
