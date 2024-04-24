@@ -34,7 +34,8 @@ module.exports = {
       'lib/tsconfig.json',
       'cli/tsconfig.json',
       'react/tsconfig.json',
-      'data-browser/tsconfig.json'
+      'data-browser/tsconfig.json',
+      'e2e/tsconfig.json',
     ],
   },
   plugins: ['react', '@typescript-eslint', 'prettier', 'react-hooks', 'jsx-a11y'],

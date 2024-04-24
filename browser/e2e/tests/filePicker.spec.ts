@@ -53,7 +53,7 @@ const createModel = async (page: Page) => {
   await page.getByRole('button', { name: 'add required property' }).click();
   await page
     .getByPlaceholder('Search for a property or enter a URL')
-    .type('programming');
+    .fill('programming');
 
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('Enter');
@@ -131,7 +131,7 @@ test.describe('File Picker', () => {
       ).toBeVisible();
 
       await page.getByRole('button', { name: 'Save' }).click();
-      await expect(page.getByText('Resource Saved')).toBeVisible();
+      await expect(page.getByText('New robot')).not.toBeVisible();
     }
 
     {
@@ -157,8 +157,7 @@ test.describe('File Picker', () => {
       ).toBeVisible();
 
       await page.getByRole('button', { name: 'Save' }).click();
-
-      await expect(page.getByText('Resource Saved')).toBeVisible();
+      await expect(page.getByText('New robot')).not.toBeVisible();
       await expect(page.getByText('testFile3.txt').nth(1)).toBeVisible();
       await page.getByText('testFile3.txt').nth(1).click();
 
