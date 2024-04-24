@@ -2,7 +2,8 @@ import toast, { ToastBar, Toaster as ReactHotToast } from 'react-hot-toast';
 import { FaCopy, FaTimes } from 'react-icons/fa';
 import { useTheme } from 'styled-components';
 import { zIndex } from '../styling';
-import { Button } from './Button';
+import { Row } from './Row';
+import { IconButton } from './IconButton/IconButton';
 
 /**
  * Makes themed toast notifications available in the Context. Render this
@@ -58,7 +59,7 @@ function ToastMessage({ icon, message, t }) {
   }
 
   return (
-    <>
+    <Row gap='1ch' center>
       {icon}
       {text}
       {t.type !== 'loading' && (
@@ -68,16 +69,16 @@ function ToastMessage({ icon, message, t }) {
             flexDirection: 'column',
           }}
         >
-          <Button title='Clear' subtle onClick={() => toast.dismiss(t.id)}>
+          <IconButton title='Clear' onClick={() => toast.dismiss(t.id)}>
             <FaTimes />
-          </Button>
+          </IconButton>
           {t.type !== 'success' && (
-            <Button title='Copy' subtle onClick={handleCopy}>
+            <IconButton title='Copy' onClick={handleCopy}>
               <FaCopy />
-            </Button>
+            </IconButton>
           )}
         </div>
       )}
-    </>
+    </Row>
   );
 }
