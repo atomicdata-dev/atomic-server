@@ -27,7 +27,8 @@ export const timestamp = () => new Date().toLocaleTimeString();
 export const editableTitle = '[data-test="editable-title"]';
 export const sideBarDriveSwitcher = '[title="Open Drive Settings"]';
 export const sideBarNewResource = '[data-test="sidebar-new-resource"]';
-export const currentDriveTitle = '[data-test=current-drive-title]';
+export const currentDriveTitle = (page: Page) =>
+  page.getByTestId('current-drive-title');
 export const publicReadRightLocator = (page: Page) =>
   page
     .locator(
@@ -58,7 +59,7 @@ export const before = async ({ page }: { page: Page }) => {
     await changeDrive(SERVER_URL, page);
   }
 
-  await expect(page.locator(currentDriveTitle)).toBeVisible();
+  await expect(currentDriveTitle(page)).toBeVisible();
 };
 
 export async function setTitle(page: Page, title: string) {
@@ -111,7 +112,8 @@ export async function newDrive(page: Page) {
   await currentDialog(page).getByLabel('Name').fill(driveTitle);
 
   await currentDialog(page).getByRole('button', { name: 'Create' }).click();
-  expect(page.locator(`${currentDriveTitle} > localhost`)).not.toBeVisible();
+  await expect(currentDriveTitle(page)).not.toHaveText('localhost');
+  await expect(currentDriveTitle(page)).toHaveText(driveTitle);
   await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   expect(driveURL).toContain('localhost');
@@ -120,7 +122,7 @@ export async function newDrive(page: Page) {
 }
 
 export async function makeDrivePublic(page: Page) {
-  await page.click(currentDriveTitle);
+  await currentDriveTitle(page).click();
   await page.click(contextMenu);
   await page.click('button:has-text("share")');
   await expect(
@@ -193,7 +195,7 @@ export async function openAgentPage(page: Page) {
 export async function openAtomic(page: Page) {
   await changeDrive('https://atomicdata.dev', page);
   // Accept the invite, create an account if necessary
-  await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
+  await expect(currentDriveTitle(page)).toHaveText('Atomic Data');
 }
 
 /** Opens the users' profile, sets a username */
