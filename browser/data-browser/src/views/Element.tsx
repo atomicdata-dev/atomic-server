@@ -170,7 +170,7 @@ export function ElementEdit({
         onFocus={() => setCurrent(index!)}
         onBlur={() => setCurrent(-1)}
       >
-        <Markdown text={text || ''} noMargin />
+        <Markdown text={text || ''} />
         <Err />
       </ElementWrapper>
     );
@@ -231,7 +231,7 @@ export function ElementShow({ subject }: ElementShowProps): JSX.Element {
 
   return (
     <ElementWrapper>
-      <Markdown text={text || ''} noMargin />
+      <Markdown text={text || ''} />
     </ElementWrapper>
   );
 }

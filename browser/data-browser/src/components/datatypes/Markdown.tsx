@@ -45,8 +45,6 @@ Markdown.defaultProps = {
 };
 
 const MarkdownWrapper = styled.div`
-  /* Corrects the margin added by <p> and other HTML elements */
-
   width: 100%;
   overflow-x: hidden;
   img {

@@ -29,7 +29,7 @@
     "start": "pnpm watch",
     "watch": "tsc --build --watch",
     "tsc": "tsc --build",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "pnpm exec tsc --noEmit"
   },
   "source": "src/index.ts",
   "type": "module",
