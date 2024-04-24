@@ -50,6 +50,8 @@ type CreateResourceOptions = {
   subject?: string;
   /** Parent the subject belongs to, defaults to the serverUrl */
   parent?: string;
+  /** Set to true if the resource should not have a parent. (For example Drives don't have parents) */
+  noParent?: boolean;
   /** Subject(s) of the resources class */
   isA?: string | string[];
   /** Any additional properties the resource should have */
@@ -216,11 +218,13 @@ export class Store {
    * isA (optional),
    * properties (optional) - any additional properties to be set on the resource.
    */
-  public async newResource<C extends OptionalClass = UnknownClass>(
-    options: CreateResourceOptions = {},
-  ): Promise<Resource<C>> {
-    const { subject, parent, isA, propVals } = options;
-
+  public async newResource<C extends OptionalClass = UnknownClass>({
+    subject,
+    parent,
+    isA,
+    propVals,
+    noParent,
+  }: CreateResourceOptions = {}): Promise<Resource<C>> {
     const normalizedIsA = Array.isArray(isA) ? isA : [isA];
     const newSubject = subject ?? this.createSubject();
 
@@ -230,7 +234,9 @@ export class Store {
       await resource.addClasses(...(normalizedIsA as string[]));
     }
 
-    await resource.set(core.properties.parent, parent ?? this.serverUrl);
+    if (!noParent) {
+      await resource.set(core.properties.parent, parent ?? this.serverUrl);
+    }
 
     if (propVals) {
       for (const [key, value] of Object.entries(propVals)) {

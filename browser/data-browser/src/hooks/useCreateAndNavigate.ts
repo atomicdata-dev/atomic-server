@@ -9,6 +9,7 @@ export type CreateAndNavigate = (
   propVals: Record<string, JSONValue>,
   options: {
     parent?: string;
+    noParent?: boolean;
     extraParams?: Record<string, string>;
     /** Query parameters for the resource / endpoint */
     onCreated?: (resource: Resource) => Promise<void>;
@@ -31,7 +32,7 @@ export function useCreateAndNavigate(): CreateAndNavigate {
     async (
       isA,
       propVals,
-      { parent, extraParams, onCreated, subject },
+      { parent, extraParams, onCreated, subject, noParent },
     ): Promise<Resource> => {
       const classResource = await store.getResource<Core.Class>(isA);
 
@@ -40,6 +41,7 @@ export function useCreateAndNavigate(): CreateAndNavigate {
         isA,
         parent,
         propVals,
+        noParent,
       });
 
       try {
