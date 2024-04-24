@@ -78,7 +78,7 @@ export function SideBarDrive({
             navigate(constructOpenURL(drive));
           }}
         >
-          <DriveTitle data-test='current-drive-title'>
+          <DriveTitle data-testid='current-drive-title'>
             {title || drive}{' '}
           </DriveTitle>
         </TitleButton>

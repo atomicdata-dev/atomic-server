@@ -45,7 +45,7 @@ test.describe('data-browser', async () => {
     // TODO: this keeps hanging. How do I make sure something is _not_ visible?
     // await expect(page.locator('text=new resource')).not.toBeVisible();
     await page.click('[data-test="sidebar-toggle"]');
-    await expect(page.locator(currentDriveTitle)).toBeVisible();
+    await expect(currentDriveTitle(page)).toBeVisible();
   });
 
   test('switch Server URL', async ({ page }) => {
@@ -164,7 +164,7 @@ test.describe('data-browser', async () => {
     // Remove public read rights for Drive
     await signIn(page);
     const { driveURL, driveTitle } = await newDrive(page);
-    await page.click(currentDriveTitle);
+    await currentDriveTitle(page).click();
     await contextMenuClick('share', page);
     expect(publicReadRightLocator(page)).not.toBeChecked();
 
@@ -330,8 +330,6 @@ test.describe('data-browser', async () => {
 
   test('drive switcher', async ({ page }) => {
     await signIn(page);
-    await page.locator(`${currentDriveTitle} > text=localhost`);
-
     await page.click(sideBarDriveSwitcher);
     // temp disable for trailing slash
     // const dropdownId = await page
@@ -350,21 +348,21 @@ test.describe('data-browser', async () => {
   test('configure drive page', async ({ page }) => {
     await signIn(page);
     await openConfigureDrive(page);
-    await expect(page.locator(currentDriveTitle)).toHaveText('localhost');
+    await expect(currentDriveTitle(page)).toHaveText('localhost');
 
     // temp disable this, because of trailing slash in base URL
     // await page.click(':text("https://atomicdata.dev") + button:text("Select")');
-    // await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
+    // await expect(currentDriveTitle(page)).toHaveText('Atomic Data');
 
     await openConfigureDrive(page);
     await page.fill('[data-test="server-url-input"]', 'https://example.com');
     await page.click('[data-test="server-url-save"]');
 
-    await expect(page.locator(currentDriveTitle)).toHaveText('example.com');
+    await expect(currentDriveTitle(page)).toHaveText('example.com');
 
     await openConfigureDrive(page);
     await page.click(':text("https://atomicdata.dev") + button:text("Select")');
-    await expect(page.locator(currentDriveTitle)).toHaveText('Atomic Data');
+    await expect(currentDriveTitle(page)).toHaveText('Atomic Data');
     await openConfigureDrive(page);
   });
 
