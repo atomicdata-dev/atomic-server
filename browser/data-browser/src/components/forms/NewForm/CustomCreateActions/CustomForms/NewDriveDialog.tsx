@@ -45,10 +45,8 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
         [core.properties.read]: [agent.subject],
       },
       {
+        noParent: true,
         onCreated: async resource => {
-          // resources created with createAndNavigate have a parent by default which we don't want for drives.
-          resource.remove(core.properties.parent);
-
           // Add drive to the agents drive list.
           const agentResource = await store.getResource(agent.subject!);
           agentResource.push(server.properties.drives, [resource.subject]);
