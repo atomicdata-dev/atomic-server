@@ -138,8 +138,6 @@ const SideBarStyled = styled.nav.attrs<SideBarStyledProps>(p => ({
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-
-  view-transition-name: sidebar;
 `;
 
 const MenuWrapper = styled.div`
