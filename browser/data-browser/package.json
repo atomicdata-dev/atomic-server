@@ -55,7 +55,8 @@
     "types-wm": "^1.1.0",
     "vite-plugin-pwa": "^0.17.0",
     "vite-plugin-webfont-dl": "^3.9.1",
-    "workbox-cli": "^6.4.1"
+    "workbox-cli": "^6.4.1",
+    "typescript": "^5.4.5"
   },
   "homepage": "https://atomicdata.dev/",
   "husky": {
@@ -78,6 +79,6 @@
     "preview": "vite preview",
     "start": "vite",
     "test": "jest",
-    "typecheck": "npx tsc --noEmit"
+    "typecheck": "pnpm exec tsc --noEmit"
   }
 }

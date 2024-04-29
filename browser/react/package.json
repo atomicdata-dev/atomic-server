@@ -6,7 +6,7 @@
     "@tomic/lib": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^4.8"
+    "typescript": "^5.4.5"
   },
   "peerDependencies": {
     "react": ">17.0.2"
