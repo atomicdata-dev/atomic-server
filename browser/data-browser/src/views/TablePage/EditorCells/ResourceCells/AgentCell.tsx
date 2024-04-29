@@ -1,11 +1,12 @@
-import { useTitle } from '@tomic/react';
+import { useResource, useTitle } from '@tomic/react';
 import { complement, setLightness } from 'polished';
 
 import { styled } from 'styled-components';
 import { ResourceCellProps } from '../Type';
 import { SimpleResourceLink } from './SimpleResourceLink';
 
-export function AgentCell({ resource }: ResourceCellProps) {
+export function AgentCell({ subject }: ResourceCellProps) {
+  const resource = useResource(subject);
   const [title] = useTitle(resource);
 
   return (

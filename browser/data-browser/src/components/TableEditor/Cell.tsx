@@ -136,7 +136,14 @@ export function Cell({
       setCursorMode(CursorMode.Visual);
       setActiveCell(rowIndex, columnIndex);
     },
-    [setActiveCell, columnIndex, shouldEnterEditMode, cursorMode, isActive],
+    [
+      setActiveCell,
+      columnIndex,
+      shouldEnterEditMode,
+      cursorMode,
+      isActive,
+      disabledKeyboardInteractions,
+    ],
   );
 
   const handleClick = useCallback(() => {

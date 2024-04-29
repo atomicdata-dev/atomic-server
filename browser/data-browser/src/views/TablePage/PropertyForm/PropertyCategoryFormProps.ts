@@ -1,5 +1,5 @@
-import { Resource } from '@tomic/react';
+import { Core, Resource } from '@tomic/react';
 
 export interface PropertyCategoryFormProps {
-  resource: Resource;
+  resource: Resource<Core.Property>;
 }

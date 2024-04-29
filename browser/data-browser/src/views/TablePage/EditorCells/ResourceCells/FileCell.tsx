@@ -1,11 +1,12 @@
-import { properties, useString, useTitle } from '@tomic/react';
+import { properties, useResource, useString, useTitle } from '@tomic/react';
 
 import { styled } from 'styled-components';
 import { getFileIcon, imageMimeTypes } from '../../../../helpers/filetypes';
 import { ResourceCellProps } from '../Type';
 import { SimpleResourceLink } from './SimpleResourceLink';
 
-export function FileCell({ resource }: ResourceCellProps) {
+export function FileCell({ subject }: ResourceCellProps) {
+  const resource = useResource(subject);
   const [title] = useTitle(resource);
   const [mimeType] = useString(resource, properties.file.mimetype);
   const [downloadUrl] = useString(resource, properties.file.downloadUrl);

@@ -78,6 +78,6 @@
     "preview": "vite preview",
     "start": "vite",
     "test": "jest",
-    "typecheck": "pnpm exec tsc --noEmit"
+    "typecheck": "npx tsc --noEmit"
   }
 }

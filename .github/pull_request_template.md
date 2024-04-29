@@ -1,6 +1,8 @@
-PR Checklist:
+## Related Issues
 
-- [ ] Link to related issues: #number
+closes #number
+
+## Checklist
 - [ ] Add changelog entry linking to issue, describe API changes
-- [ ] Add tests (optional)
-- [ ] (If new feature) add to description / readme
+- [ ] Add or update tests if needed
+- [ ] Update docs if needed
