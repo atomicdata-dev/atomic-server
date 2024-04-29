@@ -19,5 +19,5 @@ export type CellContainer<T extends JSONValue> = {
 };
 
 export interface ResourceCellProps {
-  resource: Resource;
+  subject: string;
 }

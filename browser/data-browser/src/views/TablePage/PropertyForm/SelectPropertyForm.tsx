@@ -31,20 +31,13 @@ export function SelectPropertyForm({
     valueOpts,
   );
 
-  const [subResources, setSubResources] = useArray(
-    resource,
-    dataBrowser.properties.subResources,
-    valueOpts,
-  );
-
   const handleNewTag = useCallback(
     async (tag: Resource) => {
       await setAllowOnly([...allowOnly, tag.subject]);
-      await setSubResources([...subResources, tag.subject]);
 
       await tag.save();
     },
-    [allowOnly, setAllowOnly, subResources, setSubResources],
+    [allowOnly, setAllowOnly],
   );
 
   const handleDeleteTag = useCallback(
@@ -53,15 +46,15 @@ export function SelectPropertyForm({
       tag.destroy();
 
       await setAllowOnly(removeFromArray(allowOnly, subject));
-      await setSubResources(removeFromArray(subResources, subject));
     },
-    [store, setAllowOnly, setSubResources, allowOnly, subResources],
+    [store, setAllowOnly, allowOnly],
   );
 
   useEffect(() => {
     resource.addClasses(dataBrowser.classes.selectProperty);
 
     resource.set(core.properties.datatype, Datatype.RESOURCEARRAY);
+    resource.set(core.properties.classtype, dataBrowser.classes.tag);
   }, []);
 
   return (

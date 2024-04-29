@@ -1,6 +1,6 @@
-import { Resource, core, useString } from '@tomic/react';
+import { Resource } from '@tomic/react';
 import { useCallback, useEffect, useState } from 'react';
-import { PropertyForm, getCategoryFromDatatype } from './PropertyForm';
+import { PropertyForm } from './PropertyForm';
 import { FormValidationContextProvider } from '../../../components/forms/formValidation/FormValidationContextProvider';
 import {
   Dialog,
@@ -10,6 +10,7 @@ import {
   useDialog,
 } from '../../../components/Dialog';
 import { Button } from '../../../components/Button';
+import { getCategoryFromResource } from './categories';
 
 interface EditPropertyDialogProps {
   resource: Resource;
@@ -24,9 +25,7 @@ export function EditPropertyDialog({
 }: EditPropertyDialogProps): JSX.Element {
   const [valid, setValid] = useState(true);
 
-  const [datatype] = useString(resource, core.properties.datatype);
-
-  const category = getCategoryFromDatatype(datatype);
+  const category = getCategoryFromResource(resource);
 
   const onSuccess = useCallback(() => {
     resource.save();
@@ -54,6 +53,7 @@ export function EditPropertyDialog({
         </DialogTitle>
         <DialogContent>
           <PropertyForm
+            existingProperty
             resource={resource}
             category={category}
             onSubmit={handleSaveClick}

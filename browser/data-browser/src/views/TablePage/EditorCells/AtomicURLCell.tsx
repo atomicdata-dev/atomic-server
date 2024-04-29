@@ -5,36 +5,25 @@ import {
   core,
   server,
   unknownSubject,
-  urls,
   useArray,
   useResource,
   useString,
   useTitle,
 } from '@tomic/react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FaEdit, FaTimes } from 'react-icons/fa';
-import * as RadixPopover from '@radix-ui/react-popover';
+import { FaEdit } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { FileDropzoneInput } from '../../../components/forms/FileDropzone/FileDropzoneInput';
 import {
   InputStyled,
   InputWrapper,
 } from '../../../components/forms/InputStyles';
-import { Popover } from '../../../components/Popover';
 import {
   CursorMode,
   useTableEditorContext,
 } from '../../../components/TableEditor/TableEditorContext';
 import { getIconForClass } from '../../FolderPage/iconMap';
-import { AgentCell } from './ResourceCells/AgentCell';
-import { FileCell } from './ResourceCells/FileCell';
-import { SimpleResourceLink } from './ResourceCells/SimpleResourceLink';
-import {
-  CellContainer,
-  DisplayCellProps,
-  EditCellProps,
-  ResourceCellProps,
-} from './Type';
+import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
 import { useResourceSearch } from './useResourceSearch';
 import { IconButton } from '../../../components/IconButton/IconButton';
 import { AtomicLink } from '../../../components/AtomicLink';
@@ -42,12 +31,19 @@ import {
   KeyboardInteraction,
   useCellOptions,
 } from '../../../components/TableEditor';
+import { ResourceCell } from './ResourceCells/ResourceCell';
+import {
+  PopoverTrigger,
+  SearchPopover,
+  SearchResultWrapper,
+} from './CellComponents';
+import { FaXmark } from 'react-icons/fa6';
 
 const useClassType = (subject: string) => {
   const property = useResource<Core.Property>(subject);
 
   const classType = useResource<Core.Class>(property.props.classtype);
-  const hasClassType = classType?.getSubject() !== unknownSubject;
+  const hasClassType = classType?.subject !== unknownSubject;
 
   return {
     classType,
@@ -111,26 +107,9 @@ function AtomicURLCellEdit({
 
   const { results, selectedIndex, handleKeyDown } = useResourceSearch(
     searchValue,
-    hasClassType ? classType.getSubject() : undefined,
+    hasClassType ? classType.subject : undefined,
+    setOpen,
     handleResultClick,
-  );
-
-  const modifiedHandleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        setOpen(false);
-
-        return;
-      }
-
-      if (e.key === 'Tab') {
-        return;
-      }
-
-      handleKeyDown(e);
-    },
-    [handleKeyDown],
   );
 
   const handleFilesUploaded = useCallback(
@@ -149,7 +128,7 @@ function AtomicURLCellEdit({
     return (
       <PopoverTrigger>
         <FaEdit />{' '}
-        {cell.getSubject() === unknownSubject
+        {cell.subject === unknownSubject
           ? `select ${hasClassType ? classType.title : 'resource'}`
           : title}
       </PopoverTrigger>
@@ -158,16 +137,16 @@ function AtomicURLCellEdit({
 
   useEffect(() => {
     if (selectedElement.current) {
-      selectedElement.current.scrollIntoView(false);
+      selectedElement.current.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
 
   const placehoder = hasClassType ? `Search ${classType.title}` : 'Search...';
 
   const showFileDropzone =
-    results.length === 0 && classType.getSubject() === urls.classes.file;
+    results.length === 0 && classType.subject === server.classes.file;
   const showNoResults =
-    results.length === 0 && classType.getSubject() !== urls.classes.file;
+    results.length === 0 && classType.subject !== server.classes.file;
 
   return (
     <SearchPopover
@@ -182,10 +161,10 @@ function AtomicURLCellEdit({
           value={searchValue}
           placeholder={placehoder}
           onChange={handleChange}
-          onKeyDown={modifiedHandleKeyDown}
+          onKeyDown={handleKeyDown}
         />
       </InputWrapper>
-      <ResultWrapper>
+      <SearchResultWrapper>
         {results.length > 0 && (
           <ol>
             {results.map((result, index) => (
@@ -208,7 +187,7 @@ function AtomicURLCellEdit({
             onFilesUploaded={handleFilesUploaded}
           />
         )}
-      </ResultWrapper>
+      </SearchResultWrapper>
     </SearchPopover>
   );
 }
@@ -216,27 +195,11 @@ function AtomicURLCellEdit({
 function AtomicURLCellDisplay({
   value,
 }: DisplayCellProps<JSONValue>): JSX.Element {
-  const resource = useResource(value as string);
-
   if (!value) {
     return <></>;
   }
 
-  const Comp = resource.matchClass(
-    {
-      [core.classes.agent]: AgentCell,
-      [server.classes.file]: FileCell,
-    },
-    BasicCell,
-  );
-
-  return <Comp resource={resource} />;
-}
-
-function BasicCell({ resource }: ResourceCellProps) {
-  const [title] = useTitle(resource);
-
-  return <SimpleResourceLink resource={resource}>{title}</SimpleResourceLink>;
+  return <ResourceCell subject={value as string} />;
 }
 
 interface ResultProps {
@@ -247,7 +210,7 @@ interface ResultProps {
 function Result({ subject, onClick }: ResultProps) {
   const resource = useResource(subject);
   const [title] = useTitle(resource);
-  const [[classType]] = useArray(resource, urls.properties.isA);
+  const [[classType]] = useArray(resource, core.properties.isA);
 
   const Icon = getIconForClass(classType);
 
@@ -276,13 +239,10 @@ function FileUploadContainer({
   row,
   onChange,
 }: FileUploadContainerProps): JSX.Element {
-  const [mimeType] = useString(cellResource, urls.properties.file.mimetype);
-  const [downloadUrl] = useString(
-    cellResource,
-    urls.properties.file.downloadUrl,
-  );
-  const [filename] = useString(cellResource, urls.properties.file.filename);
-  const [description] = useString(cellResource, urls.properties.description);
+  const [mimeType] = useString(cellResource, server.properties.mimetype);
+  const [downloadUrl] = useString(cellResource, server.properties.downloadUrl);
+  const [filename] = useString(cellResource, server.properties.filename);
+  const [description] = useString(cellResource, core.properties.description);
 
   const isImage = mimeType?.startsWith('image/');
 
@@ -301,10 +261,10 @@ function FileUploadContainer({
         <PreviewImg src={downloadUrl ?? ''} alt={description ?? ''} />
       )}
       {!isImage ? (
-        <AtomicLink subject={cellResource.getSubject()}>{filename}</AtomicLink>
+        <AtomicLink subject={cellResource.subject}>{filename}</AtomicLink>
       ) : null}
       <ClearFileButton title='Clear' onClick={() => onChange(undefined)}>
-        <FaTimes />
+        <FaXmark />
       </ClearFileButton>
     </ViewerWrapper>
   );
@@ -340,51 +300,8 @@ const ResultButton = styled.button`
   }
 `;
 
-const SearchPopover = styled(Popover)`
-  padding: 1rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-`;
-
-const ResultWrapper = styled.div`
-  height: min(90vh, 20rem);
-  width: min(90vw, 35rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-
-  ol {
-    padding: 0;
-    margin: 0;
-  }
-
-  li {
-    list-style: none;
-    &[data-selected='true'] button {
-      background: ${p => p.theme.colors.main};
-      color: white;
-
-      svg {
-        color: white;
-      }
-    }
-  }
-`;
-
 const StyledFileDropzoneInput = styled(FileDropzoneInput)`
   height: 100%;
-`;
-
-const PopoverTrigger = styled(RadixPopover.Trigger)`
-  border: none;
-  background: none;
-  color: ${p => p.theme.colors.main};
-  display: inline-flex;
-  gap: 1ch;
-  align-items: center;
-  user-select: none;
-  cursor: pointer;
 `;
 
 const ViewerWrapper = styled.div`

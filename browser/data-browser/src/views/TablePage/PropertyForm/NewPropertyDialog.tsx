@@ -19,7 +19,8 @@ import {
 } from '../../../components/Dialog';
 import { FormValidationContextProvider } from '../../../components/forms/formValidation/FormValidationContextProvider';
 import { randomString } from '../../../helpers/randomString';
-import { PropertyForm, PropertyFormCategory } from './PropertyForm';
+import { PropertyForm } from './PropertyForm';
+import { PropertyFormCategory } from './categories';
 
 interface NewPropertyDialogProps {
   showDialog: boolean;

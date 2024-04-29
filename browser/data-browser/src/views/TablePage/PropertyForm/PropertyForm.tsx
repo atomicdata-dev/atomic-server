@@ -1,4 +1,4 @@
-import { Resource, urls, useString } from '@tomic/react';
+import { core, Resource, useString } from '@tomic/react';
 import { useCallback, useEffect, useMemo } from 'react';
 import { styled } from 'styled-components';
 import { ErrorChip } from '../../../components/forms/ErrorChip';
@@ -7,76 +7,20 @@ import {
   InputStyled,
   InputWrapper,
 } from '../../../components/forms/InputStyles';
-import { buildComponentFactory } from '../../../helpers/buildComponentFactory';
 import { stringToSlug } from '../../../helpers/stringToSlug';
-import { CheckboxPropertyForm } from './CheckboxPropertyForm';
-import { DatePropertyForm } from './DatePropertyForm';
-import { FilePropertyForm } from './FilePropertyForm';
-import { NumberPropertyForm } from './NumberPropertyForm';
-import { RelationPropertyForm } from './RelationPropertyForm';
-import { SelectPropertyForm } from './SelectPropertyForm';
-import { TextPropertyForm } from './TextPropertyForm';
-
-export type PropertyFormCategory =
-  | 'text'
-  | 'number'
-  | 'date'
-  | 'checkbox'
-  | 'file'
-  | 'select'
-  | 'relation';
+import { categoryFormFactory, PropertyFormCategory } from './categories';
 
 interface PropertyFormProps {
   onSubmit: () => void;
   resource: Resource;
   category?: PropertyFormCategory;
+  existingProperty?: boolean;
 }
-
-export const getCategoryFromDatatype = (
-  datatype: string | undefined,
-): PropertyFormCategory => {
-  switch (datatype) {
-    case urls.datatypes.string:
-    case urls.datatypes.markdown:
-    case urls.datatypes.slug:
-      return 'text';
-    case urls.datatypes.integer:
-    case urls.datatypes.float:
-      return 'number';
-    case urls.datatypes.boolean:
-      return 'checkbox';
-    case urls.datatypes.date:
-    case urls.datatypes.timestamp:
-      return 'date';
-    case urls.datatypes.resourceArray:
-      return 'select';
-    case urls.datatypes.atomicUrl:
-      return 'relation';
-  }
-
-  throw new Error(`Unknown datatype: ${datatype}`);
-};
-
-const NoCategorySelected = () => {
-  return <span>No Type selected</span>;
-};
-
-const categoryFormFactory = buildComponentFactory(
-  new Map([
-    ['text', TextPropertyForm],
-    ['number', NumberPropertyForm],
-    ['checkbox', CheckboxPropertyForm],
-    ['select', SelectPropertyForm],
-    ['date', DatePropertyForm],
-    ['file', FilePropertyForm],
-    ['relation', RelationPropertyForm],
-  ]),
-  NoCategorySelected,
-);
 
 export function PropertyForm({
   resource,
   onSubmit,
+  existingProperty,
   category,
 }: PropertyFormProps): JSX.Element {
   const [nameError, setNameError, onNameBlur] = useValidation('Required');
@@ -95,12 +39,12 @@ export function PropertyForm({
 
   const [name, setName] = useString(
     resource,
-    urls.properties.name,
+    core.properties.name,
     valueOptions,
   );
-  const [_, setShortName] = useString(
+  const [shortname, setShortName] = useString(
     resource,
-    urls.properties.shortname,
+    core.properties.shortname,
     valueOptions,
   );
 
@@ -125,6 +69,11 @@ export function PropertyForm({
 
   // If name was already set remove the error.
   useEffect(() => {
+    if (existingProperty && !name && shortname) {
+      setName(shortname);
+      setNameError(undefined);
+    }
+
     if (name) {
       setNameError(undefined);
     }

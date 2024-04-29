@@ -5,6 +5,7 @@ import { useSettings } from '../../../helpers/AppSettings';
 export function useResourceSearch(
   searchValue: string,
   classType: string | undefined,
+  setOpen: (state: boolean) => void,
   onResultPick: (result: string) => void,
 ) {
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -21,6 +22,17 @@ export function useResourceSearch(
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setOpen(false);
+
+        return;
+      }
+
+      if (e.key === 'Tab') {
+        return;
+      }
+
       e.stopPropagation();
 
       if (e.key === 'ArrowUp') {
