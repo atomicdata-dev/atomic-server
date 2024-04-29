@@ -7,7 +7,7 @@
     "prettier": "3.0.3"
   },
   "devDependencies": {
-    "typescript": "^4.8"
+    "typescript": "^5.4.5"
   },
   "description": "",
   "license": "MIT",
