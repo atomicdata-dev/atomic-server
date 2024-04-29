@@ -110,8 +110,8 @@ importers:
         version: 3.0.3
     devDependencies:
       typescript:
-        specifier: ^4.8
-        version: 4.9.5
+        specifier: ^5.4.5
+        version: 5.4.5
 
   data-browser:
     dependencies:
@@ -304,8 +304,8 @@ importers:
         specifier: ^4.3.4
         version: 4.3.10
       typescript:
-        specifier: ^4.8
-        version: 4.9.5
+        specifier: ^5.4.5
+        version: 5.4.5
       whatwg-fetch:
         specifier: ^3.6.2
         version: 3.6.17
@@ -320,8 +320,8 @@ importers:
         version: 18.2.0
     devDependencies:
       typescript:
-        specifier: ^4.8
-        version: 4.9.5
+        specifier: ^5.4.5
+        version: 5.4.5
 
   svelte:
     dependencies:
@@ -344,6 +344,9 @@ importers:
       tslib:
         specifier: ^2.4.1
         version: 2.6.1
+      typescript:
+        specifier: ^5.4.5
+        version: 5.4.5
       vitest:
         specifier: ^0.34.6
         version: 0.34.6
@@ -15550,12 +15553,6 @@ packages:
 
   /types-wm@1.1.0:
     resolution: {integrity: sha512-kGecZLoCh4ge8rcRsoMtLs4nuSyi8wl687EfAH9Iss602rFDU/Heih86Awv/6958GwxxDm8gLztkLkrUEsxXug==}
-    dev: true
-
-  /typescript@4.9.5:
-    resolution: {integrity: sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g==}
-    engines: {node: '>=4.2.0'}
-    hasBin: true
     dev: true
 
   /typescript@5.4.5:
