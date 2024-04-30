@@ -1,0 +1,57 @@
+[
+  {
+    "@id": "https://atomicdata.dev/class/ontology",
+    "https://atomicdata.dev/properties/description": "An ontology is a group of classes, properties and class instances that together describe a certain domain.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/classes",
+      "https://atomicdata.dev/properties/properties",
+      "https://atomicdata.dev/properties/instances"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/description",
+      "https://atomicdata.dev/properties/shortname"
+    ],
+    "https://atomicdata.dev/properties/shortname": "ontology"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/properties",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "A list of properties",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "properties"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/classes",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "A list of classes",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "classes"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/instances",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "A list of class instances",
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "instances"
+  },
+  {
+    "@id": "https://atomicdata.dev/ontology/server/property/default-ontology",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/class/ontology",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The ontology where all classes go by default",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "default-ontology"
+  }
+]

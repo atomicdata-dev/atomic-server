@@ -19,7 +19,7 @@ describe('Store', () => {
 
   it('fetches a resource', async () => {
     const store = new Store({ serverUrl: 'https://atomicdata.dev' });
-    const resource = await store.getResourceAsync(
+    const resource = await store.getResource(
       'https://atomicdata.dev/properties/createdAt',
     );
 
