@@ -43,12 +43,10 @@ type PropsOfClass<C extends keyof Classes> = {
  */
 export type InferTypeOfValueInTriple<
   Class extends keyof Classes | never = never,
-  Prop extends string = string,
+  Prop = string,
   Returns = Prop extends keyof PropTypeMapping
     ? Prop extends Requires<Class>
       ? PropTypeMapping[Prop]
-      : Prop extends Recommends<Class>
-      ? PropTypeMapping[Prop] | undefined
       : PropTypeMapping[Prop] | undefined
     : JSONValue,
 > = Returns;
