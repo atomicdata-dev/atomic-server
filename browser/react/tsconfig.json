@@ -10,7 +10,8 @@
             "DOM"
         ],
         "rootDir": ".",
-        "jsx": "react"
+        "jsx": "react",
+        "module": "NodeNext"
     },
     "include": [
         "./src"
