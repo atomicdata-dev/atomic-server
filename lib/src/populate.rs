@@ -213,6 +213,12 @@ pub fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
             &ParseOpts::default(),
         )
         .map_err(|e| format!("Failed to import table.json: {e}"))?;
+    store
+        .import(
+            include_str!("../defaults/ontologies.json",),
+            &ParseOpts::default(),
+        )
+        .map_err(|e| format!("Failed to import ontologies.json: {e}"))?;
     Ok(())
 }
 
