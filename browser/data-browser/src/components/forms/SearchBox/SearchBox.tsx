@@ -129,16 +129,17 @@ export function SearchBox({
   const openLink =
     !value || selectedResource.error
       ? '#'
-      : constructOpenURL(selectedResource.getSubject());
+      : constructOpenURL(selectedResource.subject);
 
-  const navigateToSelectedResource: MouseEventHandler<HTMLAnchorElement> =
-    e => {
-      e.preventDefault();
-      navigate(openLink);
-    };
+  const navigateToSelectedResource: MouseEventHandler<
+    HTMLAnchorElement
+  > = e => {
+    e.preventDefault();
+    navigate(openLink);
+  };
 
   const title = selectedResource.error
-    ? selectedResource.getSubject()
+    ? selectedResource.subject
     : selectedResource.title;
 
   return (

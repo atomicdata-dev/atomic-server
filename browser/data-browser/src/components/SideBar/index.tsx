@@ -125,7 +125,9 @@ const SideBarStyled = styled.nav.attrs<SideBarStyledProps>(p => ({
   z-index: ${p => p.theme.zIndex.sidebar};
   box-sizing: border-box;
   background: ${p => p.theme.colors.bg};
-  transition: opacity 0.3s, left 0.3s;
+  transition:
+    opacity 0.3s,
+    left 0.3s;
   left: ${p => (p.exposed ? '0' : `calc(var(--width) * -1 + 0.5rem)`)};
   /* When the user is hovering, show half opacity */
   opacity: ${p => (p.exposed ? 1 : 0)};

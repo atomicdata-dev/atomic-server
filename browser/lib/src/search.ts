@@ -1,4 +1,4 @@
-import { Store } from './index.js';
+import { Store } from './store.js';
 
 export interface SearchOpts {
   /** Fetch full resources instead of subjects */
@@ -95,10 +95,10 @@ export function removeCachedSearchResults(store: Store) {
 
   // Get all resources that start with the search URL but aren't the search endpoint itself.
   const searchResources = store.clientSideQuery(
-    r => r.getSubject() !== url && r.getSubject().startsWith(url),
+    r => r.subject !== url && r.subject.startsWith(url),
   );
 
   for (const resource of searchResources) {
-    store.removeResource(resource.getSubject());
+    store.removeResource(resource.subject);
   }
 }

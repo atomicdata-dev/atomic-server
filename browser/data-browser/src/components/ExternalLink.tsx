@@ -54,7 +54,11 @@ const ExternalLinkButton = styled.a`
   justify-content: center;
   color: ${props => props.theme.colors.main};
   white-space: nowrap;
-  transition: 0.1s transform, 0.1s background-color, 0.1s box-shadow, 0.1s color;
+  transition:
+    0.1s transform,
+    0.1s background-color,
+    0.1s box-shadow,
+    0.1s color;
 
   &:hover,
   &:focus-within {

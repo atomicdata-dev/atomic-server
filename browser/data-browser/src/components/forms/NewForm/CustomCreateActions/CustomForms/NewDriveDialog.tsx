@@ -63,8 +63,8 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
             parent: resource.subject,
             propVals: {
               [core.properties.shortname]: ontologyName,
-              [core.properties
-                .description]: `Default ontology for the ${name} drive`,
+              [core.properties.description]:
+                `Default ontology for the ${name} drive`,
               [core.properties.classes]: [],
               [core.properties.properties]: [],
               [core.properties.instances]: [],

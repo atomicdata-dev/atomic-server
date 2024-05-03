@@ -1,4 +1,5 @@
-import { Resource, properties } from './index.js';
+import { core } from './ontologies/core.js';
+import type { Resource } from './resource.js';
 
 export enum ErrorType {
   Unauthorized = 'Unauthorized',
@@ -42,7 +43,7 @@ export class AtomicError extends Error {
     // The server should send Atomic Data Errors, which are JSON-AD resources with a Description.
     try {
       const parsed = JSON.parse(message);
-      const description = parsed[properties.description];
+      const description = parsed[core.properties.description];
 
       if (description) {
         this.message = description;
@@ -57,7 +58,7 @@ export class AtomicError extends Error {
   }
 
   public static fromResource(r: Resource): AtomicError {
-    const err = new AtomicError(r.get(properties.description)!.toString());
+    const err = new AtomicError(r.get(core.properties.description)!.toString());
 
     return err;
   }

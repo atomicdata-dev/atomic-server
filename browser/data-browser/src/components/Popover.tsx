@@ -112,9 +112,8 @@ const Arrow = styled(RadixPopover.Arrow)`
   fill: ${p => p.theme.colors.bg2};
 `;
 
-const PopoverContainerContext = createContext<RefObject<HTMLDivElement>>(
-  createRef(),
-);
+const PopoverContainerContext =
+  createContext<RefObject<HTMLDivElement>>(createRef());
 
 export const PopoverContainer: FC<PropsWithChildren> = ({ children }) => {
   const popoverContainerRef = useRef<HTMLDivElement>(null);

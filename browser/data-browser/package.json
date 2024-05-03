@@ -45,6 +45,7 @@
     "yamde": "^1.7.1"
   },
   "devDependencies": {
+    "vite": "^5.2.10",
     "@swc/plugin-styled-components": "^1.5.110",
     "@types/react-pdf": "^6.2.0",
     "@types/react-window": "^1.8.7",

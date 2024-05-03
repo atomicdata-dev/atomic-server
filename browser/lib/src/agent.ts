@@ -1,9 +1,7 @@
-import {
-  AtomicError,
-  Client,
-  generatePublicKeyFromPrivate,
-  properties,
-} from './index.js';
+import { Client } from './client.js';
+import { generatePublicKeyFromPrivate } from './commit.js';
+import { AtomicError } from './error.js';
+import { core } from './ontologies/core.js';
 
 /**
  * An Agent is a user or machine that can write data to an Atomic Server. An
@@ -77,7 +75,7 @@ export class Agent implements AgentInterface {
       );
     }
 
-    const fetchedPubKey = resource.get(properties.agent.publicKey)?.toString();
+    const fetchedPubKey = resource.get(core.properties.publicKey)?.toString();
 
     if (fetchedPubKey !== (await this.getPublicKey())) {
       throw new Error(

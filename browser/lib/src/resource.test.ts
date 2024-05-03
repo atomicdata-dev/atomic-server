@@ -1,8 +1,9 @@
+import { describe, it } from 'vitest';
 import { Resource } from './resource.js';
 import { urls } from './urls.js';
 
 describe('resource.ts', () => {
-  it('push propvals', () => {
+  it('push propvals', ({ expect }) => {
     const resource = new Resource('test');
     const testsubject = 'https://example.com/testsubject';
     resource.push(urls.properties.subResources, [testsubject], true);

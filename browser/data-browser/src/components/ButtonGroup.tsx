@@ -108,7 +108,9 @@ const Label = styled.label`
   color: ${p => p.theme.colors.textLight};
   cursor: pointer;
 
-  transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
+  transition:
+    background-color 0.1s ease-in-out,
+    color 0.1s ease-in-out;
 
   input:checked + & {
     background-color: ${p => p.theme.colors.bg1};

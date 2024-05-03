@@ -13,8 +13,11 @@
   "devDependencies": {
     "@tomic/cli": "workspace:*",
     "@types/fast-json-stable-stringify": "^2.1.0",
-    "chai": "^4.3.4",
+    "tslib": "^2.4.1",
     "typescript": "^5.4.5",
+    "vite": "^5.2.10",
+    "vite-plugin-dts": "^3.9.0",
+    "vitest": "^0.34.6",
     "whatwg-fetch": "^3.6.2"
   },
   "files": [
@@ -22,23 +25,24 @@
   ],
   "gitHead": "2172c73d8df4e5f273e6386676abc91b6c5b2707",
   "license": "MIT",
-  "main": "dist/src/index.js",
+  "main": "dist/index.js",
   "main-dev": "src/index.ts",
   "name": "@tomic/lib",
   "publishConfig": {
     "access": "public"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "pnpm exec vite build",
     "generate-ontologies": "ad-generate ontologies",
     "lint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
     "lint-fix": "eslint ./src --ext .js,.jsx,.ts,.tsx --fix",
     "prepublishOnly": "pnpm run build && pnpm run lint-fix",
     "start": "pnpm watch",
-    "test": "NODE_OPTIONS='--experimental-vm-modules' ../node_modules/jest/bin/jest.js",
+    "coverage": "vitest run --coverage",
+    "test": "vitest run",
     "tsc": "tsc --build",
     "typecheck": "pnpm exec tsc --noEmit",
-    "watch": "tsc --build --watch"
+    "watch": "pnpm exec vite build --watch"
   },
   "source": "src/index.ts",
   "type": "module",

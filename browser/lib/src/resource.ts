@@ -1,28 +1,27 @@
+import type { Agent } from './agent.js';
+import { Client } from './client.js';
+import type { Collection } from './collection.js';
+import { CollectionBuilder } from './collectionBuilder.js';
 import {
-  Agent,
   CommitBuilder,
-  isUnauthorized,
-  JSONValue,
-  properties,
-  Store,
-  validateDatatype,
-  valToArray,
-  instances,
-  JSONArray,
-  Client,
-  urls,
-  applyCommitToResource,
   Commit,
+  applyCommitToResource,
   parseCommitResource,
-  InferTypeOfValueInTriple,
-  QuickAccesPropType,
+} from './commit.js';
+import { validateDatatype } from './datatypes.js';
+import { isUnauthorized } from './error.js';
+import { core } from './ontologies/core.js';
+import { server } from './ontologies/server.js';
+
+import {
   getKnownNameBySubject,
-  OptionalClass,
-  core,
-  server,
-  Collection,
-  CollectionBuilder,
-} from './index.js';
+  type InferTypeOfValueInTriple,
+  type OptionalClass,
+  type QuickAccesPropType,
+} from './ontology.js';
+import type { Store } from './store.js';
+import { properties, instances, urls } from './urls.js';
+import { valToArray, type JSONValue, type JSONArray } from './value.js';
 
 /** Contains the PropertyURL / Value combinations */
 export type PropVals = Map<string, JSONValue>;

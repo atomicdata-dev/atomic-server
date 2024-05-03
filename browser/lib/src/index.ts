@@ -40,7 +40,6 @@ export * from './ontologies/dataBrowser.js';
 export * from './ontologies/server.js';
 export * from './agent.js';
 export * from './authentication.js';
-export * from './class.js';
 export * from './client.js';
 export * from './commit.js';
 export * from './error.js';

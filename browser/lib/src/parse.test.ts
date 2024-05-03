@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import { JSONADParser } from './parse.js';
 
 const EXAMPLE_SUBJECT = 'http://example.com/1';
@@ -10,7 +11,7 @@ const NUMBER_PROPERTY = 'http://some-number-property';
 const BOOLEAN_PROPERTY = 'http://some-boolean-property';
 const NESTED_RESOURCE_PROPERTY = 'http://some-nested-resource-property';
 describe('parse.ts', () => {
-  it('parses a JSON-AD object and returns it as a resource', () => {
+  it('parses a JSON-AD object and returns it as a resource', ({ expect }) => {
     const jsonObject = {
       '@id': EXAMPLE_SUBJECT,
       [STRING_PROPERTY]: 'Hoi',
@@ -26,7 +27,7 @@ describe('parse.ts', () => {
     expect(resource.get(BOOLEAN_PROPERTY)).toBe(true);
   });
 
-  it('parses a JSON-AD object with a nested resource', () => {
+  it('parses a JSON-AD object with a nested resource', ({ expect }) => {
     const jsonObjectWithID = {
       '@id': EXAMPLE_SUBJECT,
       [NESTED_RESOURCE_PROPERTY]: {
@@ -85,7 +86,7 @@ describe('parse.ts', () => {
     expect(parsedResources3).toHaveLength(2);
   });
 
-  it('parses an array of jsonObjects', () => {
+  it('parses an array of jsonObjects', ({ expect }) => {
     const array = [
       {
         '@id': EXAMPLE_SUBJECT,
@@ -112,7 +113,7 @@ describe('parse.ts', () => {
     expect(parsedResources).toHaveLength(4);
   });
 
-  it('Handles resources without an ID', () => {
+  it('Handles resources without an ID', ({ expect }) => {
     const jsonObject = {
       [STRING_PROPERTY]: 'Hoi',
     };
@@ -121,6 +122,6 @@ describe('parse.ts', () => {
     const [resource] = parser.parseObject(jsonObject, 'my-new-id');
 
     expect(resource.get(STRING_PROPERTY)).toBe('Hoi');
-    expect(resource.getSubject()).toBe('my-new-id');
+    expect(resource.subject).toBe('my-new-id');
   });
 });

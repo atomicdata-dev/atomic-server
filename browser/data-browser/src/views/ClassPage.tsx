@@ -1,13 +1,6 @@
-import {
-  classToTypescriptDefinition,
-  properties,
-  useStore,
-} from '@tomic/react';
-import { useState } from 'react';
+import { core } from '@tomic/react';
 import AllProps from '../components/AllProps';
-import { Button } from '../components/Button';
 import { ClassDetail } from '../components/ClassDetail';
-import { CodeBlock } from '../components/CodeBlock';
 import { ContainerNarrow } from '../components/Containers';
 import { ValueForm } from '../components/forms/ValueForm';
 import { NewInstanceButton } from '../components/NewInstanceButton';
@@ -21,14 +14,14 @@ import { defaultHiddenProps } from './ResourcePageDefault';
  * definition export.
  */
 export function ClassPage({ resource }: ResourcePageProps) {
-  const [tsDef, setTSdef] = useState<string | undefined>(undefined);
-  const store = useStore();
-
   return (
-    <ContainerNarrow about={resource.getSubject()}>
+    <ContainerNarrow about={resource.subject}>
       <Title resource={resource} />
       <ClassDetail resource={resource} />
-      <ValueForm resource={resource} propertyURL={properties.description} />
+      <ValueForm
+        resource={resource}
+        propertyURL={core.properties.description}
+      />
       <Column>
         <AllProps
           resource={resource}
@@ -37,18 +30,9 @@ export function ClassPage({ resource }: ResourcePageProps) {
           columns
         />
         <Row>
-          <NewInstanceButton icon={true} klass={resource.getSubject()} />
-          <Button
-            subtle
-            onClick={async () =>
-              setTSdef(await classToTypescriptDefinition(resource, store))
-            }
-          >
-            typescript interface
-          </Button>
+          <NewInstanceButton icon={true} klass={resource.subject} />
         </Row>
       </Column>
-      {tsDef && <CodeBlock content={tsDef} />}
     </ContainerNarrow>
   );
 }

@@ -1,23 +1,24 @@
 // Provides functionality to interact with an Atomic Server.
 // Send requests to the server and receive responses.
 
-import { hasBrowserAPI } from './hasBrowserAPI.js';
-import {
-  Agent,
-  AtomicError,
-  checkAuthenticationCookie,
-  Commit,
-  ErrorType,
-  JSONADParser,
-  parseCommitJSON,
-  Resource,
-  serializeDeterministically,
-  setCookieAuthentication,
-  signRequest,
-} from './index.js';
-
 // Works both in node and the browser
 import fetch from 'cross-fetch';
+
+import { hasBrowserAPI } from './hasBrowserAPI.js';
+import {
+  checkAuthenticationCookie,
+  setCookieAuthentication,
+  signRequest,
+} from './authentication.js';
+import { AtomicError, ErrorType } from './error.js';
+import {
+  type Agent,
+  type Commit,
+  serializeDeterministically,
+  parseCommitJSON,
+} from './index.js';
+import { JSONADParser } from './parse.js';
+import { Resource } from './resource.js';
 
 /**
  * One key-value pair per HTTP Header. Since we need to support both browsers

@@ -1,8 +1,8 @@
-import { expect } from 'chai';
-import { Agent } from './index.js';
+import { describe, it } from 'vitest';
+import { Agent } from './agent.js';
 
 describe('Agent', () => {
-  it('Constructs valid ', async () => {
+  it('Constructs valid ', async ({ expect }) => {
     const validPrivateKey = 'CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=';
     const validSubject =
       'https://atomicdata.dev/agents/PLwTOXVvQdHYpaLEq5IozLNeUBdXMVchKjFwFfamBlo=';

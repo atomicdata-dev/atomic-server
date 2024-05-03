@@ -1,4 +1,4 @@
-import { jest } from '@jest/globals';
+import { afterEach, describe, it, vi } from 'vitest';
 import { EventManager } from './EventManager.js';
 enum Events {
   Click = 'click',
@@ -11,10 +11,14 @@ type EventHandlers = {
 };
 
 describe('EventManager', () => {
-  it('registers events', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('registers events', ({ expect }) => {
     const eventManager = new EventManager<Events, EventHandlers>();
 
-    const cb = jest.fn();
+    const cb = vi.fn();
     eventManager.register(Events.Click, cb);
 
     eventManager.emit(Events.Click, 'Hello');
@@ -22,10 +26,10 @@ describe('EventManager', () => {
     expect(cb).toHaveBeenCalledWith('Hello');
   });
 
-  it('calls the correct handlers', () => {
+  it('calls the correct handlers', ({ expect }) => {
     const eventManager = new EventManager<Events, EventHandlers>();
 
-    const cb = jest.fn();
+    const cb = vi.fn();
     eventManager.register(Events.Click, cb);
 
     eventManager.emit(Events.Click, 'Hello');
@@ -34,10 +38,10 @@ describe('EventManager', () => {
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
-  it('unsubscribes', () => {
+  it('unsubscribes', ({ expect }) => {
     const eventManager = new EventManager<Events, EventHandlers>();
 
-    const cb = jest.fn();
+    const cb = vi.fn();
     const unsub = eventManager.register(Events.Click, cb);
 
     eventManager.emit(Events.Click, 'Hello');

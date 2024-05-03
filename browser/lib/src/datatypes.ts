@@ -1,6 +1,9 @@
-import { Client, JSONValue, urls } from './index.js';
-
 /** Each possible Atomic Datatype. See https://atomicdata.dev/collections/datatype */
+
+import { Client } from './index.js';
+import { urls } from './urls.js';
+import type { JSONValue } from './value.js';
+
 // TODO: use strings from `./urls`, requires TS fix: https://github.com/microsoft/TypeScript/issues/40793
 export enum Datatype {
   /** A Resource - either a URL string or a Nested Resource */
@@ -26,51 +29,11 @@ export enum Datatype {
 
 /** Convert a URL to a Datatype */
 export const datatypeFromUrl = (url: string): Datatype => {
-  switch (url) {
-    case urls.datatypes.atomicUrl: {
-      return Datatype.ATOMIC_URL;
-    }
-
-    case urls.datatypes.boolean: {
-      return Datatype.BOOLEAN;
-    }
-
-    case urls.datatypes.date: {
-      return Datatype.DATE;
-    }
-
-    case urls.datatypes.float: {
-      return Datatype.FLOAT;
-    }
-
-    case urls.datatypes.integer: {
-      return Datatype.INTEGER;
-    }
-
-    case urls.datatypes.markdown: {
-      return Datatype.MARKDOWN;
-    }
-
-    case urls.datatypes.resourceArray: {
-      return Datatype.RESOURCEARRAY;
-    }
-
-    case urls.datatypes.slug: {
-      return Datatype.SLUG;
-    }
-
-    case urls.datatypes.string: {
-      return Datatype.STRING;
-    }
-
-    case urls.datatypes.timestamp: {
-      return Datatype.TIMESTAMP;
-    }
-
-    default: {
-      return Datatype.UNKNOWN;
-    }
+  if (url in urls.datatypes) {
+    return url as Datatype;
   }
+
+  return Datatype.UNKNOWN;
 };
 
 const slug_regex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

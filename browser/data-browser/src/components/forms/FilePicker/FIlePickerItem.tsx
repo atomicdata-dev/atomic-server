@@ -41,7 +41,9 @@ const ItemCard = styled.div`
   touch-action: none;
   pointer-events: none;
   user-select: none;
-  transition: border 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+  transition:
+    border 0.1s ease-in-out,
+    box-shadow 0.1s ease-in-out;
 `;
 
 const ItemWrapper = styled.button`

@@ -1,4 +1,5 @@
-import { JSONADParser, Resource } from './index.js';
+import { JSONADParser } from './parse.js';
+import type { Resource } from './resource.js';
 
 export type JSONPrimitive = string | number | boolean;
 export type JSONValue = JSONPrimitive | JSONObject | JSONArray | undefined;

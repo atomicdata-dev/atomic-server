@@ -10,7 +10,7 @@ import { InputStyled, InputWrapper } from '../InputStyles';
 import { FaPlus, FaSearch } from 'react-icons/fa';
 import { core, server, useServerSearch } from '@tomic/react';
 import { styled } from 'styled-components';
-import { FilePickerItem } from './FIlePickerItem';
+import { FilePickerItem } from './FilePickerItem';
 import { Button } from '../../Button';
 import { Row } from '../../Row';
 import { useSettings } from '../../../helpers/AppSettings';
