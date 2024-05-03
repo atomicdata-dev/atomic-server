@@ -59,6 +59,7 @@
     "workbox-cli": "^6.4.1",
     "typescript": "^5.4.5"
   },
+  "type": "module",
   "homepage": "https://atomicdata.dev/",
   "husky": {
     "hooks": {
