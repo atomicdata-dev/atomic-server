@@ -95,7 +95,8 @@ const IconButton = styled.button<IconButtonProps>`
   align-items: center;
   padding: 0.2rem;
   visibility: ${props => (props.hide ? 'hidden' : 'visible')};
-  transition: transform var(--speed) ease-in-out,
+  transition:
+    transform var(--speed) ease-in-out,
     background-color var(--speed) ease;
   transform: rotate(${props => (props.turn ? '90deg' : '0deg')});
   background-color: transparent;

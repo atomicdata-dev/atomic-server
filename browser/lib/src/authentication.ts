@@ -1,9 +1,6 @@
-import {
-  Agent,
-  getTimestampNow,
-  HeadersObject,
-  signToBase64,
-} from './index.js';
+import type { Agent } from './agent.js';
+import type { HeadersObject } from './client.js';
+import { getTimestampNow, signToBase64 } from './commit.js';
 
 /** Returns a JSON-AD resource of an Authentication */
 export async function createAuthentication(subject: string, agent: Agent) {

@@ -1,22 +1,18 @@
 import { sign, getPublicKey, utils } from '@noble/ed25519';
 import stringify from 'fast-json-stable-stringify';
 import { decode as decodeB64, encode as encodeB64 } from 'base64-arraybuffer';
-
 // https://github.com/paulmillr/noble-ed25519/issues/38
 import { sha512 } from '@noble/hashes/sha512';
-utils.sha512 = msg => Promise.resolve(sha512(msg));
 
-import {
-  isArray,
-  JSONArray,
-  JSONValue,
-  Resource,
-  properties,
-  urls,
-  Store,
-  Client,
-  JSONADParser,
-} from './index.js';
+import { Client } from './client.js';
+import { isArray } from './datatypes.js';
+import { JSONADParser } from './parse.js';
+import { Resource } from './resource.js';
+import type { Store } from './store.js';
+import { urls, properties } from './urls.js';
+import type { JSONValue, JSONArray } from './value.js';
+
+utils.sha512 = msg => Promise.resolve(sha512(msg));
 
 /** A {@link Commit} without its signature, signer and timestamp */
 export interface CommitBuilderI {

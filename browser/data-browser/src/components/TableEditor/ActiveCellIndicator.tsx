@@ -210,7 +210,9 @@ const Indicator = styled.div.attrs<IndicatorProps>(p => ({
   border: 2px solid ${p => p.theme.colors.main};
   pointer-events: none;
   will-change: transform, width;
-  transition: transform var(--speed) ease-out, width var(--speed) ease-out,
+  transition:
+    transform var(--speed) ease-out,
+    width var(--speed) ease-out,
     height var(--speed) ease-out;
   z-index: 1;
   background-color: ${p =>

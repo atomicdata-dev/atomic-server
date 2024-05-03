@@ -1,33 +1,25 @@
 import { ulid } from 'ulid';
+
+import type { Agent } from './agent.js';
 import {
   removeCookieAuthentication,
   setCookieAuthentication,
 } from './authentication.js';
+import { Client, type FileOrFileLike } from './client.js';
+import type { Commit } from './commit.js';
+import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import { EventManager } from './EventManager.js';
 import { hasBrowserAPI } from './hasBrowserAPI.js';
-import {
-  Agent,
-  Datatype,
-  datatypeFromUrl,
-  Client,
-  Resource,
-  unknownSubject,
-  urls,
-  Commit,
-  JSONADParser,
-  FileOrFileLike,
-  OptionalClass,
-  UnknownClass,
-  Server,
-  core,
-  commits,
-  collections,
-  JSONValue,
-  SearchOpts,
-  buildSearchSubject,
-  server,
-} from './index.js';
+import { collections } from './ontologies/collections.js';
+import { commits } from './ontologies/commits.js';
+import { core } from './ontologies/core.js';
+import { server, type Server } from './ontologies/server.js';
+import type { OptionalClass, UnknownClass } from './ontology.js';
+import { JSONADParser } from './parse.js';
+import { Resource, unknownSubject } from './resource.js';
+import { type SearchOpts, buildSearchSubject } from './search.js';
 import { stringToSlug } from './stringToSlug.js';
+import type { JSONValue } from './value.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
 
 /** Function called when a resource is updated or removed */
@@ -180,7 +172,7 @@ export class Store {
     resource.setStore(this);
 
     // Incomplete resources may miss some properties
-    if (resource.get(urls.properties.incomplete)) {
+    if (resource.get(core.properties.incomplete)) {
       // If there is a resource with the same subject, we won't overwrite it with an incomplete one
       const existing = this.resources.get(resource.subject);
 
@@ -444,7 +436,7 @@ export class Store {
     } else if (!opts.allowIncomplete && resource.loading === false) {
       // In many cases, a user will always need a complete resource.
       // This checks if the resource is incomplete and fetches it if it is.
-      if (resource.get(urls.properties.incomplete)) {
+      if (resource.get(core.properties.incomplete)) {
         resource.loading = true;
         this.addResources(resource);
         this.fetchResourceFromServer(subject, opts);
@@ -861,14 +853,14 @@ export class Store {
   public async getResourceAncestry(resource: Resource): Promise<string[]> {
     const ancestry: string[] = [resource.subject];
 
-    let lastAncestor: string = resource.get(urls.properties.parent) as string;
+    let lastAncestor: string = resource.get(core.properties.parent) as string;
     lastAncestor && ancestry.push(lastAncestor);
 
     while (lastAncestor) {
-      const lastResource = await this.getResourceAsync(lastAncestor);
+      const lastResource = await this.getResource(lastAncestor);
 
       if (lastResource) {
-        lastAncestor = lastResource.get(urls.properties.parent) as string;
+        lastAncestor = lastResource.get(core.properties.parent) as string;
 
         if (ancestry.includes(lastAncestor)) {
           throw new Error(

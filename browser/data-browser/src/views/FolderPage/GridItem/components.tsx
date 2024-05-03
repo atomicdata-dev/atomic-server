@@ -11,7 +11,9 @@ export const GridCard = styled.div.attrs<ViewTransitionProps>(p => ({
   overflow: hidden;
   box-shadow: var(--shadow), var(--interaction-shadow);
   border: 1px solid ${p => p.theme.colors.bg2};
-  transition: border 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+  transition:
+    border 0.1s ease-in-out,
+    box-shadow 0.1s ease-in-out;
 `;
 
 export const GridItemWrapper = styled.a`

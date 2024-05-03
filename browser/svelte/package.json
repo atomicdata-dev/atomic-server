@@ -37,7 +37,7 @@
   "scripts": {
     "build": "tsc && vite build",
     "build:watch": "tsc && vite build --watch",
-    "coverage": "vitest --coverage",
+    "coverage": "vitest run --coverage",
     "dev": "vite",
     "lint": "eslint ./src --ext .js,.svelte,.ts,.tsx",
     "lint-fix": "eslint ./src --ext .js,.svelte,.ts,.tsx --fix",

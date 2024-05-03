@@ -1,4 +1,3 @@
-// eslint-disable-next-line no-undef
 module.exports = {
   root: true,
   extends: [
@@ -16,11 +15,9 @@ module.exports = {
     node: true,
   },
   parserOptions: {
-    ecmaVersion: 2020, // Allows for the parsing of modern ECMAScript features
-    sourceType: 'module', // Allows for the use of imports
+    ecmaVersion: 'latest', // Allows for the parsing of modern ECMAScript features
     ecmaFeatures: {
       jsx: true, // Allows for the parsing of JSX
-      arrowFunctions: true,
     },
     // Next two lines enable deeper TS type checking
     // https://typescript-eslint.io/docs/linting/typed-linting/

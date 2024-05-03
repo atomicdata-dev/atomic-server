@@ -1,5 +1,8 @@
-import { Resource, Store, urls } from './index.js';
 /** Endpoints are Resources that can respond to query parameters or POST bodies */
+
+import { Resource } from './resource.js';
+import type { Store } from './store.js';
+import { urls } from './urls.js';
 
 type ImportOpts = {
   /** Where the resources will be imported to  */

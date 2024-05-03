@@ -137,7 +137,8 @@ const OutlineIconButton = styled(IconButtonBase)<ButtonStyleProps>`
     &:hover,
     &:focus-visible {
       color: ${p => p.theme.colors.main};
-      box-shadow: 0px 0px 0px 1.5px ${p => p.theme.colors.main},
+      box-shadow:
+        0px 0px 0px 1.5px ${p => p.theme.colors.main},
         ${p => p.theme.boxShadowSoft};
     }
   }

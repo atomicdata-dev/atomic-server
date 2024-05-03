@@ -1,3 +1,4 @@
+import { describe, it } from 'vitest';
 import { escapeTantivyKey } from './search.js';
 
 const testTuples = [
@@ -6,7 +7,7 @@ const testTuples = [
 ];
 
 describe('search.ts', () => {
-  it('Handles resources without an ID', () => {
+  it('Handles resources without an ID', ({ expect }) => {
     for (const [input, output] of testTuples) {
       expect(escapeTantivyKey(input)).toBe(output);
     }

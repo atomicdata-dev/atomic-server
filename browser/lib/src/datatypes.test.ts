@@ -1,8 +1,9 @@
-import { expect } from 'chai';
+import { describe, it } from 'vitest';
+
 import { Datatype, urls, validateDatatype } from './index.js';
 
 describe('Datatypes', () => {
-  it('throws errors when datatypes dont match values', async () => {
+  it('throws errors when datatypes dont match values', async ({ expect }) => {
     const string = 'valid string';
     const int = 5;
     const float = 1.13;

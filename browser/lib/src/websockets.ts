@@ -1,5 +1,8 @@
 import { createAuthentication } from './authentication.js';
-import { JSONADParser, parseAndApplyCommit, Resource, Store } from './index.js';
+import { parseAndApplyCommit } from './index.js';
+import { JSONADParser } from './parse.js';
+import type { Resource } from './resource.js';
+import type { Store } from './store.js';
 
 /** Opens a Websocket Connection at `/ws` for the current Drive */
 export function startWebsocket(url: string, store: Store): WebSocket {
@@ -119,7 +122,7 @@ export async function fetchWebSocket(
       if (ev.data.startsWith('RESOURCE ')) {
         parseResourceMessage(ev).forEach(resource => {
           // if it is the requested subject, return the resource
-          if (resource.getSubject() === subject) {
+          if (resource.subject === subject) {
             clearTimeout(timeoutId);
             client.removeEventListener('message', listener);
             resolve(resource);

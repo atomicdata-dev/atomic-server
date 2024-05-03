@@ -24,7 +24,9 @@ const Thing = styled(GridCard)`
   width: 100%;
   font-size: 3rem;
   color: ${p => p.theme.colors.textLight};
-  transition: color 0.1s ease-in-out, font-size 0.1s ease-out,
+  transition:
+    color 0.1s ease-in-out,
+    font-size 0.1s ease-out,
     border-color 0.1s ease-in-out;
   &:hover,
   &:focus {

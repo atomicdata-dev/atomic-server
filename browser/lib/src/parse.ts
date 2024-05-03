@@ -1,12 +1,8 @@
-import {
-  AtomicError,
-  urls,
-  isArray,
-  JSONValue,
-  JSONObject,
-  Resource,
-  unknownSubject,
-} from './index.js';
+import { AtomicError } from './error.js';
+import { isArray } from './index.js';
+import { server } from './ontologies/server.js';
+import { Resource, unknownSubject } from './resource.js';
+import type { JSONObject, JSONValue } from './value.js';
 
 /** Resources in JSON-AD can be referenced by their URL (string),
  * be entire (nested) resources, in which case they are JSONObjects */
@@ -69,12 +65,12 @@ export class JSONADParser {
           }
 
           if (
-            resource.getSubject() !== 'undefined' &&
-            resource.getSubject() !== unknownSubject &&
-            value !== resource.getSubject()
+            resource.subject !== 'undefined' &&
+            resource.subject !== unknownSubject &&
+            value !== resource.subject
           ) {
             throw new Error(
-              `Resource has wrong subject in @id. Received subject was ${value}, expected ${resource.getSubject()}.`,
+              `Resource has wrong subject in @id. Received subject was ${value}, expected ${resource.subject}.`,
             );
           }
 
@@ -100,7 +96,7 @@ export class JSONADParser {
             resource.setUnsafe(key, subject);
           }
         } catch (e) {
-          const baseMsg = `Failed creating value ${value} for key ${key} in resource ${resource.getSubject()}`;
+          const baseMsg = `Failed creating value ${value} for key ${key} in resource ${resource.subject}`;
           const errorMsg = `${baseMsg}. ${e.message}`;
           throw new Error(errorMsg);
         }
@@ -108,7 +104,7 @@ export class JSONADParser {
 
       resource.loading = false;
 
-      if (resource.hasClasses(urls.classes.error)) {
+      if (resource.hasClasses(server.classes.error)) {
         resource.error = AtomicError.fromResource(resource);
       }
     } catch (e) {

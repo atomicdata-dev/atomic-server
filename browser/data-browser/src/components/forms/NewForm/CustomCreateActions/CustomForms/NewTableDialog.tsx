@@ -29,9 +29,8 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
   onClose,
 }) => {
   const store = useStore();
-  const [useExistingClass, setUseExistingClass] = useState(
-    !!initialExistingClass,
-  );
+  const [useExistingClass, setUseExistingClass] =
+    useState(!!initialExistingClass);
   const [existingClass, setExistingClass] = useState<string | undefined>(
     initialExistingClass,
   );
@@ -52,8 +51,8 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
         isA: core.classes.class,
         propVals: {
           [core.properties.shortname]: stringToSlug(name),
-          [core.properties
-            .description]: `Represents a row in the ${name} table`,
+          [core.properties.description]:
+            `Represents a row in the ${name} table`,
           [core.properties.recommends]: [core.properties.name],
         },
       });

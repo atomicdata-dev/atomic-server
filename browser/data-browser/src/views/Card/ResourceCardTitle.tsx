@@ -11,21 +11,22 @@ interface ResourceCardTitleProps {
   resource: Resource;
 }
 
-export const ResourceCardTitle: FC<PropsWithChildren<ResourceCardTitleProps>> =
-  ({ resource, children }) => {
-    const [isA] = useArray(resource, core.properties.isA);
-    const Icon = getIconForClass(isA[0]);
+export const ResourceCardTitle: FC<
+  PropsWithChildren<ResourceCardTitleProps>
+> = ({ resource, children }) => {
+  const [isA] = useArray(resource, core.properties.isA);
+  const Icon = getIconForClass(isA[0]);
 
-    return (
-      <TitleRow center gap='1ch'>
-        <Icon />
-        <AtomicLink subject={resource.getSubject()}>
-          <Title subject={resource.getSubject()}>{resource.title}</Title>
-        </AtomicLink>
-        {children}
-      </TitleRow>
-    );
-  };
+  return (
+    <TitleRow center gap='1ch'>
+      <Icon />
+      <AtomicLink subject={resource.getSubject()}>
+        <Title subject={resource.getSubject()}>{resource.title}</Title>
+      </AtomicLink>
+      {children}
+    </TitleRow>
+  );
+};
 
 const Title = styled.h2<ViewTransitionProps>`
   font-size: 1.4rem;

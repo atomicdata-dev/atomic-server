@@ -49,7 +49,9 @@ const NewCard = styled(GridCard)`
   place-items: center;
   font-size: 3rem;
   color: ${p => p.theme.colors.textLight};
-  transition: color 0.1s ease-in-out, font-size 0.1s ease-out,
+  transition:
+    color 0.1s ease-in-out,
+    font-size 0.1s ease-out,
     box-shadow 0.1s ease-in-out;
   ${GridItemWrapper}:hover &,
   ${GridItemWrapper}:focus & {

@@ -21,7 +21,6 @@
   "eslint.alwaysShowStatus": true,
   "eslint.format.enable": true,
   "eslint.lintTask.enable": true,
-  "eslint.packageManager": "pnpm",
   "eslint.quiet": true,
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
@@ -32,6 +31,9 @@
   "eslint.workingDirectories": [
     "./data-browser",
     "./react",
-    "./lib"
-  ]
+    "./lib",
+    "./cli",
+    "./svelte"
+  ],
+  "typescript.preferences.preferTypeOnlyAutoImports": true,
 }

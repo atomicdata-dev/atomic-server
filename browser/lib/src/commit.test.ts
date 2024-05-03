@@ -1,12 +1,12 @@
-import { expect } from 'chai';
-import { CommitBuilder } from './commit.js';
+import { describe, it } from 'vitest';
 import {
+  CommitBuilder,
   generatePublicKeyFromPrivate,
   parseAndApplyCommit,
   serializeDeterministically,
   signToBase64,
-  Store,
-} from './index.js';
+} from './commit.js';
+import { Store } from './store.js';
 
 // These are disabled for now, as they require TextEncoder to be available
 // https://github.com/facebook/jest/issues/9983
@@ -18,13 +18,12 @@ describe('Commit signing and keys', () => {
     'http://localhost/agents/7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=';
   const subject = 'https://localhost/new_thing';
 
-  it('creates the right public key', async () => {
+  it('creates the right public key', async ({ expect }) => {
     const generatedPublickey = await generatePublicKeyFromPrivate(privateKey);
     expect(generatedPublickey).to.equal(publicKey);
   });
 
-  it('signs a commit with the right signature', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  it('signs a commit with the right signature', async ({ expect }) => {
     const signatureCorrect =
       'kLh+mxy/lgFD6WkbIbhJANgRhyu39USL9up1zCmqU8Jmc+4rlvLZwxSlfxKTISP2BiXLSiz/5NJZrN5XpXJ/Cg==';
     const serializedCommitRust =
@@ -49,7 +48,7 @@ describe('Commit signing and keys', () => {
     expect(sig).to.equal(signatureCorrect);
   });
 
-  it('signs any string correctly', async () => {
+  it('signs any string correctly', async ({ expect }) => {
     const input = 'val';
     const correct_signature_rust =
       'YtDR/xo0272LHNBQtDer4LekzdkfUANFTI0eHxZhITXnbC3j0LCqDWhr6itNvo4tFnep6DCbev5OKAHH89+TDA==';
@@ -74,9 +73,9 @@ describe('Commit parse and apply', () => {
     "https://atomicdata.dev/properties/signer": "https://atomicdata.dev/agents/8S2U/viqkaAQVzUisaolrpX6hx/G/L3e2MTjWA83Rxk=",
     "https://atomicdata.dev/properties/subject": "https://atomicdata.dev/element/cn6ymb8s8mc"
   }`;
-  it('parses and applies a Commit correctly', async () => {
+  it('parses and applies a Commit correctly', async ({ expect }) => {
     parseAndApplyCommit(exampleCommit, store);
-    const resource = await store.getResourceAsync(
+    const resource = await store.getResource(
       'https://atomicdata.dev/element/cn6ymb8s8mc',
     );
     const description = resource

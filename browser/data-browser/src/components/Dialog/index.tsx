@@ -282,13 +282,15 @@ const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
   opacity: 0;
   transform: translateY(5rem);
   // Use a transition when animating out (for some reason keyframe animations don't work on outgoing dialog).
-  transition: opacity ${ANIM_SPEED} ease-in-out,
+  transition:
+    opacity ${ANIM_SPEED} ease-in-out,
     transform ${ANIM_SPEED} ease-in-out;
 
   &::backdrop {
     background-color: rgba(0, 0, 0, 0);
     backdrop-filter: blur(0px);
-    transition: background-color ${ANIM_SPEED} ease-out,
+    transition:
+      background-color ${ANIM_SPEED} ease-out,
       backdrop-filter ${ANIM_SPEED} ease-out;
     // Make sure the browser paints the backdrop on another layer so the animation is less expensive.
     will-change: background-color, backdrop-filter;
