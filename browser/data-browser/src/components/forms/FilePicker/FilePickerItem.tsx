@@ -7,7 +7,6 @@ interface FilePickerItemProps {
   subject: string;
   onClick?: () => void;
 }
-// Random comment so earthly updates this file
 
 export function FilePickerItem({
   subject,
