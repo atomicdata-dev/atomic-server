@@ -1,7 +1,6 @@
 /** Each possible Atomic Datatype. See https://atomicdata.dev/collections/datatype */
 
 import { Client } from './index.js';
-import { urls } from './urls.js';
 import type { JSONValue } from './value.js';
 
 // TODO: use strings from `./urls`, requires TS fix: https://github.com/microsoft/TypeScript/issues/40793
@@ -27,9 +26,11 @@ export enum Datatype {
   UNKNOWN = 'unknown-datatype',
 }
 
+const validDatatypes = new Set<string>(Object.values(Datatype));
+
 /** Convert a URL to a Datatype */
 export const datatypeFromUrl = (url: string): Datatype => {
-  if (url in urls.datatypes) {
+  if (validDatatypes.has(url)) {
     return url as Datatype;
   }
 
