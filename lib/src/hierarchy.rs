@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! The Hierarchy model describes how Resources are structured in a tree-like shape.
 //! It deals with authorization (read / write permissions, rights, grants)
 //! See

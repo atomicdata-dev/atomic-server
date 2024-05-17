@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Configuration logic which can be used in both CLI and Server contexts
 //! For serializaing, storing, and parsing the `~/.config/atomic/config.toml` file
 

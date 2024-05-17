@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Structs and models at the core of Atomic Schema (Class, Property, Datatype).
 
 use crate::{datatype::DataType, errors::AtomicResult, urls, Resource, Value};

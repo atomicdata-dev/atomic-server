@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! The QueryIndex is used to speed up queries by persisting filtered, sorted collections.
 //! It relies on lexicographic ordering of keys, which Sled utilizes using `scan_prefix` queries.
 

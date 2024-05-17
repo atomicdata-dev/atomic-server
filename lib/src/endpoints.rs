@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Endpoints are experimental plugin-like objects, that allow for dynamic resources.
 //! An endpoint is a resource that accepts one or more query parameters, and returns a resource that is probably calculated at runtime.
 //! Examples of endpoints are versions for resources, or (pages for) collections.

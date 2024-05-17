@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 /**
 Parse HTML documents and extract metadata.
 Convert articles to Markdown strings.

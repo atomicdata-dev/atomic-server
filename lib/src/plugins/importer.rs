@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 /*!
 Importers allow users to (periodically) import JSON-AD files from a remote source.
 */

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 /*!
 `atomic_lib` helps you to get, store, serialize, parse and validate Atomic Data.
 

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 use crate::{endpoints::Endpoint, urls};
 
 // Note that the actual logic of this endpoint resides in `atomic-server`, as it depends on the Actix runtime.

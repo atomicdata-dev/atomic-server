@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 use atomic_lib::{agents::generate_public_key, mapping::Mapping};
 use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::{errors::AtomicResult, Storelike};

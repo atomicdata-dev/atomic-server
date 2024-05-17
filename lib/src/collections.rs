@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2023 Joep Meindertsma <joep@ontola.io>
+//
+// SPDX-License-Identifier: MIT
+
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a [Query]
 use crate::{
