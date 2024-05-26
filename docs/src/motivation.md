@@ -44,7 +44,7 @@ If Atomic Data will be successful, there will likely be other, better implementa
 
 ## Linked data is awesome, but it is too difficult for developers in its current form
 
-[Linked data](https://ontola.io/what-is-linked-data/) (RDF / the semantic web) enables us to use the web as a large, decentralized graph database.
+[Linked data](https://ontola.io/blog/what-is-linked-data/) (RDF / the semantic web) enables us to use the web as a large, decentralized graph database.
 Using links everywhere in data has amazing merits: links remove ambiguity, they enable exploration, they enable connected datasets.
 But the existing specs are too difficult to use, and that is harming adoption.
 
