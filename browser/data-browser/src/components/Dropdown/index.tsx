@@ -447,7 +447,8 @@ const ItemDivider = styled.div`
 const Menu = styled.div<MenuProps>`
   visibility: hidden;
   font-size: 0.9rem;
-  overflow: hidden;
+  overflow: auto;
+  max-height: 80vh;
   background: ${p => p.theme.colors.bg};
   border: ${p =>
     p.theme.darkMode ? `solid 1px ${p.theme.colors.bg2}` : 'none'};
