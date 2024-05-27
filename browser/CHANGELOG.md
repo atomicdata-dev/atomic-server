@@ -14,6 +14,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - [#757](https://github.com/atomicdata-dev/atomic-server/issues/757) Add drag & drop sorting to sidebar.
 - [#873](https://github.com/atomicdata-dev/atomic-server/issues/873) Add option to allow multiple resources in relation columns (Tables).
 - [#825](https://github.com/atomicdata-dev/atomic-server/issues/825) Folder display styles are now saved locally instead of on the resource. The display style property will now act as the default view style.
+- [#884](https://github.com/atomicdata-dev/atomic-server/issues/884) Add new markdown editor.
 
 ### @tomic/lib
 

@@ -1,4 +1,4 @@
-import { useResource } from '@tomic/react';
+import { useResource, type Server } from '@tomic/react';
 import { styled } from 'styled-components';
 import { ErrorBoundary } from '../../../views/ErrorPage';
 import { FilePreviewThumbnail } from '../../../views/File/FilePreviewThumbnail';
@@ -6,13 +6,17 @@ import { FilePreviewThumbnail } from '../../../views/File/FilePreviewThumbnail';
 interface FilePickerItemProps {
   subject: string;
   onClick?: () => void;
+  allowedMimes?: Set<string>;
 }
 
 export function FilePickerItem({
   subject,
+  allowedMimes,
   onClick,
 }: FilePickerItemProps): React.JSX.Element {
-  const resource = useResource(subject);
+  const resource = useResource<Server.File>(subject);
+
+  const isAllowed = allowedMimes?.has(resource.props.mimetype ?? '') ?? true;
 
   if (resource.loading) {
     return <div>loading</div>;
@@ -20,7 +24,7 @@ export function FilePickerItem({
 
   return (
     <ErrorBoundary FallBackComponent={ItemError}>
-      <ItemWrapper onClick={onClick}>
+      <ItemWrapper onClick={onClick} disabled={!isAllowed}>
         <ItemCard>
           <FilePreviewThumbnail resource={resource} />
         </ItemCard>
@@ -67,16 +71,19 @@ const ItemWrapper = styled.button`
   color: ${p => p.theme.colors.text1};
   width: 100%;
   aspect-ratio: 1 / 1;
-  cursor: pointer;
 
-  &:hover ${ItemCard}, &:focus ${ItemCard} {
+  &:not(:disabled):is(:hover, :focus) ${ItemCard} {
     --interaction-shadow: 0px 0px 0px 1px ${p => p.theme.colors.main};
     border: 1px solid ${p => p.theme.colors.main};
   }
 
-  &:hover,
-  &:focus {
+  &:not(:disabled):is(:hover, :focus) {
+    cursor: pointer;
     color: ${p => p.theme.colors.main};
+  }
+
+  &:disabled {
+    opacity: 0.3;
   }
 `;
 

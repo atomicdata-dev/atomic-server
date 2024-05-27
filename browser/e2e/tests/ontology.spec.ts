@@ -36,9 +36,11 @@ test.describe('Ontology', async () => {
     await page.locator('dialog[open] button:has-text("Create")').click();
     await expect(page.locator(`h1:has-text("${ontologyName}")`)).toBeVisible();
 
-    page.getByRole('button', { name: 'Edit', exact: true }).click();
-    page.locator('textarea').fill('Data model for youtube thumbnail editor');
-    page.getByRole('button', { name: 'Read', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit', exact: true }).click();
+    await page
+      .getByTestId('markdown-editor')
+      .fill('Data model for youtube thumbnail editor');
+    await page.getByRole('button', { name: 'Read', exact: true }).click();
 
     await expect(
       page.getByText('Data model for youtube thumbnail editor'),
@@ -95,7 +97,7 @@ test.describe('Ontology', async () => {
     await expect(
       classCard('arrow').locator('input[value="arrow"]'),
     ).toBeVisible();
-    await expect(page.locator('textarea:has-text("Change me")')).toBeVisible();
+    await expect(page.getByText('Change me')).toBeVisible();
     await page.getByText('Change me').fill('An arrow in a thumbnail');
 
     await page

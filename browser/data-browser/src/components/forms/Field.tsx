@@ -21,6 +21,7 @@ function Field({
   required,
   disabled,
   fieldId,
+  labelId,
 }: IFieldProps): JSX.Element {
   const [collapsedHelper, setCollapsed] = useState(true);
 
@@ -28,7 +29,11 @@ function Field({
     <FieldStyled>
       <LabelWrapper>
         <Row gap='0.4rem' center>
-          <FieldLabel data-test={`field-label-${label}`} htmlFor={fieldId}>
+          <FieldLabel
+            data-test={`field-label-${label}`}
+            htmlFor={fieldId}
+            id={labelId}
+          >
             <span>{label}</span>
             {required && <FaAsterisk title='Required field' />}
           </FieldLabel>
@@ -103,6 +108,7 @@ interface IFieldProps {
 
   /** The id of the field. This is used to link the label with the input */
   fieldId?: string;
+  labelId?: string;
   /**
    * This function will be called when the delete icon is clicked. This should
    * remove the item from any parent list

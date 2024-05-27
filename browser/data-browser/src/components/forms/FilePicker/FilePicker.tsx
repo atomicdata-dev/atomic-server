@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Button } from '../../Button';
 import { FilePickerDialog } from './FilePickerDialog';
-import { SelectedFileBlob, SelectedFileResource } from './SelectedFile';
 import { InputProps } from '../ResourceField';
-import { FaFileCirclePlus } from 'react-icons/fa6';
 import { StoreEvents, useStore, useSubject } from '@tomic/react';
 import { useUpload } from '../../../hooks/useUpload';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { styled } from 'styled-components';
+import { ClearType, FilePickerButton } from './FilePickerButton';
 
 /**
  * Button that opens a dialog that lists all files in the drive and allows the user to upload a new file.
@@ -81,29 +79,20 @@ export function FilePicker({
           disabled={disabled}
         />
       </VisuallyHidden>
-      {!selectedFile && !selectedSubject && (
-        <Button subtle onClick={() => setShow(true)} disabled={disabled}>
-          <FaFileCirclePlus />
-          Select File
-        </Button>
-      )}
-      {selectedSubject && (
-        <SelectedFileResource
-          disabled={disabled}
-          subject={selectedSubject}
-          onClear={() => setSelectedSubject(undefined)}
-        />
-      )}
-      {selectedFile && (
-        <SelectedFileBlob
-          file={selectedFile}
-          disabled={disabled}
-          onClear={() => {
+      <FilePickerButton
+        file={selectedFile}
+        subject={selectedSubject}
+        disabled={disabled}
+        onButtonClick={() => setShow(true)}
+        onClear={clearType => {
+          if (clearType === ClearType.File) {
             setSelectedFile(undefined);
             unsubScheduledUpload?.();
-          }}
-        />
-      )}
+          } else {
+            setSelectedSubject(undefined);
+          }
+        }}
+      />
       <FilePickerDialog
         show={show}
         onShowChange={setShow}
