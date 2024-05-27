@@ -7,16 +7,26 @@ import { transitionName } from '../../helpers/transitionName';
 import { ViewTransitionProps } from '../../helpers/ViewTransitionProps';
 import { CardViewProps } from '../Card/CardViewProps';
 
+const TRUNCATE_THRESHOLD = 200;
+
 export function ArticleCard({ resource }: CardViewProps): JSX.Element {
   const [description] = useString(resource, core.properties.description);
-  const truncated = markdownToPlainText(description ?? '').slice(0, 200);
+  const truncated = markdownToPlainText(description ?? '').slice(
+    0,
+    TRUNCATE_THRESHOLD,
+  );
+
+  const truncationMark = truncated.length < TRUNCATE_THRESHOLD ? '' : '...';
 
   return (
     <div>
-      <AtomicLink subject={resource.getSubject()}>
-        <Title subject={resource.getSubject()}>{resource.title}</Title>
+      <AtomicLink subject={resource.subject}>
+        <Title subject={resource.subject}>{resource.title}</Title>
       </AtomicLink>
-      <p>{truncated}...</p>
+      <p>
+        {truncated}
+        {truncationMark}
+      </p>
     </div>
   );
 }

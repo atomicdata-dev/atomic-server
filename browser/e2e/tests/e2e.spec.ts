@@ -17,7 +17,6 @@ import {
   editProfileAndCommit,
   editTitle,
   editableTitle,
-  fillInput,
   getCurrentSubject,
   newDrive,
   newResource,
@@ -34,6 +33,7 @@ import {
   openAgentPage,
   fillSearchBox,
   waitForCommitOnCurrentResource,
+  currentDialog,
 } from './test-utils';
 
 test.describe('data-browser', async () => {
@@ -401,7 +401,7 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
 
     // Add a description
-    await page.click('textarea[name="yamdeContent"]');
+    await page.getByLabel('Description').click();
     await page.keyboard.type('This is a test class');
     await page.click('button:has-text("Save")');
 
@@ -481,8 +481,8 @@ test.describe('data-browser', async () => {
     // Create new class from new resource menu
     await newResource('https://atomicdata.dev/classes/Class', page);
 
-    await fillInput('shortname', page);
-    await fillInput('description', page);
+    await page.getByLabel('Shortname').fill('test-shortname');
+    await page.getByLabel('Description').fill('test-description');
     await page.click('[data-test="save"]');
     await page.locator('text=Resource Saved');
     await contextMenuClick('edit', page);
@@ -512,9 +512,8 @@ test.describe('data-browser', async () => {
       'boolean',
     );
     await selectDatatypeOption('boolean - Either `true` or `false`');
-    await page.locator('dialog textarea[name="yamdeContent"]').click();
-    await page
-      .locator('dialog textarea[name="yamdeContent"]')
+    await currentDialog(page)
+      .getByLabel('Description')
       .fill('This is a test prop');
     await page.locator('dialog footer >> text=Save').click();
 

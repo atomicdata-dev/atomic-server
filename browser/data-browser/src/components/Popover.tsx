@@ -84,10 +84,6 @@ const fadeIn = keyframes`
   }
 `;
 
-export const DefaultTrigger = styled(RadixPopover.Trigger)`
-  max-width: 100%;
-`;
-
 const Content = styled(RadixPopover.Content)`
   --popover-close-offset: ${p => p.theme.margin}rem;
   --popover-close-size: 25px;

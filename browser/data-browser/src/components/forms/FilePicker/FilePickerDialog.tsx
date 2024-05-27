@@ -21,6 +21,8 @@ interface FilePickerProps {
   onShowChange?: (show: boolean) => void;
   onResourcePicked: (subject: string) => void;
   onNewFilePicked: (file: File) => void;
+  noUpload?: boolean;
+  allowedMimes?: Set<string>;
 }
 
 export function FilePickerDialog({
@@ -28,6 +30,8 @@ export function FilePickerDialog({
   onShowChange,
   onNewFilePicked,
   onResourcePicked,
+  allowedMimes,
+  noUpload = false,
 }: FilePickerProps): React.JSX.Element {
   const { drive } = useSettings();
   const [dialogProps, showDialog, closeDialog] = useDialog({
@@ -85,21 +89,24 @@ export function FilePickerDialog({
                   onChange={e => setQuery(e.target.value)}
                 />
               </InputWrapper>
-              <StyledLabel>
-                <Button as='div'>
-                  <FaPlus aria-hidden /> {isScreenSmall ? '' : 'Upload'}
-                </Button>
-                <input
-                  type='file'
-                  style={{ display: 'none' }}
-                  onChange={handleFileInputChange}
-                />
-              </StyledLabel>
+              {!noUpload && (
+                <StyledLabel>
+                  <Button as='div'>
+                    <FaPlus aria-hidden /> {isScreenSmall ? '' : 'Upload'}
+                  </Button>
+                  <input
+                    type='file'
+                    style={{ display: 'none' }}
+                    onChange={handleFileInputChange}
+                  />
+                </StyledLabel>
+              )}
             </Row>
           </DialogTitle>
           <StyledDialogContent>
             {results.map(subject => (
               <FilePickerItem
+                allowedMimes={allowedMimes}
                 subject={subject}
                 key={subject}
                 onClick={() => handleResourcePicked(subject)}

@@ -307,21 +307,6 @@ export async function clickSidebarItem(text: string, page: Page) {
   await page.click(`[data-test="sidebar"] >> text="${text}"`);
 }
 
-export async function fillInput(
-  propertyShortname: string,
-  page: Page | Locator,
-  value?: string,
-) {
-  let locator = `[data-test="input-${propertyShortname}"]`;
-
-  if (propertyShortname === 'description') {
-    locator = 'textarea[name="yamdeContent"]';
-  }
-
-  await page.click(locator);
-  await page.locator(locator).fill(value || `test-${propertyShortname}`);
-}
-
 /** Click an item from the main, visible context menu */
 export async function contextMenuClick(text: string, page: Page) {
   await page.click(contextMenu);
