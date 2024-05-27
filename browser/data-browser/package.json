@@ -51,8 +51,7 @@
     "styled-components": "^6.0.7",
     "stylis": "4.3.0",
     "tippy.js": "^6.3.7",
-    "tiptap-markdown": "^0.8.10",
-    "yamde": "^1.7.1"
+    "tiptap-markdown": "^0.8.10"
   },
   "devDependencies": {
     "@swc/plugin-styled-components": "^1.5.110",
