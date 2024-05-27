@@ -5,6 +5,7 @@ import {
   properties,
   Resource,
   urls,
+  type OptionalClass,
 } from '@tomic/react';
 
 import { ContainerNarrow } from '../components/Containers';
@@ -31,8 +32,8 @@ import { Main } from '../components/Main';
 import { OntologyPage } from './OntologyPage';
 
 /** These properties are passed to every View at Page level */
-export type ResourcePageProps = {
-  resource: Resource;
+export type ResourcePageProps<Subject extends OptionalClass = never> = {
+  resource: Resource<Subject>;
 };
 
 type Props = {

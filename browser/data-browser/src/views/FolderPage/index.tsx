@@ -1,10 +1,8 @@
 import {
   classes,
-  properties,
-  useArray,
   useCanWrite,
   useResources,
-  useString,
+  type DataBrowser,
 } from '@tomic/react';
 import { useMemo } from 'react';
 import { styled } from 'styled-components';
@@ -15,39 +13,49 @@ import { ResourcePageProps } from '../ResourcePage';
 import { DisplayStyleButton } from './DisplayStyleButton';
 import { GridView } from './GridView';
 import { ListView } from './ListView';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
-const displayStyleOpts = {
-  commit: true,
-};
+type PreferredFolderStyles = Record<string, string>;
 
 const viewMap = new Map([
   [classes.displayStyles.list, ListView],
   [classes.displayStyles.grid, GridView],
 ]);
 
-const subResourceOpts = {
-  commit: true,
+const displayStyleStorageKey = 'folderDisplayPrefs';
+
+const useDisplayStyle = (
+  subject: string,
+): [
+  preferredStyle: string | undefined,
+  setPreferredStyle: (style: string) => void,
+] => {
+  const [preferredStyles, setPreferredStyles] =
+    useLocalStorage<PreferredFolderStyles>(displayStyleStorageKey, {});
+
+  const setPreferredStyle = (style: string) => {
+    setPreferredStyles({ ...preferredStyles, [subject]: style });
+  };
+
+  return [preferredStyles[subject], setPreferredStyle];
 };
 
-export function FolderPage({ resource }: ResourcePageProps) {
-  const [subResourceSubjects] = useArray(
-    resource,
-    properties.subResources,
-    subResourceOpts,
+export function FolderPage({
+  resource,
+}: ResourcePageProps<DataBrowser.Folder>) {
+  const [preferedDisplayStyle, setPreferedDisplayStyle] = useDisplayStyle(
+    resource.subject,
   );
-  const [displayStyle, setDisplayStyle] = useString(
-    resource,
-    properties.displayStyle,
-    displayStyleOpts,
-  );
+
+  const displayStyle = preferedDisplayStyle ?? resource.props.displayStyle;
 
   const View = useMemo(
     () => viewMap.get(displayStyle!) ?? ListView,
     [displayStyle],
   );
 
-  const subResources = useResources(subResourceSubjects);
-  const navigateToNewRoute = useNewRoute(resource.getSubject());
+  const subResources = useResources(resource.props.subResources ?? []);
+  const navigateToNewRoute = useNewRoute(resource.subject);
   const [canEdit] = useCanWrite(resource);
 
   return (
@@ -56,7 +64,7 @@ export function FolderPage({ resource }: ResourcePageProps) {
         <TitleBarInner>
           <EditableTitle resource={resource} />
           <DisplayStyleButton
-            onClick={setDisplayStyle}
+            onClick={setPreferedDisplayStyle}
             displayStyle={displayStyle}
           />
         </TitleBarInner>
