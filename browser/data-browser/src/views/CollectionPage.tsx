@@ -6,7 +6,6 @@ import {
   useNumber,
   useResource,
   useString,
-  useLocalStorage,
   useStore,
   properties,
 } from '@tomic/react';
@@ -35,6 +34,7 @@ import { ResourcePageProps } from './ResourcePage';
 import { useEffectOnce } from '../hooks/useEffectOnce';
 import { Row } from '../components/Row';
 import { EditableTitle } from '../components/EditableTitle';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const displayStyles = [
   {

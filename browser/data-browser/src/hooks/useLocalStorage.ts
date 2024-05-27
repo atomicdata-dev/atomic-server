@@ -6,11 +6,7 @@ const listeners = new Map<
 >();
 
 export type SetLocalStorageValue<T> = (value: T | ((val: T) => T)) => void;
-/**
- * Hook for storing information to LocalStorage. Note that if you use this same
- * hook in multiple component instances, these will *not* share state! If you
- * want that behavior, you should use this hook inside a Context object.
- */
+
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,

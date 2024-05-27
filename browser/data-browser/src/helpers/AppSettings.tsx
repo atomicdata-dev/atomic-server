@@ -6,16 +6,12 @@ import {
   useMemo,
 } from 'react';
 import { DarkModeOption, useDarkMode } from './useDarkMode';
-import {
-  useLocalStorage,
-  useCurrentAgent,
-  useServerURL,
-  Agent,
-} from '@tomic/react';
+import { useCurrentAgent, useServerURL, Agent } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
 import { handleError } from './loggingHandlers';
 import { serverURLStorage } from './serverURLStorage';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface ProviderProps {
   children: ReactNode;
