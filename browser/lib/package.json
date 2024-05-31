@@ -1,5 +1,5 @@
 {
-  "version": "0.37.0",
+  "version": "0.38.0",
   "author": "Joep Meindertsma",
   "dependencies": {
     "@noble/ed25519": "1.6.0",
@@ -20,9 +20,7 @@
     "vitest": "^0.34.6",
     "whatwg-fetch": "^3.6.2"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "gitHead": "2172c73d8df4e5f273e6386676abc91b6c5b2707",
   "license": "MIT",
   "main": "dist/index.js",

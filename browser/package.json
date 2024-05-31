@@ -31,7 +31,7 @@
     "eslint-plugin-import": "^2.26.0"
   },
   "name": "@tomic/root",
-  "version": "0.36.0",
+  "version": "0.38.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -53,14 +53,7 @@
     }
   },
   "workspaces": {
-    "packages": [
-      "e2e",
-      "lib",
-      "react",
-      "data-browser",
-      "svelte",
-      "cli"
-    ]
+    "packages": ["e2e", "lib", "react", "data-browser", "svelte", "cli"]
   },
   "packageManager": "pnpm@8.15.2"
 }

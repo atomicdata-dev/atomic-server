@@ -1,5 +1,5 @@
 {
-  "version": "0.37.0",
+  "version": "0.38.0",
   "author": "Joep Meindertsma",
   "description": "Atomic Data React library",
   "dependencies": {
@@ -11,9 +11,7 @@
   "peerDependencies": {
     "react": ">17.0.2"
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "license": "MIT",
   "name": "@tomic/react",
   "main-dev": "src/index.ts",

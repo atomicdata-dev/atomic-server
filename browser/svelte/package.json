@@ -19,9 +19,7 @@
       "require": "./dist/index.cjs.js"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "license": "MIT",
   "main": "./dist/index.cjs.js",
   "module": "./dist/index.js",
@@ -47,5 +45,5 @@
   "type": "module",
   "types": "dist/index.d.ts",
   "typings": "./dist/index.d.ts",
-  "version": "0.37.0"
+  "version": "0.38.0"
 }

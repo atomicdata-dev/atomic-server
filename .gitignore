@@ -4,6 +4,7 @@ trace-*.json
 **/.temp
 .DS_Store
 .cargo
+.tmp-earthly-out
 artifact
 server/assets_tmp
 

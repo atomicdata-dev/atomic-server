@@ -107,14 +107,16 @@ mod tests {
         filters.insert("name".to_string(), "John".to_string());
         filters.insert("age".to_string(), "30".to_string());
         let expected_filter_string = "name:\"John\" AND age:\"30\"";
-        assert_eq!(build_filter_string(&filters), expected_filter_string);
+        let expected_filter_string_alt = "age:\"30\" AND name:\"John\"";
+        let result = build_filter_string(&filters);
+        assert!(result == expected_filter_string || result == expected_filter_string_alt);
     }
 
     #[test]
     fn test_build_search_subject() {
         // Mimics lib/search.test.ts
         let server_url = "https://test.com";
-        let query = "q=test";
+        let query = "test";
         let opts = SearchOpts {
             include: Some(true),
             limit: Some(30),
