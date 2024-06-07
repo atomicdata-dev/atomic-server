@@ -8,7 +8,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 ## [v0.38.0] - UNRELEASED
 
 - Remove `process-management` feature #324 #334
-- Add `atomic_lib::client::search` for building queries
+- Add `atomic_lib::client::search` for building queries #778
+- Add `atomic-cli search` command #778
 - Migrate atomic_cli to use the derive API #890
 
 ## [v0.37.0] - 2024-02-01

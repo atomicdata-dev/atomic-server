@@ -45,7 +45,7 @@ fn prompt_instance(
     // I think URL generation could be better, though. Perhaps use a
     let path = SystemTime::now().duration_since(UNIX_EPOCH)?.subsec_nanos();
 
-    let write_ctx = context.get_write_context();
+    let write_ctx = context.read_config();
 
     let mut subject = format!("{}/{}", write_ctx.server, path);
     if let Some(sn) = &preferred_shortname {

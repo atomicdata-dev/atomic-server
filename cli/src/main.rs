@@ -11,6 +11,7 @@ mod commit;
 mod new;
 mod path;
 mod print;
+mod search;
 
 #[derive(Parser)]
 #[command(
@@ -92,6 +93,12 @@ enum Commands {
         #[arg(required = true)]
         subject: String,
     },
+    /// Full text search
+    Search {
+        /// The search query
+        #[arg(required = true)]
+        query: String,
+    },
     /// List all bookmarks
     List,
     /// Validates the store
@@ -129,8 +136,8 @@ pub struct Context {
 }
 
 impl Context {
-    /// Sets an agent
-    pub fn get_write_context(&self) -> Config {
+    /// Returns the config (agent, key) from the user config dir
+    pub fn read_config(&self) -> Config {
         if let Some(write_ctx) = self.write.borrow().as_ref() {
             return write_ctx.clone();
         };
@@ -249,6 +256,9 @@ fn exec_command(context: &mut Context) -> AtomicResult<()> {
             value,
         } => {
             commit::set(context, &subject, &property, &value)?;
+        }
+        Commands::Search { query } => {
+            search::search(context, query)?;
         }
         Commands::Validate => {
             validate(context);

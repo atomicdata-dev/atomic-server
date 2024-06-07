@@ -60,9 +60,7 @@ fn build_filter_string(filters: &HashMap<String, String>) -> String {
 pub fn build_search_subject(server_url: &str, query: &str, opts: SearchOpts) -> String {
     let mut url = base_url(server_url);
 
-    if let Some(q) = query.strip_prefix("q=") {
-        url.query_pairs_mut().append_pair("q", q);
-    }
+    url.query_pairs_mut().append_pair("q", query);
     if let Some(include) = opts.include {
         url.query_pairs_mut()
             .append_pair("include", &include.to_string());
