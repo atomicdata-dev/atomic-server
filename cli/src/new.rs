@@ -13,13 +13,7 @@ use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Create a new instance of some class through a series of prompts, adds it to the store
-pub fn new(context: &mut Context) -> AtomicResult<()> {
-    let class_input = context
-        .matches
-        .subcommand_matches("new")
-        .unwrap()
-        .get_one::<&str>("class")
-        .expect("Add a class value");
+pub fn new(context: &mut Context, class_input: &str) -> AtomicResult<()> {
     let class_url = context
         .mapping
         .lock()

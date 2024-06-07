@@ -1,24 +1,127 @@
+use atomic_lib::serialize::Format;
 use atomic_lib::{agents::generate_public_key, mapping::Mapping};
 use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::{errors::AtomicResult, Storelike};
-use clap::{crate_version, Arg, ArgMatches, Command};
+use clap::{crate_version, Parser, Subcommand, ValueEnum};
 use colored::*;
 use dirs::home_dir;
 use std::{cell::RefCell, path::PathBuf, sync::Mutex};
-
-use crate::print::SERIALIZE_OPTIONS;
 
 mod commit;
 mod new;
 mod path;
 mod print;
 
+#[derive(Parser)]
+#[command(
+    name = "atomic-cli",
+    version = crate_version!(),
+    author = "Joep Meindertsma <joep@ontola.io>",
+    about = "Create, share, fetch and model Atomic Data!",
+    after_help = "Visit https://atomicdata.dev for more info",
+    arg_required_else_help = true
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Subcommand, Clone)]
+enum Commands {
+    /// Create a Resource
+    New {
+        /// The URL or shortname of the Class that should be created
+        #[arg(required = true)]
+        class: String,
+    },
+    /// Get a Resource or Value by using Atomic Paths
+    #[command(after_help = "\
+        Traverses a Path and prints the resulting Resource or Value. \n\n\
+        Examples: \n\n\
+        $ atomic get class https://atomicdata.dev/properties/description\n\
+        $ atomic get class description\n\
+        $ atomic get https://example.com \n\n\
+        Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
+    ")]
+    Get {
+        /// The subject URL, shortname or path to be fetched
+        #[arg(required = true, num_args = 1..)]
+        path: Vec<String>,
+
+        /// Serialization format
+        #[arg(long, value_enum, default_value = "pretty")]
+        as_: SerializeOptions,
+    },
+    /// Update a single Atom. Creates both the Resource if they don't exist. Overwrites existing.
+    Set {
+        /// Subject URL or bookmark of the resource
+        #[arg(required = true)]
+        subject: String,
+
+        /// Property URL or shortname of the property
+        #[arg(required = true)]
+        property: String,
+
+        /// String representation of the Value to be changed
+        #[arg(required = true)]
+        value: String,
+    },
+    /// Remove a single Atom from a Resource.
+    Remove {
+        /// Subject URL or bookmark of the resource
+        #[arg(required = true)]
+        subject: String,
+
+        /// Property URL or shortname of the property to be deleted
+        #[arg(required = true)]
+        property: String,
+    },
+    /// Edit a single Atom from a Resource using your text editor.
+    Edit {
+        /// Subject URL or bookmark of the resource
+        #[arg(required = true)]
+        subject: String,
+
+        /// Property URL or shortname of the property to be edited
+        #[arg(required = true)]
+        property: String,
+    },
+    /// Permanently removes a Resource.
+    Destroy {
+        /// Subject URL or bookmark of the resource to be destroyed
+        #[arg(required = true)]
+        subject: String,
+    },
+    /// List all bookmarks
+    List,
+    /// Validates the store
+    #[command(hide = true)]
+    Validate,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
+pub enum SerializeOptions {
+    Pretty,
+    Json,
+    NTriples,
+}
+
+impl Into<Format> for SerializeOptions {
+    fn into(self) -> Format {
+        match self {
+            SerializeOptions::Pretty => Format::Pretty,
+            SerializeOptions::Json => Format::Json,
+            SerializeOptions::NTriples => Format::NTriples,
+        }
+    }
+}
+
 #[allow(dead_code)]
 /// The Context contains all the data for executing a single CLI command, such as the passed arguments and the in memory store.
 pub struct Context {
     store: atomic_lib::Store,
     mapping: Mutex<Mapping>,
-    matches: ArgMatches,
+    matches: Commands,
     config_folder: PathBuf,
     user_mapping_path: PathBuf,
     /// A set of configuration options that are required for writing data on some server
@@ -71,101 +174,7 @@ fn set_agent_config() -> CLIResult<Config> {
 }
 
 fn main() -> AtomicResult<()> {
-    let matches = Command::new("atomic-cli")
-        .version(crate_version!())
-        .author("Joep Meindertsma <joep@ontola.io>")
-        .about("Create, share, fetch and model Atomic Data!")
-        .after_help("Visit https://atomicdata.dev for more info")
-        .arg_required_else_help(true)
-        .subcommand(
-            Command::new("new").about("Create a Resource")
-            .arg(
-                Arg::new("class")
-                    .help("The URL or shortname of the Class that should be created")
-                    .required(true),
-            )
-        )
-        .subcommand(
-            Command::new("get")
-                    .about("Get a Resource or Value by using Atomic Paths.",
-                    )
-                    .after_help("\
-                    Traverses a Path and prints the resulting Resource or Value. \n\n\
-                    Examples: \n\n\
-                    $ atomic get class https://atomicdata.dev/properties/description\n\
-                    $ atomic get class description\n\
-                    $ atomic get https://example.com \n\n\
-                    Visit https://docs.atomicdata.dev/core/paths.html for more info about paths. \
-                    ")
-                .arg(Arg::new("path")
-                    .help("\
-                    The subject URL, shortname or path to be fetched. \
-                    Use quotes for paths. \
-                    You can use Bookmarks instead of a full subject URL. \
-                    ",
-                    )
-                    .required(true)
-                    .num_args(1..)
-                )
-                .arg(Arg::new("as")
-                    .long("as")
-                    .value_parser(SERIALIZE_OPTIONS)
-                    .default_value("pretty")
-                    .help("Serialization format")
-                    .num_args(1)
-                )
-        )
-        .subcommand(
-            Command::new("set")
-                .about("Update a single Atom. Creates both the Resource if they don't exist. Overwrites existing.")
-                .arg(Arg::new("subject")
-                    .help("Subject URL or bookmark of the resource")
-                    .required(true)
-                )
-                .arg(Arg::new("property")
-                    .help("Property URL or shortname of the property")
-                    .required(true)
-                )
-                .arg(Arg::new("value")
-                    .help("String representation of the Value to be changed")
-                    .required(true)
-                )
-        )
-        .subcommand(
-            Command::new("remove")
-                .about("Remove a single Atom from a Resource.")
-                .arg(Arg::new("subject")
-                    .help("Subject URL or bookmark of the resource")
-                    .required(true)
-                )
-                .arg(Arg::new("property")
-                    .help("Property URL or shortname of the property to be deleted")
-                    .required(true)
-                )
-        )
-        .subcommand(
-            Command::new("edit")
-                .about("Edit a single Atom from a Resource using your text editor.")
-                .arg(Arg::new("subject")
-                    .help("Subject URL or bookmark of the resource")
-                    .required(true)
-                )
-                .arg(Arg::new("property")
-                    .help("Property URL or shortname of the property to be edited")
-                    .required(true)
-                )
-        )
-        .subcommand(
-            Command::new("destroy")
-                .about("Permanently removes a Resource.")
-                .arg(Arg::new("subject")
-                    .help("Subject URL or bookmark of the resource to be destroyed")
-                    .required(true)
-                )
-        )
-        .subcommand(Command::new("list").about("List all bookmarks"))
-        .subcommand(Command::new("validate").about("Validates the store").hide(true))
-        .get_matches();
+    let cli = Cli::parse();
 
     let config_folder = home_dir()
         .expect("Home dir could not be opened. We need this to store some configuration files.")
@@ -188,7 +197,7 @@ fn main() -> AtomicResult<()> {
     let mut context = Context {
         mapping: Mutex::new(mapping),
         store,
-        matches,
+        matches: cli.command,
         config_folder,
         user_mapping_path,
         write: RefCell::new(None),
@@ -206,42 +215,44 @@ fn main() -> AtomicResult<()> {
 }
 
 fn exec_command(context: &mut Context) -> AtomicResult<()> {
-    match context.matches.subcommand_name() {
-        Some("destroy") => {
-            commit::destroy(context)?;
+    let command = context.matches.clone();
+
+    match command {
+        Commands::Destroy { subject } => {
+            commit::destroy(context, &subject)?;
         }
-        Some("edit") => {
+        Commands::Edit { subject, property } => {
             #[cfg(feature = "native")]
             {
-                commit::edit(context)?;
+                commit::edit(context, &subject, &property)?;
             }
             #[cfg(not(feature = "native"))]
             {
                 return Err("Feature not available. Compile with `native` feature.".into());
             }
         }
-        Some("get") => {
-            path::get_path(context)?;
+        Commands::Get { path, as_ } => {
+            path::get_path(context, &path, &as_)?;
         }
-        Some("list") => {
+        Commands::List => {
             list(context);
         }
-        Some("new") => {
-            new::new(context)?;
+        Commands::New { class } => {
+            new::new(context, &class)?;
         }
-        Some("remove") => {
-            commit::remove(context)?;
+        Commands::Remove { subject, property } => {
+            commit::remove(context, &subject, &property)?;
         }
-        Some("set") => {
-            commit::set(context)?;
+        Commands::Set {
+            subject,
+            property,
+            value,
+        } => {
+            commit::set(context, &subject, &property, &value)?;
         }
-        Some("validate") => {
+        Commands::Validate => {
             validate(context);
         }
-        Some(cmd) => {
-            return Err(format!("{} is not a valid command. Run atomic --help", cmd).into())
-        }
-        None => println!("Run atomic --help for available commands"),
     };
     Ok(())
 }

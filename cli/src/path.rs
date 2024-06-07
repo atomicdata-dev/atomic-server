@@ -1,20 +1,14 @@
-use crate::{
-    print::{get_serialization, print_resource},
-    Context,
-};
+use crate::{print::print_resource, Context, SerializeOptions};
 use atomic_lib::{agents::ForAgent, errors::AtomicResult, serialize, storelike, Atom, Storelike};
-use serialize::Format;
 
 /// Resolves an Atomic Path query
-pub fn get_path(context: &mut Context) -> AtomicResult<()> {
-    let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
-    let path_vec: Vec<String> = subcommand_matches
-        .get_many::<String>("path")
-        .expect("Add a URL, shortname or path")
-        .map(|s| s.to_string())
-        .collect();
+pub fn get_path(
+    context: &mut Context,
+    path_vec: &Vec<String>,
+    serialize: &SerializeOptions,
+) -> AtomicResult<()> {
+    // let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
     let path_string: String = path_vec.join(" ");
-    let serialization: Format = get_serialization(subcommand_matches)?;
 
     // Returns a URL or Value
     let store = &mut context.store;
@@ -26,17 +20,15 @@ pub fn get_path(context: &mut Context) -> AtomicResult<()> {
     let out = match path {
         storelike::PathReturn::Subject(subject) => {
             let resource = store.get_resource_extended(&subject, false, &ForAgent::Sudo)?;
-            print_resource(context, &resource, subcommand_matches)?;
+            print_resource(context, &resource, serialize)?;
             return Ok(());
         }
-        storelike::PathReturn::Atom(atom) => match serialization {
-            Format::JsonLd | Format::Json | Format::JsonAd | Format::Pretty => {
-                atom.value.to_string()
-            }
-            Format::NTriples => {
+        storelike::PathReturn::Atom(atom) => match serialize {
+            SerializeOptions::NTriples => {
                 let atoms: Vec<Atom> = vec![*atom];
                 serialize::atoms_to_ntriples(atoms, store)?
             }
+            _other => atom.value.to_string(),
         },
     };
     println!("{}", out);
