@@ -8,9 +8,17 @@ use atomic_lib::{
     Resource, Storelike, Value,
 };
 use colored::Colorize;
-use promptly::prompt_opt;
+use dialoguer::Input;
 use regex::Regex;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+fn prompt_opt(msg: &str) -> AtomicResult<Option<String>> {
+    dialoguer::Input::new()
+        .with_prompt(msg)
+        .interact_text()
+        .map(|s: String| if s.is_empty() { None } else { Some(s) })
+        .map_err(|e| format!("Error while prompting: {}", e).into())
+}
 
 /// Create a new instance of some class through a series of prompts, adds it to the store
 pub fn new(context: &mut Context, class_input: &str) -> AtomicResult<()> {
@@ -19,7 +27,7 @@ pub fn new(context: &mut Context, class_input: &str) -> AtomicResult<()> {
         .lock()
         .unwrap()
         .try_mapping_or_url(class_input)
-        .unwrap();
+        .expect(&format!("No class found with that input: {class_input}"));
     let class = context.store.get_class(&class_url)?;
     println!("Enter a new {}: {}", class.shortname, class.description);
     let (resource, _bookmark) = prompt_instance(context, &class, None)?;
@@ -127,12 +135,12 @@ fn prompt_field(
     match &property.data_type {
         DataType::String | DataType::Markdown => {
             let msg = format!("string{}", msg_appendix);
-            input = prompt_opt(msg)?;
+            input = prompt_opt(&msg)?;
             return Ok(input);
         }
         DataType::Slug => {
             let msg = format!("slug{}", msg_appendix);
-            input = prompt_opt(msg)?;
+            input = prompt_opt(&msg)?;
             let re = Regex::new(atomic_lib::values::SLUG_REGEX)?;
             match input {
                 Some(slug) => {
@@ -147,7 +155,7 @@ fn prompt_field(
         }
         DataType::Integer => {
             let msg = format!("integer{}", msg_appendix);
-            let number: Option<u32> = prompt_opt(msg)?;
+            let number: Option<u32> = Input::<u32>::new().with_prompt(&msg).interact_text().ok();
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
@@ -157,7 +165,7 @@ fn prompt_field(
         }
         DataType::Float => {
             let msg = format!("float{}", msg_appendix);
-            let number: Option<f64> = prompt_opt(msg)?;
+            let number: Option<f64> = Input::<f64>::new().with_prompt(&msg).interact_text().ok();
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
@@ -167,7 +175,7 @@ fn prompt_field(
         }
         DataType::Date => {
             let msg = format!("date YYYY-MM-DD{}", msg_appendix);
-            let date: Option<String> = prompt_opt(msg).unwrap();
+            let date: Option<String> = prompt_opt(&msg).unwrap();
             let re = Regex::new(atomic_lib::values::DATE_REGEX).unwrap();
             match date {
                 Some(date_val) => {
@@ -193,7 +201,7 @@ fn prompt_field(
                     class.shortname, class.subject
                 )
             }
-            let url: Option<String> = prompt_opt(msg).unwrap();
+            let url: Option<String> = prompt_opt(&msg).unwrap();
             // If a classtype is present, the given URL must be an instance of that Class
             if let Some(u) = url {
                 // TODO: Check if string or if map
@@ -212,7 +220,7 @@ fn prompt_field(
                 "resource array - Add the URLs or Shortnames, separated by spacebars{}",
                 msg_appendix
             );
-            let option_string: Option<String> = prompt_opt(msg).unwrap();
+            let option_string: Option<String> = prompt_opt(&msg).unwrap();
             match option_string {
                 Some(string) => {
                     let string_items = string.split(' ');
@@ -253,7 +261,7 @@ fn prompt_field(
         },
         DataType::Timestamp => {
             let msg = format!("timestamp{}", msg_appendix);
-            let number: Option<u64> = prompt_opt(msg)?;
+            let number: Option<u64> = Input::<u64>::new().with_prompt(&msg).interact_text().ok();
             match number {
                 Some(nr) => {
                     input = Some(nr.to_string());
@@ -266,7 +274,7 @@ fn prompt_field(
                 "unsupported datatype {}, defaulting to string{}",
                 unsup, msg_appendix
             );
-            let string: Option<String> = prompt_opt(msg)?;
+            let string: Option<String> = prompt_opt(&msg)?;
             match string {
                 Some(nr) => {
                     input = Some(nr);
@@ -276,16 +284,8 @@ fn prompt_field(
         }
         DataType::Boolean => {
             let msg = format!("boolean{}", msg_appendix);
-            let number: Option<bool> = prompt_opt(msg)?;
-            match number {
-                Some(nr) => {
-                    if nr {
-                        return Ok(Some("true".to_string()));
-                    }
-                    return Ok(Some("false".to_string()));
-                }
-                None => return Ok(None),
-            }
+            let number: Option<bool> = Input::<bool>::new().with_prompt(&msg).interact_text().ok();
+            return Ok(number.map(|b| b.to_string()));
         }
     };
     Ok(input)
@@ -303,7 +303,7 @@ fn prompt_bookmark(mapping: &mut mapping::Mapping, subject: &str) -> Option<Stri
                         "You're already using that shortname for {:?}, try something else",
                         mapping.get(sn).unwrap()
                     );
-                    shortname = prompt_opt(msg).unwrap();
+                    shortname = prompt_opt(&msg).unwrap();
                 } else if re.is_match(sn.as_str()) {
                     mapping.insert(sn.into(), subject.into());
                     return Some(String::from(sn));

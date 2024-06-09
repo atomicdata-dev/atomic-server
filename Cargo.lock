@@ -454,6 +454,7 @@ dependencies = [
  "atomic_lib",
  "clap",
  "colored",
+ "dialoguer",
  "dirs",
  "edit",
  "promptly",

@@ -165,9 +165,17 @@ fn set_agent_config() -> CLIResult<Config> {
                 "No config found at {:?}. Let's create one!",
                 &agent_config_path
             );
-            let server = promptly::prompt("What's the base url of your Atomic Server?")?;
-            let agent = promptly::prompt("What's the URL of your Agent?")?;
-            let private_key = promptly::prompt("What's the private key of this Agent?")?;
+
+            use dialoguer::Input;
+            let server: String = Input::new()
+                .with_prompt("What's the base url of your Atomic Server?")
+                .interact_text()?;
+            let agent: String = Input::new()
+                .with_prompt("What's the URL of your Agent?")
+                .interact_text()?;
+            let private_key: String = Input::new()
+                .with_prompt("What's the private key of this Agent?")
+                .interact_text()?;
             let config = atomic_lib::config::Config {
                 server,
                 agent,
