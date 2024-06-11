@@ -260,17 +260,6 @@ export const GlobalStyle = createGlobalStyle`
     }
   }
 
-  code {
-    background-color: ${props => props.theme.colors.bg1};
-    padding: 0rem 0.2rem;
-    font-family: Monaco, monospace;
-    font-size: .8em;
-    display: inline-flex;
-    white-space: nowrap;
-    overflow: auto;
-    max-width: 100%;
-  }
-
   b {
     font-weight: bold;
   }

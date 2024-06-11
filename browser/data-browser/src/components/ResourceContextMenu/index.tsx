@@ -17,6 +17,7 @@ import { DropdownTriggerRenderFunction } from '../Dropdown/DropdownTrigger';
 import { buildDefaultTrigger } from '../Dropdown/DefaultTrigger';
 import {
   FaClock,
+  FaCode,
   FaDownload,
   FaEdit,
   FaEllipsisV,
@@ -33,6 +34,7 @@ import {
 import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
+import { ResourceCodeUsageDialog } from '../../views/CodeUsage/ResourceCodeUsageDialog';
 
 export enum ContextMenuOptions {
   View = 'view',
@@ -44,6 +46,7 @@ export enum ContextMenuOptions {
   Delete = 'delete',
   History = 'history',
   Import = 'import',
+  UseInCode = 'useInCode',
 }
 
 export interface ResourceContextMenuProps {
@@ -76,6 +79,8 @@ function ResourceContextMenu({
   const location = useLocation();
   const resource = useResource(subject);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
+
   const [currentSubject] = useCurrentSubject();
 
   const { enableScope } = useQueryScopeHandler(subject);
@@ -142,6 +147,14 @@ function ResourceContextMenu({
       icon: <FaEdit />,
       shortcut: simple ? '' : shortcuts.edit,
       onClick: () => navigate(editURL(subject)),
+    },
+    {
+      id: ContextMenuOptions.UseInCode,
+      label: 'use in code',
+      helper:
+        'Usage instructions for how to fetch and use the resource in your code.',
+      icon: <FaCode />,
+      onClick: () => setShowCodeUsageDialog(true),
     },
     {
       id: ContextMenuOptions.Scope,
@@ -219,6 +232,13 @@ function ResourceContextMenu({
           <ResourceUsage resource={resource} />
         </>
       </ConfirmationDialog>
+      {currentSubject && (
+        <ResourceCodeUsageDialog
+          subject={currentSubject}
+          show={showCodeUsageDialog}
+          bindShow={setShowCodeUsageDialog}
+        />
+      )}
     </>
   );
 }

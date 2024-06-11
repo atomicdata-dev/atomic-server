@@ -120,7 +120,8 @@ const unknownProp = book.get('https://unknownprop.site/prop/42'); // JSONValue
 
 ### Props shorthand
 
-Because you have initialized your ontologies before lib is aware of what properties exist and what their name and type is. Because of this it is possible to use the props field on a resource and get full intellisense and typing on it.
+Because you've generated your ontologies, lib is aware of what properties exist and what their name and types are.
+It is therefore possible to use the `.props` field on a resource and get full intellisense and typing!
 
 ```typescript
 const book = await store.getResourceAsync<Book>(
@@ -133,7 +134,7 @@ const description = book.props.description; // string | undefined
 
 > The props field is a computed property and is readonly.
 >
-> If you have to read very large number of properties at a time it is more efficient to use the `resource.get()` method instead of the props field because the props field iterates over the resources propval map.
+> If you have to read **very** large number of properties at a time it is more efficient to use the `resource.get()` method instead of the props field because the props field iterates over the resources propval map.
 
 ## Configuration
 

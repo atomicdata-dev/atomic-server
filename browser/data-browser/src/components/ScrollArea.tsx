@@ -58,6 +58,7 @@ const Thumb = styled(RadixScrollArea.Thumb)`
   z-index: 2;
 `;
 
+// @ts-ignore
 export const ScrollViewPort = styled(RadixScrollArea.Viewport)`
   width: 100%;
   height: 100%;

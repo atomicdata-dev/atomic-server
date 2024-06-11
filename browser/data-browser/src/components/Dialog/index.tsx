@@ -37,6 +37,7 @@ export enum DialogSlot {
 }
 
 export const DIALOG_MEDIA_BREAK_POINT = '640px';
+export const VAR_DIALOG_INNER_WIDTH = '--dialog-inner-width';
 
 const ANIM_MS = 80;
 const ANIM_SPEED = `${ANIM_MS}ms`;
@@ -158,8 +159,8 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
       onMouseDown={handleOutSideClick}
       $width={width}
     >
-      <StyledInnerDialog ref={innerDialogRef}>
-        <PopoverContainer>
+      <PopoverContainer>
+        <StyledInnerDialog ref={innerDialogRef}>
           <DropdownContainer>
             <CloseButtonSlot slot='close'>
               <Button icon onClick={cancelDialog} aria-label='close'>
@@ -168,8 +169,8 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
             </CloseButtonSlot>
             {children}
           </DropdownContainer>
-        </PopoverContainer>
-      </StyledInnerDialog>
+        </StyledInnerDialog>
+      </PopoverContainer>
     </StyledDialog>
   );
 };
@@ -235,6 +236,7 @@ const StyledInnerDialog = styled.div`
   grid-template-rows: 1fr auto auto;
   gap: 1rem;
   grid-template-areas: 'title close' 'content content' 'actions actions';
+  max-block-size: calc(100vh - ${p => p.theme.margin}rem * 2);
 `;
 
 const fadeInForground = keyframes`
@@ -261,6 +263,12 @@ const fadeInBackground = keyframes`
 
 const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
   --animation-speed: 500ms;
+  --dialog-width: min(90vw, ${p => p.$width ?? '60ch'});
+
+  ${VAR_DIALOG_INNER_WIDTH}: calc(
+    var(--dialog-width) - 2 * ${p => p.theme.margin}rem
+  );
+
   box-sizing: border-box;
   inset: 0px;
   position: relative;
@@ -270,11 +278,9 @@ const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
   background-color: ${props => props.theme.colors.bg};
   border-radius: ${props => props.theme.radius};
   border: solid 1px ${props => props.theme.colors.bg2};
-  max-inline-size: min(90vw, ${p => p.$width ?? '100ch'});
-  min-inline-size: min(90vw, ${p => p.$width ?? '60ch'});
+  inline-size: var(--dialog-width);
   max-block-size: 100vh;
   height: fit-content;
-  max-height: 90vh;
   overflow: visible;
   box-shadow: ${p => p.theme.boxShadowSoft};
 
