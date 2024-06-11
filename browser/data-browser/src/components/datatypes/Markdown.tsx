@@ -76,11 +76,27 @@ const MarkdownWrapper = styled.div`
     color: ${props => props.theme.colors.textLight};
   }
 
-  pre code {
-    white-space: pre-wrap;
-    padding: 1rem;
-    width: 100%;
+  code {
+    font-family: Monaco, monospace;
+    font-size: 0.8em;
+  }
+
+  :not(pre) > code {
+    background-color: ${props => props.theme.colors.bg1};
+    padding: 0rem 0.2rem;
+    font-family: Monaco, monospace;
+    display: inline-flex;
+    white-space: nowrap;
+    overflow: auto;
+    max-width: 100%;
+  }
+
+  pre {
+    background-color: ${p => p.theme.colors.bg1};
+    padding: 0.5rem ${p => p.theme.margin}rem;
     border-radius: ${p => p.theme.radius};
+    white-space: pre;
+    overflow-x: auto;
   }
 
   table {

@@ -36,13 +36,19 @@ export const Tabs: FC<PropsWithChildren<TabsProps>> = ({
 
 interface TabPanelProps {
   value: string;
+  className?: string;
 }
 
 export const TabPanel: FC<PropsWithChildren<TabPanelProps>> = ({
   value,
+  className,
   children,
 }) => {
-  return <RadixTabs.Content value={value}>{children}</RadixTabs.Content>;
+  return (
+    <RadixTabs.Content className={className} value={value}>
+      {children}
+    </RadixTabs.Content>
+  );
 };
 
 const TabList = styled(RadixTabs.List)`

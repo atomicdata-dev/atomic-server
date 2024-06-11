@@ -58,7 +58,7 @@ const Flex = styled.div<FlexProps>`
   gap: ${p => p.gap ?? `${p.theme.margin}rem`};
   justify-content: ${p => p.justify ?? 'start'};
   flex-direction: ${p => p.direction ?? 'row'};
-  flex-wrap: ${p => (p.wrapItems ? 'wrap' : 'no-wrap')};
+  flex-wrap: ${p => (p.wrapItems ? 'wrap' : 'nowrap')};
   width: ${p => (p.fullWidth ? '100%' : 'initial')};
   height: ${p => (p.fullHeight ? '100%' : 'initial')};
 

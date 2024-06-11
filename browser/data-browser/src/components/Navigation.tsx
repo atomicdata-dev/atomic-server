@@ -216,4 +216,10 @@ const SideBarWrapper = styled('div')`
   bottom: 0;
   left: 0;
   right: 0;
+
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+  @starting-style {
+    opacity: 0;
+  }
 `;

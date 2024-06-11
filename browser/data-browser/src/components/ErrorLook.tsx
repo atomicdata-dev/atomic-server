@@ -25,13 +25,18 @@ export function ErrorBlock({ error, showTrace }: ErrorBlockProps): JSX.Element {
         <FaExclamationTriangle />
         Something went wrong
       </BiggerText>
-      <CodeBlock>{error.message}</CodeBlock>
-      {showTrace && (
-        <>
-          <span>Stack trace:</span>
-          <CodeBlock>{error.stack}</CodeBlock>
-        </>
-      )}
+      <Pre>
+        <code>{error.message}</code>
+        {showTrace && (
+          <>
+            <br />
+            <br />
+            <span>Stack trace:</span>
+            <br />
+            <code>{error.stack}</code>
+          </>
+        )}
+      </Pre>
     </ErrorLookBig>
   );
 }
@@ -45,11 +50,12 @@ const ErrorLookBig = styled.div`
   background-color: ${p => p.theme.colors.bg1};
 `;
 
-const CodeBlock = styled.code`
+const Pre = styled.pre`
   white-space: pre-wrap;
   border-radius: ${p => p.theme.radius};
   padding: ${p => p.theme.margin}rem;
   background-color: ${p => p.theme.colors.bg};
+  font-size: 0.9rem;
 `;
 
 const BiggerText = styled.p`
