@@ -6,6 +6,17 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ### Atomic Browser
 
+- [#855](https://github.com/atomicdata-dev/atomic-server/issues/855) Add a dialog that shows how to fetch and use the current resource in your code.
+- [#825](https://github.com/atomicdata-dev/atomic-server/issues/825) Folder display styles are now saved locally instead of on the resource. The display style property will now act as the default view style.
+
+### @tomic/react
+
+- BREAKING CHANGE: Removed the `useLocalStorage` hook.
+
+## v0.38.0
+
+### Atomic Browser
+
 - [#845](https://github.com/atomicdata-dev/atomic-server/issues/845) Add option to create instances and tables from the ontology view.
 - [#845](https://github.com/atomicdata-dev/atomic-server/issues/845) Add default Ontology option to drives.
 - [#841](https://github.com/atomicdata-dev/atomic-server/issues/841) Add better inputs for `Timestamp` and `Date` datatypes.
@@ -46,7 +57,6 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Added `useCollectionPage` hook.
 - Fix bug where `useCollection` would fetch the collection twice on mount.
 - `useServerURL` no longer stores the server url in localstorage.
-- BREAKING CHANGE: Removed the `useLocalStorage` hook.
 
 ### @tomic/cli
 
