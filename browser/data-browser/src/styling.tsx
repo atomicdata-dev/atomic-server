@@ -209,11 +209,10 @@ export const GlobalStyle = createGlobalStyle`
     margin: 0;
     /** Pretty dark mode transition */
     transition: background .2s ease, border-color .2s ease, color .2s ease;
-    font-size: 15px;
+    font-size: 0.95rem;
   }
 
   input, button, body {
-    /* transition: background .2s ease, border-color .2s ease, color .2s ease; */
     /* Don't overflow input elements */
     overflow-wrap: normal;
   }
