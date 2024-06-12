@@ -1,0 +1,28 @@
+version: "3.4"
+
+services:
+  atomic-server:
+    image: joepmeneer/atomic-server
+    container_name: atomic-server
+    restart: unless-stopped
+    environment:
+      ATOMIC_DOMAIN: ${ATOMIC_DOMAIN}
+      ATOMIC_SERVER_URL: ${ATOMIC_SERVER_URL}
+    ports:
+      - 8080:80
+    volumes:
+      - data:/atomic-storage
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    environment:
+      TUNNEL_URL: ${TUNNEL_URL}
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    command: "tunnel run"
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+    links:
+      - atomic-server
+    depends_on:
+      - atomic-server
+volumes:
+  data:
