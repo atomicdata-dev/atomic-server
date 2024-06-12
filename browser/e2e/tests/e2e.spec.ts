@@ -34,6 +34,7 @@ import {
   fillSearchBox,
   waitForCommitOnCurrentResource,
   currentDialog,
+  clickSidebarItem,
 } from './test-utils';
 
 test.describe('data-browser', async () => {
@@ -313,13 +314,15 @@ test.describe('data-browser', async () => {
     // Create a new folder
     await newResource('folder', page);
     // Createa sub-resource in the folder
-    await page.click('text=Untitled folder');
-    await page.click('main >> text=New Resource');
+    await page
+      .getByRole('main')
+      .getByRole('button', { name: 'New Resource', exact: true })
+      .click();
     await page.click('button:has-text("Document")');
     await page.locator(editableTitle).click();
     await page.keyboard.type('RAM Downloading Strategies');
     await page.keyboard.press('Enter');
-    await page.click('[data-test="sidebar"] >> text=Untitled folder');
+    await clickSidebarItem('Untitled folder', page);
     await expect(
       page.locator(
         '[data-test="folder-list"] >> text=RAM Downloading Strategies',
@@ -415,14 +418,12 @@ test.describe('data-browser', async () => {
     // create a resource, make sure its visible in the sidebar (and after refresh)
     const klass = 'folder';
     await newResource(klass, page);
-    await expect(
-      page.locator(`[data-test="sidebar"] >> text=${klass}`),
-    ).toBeVisible();
+    await expect(page.getByTestId('sidebar').getByText(klass)).toBeVisible();
     const d0 = 'depth0';
     await setTitle(page, d0);
 
     // Create a subresource, and later check it in the sidebar
-    await page.locator(`[data-test="sidebar"] >> text=${d0}`).hover();
+    await page.getByTestId('sidebar').getByText(d0).hover();
     await page.locator(`[title="Create new resource under ${d0}"]`).click();
     await page.click(`button:has-text("${klass}")`);
     const d1 = 'depth1';
@@ -430,21 +431,21 @@ test.describe('data-browser', async () => {
     await setTitle(page, d1);
 
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      page.getByTestId('sidebar').getByText(d0),
       "Sidebar doesn't show updated parent resource title",
     ).toBeVisible();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      page.getByTestId('sidebar').getByText(d1),
       "Sidebar doesn't show child resource title",
     ).toBeVisible();
     await page.waitForTimeout(500);
     await page.reload();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      page.getByTestId('sidebar').getByText(d1),
       "Sidebar doesn't show parent resource resource title after refresh",
     ).toBeVisible();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      page.getByTestId('sidebar').getByText(d0),
       "Sidebar doesn't show child resource title after refresh",
     ).toBeVisible();
   });

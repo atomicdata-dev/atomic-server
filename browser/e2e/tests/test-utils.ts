@@ -304,7 +304,7 @@ export async function editTitle(title: string, page: Page) {
 }
 
 export async function clickSidebarItem(text: string, page: Page) {
-  await page.click(`[data-test="sidebar"] >> text="${text}"`);
+  await page.getByTestId('sidebar').getByText(text).click();
 }
 
 /** Click an item from the main, visible context menu */
