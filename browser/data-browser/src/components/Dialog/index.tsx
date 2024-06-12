@@ -159,8 +159,8 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
       onMouseDown={handleOutSideClick}
       $width={width}
     >
-      <PopoverContainer>
-        <StyledInnerDialog ref={innerDialogRef}>
+      <StyledInnerDialog ref={innerDialogRef}>
+        <PopoverContainer>
           <DropdownContainer>
             <CloseButtonSlot slot='close'>
               <Button icon onClick={cancelDialog} aria-label='close'>
@@ -169,8 +169,8 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
             </CloseButtonSlot>
             {children}
           </DropdownContainer>
-        </StyledInnerDialog>
-      </PopoverContainer>
+        </PopoverContainer>
+      </StyledInnerDialog>
     </StyledDialog>
   );
 };

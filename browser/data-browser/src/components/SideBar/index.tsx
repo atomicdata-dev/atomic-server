@@ -61,7 +61,7 @@ export function SideBar(): JSX.Element {
       <SideBarStyled
         ref={mountRefs}
         size={size}
-        data-test='sidebar'
+        data-testid='sidebar'
         locked={isWideScreen && sideBarLocked}
         exposed={sidebarVisible}
         {...listeners}
