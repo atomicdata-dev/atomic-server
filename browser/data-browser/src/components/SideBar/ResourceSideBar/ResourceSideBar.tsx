@@ -1,5 +1,13 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { useString, useResource, useTitle, urls, useArray } from '@tomic/react';
+import {
+  useString,
+  useResource,
+  useTitle,
+  useArray,
+  useCanWrite,
+  core,
+  dataBrowser,
+} from '@tomic/react';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
 import { SideBarItem } from '../SideBarItem';
 import { AtomicLink } from '../../AtomicLink';
@@ -38,12 +46,15 @@ export function ResourceSideBar({
   const resource = useResource(subject, { allowIncomplete: true });
   const [currentUrl] = useCurrentSubject();
   const [title] = useTitle(resource);
-  const [description] = useString(resource, urls.properties.description);
-
+  const [description] = useString(resource, core.properties.description);
+  const [canWrite] = useCanWrite(resource);
   const active = currentUrl === subject;
   const [open, setOpen] = useState(active);
 
-  const [subResources] = useArray(resource, urls.properties.subResources);
+  const [subResources] = useArray(
+    resource,
+    dataBrowser.properties.subResources,
+  );
   const hasSubResources = subResources.length > 0;
 
   const dragData: SideBarDragData = {
@@ -59,6 +70,7 @@ export function ResourceSideBar({
   } = useDraggable({
     id: subject,
     data: dragData,
+    disabled: !canWrite,
   });
 
   const isDragging = draggingNode?.id === subject;

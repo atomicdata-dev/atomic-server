@@ -17,8 +17,9 @@ import { ContainerNarrow } from '../components/Containers';
 import { AtomicLink } from '../components/AtomicLink';
 import { editURL } from '../helpers/navigation';
 import { useNavigate } from 'react-router';
-import { ErrorLook } from '../components/ErrorLook';
 import { Main } from '../components/Main';
+import { Column } from '../components/Row';
+import { WarningBlock } from '../components/WarningBlock';
 
 const SettingsAgent: React.FunctionComponent = () => {
   const { agent, setAgent } = useSettings();
@@ -142,26 +143,26 @@ const SettingsAgent: React.FunctionComponent = () => {
             Key. Together, these can be used to edit data and sign Commits.
           </p>
           {agent ? (
-            <>
+            <Column>
               {agent.subject?.startsWith('http://localhost') && (
-                <p>
-                  <ErrorLook>Warning:</ErrorLook>
+                <WarningBlock>
+                  <WarningBlock.Title>Warning:</WarningBlock.Title>
                   {
                     "You're using a local Agent, which cannot authenticate on other domains, because its URL does not resolve."
                   }
-                </p>
+                </WarningBlock>
               )}
-              <LabelStyled>
-                <FaUser /> You{"'"}re signed in as
-              </LabelStyled>
-              <p>
+              <div>
+                <LabelStyled>
+                  <FaUser /> You{"'"}re signed in as
+                </LabelStyled>
                 <ResourceInline subject={agent.subject!} />
-              </p>
+              </div>
               <Button onClick={() => navigate(editURL(agent.subject!))}>
                 Edit profile
               </Button>
               <Margin />
-            </>
+            </Column>
           ) : (
             <p>
               You can create your own Agent by hosting an{' '}
