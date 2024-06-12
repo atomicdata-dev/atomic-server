@@ -361,20 +361,23 @@ function DocumentPageShow({
   setEditMode,
 }: DocumentSubPageProps): JSX.Element {
   const [elements] = useArray(resource, dataBrowser.properties.elements);
+  const [canWrite] = useCanWrite(resource);
 
   return (
     <>
       <div style={{ display: 'flex', flexDirection: 'row' }}>
         <h1 style={{ flex: 1 }}>{resource.title}</h1>
-        <Button
-          data-test='document-edit'
-          icon
-          subtle
-          onClick={() => setEditMode(true)}
-          title='Edit mode'
-        >
-          <FaEdit />
-        </Button>
+        {canWrite && (
+          <Button
+            data-test='document-edit'
+            icon
+            subtle
+            onClick={() => setEditMode(true)}
+            title='Edit mode'
+          >
+            <FaEdit />
+          </Button>
+        )}
       </div>
       {elements.map(subject => (
         <ElementShow subject={subject} key={subject} />

@@ -1,6 +1,6 @@
 import { ResourcePageProps } from '../ResourcePage';
 import { useCallback } from 'react';
-import { urls, useString } from '@tomic/react';
+import { urls, useCanWrite, useString } from '@tomic/react';
 import { EditableTitle } from '../../components/EditableTitle';
 import { styled } from 'styled-components';
 import { ContainerFull, ContainerNarrow } from '../../components/Containers';
@@ -19,6 +19,8 @@ export function BookmarkPage({ resource }: ResourcePageProps): JSX.Element {
   });
 
   const { preview, error, update, loading } = usePreview(resource);
+
+  const [canWrite] = useCanWrite(resource);
 
   const handleUrlChange = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -43,6 +45,7 @@ export function BookmarkPage({ resource }: ResourcePageProps): JSX.Element {
                     placeholder='https://example.com'
                     value={url}
                     onChange={handleUrlChange}
+                    disabled={!canWrite}
                   />
                 </InputWrapper>
               </FieldWrapper>

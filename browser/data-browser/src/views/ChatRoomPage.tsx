@@ -4,6 +4,7 @@ import {
   dataBrowser,
   getTimestampNow,
   useArray,
+  useCanWrite,
   useResource,
   useStore,
   useString,
@@ -188,6 +189,7 @@ const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
   const [lastCommit] = useSubject(resource, commits.properties.lastCommit);
   const [replyTo] = useSubject(resource, dataBrowser.properties.replyTo);
   const navigate = useNavigate();
+  const [canWrite] = useCanWrite(resource);
 
   function handleCopyUrl() {
     navigator.clipboard.writeText(subject);
@@ -205,14 +207,16 @@ const Message = memo(function Message({ subject, setReplyTo }: MessageProps) {
         <CommitDetail commitSubject={lastCommit!} />
         {replyTo && <MessageLine subject={replyTo} />}
         <MessageActions>
-          <Button
-            icon
-            subtle
-            onClick={() => navigate(editURL(subject))}
-            title='Edit message'
-          >
-            <FaPencilAlt />
-          </Button>
+          {canWrite && (
+            <Button
+              icon
+              subtle
+              onClick={() => navigate(editURL(subject))}
+              title='Edit message'
+            >
+              <FaPencilAlt />
+            </Button>
+          )}
           <Button
             icon
             subtle

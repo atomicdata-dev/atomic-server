@@ -3,6 +3,7 @@ import { styled } from 'styled-components';
 import { useState } from 'react';
 import { transition } from '../../../helpers/transition';
 import { SideBarDropData } from '../useSidebarDnd';
+import { useCanWrite, useResource } from '@tomic/react';
 
 interface DropEdgeProps {
   parentHierarchy: string[];
@@ -21,6 +22,9 @@ export function DropEdge({
 
   const parent = parentHierarchy.at(-1)!;
 
+  const parentResource = useResource(parent);
+
+  const [canWrite] = useCanWrite(parentResource);
   useDndMonitor({
     onDragStart: event => setDraggingSubject(event.active.id as string),
     onDragEnd: () => setDraggingSubject(undefined),
@@ -35,6 +39,10 @@ export function DropEdge({
     id: `${parent}-${position}`,
     data,
   });
+
+  if (!canWrite) {
+    return <></>;
+  }
 
   const shouldRender =
     !!activeDraggedSubject && !parentHierarchy.includes(activeDraggedSubject);

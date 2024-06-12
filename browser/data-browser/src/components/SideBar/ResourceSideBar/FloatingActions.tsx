@@ -1,4 +1,4 @@
-import { useResource, useTitle } from '@tomic/react';
+import { useCanWrite, useResource, useTitle } from '@tomic/react';
 import { useState } from 'react';
 import { FaEllipsisV, FaPlus } from 'react-icons/fa';
 import { styled, css } from 'styled-components';
@@ -20,18 +20,21 @@ export function FloatingActions({
   const parentResource = useResource(subject);
   const [parentName] = useTitle(parentResource);
   const [dropdownActive, setDropdownActive] = useState(false);
+  const [canWrite] = useCanWrite(parentResource);
 
   const handleAddClick = useNewRoute(subject);
 
   return (
     <Wrapper className={className} dropdownActive={dropdownActive}>
-      <IconButton
-        data-test='add-subresource'
-        onClick={handleAddClick}
-        title={`Create new resource under ${parentName}`}
-      >
-        <FaPlus />
-      </IconButton>
+      {canWrite && (
+        <IconButton
+          data-test='add-subresource'
+          onClick={handleAddClick}
+          title={`Create new resource under ${parentName}`}
+        >
+          <FaPlus />
+        </IconButton>
+      )}
       <ResourceContextMenu
         simple
         subject={subject}
