@@ -1,4 +1,4 @@
-VERSION --try --global-cache 0.8
+VERSION --try 0.8
 PROJECT ontola/atomic-server
 IMPORT ./browser AS browser
 IMPORT github.com/earthly/lib/rust AS rust
@@ -88,7 +88,9 @@ docker-musl:
   VOLUME /atomic-storage
   ENTRYPOINT ["/atomic-server-bin"]
   RUN echo "Pushing tags: ${tags}"
-  SAVE IMAGE --push ${tags}
+  FOR tag IN ${tags}
+    SAVE IMAGE --push ${tag}
+  END
 
 setup-playwright:
   FROM mcr.microsoft.com/playwright:v1.43.1-jammy
