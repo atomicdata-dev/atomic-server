@@ -93,7 +93,7 @@ docker-musl:
   END
 
 setup-playwright:
-  FROM mcr.microsoft.com/playwright:v1.43.1-jammy
+  FROM mcr.microsoft.com/playwright:v1.44.1-jammy
   RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
   RUN apt update && apt install -y zip
   RUN pnpx playwright install --with-deps
