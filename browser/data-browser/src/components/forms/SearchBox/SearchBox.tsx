@@ -23,6 +23,7 @@ interface SearchBoxProps {
   value: string | undefined;
   isA?: string;
   scopes?: string[];
+  allowsOnly?: string[];
   placeholder?: string;
   disabled?: boolean;
   required?: boolean;
@@ -46,6 +47,7 @@ export function SearchBox({
   children,
   prefix,
   hideClearButton,
+  allowsOnly,
   onChange,
   onCreateItem,
   onClose,
@@ -212,6 +214,7 @@ export function SearchBox({
               isA={isA}
               placeholder={placeholderText}
               triggerRef={triggerRef}
+              allowsOnly={allowsOnly}
               onExit={handleExit}
               onSelect={handleSelect}
               onCreateItem={onCreateItem}
@@ -247,7 +250,6 @@ const TriggerButtonWrapper = styled.div<{
     p.invalid ? p.theme.colors.alert : p.theme.colors.main};
   display: flex;
   position: relative;
-  overflow: hidden;
   border: 1px solid ${props => props.theme.colors.bg2};
   border-radius: ${props => props.theme.radius};
   background-color: var(--search-box-bg, ${props => props.theme.colors.bg});
@@ -279,5 +281,5 @@ const PlaceholderText = styled.span`
 const PositionedErrorChip = styled(ErrorChip)`
   position: absolute;
   top: 2rem;
-  z-index: 10;
+  z-index: 1001;
 `;

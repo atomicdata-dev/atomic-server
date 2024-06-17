@@ -32,7 +32,8 @@ export function InputResource({
         isA={property.classType}
         setSubject={setSubject}
         value={subject}
-        parent={resource.getSubject()}
+        allowsOnly={property.allowsOnly}
+        parent={resource.subject}
         {...props}
       />
     </div>

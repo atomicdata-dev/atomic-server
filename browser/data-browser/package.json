@@ -30,7 +30,7 @@
     "polished": "^4.1.0",
     "prismjs": "^1.29.0",
     "query-string": "^7.0.0",
-    "quick-score": "^0.0.10",
+    "quick-score": "^0.2.0",
     "react": "^18.2.0",
     "react-colorful": "^5.1.1",
     "react-dom": "^18.2.0",
@@ -69,7 +69,7 @@
     "vite-plugin-prismjs": "^0.0.11",
     "vite-plugin-pwa": "^0.17.0",
     "vite-plugin-webfont-dl": "^3.9.1",
-    "workbox-cli": "^6.4.1""workbox-cli": "^6.4.1"
+    "workbox-cli": "^6.4.1"
   },
   "type": "module",
   "homepage": "https://atomicdata.dev/",

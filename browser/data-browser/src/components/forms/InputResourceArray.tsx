@@ -121,7 +121,8 @@ export default function InputResourceArray({
                   error={errMaybe(index)}
                   isA={property.classType}
                   handleRemove={handleRemoveRowList[index]}
-                  parent={resource.getSubject()}
+                  parent={resource.subject}
+                  allowsOnly={property.allowsOnly}
                   hideClearButton
                   {...props}
                 />
@@ -142,7 +143,7 @@ export default function InputResourceArray({
                     isA={property.classType}
                     handleRemove={() => undefined}
                     hideClearButton
-                    parent={resource.getSubject()}
+                    parent={resource.subject}
                     {...props}
                   />
                 )}
@@ -154,7 +155,7 @@ export default function InputResourceArray({
       )}
       {!props.disabled && (
         <Row justify='space-between'>
-          <StyledButton
+          <AddButton
             title={`Add an item to the ${property.shortname} list`}
             data-testid={`input-${property.shortname}-add-resource`}
             subtle
@@ -162,7 +163,7 @@ export default function InputResourceArray({
             onClick={handleAddRow}
           >
             <FaPlus />
-          </StyledButton>
+          </AddButton>
           {array.length > 1 && (
             <StyledButton
               title='Remove all items from this list'
@@ -292,6 +293,21 @@ const DragWrapper = styled(Row)<{ active: boolean }>`
 
 const StyledButton = styled(Button)`
   align-self: flex-start;
+`;
+
+const AddButton = styled(Button)`
+  align-self: flex-start;
+  width: 100%;
+  box-shadow: none;
+  border: 1px dashed ${p => p.theme.colors.bg2};
+  background: none;
+
+  &:hover,
+  &:focus-visible {
+    border: 1px solid ${p => p.theme.colors.main};
+    /* background: none; */
+    box-shadow: none !important;
+  }
 `;
 
 const DropEdgeElement = styled.div<{ visible: boolean; active: boolean }>`

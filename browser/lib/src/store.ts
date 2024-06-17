@@ -546,6 +546,7 @@ export class Store {
       shortname: shortname.toString(),
       description: description.toString(),
       datatype: datatypeFromUrl(datatypeUrl.toString()),
+      allowsOnly: resource.get(core.properties.allowsOnly),
     };
 
     return propery;
@@ -989,6 +990,7 @@ export interface Property {
   isDynamic?: boolean;
   /** When the Property is still awaiting a server response */
   loading?: boolean;
+  allowsOnly?: string[];
 }
 
 export interface FetchOpts {
