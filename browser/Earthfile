@@ -10,7 +10,8 @@ all:
   BUILD +typedoc
 
 deps:
-  RUN curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=9.3.0 sh -
+  RUN curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=9.3.0 ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
+  ENV PATH="/root/.local/share/pnpm:$PATH"
   COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .
   COPY data-browser/package.json data-browser/.
   COPY lib/package.json lib/.
