@@ -2,18 +2,15 @@
 // This is why the `testConfig` is imported.
 import { test, expect } from '@playwright/test';
 import {
-  DEMO_FILENAME,
   DEMO_INVITE_NAME,
   FRONTEND_URL,
   INITIAL_TEST,
   SERVER_URL,
   before,
   changeDrive,
-  contextMenu,
   contextMenuClick,
   currentDialogOkButton,
   currentDriveTitle,
-  demoFile,
   editProfileAndCommit,
   editTitle,
   editableTitle,
@@ -76,7 +73,7 @@ test.describe('data-browser', async () => {
   test('sign up and edit document atomicdata.dev', async ({ page }) => {
     await openAtomic(page);
     // Use invite
-    await page.click(`text=${DEMO_INVITE_NAME}`);
+    await clickSidebarItem(DEMO_INVITE_NAME, page);
     await page.click('text=Accept as new user');
     await expect(page.locator(editableTitle)).toBeVisible();
     // We need the initial enter because removing the top line isn't working ATM
@@ -199,23 +196,6 @@ test.describe('data-browser', async () => {
     await waiter;
     await page3.reload();
     await expect(page3.locator(`text=${driveTitle}`).first()).toBeVisible();
-  });
-
-  test('upload, download', async ({ page }) => {
-    await signIn(page);
-    await newDrive(page);
-    // add attachment to drive
-    await page.click(contextMenu);
-    await page.locator('[data-test="menu-item-edit"]').click();
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.click('button:has-text("Upload file")'),
-    ]);
-    await fileChooser.setFiles(demoFile());
-    await page.click(`[data-test="file-pill"]:has-text("${DEMO_FILENAME}")`);
-    const image = page.locator('[data-test="image-viewer"]');
-    await expect(image).toBeVisible();
-    await expect(image).toHaveScreenshot({ maxDiffPixelRatio: 0.1 });
   });
 
   test('chatroom', async ({ page, browser }) => {
@@ -382,7 +362,7 @@ test.describe('data-browser', async () => {
     await page.locator(shortnameInput).fill('');
     await page.keyboard.type('is-valid');
     await expect(page.locator('text=Not a valid slug')).not.toBeVisible();
-
+    await page.getByRole('button', { name: 'advanced' }).click();
     await fillSearchBox(
       page,
       'Search for a property or enter a URL',

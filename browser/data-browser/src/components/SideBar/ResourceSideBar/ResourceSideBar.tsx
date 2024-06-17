@@ -44,7 +44,6 @@ export function ResourceSideBar({
   }
 
   const resource = useResource(subject, { allowIncomplete: true });
-  console.log(resource);
   const [currentUrl] = useCurrentSubject();
   const [title] = useTitle(resource);
   const [description] = useString(resource, core.properties.description);

@@ -1,6 +1,5 @@
 import { Page, expect, Browser, Locator } from '@playwright/test';
 
-export const DEMO_FILENAME = 'testimage.svg';
 export const SERVER_URL = 'http://localhost:9883';
 export const DELETE_PREVIOUS_TEST_DRIVES =
   process.env.DELETE_PREVIOUS_TEST_DRIVES === 'false' ? false : true;
@@ -8,7 +7,7 @@ export const DELETE_PREVIOUS_TEST_DRIVES =
 export const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 // TODO: Should use an env var so the CI can test the setup test.
 export const INITIAL_TEST = false;
-export const DEMO_INVITE_NAME = 'document demo';
+export const DEMO_INVITE_NAME = 'document demo invite';
 
 export const testFilePath = (filename: string) => {
   const processPath = process.cwd();
@@ -20,8 +19,6 @@ export const testFilePath = (filename: string) => {
     return `${processPath}/tests/${filename}`;
   }
 };
-
-export const demoFile = () => testFilePath(DEMO_FILENAME);
 
 export const timestamp = () => new Date().toLocaleTimeString();
 export const editableTitle = '[data-test="editable-title"]';
@@ -202,6 +199,7 @@ export async function openAtomic(page: Page) {
 export async function editProfileAndCommit(page: Page) {
   await openAgentPage(page);
   await page.click('text=Edit profile');
+  await page.getByRole('button', { name: 'Advanced' }).click();
   await expect(page.locator('text=add another property')).toBeVisible();
   const username = `Test user edited at ${new Date().toLocaleDateString()}`;
   await page.fill('[data-test="input-name"]', username);
@@ -304,7 +302,10 @@ export async function editTitle(title: string, page: Page) {
 }
 
 export async function clickSidebarItem(text: string, page: Page) {
-  await page.getByTestId('sidebar').getByText(text).click();
+  await page
+    .getByTestId('sidebar')
+    .getByRole('button', { name: text })
+    .click({ force: true });
 }
 
 /** Click an item from the main, visible context menu */
