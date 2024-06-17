@@ -1,4 +1,11 @@
-import { Resource, reverseDatatypeMapping, urls, useArray } from '@tomic/react';
+import {
+  Datatype,
+  Resource,
+  reverseDatatypeMapping,
+  core,
+  useArray,
+  useString,
+} from '@tomic/react';
 import { AtomicSelectInput } from '../../components/forms/AtomicSelectInput';
 interface PropertyDatatypePickerProps {
   resource: Resource;
@@ -16,19 +23,24 @@ export function PropertyDatatypePicker({
   resource,
   disabled,
 }: PropertyDatatypePickerProps): JSX.Element {
-  const [_, setAllowsOnly] = useArray(resource, urls.properties.allowsOnly, {
+  const [, setAllowsOnly] = useArray(resource, core.properties.allowsOnly, {
+    commit: true,
+  });
+  const [, setClassType] = useString(resource, core.properties.classtype, {
     commit: true,
   });
 
-  const removeAllowsOnlyForNonResourceArray = (type: string) => {
-    if (
-      type === urls.datatypes.resourceArray ||
-      type === urls.datatypes.atomicUrl
-    ) {
-      return;
-    }
+  const isResourceLike = (datatype: string) => {
+    return (
+      datatype === Datatype.ATOMIC_URL || datatype === Datatype.RESOURCEARRAY
+    );
+  };
 
-    setAllowsOnly(undefined);
+  const handleChange = (datatype: string) => {
+    if (!isResourceLike(datatype)) {
+      setClassType(undefined);
+      setAllowsOnly(undefined);
+    }
   };
 
   return (
@@ -36,9 +48,9 @@ export function PropertyDatatypePicker({
       commit
       disabled={disabled}
       resource={resource}
-      property={urls.properties.datatype}
+      property={core.properties.datatype}
       options={options}
-      onChange={removeAllowsOnlyForNonResourceArray}
+      onChange={handleChange}
     />
   );
 }
