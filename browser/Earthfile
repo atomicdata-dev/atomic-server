@@ -10,7 +10,7 @@ all:
   BUILD +typedoc
 
 deps:
-  RUN curl -f https://get.pnpm.io/v6.14.js | node - add --global pnpm
+  RUN curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=9.3.0 sh -
   COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .
   COPY data-browser/package.json data-browser/.
   COPY lib/package.json lib/.
