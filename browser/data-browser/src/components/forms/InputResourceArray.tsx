@@ -305,7 +305,6 @@ const AddButton = styled(Button)`
   &:hover,
   &:focus-visible {
     border: 1px solid ${p => p.theme.colors.main};
-    /* background: none; */
     box-shadow: none !important;
   }
 `;

@@ -21,7 +21,6 @@ import ResourceField from './ResourceField';
 import { ErrMessage } from './InputStyles';
 import { ResourceSelector } from './ResourceSelector';
 import Field from './Field';
-// import UploadForm from './UploadForm';
 import { Gutter } from '../Gutter';
 import { useSaveResource } from './hooks/useSaveResource';
 import { Column, Row } from '../Row';
@@ -211,7 +210,6 @@ export function ResourceForm({
           );
         })}
       </Column>
-      {/* <UploadForm parentResource={resource} /> */}
       <Gutter />
       <Button
         title={'show / hide advanced form fields'}
