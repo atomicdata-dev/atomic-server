@@ -17,20 +17,29 @@ export function Collapse({
   children,
 }: React.PropsWithChildren<CollapseProps>): JSX.Element {
   const [mountChildren, setMountChildren] = useState(open);
+  const [enableOverflow, setEnableOverflow] = useState(false);
 
   useEffect(() => {
     if (!open) {
+      setEnableOverflow(false);
+
       return timeoutEffect(() => {
         setMountChildren(false);
       }, ANIMATION_DURATION());
     }
 
     setMountChildren(true);
+
+    return timeoutEffect(() => {
+      setEnableOverflow(true);
+    }, ANIMATION_DURATION());
   }, [open]);
 
   return (
     <GridCollapser open={open} className={className}>
-      <CollapseInner>{mountChildren && children}</CollapseInner>
+      <InnerWrapper overflow={enableOverflow}>
+        {mountChildren && children}
+      </InnerWrapper>
     </GridCollapser>
   );
 }
@@ -42,6 +51,7 @@ interface GridCollapserProps {
 const GridCollapser = styled.div<GridCollapserProps>`
   display: grid;
   grid-template-rows: ${({ open }) => (open ? '1fr' : '0fr')};
+  grid-template-columns: 100%;
   transition: grid-template-rows ${() => ANIMATION_DURATION()}ms ease-in-out;
 
   @media (prefers-reduced-motion) {
@@ -49,6 +59,7 @@ const GridCollapser = styled.div<GridCollapserProps>`
   }
 `;
 
-const CollapseInner = styled.div`
-  overflow: hidden;
+const InnerWrapper = styled.div<{ overflow: boolean }>`
+  width: 100%;
+  overflow: ${({ overflow }) => (overflow ? 'visible' : 'hidden')};
 `;

@@ -1,9 +1,11 @@
-import { core, useServerSearch } from '@tomic/react';
+import { core, useResources, useServerSearch } from '@tomic/react';
 import {
   ChangeEvent,
   ClipboardEventHandler,
   KeyboardEventHandler,
   RefObject,
+  useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -19,6 +21,7 @@ import { isURL } from '../../../helpers/isURL';
 import { useAvailableSpace } from '../hooks/useAvailableSpace';
 import { remToPixels } from '../../../helpers/remToPixels';
 import { useSettings } from '../../../helpers/AppSettings';
+import { QuickScore } from 'quick-score';
 
 const BOX_HEIGHT_REM = 20;
 
@@ -27,6 +30,7 @@ interface SearchBoxWindowProps {
   isA?: string;
   scopes?: string[];
   placeholder?: string;
+  allowsOnly?: string[];
   triggerRef: RefObject<HTMLButtonElement>;
   onExit: (lostFocus: boolean) => void;
   onChange: (value: string) => void;
@@ -41,6 +45,7 @@ export function SearchBoxWindow({
   scopes,
   placeholder,
   triggerRef,
+  allowsOnly,
   onExit,
   onSelect,
   onCreateItem,
@@ -49,23 +54,8 @@ export function SearchBoxWindow({
   const [realIndex, setIndex] = useState<number | undefined>(undefined);
   const { below } = useAvailableSpace(true, triggerRef);
   const wrapperRef = useRef<HTMLDivElement>(null);
-
-  const searchOptions = useMemo(
-    () => ({
-      filters: {
-        ...(isA ? { [core.properties.isA]: isA } : {}),
-      },
-      parents: scopes ?? [drive, 'https://atomicdata.dev'],
-      // If a classtype is given we want to prefill the searchbox with data.
-      allowEmptyQuery: !!isA,
-    }),
-    [isA, scopes],
-  );
-
-  const { results, error: searchError } = useServerSearch(
-    searchValue,
-    searchOptions,
-  );
+  const [results, setResults] = useState<string[]>([]);
+  const [searchError, setSearchError] = useState<Error | undefined>();
 
   const isAboveTrigger = below < remToPixels(BOX_HEIGHT_REM);
 
@@ -149,6 +139,11 @@ export function SearchBoxWindow({
     onSelect(results[selectedIndex - offset]);
   };
 
+  const handleResults = useCallback((res: string[], error?: Error) => {
+    setResults(res);
+    setSearchError(error);
+  }, []);
+
   const handleBlur = () => {
     requestAnimationFrame(() => {
       if (!wrapperRef.current?.contains(document.activeElement)) {
@@ -219,9 +214,102 @@ export function SearchBoxWindow({
           )}
         </StyledScrollArea>
       </ResultBox>
+      {allowsOnly ? (
+        <LocalSearchUnit
+          searchValue={searchValue}
+          allowsOnly={allowsOnly}
+          onResult={handleResults}
+        />
+      ) : (
+        <ServerSearchUnit
+          drive={drive}
+          isA={isA}
+          scopes={scopes}
+          searchValue={searchValue}
+          onResult={handleResults}
+        />
+      )}
     </Wrapper>
   );
 }
+
+interface SearchUnitProps {
+  searchValue: string;
+  onResult: (result: string[], error?: Error) => void;
+}
+
+interface ServerSearchUnitProps extends SearchUnitProps {
+  isA?: string;
+  scopes?: string[];
+  drive: string;
+}
+
+interface LocalSearchUnitProps extends SearchUnitProps {
+  allowsOnly: string[];
+}
+
+const ServerSearchUnit = ({
+  searchValue,
+  isA,
+  scopes,
+  drive,
+  onResult,
+}: ServerSearchUnitProps) => {
+  const searchOptions = useMemo(
+    () => ({
+      filters: {
+        ...(isA ? { [core.properties.isA]: isA } : {}),
+      },
+      parents: scopes ?? [drive, 'https://atomicdata.dev'],
+      // If a classtype is given we want to prefill the searchbox with data.
+      allowEmptyQuery: !!isA,
+    }),
+    [isA, scopes],
+  );
+
+  const { results, error } = useServerSearch(searchValue, searchOptions);
+
+  useEffect(() => {
+    onResult(results, error);
+  }, [results, error, onResult]);
+
+  return null;
+};
+
+const LocalSearchUnit = ({
+  searchValue,
+  allowsOnly,
+  onResult,
+}: LocalSearchUnitProps) => {
+  const resources = useResources(allowsOnly);
+
+  const quickScore = useMemo(() => {
+    const values = Array.from(resources.entries()).map(
+      ([subject, resource]) => ({
+        title: resource.title,
+        subject,
+      }),
+    );
+
+    return new QuickScore(values, ['title']);
+  }, [resources]);
+
+  useEffect(() => {
+    if (searchValue === '') {
+      onResult(allowsOnly);
+
+      return;
+    }
+
+    const results = quickScore
+      .search(searchValue)
+      .map(result => result.item.subject);
+
+    onResult(results);
+  }, [searchValue, quickScore]);
+
+  return null;
+};
 
 const SearchInputWrapper = styled.div`
   display: flex;

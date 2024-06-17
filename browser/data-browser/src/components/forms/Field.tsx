@@ -10,6 +10,7 @@ import {
   LabelHelper,
   LabelWrapper,
 } from './InputStyles';
+import { complement } from 'polished';
 
 /** High level form field skeleton. Pass the actual input as a child component. */
 function Field({
@@ -35,7 +36,7 @@ function Field({
             id={labelId}
           >
             <span>{label}</span>
-            {required && <FaAsterisk title='Required field' />}
+            {required && <Astrisk title='Required field' size='0.6em' />}
           </FieldLabel>
           {helper && (
             <IconButton
@@ -86,11 +87,6 @@ export const FieldLabel = styled.label`
   gap: 0.2rem;
   align-items: center;
   font-weight: bold;
-
-  svg {
-    color: ${props => props.theme.colors.textLight};
-    font-size: 0.8rem;
-  }
 `;
 
 interface IFieldProps {
@@ -117,3 +113,8 @@ interface IFieldProps {
 }
 
 export default Field;
+
+const Astrisk = styled(FaAsterisk)`
+  margin-bottom: 0.5em;
+  color: ${p => complement(p.theme.colors.main)};
+`;

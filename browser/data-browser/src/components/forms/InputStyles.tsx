@@ -64,7 +64,6 @@ const inputStyle = css`
   background-color: ${props => props.theme.colors.bg};
   /* Invisible border, but useful because you need to set :focus styles with Input tags */
   border: solid 1px ${props => props.theme.colors.bg};
-  /* border-radius: ${props => props.theme.radius}; */
   outline: none;
   box-sizing: border-box;
   /* If buttons are inside the input, the edges should be sharp */

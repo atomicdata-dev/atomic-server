@@ -62,5 +62,6 @@ export default function InputNumber({
 
 const Wrapper = styled.div`
   flex: 1;
+  width: fit-content;
   position: relative;
 `;
