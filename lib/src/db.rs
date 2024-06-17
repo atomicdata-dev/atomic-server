@@ -16,6 +16,7 @@ use std::{
 };
 
 use mail_send::{Connected, Transport};
+use migrations::{REFERENCE_INDEX_CURRENT, RESOURCE_TREE_CURRENT};
 use tracing::{info, instrument};
 
 use crate::{
@@ -100,8 +101,8 @@ impl Db {
     /// It is used for distinguishing locally defined items from externally defined ones.
     pub fn init(path: &std::path::Path, server_url: &str) -> AtomicResult<Db> {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
-        let resources = db.open_tree("resources_v1").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
-        let reference_index = db.open_tree("reference_index_v1")?;
+        let resources = db.open_tree(RESOURCE_TREE_CURRENT).map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
+        let reference_index = db.open_tree(REFERENCE_INDEX_CURRENT)?;
         let query_index = db.open_tree("members_index")?;
         let prop_val_sub_index = db.open_tree("prop_val_sub_index")?;
         let watched_queries = db.open_tree("watched_queries")?;
