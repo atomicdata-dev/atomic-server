@@ -1,7 +1,9 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-use crate::{appstate::AppState, errors::AtomicServerResult};
+use crate::{appstate::AppState,
+            files::{self, FileStore},
+            errors::AtomicServerResult};
 use actix_web::HttpResponse;
 
 /// Returns the atomic-data-browser single page application
@@ -12,10 +14,14 @@ pub async fn single_page(
 ) -> AtomicServerResult<HttpResponse> {
     let template = include_str!("../../assets_tmp/index.html");
     let subject = format!("{}/{}", appstate.store.get_server_url(), path);
+
+    let file_store = FileStore::get_subject_file_store(&appstate, &subject);
+    let encoded = subject.replace(file_store.prefix(), &file_store.encoded());
+    println!("encoded from single_page: {}", &encoded);
     let meta_tags: MetaTags = if let Ok(resource) =
         appstate
             .store
-            .get_resource_extended(&subject, true, &ForAgent::Public)
+            .get_resource_extended(&encoded, true, &ForAgent::Public)
     {
         resource.into()
     } else {

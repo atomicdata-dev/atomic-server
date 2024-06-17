@@ -209,6 +209,7 @@ pub trait Storelike: Sized {
     ) -> AtomicResult<Resource> {
         if let Some(self_url) = self.get_self_url() {
             if subject.starts_with(&self_url) {
+                println!("Custom backtrace: {}", std::backtrace::Backtrace::force_capture());
                 return Err(AtomicError::not_found(format!(
                     "Failed to retrieve locally: '{}'",
                     subject

@@ -2,6 +2,7 @@ use crate::{
     appstate::AppState,
     content_types::get_accept,
     content_types::ContentType,
+    files::{self, FileStore},
     errors::AtomicServerResult,
     helpers::{get_client_agent, try_extension},
 };
@@ -43,6 +44,7 @@ pub async fn handle_get_resource(
                 format!("?{}", req.query_string())
             };
             let subject = format!("{}/{}{}", server_url, subj_end_string, querystring);
+            tracing::info!("subject at get_resource: {}", subject);
             subject
         }
     } else {
@@ -67,7 +69,9 @@ pub async fn handle_get_resource(
         "no-store, no-cache, must-revalidate, private",
     ));
 
-    let resource = store.get_resource_extended(&subject, false, &for_agent)?;
+    let file_store = FileStore::get_subject_file_store(&appstate, &subject);
+    let encoded = subject.replace(file_store.prefix(), &file_store.encoded());
+    let resource = store.get_resource_extended(&encoded, false, &for_agent)?;
     timer.add("get_resource");
 
     let response_body = match content_type {
