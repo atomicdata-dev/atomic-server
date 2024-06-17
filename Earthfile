@@ -97,7 +97,7 @@ setup-playwright:
   RUN curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=9.3.0 ENV="$HOME/.shrc" SHELL="$(which sh)" sh -
   ENV PATH="/root/.local/share/pnpm:$PATH"
   RUN apt update && apt install -y zip
-  RUN pnpx playwright install --with-deps
+  RUN pnpm dlx playwright install --with-deps
   RUN npm install -g netlify-cli
 
 e2e:
