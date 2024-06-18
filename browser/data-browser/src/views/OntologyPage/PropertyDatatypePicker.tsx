@@ -36,7 +36,7 @@ export function PropertyDatatypePicker({
     );
   };
 
-  const handleChange = (datatype: string) => {
+  const clearInapplicableProps = (datatype: string) => {
     if (!isResourceLike(datatype)) {
       setClassType(undefined);
       setAllowsOnly(undefined);
@@ -50,7 +50,7 @@ export function PropertyDatatypePicker({
       resource={resource}
       property={core.properties.datatype}
       options={options}
-      onChange={handleChange}
+      onChange={clearInapplicableProps}
     />
   );
 }
