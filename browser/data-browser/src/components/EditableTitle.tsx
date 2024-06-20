@@ -1,7 +1,7 @@
 import { Resource, useCanWrite, useTitle } from '@tomic/react';
 import { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { FaEdit } from 'react-icons/fa';
+import { FaPencil } from 'react-icons/fa6';
 import { styled, css } from 'styled-components';
 import { transitionName } from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
@@ -107,8 +107,6 @@ const Title = styled.h1<TitleProps & ViewTransitionProps>`
   display: flex;
   align-items: center;
   gap: ${p => p.theme.margin}rem;
-  justify-content: space-between;
-  cursor: pointer;
   cursor: ${props => (props.canEdit ? 'pointer' : 'initial')};
   opacity: ${props => (props.subtle ? 0.5 : 1)};
 
@@ -138,14 +136,10 @@ const TitleInput = styled.input`
   }
 `;
 
-const Icon = styled(FaEdit)`
+const Icon = styled(FaPencil)`
   opacity: 0;
   font-size: 0.8em;
   ${Title}:hover & {
     opacity: 0.5;
-
-    &:hover {
-      opacity: 1;
-    }
   }
 `;

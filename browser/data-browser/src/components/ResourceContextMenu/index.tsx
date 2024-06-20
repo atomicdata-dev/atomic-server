@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Client, core, useResource, useStore } from '@tomic/react';
+import { Client, core, useCanWrite, useResource } from '@tomic/react';
 import {
   editURL,
   dataURL,
@@ -19,13 +19,13 @@ import {
   FaClock,
   FaCode,
   FaDownload,
-  FaEdit,
-  FaEllipsisV,
-  FaRedo,
-  FaSearch,
-  FaShareSquare,
+  FaPencil,
+  FaEllipsisVertical,
+  FaMagnifyingGlass,
+  FaShare,
   FaTrash,
-} from 'react-icons/fa';
+  FaPlus,
+} from 'react-icons/fa6';
 import { useQueryScopeHandler } from '../../hooks/useQueryScope';
 import {
   ConfirmationDialog,
@@ -35,18 +35,20 @@ import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ResourceCodeUsageDialog } from '../../views/CodeUsage/ResourceCodeUsageDialog';
+import { useNewRoute } from '../../helpers/useNewRoute';
+import { addIf } from '../../helpers/addIf';
 
 export enum ContextMenuOptions {
   View = 'view',
   Data = 'data',
   Edit = 'edit',
-  Refresh = 'refresh',
   Scope = 'scope',
   Share = 'share',
   Delete = 'delete',
   History = 'history',
   Import = 'import',
   UseInCode = 'useInCode',
+  NewChild = 'newChild',
 }
 
 export interface ResourceContextMenuProps {
@@ -74,15 +76,14 @@ function ResourceContextMenu({
   bindActive,
   onAfterDelete,
 }: ResourceContextMenuProps) {
-  const store = useStore();
   const navigate = useNavigate();
   const location = useLocation();
   const resource = useResource(subject);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
-
+  const handleAddClick = useNewRoute(subject);
   const [currentSubject] = useCurrentSubject();
-
+  const [canWrite] = useCanWrite(resource);
   const { enableScope } = useQueryScopeHandler(subject);
   // Try to not have a useResource hook in here, as that will lead to many costly fetches when the user enters a new subject
 
@@ -111,43 +112,44 @@ function ResourceContextMenu({
   }
 
   const items: DropdownItem[] = [
-    ...(simple
-      ? []
-      : [
-          {
-            disabled: location.pathname.startsWith(paths.show),
-            id: ContextMenuOptions.View,
-            label: 'normal view',
-            helper: 'Open the regular, default View.',
-            onClick: () => navigate(constructOpenURL(subject)),
-          },
-          {
-            disabled: location.pathname.startsWith(paths.data),
-            id: ContextMenuOptions.Data,
-            label: 'data view',
-            helper: 'View the resource and its properties in the Data View.',
-            shortcut: shortcuts.data,
-            onClick: () => navigate(dataURL(subject)),
-          },
-          DIVIDER,
-          {
-            id: ContextMenuOptions.Refresh,
-            icon: <FaRedo />,
-            label: 'refresh',
-            helper:
-              'Fetch the resouce again from the server, possibly see new changes.',
-            onClick: () => store.fetchResourceFromServer(subject),
-          },
-        ]),
-    {
-      // disabled: !canWrite || location.pathname.startsWith(paths.edit),
-      id: ContextMenuOptions.Edit,
-      label: 'edit',
-      helper: 'Open the edit form.',
-      icon: <FaEdit />,
-      shortcut: simple ? '' : shortcuts.edit,
-      onClick: () => navigate(editURL(subject)),
-    },
+    ...addIf<DropdownItem>(
+      !simple,
+      {
+        disabled: location.pathname.startsWith(paths.show),
+        id: ContextMenuOptions.View,
+        label: 'normal view',
+        helper: 'Open the regular, default View.',
+        onClick: () => navigate(constructOpenURL(subject)),
+      },
+      {
+        disabled: location.pathname.startsWith(paths.data),
+        id: ContextMenuOptions.Data,
+        label: 'data view',
+        helper: 'View the resource and its properties in the Data View.',
+        shortcut: shortcuts.data,
+        onClick: () => navigate(dataURL(subject)),
+      },
+      DIVIDER,
+    ),
+    ...addIf(
+      canWrite,
+      {
+        // disabled: !canWrite || location.pathname.startsWith(paths.edit),
+        id: ContextMenuOptions.Edit,
+        label: 'edit',
+        helper: 'Open the edit form.',
+        icon: <FaPencil />,
+        shortcut: simple ? '' : shortcuts.edit,
+        onClick: () => navigate(editURL(subject)),
+      },
+      {
+        id: ContextMenuOptions.NewChild,
+        label: 'add child',
+        helper: 'Create a new resource under this resource.',
+        icon: <FaPlus />,
+        onClick: handleAddClick,
+      },
+    ),
     {
       id: ContextMenuOptions.UseInCode,
       label: 'use in code',
@@ -158,27 +160,19 @@ function ResourceContextMenu({
     },
     {
       id: ContextMenuOptions.Scope,
-      label: 'search in',
+      label: 'search children',
       helper: 'Scope search to resource',
-      icon: <FaSearch />,
+      icon: <FaMagnifyingGlass />,
       onClick: enableScope,
     },
     {
-      // disabled: !canWrite || history.location.pathname.startsWith(paths.edit),
       id: ContextMenuOptions.Share,
       label: 'share',
-      icon: <FaShareSquare />,
+      icon: <FaShare />,
       helper: 'Open the share menu',
       onClick: () => navigate(shareURL(subject)),
     },
-    {
-      // disabled: !canWrite,
-      id: ContextMenuOptions.Delete,
-      icon: <FaTrash />,
-      label: 'delete',
-      helper: 'Delete this resource.',
-      onClick: () => setShowDeleteDialog(true),
-    },
+
     {
       id: ContextMenuOptions.History,
       icon: <FaClock />,
@@ -186,13 +180,24 @@ function ResourceContextMenu({
       helper: 'Show the history of this resource',
       onClick: () => navigate(historyURL(subject)),
     },
-    {
-      id: ContextMenuOptions.Import,
-      icon: <FaDownload />,
-      label: 'import',
-      helper: 'Import Atomic Data to this resource',
-      onClick: () => navigate(importerURL(subject)),
-    },
+    ...addIf(
+      canWrite,
+      {
+        id: ContextMenuOptions.Import,
+        icon: <FaDownload />,
+        label: 'import',
+        helper: 'Import Atomic Data to this resource',
+        onClick: () => navigate(importerURL(subject)),
+      },
+      {
+        disabled: !canWrite,
+        id: ContextMenuOptions.Delete,
+        icon: <FaTrash />,
+        label: 'delete',
+        helper: 'Delete this resource.',
+        onClick: () => setShowDeleteDialog(true),
+      },
+    ),
   ];
 
   const filteredItems = showOnly
@@ -205,7 +210,7 @@ function ResourceContextMenu({
   const triggerComp =
     trigger ??
     buildDefaultTrigger(
-      <FaEllipsisV />,
+      <FaEllipsisVertical />,
       title ?? `Open ${resource.title} menu`,
     );
 

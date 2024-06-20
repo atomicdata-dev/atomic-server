@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { transition } from '../../../helpers/transition';
 import { SideBarDropData } from '../useSidebarDnd';
 import { useCanWrite, useResource } from '@tomic/react';
+import { SIDEBAR_WIDTH_PROP } from '../SidebarCSSVars';
 
 interface DropEdgeProps {
   parentHierarchy: string[];
@@ -62,7 +63,7 @@ const DropEdgeElement = styled.div<{ visible: boolean; active: boolean }>`
   background: ${p => p.theme.colors.main};
   opacity: ${p => (p.active ? 1 : 0)};
   z-index: 2;
-  width: calc(var(--width) - 2rem);
+  width: calc(var(${SIDEBAR_WIDTH_PROP}) - 2rem);
 
   ${transition('opacity', 'transform')}
 `;

@@ -1,5 +1,5 @@
 import {
-  urls,
+  dataBrowser,
   useArray,
   useCanWrite,
   useResource,
@@ -7,7 +7,7 @@ import {
   useTitle,
 } from '@tomic/react';
 import { Fragment, useEffect, useState } from 'react';
-import { FaPlus } from 'react-icons/fa';
+import { FaPlus } from 'react-icons/fa6';
 import { useNavigate } from 'react-router-dom';
 import { styled } from 'styled-components';
 import { useSettings } from '../../helpers/AppSettings';
@@ -16,10 +16,8 @@ import { paths } from '../../routes/paths';
 import { Button } from '../Button';
 import { ResourceSideBar } from './ResourceSideBar/ResourceSideBar';
 import { SideBarHeader } from './SideBarHeader';
-import { shortcuts } from '../HotKeyWrapper';
 import { ErrorLook } from '../ErrorLook';
 import { DriveSwitcher } from './DriveSwitcher';
-import { IconButton } from '../IconButton/IconButton';
 import { Row } from '../Row';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ScrollArea } from '../ScrollArea';
@@ -28,16 +26,16 @@ import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { SidebarItemTitle } from './ResourceSideBar/SidebarItemTitle';
 import { DropEdge } from './ResourceSideBar/DropEdge';
 import { createPortal } from 'react-dom';
+import { transition } from '../../helpers/transition';
 
 interface SideBarDriveProps {
-  /** Closes the sidebar on small screen devices */
-  handleClickItem: () => unknown;
+  onItemClick: () => unknown;
   onIsRearangingChange: (isRearanging: boolean) => void;
 }
 
 /** Shows the current Drive, it's children and an option to change to a different Drive */
 export function SideBarDrive({
-  handleClickItem,
+  onItemClick,
   onIsRearangingChange,
 }: SideBarDriveProps): JSX.Element {
   const store = useStore();
@@ -52,7 +50,10 @@ export function SideBarDrive({
     announcements,
   } = useSidebarDnd(onIsRearangingChange);
   const driveResource = useResource(drive);
-  const [subResources] = useArray(driveResource, urls.properties.subResources);
+  const [subResources] = useArray(
+    driveResource,
+    dataBrowser.properties.subResources,
+  );
   const [title] = useTitle(driveResource);
   const navigate = useNavigate();
   const [agentCanWrite] = useCanWrite(driveResource);
@@ -74,7 +75,7 @@ export function SideBarDrive({
           title={`Your current baseURL is ${drive}`}
           data-test='sidebar-drive-open'
           onClick={() => {
-            handleClickItem();
+            onItemClick();
             navigate(constructOpenURL(drive));
           }}
         >
@@ -83,15 +84,6 @@ export function SideBarDrive({
           </DriveTitle>
         </TitleButton>
         <HeadingButtonWrapper gap='0'>
-          {agentCanWrite && (
-            <IconButton
-              onClick={() => navigate(paths.new)}
-              title={`Create a new resource in this drive (${shortcuts.new})`}
-              data-test='sidebar-new-resource'
-            >
-              <FaPlus />
-            </IconButton>
-          )}
           <DriveSwitcher />
         </HeadingButtonWrapper>
       </SideBarHeader>
@@ -117,7 +109,7 @@ export function SideBarDrive({
                       subject={child}
                       renderedHierargy={[drive]}
                       ancestry={ancestry}
-                      onClick={handleClickItem}
+                      onClick={onItemClick}
                     />
                     <DropEdge parentHierarchy={[drive]} position={index + 1} />
                   </Fragment>
@@ -132,6 +124,15 @@ export function SideBarDrive({
                       : driveResource.error.message
                     : driveResource.error.message)}
               </SideBarErr>
+            )}
+            {agentCanWrite && (
+              <AddButton
+                title='New resource'
+                data-testid='sidebar-new-resource'
+                onClick={() => navigate(paths.new)}
+              >
+                <FaPlus />
+              </AddButton>
             )}
           </ListWrapper>
         </StyledScrollArea>
@@ -181,4 +182,26 @@ const HeadingButtonWrapper = styled(Row)`
 
 const StyledScrollArea = styled(ScrollArea)`
   overflow: hidden;
+`;
+
+const AddButton = styled.button`
+  display: flex;
+  justify-content: center;
+  color: ${p => p.theme.colors.textLight};
+  background: none;
+  appearance: none;
+  border: 1px dashed ${p => p.theme.colors.bg2};
+  border-radius: ${p => p.theme.radius};
+  width: calc(100% - 4rem);
+  padding-block: 0.3rem;
+  margin-inline-start: 1.5rem;
+  margin-block: 0.5rem;
+  cursor: pointer;
+  ${transition('color', 'border')}
+
+  &:hover,
+  &:focus-visible {
+    color: ${p => p.theme.colors.main};
+    border: 1px solid ${p => p.theme.colors.main};
+  }
 `;
