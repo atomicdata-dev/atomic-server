@@ -318,6 +318,15 @@ impl Db {
     }
 }
 
+impl Drop for Db {
+    fn drop(&mut self) {
+        match self.db.flush() {
+            Ok(..) => (),
+            Err(e) => eprintln!("Failed to flush the database: {}", e),
+        };
+    }
+}
+
 impl Storelike for Db {
     #[instrument(skip(self))]
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()> {
