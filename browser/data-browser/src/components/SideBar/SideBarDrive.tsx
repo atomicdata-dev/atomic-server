@@ -192,16 +192,28 @@ const AddButton = styled.button`
   appearance: none;
   border: 1px dashed ${p => p.theme.colors.bg2};
   border-radius: ${p => p.theme.radius};
-  width: calc(100% - 4rem);
+  width: calc(100% - 5rem);
   padding-block: 0.3rem;
-  margin-inline-start: 1.5rem;
-  margin-block: 0.5rem;
+  margin-inline-start: 2rem;
+  margin-block-start: 0.5rem;
+  margin-block-end: 1rem;
   cursor: pointer;
   ${transition('color', 'border')}
 
+  & svg {
+    ${transition('transform')}
+  }
   &:hover,
   &:focus-visible {
     color: ${p => p.theme.colors.main};
     border: 1px solid ${p => p.theme.colors.main};
+
+    & svg {
+      transform: scale(1.3);
+    }
+  }
+
+  &:active {
+    background-color: ${p => p.theme.colors.bg1};
   }
 `;
