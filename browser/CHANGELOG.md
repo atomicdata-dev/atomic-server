@@ -43,6 +43,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Added `resource.setVersion()` method.
 - Added `collection.getMembersOnPage()` method.
 - Added `collection.totalPages`.
+- Fix lib not working in non-secure browser contexts.
 - BREAKING CHANGE: Renamed `resource.getCommitsCollection` to `resource.getCommitsCollectionSubject`.
 - BREAKING CHANGE: `resource.getChildrenCollection()` now returns a `Promise<Collection>` instead of a subject.
 - BREAKING CHANGE: `resource.createSubject()` no longer accepts a class name as an argument and defaults to a fully random subject.

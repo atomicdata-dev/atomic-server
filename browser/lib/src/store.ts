@@ -1,5 +1,4 @@
-import { ulid } from 'ulid';
-
+import { ulid } from 'ulidx';
 import type { Agent } from './agent.js';
 import {
   removeCookieAuthentication,
@@ -148,7 +147,6 @@ export class Store {
     this.client.setFetch(fetchOverride);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public addResources(
     resources: Resource | Resource[],
     opts?: AddResourcesOpts,
