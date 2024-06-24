@@ -1,0 +1,14 @@
+[
+    {
+        "@id": "http://localhost:9883/o",
+        "https://atomicdata.dev/properties/isA": [
+            "https://atomicdata.dev/class/ontology"
+        ],
+        "https://atomicdata.dev/properties/parent": "http://localhost:9883",
+        "https://atomicdata.dev/properties/shortname": "ontology",
+        "https://atomicdata.dev/properties/description": "Vihreiden ohjelma-alustan ontologia",
+        "https://atomicdata.dev/properties/classes": [],
+        "https://atomicdata.dev/properties/properties": [],
+        "https://atomicdata.dev/properties/instances": []
+    }
+]
