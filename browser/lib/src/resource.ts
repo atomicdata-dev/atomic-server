@@ -691,7 +691,16 @@ export class Resource<C extends OptionalClass = any> {
 
     if (validate) {
       const fullProp = await this.store.getProperty(prop);
-      validateDatatype(value, fullProp.datatype);
+
+      try {
+        validateDatatype(value, fullProp.datatype);
+      } catch (e) {
+        if (e instanceof Error) {
+          e.message = `Error validating ${fullProp.shortname} with value ${value} for ${this.subject}: ${e.message}`;
+        }
+
+        throw e;
+      }
     }
 
     if (value === undefined) {
