@@ -57,6 +57,9 @@
   "devDependencies": {
     "@swc/plugin-styled-components": "^1.5.110",
     "@types/prismjs": "^1.26.4",
+    "@types/react": "^18.2.34",
+    "@types/react-dom": "^18.2.14",
+    "@types/react-router-dom": "^5.3.3",
     "@types/react-pdf": "^6.2.0",
     "@types/react-window": "^1.8.7",
     "@vitejs/plugin-react-swc": "^3.5.0",
