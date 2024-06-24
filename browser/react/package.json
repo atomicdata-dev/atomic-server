@@ -6,12 +6,17 @@
     "@tomic/lib": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "@types/react": "^18.2.34",
+    "@types/react-dom": "^18.2.14",
+    "@types/react-router-dom": "^5.3.3"
   },
   "peerDependencies": {
     "react": ">17.0.2"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "license": "MIT",
   "name": "@tomic/react",
   "main-dev": "src/index.ts",
