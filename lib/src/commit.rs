@@ -177,9 +177,12 @@ impl Commit {
         if is_new && opts.validate_subject_url_parent {
             if let Ok(parent) = resource_new.get(urls::PARENT) {
                 let parent_str = parent.to_string();
-                if !self.subject.starts_with(&parent_str) {
+                let parent_url = url::Url::parse(&parent_str)?;
+                let subj_host = subject_url.host_str().ok_or("No host in subject URL")?;
+                let parent_host = parent_url.host_str().ok_or("No host in parent URL")?;
+                if subj_host != parent_host {
                     return Err(format!(
-                        "You cannot create a new Resource with this subject, because the parent '{}' is not part of the URL of the new subject '{}'.",
+                        "Subject URL host '{}' does not match parent host URL '{}'.",
                         parent_str, self.subject
                     )
                     .into());
@@ -746,7 +749,7 @@ mod test {
 
     #[test]
     fn agent_and_commit() {
-        let store = crate::Store::init().unwrap();
+        let mut store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
         let subject = "https://localhost/new_thing";
@@ -778,7 +781,7 @@ mod test {
 
     #[test]
     fn serialize_commit() {
-        let store = crate::Store::init().unwrap();
+        let mut store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let mut set: HashMap<String, Value> = HashMap::new();
         let shortname = Value::new("shortname", &DataType::String).unwrap();
@@ -844,7 +847,7 @@ mod test {
     #[test]
 
     fn invalid_subjects() {
-        let store = crate::Store::init().unwrap();
+        let mut store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
         let resource = Resource::new("https://localhost/test_resource".into());
