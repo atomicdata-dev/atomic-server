@@ -41,14 +41,14 @@ export default function InputResourceArray({
   }
 
   function handleClear() {
-    setArray([]);
+    setArray(undefined);
   }
 
   const handleRemoveRowList = useIndexDependantCallback(
     (index: number) => () => {
       const newArray = [...array];
       newArray.splice(index, 1);
-      setArray(newArray);
+      setArray(newArray.length === 0 ? undefined : newArray);
     },
     array,
     [setArray],

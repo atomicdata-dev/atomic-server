@@ -42,8 +42,6 @@ const createModel = async (page: Page) => {
 
   await expect(page.locator(`h1:has-text("${ONTOLOGY_NAME}")`)).toBeVisible();
 
-  page.getByRole('button', { name: 'Edit', exact: true }).click();
-
   await page.getByRole('button', { name: 'Add class', exact: true }).click();
   await page.getByPlaceholder('shortname').fill('robot');
   await page.getByRole('button', { name: 'Save' }).click();
