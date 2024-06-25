@@ -18,13 +18,17 @@ import { Graph } from './Graph';
 import { CreateInstanceButton } from './CreateInstanceButton';
 import { useState } from 'react';
 
+const isEmpty = (arr: Array<unknown>) => arr.length === 0;
+
 export function OntologyPage({ resource }: ResourcePageProps) {
   const [classes] = useArray(resource, core.properties.classes);
   const [properties] = useArray(resource, core.properties.properties);
   const [instances] = useArray(resource, core.properties.instances);
   const [canWrite] = useCanWrite(resource);
 
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(
+    isEmpty(classes) && isEmpty(properties) && isEmpty(instances),
+  );
 
   return (
     <OntologyContextProvider ontology={resource}>
