@@ -13,6 +13,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
 - Updated the look & feel of the sidebar a bit.
 - [#893](https://github.com/atomicdata-dev/atomic-server/issues/893) Fix tables not showing any rows when viewing from a different server.
+- Fix an issue where the resource-array properties would be set to an empty array instead of removing the property when removing all items in the input.
 
 ### @tomic/react
 

@@ -91,7 +91,7 @@ export function DriveSwitcher() {
         disabled: !agent,
       },
     ],
-    [savedDrivesMap, drive, historyMap],
+    [savedDrivesMap, drive, historyMap, agent],
   );
 
   return <DropdownMenu trigger={Trigger} items={items} />;
