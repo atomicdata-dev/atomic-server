@@ -7,7 +7,10 @@ import { useResource, useArray, core, useString } from '@tomic/react';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { DraggableAttributes } from '@dnd-kit/core';
 import { StyledLink, TextWrapper } from './shared';
-import { getTransitionName } from '../../../helpers/transitionName';
+import {
+  SIDEBAR_TRANSITION_TAG,
+  getTransitionName,
+} from '../../../helpers/transitionName';
 import { useSettings } from '../../../helpers/AppSettings';
 import { IconButton } from '../../IconButton/IconButton';
 import { FaGripVertical } from 'react-icons/fa6';
@@ -47,7 +50,7 @@ export const SidebarItemTitle = forwardRef<
     return (
       <ActionWrapper
         isDragging={isDragging}
-        data-sidebar-id={getTransitionName('sidebar', subject)}
+        data-sidebar-id={getTransitionName(SIDEBAR_TRANSITION_TAG, subject)}
       >
         {sidebarKeyboardDndEnabled ? (
           <StyledLink subject={subject} clean ref={ref}>

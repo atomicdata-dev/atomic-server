@@ -1,10 +1,10 @@
-import { Resource, core, useCollection } from '@tomic/react';
+import { Resource, core } from '@tomic/react';
 
 import { PropertyUsage } from './PropertyUsage';
-import { UsageCard } from './UsageCard';
 import { ClassUsage } from './ClassUsage';
 import { ChildrenUsage } from './ChildrenUsage';
 import { Column } from '../Row';
+import { ReferenceUsage } from './ReferenceUsage';
 
 interface ResourceUsageProps {
   resource: Resource;
@@ -23,22 +23,10 @@ export function ResourceUsage({ resource }: ResourceUsageProps): JSX.Element {
 }
 
 function BasicUsage({ resource }: ResourceUsageProps): JSX.Element {
-  const { collection } = useCollection({
-    value: resource.subject,
-  });
-
   return (
     <Column>
       <ChildrenUsage resource={resource} />
-      <UsageCard
-        collection={collection}
-        title={
-          <span>
-            <strong>{collection.totalMembers}</strong> resources reference{' '}
-            {resource.title}
-          </span>
-        }
-      />
+      <ReferenceUsage resource={resource} />
     </Column>
   );
 }

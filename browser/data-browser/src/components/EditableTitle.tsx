@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaPencil } from 'react-icons/fa6';
 import { styled, css } from 'styled-components';
-import { transitionName } from '../helpers/transitionName';
+import {
+  PAGE_TITLE_TRANSITION_TAG,
+  transitionName,
+} from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
 
 export interface EditableTitleProps {
@@ -110,7 +113,7 @@ const Title = styled.h1<TitleProps & ViewTransitionProps>`
   cursor: ${props => (props.canEdit ? 'pointer' : 'initial')};
   opacity: ${props => (props.subtle ? 0.5 : 1)};
 
-  ${props => transitionName('page-title', props.subject)};
+  ${props => transitionName(PAGE_TITLE_TRANSITION_TAG, props.subject)};
 `;
 
 const TitleInput = styled.input`

@@ -9,7 +9,10 @@ import Markdown from '../../../components/datatypes/Markdown';
 import { AtomicLink } from '../../../components/AtomicLink';
 import { toAnchorId } from '../toAnchorId';
 import { ViewTransitionProps } from '../../../helpers/ViewTransitionProps';
-import { transitionName } from '../../../helpers/transitionName';
+import {
+  RESOURCE_PAGE_TRANSITION_TAG,
+  transitionName,
+} from '../../../helpers/transitionName';
 import { NewClassInstanceButton } from './NewClassInstanceButton';
 
 interface ClassCardReadProps {
@@ -56,7 +59,7 @@ export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
 
 const StyledCard = styled(Card)<ViewTransitionProps>`
   padding-bottom: ${p => p.theme.margin}rem;
-  ${props => transitionName('resource-page', props.subject)};
+  ${props => transitionName(RESOURCE_PAGE_TRANSITION_TAG, props.subject)};
 `;
 
 const StyledH3 = styled.h3`

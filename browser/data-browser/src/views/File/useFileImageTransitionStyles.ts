@@ -1,4 +1,7 @@
-import { getTransitionName } from '../../helpers/transitionName';
+import {
+  FILE_IMAGE_TRANSITION_TAG,
+  getTransitionName,
+} from '../../helpers/transitionName';
 import { useGlobalStylesWhileMounted } from '../../hooks/useGlobalStylesWhileMounted';
 
 export function useFileImageTransitionStyles(subject: string) {
@@ -6,7 +9,7 @@ export function useFileImageTransitionStyles(subject: string) {
   let name = 'none';
 
   try {
-    name = getTransitionName('file-image', subject);
+    name = getTransitionName(FILE_IMAGE_TRANSITION_TAG, subject);
     css = `
     ::view-transition-old(${name}),
     ::view-transition-new(${name}) {
