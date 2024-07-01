@@ -129,9 +129,7 @@ export function DropdownMenu({
 
   const handleClose = useCallback(() => {
     triggerRef.current?.focus();
-    setTimeout(() => {
-      setIsActive(false);
-    }, 100);
+    setIsActive(false);
   }, [setIsActive]);
 
   useClickAwayListener([triggerRef, dropdownRef], handleClose, isActive, [
@@ -140,8 +138,6 @@ export function DropdownMenu({
 
   const normalizedItems = useMemo(() => normalizeItems(items), [items]);
 
-  const [x, setX] = useState(0);
-  const [y, setY] = useState(0);
   const getNewIndex = createIndexOffset(normalizedItems);
   const [selectedIndex, setSelectedIndex] = useState<number>(getNewIndex(0, 0));
   // if the keyboard is used to navigate the menu items
@@ -167,25 +163,21 @@ export function DropdownMenu({
 
       // If the top is outside of the screen, render it below
       if (topPos < 0) {
-        setY(triggerRect.y + triggerRect.height / 2);
+        dropdownRef.current.style.top = `${triggerRect.y + triggerRect.height / 2}px`;
       } else {
-        setY(topPos + triggerRect.height / 2);
+        dropdownRef.current.style.top = `${topPos + triggerRect.height / 2}px`;
       }
 
       const leftPos = triggerRect.x - menuRect.width;
 
       // If the left is outside of the screen, render it to the right
       if (leftPos < 0) {
-        setX(triggerRect.x);
+        dropdownRef.current.style.left = `${triggerRect.x}px`;
       } else {
-        setX(triggerRect.x - menuRect.width + triggerRect.width);
+        dropdownRef.current.style.left = `${triggerRect.x - menuRect.width + triggerRect.width}px`;
       }
 
-      // The dropdown is hidden at first because in the first few frames it is still position at 0,0.
-      // We only want to show the dropdown after it has been positioned correctly.
-      requestAnimationFrame(() => {
-        dropdownRef.current!.style.visibility = 'visible';
-      });
+      dropdownRef.current.style.visibility = 'visible';
     });
   }, [isActive, setIsActive]);
 
@@ -285,8 +277,6 @@ export function DropdownMenu({
           <Menu
             ref={dropdownRef}
             isActive={isActive}
-            x={x}
-            y={y}
             id={menuId}
             onMouseOver={handleMouseOverMenu}
             onBlur={handleBlur}
@@ -338,8 +328,6 @@ const DropdownPortal = ({ children }: PropsWithChildren) => {
 
 interface MenuProps {
   isActive: boolean;
-  x: number;
-  y: number;
 }
 
 export interface MenuItemSidebarProps extends MenuItemMinimial {
@@ -457,11 +445,12 @@ const Menu = styled.div<MenuProps>`
   border-radius: 8px;
   position: fixed;
   z-index: ${p => p.theme.zIndex.dropdown};
-  top: ${p => p.y}px;
-  left: ${p => p.x}px;
   width: auto;
   box-shadow: ${p => p.theme.boxShadowSoft};
   opacity: ${p => (p.isActive ? 1 : 0)};
 
+  @starting-style {
+    opacity: 0;
+  }
   ${transition('opacity')};
 `;
