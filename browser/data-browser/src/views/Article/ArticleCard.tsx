@@ -3,7 +3,10 @@ import { core, useString } from '@tomic/react';
 import { styled } from 'styled-components';
 import { AtomicLink } from '../../components/AtomicLink';
 import { markdownToPlainText } from '../../helpers/markdown';
-import { transitionName } from '../../helpers/transitionName';
+import {
+  PAGE_TITLE_TRANSITION_TAG,
+  transitionName,
+} from '../../helpers/transitionName';
 import { ViewTransitionProps } from '../../helpers/ViewTransitionProps';
 import { CardViewProps } from '../Card/CardViewProps';
 
@@ -37,5 +40,5 @@ const Title = styled.h2<ViewTransitionProps>`
   width: 100%;
   overflow: hidden;
   font-size: 1.3rem;
-  ${props => transitionName('page-title', props.subject)}
+  ${props => transitionName(PAGE_TITLE_TRANSITION_TAG, props.subject)}
 `;

@@ -36,7 +36,6 @@ test.describe('Ontology', async () => {
     await page.locator('dialog[open] button:has-text("Create")').click();
     await expect(page.locator(`h1:has-text("${ontologyName}")`)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
     await page
       .getByTestId('markdown-editor')
       .fill('Data model for youtube thumbnail editor');

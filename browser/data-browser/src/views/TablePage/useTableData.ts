@@ -1,6 +1,6 @@
 import {
+  core,
   Resource,
-  urls,
   useCollection,
   UseCollectionResult,
   useResource,
@@ -46,23 +46,26 @@ const useTableSorting = () =>
 export function useTableData(resource: Resource): UseTableDataResult {
   const [sorting, setSortBy] = useTableSorting();
 
-  const [classSubject] = useSubject(resource, urls.properties.classType);
+  const [classSubject] = useSubject(resource, core.properties.classtype);
   const tableClass = useResource(classSubject);
 
   const queryFilter = useMemo(
     () => ({
-      property: urls.properties.parent,
-      value: resource.getSubject(),
+      property: core.properties.parent,
+      value: resource.subject,
       sort_by: sorting.prop,
       sort_desc: sorting.sortDesc,
     }),
-    [resource.getSubject(), sorting.prop, sorting.sortDesc],
+    [resource.subject, sorting.prop, sorting.sortDesc],
   );
 
   return {
     tableClass,
     sorting,
     setSortBy,
-    ...useCollection(queryFilter, PAGE_SIZE),
+    ...useCollection(queryFilter, {
+      pageSize: PAGE_SIZE,
+      server: new URL(resource.subject).origin,
+    }),
   };
 }

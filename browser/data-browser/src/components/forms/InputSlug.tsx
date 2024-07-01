@@ -11,6 +11,7 @@ export default function InputSlug({
   resource,
   property,
   commit,
+  commitDebounceInterval,
   ...props
 }: InputProps): JSX.Element {
   const [err, setErr, onBlur] = useValidation();
@@ -19,6 +20,7 @@ export default function InputSlug({
     handleValidationError: setErr,
     validate: false,
     commit,
+    commitDebounce: commitDebounceInterval,
   });
 
   const [inputValue, setInputValue] = useState(value);

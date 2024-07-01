@@ -9,7 +9,7 @@ import {
   clickSidebarItem,
   editTitle,
   setTitle,
-  sideBarNewResource,
+  sideBarNewResourceTestId,
 } from './test-utils';
 test.describe('search', async () => {
   test.beforeEach(before);
@@ -26,7 +26,7 @@ test.describe('search', async () => {
     await newDrive(page);
 
     // Create folder called 1
-    await page.locator(sideBarNewResource).click();
+    await page.getByTestId(sideBarNewResourceTestId).click();
     await page.locator('button:has-text("folder")').click();
     await setTitle(page, 'Salad folder');
 
@@ -38,7 +38,7 @@ test.describe('search', async () => {
     await waitForCommit(page);
     await editTitle('Avocado Salad', page);
 
-    await page.locator(sideBarNewResource).click();
+    await page.getByTestId(sideBarNewResourceTestId).click();
 
     // Create folder called 'Cake folder'
     await page.locator('button:has-text("folder")').click();

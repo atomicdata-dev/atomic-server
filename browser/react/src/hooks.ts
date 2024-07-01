@@ -27,6 +27,7 @@ import {
   OptionalClass,
   proxyResource,
   type Core,
+  ResourceEvents,
 } from '@tomic/lib';
 import { useDebouncedCallback } from './index.js';
 
@@ -274,6 +275,14 @@ export function useValue(
 
     setPrevResourceReference(resource);
   }
+
+  useEffect(() => {
+    return resource.on(ResourceEvents.LocalChange, (prop, value) => {
+      if (prop === propertyURL) {
+        set(value);
+      }
+    });
+  }, [resource, propertyURL]);
 
   return [val, validateAndSet];
 }

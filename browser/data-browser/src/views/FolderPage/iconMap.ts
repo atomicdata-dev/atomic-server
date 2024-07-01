@@ -1,6 +1,7 @@
-import { classes } from '@tomic/react';
+import { collections, commits, core, dataBrowser, server } from '@tomic/react';
 import { IconType } from 'react-icons';
 import {
+  FaTag,
   FaAtom,
   FaBook,
   FaClock,
@@ -8,33 +9,34 @@ import {
   FaCube,
   FaCubes,
   FaFile,
-  FaFileAlt,
+  FaFileLines,
   FaFileImport,
   FaFolder,
   FaHashtag,
-  FaHdd,
-  FaListAlt,
+  FaHardDrive,
+  FaList,
   FaShapes,
-  FaShareSquare,
+  FaShareFromSquare,
   FaTable,
-} from 'react-icons/fa';
+} from 'react-icons/fa6';
 
 const iconMap = new Map<string, IconType>([
-  [classes.folder, FaFolder],
-  [classes.bookmark, FaBook],
-  [classes.chatRoom, FaComment],
-  [classes.document, FaFileAlt],
-  [classes.file, FaFile],
-  [classes.drive, FaHdd],
-  [classes.commit, FaClock],
-  [classes.importer, FaFileImport],
-  [classes.invite, FaShareSquare],
-  [classes.collection, FaListAlt],
-  [classes.class, FaCube],
-  [classes.property, FaCubes],
-  [classes.table, FaTable],
-  [classes.property, FaHashtag],
-  [classes.ontology, FaShapes],
+  [dataBrowser.classes.folder, FaFolder],
+  [dataBrowser.classes.bookmark, FaBook],
+  [dataBrowser.classes.chatroom, FaComment],
+  [dataBrowser.classes.document, FaFileLines],
+  [server.classes.file, FaFile],
+  [server.classes.drive, FaHardDrive],
+  [commits.classes.commit, FaClock],
+  [dataBrowser.classes.importer, FaFileImport],
+  [server.classes.invite, FaShareFromSquare],
+  [collections.classes.collection, FaList],
+  [core.classes.class, FaCube],
+  [core.classes.property, FaCubes],
+  [dataBrowser.classes.table, FaTable],
+  [core.classes.property, FaHashtag],
+  [core.classes.ontology, FaShapes],
+  [dataBrowser.classes.tag, FaTag],
 ]);
 
 export function getIconForClass(

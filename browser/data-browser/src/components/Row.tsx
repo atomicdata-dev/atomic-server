@@ -62,6 +62,10 @@ const Flex = styled.div<FlexProps>`
   width: ${p => (p.fullWidth ? '100%' : 'initial')};
   height: ${p => (p.fullHeight ? '100%' : 'initial')};
 
+  & > :is(h1, h2, h3, h4, h5, h6) {
+    margin-bottom: 0;
+  }
+
   & ${ButtonDefault} {
     align-self: flex-start;
   }

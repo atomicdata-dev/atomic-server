@@ -23,7 +23,7 @@ export const testFilePath = (filename: string) => {
 export const timestamp = () => new Date().toLocaleTimeString();
 export const editableTitle = '[data-test="editable-title"]';
 export const sideBarDriveSwitcher = '[title="Open Drive Settings"]';
-export const sideBarNewResource = '[data-test="sidebar-new-resource"]';
+export const sideBarNewResourceTestId = 'sidebar-new-resource';
 export const currentDriveTitle = (page: Page) =>
   page.getByTestId('current-drive-title');
 export const publicReadRightLocator = (page: Page) =>
@@ -243,7 +243,7 @@ export async function fillSearchBox(
 /** Create a new Resource in the current Drive.
  * Class can be an Class URL or a shortname available in the new page. */
 export async function newResource(klass: string, page: Page) {
-  await page.locator(sideBarNewResource).click();
+  await page.getByTestId(sideBarNewResourceTestId).click();
   await expect(page).toHaveURL(`${FRONTEND_URL}/app/new`);
 
   if (klass.startsWith('https://')) {

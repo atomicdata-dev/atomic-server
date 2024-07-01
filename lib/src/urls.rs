@@ -37,6 +37,9 @@ pub const ALLOWS_ONLY: &str = "https://atomicdata.dev/properties/allowsOnly";
 // ... for Classes
 pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
 pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";
+// ... for Drives
+pub const DEFAULT_ONTOLOGY: &str =
+    "https://atomicdata.dev/ontology/server/property/default-ontology";
 // ... for Commits
 pub const SUBJECT: &str = "https://atomicdata.dev/properties/subject";
 pub const SET: &str = "https://atomicdata.dev/properties/set";

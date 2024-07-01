@@ -12,6 +12,8 @@ use crate::{
     urls, Storelike, Value,
 };
 
+const DEFAULT_ONTOLOGY_PATH: &str = "defaultOntology";
+
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.
 /// This is necessary to prevent a loop where Property X (like the `shortname` Property)
 /// cannot be added, because it's Property Y (like `description`) has to be fetched before it can be added,
@@ -165,6 +167,42 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
         store,
     )?;
     drive.save_locally(store)?;
+
+    Ok(())
+}
+
+pub fn create_default_ontology(store: &impl Storelike) -> AtomicResult<()> {
+    let mut drive = store.get_resource(store.get_server_url())?;
+
+    let ontology_subject = format!("{}/{}", drive.get_subject(), DEFAULT_ONTOLOGY_PATH);
+
+    // If the ontology already exists, don't change it.
+    if store.get_resource(&ontology_subject).is_ok() {
+        return Ok(());
+    }
+
+    let mut ontology = store.get_resource_new(&ontology_subject);
+
+    ontology.set_class(urls::ONTOLOGY);
+    ontology.set_string(urls::SHORTNAME.into(), "ontology", store)?;
+    ontology.set_string(
+        urls::DESCRIPTION.into(),
+        "Default ontology for this drive",
+        store,
+    )?;
+    ontology.set_string(urls::PARENT.into(), drive.get_subject(), store)?;
+    ontology.set(urls::CLASSES.into(), Value::ResourceArray(vec![]), store)?;
+    ontology.set(urls::PROPERTIES.into(), Value::ResourceArray(vec![]), store)?;
+    ontology.set(urls::INSTANCES.into(), Value::ResourceArray(vec![]), store)?;
+    ontology.save_locally(store)?;
+
+    drive.set_string(urls::DEFAULT_ONTOLOGY.into(), ontology.get_subject(), store)?;
+    drive.push(
+        urls::SUBRESOURCES,
+        crate::values::SubResource::Subject(ontology.get_subject().into()),
+        false,
+    )?;
+    drive.save_locally(store)?;
     Ok(())
 }
 
@@ -183,11 +221,20 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
 
     if let Err(_no_description) = drive.get(urls::DESCRIPTION) {
         drive.set_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
-
-Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
+### Getting started
+Start by registering your Agent by visiting [`/setup`]({}/setup).
 
 Note that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.
-"#, store.get_server_url()), store)?;
+
+Once you've setup an agent you should start editing your schema using ontologies.
+We've created a [default ontology]({}) for you but you can create more if you want.
+
+Next create some resources by clicking on the plus button in the sidebar.
+You can create folders to organise your resources.
+
+To use the data in your web apps checkout our client libraries: [@tomic/lib](https://docs.atomicdata.dev/js), [@tomic/react](https://docs.atomicdata.dev/usecases/react) and [@tomic/svelte](https://docs.atomicdata.dev/svelte)
+Use [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologies inside your code.
+"#, store.get_server_url(), &format!("{}/{}", drive.get_subject(), DEFAULT_ONTOLOGY_PATH)), store)?;
     }
     drive.save_locally(store)?;
     Ok(())
@@ -296,6 +343,8 @@ pub fn populate_all(store: &crate::Db) -> AtomicResult<()> {
     populate_default_store(store)
         .map_err(|e| format!("Failed to populate default store. {}", e))?;
     create_drive(store).map_err(|e| format!("Failed to create drive. {}", e))?;
+    create_default_ontology(store)
+        .map_err(|e| format!("Failed to create default ontology. {}", e))?;
     set_drive_rights(store, true)?;
     populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
     populate_endpoints(store).map_err(|e| format!("Failed to populate endpoints. {}", e))?;

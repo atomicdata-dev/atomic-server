@@ -8,11 +8,23 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 - [#855](https://github.com/atomicdata-dev/atomic-server/issues/855) Add a dialog that shows how to fetch and use the current resource in your code.
 - [#825](https://github.com/atomicdata-dev/atomic-server/issues/825) Folder display styles are now saved locally instead of on the resource. The display style property will now act as the default view style.
+- [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
 - Updated look of the default resource form.
+- [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
+- Updated the look & feel of the sidebar a bit.
+- [#893](https://github.com/atomicdata-dev/atomic-server/issues/893) Fix tables not showing any rows when viewing from a different server.
+- Fix an issue where the resource-array properties would be set to an empty array instead of removing the property when removing all items in the input.
+- Fix an issue where dropdown menus sometimes jump from the upper left corner of the screen.
+- Added a full page view for tags.
+
+### @tomic/lib
+
+- Added `LocalChange` event to `Resource`.
 
 ### @tomic/react
 
 - BREAKING CHANGE: Removed the `useLocalStorage` hook.
+- When using any `useValue` type hook, values will now update when local changes are made to the resource from elsewhere in the app.
 
 ## v0.38.0
 
@@ -39,6 +51,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Added `resource.setVersion()` method.
 - Added `collection.getMembersOnPage()` method.
 - Added `collection.totalPages`.
+- Fix lib not working in non-secure browser contexts.
 - BREAKING CHANGE: Renamed `resource.getCommitsCollection` to `resource.getCommitsCollectionSubject`.
 - BREAKING CHANGE: `resource.getChildrenCollection()` now returns a `Promise<Collection>` instead of a subject.
 - BREAKING CHANGE: `resource.createSubject()` no longer accepts a class name as an argument and defaults to a fully random subject.

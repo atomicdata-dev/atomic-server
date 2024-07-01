@@ -1,5 +1,5 @@
 import { Resource, core, dataBrowser, useStore } from '@tomic/react';
-import { useState, useCallback, Suspense, lazy } from 'react';
+import { useState, useCallback } from 'react';
 import { FaPlus } from 'react-icons/fa';
 import { randomItem } from '../../helpers/randomItem';
 import { stringToSlug } from '../../helpers/stringToSlug';
@@ -7,8 +7,7 @@ import { Button } from '../Button';
 import { Row } from '../Row';
 import { InputWrapper, InputStyled } from '../forms/InputStyles';
 import { tagColours } from './tagColours';
-
-const EmojiInput = lazy(() => import('../../chunks/EmojiInput/EmojiInput'));
+import { EmojiInput } from '../forms/EmojiInput';
 
 interface CreateTagRowProps {
   parent: string;
@@ -61,21 +60,19 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
   );
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <Row>
-        <InputWrapper>
-          <EmojiInput onChange={setEmoji} key={resetKey} />
-          <InputStyled
-            placeholder='New tag'
-            value={tagName}
-            onChange={handleChange}
-            onKeyDown={handleKeyDown}
-          />
-        </InputWrapper>
-        <Button title='Add tag' onClick={createNewTag} disabled={!tagName}>
-          <FaPlus />
-        </Button>
-      </Row>
-    </Suspense>
+    <Row>
+      <InputWrapper>
+        <EmojiInput onChange={setEmoji} key={resetKey} />
+        <InputStyled
+          placeholder='New tag'
+          value={tagName}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+        />
+      </InputWrapper>
+      <Button title='Add tag' onClick={createNewTag} disabled={!tagName}>
+        <FaPlus />
+      </Button>
+    </Row>
   );
 }

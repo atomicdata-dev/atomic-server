@@ -10,6 +10,7 @@ export interface DetailsProps {
   disabled?: boolean;
   /** Event that fires when a user opens or closes the details */
   onStateToggle?: (state: boolean) => void;
+  noIndent?: boolean;
 }
 
 /** A collapsible item with a title. Similar to the <details> HTML element. */
@@ -19,6 +20,7 @@ export function Details({
   children,
   title,
   disabled,
+  noIndent,
   onStateToggle,
 }: PropsWithChildren<DetailsProps>): JSX.Element {
   const [isOpen, setIsOpen] = useState(initialState);
@@ -26,6 +28,10 @@ export function Details({
   useEffect(() => {
     setIsOpen(open);
   }, [open]);
+
+  useEffect(() => {
+    setIsOpen(initialState);
+  }, [initialState]);
 
   const toggleOpen = useCallback(() => {
     setIsOpen(p => {
@@ -49,7 +55,9 @@ export function Details({
         </IconButton>
         <TitleWrapper>{title}</TitleWrapper>
       </SummaryWrapper>
-      <StyledCollapse open={!!isOpen}>{children}</StyledCollapse>
+      <StyledCollapse open={!!isOpen} noIndent={noIndent}>
+        {children}
+      </StyledCollapse>
     </>
   );
 }
@@ -108,7 +116,7 @@ const IconButton = styled.button<IconButtonProps>`
   }
 `;
 
-const StyledCollapse = styled(Collapse)`
+const StyledCollapse = styled(Collapse)<{ noIndent?: boolean }>`
   overflow-x: hidden;
-  margin-left: ${({ theme }) => theme.margin}rem;
+  margin-left: ${p => (p.noIndent ? 0 : p.theme.margin) + 'rem'};
 `;

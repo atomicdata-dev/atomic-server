@@ -60,10 +60,10 @@ const TagWrapper = styled.span<TagWrapperProps>`
   --tag-light-color: ${props =>
     setSaturation(0.5, setLightness(0.9, props.color))};
   display: inline-flex;
-  gap: 0.5rem;
+  gap: 1ch;
   align-items: center;
-  padding-inline: 0.5rem;
-  padding-block: 0.4rem;
+  padding-inline: 0.5em;
+  padding-block: 0.4em;
   border-radius: 1em;
   border: 1px solid var(--tag-mid-color);
   color: ${p =>
@@ -136,6 +136,7 @@ export function EditableTag({
 
   return (
     <Popover
+      modal
       open={open}
       onOpenChange={setOpen}
       Trigger={

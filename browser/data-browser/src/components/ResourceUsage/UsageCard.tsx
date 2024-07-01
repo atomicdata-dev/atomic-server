@@ -1,39 +1,69 @@
-import { Collection } from '@tomic/react';
+import { Collection, useCollectionPage } from '@tomic/react';
 
 import { styled } from 'styled-components';
 import { Details } from '../Details';
 import { UsageRow } from './UsageRow';
-import { Column } from '../Row';
+import { Column, Row } from '../Row';
+import { useState } from 'react';
+import { FaChevronLeft, FaChevronRight } from 'react-icons/fa6';
+import { IconButton } from '../IconButton/IconButton';
 
 interface UsageCardProps {
   collection: Collection;
   title: string | React.ReactNode;
+  initialOpenState?: boolean;
 }
 
-function mapOverCollection<T>(
-  collection: Collection,
-  mapFn: (index: number) => T,
-): T[] {
-  return new Array(Math.min(100, collection.totalMembers))
-    .fill(0)
-    .map((_, i) => mapFn(i));
-}
+export function UsageCard({
+  collection,
+  title,
+  initialOpenState = false,
+}: UsageCardProps): JSX.Element {
+  const [page, setPage] = useState(0);
+  const [isOpen, setIsOpen] = useState(initialOpenState);
+  const members = useCollectionPage(collection, page);
 
-export function UsageCard({ collection, title }: UsageCardProps): JSX.Element {
+  const PageButtons = (
+    <Row center>
+      <IconButton
+        title='Previous page'
+        onClick={() => setPage(p => p - 1)}
+        disabled={page === 0}
+      >
+        <FaChevronLeft />
+      </IconButton>
+      <PageNumber>{page + 1}</PageNumber>
+      <IconButton
+        title='Next page'
+        onClick={() => setPage(p => p + 1)}
+        disabled={page === collection.totalPages - 1}
+      >
+        <FaChevronRight />
+      </IconButton>
+    </Row>
+  );
+
   return (
     <DetailsCard>
-      <Details title={<>{title}</>}>
+      <Details
+        noIndent
+        title={
+          <Row justify='space-between'>
+            <span>{title}</span>
+            {isOpen && PageButtons}
+          </Row>
+        }
+        initialState={initialOpenState}
+        onStateToggle={setIsOpen}
+      >
         <ContentWrapper>
-          {collection.totalMembers > 100 && (
-            <LimitMessage>
-              Showing 100 of {collection.totalMembers}
-            </LimitMessage>
-          )}
           <List>
-            {mapOverCollection(collection, i => (
-              <UsageRow collection={collection} index={i} key={1} />
+            {/* We need to filter out duplicate members because react will do weird things when duplicate keys are present */}
+            {Array.from(new Set(members)).map(s => (
+              <UsageRow subject={s} key={s} />
             ))}
           </List>
+          <Row justify='end'>{PageButtons}</Row>
         </ContentWrapper>
       </Details>
     </DetailsCard>
@@ -57,7 +87,6 @@ const ContentWrapper = styled(Column)`
   margin-top: ${({ theme }) => theme.margin}rem;
 `;
 
-const LimitMessage = styled.span`
-  text-align: end;
+const PageNumber = styled.span`
   color: ${({ theme }) => theme.colors.textLight};
 `;

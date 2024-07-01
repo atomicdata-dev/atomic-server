@@ -1,3 +1,8 @@
+export const FILE_IMAGE_TRANSITION_TAG = 'file-image';
+export const SIDEBAR_TRANSITION_TAG = 'sidebar';
+export const PAGE_TITLE_TRANSITION_TAG = 'page-title';
+export const RESOURCE_PAGE_TRANSITION_TAG = 'resource-page';
+
 const hashStringWithCYRB53 = (str, seed = 0) => {
   let h1 = 0xdeadbeef ^ seed,
     h2 = 0x41c6ce57 ^ seed;

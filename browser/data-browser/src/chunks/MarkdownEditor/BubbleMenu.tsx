@@ -72,6 +72,7 @@ export function BubbleMenu(): React.JSX.Element {
           <FaCode />
         </ToggleButton>
         <StyledPopover
+          modal
           open={linkMenuOpen}
           onOpenChange={setLinkMenuOpen}
           Trigger={

@@ -19,6 +19,12 @@ const options = Object.entries(reverseDatatypeMapping)
   }))
   .filter(x => x.value !== 'unknown-datatype');
 
+const isResourceLike = (datatype: string) => {
+  return (
+    datatype === Datatype.ATOMIC_URL || datatype === Datatype.RESOURCEARRAY
+  );
+};
+
 export function PropertyDatatypePicker({
   resource,
   disabled,
@@ -29,12 +35,6 @@ export function PropertyDatatypePicker({
   const [, setClassType] = useString(resource, core.properties.classtype, {
     commit: true,
   });
-
-  const isResourceLike = (datatype: string) => {
-    return (
-      datatype === Datatype.ATOMIC_URL || datatype === Datatype.RESOURCEARRAY
-    );
-  };
 
   const clearInapplicableProps = (datatype: string) => {
     if (!isResourceLike(datatype)) {
