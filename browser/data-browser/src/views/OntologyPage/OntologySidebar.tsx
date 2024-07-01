@@ -21,7 +21,7 @@ export function OntologySidebar({
     <Wrapper>
       <SideBarScrollArea>
         <Details
-          open
+          initialState={true}
           title={
             <Title>
               <FaCube />
@@ -36,7 +36,7 @@ export function OntologySidebar({
           </ul>
         </Details>
         <Details
-          open
+          initialState={true}
           title={
             <Title>
               <FaHashtag />
@@ -51,7 +51,7 @@ export function OntologySidebar({
           </ul>
         </Details>
         <Details
-          open
+          initialState={true}
           title={
             <Title>
               <FaAtom />

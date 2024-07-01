@@ -6,6 +6,7 @@ import {
   Resource,
   urls,
   type OptionalClass,
+  dataBrowser,
 } from '@tomic/react';
 
 import { ContainerNarrow } from '../components/Containers';
@@ -30,6 +31,7 @@ import { ArticlePage } from './Article';
 import { TablePage } from './TablePage';
 import { Main } from '../components/Main';
 import { OntologyPage } from './OntologyPage';
+import { TagPage } from './TagPage/TagPage';
 
 /** These properties are passed to every View at Page level */
 export type ResourcePageProps<Subject extends OptionalClass = never> = {
@@ -122,6 +124,8 @@ function selectComponent(klass: string) {
       return TablePage;
     case urls.classes.ontology:
       return OntologyPage;
+    case dataBrowser.classes.tag:
+      return TagPage;
     default:
       return ResourcePageDefault;
   }

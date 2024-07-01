@@ -9,11 +9,13 @@ export default function InputString({
   resource,
   property,
   commit,
+  commitDebounceInterval,
   ...props
 }: InputProps): JSX.Element {
   const [err, setErr, onBlur] = useValidation();
   const [value, setValue] = useString(resource, property.subject, {
     commit,
+    commitDebounce: commitDebounceInterval,
     validate: false,
   });
 

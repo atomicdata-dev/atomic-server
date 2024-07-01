@@ -141,7 +141,10 @@ export type InputProps = {
   disabled?: boolean;
   /** Whether the field should be focused on render */
   autoFocus?: boolean;
+  /** Whether the field should commit on change */
   commit?: boolean;
+  /** The debounce interval for the commit event in miliseconds */
+  commitDebounceInterval?: number;
 };
 
 interface IFieldProps {

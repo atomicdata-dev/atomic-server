@@ -1,5 +1,8 @@
 import { styled } from 'styled-components';
-import { getTransitionStyle } from '../helpers/transitionName';
+import {
+  RESOURCE_PAGE_TRANSITION_TAG,
+  getTransitionStyle,
+} from '../helpers/transitionName';
 
 type CardProps = {
   /** Adds a colorful border */
@@ -11,7 +14,7 @@ type CardProps = {
 /** A Card with a border. */
 export const Card = styled.div.attrs<CardProps>(p => ({
   // When we render a lot of cards it is more performant to use styles instead of classes when each card has a unique style
-  style: getTransitionStyle('resource-page', p.about),
+  style: getTransitionStyle(RESOURCE_PAGE_TRANSITION_TAG, p.about),
 }))`
   background-color: ${props => props.theme.colors.bg};
 

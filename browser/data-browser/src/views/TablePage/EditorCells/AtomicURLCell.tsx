@@ -150,6 +150,7 @@ function AtomicURLCellEdit({
 
   return (
     <SearchPopover
+      modal
       Trigger={Trigger}
       open={open}
       onOpenChange={handleOpenChange}

@@ -161,6 +161,7 @@ function SelectCellEdit({
           </Tag>
         ))}
         <Popover
+          modal
           defaultOpen
           noLock
           open={open}
