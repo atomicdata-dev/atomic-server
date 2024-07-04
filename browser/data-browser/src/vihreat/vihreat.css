@@ -1,0 +1,41 @@
+div.vihreat-ohjelma {
+    margin: auto;
+    max-width: 40em;
+}
+
+div.vihreat-ohjelma h1 {
+    margin-top: 0.67em;
+    margin-bottom: 0.67em;
+    color: #006845;
+    font-size: 2.0em;
+    text-transform: capitalize;
+}
+
+div.vihreat-ohjelma h2 {
+    margin-top: 2.0em;
+    margin-bottom: 0.67em;
+    color: #006845;
+    font-size: 1.5em;
+}
+
+div.vihreat-ohjelma h3 {
+    margin-top: 2.0em;
+    margin-bottom: 0.67em;
+    color: #006845;
+    font-size: 1.2em;
+    font-weight: lighter;
+}
+
+div.vihreat-ohjelma p {
+    margin-top: 0.67em;
+    margin-bottom: 0.67em;
+}
+
+div.vihreat-ohjelma ul {
+    margin: 0;
+}
+
+div.vihreat-ohjelma li {
+    margin-top: 0.2rem;
+    margin-bottom: 0.2rem;
+}
