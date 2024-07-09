@@ -127,7 +127,6 @@ function selectComponent(klass: string) {
     case vihreat.classes.program:
       return ProgramPage;
     default:
-      console.log('Default: ' + klass);
       return ResourcePageDefault;
   }
 }

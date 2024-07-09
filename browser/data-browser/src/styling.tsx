@@ -185,13 +185,13 @@ export const GlobalStyle = createGlobalStyle`
     height: 10px;
     padding: 3px;
     background-color: ${p =>
-    p.theme.colors.bg}; /* color of the tracking area */
+      p.theme.colors.bg}; /* color of the tracking area */
   }
   &::-webkit-scrollbar-thumb {
     width: 8px;
     margin: auto;
     background-color: ${p =>
-    p.theme.colors.bg2}; /* color of the tracking area */
+      p.theme.colors.bg2}; /* color of the tracking area */
     border-radius: ${p => p.theme.radius};
 
     &:hover {
