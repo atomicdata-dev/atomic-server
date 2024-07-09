@@ -59,6 +59,7 @@ module.exports = {
     // "import/extensions": ["error", "ignorePackages"],
     "import/no-unresolved": "off",
     'import/no-dynamic-require': 'off', // https://github.com/benmosher/eslint-plugin-import/blob/master/docs/rules/no-dynamic-require.md
+    'import/no-named-as-default': 'off',
     'no-inner-declarations': 'off', // https://eslint.org/docs/rules/no-inner-declarations// New rules
     'class-methods-use-this': 'off',
     //Allow underscores https://stackoverflow.com/questions/57802057/eslint-configuring-no-unused-vars-for-typescript

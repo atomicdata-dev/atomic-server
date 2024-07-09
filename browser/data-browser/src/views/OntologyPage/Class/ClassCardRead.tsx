@@ -14,7 +14,6 @@ import {
   transitionName,
 } from '../../../helpers/transitionName';
 import { NewClassInstanceButton } from './NewClassInstanceButton';
-import { CARD_CONTAINER } from '../../../helpers/containers';
 
 interface ClassCardReadProps {
   subject: string;
