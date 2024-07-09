@@ -46,6 +46,36 @@ export const animationDuration = 100;
 const breadCrumbBarHeight = '2.2rem';
 const floatingSearchBarPadding = '4.2rem';
 
+function size(index = 3): string {
+  const sizes = [
+    size.raw(0.25),
+    size.raw(0.5),
+    size.raw(1),
+    size.raw(1.25),
+    size.raw(1.5),
+    size.raw(1.75),
+    size.raw(2),
+    size.raw(3),
+    size.raw(4),
+    size.raw(5),
+    size.raw(7.5),
+    size.raw(10),
+    size.raw(15),
+    size.raw(20),
+    size.raw(30),
+  ];
+
+  const sizeStr = sizes[index - 1];
+
+  if (sizeStr === undefined) {
+    throw new Error(`Size index ${index} out of bounds`);
+  }
+
+  return sizeStr;
+}
+
+size.raw = (multiplier: number) => `${multiplier}rem`;
+
 /** Construct a StyledComponents theme object */
 export const buildTheme = (darkMode: boolean, mainIn: string): DefaultTheme => {
   const main = darkMode ? lighten(0.2, mainIn) : mainIn;
@@ -80,6 +110,7 @@ export const buildTheme = (darkMode: boolean, mainIn: string): DefaultTheme => {
       floatingSearchBarPadding: floatingSearchBarPadding,
       fullPage: `calc(100% - ${breadCrumbBarHeight})`,
     },
+    size,
     colors: {
       main,
       mainLight: darkMode ? lighten(0.08)(main) : lighten(0.08)(main),
@@ -118,7 +149,10 @@ declare module 'styled-components' {
     boxShadow: string;
     boxShadowIntense: string;
     boxShadowSoft: string;
-    /** Base margin */
+    /**
+     * @deprecated
+     * use size() instead
+     */
     margin: number;
     /** Width of the container, in rem */
     containerWidth: number;
@@ -134,6 +168,29 @@ declare module 'styled-components' {
       fullPage: string;
       floatingSearchBarPadding: string;
     };
+
+    /**
+     * Function that returns a size in rem for the given index.
+     * Based on the following ratio:
+     * 1) size.raw(0.25),
+     * 2) size.raw(0.5),
+     * 3) size.raw(1),
+     * 4) size.raw(1.25),
+     * 5) size.raw(1.5),
+     * 6) size.raw(1.75),
+     * 7) size.raw(2),
+     * 8) size.raw(3),
+     * 9) size.raw(4),
+     * 10) size.raw(5),
+     * 11) size.raw(7.5),
+     * 12) size.raw(10),
+     * 13) size.raw(15),
+     * 14) size.raw(20),
+     * 15) size.raw(30),
+     *
+     * When given no index it returns the default size (3)
+     */
+    size: typeof size;
     colors: {
       /** Main accent color, used for links */
       main: string;
@@ -208,7 +265,7 @@ export const GlobalStyle = createGlobalStyle`
     overflow-wrap: anywhere;
     margin: 0;
     /** Pretty dark mode transition */
-    transition: background .2s ease, border-color .2s ease, color .2s ease;
+    transition: background-color .2s ease, border-color .2s ease, color .2s ease;
     font-size: 0.95rem;
   }
 
@@ -230,7 +287,7 @@ export const GlobalStyle = createGlobalStyle`
   }
 
   h1,h2,h3,h4,h5,h6 {
-    margin-bottom: ${props => props.theme.margin}rem;
+    margin-bottom: ${props => props.theme.size()};
     font-weight: bold;
     font-family: ${p => p.theme.fontFamilyHeader};
     line-height: 1em;
@@ -244,18 +301,18 @@ export const GlobalStyle = createGlobalStyle`
 
   p {
     margin-top: 0;
-    margin-bottom: ${props => props.theme.margin}rem;
+    margin-bottom: ${props => props.theme.size()};
   }
 
   ul {
     margin-top: 0;
-    margin-bottom: ${props => props.theme.margin}rem;
+    margin-bottom: ${props => props.theme.size()};
     padding: 0;
 
     li {
       list-style-type: disc;
-      margin-left: ${props => props.theme.margin * 2}rem;
-      margin-bottom: ${props => props.theme.margin / 2}rem;
+      margin-left: ${props => props.theme.size(7)};
+      margin-bottom: ${props => props.theme.size(7)};
     }
   }
 

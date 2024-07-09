@@ -10,6 +10,7 @@ import {
   editTitle,
   setTitle,
   sideBarNewResourceTestId,
+  contextMenuClick,
 } from './test-utils';
 test.describe('search', async () => {
   test.beforeEach(before);
@@ -57,7 +58,7 @@ test.describe('search', async () => {
     // Set search scope to 'Cake folder'
     await page.waitForTimeout(REBUILD_INDEX_TIME);
     await page.reload();
-    await page.locator('button[title="Search in Cake Folder"]').click();
+    await contextMenuClick('scope', page);
     // Search for 'Avocado'
     await page.locator('[data-test="address-bar"]').type('Avocado');
     // I don't like the `.first` here, but for some reason there is one frame where

@@ -6,10 +6,11 @@ type Props = React.SelectHTMLAttributes<HTMLSelectElement>;
 
 export const BasicSelect: FC<PropsWithChildren<Props>> = ({
   children,
+  className,
   ...props
 }) => {
   return (
-    <StyledInputWrapper>
+    <StyledInputWrapper className={className}>
       <SelectWrapper disabled={!!props.disabled}>
         <Select {...props}>{children}</Select>
       </SelectWrapper>

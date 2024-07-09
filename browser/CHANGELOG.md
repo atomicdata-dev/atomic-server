@@ -16,6 +16,9 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Fix an issue where the resource-array properties would be set to an empty array instead of removing the property when removing all items in the input.
 - Fix an issue where dropdown menus sometimes jump from the upper left corner of the screen.
 - Added a full page view for tags.
+- Redesigned the ontology page.
+- Moved the resource context menu to the top of the page.
+- [#861](https://github.com/atomicdata-dev/atomic-server/issues/861) Fix long usernames overflowing on the share page.
 
 ### @tomic/lib
 

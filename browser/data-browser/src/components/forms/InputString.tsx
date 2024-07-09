@@ -20,7 +20,7 @@ export default function InputString({
   });
 
   function handleUpdate(event: React.ChangeEvent<HTMLInputElement>): void {
-    const newval = event.target.value;
+    const newval = event.target.value || undefined;
     setValue(newval);
 
     try {

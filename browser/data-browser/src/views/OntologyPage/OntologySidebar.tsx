@@ -93,7 +93,7 @@ const Wrapper = styled.div`
   flex-direction: column;
   background-color: ${p => p.theme.colors.bg};
   height: 100vh;
-  border-right: 1px solid ${p => p.theme.colors.bg2};
+  border-left: 1px solid ${p => p.theme.colors.bg2};
   min-width: 10rem;
 `;
 

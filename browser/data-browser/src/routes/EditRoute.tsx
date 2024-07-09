@@ -8,7 +8,6 @@ import { ResourceForm } from '../components/forms/ResourceForm';
 import { useCurrentSubject } from '../helpers/useCurrentSubject';
 import { ClassDetail } from '../components/ClassDetail';
 import { Title } from '../components/Title';
-import Parent from '../components/Parent';
 import { Main } from '../components/Main';
 import { Column, Row } from '../components/Row';
 import { IconButton } from '../components/IconButton/IconButton';
@@ -38,39 +37,36 @@ export function Edit(): JSX.Element {
   };
 
   return (
-    <>
-      <Parent resource={resource} />
+    <Main subject={subject}>
       <ContainerNarrow>
-        <Main subject={subject}>
-          {subject ? (
-            <Column>
-              <Row center gap='1ch'>
-                <IconButton
-                  title={`Back to ${resource.title}`}
-                  size='1.4em'
-                  edgeAlign='start'
-                  onClick={handleBackClick}
-                >
-                  <FaArrowLeft />
-                </IconButton>
-                <Title resource={resource} prefix='Edit' />
-              </Row>
-              <ClassDetail resource={resource} />
-              {/* Key is required for re-rendering when subject changes */}
-              <ResourceForm resource={resource} key={subject} />
-            </Column>
-          ) : (
-            <form onSubmit={handleClassSet}>
-              <h1>edit a resource</h1>
-              <InputStyled
-                value={subjectInput || undefined}
-                onChange={e => setSubjectInput(e.target.value)}
-                placeholder={'Enter a Resource URL...'}
-              />
-            </form>
-          )}
-        </Main>
+        {subject ? (
+          <Column>
+            <Row center gap='1ch'>
+              <IconButton
+                title={`Back to ${resource.title}`}
+                size='1.4em'
+                edgeAlign='start'
+                onClick={handleBackClick}
+              >
+                <FaArrowLeft />
+              </IconButton>
+              <Title resource={resource} prefix='Edit' />
+            </Row>
+            <ClassDetail resource={resource} />
+            {/* Key is required for re-rendering when subject changes */}
+            <ResourceForm resource={resource} key={subject} />
+          </Column>
+        ) : (
+          <form onSubmit={handleClassSet}>
+            <h1>edit a resource</h1>
+            <InputStyled
+              value={subjectInput || undefined}
+              onChange={e => setSubjectInput(e.target.value)}
+              placeholder={'Enter a Resource URL...'}
+            />
+          </form>
+        )}
       </ContainerNarrow>
-    </>
+    </Main>
   );
 }
