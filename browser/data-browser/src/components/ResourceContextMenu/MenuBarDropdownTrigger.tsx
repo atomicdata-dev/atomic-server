@@ -1,24 +1,22 @@
-import { ButtonBar } from '../Button';
 import { FaEllipsisV } from 'react-icons/fa';
 import { DropdownTriggerRenderFunction } from '../Dropdown/DropdownTrigger';
 import { shortcuts } from '../HotKeyWrapper';
+import { IconButton } from '../IconButton/IconButton';
 
 export const MenuBarDropdownTrigger: DropdownTriggerRenderFunction = (
-  { onClick, isActive, menuId },
+  { onClick, menuId },
   ref,
 ) => (
-  <ButtonBar
+  <IconButton
     aria-controls={menuId}
-    selected={isActive}
     ref={ref}
     title={`Open menu (${shortcuts.menu})`}
     type='button'
     data-test='context-menu'
     onClick={onClick}
-    rightPadding
   >
     <FaEllipsisV />
-  </ButtonBar>
+  </IconButton>
 );
 
 MenuBarDropdownTrigger.displayName = 'MenuBarDropdownTrigger';

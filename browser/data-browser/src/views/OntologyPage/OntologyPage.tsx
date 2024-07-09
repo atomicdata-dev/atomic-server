@@ -54,7 +54,7 @@ export function OntologyPage({ resource }: ResourcePageProps) {
           <OntologySidebar ontology={resource} />
         </SidebarSlot>
         <ListSlot>
-          <Column>
+          <Column style={{ paddingBottom: '3rem' }}>
             <OntologyDescription edit={editMode} resource={resource} />
             <h2>Classes</h2>
             <StyledUl>
@@ -106,6 +106,15 @@ export function OntologyPage({ resource }: ResourcePageProps) {
   );
 }
 
+const SidebarSlot = styled.div`
+  grid-area: sidebar;
+`;
+
+const ListSlot = styled.div`
+  grid-area: list;
+  padding: ${p => p.theme.size()};
+`;
+
 const FullPageWrapper = styled.div<{ edit: boolean }>`
   --ontology-graph-position: sticky;
   --ontology-graph-ratio: 9 / 16;
@@ -113,9 +122,9 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
   display: grid;
   grid-template-areas: ${p =>
     p.edit
-      ? `'sidebar title title' 'sidebar list list'`
-      : `'sidebar title graph' 'sidebar list graph'`};
-  grid-template-columns: minmax(auto, 13rem) 3fr 2fr;
+      ? `'title title sidebar' 'list list sidebar'`
+      : `'title graph sidebar' 'list graph sidebar'`};
+  grid-template-columns: 3fr 2fr minmax(auto, 13rem);
   grid-template-rows: 4rem auto;
   width: 100%;
   min-height: ${p => p.theme.heights.fullPage};
@@ -123,10 +132,10 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
   @container (max-width: 950px) {
     grid-template-areas: ${p =>
       p.edit
-        ? `'sidebar title' 'sidebar list' 'sidebar list'`
-        : `'sidebar title' 'sidebar graph' 'sidebar list'`};
+        ? `'title sidebar' 'list sidebar' 'list sidebar'`
+        : `'title sidebar' 'graph sidebar' 'list sidebar'`};
 
-    grid-template-columns: 1fr 5fr;
+    grid-template-columns: 5fr minmax(auto, 13rem);
     grid-template-rows: 4rem auto auto;
     --ontology-graph-position: sticky;
     --ontology-graph-ratio: 16/9;
@@ -135,29 +144,27 @@ const FullPageWrapper = styled.div<{ edit: boolean }>`
   @container (max-width: 600px) {
     grid-template-areas: ${p =>
       p.edit ? `'title' 'list' 'list'` : `'title' 'graph' 'list'`};
-    grid-template-columns: 100%;
+    grid-template-columns: 100vw;
+
+    ${SidebarSlot} {
+      display: none;
+    }
   }
 
-  padding-bottom: 3rem;
+  ${ListSlot} {
+    width: ${p => (p.edit ? 'min(100%, 80rem)' : 'unset')};
+    margin: ${p => (p.edit ? '0 auto' : 'unset')};
+  }
 `;
 
 const TitleSlot = styled.div`
   grid-area: title;
-  padding: ${p => p.theme.margin}rem;
-`;
-
-const SidebarSlot = styled.div`
-  grid-area: sidebar;
-`;
-
-const ListSlot = styled.div`
-  grid-area: list;
-  padding: ${p => p.theme.margin}rem;
+  padding: ${p => p.theme.size()};
 `;
 
 const GraphSlot = styled.div`
   grid-area: graph;
-  padding: ${p => p.theme.margin}rem;
+  padding: ${p => p.theme.size()};
   height: 100%;
 `;
 

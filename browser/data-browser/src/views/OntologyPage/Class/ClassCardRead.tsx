@@ -14,6 +14,7 @@ import {
   transitionName,
 } from '../../../helpers/transitionName';
 import { NewClassInstanceButton } from './NewClassInstanceButton';
+import { CARD_CONTAINER } from '../../../helpers/containers';
 
 interface ClassCardReadProps {
   subject: string;
@@ -58,7 +59,7 @@ export function ClassCardRead({ subject }: ClassCardReadProps): JSX.Element {
 }
 
 const StyledCard = styled(Card)<ViewTransitionProps>`
-  padding-bottom: ${p => p.theme.margin}rem;
+  padding-bottom: ${p => p.theme.size()};
   ${props => transitionName(RESOURCE_PAGE_TRANSITION_TAG, props.subject)};
 `;
 
@@ -74,6 +75,4 @@ const StyledH4 = styled.h4`
   margin-bottom: 0px;
 `;
 
-const StyledTable = styled.table`
-  border-collapse: collapse;
-`;
+const StyledTable = styled.div``;

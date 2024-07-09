@@ -7,6 +7,7 @@ import {
   useString,
 } from '@tomic/react';
 import { AtomicSelectInput } from '../../components/forms/AtomicSelectInput';
+import styled from 'styled-components';
 interface PropertyDatatypePickerProps {
   resource: Resource;
   disabled?: boolean;
@@ -44,7 +45,7 @@ export function PropertyDatatypePicker({
   };
 
   return (
-    <AtomicSelectInput
+    <StyledAtomicSelectInput
       commit
       disabled={disabled}
       resource={resource}
@@ -54,3 +55,7 @@ export function PropertyDatatypePicker({
     />
   );
 }
+
+const StyledAtomicSelectInput = styled(AtomicSelectInput)`
+  min-width: 18ch;
+`;

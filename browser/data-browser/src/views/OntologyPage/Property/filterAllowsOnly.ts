@@ -14,7 +14,7 @@ export async function filterAllowsOnly(
   const filteredTags: string[] = [];
 
   for (const line of allowsOnly) {
-    const lineResource = await store.getResourceAsync(line);
+    const lineResource = await store.getResource(line);
 
     if (lineResource.hasClasses(isA)) {
       filteredTags.push(line);

@@ -15,7 +15,7 @@ import SettingsAgent from './SettingsAgent';
 import { SettingsServer } from './SettingsServer';
 import { paths } from './paths';
 import ResourcePage from '../views/ResourcePage';
-import { ShareRoute } from './ShareRoute';
+import { ShareRoute } from './Share/ShareRoute';
 import { Sandbox } from './Sandbox';
 import { TokenRoute } from './TokenRoute';
 import { ImporterPage } from '../views/ImporterPage';

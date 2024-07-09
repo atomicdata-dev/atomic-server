@@ -770,7 +770,7 @@ export class Resource<C extends OptionalClass = any> {
 }
 
 /** Type of Rights (e.g. read or write) */
-enum RightType {
+export enum RightType {
   /** Open a resource or its children */
   READ = 'read',
   /** Edit or delete a resource or its children */
