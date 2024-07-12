@@ -25,7 +25,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "generate-ontologies": "ad-generate ontologies",
+    "generate-ontologies": "pnpm exec ad-generate ontologies",
     "lint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
     "lint-fix": "eslint ./src --ext .js,.jsx,.ts,.tsx --fix",
     "prepublishOnly": "pnpm run lint-fix && pnpm run build",
