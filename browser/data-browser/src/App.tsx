@@ -27,6 +27,7 @@ import { registerCustomCreateActions } from './components/forms/NewForm/CustomCr
 import isPropValid from '@emotion/is-prop-valid';
 import { NewResourceUIProvider } from './components/forms/NewForm/useNewResourceUI';
 import { serverURLStorage } from './helpers/serverURLStorage';
+import { initOntologies } from 'vihreat-lib';
 
 function fixDevUrl(url: string) {
   if (isDev()) {
@@ -84,6 +85,8 @@ function shouldForwardProp(propName, target) {
   // For other elements, forward all props
   return true;
 }
+
+initOntologies();
 
 /** Entrypoint of the application. This is where providers go. */
 function App(): JSX.Element {

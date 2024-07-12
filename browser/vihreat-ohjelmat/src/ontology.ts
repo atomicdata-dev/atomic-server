@@ -1,6 +1,6 @@
 const baseUrl = 'http://localhost:9883';
 
-export const vihreat = {
+export const ontology = {
   classes: {
     program: baseUrl + '/o/Program',
     title: baseUrl + '/o/Title',

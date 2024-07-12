@@ -1,0 +1,45 @@
+.vo-program-meta {
+  text-align: center;
+}
+
+.vo-program-body {
+  margin: auto;
+  max-width: 40em;
+}
+
+.vo-program-body h1 {
+  margin-top: 0.67em;
+  margin-bottom: 0.67em;
+  color: #006845;
+  font-size: 2em;
+  text-transform: capitalize;
+}
+
+.vo-program-body h2 {
+  margin-top: 2em;
+  margin-bottom: 0.67em;
+  color: #006845;
+  font-size: 1.5em;
+}
+
+.vo-program-body h3 {
+  margin-top: 2em;
+  margin-bottom: 0.67em;
+  color: #006845;
+  font-size: 1.2em;
+  font-weight: lighter;
+}
+
+.vo-program-body p {
+  margin-top: 0.67em;
+  margin-bottom: 0.67em;
+}
+
+.vo-program-body ul {
+  margin: 0;
+}
+
+.vo-program-body li {
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+}

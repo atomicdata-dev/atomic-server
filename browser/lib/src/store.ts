@@ -1,4 +1,4 @@
-import { ulid } from 'ulid';
+import { ulid } from 'ulidx';
 
 import type { Agent } from './agent.js';
 import {
@@ -191,7 +191,7 @@ export class Store {
         !storeResource.loading &&
         !storeResource.new &&
         storeResource.get(commits.properties.lastCommit) ===
-          resource.get(commits.properties.lastCommit)
+        resource.get(commits.properties.lastCommit)
       ) {
         return;
       }

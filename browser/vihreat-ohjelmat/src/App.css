@@ -1,0 +1,33 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.vo-program-meta {
+  text-align: center;
+}
+
+.vo-program-body {
+  max-width: 75ch;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.vo-program-body h1 {
+  color: #006845;
+  text-transform: uppercase;
+}
+
+.vo-program-body h2 {
+  color: #006845;
+}
+
+.vo-program-body ul {
+  margin: 0;
+}
+
+.vo-program-body li {
+  margin-top: 0.2rem;
+  margin-bottom: 0.2rem;
+}

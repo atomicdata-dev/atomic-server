@@ -59,7 +59,9 @@
       "react",
       "data-browser",
       "svelte",
-      "cli"
+      "cli",
+      "vihreat-lib",
+      "vihreat-ohjelmat"
     ]
   },
   "packageManager": "pnpm@9.3.0"

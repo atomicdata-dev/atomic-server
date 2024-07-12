@@ -7,7 +7,6 @@ import {
   urls,
   type OptionalClass,
 } from '@tomic/react';
-import { vihreat } from '../vihreat/vihreat';
 
 import { ContainerNarrow } from '../components/Containers';
 import Collection from '../views/CollectionPage';
@@ -16,7 +15,7 @@ import DrivePage from './DrivePage';
 import RedirectPage from './RedirectPage';
 import InvitePage from './InvitePage';
 import { DocumentPage } from './DocumentPage';
-import { ProgramPage } from '../vihreat/ProgramPage';
+import { ProgramView as ProgramPage, ontology as vihreat } from 'vihreat-lib';
 import ErrorPage, { ErrorBoundary } from './ErrorPage';
 import { ClassPage } from './ClassPage';
 import { FilePage } from './File/FilePage';

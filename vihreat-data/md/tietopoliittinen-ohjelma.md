@@ -1,4 +1,4 @@
-# IHMISLÄHTÖINEN JA KESTÄVÄ DIGITALISAATIO
+# Ihmislähtöinen ja kestävä digitalisaatio
 
 ## Johdanto
 
@@ -46,7 +46,7 @@ Digitaalisen tiedon mahdollisuuksia ja riskejä globaalissa toimintaympäristös
 *   Tehdään lainsäädännöstä ymmärrettävää ja yhteentoimivaa. Lainsäädännön valmistelussa on käytettävä kielenhuollon ja terminologian asiantuntemusta.
 *   Laajennetaan tietosuojavaltuutetun toimiston roolia ja rahoitusta tietovaltuutetun toimistoksi, joka olisi kansallinen neuvonta- ja valvontaviranomainen sekä tietosuojalainsäädännön että julkisuuslainsäädännön osalta.
 
-## PARHAALLA TIEDOLLA REILUUN MUUTOKSEEN
+## Parhaalla tiedolla reiluun muutokseen
 
 Edellytämme **luotettavaa ja avointa tietopohjaa sekä tiedon monipuolista hyödyntämistä** reilun muutoksen tavoitteiden saavuttamiseksi.
 
@@ -92,7 +92,7 @@ Digitalisaation muuttaessa työmarkkinoita edellytykset ja kannustimet uuden opp
 *   Huomioidaan sukupuolinäkökulma kaikessa digitalisaatiopolitiikassa. Vähennetään tieto- ja viestintäteknologia-alojen sukupuolittuneisuutta mm. sukupuolitietoisella kasvatuksella, oppilaanohjauksella ja anonyymillä rekrytoinnilla.
 *   Tarjotaan joustavaa ajasta ja paikasta riippumatonta koulutustarjontaa taantuvilla aloilla työskenteleville ja lisäkoulutusta niille aloille, joilla on suuri kysyntä uusista työntekijöistä, ja joissa teknologia ei voi korvata ihmistyötä.
 
-## IHMISLÄHTÖISET JULKISET PALVELUT
+## Ihmislähtöiset julkiset palvelut
 
 Haluamme, että **julkiset digitaaliset palvelut järjestetään ihmislähtöisesti** ihmisten elämäntapahtumien ja organisaatioiden tapahtumien ympärille.
 
@@ -126,7 +126,7 @@ Tekoälyn ja robotiikan avulla julkinen sektori voi samanaikaisesti parantaa tuo
 *   Hyödynnetään automaattista päätöksentekoa ja vauhditetaan sääntöpohjaisen automaation, kuten veroehdotusten kaltaisten toiminnallisuuksien käyttöönottoa julkishallinnossa.
 *   Säädetään julkisessa päätöksenteossa käytettävien algoritmien, lähdekoodin ja datan avoimuudesta ja kuulumisesta julkisuuslain piiriin.
 
-## DIGITAALINEN TASA-ARVO JA YHDENVERTAISUUS
+## Digitaalinen tasa-arvo ja yhdenvertaisuus
 
 Ohjaamme **yhteiskunnan digitalisoitumista vähentämään eriarvoisuutta.**
 
@@ -168,7 +168,7 @@ Tekijänoikeuksiin tarvitaan sekä Suomessa että EU-tasolla reilun käytön sä
 *   Luodaan lainsäädäntö sosiaalisessa mediassa toimivien esiintyjien ja luovan työn tekijöiden ja muiden yhteisöjen ansaintamalleille, kuten sisältömarkkinoinnille sekä rahankeräykselle suoratoiston yhteydessä.
 *   Piratisminvastaisia toimia ei tule ensisijaisesti kohdistaa yksityishenkilöihin, jotka eivät toimi ansaintatarkoituksessa. Piratismista epäiltyjen yhteystietoja luovutetaan oikeudenhaltijoille vain merkittävissä tapauksissa.
 
-## TURVALLINEN DIGITAALINEN ELÄMÄ
+## Turvallinen digitaalinen elämä
 
 Kehitämme **turvallisia digitaalisia toimintaympäristöjä** sekä **parannamme kyberturvallisuutta ja digitaalista huoltovarmuutta** demokratian vahvistamiseksi.
 
@@ -229,7 +229,7 @@ Pääsyn estäminen kokonaisille verkkosivustoille tulee rajata koskemaan vain t
 *   Varmistetaan oikeusturvan toteutuminen laittomien verkkosisältöjen torjunnassa. Kokonaisten sivustojen estämistä ei tule käyttää ensisijaisena keinona.
 *   Suhtaudutaan pidättyvästi maksuliikenteen rajoittamiseen valtion taholta muun kuin selvästi rikollisen toiminnan kohdalla.
 
-## LAADUKKAAN ETÄTEKEMISEN EDELLÄKÄVIJÄ
+## Laadukkaan etätekemisen edelläkävijä
 
 Haluamme, että **laadukas etänä tekeminen on kaikille mahdollista** niin työssä, opinnoissa, kansalaistoiminnassa kuin vapaa-ajallakin.
 
@@ -286,7 +286,7 @@ Vaalit ovat yhteiskunnan kriittistä infrastruktuuria, ja niiden turvallisuus on
 *   Valmistellaan kunnallisten luottamuselinten ja harkitusti myös eduskunnan toimintaan luotettavia etäosallistumisen menettelyjä.
 *   Ratkaistaan ennakoivasti etäosallistumiseen liittyvien väärinkäytösepäilyjen ja teknisten ongelmien käsittely.
 
-## DIGITAALINEN IDENTITEETTI JA OMADATA
+## digitaalinen identiteetti ja omadata
 
 Rakennamme Suomeen **maailman edistyneimmän digitaalisen infrastruktuurin**, jonka keskiössä ovat **ihmislähtöiset digitaalisen identiteetin ja tunnistamisen ratkaisut sekä oikeus omaan tietoon.**
 
@@ -327,7 +327,7 @@ Nykyisen vahvan tunnistautumisen luottamusverkoston rinnalle tulee kehittää om
 *   Laajennetaan tiedollista itsemääräämisoikeutta, esimerkiksi ottamalla käyttöön oikeus pyytää omia terveystietoja poistettaviksi, kun tietoja ei enää tarvita hoidon vuoksi.
 *   Kehitetään vahvistetun datan omadata-operaattoriverkosto, jonka avulla ihmiset ja organisaatiot voivat välittää tietojaan eri palveluihin.
 
-## HYVINVOINTIA TERVEESTÄ ALUSTATALOUDESTA
+## Hyvinvointia terveestä alustataloudesta
 
 Haluamme **kehittää alustataloutta avoimuuteen**, **oikeudenmukaisuuteen ja terveeseen kilpailuun ohjaavilla sääntelymekanismeilla**. Alustoja tulee säännellä alustojen keinoilla ja yhteiskunnan ehdoin.
 
@@ -374,7 +374,7 @@ Avoimen verotustiedon ja reaaliaikaisen tulorekisterin avulla voidaan tarvittaes
 *   Velvoitetaan kaikessa kaupankäynnissä sähköisen laskutusmahdollisuuden ja e-kuitin tarjoamiseen asiakkaan niin halutessa sekä siirrytään automaattiseen ja reaaliaikaiseen arvonlisäverotukseen. Toteutetaan muutokset kohtuullisella siirtymäajalla ja riittävien tukitoimien kanssa siten, etteivät ne kohtuuttomasti rasita yrityksiä.
 *   Selvitetään tukien ja verovähennysten reaaliaikaisen ja automatisoidun maksatuksen mahdollisuuksia tapauksissa, joissa päätökset voidaan toteuttaa sääntöpohjaisesti rekisteritietojen perusteella.
 
-## EETTISESTI KESTÄVÄ TEKOÄLY JA ROBOTIIKKA
+## Eettisesti kestävä tekoäly ja robotiikka
 
 Haluamme **tekoälyn avulla ratkoa sosiaalisesti ja ekologisesti kestävän yhteiskunnan kannalta merkityksellisiä haasteita**.
 
@@ -416,7 +416,7 @@ Kuluttajansuojan ja yleisen oikeusturvan toteutuminen edellyttää, että automa
 *   Otetaan käyttöön tekoälymenetelmiä syrjintään viittaavien tilastopoikkeamien havaitsemiseen julkishallinnon päätösprosesseissa.  
     Kielletään kasvojentunnistukseen tai vastaaviin biometrisiin tunnisteisiin pohjautuva massavalvonta julkisilla paikoilla.
 
-## DIGITALISAATION YMPÄRISTÖVAIKUTUKSET
+## Digitalisaation ympäristövaikutukset
 
 Tuomme poliittiseen keskusteluun **realistista kokonaiskuvaa digitalisaation myönteisistä ja kielteisistä ympäristövaikutuksista**, jotta nämä voidaan kattavasti huomioida päätöksenteossa.
 

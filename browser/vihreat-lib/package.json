@@ -1,0 +1,40 @@
+{
+  "version": "0.1.0",
+  "author": "Vihreat ohjelmat Team",
+  "description": "Reusable React components for Vihreiden ohjelma-alusta",
+  "dependencies": {
+    "@tomic/lib": "workspace:*",
+    "@tomic/react": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-markdown": "^9.0.1"
+  },
+  "devDependencies": {
+    "@tomic/cli": "workspace:*",
+    "typescript": "^5.4.5"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT",
+  "name": "vihreat-lib",
+  "main-dev": "src/index.ts",
+  "main": "dist/src/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "generate-ontologies": "ad-generate ontologies",
+    "lint": "eslint ./src --ext .js,.jsx,.ts,.tsx",
+    "lint-fix": "eslint ./src --ext .js,.jsx,.ts,.tsx --fix",
+    "prepublishOnly": "pnpm run lint-fix && pnpm run build",
+    "start": "pnpm watch",
+    "watch": "tsc --build --watch",
+    "tsc": "tsc --build",
+    "typecheck": "pnpm exec tsc --noEmit"
+  },
+  "source": "src/index.ts",
+  "type": "module",
+  "types": "dist/src/index.d.ts"
+}

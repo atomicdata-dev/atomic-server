@@ -1,21 +1,21 @@
 {
-    "compilerOptions": {
-        "paths": {
-            "@tomic/lib/*": [
-                "./lib/src/*"
-            ],
-            "@tomic/react/*": [
-                "./react/src/*"
-            ]
-        },
+  "compilerOptions": {
+    "paths": {
+      "@tomic/lib/*": ["./lib/src/*"],
+      "@tomic/react/*": ["./react/src/*"],
+      "vihreat-lib/*": ["./vihreat-lib/src/*"]
+    }
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "lib"
     },
-    "files": [],
-    "references": [
-        {
-            "path": "lib"
-        },
-        {
-            "path": "react"
-        }
-    ]
+    {
+      "path": "react"
+    },
+    {
+      "path": "vihreat-lib"
+    }
+  ]
 }
