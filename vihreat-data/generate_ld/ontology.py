@@ -12,6 +12,9 @@ def build() -> list[dict]:
         _build_subtitle(),
         _build_elements(),
         _build_approvedOn(),
+        _build_updatedOn(),
+        _build_retiredOn(),
+        _build_staleOn(),
         _build_text(),
         _build_titleLevel(),
     ]
@@ -35,6 +38,9 @@ def _build_ontology() -> dict:
             url.local("o/subtitle"),
             url.local("o/elements"),
             url.local("o/approvedOn"),
+            url.local("o/updatedOn"),
+            url.local("o/retiredOn"),
+            url.local("o/staleOn"),
             url.local("o/text"),
             url.local("o/titleLevel"),
         ],
@@ -56,6 +62,9 @@ def _build_Program() -> dict:
         url.atomic("properties/recommends"): [
             url.local("o/subtitle"),
             url.local("o/approvedOn"),
+            url.local("o/updatedOn"),
+            url.local("o/retiredOn"),
+            url.local("o/staleOn"),
         ],
     }
 
@@ -123,7 +132,9 @@ def _build_subtitle() -> dict:
         "@id": url.local("o/subtitle"),
         url.atomic("properties/parent"): url.local("o"),
         url.atomic("properties/shortname"): "subtitle",
-        url.atomic("properties/description"): "Ohjelman alaotsikko (esim. \"Tietopoliittinen ohjelma\").",
+        url.atomic(
+            "properties/description"
+        ): 'Ohjelman alaotsikko (esim. "Tietopoliittinen ohjelma").',
         url.atomic("properties/datatype"): url.atomic("datatypes/string"),
         url.atomic("properties/isA"): [url.atomic("classes/Property")],
     }
@@ -153,6 +164,45 @@ def _build_approvedOn() -> dict:
         url.atomic("properties/parent"): url.local("o"),
         url.atomic("properties/shortname"): "approvedon",
         url.atomic("properties/description"): "Päivämäärä, jona ohjelma hyväksyttiin.",
+        url.atomic("properties/datatype"): url.atomic("datatypes/date"),
+        url.atomic("properties/isA"): [url.atomic("classes/Property")],
+    }
+
+
+def _build_updatedOn() -> dict:
+    return {
+        "@id": url.local("o/updatedOn"),
+        url.atomic("properties/parent"): url.local("o"),
+        url.atomic("properties/shortname"): "updatedon",
+        url.atomic(
+            "properties/description"
+        ): "Päivämäärä, jona ohjelmaa viimeksi päivitettiin.",
+        url.atomic("properties/datatype"): url.atomic("datatypes/date"),
+        url.atomic("properties/isA"): [url.atomic("classes/Property")],
+    }
+
+
+def _build_retiredOn() -> dict:
+    return {
+        "@id": url.local("o/retiredOn"),
+        url.atomic("properties/parent"): url.local("o"),
+        url.atomic("properties/shortname"): "retiredon",
+        url.atomic(
+            "properties/description"
+        ): "Päivämäärä, jona ohjelma poistuu voimasta.",
+        url.atomic("properties/datatype"): url.atomic("datatypes/date"),
+        url.atomic("properties/isA"): [url.atomic("classes/Property")],
+    }
+
+
+def _build_staleOn() -> dict:
+    return {
+        "@id": url.local("o/staleOn"),
+        url.atomic("properties/parent"): url.local("o"),
+        url.atomic("properties/shortname"): "staleon",
+        url.atomic(
+            "properties/description"
+        ): "Päivämäärä, jona ohjelma vanhentuu (tulee uudelleentarkasteltavaksi).",
         url.atomic("properties/datatype"): url.atomic("datatypes/date"),
         url.atomic("properties/isA"): [url.atomic("classes/Property")],
     }

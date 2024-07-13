@@ -23,7 +23,7 @@ export function ProgramView({ resource }: ProgramViewProps): JSX.Element {
           <FrontMatter approvedOn={approvedOn} />
           <Body elements={elements} />
         </div>
-      </div>
+      </div >
     );
   } else {
     return (

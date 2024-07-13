@@ -17,6 +17,9 @@ export const ontology = {
     subtitle: 'http://localhost:9883/o/subtitle',
     elements: 'http://localhost:9883/o/elements',
     approvedon: 'http://localhost:9883/o/approvedOn',
+    updatedon: 'http://localhost:9883/o/updatedOn',
+    retiredon: 'http://localhost:9883/o/retiredOn',
+    staleon: 'http://localhost:9883/o/staleOn',
     text: 'http://localhost:9883/o/text',
     titlelevel: 'http://localhost:9883/o/titleLevel',
   },
@@ -36,7 +39,10 @@ declare module '@tomic/lib' {
         | typeof ontology.properties.elements;
       recommends:
         | typeof ontology.properties.subtitle
-        | typeof ontology.properties.approvedon;
+        | typeof ontology.properties.approvedon
+        | typeof ontology.properties.updatedon
+        | typeof ontology.properties.retiredon
+        | typeof ontology.properties.staleon;
     };
     [ontology.classes.title]: {
       requires:
@@ -60,6 +66,9 @@ declare module '@tomic/lib' {
     [ontology.properties.subtitle]: string;
     [ontology.properties.elements]: string[];
     [ontology.properties.approvedon]: string;
+    [ontology.properties.updatedon]: string;
+    [ontology.properties.retiredon]: string;
+    [ontology.properties.staleon]: string;
     [ontology.properties.text]: string;
     [ontology.properties.titlelevel]: number;
   }
@@ -69,6 +78,9 @@ declare module '@tomic/lib' {
     [ontology.properties.subtitle]: 'subtitle';
     [ontology.properties.elements]: 'elements';
     [ontology.properties.approvedon]: 'approvedon';
+    [ontology.properties.updatedon]: 'updatedon';
+    [ontology.properties.retiredon]: 'retiredon';
+    [ontology.properties.staleon]: 'staleon';
     [ontology.properties.text]: 'text';
     [ontology.properties.titlelevel]: 'titlelevel';
   }

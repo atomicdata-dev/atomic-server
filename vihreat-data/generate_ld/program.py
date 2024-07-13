@@ -11,8 +11,11 @@ def _build_main(
     elements: list[dict],
     name: str,
     title: str,
-    subtitle: str | None,
-    approved_on: str | None,
+    subtitle: str | None = None,
+    approved_on: str | None = None,
+    updated_on: str | None = None,
+    stale_on: str | None = None,
+    retired_on: str | None = None,
 ) -> dict:
     j = {
         "@id": url.local(f"ohjelmat/{name}"),
@@ -25,6 +28,12 @@ def _build_main(
         j[url.local("o/subtitle")] = subtitle
     if approved_on:
         j[url.local("o/approvedOn")] = approved_on
+    if updated_on:
+        j[url.local("o/updatedOn")] = updated_on
+    if retired_on:
+        j[url.local("o/retiredOn")] = retired_on
+    if stale_on:
+        j[url.local("o/staleOn")] = stale_on
     return j
 
 
