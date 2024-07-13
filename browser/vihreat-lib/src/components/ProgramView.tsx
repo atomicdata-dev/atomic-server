@@ -21,7 +21,7 @@ export function ProgramView({ resource }: ProgramViewProps): JSX.Element {
 
   if (title !== undefined && elements !== undefined) {
     return (
-      <div className='vo-program'>
+      <div className='vo-container'>
         <Metadata title={title} approvedOn={approvedOn} />
         <Body elements={elements} />
       </div>
@@ -29,7 +29,7 @@ export function ProgramView({ resource }: ProgramViewProps): JSX.Element {
   } else {
     return (
       <>
-        <p>Failed to load resource; is the server running?</p>
+        <p>Failed to load resource {resource.subject}. Is the server running?</p>;
       </>
     );
   }

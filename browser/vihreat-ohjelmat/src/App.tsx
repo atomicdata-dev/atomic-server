@@ -1,8 +1,13 @@
-import { ViewProgram } from './ViewProgram';
+import { BrowserRouter } from 'react-router-dom';
+import { AppRoutes } from './routes';
 import './App.css';
 
 function App() {
-  return <ViewProgram subject='http://localhost:9883/ohjelmat/p0' />;
+  return (
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
+  );
 }
 
 export default App;

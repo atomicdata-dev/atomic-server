@@ -1,10 +1,10 @@
-.vo-program-meta {
-  text-align: center;
-}
-
-.vo-program-body {
+.vo-container {
   margin: auto;
   max-width: 40em;
+}
+
+.vo-program-meta {
+  text-align: center;
 }
 
 .vo-program-body h1 {
