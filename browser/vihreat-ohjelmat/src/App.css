@@ -24,6 +24,30 @@ h1.vo-program-subtitle {
   text-align: center;
 }
 
+.vo-program-status-banner {
+  font-size: medium;
+  font-weight: bold;
+  padding: 0.1em;
+  margin: 0.25em;
+}
+
+.vo-program-status-banner-draft {
+  background-color: lightgray;
+}
+
+.vo-program-status-banner-stale {
+  background-color: gold;
+}
+
+.vo-program-status-banner-retired {
+  background-color: lightcoral;
+}
+
+.vo-program-status-info {
+  margin: 0.25em;
+  font-size: small;
+}
+
 .vo-program-body {
   text-align: left;
 }
