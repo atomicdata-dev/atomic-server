@@ -1,9 +1,3 @@
-# Kohti kestävämpää ja reilumpaa maataloutta – Vihreiden maatalouspoliittinen ohjelma
-
-*Hyväksytty valtuuskunnan kokouksessa 27.11.2022. Tämä ohjelma päivittää 9.9.2018 hyväksytyn maatalouspoliittisen ohjelman.*
-
-*Tämän ohjelman lisäksi maatalouspolitiikkaa ja sitä sivuavia teemoja käsitellään mm. puolueen maaseutu- ja aluepoliittisessa ohjelmassa (hyväksytty 25.9.2022) ja ruokapoliittisessa ohjelmassa ”Sydämen ja omantunnon lautanen” (hyväksytty 1.10.2010).*
-
 ## Johdanto
 
 Koronapandemia, Venäjän terroristinen toiminta ja laiton hyökkäyssota Ukrainassa, sekä siitä seurannut energiakriisi ovat haastaneet pitkään vallinneen yhteistyötä ja keskinäisriippuvuutta korostavan kansainvälisen työnjaon.
@@ -24,7 +18,7 @@ Maatalouden tuet ovat keskeinen maatalouspolitiikan ohjauskeino. Tätä kirjoite
 
 Maataloustukia tulee suunnata uudelleen eettiseen sekä ympäristön ja ilmaston kannalta kestävämpään tuotantoon sekä kansallisella että EU-tasolla. Osana Euroopan unionia kansallisen maatalouspolitiikan keinot ovat tiukasti rajattuja. Monia tavoitteitamme pystyy edistämään vain johdonmukaisella ja aktiivisella EU-politiikalla.
 
-## 1. Kestävämpi kulutus
+## Kestävämpi kulutus
 
 Tavoitteenamme on ruoan kestävä kulutus: kestävät ruokavalinnat edistävät ihmisten terveyttä, noudattavat kestävän kehityksen periaatteita ja ottavat samalla huomioon kulttuurin sekä ihmisten ja eläinten oikeudet. Terveellisen, ekologisen ja eettisen ruoan pitää myös olla kaikkien saatavilla riippumatta tulotasosta ja asuinpaikasta.
 
@@ -34,7 +28,7 @@ Haluamme minimoida roskiin päätyvän ruoan määrän sekä vähentää eläinp
 
 Tunnistamme kestävän ruoantuotannon merkityksellisyyden ja tavoittelemme ruoan arvostuksen kasvamista sekä ruokatietoisuuden lisääntymistä. Näitä tavoitteita edistetään esimerkiksi lisäämällä elintarvikeketjun läpinäkyvyyttä sekä vuoropuhelua ruoantuottajien ja kuluttajien välillä.
 
-### 1.1 Lisätään tietoa ja ymmärrystä ruoantuotannosta
+### Lisätään tietoa ja ymmärrystä ruoantuotannosta
 
 Ruoantuotanto on tehostumisen myötä etääntynyt tavallisista ihmisistä. Vielä 1950-luvun Suomessa 40 prosenttia ihmisistä sai elantonsa maataloudesta, ja yli 60 prosenttia asui maaseudulla. Nykyään vastaavat prosentit ovat 4 ja alle 30.
 
@@ -54,7 +48,7 @@ Haluamme kasvattaa ruoan arvostusta, vähentää ruokahävikkiä, lisätä kulut
 * Maankäytön suunnittelussa hillitään hajanaista rakentamista pelloille.
 * Kaupunkien kaavoituksessa edistetään monitavoitteisen kaupunkiviljelyn leviämistä. Ohjataan kaupunkirakentamisessa rakentamismääräyksiä osoittamaan viljelytilaa kiinteistön tontilla ja katoilla.
 
-### 1.2 Vähemmän eläinperäisiä tuotteita
+### Vähemmän eläinperäisiä tuotteita
 
 Eläintuotteiden tuotanto kuormittaa ympäristöä merkittävästi enemmän kuin kasvipohjaisten elintarvikkeiden tuotanto. Teollisen tason eläintuotantoa on myös mahdotonta järjestää ilman joko eläineettisiä ongelmia tai mittavaa rahallista tukea. Siksi on panostettava eläintuotteiden kulutuksen huomattavaan vähentämiseen ja samalla suunnattava kulutusta kohti kestävimmin tuotettuja eläin- ja kasviperäisiä tuotteita.
 
@@ -69,7 +63,7 @@ Tavoitteena on vähintään puolittaa eläinperäisten tuotteiden kulutus vuotee
 * Tuetaan lihalle vaihtoehtoisten proteiinilähteiden sekä uusien ruoantuotantomenetelmien tutkimusta ja käyttöönottoa.
 * Tuemme kestävän kehityksen päämääriä tukevaa jalostamista. Tähän kuuluu myös kasvinjalostuksessa käytettävät uuden sukupolven geenitekniset jalostusmenetelmät, joiden eurooppalaista sääntelyä tulisi yhdenmukaistaa samaan linjaan perinteisten jalostusmenetelmien kanssa.
 
-### 1.3 Ruokahävikki minimiin
+### Ruokahävikki minimiin
 
 Ruokahävikki lisää merkittävästi elintarvikeketjun ympäristökuormitusta. Suomessa syömäkelpoisista elintarvikkeista päätyy jätteeksi noin 10–15 prosenttia, maailmanlaajuisesti määrä on vieläkin suurempi. Ruokahävikkiä syntyy elintarvikeketjun joka osassa (alkutuotanto, teollisuus, kauppa, kuluttajat), mutta hävikin osuus on suurin ketjun loppupäässä, kotitalouksissa ja ravitsemispalveluissa. Tavoitteena on ruokahävikin pudottaminen minimiin.
 
@@ -81,7 +75,7 @@ Ruokahävikki lisää merkittävästi elintarvikeketjun ympäristökuormitusta. 
 * Kielletään elintarviketeollisuutta ja kauppoja heittämästä syömäkelpoista ruokaa roskiin. Selvitetään kiellon laajentaminen ravintoloihin, joukkoruokailuihin sekä kotitalouksiin.
 * Edistetään julkisen sektorin valmistuskeittiöiden keinoja vähentää ruokahävikkiä esimerkiksi myymällä tai lahjoittamalla nykyistä tehokkaammin ylimääräinen ruokatuotanto.
 
-## 2. Kestävämpi tuotanto
+## Kestävämpi tuotanto
 
 Maatalouden modernisaatiossa on tähän asti lähinnä parannettu työn ja maatalousmaan tuottavuutta lisäämällä ulkopuolelta tuotujen, uusiutumattomien panosten (lannoitteet, energia, torjunta-aineet) ja tuontirehun käyttöä. Apuenergian ja agrokemian avulla onkin saavutettu suuria muutoksia niin hyvässä kuin pahassakin.Seuraava maatalousmurros tulee tapahtua uusiutuvan kiertotalouden suuntaan: meidän on suljettava ravinnekiertoja ja kyettävä hyödyntämään uusiutuvaa energiaa sekä viljelytoimenpiteissä että tuotantopanoksissa.Vihreiden tavoitteena on tehdä suomalaisesta maataloudesta maailman eettisintä ja kestävintä. Tähän on erinomaiset mahdollisuudet viljelijöiden osaamisen, koko elintarvikeketjun läpinäkyvyyden sekä maailman puhtaimpiin kuuluvan ruoan ansiosta. Valmista ei vielä kuitenkaan ole: ilmastonmuutoksen osalta puhutaan jo ilmastokatastrofista, luonnon monimuotoisuus heikkenee edelleen, tuotannon hyötysuhdetta voi kasvattaa ja tuotantoeläinten hyvinvoinnissa on parannettavaa.Maataloudella ja maatalousympäristöllä on merkittävä rooli matkalla kohti hiilineutraalia Suomea. Viljelytapoja ja maan hoitoa kehittämällä hiiltä sitoutuu peltoon entistä tehokkaammin. Biokaasulaitokset sekä aurinkovoimalat nousevat merkittäväksi osaksi Suomen energiantuotantoa. Tavoitteena on hidastaa ilmastonmuutosta vähentämällä maatalouden hiilipäästöjä ja muuttamalla maatalous nettohiilipäästäjästä hiilinieluksi.Samalla on odotettavissa, että Pohjois-Euroopan rooli kasvaa ruoantuotannossa: meidän olosuhteemme huonontuvat todennäköisesti vähemmän, kun taas monet nykyiset tuotantoalueet kärsivät vielä enemmän esimerkiksi tulvista ja kuivuudesta. Vastuumme ruoantuotannon riittävyydestä ja kestävyydestä tulee kasvamaan.Tuotannossa omavaraisuuden ja globaalin työnjaon suhdetta on punnittava tarkkaan. Kansallinen ja alueellinen omavaraisuus on pidettävä riittävänä, mutta normaalioloissa luonnonvarojen tehokasta käyttöä tukeva tuonti ja vienti eivät ole ongelma. Muutosjoustavuuden (resilienssi) ja huoltovarmuuden kannalta on syytä suosia mieluummin ylimääräistä monimuotoisuutta kuin äärimmilleen erikoistunutta tuotantoa.
 Nouseviksi ennustetut keskilämpötilat eivät kuitenkaan poista pohjoisen syksyn pimeyttä, ja sään ääri-ilmiöt tulevat todennäköisesti vain yleistymään. Leudommat talvet tuovat uusia haasteita esimerkiksi tautien ja tuholaisten lisääntymisen tai talviaikaisten ravinnepäästöjen hallinnan kanssa.
@@ -90,7 +84,7 @@ Maataloudella on muutenkin avaimet monien ongelmien ratkaisuun ja sopeutumiseen 
 
 Eläintuotannon tulee tukea maatalousympäristön luonnon monimuotoisuutta ja ravinteiden kierrätystä. Parhaimmillaan sopiva määrä kotieläintuotantoa luo edellytyksiä myös kasvituotannolle; esimerkiksi maan kasvukuntoa parantava nurmiviljely sopii märehtijöiden rehuksi ja parantaa maata muita viljelykasveja varten. Samalla kun maatalouselinkeinon riippuvuus nykyisenlaisesta eläintuotannosta pienenee, avautuu mahdollisuuksia uudenlaisten ruokajärjestelmien kehittymiseen.
 
-### 2.1 Elinvoimainen maaseutu omavaraisuuden ja huoltovarmuuden takaajana
+### Elinvoimainen maaseutu omavaraisuuden ja huoltovarmuuden takaajana
 
 Tarkastelemme ruoantuotantoa aluelähtöisesti. Sillä tavalla taataan parhaiten agroekologisen symbioosin toteutuminen, riittävä ruoantuotannon omavaraisuuden ja huoltovarmuuden toteuttaminen sekä maaseudun elinvoiman säilyminen.
 
@@ -105,7 +99,7 @@ Riittävä ravinnon saatavuus turvataan koko väestölle kriisi- ja poikkeustila
 * Edistetään maatalouden kotimaisten tuotantopanosten, kuten lannoitteiden ja polttoaineiden, tutkimusta ja kehittämistä.
 * Edistetään jakamis- ja yhteisötalouden mahdollisuuksia maaseudulla.
 
-### 2.2 Hiiltä sitovat, kasvukuntoiset pellot
+### Hiiltä sitovat, kasvukuntoiset pellot
 
 Lämpenevä ilmasto, sään ääri-ilmiöt, kuivuusjaksot, rankkasateet ja lumettomat talvet muuttavat myös maataloutta. Säiden ja luonnon armoilla toimivan maatalouden on sopeuduttava tilanteeseen. Maatalous tulee saada nykyistä huomattavasti enemmän mukaan ilmastotalkoisiin.
 
@@ -131,7 +125,7 @@ Peltoviljelyssä lannoittaminen on välttämättömyys, mutta ravinteiden määr
 * Kehitetään kannusteita biologisen typensidonnan eli palkokasvien hyödyntämisen lisäämiseksi.
 * Lisätään kompostien ja biohiilen käyttöä maanhoidossa.
 
-### 2.3 Monimuotoinen luonto ja puhtaat vedet
+### Monimuotoinen luonto ja puhtaat vedet
 
 Monipuolinen maatalousalueiden luonto on syntynyt evoluution kautta ihmisen, eläinten ja kasvien vuorovaikutuksessa. Maatalouden tehostuminen on johtanut sen yksipuolistumiseen sekä maatalousalueiden luonnonvaraisen eliöstön nopeaan köyhtymiseen. Monimuotoinen, perinteisen maatalouden muovaama maatalousympäristö on maisemallisesti kaunis ja sillä on esteettinen itseisarvo. Lisäksi biodiversiteetin vähentyminen hävittää vielä tutkimattomia lajien välisiä vaikutuksia toisiinsa, kuten kasvintuhoojien vihollisiin tai haitallisimpien rikkakasvien kilpailijoihin.
 
@@ -149,7 +143,7 @@ Maataloustukijärjestelmää tulee kehittää edelleen maatalousympäristön luo
 * Estetään valumat vesistöihin. Valumat estää parhaiten elävä, humuspitoinen, vettä ja ravinteita pidättävä maa, joka parhaimmillaan syntyy luomuviljelyn monipuolisessa viljelykierrossa. Lisäksi edistetään suojavyöhykkeiden käyttöä ja kasvipeitteisyyttä, jotta kasvukauden ulkopuolella valumat pienenevät.
 * Edistetään tulvaherkimpien peltojen ennallistamista kosteikoiksi sekä olemassaolevien kosteikkojen hoitoa laiduntamalla ja niittämällä.
 
-### 2.4 Lisää luomutuotantoa
+### Lisää luomutuotantoa
 
 Luomuviljelyn tavoitteet ovat pitkälti vihreiden tavoitteiden mukaisia: ruokaa tuotetaan paikallisin uusiutuvin luonnonvaroin mahdollisimman pienin ympäristöhaitoin, sosiaalisesti kestävällä tuotantorakenteella.
 
@@ -162,7 +156,7 @@ Pitkällä tähtäimellä kehitetään ympäristökorvausmalli, jossa luomun tuo
 * Kehitetään ja kevennetään luomun sertifiointikäytäntöjä.
 * Turvataan luomutuotannon tutkimus- ja kehitysresurssien riittävyys.
 
-### 2.5 Lisääntyvä kasviproteiinien tuotanto
+### Lisääntyvä kasviproteiinien tuotanto
 
 Tulevaisuudessa yhä suurempi osa viljelymaasta käytetään kasviproteiinien viljelyyn ihmisravinnoksi ja yhä pienempi osa eläinten rehuntuotantoon tai polttoaineeksi. Tällainen rakennemuutos tuotannossa ei tapahdu itsestään, vaan se vaatii aktiivista politiikka ja toimintaa toteutuakseen.
 
@@ -179,7 +173,7 @@ Kasviproteiiniviljelyn kannattavuuden takaamiseksi ja sitä kautta houkuttelevuu
 * Annetaan maatalousalan tutkimuksessa ja koulutuksessa proteiinikasvien jatkojalostusmenetelmille huomattavasti nykyistä merkittävämpi rooli.
 * Edistetään siirtymistä keinolannoitteista orgaanisten lannoitteiden ja maanparannusaineiden käyttöön.
 
-### 2.6 Maailman eettisin ja kestävin eläintuotanto
+### Maailman eettisin ja kestävin eläintuotanto
 
 Eläimellä on itseisarvo, joka tulee tunnustaa ja tunnistaa myös eläintuotannon osana.
 
@@ -203,7 +197,7 @@ Eläintuotannolla on merkittävä vaikutus kasvihuonekaasupäästöihin. Eläint
 * Huolehditaan eläinsuojeluneuvonnan ja valvontaeläinlääkäreiden riittävyydestä joka puolella Suomea. Turvataan valvontaeläinlääkäreiden riittävä määrä ja yhtenäiset käytännöt, joilla pystytään puuttumaan tehokkaasti todellisiin eläinsuojeluongelmiin unohtamatta eläinten omistajan oikeusturvaa.
 * Ulotetaan luomustandardien hyvinvointivaatimukset kaikkiin tuotantoeläimiin ja kehitetään standardeja yhä edelleen huomioimaan paremmin eläinten tarpeet ja oikeudet.
 
-### 2.7 Energiayliomavarainen maatalous
+### Energiayliomavarainen maatalous
 
 Maatalous ja maatalousympäristö voivat tuottaa puhdasta energiaa sekä omiin että laajemmin yhteiskunnan tarpeisiin. Ohjataan maataloutta lannan ja nurmibiomassan kasvavaan hyödyntämiseen biokaasun ja kierrätysravinteiden tuotannossa sekä siirtymään fossiilisen energian käytöstä kohti paikallista ja uusiutuvaa energiaa.
 
@@ -227,7 +221,7 @@ Bioenergian ympäristöystävällisyys riippuu kuitenkin erittäin vahvasti siit
 * Tuetaan lämpöpumppujen ja hukkalämmön hyödyntämistä osana maatilojen kestäviä energiaratkaisuja.
 * Hyödynnetään ihmisravinnoksi kelpaamaton ruoka-aines täysimääräisesti biopolttoaineiden tuotannossa. Biopolttoaineita varten ei tule käyttää erillistuotantoa tai ekologisesti haitallisia ainesosia. Hyödynnetään biopolttoaineiden tuotannon jakeet rehutuotannossa.
 
-## 3. Kestävämpi talous ja yhteiskunta
+## Kestävämpi talous ja yhteiskunta
 
 Tavoittelemme maataloutta, joka on myös taloudellisesti kestävää. Tuottajan tulee saada tuotteestaan markkinoilla riittävä korvaus. Näin ei tällä hetkellä ole, vaan tuottajan elintärkeästä työstä saama korvaus on liian alhainen. Kun kannattavuus paranee ja kun nykyistä suurempi osa maatalouden tulonmuodostuksesta saadaan markkinoilta, yhteiskunnan tukia suunnataan asioihin, joista markkinoilta ei saa täyttä korvausta – eli ekosysteemipalveluihin.
 
@@ -241,7 +235,7 @@ Maataloustuotannon osaaminen, tuotteiden jalostus sekä infrastruktuuri ovat my�
 
 Optimaalisen tilakoon määrittely ei ole järkevää, koska kaikenkokoisilla tiloilla on väliä maaseudun elinvoiman, luonnon monimuotoisuuden sekä ruoantuotannon kannalta.
 
-### 3.1 Kannattava maatalous
+### Kannattava maatalous
 
 Kannattavuuden parantaminen on avainasemassa maatalouden kehittämiseksi. Pyritään siis löytämään monipuolisesti keinoja kannattavuuden kasvattamiseksi. Parannetaan myös tuottajien jaksamista, varmistetaan alan houkuttelevuus myös nuorille ja vähennetään byrokratiaa.
 
@@ -267,7 +261,7 @@ EU-lainsäädäntö sallii jo nykyisin tuottajien yhteistyön ja tarjonnan keski
 * Puututaan ruoan harhaanjohtavaan mainontaan.
 * Tuetaan viljelijöiden organisoitumista esimerkiksi osuuskunniksi tai tuottajaorganisaatioiksi, jotka yhdessä jatkojalostavat raaka-aineita, käyttävät yhteisiä koneita tai perustavat biokaasulaitoksia.
 
-### 3.2 Inhimillinen byrokratia
+### Inhimillinen byrokratia
 
 Haluamme myös inhimillistää maatalouteen liittyvää byrokratiaa. On tärkeä valvoa julkisen rahan käyttöä sekä tuotantoeläinten hyvinvointia. Kuitenkin maatalouden kaavamaista valvontaa pitää muuttaa riskiperusteisuuden suuntaan.
 
@@ -281,7 +275,7 @@ Asennemuutos säännösten, direktiivien ja ohjeiden tulkinnassa on tarpeen. Tur
 * Satovahinkoihin ja katovuosiin varautumisissa nojataan ensisijaisesti vakuutuksiin. Varmistetaan, että näihin vakuutuksiin liittyvä säätely on asianmukaista.
 * Edistetään maatilojen kykyä sopeutua yhä kompleksisempaan toimintaympäristöön esimerkiksi kehittämällä laadunhallintajärjestelmiä, riskeihin varautumista sekä ylipäätään maatilojen suunnitelmallista kehittämistä ja johtamista tapoina toipua yllättävistä tilanteista. Otetaan tämä toipumiskyky (resilienssi) osaksi maatalouden kannattavuuden arviointia.
 
-### 3.3. Kohti kestävää tukipolitiikkaa
+### Kohti kestävää tukipolitiikkaa
 
 Haluamme uudistaa maataloustukijärjestelmää kestävämmäksi. Nykyinen tukijärjestelmä ei toimi tehokkaasti ympäristön tai maatalousyrittäjien kannalta: ilmastonmuutos etenee, luonnon monimuotoisuus heikkenee ja maanviljelyn kannattavuus on surkea. Maataloustukipolitiikalla tulee vastata näihin asioihin nykyistä paremmin.
 
@@ -323,7 +317,7 @@ Kansallisesti maksetut maataloustuet koostuvat sekä EU-tukien kansallisista osu
 * Kehitetään maataloustukien maksuperusteiden muutosta kohti tulosperusteisuutta sekä kustannus-hyöty-arvion käyttöönottamista.
 * Varmistetaan, että maataloustuet ovat käytettävissä myös uudenlaiseen ruoantuotantoon silloin kuin se on perusteltua.
 
-### 3.4 Hyvinvoivat viljelijät ja houkutteleva ala
+### Hyvinvoivat viljelijät ja houkutteleva ala
 
 On tärkeää saada alalle eri-ikäisiä ja eri taustoista tulevia uusia, motivoituneita viljelijöitä, jotka ovat kiinnostuneita kestävästä maataloustuotannosta ja tuovat mukanaan uusia ajatuksia sekä kehittävät uusia käytäntöjä. On tärkeää edistää sukupolvenvaihdoksia ja perhepiirin ulkopuolisille henkilöille tapahtuvia tilakauppoja.
 
@@ -343,7 +337,7 @@ Kaikkien ei tarvitse olla viljelijöitä, vaan maatalous tarvitsee myös työnte
 * Jatketaan Välitä viljelijästä -projektin rahoitusta.
 * Kehitetään perustuloa, joka parantaa kausituottajien ja uusien tuotteiden kehittäjien toimintavarmuutta.
 
-### 3.5 Innovatiivinen ja osaamisintensitiivinen maatalous
+### Innovatiivinen ja osaamisintensitiivinen maatalous
 
 Maailma muuttuu todella nopeaa vauhtia, ja ruoantuotannonkin on kyettävä vastaamaan paikallisiin ja globaaleihin haasteisiin. Ruoantuotannossa automatisaatio, robotisaatio ja digitalisaatio ovat jo muuttaneet toimintatapoja, ja tulevat entisestään muuttamaan. Se avaa mahdollisuuksia uuden teknologian kehittämiseen sekä houkuttelee ruoantuotannon pariin uusia osaajia.
 

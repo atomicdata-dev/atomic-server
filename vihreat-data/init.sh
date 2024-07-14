@@ -18,11 +18,10 @@ cargo build
 
 # Import bootstrap data
 ./target/debug/atomic-server import --file $here/json/ontology.json --force
-./target/debug/atomic-server import --file $here/json/tietopoliittinen-ohjelma.json --force
-./target/debug/atomic-server import --file $here/json/px_luo.json --force
-./target/debug/atomic-server import --file $here/json/px_hyv.json --force
-./target/debug/atomic-server import --file $here/json/px_van.json --force
-./target/debug/atomic-server import --file $here/json/px_poi.json --force
+for file in $here/json/p*.json
+do 
+    ./target/debug/atomic-server import --file $file --force
+done
 
 # Export
 ./target/debug/atomic-server export -p $here/json/debug_export.json

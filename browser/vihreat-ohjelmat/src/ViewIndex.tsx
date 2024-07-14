@@ -2,7 +2,11 @@ export function ViewIndex(): JSX.Element {
   return (
     <div className='vo-container'>
       <h1>Ohjelmat</h1>
-      <p><a href="/ohjelmat/p0">Tietopoliittinen ohjelma</a></p>
+      <p>
+        <a href="/ohjelmat/p0">Tietopoliittinen ohjelma</a>
+        <br />
+        <a href="/ohjelmat/p1">Maatalouspoliittinen ohjelma</a>
+      </p>
       <h2>Testiohjelmat</h2>
       <p>
         <a href="/ohjelmat/px_luo">Ohjelmaluonnos (ei hyväksytty)</a>
