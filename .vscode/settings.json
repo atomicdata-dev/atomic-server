@@ -3,7 +3,6 @@
   "editor.formatOnSave": true,
   "files.autoSave": "onFocusChange",
   "rust-analyzer.checkOnSave.command": "clippy",
-
   "search.exclude": {
     "**/.git": true,
     "**/node_modules": true,
@@ -33,7 +32,9 @@
     "./react",
     "./lib",
     "./cli",
-    "./svelte"
+    "./svelte",
+    "./vihreat-lib",
+    "./vihreat-ohjelmat"
   ],
   "typescript.preferences.preferTypeOnlyAutoImports": true,
 }
