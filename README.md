@@ -7,25 +7,24 @@ Tämä ohjelmisto pohjautuu avoimen lähdekoodin projektiin [Atomic Server](http
 3. Kloonaa tämä repositorio.
 4. Lisää ohjelmadataa tietokantaan komennolla:
    ```sh
-   vihreat-data/init.sh
+   ./init.sh
    ```
 5. Käynnistä atomic server ajamalla projektin juuressa
    ```sh
-   cargo run
+   ./server.sh
    ```
-   Ensimmäisen käynnistyksen jälkeen voit käynnistää palvelimen myös komennolla
+6. Avaa toinen ikkuna ja käynnistä ohjelmien lukuapplikaatio:
    ```sh
-   ./target/debug/atomic-server
+   ./start.sh
    ```
-6. Avaa toinen ikkuna ja käynnistä atomic browser (admin-näkymä):
-   ```sh
-   cd browser
-   pnpm install
-   cd data-browser
-   pnpm start
-   ```
-   Sivu pyörii osoitteessa http://localhost:5173.
-7. Luo itsellesi käyttäjä seuraamalla dokumentaation [ohjeita](https://docs.atomicdata.dev/atomicserver/gui).
+   Sivu pyörii osoitteessa http://localhost:5176.
+
+Vaihtoehtoisesti voit käynnistää data-browserin ("admin-näkymä"):
+```sh
+./start-admin.sh
+```
+Tällöin sivu pyörii osoitteessa http://localhost:5173.
+Voit luoda itsellesi käyttäjätunnuksen seuraamalla [näitä ohjeita](https://docs.atomicdata.dev/atomicserver/gui).
 
 ## Kehittäminen
 
