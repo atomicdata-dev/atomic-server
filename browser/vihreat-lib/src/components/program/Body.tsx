@@ -32,7 +32,7 @@ function Element({ subject }: ElementProps): JSX.Element {
     case ontology.classes.actionitem:
       return <ActionItem subject={subject} />;
     default:
-      return <Unknown subject={subject} />;
+      return <Loading subject={subject} />;
   }
 }
 
@@ -84,6 +84,10 @@ function ActionItem({ subject }: ElementProps): JSX.Element {
   );
 }
 
-function Unknown({ subject }: ElementProps): JSX.Element {
-  return <p>{subject}</p>;
+function Loading({ subject }: ElementProps): JSX.Element {
+  return (
+    <p className='vo-cell-loading' title={subject}>
+      sisältöä haetaan...
+    </p>
+  );
 }

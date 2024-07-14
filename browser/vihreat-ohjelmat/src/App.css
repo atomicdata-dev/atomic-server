@@ -69,3 +69,23 @@ h1.vo-program-subtitle {
   margin-top: 0.2rem;
   margin-bottom: 0.2rem;
 }
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    background-color: #fff;
+  }
+
+  50% {
+    background-color: #f8f8f8;
+  }
+}
+
+.vo-cell-loading {
+  text-align: center;
+  color: #666;
+  animation: pulse 1s infinite;
+  padding: 0.2em;
+  margin: 0.5em 0;
+}
