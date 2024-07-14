@@ -77,7 +77,7 @@ function UpdatedLine({ status }: WithStatusProps): JSX.Element {
 }
 
 function StaleLine({ status }: WithStatusProps): JSX.Element {
-  if (status.isStale && !status.isRetired) {
+  if (status.isStale) {
     return (
       <p className='vo-program-status-info'>
         Varoitusmerkintä vanhentumisesta annettu {dateToString(status.staleOn)}
@@ -90,7 +90,7 @@ function StaleLine({ status }: WithStatusProps): JSX.Element {
 }
 
 function RetiredLine({ status }: WithStatusProps): JSX.Element {
-  if (status.retiredOn) {
+  if (status.isRetired) {
     return (
       <p className='vo-program-status-info'>
         Voimassaolo päättyi {dateToString(status.retiredOn)}

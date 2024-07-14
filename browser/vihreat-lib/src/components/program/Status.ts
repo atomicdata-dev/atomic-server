@@ -11,26 +11,24 @@ export enum Status {
 
 export class StatusInfo {
     status: Status;
-    now: Date;
     approvedOn?: Date;
     updatedOn?: Date;
     staleOn?: Date;
     retiredOn?: Date;
 
-    constructor(now: Date, approvedOn?: Date, updatedOn?: Date, staleOn?: Date, retiredOn?: Date) {
-        this.now = now;
+    constructor(approvedOn?: Date, updatedOn?: Date, staleOn?: Date, retiredOn?: Date) {
         this.approvedOn = approvedOn;
         this.updatedOn = updatedOn;
         this.staleOn = staleOn;
         this.retiredOn = retiredOn;
 
-        if (retiredOn && (retiredOn <= now)) {
+        if (retiredOn) {
             this.status = Status.Retired;
         }
-        else if (staleOn && (staleOn <= now)) {
+        else if (staleOn) {
             this.status = Status.Stale;
         }
-        else if (approvedOn && (approvedOn <= now)) {
+        else if (approvedOn) {
             this.status = Status.Current;
         }
         else {
@@ -53,26 +51,10 @@ export class StatusInfo {
     get isRetired(): boolean {
         return this.status == Status.Retired;
     }
-
-    get statusString(): string {
-        switch (this.status) {
-            case Status.Draft:
-                return "draft";
-            case Status.Current:
-                return "current";
-            case Status.Stale:
-                return "stale";
-            case Status.Retired:
-                return "retired";
-            default:
-                return "";
-        }
-    }
 }
 
 export function useStatusInfo(resource: Resource): StatusInfo {
     return new StatusInfo(
-        new Date(),
         useDate(resource, ontology.properties.approvedon),
         useDate(resource, ontology.properties.updatedon),
         useDate(resource, ontology.properties.staleon),
