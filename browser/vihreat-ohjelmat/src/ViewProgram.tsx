@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useResource } from '@tomic/react';
 import { ProgramView, Program } from 'vihreat-lib';
 
@@ -12,7 +13,12 @@ export function ViewProgram({ subject }: ViewProgramProps): JSX.Element {
     <p>Failed to load resource {subject}. Is the server running?</p>;
   }
 
-  return <ProgramView resource={resource} />;
+  return (
+    <>
+      <Link to='/ohjelmat'><strong>←</strong>&nbsp;&nbsp;Ohjelmat</Link>
+      <ProgramView resource={resource} />
+    </>
+  );
 }
 
 export default ViewProgram;
