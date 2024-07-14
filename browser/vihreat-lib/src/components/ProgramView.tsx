@@ -11,15 +11,18 @@ interface ProgramViewProps {
 
 export function ProgramView({ resource }: ProgramViewProps): JSX.Element {
   const [title] = useString(resource, ontology.properties.title);
-  const approvedOn = useDate(resource, ontology.properties.approvedon);
+  const [subtitle] = useString(resource, ontology.properties.subtitle);
   const [elements] = useArray(resource, ontology.properties.elements);
+  const approvedOn = useDate(resource, ontology.properties.approvedon);
 
   if (title !== undefined && elements !== undefined) {
     return (
       <div className='vo-container'>
-        <Title title={title} />
-        <FrontMatter approvedOn={approvedOn} />
-        <Body elements={elements} />
+        <Title title={title} subtitle={subtitle} />
+        <div className='vo-program-content'>
+          <FrontMatter approvedOn={approvedOn} />
+          <Body elements={elements} />
+        </div>
       </div>
     );
   } else {

@@ -1,5 +1,3 @@
-# Ihmislähtöinen ja kestävä digitalisaatio
-
 ## Johdanto
 
 Digitalisaatio vaikuttaa meihin joka päivä. Se muokkaa yhteiskuntaa nopeasti ja laajasti yhtä aikaa ympäristökriisin, kaupungistumisen, globalisaation sekä väestön vanhenemisen ja moninaistumisen rinnalla. Vahvalla uudella politiikalla varmistetaan, että digitalisaatioon liittyvien muutosten vaikutukset ovat ihmisten ja ympäristön kannalta myönteisiä.

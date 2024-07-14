@@ -7,15 +7,25 @@ def build(markdown_path: str, **kwargs) -> list[dict]:
     return elements + [main]
 
 
-def _build_main(elements: list[dict], name: str, title: str, approved_on: str) -> dict:
-    return {
+def _build_main(
+    elements: list[dict],
+    name: str,
+    title: str,
+    subtitle: str | None,
+    approved_on: str | None,
+) -> dict:
+    j = {
         "@id": url.local(f"ohjelmat/{name}"),
         url.atomic("properties/parent"): url.local(),
         url.atomic("properties/isA"): [url.local("o/Program")],
         url.local("o/title"): title,
         url.local("o/elements"): [e["@id"] for e in elements],
-        url.local("o/approvedOn"): approved_on,
     }
+    if subtitle:
+        j[url.local("o/subtitle")] = subtitle
+    if approved_on:
+        j[url.local("o/approvedOn")] = approved_on
+    return j
 
 
 def _build_elements(markdown_path: str, parent_name: str) -> list[dict]:

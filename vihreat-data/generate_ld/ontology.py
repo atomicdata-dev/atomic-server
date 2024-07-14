@@ -9,6 +9,7 @@ def build() -> list[dict]:
         _build_Paragraph(),
         _build_ActionItem(),
         _build_title(),
+        _build_subtitle(),
         _build_elements(),
         _build_approvedOn(),
         _build_text(),
@@ -31,6 +32,7 @@ def _build_ontology() -> dict:
         ],
         url.atomic("properties/properties"): [
             url.local("o/title"),
+            url.local("o/subtitle"),
             url.local("o/elements"),
             url.local("o/approvedOn"),
             url.local("o/text"),
@@ -51,7 +53,10 @@ def _build_Program() -> dict:
             url.local("o/title"),
             url.local("o/elements"),
         ],
-        url.atomic("properties/recommends"): [url.local("o/approvedOn")],
+        url.atomic("properties/recommends"): [
+            url.local("o/subtitle"),
+            url.local("o/approvedOn"),
+        ],
     }
 
 
@@ -108,6 +113,17 @@ def _build_title() -> dict:
         url.atomic("properties/parent"): url.local("o"),
         url.atomic("properties/shortname"): "title",
         url.atomic("properties/description"): "Ohjelman otsikko.",
+        url.atomic("properties/datatype"): url.atomic("datatypes/string"),
+        url.atomic("properties/isA"): [url.atomic("classes/Property")],
+    }
+
+
+def _build_subtitle() -> dict:
+    return {
+        "@id": url.local("o/subtitle"),
+        url.atomic("properties/parent"): url.local("o"),
+        url.atomic("properties/shortname"): "subtitle",
+        url.atomic("properties/description"): "Ohjelman alaotsikko (esim. \"Tietopoliittinen ohjelma\").",
         url.atomic("properties/datatype"): url.atomic("datatypes/string"),
         url.atomic("properties/isA"): [url.atomic("classes/Property")],
     }
