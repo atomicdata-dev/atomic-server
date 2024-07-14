@@ -3,7 +3,7 @@ import { ViewIndex } from './ViewIndex';
 import { ViewProgram } from './ViewProgram';
 
 const fixURL = function (url: string): string {
-  return url.replace('5173', '9883');
+  return url.replace('5173', '9883').replace('5176', '9883');
 }
 
 export function AppRoutes(): JSX.Element {
