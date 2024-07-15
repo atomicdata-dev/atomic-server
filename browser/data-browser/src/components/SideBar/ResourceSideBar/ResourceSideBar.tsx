@@ -7,6 +7,7 @@ import {
   useCanWrite,
   core,
   dataBrowser,
+  unknownSubject,
 } from '@tomic/react';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
 import { SideBarItem } from '../SideBarItem';
@@ -33,12 +34,12 @@ interface ResourceSideBarProps {
 }
 
 /** Renders a Resource as a nav item for in the sidebar. */
-export function ResourceSideBar({
+export const ResourceSideBar: React.FC<ResourceSideBarProps> = ({
   subject,
   renderedHierargy,
   ancestry,
   onClick,
-}: ResourceSideBarProps): JSX.Element {
+}) => {
   if (renderedHierargy.length === 0) {
     throw new Error('renderedHierargy should not be empty');
   }
@@ -103,6 +104,10 @@ export function ResourceSideBar({
     }
   }, [ancestry]);
 
+  if (!subject || subject === unknownSubject) {
+    return null;
+  }
+
   if (resource.loading) {
     return (
       <SideBarItem
@@ -158,7 +163,7 @@ export function ResourceSideBar({
       </Details>
     </Wrapper>
   );
-}
+};
 
 const Wrapper = styled.div<{ highlight: boolean }>`
   background-color: ${p =>

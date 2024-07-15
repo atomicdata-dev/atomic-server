@@ -756,6 +756,13 @@ export class Resource<C extends OptionalClass = any> {
     this._subject = subject;
   }
 
+  /** Refetches the resource from the server. Will reset all changes to the latest saved version */
+  public async refresh(): Promise<void> {
+    await this.store.fetchResourceFromServer(this.subject, {
+      noWebSocket: true,
+    });
+  }
+
   private isParentNew() {
     const parentSubject = this.propvals.get(core.properties.parent) as string;
 

@@ -14,6 +14,7 @@ import {
 import { useSettings } from '../../../helpers/AppSettings';
 import { IconButton } from '../../IconButton/IconButton';
 import { FaGripVertical } from 'react-icons/fa6';
+import { UnsavedIndicator } from '../../UnsavedIndicator';
 
 interface SidebarItemTitleProps {
   subject: string;
@@ -70,6 +71,7 @@ export const SidebarItemTitle = forwardRef<
                   <FaGripVertical />
                 </StyledIconButton>
                 {resource.title}
+                <UnsavedIndicator resource={resource} />
               </TextWrapper>
             </SideBarItem>
           </StyledLink>
@@ -90,6 +92,7 @@ export const SidebarItemTitle = forwardRef<
               <TextWrapper>
                 <Icon />
                 {resource.title}
+                <UnsavedIndicator resource={resource} />
               </TextWrapper>
             </SideBarItem>
           </StyledLink>

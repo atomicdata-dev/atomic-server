@@ -452,7 +452,7 @@ test.describe('data-browser', async () => {
 
     // get current url, append the localID
     await page.goto(parentSubject + '/' + localID);
-    await expect(page.locator(`h1:text("${name}")`)).toBeVisible();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
   });
 
   test('dialog', async ({ page }) => {
