@@ -8,6 +8,7 @@ import {
   transitionName,
 } from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
+import { UnsavedIndicator } from './UnsavedIndicator';
 
 export interface EditableTitleProps {
   resource: Resource;
@@ -80,15 +81,18 @@ export function EditableTitle({
       disabled={!canEdit}
       id={id}
       canEdit={!!canEdit}
-      title={canEdit ? 'Edit title' : 'View title'}
+      title={canEdit ? 'Click to edit title' : ''}
       data-test='editable-title'
       onClick={handleClick}
       subtle={!!canEdit && !text}
-      subject={resource.getSubject()}
+      subject={resource.subject}
       className={className}
     >
       <>
-        {text || placeholder}
+        <span>
+          {text || placeholder}
+          <UnsavedIndicator resource={resource} />
+        </span>
         {canEdit && <Icon />}
       </>
     </Title>
@@ -109,7 +113,7 @@ const Title = styled.h1<TitleProps & ViewTransitionProps>`
   ${TitleShared}
   display: flex;
   align-items: center;
-  gap: ${p => p.theme.margin}rem;
+  gap: ${p => p.theme.size()};
   cursor: ${props => (props.canEdit ? 'pointer' : 'initial')};
   opacity: ${props => (props.subtle ? 0.5 : 1)};
 

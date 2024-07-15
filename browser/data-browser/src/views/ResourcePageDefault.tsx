@@ -1,8 +1,8 @@
-import { useString, properties } from '@tomic/react';
+import { useString, core, server, commits } from '@tomic/react';
 import AllProps from '../components/AllProps';
 import { ClassDetail } from '../components/ClassDetail';
 import { ContainerNarrow } from '../components/Containers';
-import { ValueForm } from '../components/forms/ValueForm';
+import { ValueForm } from '../components/forms/ValueForm/ValueForm';
 import { ResourcePageProps } from './ResourcePage';
 import { CommitDetail } from '../components/CommitDetail';
 import { Details } from '../components/Detail';
@@ -15,20 +15,20 @@ import { EditableTitle } from '../components/EditableTitle';
  */
 export const defaultHiddenProps = [
   // Shown as title
-  properties.name,
-  properties.shortname,
-  properties.file.filename,
+  core.properties.name,
+  core.properties.shortname,
+  server.properties.filename,
   // Shown separately
-  properties.description,
+  core.properties.description,
   // Content should indicate Class in custom views (e.g. document looks like a document)
-  properties.isA,
+  core.properties.isA,
   // Shown in navigation
-  properties.parent,
+  core.properties.parent,
   // Shown in rights / share menu
-  properties.write,
-  properties.read,
+  core.properties.write,
+  core.properties.read,
   // Shown in CommitDetail
-  properties.commit.lastCommit,
+  commits.properties.lastCommit,
 ];
 
 /**
@@ -38,7 +38,7 @@ export const defaultHiddenProps = [
 export function ResourcePageDefault({
   resource,
 }: ResourcePageProps): JSX.Element {
-  const [lastCommit] = useString(resource, properties.commit.lastCommit);
+  const [lastCommit] = useString(resource, commits.properties.lastCommit);
 
   return (
     <ContainerNarrow>
@@ -47,7 +47,10 @@ export function ResourcePageDefault({
         <ClassDetail resource={resource} />
         <CommitDetail commitSubject={lastCommit} />
       </Details>
-      <ValueForm resource={resource} propertyURL={properties.description} />
+      <ValueForm
+        resource={resource}
+        propertyURL={core.properties.description}
+      />
       <AllProps
         resource={resource}
         except={defaultHiddenProps}

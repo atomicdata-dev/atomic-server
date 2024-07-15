@@ -3,13 +3,9 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEdit } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { useProperty, useValue, Datatype, Resource } from '@tomic/react';
-import { Button } from '../Button';
-import ValueComp from '../ValueComp';
-import { ErrMessage } from './InputStyles';
-import InputSwitcher from './InputSwitcher';
-import { useSettings } from '../../helpers/AppSettings';
-import toast from 'react-hot-toast';
-import { Column, Row } from '../Row';
+import ValueComp from '../../ValueComp';
+import { useSettings } from '../../../helpers/AppSettings';
+import { ValueFormEdit } from './ValueFormEdit';
 
 interface ValueFormProps {
   // Maybe pass Value instead of Resource?
@@ -31,6 +27,7 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
   const property = useProperty(propertyURL);
   const [value] = useValue(resource, propertyURL);
   const { agent } = useSettings();
+
   useHotkeys(
     'esc',
     () => {
@@ -40,27 +37,8 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
       enableOnTags: ['INPUT', 'TEXTAREA', 'SELECT'],
     },
   );
-  const [err, setErr] = useState<Error | undefined>(undefined);
-  const haveAgent = agent !== undefined;
 
-  function handleCancel() {
-    setErr(undefined);
-    setEditMode(false);
-    // Should this maybe also remove the edits to the resource?
-    // https://github.com/atomicdata-dev/atomic-data-browser/issues/36
-  }
-
-  async function handleSave() {
-    try {
-      await resource.save();
-      setEditMode(false);
-      toast.success('Resource saved');
-    } catch (e) {
-      setErr(e);
-      setEditMode(true);
-      toast.error('Could not save resource...');
-    }
-  }
+  const hasAgent = agent !== undefined;
 
   if (value === undefined) {
     return null;
@@ -74,41 +52,21 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
     return (
       <ValueFormWrapper>
         <ValueComp value={value} datatype={datatype || property.datatype} />
-        <EditButton title='Edit value'>
-          <FaEdit onClick={() => setEditMode(!editMode)} />
-        </EditButton>
+        {hasAgent && (
+          <EditButton title='Edit value'>
+            <FaEdit onClick={() => setEditMode(!editMode)} />
+          </EditButton>
+        )}
       </ValueFormWrapper>
     );
   }
 
   return (
-    <ValueFormWrapper>
-      <Column gap='0.5rem'>
-        <InputSwitcher
-          data-test={`input-${property.subject}`}
-          resource={resource}
-          property={property}
-          autoFocus
-        />
-        {err && <ErrMessage>{err.message}</ErrMessage>}
-        <Row gap='0.5rem'>
-          <Button subtle onClick={handleCancel}>
-            cancel
-          </Button>
-          <Button
-            disabled={!haveAgent}
-            title={
-              haveAgent
-                ? 'Save the edits'
-                : 'You cannot save - there is no Agent set. Go to settings.'
-            }
-            onClick={handleSave}
-          >
-            save
-          </Button>
-        </Row>
-      </Column>
-    </ValueFormWrapper>
+    <ValueFormEdit
+      resource={resource}
+      property={property}
+      onClose={() => setEditMode(false)}
+    />
   );
 }
 

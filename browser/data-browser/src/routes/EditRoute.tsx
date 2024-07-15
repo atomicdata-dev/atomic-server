@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useCallback, useEffect, useState } from 'react';
 import { useResource } from '@tomic/react';
 import { constructOpenURL, newURL } from '../helpers/navigation';
 import { ContainerNarrow } from '../components/Containers';
@@ -12,6 +11,7 @@ import { Main } from '../components/Main';
 import { Column, Row } from '../components/Row';
 import { IconButton } from '../components/IconButton/IconButton';
 import { FaArrowLeft } from 'react-icons/fa';
+import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 
 /** Form for instantiating a new Resource from some Class */
 export function Edit(): JSX.Element {
@@ -20,9 +20,9 @@ export function Edit(): JSX.Element {
   const [subjectInput, setSubjectInput] = useState<string | undefined>(
     undefined,
   );
-  const navigate = useNavigate();
+  const navigate = useNavigateWithTransition();
 
-  function handleClassSet(e) {
+  const handleClassSet: React.FormEventHandler<HTMLFormElement> = e => {
     e.preventDefault();
 
     if (!subjectInput) {
@@ -30,11 +30,18 @@ export function Edit(): JSX.Element {
     }
 
     navigate(newURL(subjectInput));
-  }
-
-  const handleBackClick = () => {
-    navigate(constructOpenURL(subject ?? ''));
   };
+
+  const cancelEdit = useCallback(() => {
+    navigate(constructOpenURL(subject ?? ''));
+  }, [subject, navigate]);
+
+  useEffect(
+    () => () => {
+      resource.refresh();
+    },
+    [],
+  );
 
   return (
     <Main subject={subject}>
@@ -46,7 +53,7 @@ export function Edit(): JSX.Element {
                 title={`Back to ${resource.title}`}
                 size='1.4em'
                 edgeAlign='start'
-                onClick={handleBackClick}
+                onClick={cancelEdit}
               >
                 <FaArrowLeft />
               </IconButton>
@@ -54,7 +61,11 @@ export function Edit(): JSX.Element {
             </Row>
             <ClassDetail resource={resource} />
             {/* Key is required for re-rendering when subject changes */}
-            <ResourceForm resource={resource} key={subject} />
+            <ResourceForm
+              resource={resource}
+              key={subject}
+              onCancel={cancelEdit}
+            />
           </Column>
         ) : (
           <form onSubmit={handleClassSet}>

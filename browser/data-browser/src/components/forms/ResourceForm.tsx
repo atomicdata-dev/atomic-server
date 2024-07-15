@@ -3,15 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import {
   useArray,
   useResource,
-  useString,
   Resource,
-  classes,
-  properties,
-  urls,
   useDebounce,
   useCanWrite,
   Client,
   useStore,
+  core,
+  commits,
 } from '@tomic/react';
 import { FaCaretDown, FaCaretRight } from 'react-icons/fa';
 
@@ -44,14 +42,15 @@ export interface ResourceFormProps {
 
   variant?: ResourceFormVariant;
   onSave?: () => void;
+  onCancel?: () => void;
 }
 
-const nonEssentialProps = [
-  properties.isA,
-  properties.parent,
-  properties.read,
-  properties.write,
-  properties.commit.lastCommit,
+const nonEssentialProps: string[] = [
+  core.properties.isA,
+  core.properties.parent,
+  core.properties.write,
+  core.properties.read,
+  commits.properties.lastCommit,
 ];
 
 /** Form for editing and creating a Resource */
@@ -60,8 +59,9 @@ export function ResourceForm({
   resource,
   variant,
   onSave,
+  onCancel,
 }: ResourceFormProps): JSX.Element {
-  const [isAArray] = useArray(resource, properties.isA);
+  const [isAArray] = useArray(resource, core.properties.isA);
 
   if (classSubject === undefined && isAArray?.length > 0) {
     // This is not entirely accurate, as Atomic Data supports having multiple
@@ -70,9 +70,8 @@ export function ResourceForm({
   }
 
   const klass = useResource(classSubject);
-  const [requires] = useArray(klass, properties.requires);
-  const [recommends] = useArray(klass, properties.recommends);
-  const [klassIsa] = useString(klass, properties.isA);
+  const [requires] = useArray(klass, core.properties.requires);
+  const [recommends] = useArray(klass, core.properties.recommends);
   const [newPropErr, setNewPropErr] = useState<Error | undefined>(undefined);
   const navigate = useNavigate();
   /** A list of custom properties, set by the User while editing this form */
@@ -126,7 +125,7 @@ export function ResourceForm({
     return <>Loading class...</>;
   }
 
-  if (klassIsa && klassIsa !== classes.class) {
+  if (!klass.hasClasses(core.classes.class)) {
     return (
       <ErrMessage>
         {classSubject} is not a Class. Only resources with valid classes can be
@@ -169,7 +168,7 @@ export function ResourceForm({
   }
 
   return (
-    <form about={resource.getSubject()} onSubmit={save}>
+    <form about={resource.subject} onSubmit={save}>
       <Column>
         {classSubject && klass.error && (
           <ErrMessage>
@@ -234,25 +233,25 @@ export function ResourceForm({
                   handleAddProp(set);
                 }}
                 error={newPropErr}
-                isA={urls.classes.property}
+                isA={core.classes.property}
               />
             </div>
             {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
           </Field>
-          <ResourceField propertyURL={properties.isA} resource={resource} />
-          <ResourceField propertyURL={properties.parent} resource={resource} />
-          <ResourceField propertyURL={properties.write} resource={resource} />
-          <ResourceField propertyURL={properties.read} resource={resource} />
-          <ResourceField
-            propertyURL={properties.commit.lastCommit}
-            resource={resource}
-          />
+          {nonEssentialProps.map(prop => (
+            <ResourceField key={prop} propertyURL={prop} resource={resource} />
+          ))}
         </Column>
       </StyledCollapse>
       {variant !== ResourceFormVariant.Dialog && (
         <>
           {err && <ErrMessage>{err.message}</ErrMessage>}
           <Row justify='flex-end'>
+            {onCancel && (
+              <Button subtle onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
             <Button disabled={saving} data-test='save' type='submit'>
               <FaFloppyDisk />
               {saving ? 'wait...' : 'Save'}
