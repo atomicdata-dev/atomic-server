@@ -3,6 +3,7 @@ import { styled, css } from 'styled-components';
 
 import { FaExclamationTriangle } from 'react-icons/fa';
 import { Column } from './Row';
+import { CodeBlock } from './CodeBlock';
 
 export const errorLookStyle = css`
   color: ${props => props.theme.colors.alert};
@@ -27,17 +28,11 @@ export function ErrorBlock({ error, showTrace }: ErrorBlockProps): JSX.Element {
         Something went wrong
       </BiggerText>
       <Column>
-        <CodeBlock>{error.message}</CodeBlock>
+        <CodeBlock content={error.message || 'no error message available'} />
         {showTrace && (
           <>
             Stack trace:
-            <CodeBlock
-              style={{
-                maxHeight: '10rem',
-              }}
-            >
-              {error.stack}
-            </CodeBlock>
+            <CodeBlock content={error.stack || 'no stack trace available'} />
           </>
         )}
       </Column>
@@ -46,12 +41,11 @@ export function ErrorBlock({ error, showTrace }: ErrorBlockProps): JSX.Element {
 }
 
 const ErrorLookBig = styled.div`
-  color: ${p => p.theme.colors.alert};
   font-size: 1rem;
   padding: ${p => p.theme.margin}rem;
   border-radius: ${p => p.theme.radius};
   border: 1px solid ${p => lighten(0.2, p.theme.colors.alert)};
-  background-color: ${p => p.theme.colors.bg1};
+  background-color: ${p => p.theme.colors.bg};
 `;
 
 const Pre = styled.pre`
@@ -63,6 +57,7 @@ const Pre = styled.pre`
 `;
 
 const BiggerText = styled.p`
+  color: ${p => p.theme.colors.alert};
   font-size: 1.3rem;
   display: flex;
   align-items: center;
