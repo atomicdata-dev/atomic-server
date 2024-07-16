@@ -59,7 +59,7 @@ function Data(): JSX.Element {
     setTextResponseLoading(true);
 
     try {
-      const resp = await window.fetch(subject!, { headers: headers });
+      const resp = await fetch(subject!, { headers: headers });
       const body = await resp.text();
       setTextResponseLoading(false);
       setTextResponse(body);

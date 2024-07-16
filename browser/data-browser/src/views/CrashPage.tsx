@@ -2,7 +2,11 @@ import * as React from 'react';
 import { Resource } from '@tomic/react';
 
 import { ContainerWide } from '../components/Containers';
-import { ErrorBlock } from '../components/ErrorLook';
+import {
+  createGithubIssueLink,
+  ErrorBlock,
+  GitHubIssueButton,
+} from '../components/ErrorLook';
 import { Button } from '../components/Button';
 import { Column, Row } from '../components/Row';
 
@@ -13,32 +17,6 @@ type ErrorPageProps = {
   info: React.ErrorInfo;
   clearError: () => void;
 };
-
-const githubIssueTemplate = (
-  message,
-  stack,
-) => `**Describe what you did to produce the bug**
-
-## Error message
-\`\`\`
-${message}
-\`\`\`
-
-## Stack trace
-\`\`\`
-${stack}
-\`\`\`
-`;
-
-function createGithubIssueLink(error: Error): string {
-  const url = new URL(
-    'https://github.com/atomicdata-dev/atomic-data-browser/issues/new',
-  );
-  url.searchParams.set('body', githubIssueTemplate(error.message, error.stack));
-  url.searchParams.set('labels', 'bug');
-
-  return url.href;
-}
 
 /** If the entire app crashes, show this page */
 function CrashPage({
@@ -53,6 +31,7 @@ function CrashPage({
         {children ? children : <ErrorBlock error={error} showTrace />}
         <Row>
           <a href={createGithubIssueLink(error)}>Create Github issue</a>
+          <GitHubIssueButton error={error} />
           {clearError && <Button onClick={clearError}>Clear error</Button>}
           <Button
             onClick={() =>
