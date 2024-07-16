@@ -25,6 +25,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 - Added `LocalChange` event to `Resource`.
 - Added `resource.refresh()` method.
+- Removed `cross-fetch`, if your environment does not support fetch make sure to add a polyfill or inject one using `store.injectFetch()`.
 
 ### @tomic/react
 
