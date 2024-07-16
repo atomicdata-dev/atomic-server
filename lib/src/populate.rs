@@ -187,18 +187,27 @@ pub fn create_drive(
         store.get_resource_new(&drive_subject)
     };
     drive.set_class(urls::DRIVE);
-    drive.set_string(
-        urls::NAME.into(),
-        drive_name.unwrap_or_else(|| self_url.host_str().unwrap()),
-        store,
-    )?;
+    let host = self_url
+        .url()
+        .host()
+        .ok_or("no host in URL found")?
+        .to_string();
+    drive.set_string(urls::NAME.into(), drive_name.unwrap_or(&host), store)?;
+
+    // Set rights
+    drive.push(urls::WRITE, for_agent.into(), true)?;
+    drive.push(urls::READ, for_agent.into(), true)?;
+    if public_read {
+        drive.push(urls::READ, urls::PUBLIC_AGENT.into(), true)?;
+    }
+
     drive.save_locally(store)?;
 
-    Ok(())
+    Ok(drive)
 }
 
 pub fn create_default_ontology(store: &impl Storelike) -> AtomicResult<()> {
-    let mut drive = store.get_resource(store.get_server_url())?;
+    let mut drive = store.get_resource(store.get_server_url().as_str())?;
 
     let ontology_subject = format!("{}/{}", drive.get_subject(), DEFAULT_ONTOLOGY_PATH);
 
@@ -235,7 +244,7 @@ pub fn create_default_ontology(store: &impl Storelike) -> AtomicResult<()> {
 /// Adds rights to the default agent to the Drive resource (at the base URL). Optionally give Public Read rights.
 pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
-    let mut drive = store.get_resource(store.get_server_url())?;
+    let mut drive = store.get_resource(store.get_server_url().as_str())?;
     let write_agent = store.get_default_agent()?.subject;
     let read_agent = write_agent.clone();
 
@@ -265,7 +274,7 @@ Use [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologie
 
     drive.save_locally(store)?;
 
-    Ok(drive)
+    Ok(())
 }
 
 /// Imports the Atomic Data Core items (the entire atomicdata.dev Ontology / Vocabulary)
@@ -379,7 +388,8 @@ pub fn populate_all(store: &mut crate::Db) -> AtomicResult<()> {
     // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
     populate_default_store(store)
         .map_err(|e| format!("Failed to populate default store. {}", e))?;
-    create_drive(store).map_err(|e| format!("Failed to create drive. {}", e))?;
+    create_drive(store, None, &store.get_default_agent()?.subject, true)
+        .map_err(|e| format!("Failed to create drive. {}", e))?;
     create_default_ontology(store)
         .map_err(|e| format!("Failed to create default ontology. {}", e))?;
     set_drive_rights(store, true)?;
