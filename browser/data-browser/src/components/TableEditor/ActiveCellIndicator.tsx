@@ -11,10 +11,16 @@ import {
 import { scrollIntoView } from './helpers/scrollIntoView';
 import { CursorMode, useTableEditorContext } from './TableEditorContext';
 
+type OnScrollCallbackOptions = {
+  scrollUpdateWasRequested: boolean;
+};
+
 export interface ActiveCellIndicatorProps {
   sizeStr: string;
   scrollerRef: React.RefObject<HTMLDivElement>;
-  setOnScroll: (onScroll: () => void) => void;
+  setOnScroll: (
+    onScroll: ({ scrollUpdateWasRequested }: OnScrollCallbackOptions) => void,
+  ) => void;
 }
 
 const cursorGoesOffscreen = (parentRect: DOMRect, childRect: DOMRect) => {
@@ -128,14 +134,17 @@ export function ActiveCellIndicator({
   );
 
   useEffect(() => {
-    setOnScroll(() => (_, __, requested: boolean) => {
-      if (requested) {
-        return;
-      }
+    setOnScroll(
+      () =>
+        ({ scrollUpdateWasRequested }: OnScrollCallbackOptions) => {
+          if (scrollUpdateWasRequested) {
+            return;
+          }
 
-      setScrolling(true);
-      updatePosition(false);
-    });
+          setScrolling(true);
+          updatePosition(false);
+        },
+    );
   }, [updatePosition]);
 
   useEffect(() => {
