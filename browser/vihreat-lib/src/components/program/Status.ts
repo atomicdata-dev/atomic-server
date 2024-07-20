@@ -2,62 +2,93 @@
 import { useDate, Resource } from '@tomic/react';
 import { ontology } from '../../ontologies/ontology';
 
-export enum Status {
-    Draft = 1,
-    Current,
-    Stale,
-    Retired
+// "Traffic light" color
+export enum StatusColor {
+    Gray = 1,
+    Green,
+    Yellow,
+    Red
+}
+
+interface StatusInfoProps {
+    approvedOn?: Date;
+    updatedOn?: Date;
+    retiredOn?: Date;
+    staleOn?: Date;
 }
 
 export class StatusInfo {
-    status: Status;
+    color: StatusColor;
+    now: Date;
     approvedOn?: Date;
     updatedOn?: Date;
-    staleOn?: Date;
     retiredOn?: Date;
+    staleOn?: Date;
 
-    constructor(approvedOn?: Date, updatedOn?: Date, staleOn?: Date, retiredOn?: Date) {
+    constructor(now: Date, { approvedOn, updatedOn, retiredOn, staleOn }: StatusInfoProps) {
+        this.now = now;
         this.approvedOn = approvedOn;
         this.updatedOn = updatedOn;
-        this.staleOn = staleOn;
         this.retiredOn = retiredOn;
+        this.staleOn = staleOn;
 
-        if (retiredOn) {
-            this.status = Status.Retired;
-        }
-        else if (staleOn) {
-            this.status = Status.Stale;
-        }
-        else if (approvedOn) {
-            this.status = Status.Current;
+        if (!this.hasBeenApproved) {
+            this.color = StatusColor.Gray;
         }
         else {
-            this.status = Status.Draft;
+            if (this.hasBeenRetired) {
+                this.color = StatusColor.Red;
+            }
+            else if (this.hasGoneStale) {
+                this.color = StatusColor.Yellow;
+            }
+            else {
+                this.color = StatusColor.Green;
+            }
         }
     }
 
-    get isDraft(): boolean {
-        return this.status == Status.Draft;
+    get hasBeenApproved(): boolean {
+        return Boolean(this.approvedOn && this.approvedOn <= this.now);
     }
 
-    get isCurrent(): boolean {
-        return this.status == Status.Current;
+    get hasBeenUpdated(): boolean {
+        return Boolean(this.updatedOn && this.updatedOn <= this.now);
     }
 
-    get isStale(): boolean {
-        return this.status == Status.Stale;
+    get hasGoneStale(): boolean {
+        return Boolean(this.staleOn && this.staleOn <= this.now);
     }
 
-    get isRetired(): boolean {
-        return this.status == Status.Retired;
+    get hasBeenRetired(): boolean {
+        return Boolean(this.retiredOn && this.retiredOn <= this.now);
+    }
+
+    get isGray(): boolean {
+        return this.color == StatusColor.Gray;
+    }
+
+    get isGreen(): boolean {
+        return this.color == StatusColor.Green;
+    }
+
+    get isYellow(): boolean {
+        return this.color == StatusColor.Yellow;
+    }
+
+    get isRed(): boolean {
+        return this.color == StatusColor.Red;
     }
 }
 
 export function useStatusInfo(resource: Resource): StatusInfo {
     return new StatusInfo(
-        useDate(resource, ontology.properties.approvedon),
-        useDate(resource, ontology.properties.updatedon),
-        useDate(resource, ontology.properties.staleon),
-        useDate(resource, ontology.properties.retiredon)
+        new Date(),
+        {
+            approvedOn: useDate(resource, ontology.properties.approvedon),
+            updatedOn: useDate(resource, ontology.properties.updatedon),
+            staleOn: useDate(resource, ontology.properties.staleon),
+            retiredOn: useDate(resource, ontology.properties.retiredon)
+        }
     );
 }

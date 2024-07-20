@@ -10,31 +10,30 @@ export function FrontMatter({ status }: WithStatusProps): JSX.Element {
       <Banner status={status} />
       <ApprovedLine status={status} />
       <UpdatedLine status={status} />
-      <StaleLine status={status} />
       <RetiredLine status={status} />
     </div>
   );
 }
 
 function Banner({ status }: WithStatusProps): JSX.Element {
-  if (status.isCurrent) {
+  if (status.isGreen) {
     return <></>;
   }
-  else if (status.isDraft) {
+  else if (status.isGray) {
     return (
       <p className='vo-program-status-banner vo-program-status-banner-draft'>
         ⚠ Tämä on ohjelmaluonnos. Se ei ole eikä ole koskaan ollut voimassa.
       </p>
     );
   }
-  else if (status.isStale) {
+  else if (status.isYellow) {
     return (
       <p className='vo-program-status-banner vo-program-status-banner-stale'>
         ⚠ Tämä ohjelma voi sisältää vanhentunutta asiasisältöä.
       </p>
     );
   }
-  else if (status.isRetired) {
+  else if (status.isRed) {
     return (
       <p className='vo-program-status-banner vo-program-status-banner-retired'>
         ⚠ Tämä ohjelma ei ole enää voimassa.
@@ -51,7 +50,7 @@ function Banner({ status }: WithStatusProps): JSX.Element {
 }
 
 function ApprovedLine({ status }: WithStatusProps): JSX.Element {
-  if (status.approvedOn) {
+  if (status.hasBeenApproved) {
     return (
       <p className='vo-program-status-info'>
         Hyväksyttiin {dateToString(status.approvedOn)}
@@ -64,7 +63,7 @@ function ApprovedLine({ status }: WithStatusProps): JSX.Element {
 }
 
 function UpdatedLine({ status }: WithStatusProps): JSX.Element {
-  if (status.updatedOn) {
+  if (status.hasBeenUpdated) {
     return (
       <p className='vo-program-status-info'>
         Päivitetty viimeksi {dateToString(status.updatedOn)}
@@ -76,24 +75,18 @@ function UpdatedLine({ status }: WithStatusProps): JSX.Element {
   }
 }
 
-function StaleLine({ status }: WithStatusProps): JSX.Element {
-  if (status.isStale) {
-    return (
-      <p className='vo-program-status-info'>
-        Varoitusmerkintä vanhentumisesta annettu {dateToString(status.staleOn)}
-      </p>
-    );
-  }
-  else {
-    return <></>;
-  }
-}
-
 function RetiredLine({ status }: WithStatusProps): JSX.Element {
-  if (status.isRetired) {
+  if (status.hasBeenRetired) {
     return (
       <p className='vo-program-status-info'>
         Voimassaolo päättyi {dateToString(status.retiredOn)}
+      </p>
+    );
+  }
+  else if (status.retiredOn) {
+    return (
+      <p className='vo-program-status-info'>
+        Voimassaolo päättyy {dateToString(status.retiredOn)}
       </p>
     );
   }
