@@ -18,41 +18,53 @@ struct Dirs {
 }
 
 fn main() -> std::io::Result<()> {
-    const BROWSER_ROOT: &str = "../browser/";
-    let dirs: Dirs = {
-        Dirs {
-            js_dist_source: PathBuf::from("../browser/data-browser/dist"),
-            js_dist_tmp: PathBuf::from("./assets_tmp"),
-            src_browser: PathBuf::from("../browser/data-browser/src"),
-            browser_root: PathBuf::from(BROWSER_ROOT),
-        }
-    };
-    println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
+    // Check if we're likely running in a check-like context
+    let opt_level = std::env::var("OPT_LEVEL").unwrap_or_else(|_| "0".to_string());
+    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "release".to_string());
 
-    if should_build(&dirs) {
-        build_js(&dirs);
-        let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
-        dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
-    } else if dirs.js_dist_tmp.exists() {
-        p!("Found {}, skipping copy", dirs.js_dist_tmp.display());
+    let is_check_like = profile == "debug" && opt_level == "0";
+
+    if is_check_like {
+        println!("cargo:rerun-if-changed=build.rs");
+        // Skip the heavy logic
+        println!("Skipping build.rs logic for cargo check/clippy.");
     } else {
-        p!(
-            "Could not find {} , copying from {}",
-            dirs.js_dist_tmp.display(),
-            dirs.js_dist_source.display()
-        );
-        dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
-    }
+        const BROWSER_ROOT: &str = "../browser/";
+        println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
+        let dirs: Dirs = {
+            Dirs {
+                js_dist_source: PathBuf::from("../browser/data-browser/dist"),
+                js_dist_tmp: PathBuf::from("./assets_tmp"),
+                src_browser: PathBuf::from("../browser/data-browser/src"),
+                browser_root: PathBuf::from(BROWSER_ROOT),
+            }
+        };
+        //
+        if should_build(&dirs) {
+            build_js(&dirs);
+            let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
+            dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        } else if dirs.js_dist_tmp.exists() {
+            p!("Found {}, skipping copy", dirs.js_dist_tmp.display());
+        } else {
+            p!(
+                "Could not find {} , copying from {}",
+                dirs.js_dist_tmp.display(),
+                dirs.js_dist_source.display()
+            );
+            dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        }
 
-    // Makes the static files available for compilation
-    static_files::resource_dir(&dirs.js_dist_tmp)
-        .build()
-        .unwrap_or_else(|_e| {
-            panic!(
-                "failed to open data browser assets from {}",
-                dirs.js_dist_tmp.display()
-            )
-        });
+        // Makes the static files available for compilation
+        static_files::resource_dir(&dirs.js_dist_tmp)
+            .build()
+            .unwrap_or_else(|_e| {
+                panic!(
+                    "failed to open data browser assets from {}",
+                    dirs.js_dist_tmp.display()
+                )
+            });
+    }
 
     Ok(())
 }
