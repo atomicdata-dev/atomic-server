@@ -1,3 +1,4 @@
+import { commits } from './ontologies/commits.js';
 import { EventManager } from './EventManager.js';
 import type { Agent } from './agent.js';
 import { Client } from './client.js';
@@ -371,19 +372,25 @@ export class Resource<C extends OptionalClass = any> {
   public async getHistory(
     progressCallback?: (percentage: number) => void,
   ): Promise<Version[]> {
-    const commitsCollection = await this.store.fetchResourceFromServer(
-      this.getCommitsCollectionSubject(),
-    );
-    const commits = commitsCollection.get(
-      properties.collection.members,
-    ) as string[];
+    const commitsCollection = await new CollectionBuilder(this.store)
+      .setPageSize(9999)
+      .setProperty(commits.properties.subject)
+      .setValue(this.subject)
+      .setSortBy(commits.properties.createdAt)
+      .buildAndFetch();
+
+    const commitSubjects = await commitsCollection.getAllMembers();
 
     const builtVersions: Version[] = [];
 
+    if (!commitSubjects) {
+      return builtVersions;
+    }
+
     let previousResource = new Resource(this.subject);
 
-    for (let i = 0; i < commits.length; i++) {
-      const commitResource = await this.store.getResource(commits[i]);
+    for (let i = 0; i < commitSubjects.length; i++) {
+      const commitResource = await this.store.getResource(commitSubjects[i]);
       const parsedCommit = parseCommitResource(commitResource);
       const builtResource = applyCommitToResource(
         previousResource.clone(),
@@ -397,7 +404,7 @@ export class Resource<C extends OptionalClass = any> {
 
       // Every 30 cycles we report the progress
       if (progressCallback && i % 30 === 0) {
-        progressCallback(Math.round((i / commits.length) * 100));
+        progressCallback(Math.round((i / commitSubjects.length) * 100));
         await WaitForImmediate();
       }
     }
