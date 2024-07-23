@@ -21,7 +21,7 @@ export function OntologySidebar({
     <Wrapper>
       <SideBarScrollArea>
         <Details
-          open
+          initialState={true}
           title={
             <Title>
               <FaCube />
@@ -36,7 +36,7 @@ export function OntologySidebar({
           </ul>
         </Details>
         <Details
-          open
+          initialState={true}
           title={
             <Title>
               <FaHashtag />
@@ -51,7 +51,7 @@ export function OntologySidebar({
           </ul>
         </Details>
         <Details
-          open
+          initialState={true}
           title={
             <Title>
               <FaAtom />
@@ -93,7 +93,7 @@ const Wrapper = styled.div`
   flex-direction: column;
   background-color: ${p => p.theme.colors.bg};
   height: 100vh;
-  border-right: 1px solid ${p => p.theme.colors.bg2};
+  border-left: 1px solid ${p => p.theme.colors.bg2};
   min-width: 10rem;
 `;
 

@@ -7,6 +7,7 @@ import {
   useString,
 } from '@tomic/react';
 import { AtomicSelectInput } from '../../components/forms/AtomicSelectInput';
+import styled from 'styled-components';
 interface PropertyDatatypePickerProps {
   resource: Resource;
   disabled?: boolean;
@@ -19,6 +20,12 @@ const options = Object.entries(reverseDatatypeMapping)
   }))
   .filter(x => x.value !== 'unknown-datatype');
 
+const isResourceLike = (datatype: string) => {
+  return (
+    datatype === Datatype.ATOMIC_URL || datatype === Datatype.RESOURCEARRAY
+  );
+};
+
 export function PropertyDatatypePicker({
   resource,
   disabled,
@@ -30,12 +37,6 @@ export function PropertyDatatypePicker({
     commit: true,
   });
 
-  const isResourceLike = (datatype: string) => {
-    return (
-      datatype === Datatype.ATOMIC_URL || datatype === Datatype.RESOURCEARRAY
-    );
-  };
-
   const clearInapplicableProps = (datatype: string) => {
     if (!isResourceLike(datatype)) {
       setClassType(undefined);
@@ -44,7 +45,7 @@ export function PropertyDatatypePicker({
   };
 
   return (
-    <AtomicSelectInput
+    <StyledAtomicSelectInput
       commit
       disabled={disabled}
       resource={resource}
@@ -54,3 +55,7 @@ export function PropertyDatatypePicker({
     />
   );
 }
+
+const StyledAtomicSelectInput = styled(AtomicSelectInput)`
+  min-width: 18ch;
+`;

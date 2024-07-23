@@ -1,5 +1,4 @@
 import { ulid } from 'ulidx';
-
 import type { Agent } from './agent.js';
 import {
   removeCookieAuthentication,
@@ -148,7 +147,6 @@ export class Store {
     this.client.setFetch(fetchOverride);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public addResources(
     resources: Resource | Resource[],
     opts?: AddResourcesOpts,
@@ -328,7 +326,7 @@ export class Store {
     if (opts.setLoading) {
       const newR = new Resource<C>(subject);
       newR.loading = true;
-      this.addResources(newR);
+      this.addResources(newR, { skipCommitCompare: true });
     }
 
     // Use WebSocket if available, else use HTTP(S)
@@ -359,7 +357,7 @@ export class Store {
         },
       );
 
-      this.addResources(createdResources);
+      this.addResources(createdResources, { skipCommitCompare: true });
     }
 
     return this.resources.get(subject)!;

@@ -1,8 +1,15 @@
-const hashStringWithCYRB53 = (str, seed = 0) => {
+export const FILE_IMAGE_TRANSITION_TAG = 'file-image';
+export const SIDEBAR_TRANSITION_TAG = 'sidebar';
+export const PAGE_TITLE_TRANSITION_TAG = 'page-title';
+export const RESOURCE_PAGE_TRANSITION_TAG = 'resource-page';
+export const BREADCRUMB_BAR_TRANSITION_TAG = 'breadcrumb-bar';
+export const NAVBAR_TRANSITION_TAG = 'navbar';
+
+const hashStringWithCYRB53 = (str: string, seed = 0) => {
   let h1 = 0xdeadbeef ^ seed,
     h2 = 0x41c6ce57 ^ seed;
 
-  for (let i = 0, ch; i < str.length; i++) {
+  for (let i = 0, ch: number; i < str.length; i++) {
     ch = str.charCodeAt(i);
     h1 = Math.imul(h1 ^ ch, 2654435761);
     h2 = Math.imul(h2 ^ ch, 1597334677);

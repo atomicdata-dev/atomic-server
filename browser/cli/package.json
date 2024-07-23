@@ -22,7 +22,7 @@
     "prepublishOnly": "pnpm run build && pnpm run lint-fix",
     "watch": "tsc --build --watch",
     "start": "pnpm watch",
-    "tsc": "tsc --build",
+    "tsc": "pnpm exec tsc --build",
     "typecheck": "pnpm exec tsc --noEmit"
   },
   "bin": {

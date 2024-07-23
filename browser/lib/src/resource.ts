@@ -1,3 +1,4 @@
+import { EventManager } from './EventManager.js';
 import type { Agent } from './agent.js';
 import { Client } from './client.js';
 import type { Collection } from './collection.js';
@@ -31,6 +32,14 @@ export type PropVals = Map<string, JSONValue>;
  * Resource is not saved or fetched.
  */
 export const unknownSubject = 'unknown-subject';
+
+export enum ResourceEvents {
+  LocalChange = 'local-change',
+}
+
+type ResourceEventHandlers = {
+  [ResourceEvents.LocalChange]: (prop: string, value: JSONValue) => void;
+};
 
 /**
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
@@ -68,6 +77,10 @@ export class Resource<C extends OptionalClass = any> {
   private hasQueue = false;
 
   private _store?: Store;
+  private eventManager = new EventManager<
+    ResourceEvents,
+    ResourceEventHandlers
+  >();
 
   public constructor(subject: string, newResource?: boolean) {
     if (typeof subject !== 'string') {
@@ -120,6 +133,13 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     return this._store;
+  }
+
+  public on<T extends ResourceEvents>(
+    event: T,
+    callback: ResourceEventHandlers[T],
+  ) {
+    return this.eventManager.register(event, callback);
   }
 
   /** @internal */
@@ -691,11 +711,21 @@ export class Resource<C extends OptionalClass = any> {
 
     if (validate) {
       const fullProp = await this.store.getProperty(prop);
-      validateDatatype(value, fullProp.datatype);
+
+      try {
+        validateDatatype(value, fullProp.datatype);
+      } catch (e) {
+        if (e instanceof Error) {
+          e.message = `Error validating ${fullProp.shortname} with value ${value} for ${this.subject}: ${e.message}`;
+        }
+
+        throw e;
+      }
     }
 
     if (value === undefined) {
       this.remove(prop);
+      this.eventManager.emit(ResourceEvents.LocalChange, prop, value);
 
       return;
     }
@@ -703,6 +733,7 @@ export class Resource<C extends OptionalClass = any> {
     this.propvals.set(prop, value);
     // Add the change to the Commit Builder, so we can commit our changes later
     this.commitBuilder.addSetAction(prop, value);
+    this.eventManager.emit(ResourceEvents.LocalChange, prop, value);
   }
 
   /**
@@ -725,6 +756,13 @@ export class Resource<C extends OptionalClass = any> {
     this._subject = subject;
   }
 
+  /** Refetches the resource from the server. Will reset all changes to the latest saved version */
+  public async refresh(): Promise<void> {
+    await this.store.fetchResourceFromServer(this.subject, {
+      noWebSocket: true,
+    });
+  }
+
   private isParentNew() {
     const parentSubject = this.propvals.get(core.properties.parent) as string;
 
@@ -739,7 +777,7 @@ export class Resource<C extends OptionalClass = any> {
 }
 
 /** Type of Rights (e.g. read or write) */
-enum RightType {
+export enum RightType {
   /** Open a resource or its children */
   READ = 'read',
   /** Edit or delete a resource or its children */

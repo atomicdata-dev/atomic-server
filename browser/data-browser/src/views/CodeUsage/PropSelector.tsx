@@ -22,11 +22,7 @@ export function PropSelector({
   const props = useResources(allProps);
 
   return (
-    <BasicSelect
-      onChange={e => onPropSelect(e.target.value)}
-      placeholder='Select a property'
-      defaultValue={''}
-    >
+    <BasicSelect onChange={e => onPropSelect(e.target.value)} defaultValue={''}>
       <option value=''>None</option>
       <hr />
       {Array.from(props.entries()).map(([prop, propResource]) => (

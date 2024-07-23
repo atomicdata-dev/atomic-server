@@ -1,10 +1,14 @@
 import { Resource, useCanWrite, useTitle } from '@tomic/react';
 import { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { FaEdit } from 'react-icons/fa';
+import { FaPencil } from 'react-icons/fa6';
 import { styled, css } from 'styled-components';
-import { transitionName } from '../helpers/transitionName';
+import {
+  PAGE_TITLE_TRANSITION_TAG,
+  transitionName,
+} from '../helpers/transitionName';
 import { ViewTransitionProps } from '../helpers/ViewTransitionProps';
+import { UnsavedIndicator } from './UnsavedIndicator';
 
 export interface EditableTitleProps {
   resource: Resource;
@@ -77,15 +81,18 @@ export function EditableTitle({
       disabled={!canEdit}
       id={id}
       canEdit={!!canEdit}
-      title={canEdit ? 'Edit title' : 'View title'}
+      title={canEdit ? 'Click to edit title' : ''}
       data-test='editable-title'
       onClick={handleClick}
       subtle={!!canEdit && !text}
-      subject={resource.getSubject()}
+      subject={resource.subject}
       className={className}
     >
       <>
-        {text || placeholder}
+        <span>
+          {text || placeholder}
+          <UnsavedIndicator resource={resource} />
+        </span>
         {canEdit && <Icon />}
       </>
     </Title>
@@ -106,13 +113,11 @@ const Title = styled.h1<TitleProps & ViewTransitionProps>`
   ${TitleShared}
   display: flex;
   align-items: center;
-  gap: ${p => p.theme.margin}rem;
-  justify-content: space-between;
-  cursor: pointer;
+  gap: ${p => p.theme.size()};
   cursor: ${props => (props.canEdit ? 'pointer' : 'initial')};
   opacity: ${props => (props.subtle ? 0.5 : 1)};
 
-  ${props => transitionName('page-title', props.subject)};
+  ${props => transitionName(PAGE_TITLE_TRANSITION_TAG, props.subject)};
 `;
 
 const TitleInput = styled.input`
@@ -138,14 +143,10 @@ const TitleInput = styled.input`
   }
 `;
 
-const Icon = styled(FaEdit)`
+const Icon = styled(FaPencil)`
   opacity: 0;
   font-size: 0.8em;
   ${Title}:hover & {
     opacity: 0.5;
-
-    &:hover {
-      opacity: 1;
-    }
   }
 `;

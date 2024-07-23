@@ -50,7 +50,7 @@ export function ListView({
         </>
       </StyledTable>
       {showNewButton && (
-        <NewButton clean onClick={onNewClick} data-test='new-resource-folder'>
+        <NewButton clean onClick={onNewClick} data-testid='new-resource-folder'>
           <span>
             <FaPlus /> New Resource
           </span>

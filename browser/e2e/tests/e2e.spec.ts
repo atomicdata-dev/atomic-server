@@ -403,8 +403,7 @@ test.describe('data-browser', async () => {
     await setTitle(page, d0);
 
     // Create a subresource, and later check it in the sidebar
-    await page.getByTestId('sidebar').getByText(d0).hover();
-    await page.locator(`[title="Create new resource under ${d0}"]`).click();
+    await page.getByTestId('new-resource-folder').click();
     await page.click(`button:has-text("${klass}")`);
     const d1 = 'depth1';
 
@@ -453,7 +452,7 @@ test.describe('data-browser', async () => {
 
     // get current url, append the localID
     await page.goto(parentSubject + '/' + localID);
-    await expect(page.locator(`h1:text("${name}")`)).toBeVisible();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
   });
 
   test('dialog', async ({ page }) => {

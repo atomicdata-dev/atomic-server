@@ -6,7 +6,6 @@ import {
   Store,
 } from '@tomic/lib';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useServerURL } from './useServerURL.js';
 import { useStore } from './hooks.js';
 
 export type UseCollectionResult = {
@@ -14,9 +13,16 @@ export type UseCollectionResult = {
   invalidateCollection: () => Promise<void>;
 };
 
+export type UseCollectionOptions = {
+  /** The max number of members on one page, defaults to 30 */
+  pageSize?: number;
+  /** URL of the server that should be queried. defaults to the store's serverURL */
+  server?: string;
+};
+
 const buildCollection = (
   store: Store,
-  server: string,
+  server: string | undefined,
   { property, value, sort_by, sort_desc }: QueryFilter,
   pageSize?: number,
 ) => {
@@ -38,13 +44,14 @@ const buildCollection = (
  */
 export function useCollection(
   queryFilter: QueryFilter,
-  pageSize?: number,
+  { pageSize, server }: UseCollectionOptions = {
+    pageSize: undefined,
+    server: undefined,
+  },
 ): UseCollectionResult {
   const [firstRun, setFirstRun] = useState(true);
 
   const store = useStore();
-  const [server] = useServerURL();
-
   const queryFilterMemo = useQueryFilterMemo(queryFilter);
 
   const [collection, setCollection] = useState(() =>

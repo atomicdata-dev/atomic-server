@@ -38,11 +38,16 @@ const PaletteButton = styled.button<PaletteButtonProps>`
   border-radius: 50%;
   cursor: pointer;
   transform-origin: center;
-  transition: ${transition('transform')};
+  transform: scale(1);
+  ${transition('transform')};
 
   &:hover,
-  &:focus {
+  &:focus-visible {
     outline: none;
     transform: scale(1.3);
+  }
+
+  &:active {
+    transform: scale(1.1);
   }
 `;

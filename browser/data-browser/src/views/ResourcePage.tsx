@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import {
   useString,
   useResource,
-  properties,
   Resource,
-  urls,
   type OptionalClass,
+  dataBrowser,
+  collections,
+  server,
+  core,
 } from '@tomic/react';
 
 import { ContainerNarrow } from '../components/Containers';
@@ -25,12 +27,12 @@ import { ChatRoomPage } from './ChatRoomPage';
 import { MessagePage } from './MessagePage';
 import { BookmarkPage } from './BookmarkPage/BookmarkPage';
 import { ImporterPage } from './ImporterPage.jsx';
-import Parent from '../components/Parent';
 import { FolderPage } from './FolderPage';
 import { ArticlePage } from './Article';
 import { TablePage } from './TablePage';
 import { Main } from '../components/Main';
 import { OntologyPage } from './OntologyPage';
+import { TagPage } from './TagPage/TagPage';
 
 /** These properties are passed to every View at Page level */
 export type ResourcePageProps<Subject extends OptionalClass = never> = {
@@ -48,7 +50,7 @@ type Props = {
  */
 function ResourcePage({ subject }: Props): JSX.Element {
   const resource = useResource(subject);
-  const [klass] = useString(resource, properties.isA);
+  const [klass] = useString(resource, core.properties.isA);
 
   // The body can have an inert attribute when the user navigated from an open dialog.
   // we remove it to make the page becomes interavtive again.
@@ -78,51 +80,50 @@ function ResourcePage({ subject }: Props): JSX.Element {
   const ReturnComponent = selectComponent(klass!);
 
   return (
-    <>
-      <Parent resource={resource} />
-      <Main subject={subject}>
-        <ErrorBoundary>
-          <ReturnComponent resource={resource} />
-        </ErrorBoundary>
-      </Main>
-    </>
+    <Main subject={subject}>
+      <ErrorBoundary>
+        <ReturnComponent resource={resource} />
+      </ErrorBoundary>
+    </Main>
   );
 }
 
 function selectComponent(klass: string) {
   switch (klass) {
-    case urls.classes.collection:
+    case collections.classes.collection:
       return Collection;
-    case urls.classes.endpoint:
+    case server.classes.endpoint:
       return EndpointPage;
-    case urls.classes.drive:
+    case server.classes.drive:
       return DrivePage;
-    case urls.classes.redirect:
+    case server.classes.redirect:
       return RedirectPage;
-    case urls.classes.invite:
+    case server.classes.invite:
       return InvitePage;
-    case urls.classes.document:
+    case dataBrowser.classes.document:
       return DocumentPage;
-    case urls.classes.class:
+    case core.classes.class:
       return ClassPage;
-    case urls.classes.file:
+    case server.classes.file:
       return FilePage;
-    case urls.classes.chatRoom:
+    case dataBrowser.classes.chatroom:
       return ChatRoomPage;
-    case urls.classes.message:
+    case dataBrowser.classes.message:
       return MessagePage;
-    case urls.classes.bookmark:
+    case dataBrowser.classes.bookmark:
       return BookmarkPage;
-    case urls.classes.importer:
+    case dataBrowser.classes.importer:
       return ImporterPage;
-    case urls.classes.folder:
+    case dataBrowser.classes.folder:
       return FolderPage;
-    case urls.classes.article:
+    case dataBrowser.classes.article:
       return ArticlePage;
-    case urls.classes.table:
+    case dataBrowser.classes.table:
       return TablePage;
-    case urls.classes.ontology:
+    case core.classes.ontology:
       return OntologyPage;
+    case dataBrowser.classes.tag:
+      return TagPage;
     case vihreat.classes.program:
       return ProgramPage;
     default:

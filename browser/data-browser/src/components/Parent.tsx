@@ -8,24 +8,21 @@ import {
   server,
 } from '@tomic/react';
 import { constructOpenURL } from '../helpers/navigation';
-import { FaSearch } from 'react-icons/fa';
 import { Row } from './Row';
-import { useQueryScopeHandler } from '../hooks/useQueryScope';
-import { IconButton } from './IconButton/IconButton';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { useSettings } from '../helpers/AppSettings';
 import { Button } from './Button';
+import { BREADCRUMB_BAR_TRANSITION_TAG } from '../helpers/transitionName';
+import ResourceContextMenu from './ResourceContextMenu';
+import { MenuBarDropdownTrigger } from './ResourceContextMenu/MenuBarDropdownTrigger';
 
 type ParentProps = {
   resource: Resource;
 };
 
-export const PARENT_PADDING_BLOCK = '0.2rem';
-
 /** Breadcrumb list. Recursively renders parents. */
 function Parent({ resource }: ParentProps): JSX.Element {
   const [parent] = useString(resource, core.properties.parent);
-  const { enableScope } = useQueryScopeHandler(resource.getSubject());
 
   return (
     <ParentWrapper aria-label='Breadcrumbs'>
@@ -33,17 +30,17 @@ function Parent({ resource }: ParentProps): JSX.Element {
         {parent ? (
           <NestedParent subject={parent} depth={0} />
         ) : (
-          <DriveMismatch subject={resource.getSubject()} />
+          <DriveMismatch subject={resource.subject} />
         )}
         <BreadCrumbCurrent>{resource.title}</BreadCrumbCurrent>
         <Spacer />
-        <ScopedSearchButton
-          onClick={enableScope}
-          title={`Search in ${resource.title}`}
-          color='textLight'
-        >
-          <FaSearch />
-        </ScopedSearchButton>
+        <ButtonArea>
+          <ResourceContextMenu
+            isMainMenu
+            subject={resource.subject}
+            trigger={MenuBarDropdownTrigger}
+          />
+        </ButtonArea>
       </Row>
     </ParentWrapper>
   );
@@ -51,9 +48,7 @@ function Parent({ resource }: ParentProps): JSX.Element {
 
 const ParentWrapper = styled.nav`
   height: ${p => p.theme.heights.breadCrumbBar};
-  padding-block: ${PARENT_PADDING_BLOCK};
-  padding-inline: 0.5rem;
-  color: ${props => props.theme.colors.textLight2};
+  padding-inline: ${p => p.theme.size(2)};
   border-bottom: 1px solid ${props => props.theme.colors.bg2};
   background-color: ${props => props.theme.colors.bg};
   display: flex;
@@ -61,7 +56,7 @@ const ParentWrapper = styled.nav`
   align-items: center;
   justify-content: flex-start;
 
-  view-transition-name: breadcrumb-bar;
+  view-transition-name: ${BREADCRUMB_BAR_TRANSITION_TAG};
 `;
 
 type NestedParentProps = {
@@ -111,10 +106,10 @@ function NestedParent({ subject, depth }: NestedParentProps): JSX.Element {
     return <Breadcrumb>Set as drive</Breadcrumb>;
   }
 
-  function handleClick(e) {
+  const handleClick: React.MouseEventHandler<HTMLAnchorElement> = e => {
     e.preventDefault();
     navigate(constructOpenURL(subject));
-  }
+  };
 
   return (
     <>
@@ -170,7 +165,7 @@ const Spacer = styled.span`
   flex: 1;
 `;
 
-const ScopedSearchButton = styled(IconButton)`
+const ButtonArea = styled.div`
   justify-self: flex-end;
 `;
 

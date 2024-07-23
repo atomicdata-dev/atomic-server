@@ -8,7 +8,7 @@ import {
   fillSearchBox,
   newDrive,
   newResource,
-  sideBarNewResource,
+  sideBarNewResourceTestId,
   signIn,
   testFilePath,
   waitForCommit,
@@ -17,7 +17,7 @@ import {
 const ONTOLOGY_NAME = 'filepicker-test';
 
 const uploadFile = async (page: Page, fileName: string) => {
-  await page.locator(sideBarNewResource).click();
+  await page.getByTestId(sideBarNewResourceTestId).click();
   await expect(page).toHaveURL(`${FRONTEND_URL}/app/new`);
 
   const fileChooserPromise = page.waitForEvent('filechooser');
@@ -41,8 +41,6 @@ const createModel = async (page: Page) => {
   await currentDialog(page).getByRole('button', { name: 'Create' }).click();
 
   await expect(page.locator(`h1:has-text("${ONTOLOGY_NAME}")`)).toBeVisible();
-
-  page.getByRole('button', { name: 'Edit', exact: true }).click();
 
   await page.getByRole('button', { name: 'Add class', exact: true }).click();
   await page.getByPlaceholder('shortname').fill('robot');

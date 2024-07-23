@@ -7,6 +7,7 @@ import {
   useCanWrite,
   core,
   dataBrowser,
+  unknownSubject,
 } from '@tomic/react';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
 import { SideBarItem } from '../SideBarItem';
@@ -33,12 +34,12 @@ interface ResourceSideBarProps {
 }
 
 /** Renders a Resource as a nav item for in the sidebar. */
-export function ResourceSideBar({
+export const ResourceSideBar: React.FC<ResourceSideBarProps> = ({
   subject,
   renderedHierargy,
   ancestry,
   onClick,
-}: ResourceSideBarProps): JSX.Element {
+}) => {
   if (renderedHierargy.length === 0) {
     throw new Error('renderedHierargy should not be empty');
   }
@@ -55,7 +56,6 @@ export function ResourceSideBar({
     resource,
     dataBrowser.properties.subResources,
   );
-  const hasSubResources = subResources.length > 0;
 
   const dragData: SideBarDragData = {
     renderedUnder: renderedHierargy.at(-1)!,
@@ -73,24 +73,6 @@ export function ResourceSideBar({
     disabled: !canWrite,
   });
 
-  const isDragging = draggingNode?.id === subject;
-
-  useEffect(() => {
-    if (isDragging) {
-      setOpen(false);
-    }
-  }, [isDragging]);
-
-  const isHoveringOver = over?.data.current?.parent === subject;
-
-  useEffect(() => {
-    if (ancestry.includes(subject) && ancestry[0] !== subject) {
-      setOpen(true);
-    }
-  }, [ancestry]);
-
-  const hierarchyWithItself = [...renderedHierargy, subject];
-
   const TitleComp = useMemo(
     () => (
       <SidebarItemTitle
@@ -104,6 +86,27 @@ export function ResourceSideBar({
     ),
     [subject, active, onClick, description, title, listeners, attributes],
   );
+
+  const hasSubResources = subResources.length > 0;
+  const isDragging = draggingNode?.id === subject;
+  const isHoveringOver = over?.data.current?.parent === subject;
+  const hierarchyWithItself = [...renderedHierargy, subject];
+
+  useEffect(() => {
+    if (isDragging) {
+      setOpen(false);
+    }
+  }, [isDragging]);
+
+  useEffect(() => {
+    if (ancestry.includes(subject) && ancestry[0] !== subject) {
+      setOpen(true);
+    }
+  }, [ancestry]);
+
+  if (!subject || subject === unknownSubject) {
+    return null;
+  }
 
   if (resource.loading) {
     return (
@@ -149,6 +152,7 @@ export function ResourceSideBar({
                 subject={child}
                 renderedHierargy={hierarchyWithItself}
                 ancestry={ancestry}
+                onClick={onClick}
               />
               <DropEdge
                 parentHierarchy={hierarchyWithItself}
@@ -159,7 +163,7 @@ export function ResourceSideBar({
       </Details>
     </Wrapper>
   );
-}
+};
 
 const Wrapper = styled.div<{ highlight: boolean }>`
   background-color: ${p =>

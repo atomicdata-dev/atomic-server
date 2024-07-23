@@ -9,7 +9,8 @@ import {
   clickSidebarItem,
   editTitle,
   setTitle,
-  sideBarNewResource,
+  sideBarNewResourceTestId,
+  contextMenuClick,
 } from './test-utils';
 test.describe('search', async () => {
   test.beforeEach(before);
@@ -26,7 +27,7 @@ test.describe('search', async () => {
     await newDrive(page);
 
     // Create folder called 1
-    await page.locator(sideBarNewResource).click();
+    await page.getByTestId(sideBarNewResourceTestId).click();
     await page.locator('button:has-text("folder")').click();
     await setTitle(page, 'Salad folder');
 
@@ -38,7 +39,7 @@ test.describe('search', async () => {
     await waitForCommit(page);
     await editTitle('Avocado Salad', page);
 
-    await page.locator(sideBarNewResource).click();
+    await page.getByTestId(sideBarNewResourceTestId).click();
 
     // Create folder called 'Cake folder'
     await page.locator('button:has-text("folder")').click();
@@ -57,7 +58,7 @@ test.describe('search', async () => {
     // Set search scope to 'Cake folder'
     await page.waitForTimeout(REBUILD_INDEX_TIME);
     await page.reload();
-    await page.locator('button[title="Search in Cake Folder"]').click();
+    await contextMenuClick('scope', page);
     // Search for 'Avocado'
     await page.locator('[data-test="address-bar"]').type('Avocado');
     // I don't like the `.first` here, but for some reason there is one frame where
