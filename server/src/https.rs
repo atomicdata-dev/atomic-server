@@ -287,7 +287,7 @@ pub async fn request_cert(config: &crate::config::Config) -> AtomicServerResult<
     // Exponentially back off until the order becomes ready or invalid.
     let mut tries = 1u8;
     let mut delay = std::time::Duration::from_millis(250);
-    let url = authorizations.get(0).expect("Authorizations is empty");
+    let url = authorizations.first().expect("Authorizations is empty");
     let state = loop {
         let state = order.state();
         info!("Order state: {:#?}", state);

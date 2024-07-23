@@ -6,16 +6,12 @@ import {
   useMemo,
 } from 'react';
 import { DarkModeOption, useDarkMode } from './useDarkMode';
-import {
-  useLocalStorage,
-  useCurrentAgent,
-  useServerURL,
-  Agent,
-} from '@tomic/react';
+import { useCurrentAgent, useServerURL, Agent } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
 import { handleError } from './loggingHandlers';
 import { serverURLStorage } from './serverURLStorage';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface ProviderProps {
   children: ReactNode;
@@ -46,7 +42,8 @@ export const AppSettingsContextProvider = (
 
   const [agent, setAgent] = useCurrentAgent();
   const [baseURL, setBaseURL] = useServerURL();
-  const [drive, innerSetDrive] = useLocalStorage('drive', baseURL);
+  // By default, we want to use the current URL's origin with a trailing slash.
+  const [drive, innerSetDrive] = useLocalStorage('drive', baseURL + '/');
 
   const setDrive = useCallback(
     (newDrive: string) => {

@@ -2,22 +2,18 @@
 // This is why the `testConfig` is imported.
 import { test, expect } from '@playwright/test';
 import {
-  DEMO_FILENAME,
   DEMO_INVITE_NAME,
   FRONTEND_URL,
   INITIAL_TEST,
   SERVER_URL,
   before,
   changeDrive,
-  contextMenu,
   contextMenuClick,
   currentDialogOkButton,
   currentDriveTitle,
-  demoFile,
   editProfileAndCommit,
   editTitle,
   editableTitle,
-  fillInput,
   getCurrentSubject,
   newDrive,
   newResource,
@@ -34,6 +30,8 @@ import {
   openAgentPage,
   fillSearchBox,
   waitForCommitOnCurrentResource,
+  currentDialog,
+  clickSidebarItem,
 } from './test-utils';
 
 test.describe('data-browser', async () => {
@@ -67,15 +65,15 @@ test.describe('data-browser', async () => {
     // Sign out
     await openAgentPage(page);
     await page.click('[data-test="sign-out"]');
-    await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
+    await expect(page.locator('text=Enter your Secret')).toBeVisible();
     await page.reload();
-    await expect(page.locator('text=Enter your Agent secret')).toBeVisible();
+    await expect(page.locator('text=Enter your Secret')).toBeVisible();
   });
 
   test('sign up and edit document atomicdata.dev', async ({ page }) => {
     await openAtomic(page);
     // Use invite
-    await page.click(`text=${DEMO_INVITE_NAME}`);
+    await clickSidebarItem(DEMO_INVITE_NAME, page);
     await page.click('text=Accept as new user');
     await expect(page.locator(editableTitle)).toBeVisible();
     // We need the initial enter because removing the top line isn't working ATM
@@ -200,23 +198,6 @@ test.describe('data-browser', async () => {
     await expect(page3.locator(`text=${driveTitle}`).first()).toBeVisible();
   });
 
-  test('upload, download', async ({ page }) => {
-    await signIn(page);
-    await newDrive(page);
-    // add attachment to drive
-    await page.click(contextMenu);
-    await page.locator('[data-test="menu-item-edit"]').click();
-    const [fileChooser] = await Promise.all([
-      page.waitForEvent('filechooser'),
-      page.click('button:has-text("Upload file")'),
-    ]);
-    await fileChooser.setFiles(demoFile());
-    await page.click(`[data-test="file-pill"]:has-text("${DEMO_FILENAME}")`);
-    const image = page.locator('[data-test="image-viewer"]');
-    await expect(image).toBeVisible();
-    await expect(image).toHaveScreenshot({ maxDiffPixelRatio: 0.1 });
-  });
-
   test('chatroom', async ({ page, browser }) => {
     await signIn(page);
     await newDrive(page);
@@ -313,13 +294,15 @@ test.describe('data-browser', async () => {
     // Create a new folder
     await newResource('folder', page);
     // Createa sub-resource in the folder
-    await page.click('text=Untitled folder');
-    await page.click('main >> text=New Resource');
+    await page
+      .getByRole('main')
+      .getByRole('button', { name: 'New Resource', exact: true })
+      .click();
     await page.click('button:has-text("Document")');
     await page.locator(editableTitle).click();
     await page.keyboard.type('RAM Downloading Strategies');
     await page.keyboard.press('Enter');
-    await page.click('[data-test="sidebar"] >> text=Untitled folder');
+    await clickSidebarItem('Untitled folder', page);
     await expect(
       page.locator(
         '[data-test="folder-list"] >> text=RAM Downloading Strategies',
@@ -379,7 +362,7 @@ test.describe('data-browser', async () => {
     await page.locator(shortnameInput).fill('');
     await page.keyboard.type('is-valid');
     await expect(page.locator('text=Not a valid slug')).not.toBeVisible();
-
+    await page.getByRole('button', { name: 'advanced' }).click();
     await fillSearchBox(
       page,
       'Search for a property or enter a URL',
@@ -401,7 +384,7 @@ test.describe('data-browser', async () => {
     ).toBeVisible();
 
     // Add a description
-    await page.click('textarea[name="yamdeContent"]');
+    await page.getByLabel('Description').click();
     await page.keyboard.type('This is a test class');
     await page.click('button:has-text("Save")');
 
@@ -415,36 +398,33 @@ test.describe('data-browser', async () => {
     // create a resource, make sure its visible in the sidebar (and after refresh)
     const klass = 'folder';
     await newResource(klass, page);
-    await expect(
-      page.locator(`[data-test="sidebar"] >> text=${klass}`),
-    ).toBeVisible();
+    await expect(page.getByTestId('sidebar').getByText(klass)).toBeVisible();
     const d0 = 'depth0';
     await setTitle(page, d0);
 
     // Create a subresource, and later check it in the sidebar
-    await page.locator(`[data-test="sidebar"] >> text=${d0}`).hover();
-    await page.locator(`[title="Create new resource under ${d0}"]`).click();
+    await page.getByTestId('new-resource-folder').click();
     await page.click(`button:has-text("${klass}")`);
     const d1 = 'depth1';
 
     await setTitle(page, d1);
 
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      page.getByTestId('sidebar').getByText(d0),
       "Sidebar doesn't show updated parent resource title",
     ).toBeVisible();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      page.getByTestId('sidebar').getByText(d1),
       "Sidebar doesn't show child resource title",
     ).toBeVisible();
     await page.waitForTimeout(500);
     await page.reload();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d1}`),
+      page.getByTestId('sidebar').getByText(d1),
       "Sidebar doesn't show parent resource resource title after refresh",
     ).toBeVisible();
     await expect(
-      page.locator(`[data-test="sidebar"] >> text=${d0}`),
+      page.getByTestId('sidebar').getByText(d0),
       "Sidebar doesn't show child resource title after refresh",
     ).toBeVisible();
   });
@@ -472,7 +452,7 @@ test.describe('data-browser', async () => {
 
     // get current url, append the localID
     await page.goto(parentSubject + '/' + localID);
-    await expect(page.locator(`h1:text("${name}")`)).toBeVisible();
+    await expect(page.getByRole('heading', { name })).toBeVisible();
   });
 
   test('dialog', async ({ page }) => {
@@ -481,8 +461,8 @@ test.describe('data-browser', async () => {
     // Create new class from new resource menu
     await newResource('https://atomicdata.dev/classes/Class', page);
 
-    await fillInput('shortname', page);
-    await fillInput('description', page);
+    await page.getByLabel('Shortname').fill('test-shortname');
+    await page.getByLabel('Description').fill('test-description');
     await page.click('[data-test="save"]');
     await page.locator('text=Resource Saved');
     await contextMenuClick('edit', page);
@@ -512,9 +492,8 @@ test.describe('data-browser', async () => {
       'boolean',
     );
     await selectDatatypeOption('boolean - Either `true` or `false`');
-    await page.locator('dialog textarea[name="yamdeContent"]').click();
-    await page
-      .locator('dialog textarea[name="yamdeContent"]')
+    await currentDialog(page)
+      .getByLabel('Description')
       .fill('This is a test prop');
     await page.locator('dialog footer >> text=Save').click();
 

@@ -23,10 +23,10 @@ export const Login = () => {
 
   return (
     <label>
-      Agent Secret
+      Secret
       <input
         type="password"
-        placeholder="My agent secret"
+        placeholder="My Secret"
         value={agentSecret}
         onChange={e => setAgentSecret(e.target.value)}
       />

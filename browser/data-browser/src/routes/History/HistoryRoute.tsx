@@ -15,6 +15,7 @@ import { HistoryMobileView } from './HistoryMobileView';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { Column, Row } from '../../components/Row';
 import { ProgressBar } from '../../components/ProgressBar';
+import { Main } from '../../components/Main';
 
 /** Shows an activity log of previous versions */
 export function History(): JSX.Element {
@@ -93,18 +94,20 @@ export function History(): JSX.Element {
   }
 
   return (
-    <SplitView about={subject}>
-      <ViewComp
-        resource={resource}
-        groupedVersions={groupedVersions}
-        selectedVersion={selectedVersion}
-        isCurrentVersion={isCurrentVersion}
-        onNextVersion={nextVersion}
-        onPreviousVersion={previousVersion}
-        onSelectVersion={setSelectedVersion}
-        onVersionAccept={setResourceToCurrentVersion}
-      />
-    </SplitView>
+    <Main subject={subject}>
+      <SplitView about={subject}>
+        <ViewComp
+          resource={resource}
+          groupedVersions={groupedVersions}
+          selectedVersion={selectedVersion}
+          isCurrentVersion={isCurrentVersion}
+          onNextVersion={nextVersion}
+          onPreviousVersion={previousVersion}
+          onSelectVersion={setSelectedVersion}
+          onVersionAccept={setResourceToCurrentVersion}
+        />
+      </SplitView>
+    </Main>
   );
 }
 

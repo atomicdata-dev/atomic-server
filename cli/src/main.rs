@@ -113,9 +113,9 @@ pub enum SerializeOptions {
     NTriples,
 }
 
-impl Into<Format> for SerializeOptions {
-    fn into(self) -> Format {
-        match self {
+impl From<&SerializeOptions> for Format {
+    fn from(val: &SerializeOptions) -> Self {
+        match val {
             SerializeOptions::Pretty => Format::Pretty,
             SerializeOptions::Json => Format::Json,
             SerializeOptions::NTriples => Format::NTriples,
@@ -165,7 +165,7 @@ fn set_agent_config() -> CLIResult<Config> {
                 "No config found at {:?}. Let's create one!",
                 &agent_config_path
             );
-            let server = promptly::prompt("What's the base url of your Atomic Server?")?;
+            let server: String = promptly::prompt("What's the base url of your Atomic Server?")?;
             let agent = promptly::prompt("What's the URL of your Agent?")?;
             let private_key = promptly::prompt("What's the private key of this Agent?")?;
             let config = atomic_lib::config::Config {

@@ -14,7 +14,7 @@ pub enum AppErrorType {
     Other,
 }
 
-// More strict error type, supports HTTP responses
+/// Error type that includes a Resource representation of the Error, which can be sent to the client.
 pub struct AtomicServerError {
     pub message: String,
     pub error_type: AppErrorType,
@@ -49,8 +49,8 @@ impl ResponseError for AtomicServerError {
     }
     fn error_response(&self) -> HttpResponse {
         // Creates a JSON-AD resource representing the Error.
-        let r = match &self.error_resource {
-            Some(r) => r.to_owned(),
+        let r: Resource = match &self.error_resource {
+            Some(r) => *r.clone(),
             None => {
                 let mut r = Resource::new("subject".into());
                 r.set_class(urls::ERROR);
@@ -58,12 +58,12 @@ impl ResponseError for AtomicServerError {
                     urls::DESCRIPTION.into(),
                     Value::String(self.message.clone()),
                 );
-                Box::new(r)
+                r
             }
         };
 
         let body = r.to_json_ad().unwrap();
-        tracing::info!("Error response: {}", self.message);
+        // tracing::info!("Error response: {}", self.message);
         HttpResponse::build(self.status_code())
             .content_type(JSON_AD_MIME)
             .body(body)
@@ -172,6 +172,16 @@ impl From<tantivy::TantivyError> for AtomicServerError {
 
 impl From<actix_web::Error> for AtomicServerError {
     fn from(error: actix_web::Error) -> Self {
+        AtomicServerError {
+            message: error.to_string(),
+            error_type: AppErrorType::Other,
+            error_resource: None,
+        }
+    }
+}
+
+impl From<url::ParseError> for AtomicServerError {
+    fn from(error: url::ParseError) -> Self {
         AtomicServerError {
             message: error.to_string(),
             error_type: AppErrorType::Other,

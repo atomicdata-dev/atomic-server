@@ -1,3 +1,5 @@
+import { commits } from './ontologies/commits.js';
+import { EventManager } from './EventManager.js';
 import type { Agent } from './agent.js';
 import { Client } from './client.js';
 import type { Collection } from './collection.js';
@@ -31,6 +33,14 @@ export type PropVals = Map<string, JSONValue>;
  * Resource is not saved or fetched.
  */
 export const unknownSubject = 'unknown-subject';
+
+export enum ResourceEvents {
+  LocalChange = 'local-change',
+}
+
+type ResourceEventHandlers = {
+  [ResourceEvents.LocalChange]: (prop: string, value: JSONValue) => void;
+};
 
 /**
  * Describes an Atomic Resource, which has a Subject URL and a bunch of Property
@@ -68,6 +78,10 @@ export class Resource<C extends OptionalClass = any> {
   private hasQueue = false;
 
   private _store?: Store;
+  private eventManager = new EventManager<
+    ResourceEvents,
+    ResourceEventHandlers
+  >();
 
   public constructor(subject: string, newResource?: boolean) {
     if (typeof subject !== 'string') {
@@ -120,6 +134,13 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     return this._store;
+  }
+
+  public on<T extends ResourceEvents>(
+    event: T,
+    callback: ResourceEventHandlers[T],
+  ) {
+    return this.eventManager.register(event, callback);
   }
 
   /** @internal */
@@ -351,19 +372,25 @@ export class Resource<C extends OptionalClass = any> {
   public async getHistory(
     progressCallback?: (percentage: number) => void,
   ): Promise<Version[]> {
-    const commitsCollection = await this.store.fetchResourceFromServer(
-      this.getCommitsCollectionSubject(),
-    );
-    const commits = commitsCollection.get(
-      properties.collection.members,
-    ) as string[];
+    const commitsCollection = await new CollectionBuilder(this.store)
+      .setPageSize(9999)
+      .setProperty(commits.properties.subject)
+      .setValue(this.subject)
+      .setSortBy(commits.properties.createdAt)
+      .buildAndFetch();
+
+    const commitSubjects = await commitsCollection.getAllMembers();
 
     const builtVersions: Version[] = [];
 
+    if (!commitSubjects) {
+      return builtVersions;
+    }
+
     let previousResource = new Resource(this.subject);
 
-    for (let i = 0; i < commits.length; i++) {
-      const commitResource = await this.store.getResource(commits[i]);
+    for (let i = 0; i < commitSubjects.length; i++) {
+      const commitResource = await this.store.getResource(commitSubjects[i]);
       const parsedCommit = parseCommitResource(commitResource);
       const builtResource = applyCommitToResource(
         previousResource.clone(),
@@ -377,7 +404,7 @@ export class Resource<C extends OptionalClass = any> {
 
       // Every 30 cycles we report the progress
       if (progressCallback && i % 30 === 0) {
-        progressCallback(Math.round((i / commits.length) * 100));
+        progressCallback(Math.round((i / commitSubjects.length) * 100));
         await WaitForImmediate();
       }
     }
@@ -691,11 +718,21 @@ export class Resource<C extends OptionalClass = any> {
 
     if (validate) {
       const fullProp = await this.store.getProperty(prop);
-      validateDatatype(value, fullProp.datatype);
+
+      try {
+        validateDatatype(value, fullProp.datatype);
+      } catch (e) {
+        if (e instanceof Error) {
+          e.message = `Error validating ${fullProp.shortname} with value ${value} for ${this.subject}: ${e.message}`;
+        }
+
+        throw e;
+      }
     }
 
     if (value === undefined) {
       this.remove(prop);
+      this.eventManager.emit(ResourceEvents.LocalChange, prop, value);
 
       return;
     }
@@ -703,6 +740,7 @@ export class Resource<C extends OptionalClass = any> {
     this.propvals.set(prop, value);
     // Add the change to the Commit Builder, so we can commit our changes later
     this.commitBuilder.addSetAction(prop, value);
+    this.eventManager.emit(ResourceEvents.LocalChange, prop, value);
   }
 
   /**
@@ -725,6 +763,13 @@ export class Resource<C extends OptionalClass = any> {
     this._subject = subject;
   }
 
+  /** Refetches the resource from the server. Will reset all changes to the latest saved version */
+  public async refresh(): Promise<void> {
+    await this.store.fetchResourceFromServer(this.subject, {
+      noWebSocket: true,
+    });
+  }
+
   private isParentNew() {
     const parentSubject = this.propvals.get(core.properties.parent) as string;
 
@@ -739,7 +784,7 @@ export class Resource<C extends OptionalClass = any> {
 }
 
 /** Type of Rights (e.g. read or write) */
-enum RightType {
+export enum RightType {
   /** Open a resource or its children */
   READ = 'read',
   /** Edit or delete a resource or its children */

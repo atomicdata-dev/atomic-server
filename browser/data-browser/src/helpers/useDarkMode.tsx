@@ -1,5 +1,5 @@
 import { Dispatch, useEffect, useState } from 'react';
-import { useLocalStorage } from '@tomic/react';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 export enum DarkModeOption {
   /** Always use dark mode */

@@ -4,9 +4,9 @@ import { isDev } from '../config';
 import { useSettings } from '../helpers/AppSettings';
 
 const rootDrives = [
-  window.location.origin,
-  'https://atomicdata.dev',
-  ...(isDev() ? ['http://localhost:9883'] : []),
+  window.location.origin + '/',
+  'https://atomicdata.dev/',
+  ...(isDev() ? ['http://localhost:9883/'] : []),
 ];
 
 const arrayOpts = {

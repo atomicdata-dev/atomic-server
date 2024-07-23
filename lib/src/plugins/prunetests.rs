@@ -1,8 +1,7 @@
 use crate::{
     endpoints::{Endpoint, HandleGetContext, HandlePostContext},
     errors::AtomicResult,
-    storelike::Query,
-    urls, Resource, Storelike, Value,
+    urls, Query, Resource, Storelike, Value,
 };
 
 pub fn prune_tests_endpoint() -> Endpoint {

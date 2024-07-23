@@ -2,10 +2,10 @@
 //! This provides many methods for finding, changing, serializing and parsing Atomic Data.
 
 use crate::agents::Agent;
-use crate::storelike::QueryResult;
-use crate::Value;
-use crate::{atoms::Atom, storelike::Storelike};
+use crate::query::QueryResult;
+use crate::{atomic_url::AtomicUrl, storelike::Storelike};
 use crate::{errors::AtomicResult, Resource};
+use crate::{Atom, Query, Value};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
 /// The in-memory store of data, containing the Resources, Properties and Classes
@@ -15,6 +15,10 @@ pub struct Store {
     // The store currently holds two stores - that is not ideal
     hashmap: Arc<Mutex<HashMap<String, Resource>>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+}
+
+lazy_static::lazy_static! {
+    static ref LOCAL_STORE_URL: AtomicUrl = AtomicUrl::try_from(crate::urls::LOCAL_STORE).unwrap();
 }
 
 impl Store {
@@ -34,7 +38,7 @@ impl Store {
     /// Returns an empty array if nothing is found.
     // Very costly, slow implementation.
     // Does not assume any indexing.
-    fn tpf(
+    pub fn tpf(
         &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
@@ -158,14 +162,14 @@ impl Storelike for Store {
         Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &AtomicUrl {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/atomicdata-dev/atomic-server/issues/6
-        "local:store"
+        &LOCAL_STORE_URL
     }
 
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<Agent> {
@@ -179,11 +183,7 @@ impl Storelike for Store {
         if let Some(resource) = self.hashmap.lock().unwrap().get(subject) {
             return Ok(resource.clone());
         }
-        self.handle_not_found(
-            subject,
-            "Not found in HashMap.".into(),
-            self.get_default_agent().ok().as_ref(),
-        )
+        self.handle_not_found(subject, "Not found in HashMap.".into())
     }
 
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
@@ -202,7 +202,7 @@ impl Storelike for Store {
         self.default_agent.lock().unwrap().replace(agent);
     }
 
-    fn query(&self, q: &crate::storelike::Query) -> AtomicResult<crate::storelike::QueryResult> {
+    fn query(&self, q: &Query) -> AtomicResult<QueryResult> {
         let atoms = self.tpf(
             None,
             q.property.as_deref(),
@@ -265,7 +265,7 @@ mod test {
     use crate::{agents::ForAgent, urls, Value};
 
     fn init_store() -> Store {
-        let store = Store::init().unwrap();
+        let mut store = Store::init().unwrap();
         store.populate().unwrap();
         store
     }

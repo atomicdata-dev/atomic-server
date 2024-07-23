@@ -1,10 +1,9 @@
-import { useLocalStorage } from '@tomic/react';
-
 export enum Panel {
   Ontologies = 'ontologies',
 }
 
 import { useCallback, useMemo } from 'react';
+import { useLocalStorage } from '../../hooks/useLocalStorage';
 
 export const usePanelList = (): {
   enabledPanels: Set<Panel>;

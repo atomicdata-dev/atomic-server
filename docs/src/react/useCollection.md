@@ -15,26 +15,33 @@ const { collection ,invalidateCollection } = useCollection({
 
 ### Parameters
 
-- **query**: QueryFilter - The query used to build the collection
-- **pageSize**: number - The max number of items per page
+- **query**: [QueryFilter](#queryfilter) - The query used to build the collection
+- **options**: [UseCollectionOptions?](#usecollectionoptions) - An options object described below.
+
 
 ### Returns
 
 Returns an object containing the following items:
 
 - **collection**: [Collection](../js-lib/collection.md) - The collection.
-- **invalidateCollection**: `function` - A function to invalidate and re-fetch the collection.
+- **invalidateCollection**: `() => void` - A function to invalidate and re-fetch the collection.
 
-## QueryFilter
+### QueryFilter
 
 A QueryFilter is an object with the following properties:
 
 | Name | Type | Description |
 | --- | --- | --- |
-| property | `string` | The subject of the property you want to filter by. |
-| value | `string` | The value of the property you want to filter by. |
-| sort_by | `string` | The subject of the property you want to sort by. By default collections are sorted by subject |
-| sort_desc | `boolean` | If true, the collection will be sorted in descending order. (Default: false) |
+| property | `string?` | The subject of the property you want to filter by. |
+| value | `string?` | The value of the property you want to filter by. |
+| sort_by | `string?` | The subject of the property you want to sort by. By default collections are sorted by subject |
+| sort_desc | `boolean?` | If true, the collection will be sorted in descending order. (Default: false) |
+
+### UseCollectionOptions
+| Name | Type | Description |
+| --- | --- | --- |
+| pageSize | `number?` | The max number of members per page. Defaults to 30 |
+| server | `string?` | The server that this collection should query. Defaults to the store's serverURL |
 
 ## Additional Hooks
 

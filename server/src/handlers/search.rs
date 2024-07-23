@@ -5,6 +5,7 @@
 use crate::{
     appstate::AppState,
     errors::{AtomicServerError, AtomicServerResult},
+    helpers::get_subject,
     search::{resource_to_facet, Fields},
 };
 use actix_web::{web, HttpResponse};
@@ -30,8 +31,6 @@ type Queries = Vec<(Occur, Box<dyn Query>)>;
 pub struct SearchQuery {
     /// The text search query entered by the user in the search box
     pub q: Option<String>,
-    /// Include the full resources in the response
-    pub include: Option<bool>,
     /// Maximum amount of results
     pub limit: Option<usize>,
     /// Only include resources that have one of these resources as its ancestor
@@ -55,6 +54,7 @@ pub async fn search_query(
     appstate: web::Data<AppState>,
     params: web::Query<SearchQuery>,
     req: actix_web::HttpRequest,
+    conn: actix_web::dev::ConnectionInfo,
 ) -> AtomicServerResult<HttpResponse> {
     let mut timer = Timer::new();
     let store = &appstate.store;
@@ -83,12 +83,7 @@ pub async fn search_query(
     let subjects = docs_to_subjects(top_docs, &fields, &searcher)?;
 
     // Create a valid atomic data resource.
-    // You'd think there would be a simpler way of getting the requested URL...
-    let subject = format!(
-        "{}{}",
-        store.get_self_url().ok_or("No base URL set")?,
-        req.uri().path_and_query().ok_or("Add a query param")?
-    );
+    let (subject, _) = get_subject(&req, &conn, &appstate)?;
 
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());

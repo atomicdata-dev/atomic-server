@@ -1,9 +1,13 @@
 import { styled } from 'styled-components';
-import { getTransitionStyle } from '../../../helpers/transitionName';
+import {
+  PAGE_TITLE_TRANSITION_TAG,
+  RESOURCE_PAGE_TRANSITION_TAG,
+  getTransitionStyle,
+} from '../../../helpers/transitionName';
 import { ViewTransitionProps } from '../../../helpers/ViewTransitionProps';
 
 export const GridCard = styled.div.attrs<ViewTransitionProps>(p => ({
-  style: getTransitionStyle('resource-page', p.subject),
+  style: getTransitionStyle(RESOURCE_PAGE_TRANSITION_TAG, p.subject),
 }))`
   grid-area: card;
   background-color: ${p => p.theme.colors.bg1};
@@ -48,7 +52,7 @@ export const GridItemWrapper = styled.a`
 `;
 
 export const GridItemTitle = styled.div.attrs<ViewTransitionProps>(p => ({
-  style: getTransitionStyle('page-title', p.subject),
+  style: getTransitionStyle(PAGE_TITLE_TRANSITION_TAG, p.subject),
 }))`
   grid-area: title;
   font-size: 1rem;

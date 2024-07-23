@@ -4,7 +4,7 @@ use atomic_lib::{agents::ForAgent, errors::AtomicResult, serialize, storelike, A
 /// Resolves an Atomic Path query
 pub fn get_path(
     context: &mut Context,
-    path_vec: &Vec<String>,
+    path_vec: &[String],
     serialize: &SerializeOptions,
 ) -> AtomicResult<()> {
     // let subcommand_matches = context.matches.subcommand_matches("get").unwrap();

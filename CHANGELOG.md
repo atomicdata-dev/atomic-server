@@ -70,17 +70,25 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Refactor `Endpoint` handlers, uses a Context now #592
 - Re-build store + invite when adjusting server url #607
 - Use local atomic-server for properties and classes, improves atomic-server #604
+- New sign up / register flow. Add `/register` Endpoint #489 #254
+- New sign up / register flow. Add `/register`, `/confirm-email`, `/add-public-key` endpoints  #489 #254
+- Add multi-tenancy support. Users can create their own `Drives` on subdomains. #288
+- Refactor URLs. `store.self_url()` returns an `AtomicUrl`, which provides methods to easily add paths, find subdomains and more.
+- Add support for subdomains, use a Wildcard TLS certificate #502
 
 ## [v0.34.1] - 2023-02-11
-
 - Improve query performance, refactor indexes. The `.tpf` API is deprecated in favor of the more powerful `.query`. #529
 - Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency, add DNS verification for TLS option with `--https-dns` #192
 - Improved error handling for HTTPS initialization #530
 - Add `--force` to `atomic-server import` #536
+- Email support. Connect to external SMTP servers. #276
+- Basic plugin support through Endpoints. For now only works if you use `**Atomic**-Lib` as a library. Add your plugins by calling `Db::register_endpoint`.
+- Allow parsing `.env` files from custom locations using the `--env-file` flag.
+- Plugins support `tokio`, so you can spawn async tasks from plugins.
+- Add JWT token support, used for emails and registration #544
 - Fix index issue happening when deleting a single property in a sorted collection #545
 - Update JS assets & playwright
 - Fix initial indexing bug #560
-- Fix errors on succesful export / import #565
 - Fix envs for store path, change `ATOMIC_STORE_DIR` to `ATOMIC_DATA_DIR` #567
 - Refactor static file asset hosting #578
 - Meta tags server side #577
@@ -88,6 +96,10 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Remove feature to index external RDF files and search them #579
 - Add staging environment #588
 - Add systemd instructions to readme #271
+- Improve check_append error #558
+- Fix errors on successful export / import #565
+- Most Collection routes now live under `/collections`, e.g. `/collections/agents` instead of `/agents`. #556
+- Constrain new URLs. Commits for new Resources are now only valid if their parent is part of the current URL. So it's no longer possible to create `/some-path/new-resource` if `new-resource` is its parent is not in its URL. #556
 
 ## [v0.34.0] - 2022-10-31
 
@@ -98,6 +110,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - `Store::all_resources` returns `Iterator` instead of `Vec` #522 #487
 - Change authentication order #525
 - Fix cookie subject check #525
+- Refactored Subject URLs to use `AtomicUrl`
 
 ## [v0.33.1] - 2022-09-25
 

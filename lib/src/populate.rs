@@ -8,9 +8,10 @@ use crate::{
     errors::AtomicResult,
     parse::ParseOpts,
     schema::{Class, Property},
-    storelike::Query,
-    urls, Storelike, Value,
+    urls, Query, Resource, Storelike, Value,
 };
+
+const DEFAULT_ONTOLOGY_PATH: &str = "defaultOntology";
 
 /// Populates a store with some of the most fundamental Properties and Classes needed to bootstrap the whole.
 /// This is necessary to prevent a loop where Property X (like the `shortname` Property)
@@ -151,18 +152,90 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
     Ok(())
 }
 
-/// Creates a Drive resource at the base URL. Does not set rights. Use set_drive_rights for that.
-pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
-    let self_url = store
-        .get_self_url()
-        .ok_or("No self_url set, cannot populate store with Drive")?;
-    let mut drive = store.get_resource_new(&self_url);
+/// Creates a Drive resource at the base URL if no name is passed.
+// #[tracing::instrument(skip(store), level = "info")]
+pub fn create_drive(
+    store: &impl Storelike,
+    drive_name: Option<&str>,
+    for_agent: &str,
+    public_read: bool,
+) -> AtomicResult<Resource> {
+    let self_url = if let Some(url) = store.get_self_url() {
+        url.to_owned()
+    } else {
+        return Err("No self URL set. Cannot create drive.".into());
+    };
+    let drive_subject: String = if let Some(name) = drive_name {
+        // Let's make a subdomain
+        let mut url = self_url.url();
+        let host = url.host().expect("No host in server_url");
+        let subdomain_host = format!("{}.{}", name, host);
+        url.set_host(Some(&subdomain_host))?;
+        url.to_string()
+    } else {
+        self_url.to_string()
+    };
+
+    let mut drive = if let Some(drive_name_some) = drive_name {
+        if store.get_resource(&drive_subject).is_ok() {
+            return Err(format!("Name '{}' is already taken", drive_name_some).into());
+        }
+        Resource::new(drive_subject)
+    } else {
+        // Only for the base URL (of no drive name is passed), we should not check if the drive exists.
+        // This is because we use `create_drive` in the `--initialize` command.
+        store.get_resource_new(&drive_subject)
+    };
     drive.set_class(urls::DRIVE);
-    let server_url = url::Url::parse(store.get_server_url())?;
-    drive.set_string(
-        urls::NAME.into(),
-        server_url.host_str().ok_or("Can't use current base URL")?,
+    let host = self_url
+        .url()
+        .host()
+        .ok_or("no host in URL found")?
+        .to_string();
+    drive.set_string(urls::NAME.into(), drive_name.unwrap_or(&host), store)?;
+
+    // Set rights
+    drive.push(urls::WRITE, for_agent.into(), true)?;
+    drive.push(urls::READ, for_agent.into(), true)?;
+    if public_read {
+        drive.push(urls::READ, urls::PUBLIC_AGENT.into(), true)?;
+    }
+
+    drive.save_locally(store)?;
+
+    Ok(drive)
+}
+
+pub fn create_default_ontology(store: &impl Storelike) -> AtomicResult<()> {
+    let mut drive = store.get_resource(store.get_server_url().as_str())?;
+
+    let ontology_subject = format!("{}/{}", drive.get_subject(), DEFAULT_ONTOLOGY_PATH);
+
+    // If the ontology already exists, don't change it.
+    if store.get_resource(&ontology_subject).is_ok() {
+        return Ok(());
+    }
+
+    let mut ontology = store.get_resource_new(&ontology_subject);
+
+    ontology.set_class(urls::ONTOLOGY);
+    ontology.set_string(urls::SHORTNAME.into(), "ontology", store)?;
+    ontology.set_string(
+        urls::DESCRIPTION.into(),
+        "Default ontology for this drive",
         store,
+    )?;
+    ontology.set_string(urls::PARENT.into(), drive.get_subject(), store)?;
+    ontology.set(urls::CLASSES.into(), Value::ResourceArray(vec![]), store)?;
+    ontology.set(urls::PROPERTIES.into(), Value::ResourceArray(vec![]), store)?;
+    ontology.set(urls::INSTANCES.into(), Value::ResourceArray(vec![]), store)?;
+    ontology.save_locally(store)?;
+
+    drive.set_string(urls::DEFAULT_ONTOLOGY.into(), ontology.get_subject(), store)?;
+    drive.push(
+        urls::SUBRESOURCES,
+        crate::values::SubResource::Subject(ontology.get_subject().into()),
+        false,
     )?;
     drive.save_locally(store)?;
     Ok(())
@@ -171,7 +244,7 @@ pub fn create_drive(store: &impl Storelike) -> AtomicResult<()> {
 /// Adds rights to the default agent to the Drive resource (at the base URL). Optionally give Public Read rights.
 pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResult<()> {
     // Now let's add the agent as the Root user and provide write access
-    let mut drive = store.get_resource(store.get_server_url())?;
+    let mut drive = store.get_resource(store.get_server_url().as_str())?;
     let write_agent = store.get_default_agent()?.subject;
     let read_agent = write_agent.clone();
 
@@ -183,13 +256,24 @@ pub fn set_drive_rights(store: &impl Storelike, public_read: bool) -> AtomicResu
 
     if let Err(_no_description) = drive.get(urls::DESCRIPTION) {
         drive.set_string(urls::DESCRIPTION.into(), &format!(r#"## Welcome to your Atomic-Server!
-
-Register your Agent by visiting [`/setup`]({}/setup). After that, edit this page by pressing `edit` in the navigation bar menu.
+### Getting started
+Start by registering your Agent by visiting [`/setup`]({}/setup).
 
 Note that, by default, all resources are `public`. You can edit this by opening the context menu (the three dots in the navigation bar), and going to `share`.
-"#, store.get_server_url()), store)?;
+
+Once you've setup an agent you should start editing your schema using ontologies.
+We've created a [default ontology]({}) for you but you can create more if you want.
+
+Next create some resources by clicking on the plus button in the sidebar.
+You can create folders to organise your resources.
+
+To use the data in your web apps checkout our client libraries: [@tomic/lib](https://docs.atomicdata.dev/js), [@tomic/react](https://docs.atomicdata.dev/usecases/react) and [@tomic/svelte](https://docs.atomicdata.dev/svelte)
+Use [@tomic/cli](https://docs.atomicdata.dev/js-cli) to generate typed ontologies inside your code.
+"#, store.get_server_url(), &format!("{}/{}", drive.get_subject(), DEFAULT_ONTOLOGY_PATH)), store)?;
     }
+
     drive.save_locally(store)?;
+
     Ok(())
 }
 
@@ -231,7 +315,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
     for subject in result.subjects {
         let mut collection =
-            crate::collections::create_collection_resource_for_class(store, &subject)?;
+            crate::collections::create_collection_resource_for_class(store, &subject.to_string())?;
         collection.save_locally(store)?;
     }
 
@@ -242,13 +326,14 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 /// Adds default Endpoints (versioning) to the Db.
 /// Makes sure they are fetchable
 pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
-    let endpoints = crate::endpoints::default_endpoints();
-    let endpoints_collection = format!("{}/endpoints", store.get_server_url());
-    for endpoint in endpoints {
+    use crate::atomic_url::Routes;
+
+    let endpoints_collection = store.get_server_url().set_route(Routes::Endpoints);
+    for endpoint in crate::endpoints::build_default_endpoints() {
         let mut resource = endpoint.to_resource(store)?;
         resource.set(
             urls::PARENT.into(),
-            Value::AtomicUrl(endpoints_collection.clone()),
+            Value::AtomicUrl(endpoints_collection.to_string()),
             store,
         )?;
         resource.save_locally(store)?;
@@ -257,15 +342,21 @@ pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
 }
 
 #[cfg(feature = "db")]
-/// Adds default Endpoints (versioning) to the Db.
-/// Makes sure they are fetchable
 pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
+    use crate::urls::IMPORTER;
+
     let base = store
         .get_self_url()
-        .ok_or("No self URL in this Store - required for populating importer")?;
-    let mut importer = crate::Resource::new(urls::construct_path_import(&base));
+        .ok_or("No self URL in this Store - required for populating importer")?
+        .clone();
+    let importer_subject = base.clone().set_path(IMPORTER);
+    let mut importer = crate::Resource::new(importer_subject.to_string());
     importer.set_class(urls::IMPORTER);
-    importer.set(urls::PARENT.into(), Value::AtomicUrl(base), store)?;
+    importer.set(
+        urls::PARENT.into(),
+        Value::AtomicUrl(base.to_string()),
+        store,
+    )?;
     importer.set(urls::NAME.into(), Value::String("Import".into()), store)?;
     importer.save_locally(store)?;
     Ok(())
@@ -276,14 +367,14 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
 /// Useful for helping a new user get started.
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     let base = store.get_self_url().ok_or("No self_url")?;
-    let mut drive = store.get_resource(&base)?;
-    let arr = vec![
-        format!("{}/setup", base),
-        format!("{}/import", base),
-        format!("{}/collections", base),
+    let mut drive = store.get_resource(base.as_str())?;
+    let sidebar_items = vec![
+        base.set_route(crate::atomic_url::Routes::Setup),
+        base.set_route(crate::atomic_url::Routes::Import),
+        base.set_route(crate::atomic_url::Routes::Collections),
     ];
-    for item in arr {
-        drive.push(urls::SUBRESOURCES, item.into(), true)?;
+    for item in sidebar_items {
+        drive.push(urls::SUBRESOURCES, item.to_string().into(), true)?;
     }
     drive.save_locally(store)?;
     Ok(())
@@ -295,11 +386,12 @@ pub fn populate_all(store: &crate::Db) -> AtomicResult<()> {
     // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
     populate_default_store(store)
         .map_err(|e| format!("Failed to populate default store. {}", e))?;
-    create_drive(store).map_err(|e| format!("Failed to create drive. {}", e))?;
+    create_drive(store, None, &store.get_default_agent()?.subject, true)
+        .map_err(|e| format!("Failed to create drive. {}", e))?;
+    create_default_ontology(store)
+        .map_err(|e| format!("Failed to create default ontology. {}", e))?;
     set_drive_rights(store, true)?;
     populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
-    populate_endpoints(store).map_err(|e| format!("Failed to populate endpoints. {}", e))?;
-    populate_importer(store).map_err(|e| format!("Failed to populate importer. {}", e))?;
     populate_sidebar_items(store)
         .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
     Ok(())

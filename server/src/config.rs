@@ -75,6 +75,7 @@ pub struct Opts {
     pub data_dir: Option<PathBuf>,
 
     /// CAUTION: Skip authentication checks, making all data publicly readable. Improves performance.
+
     #[clap(long, env = "ATOMIC_PUBLIC_MODE")]
     pub public_mode: bool,
 
@@ -94,6 +95,18 @@ pub struct Opts {
     /// Introduces random delays in the server, to simulate a slow connection. Useful for testing.
     #[clap(long, env = "ATOMIC_SLOW_MODE")]
     pub slow_mode: bool,
+
+    /// Host address of an SMTP server. Add if you want so send e-mails (e.g. for user registration). Also set the port.
+    #[clap(long, env = "ATOMIC_SMTP_HOST")]
+    pub smpt_host: Option<String>,
+
+    /// Port of your SMTP server.
+    #[clap(long, env = "ATOMIC_SMTP_PORT", default_value = "25")]
+    pub smpt_port: u16,
+
+    /// If you want to parse options from a specific .env file. By default reads the `./.env` file.
+    #[clap(long)]
+    pub env_file: Option<PathBuf>,
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -200,7 +213,14 @@ pub fn read_opts() -> Opts {
     dotenv().ok();
 
     // Parse CLI options, .env values, set defaults
-    Opts::parse()
+    let mut opts = Opts::parse();
+    if let Some(env_path) = &opts.env_file {
+        dotenv::from_path(env_path)
+            .unwrap_or_else(|_| panic!("Env file not found: {} ", env_path.display()));
+        // Parse the opts again so the CLI opts override the .env file
+        opts = Opts::parse();
+    }
+    opts
 }
 
 /// Creates the server config, reads .env values and sets defaults
@@ -260,7 +280,11 @@ pub fn build_config(opts: Opts) -> AtomicServerResult<Config> {
 
     // This logic could be a bit too complicated, but I'm not sure on how to make this simpler.
     let server_url = if let Some(addr) = opts.server_url.clone() {
-        addr
+        if addr.ends_with('/') {
+            return Err("The Server URL should not end with a trailing slash.".into());
+        } else {
+            addr
+        }
     } else if opts.https && opts.port_https == 443 || !opts.https && opts.port == 80 {
         format!("{}://{}", schema, opts.domain)
     } else {

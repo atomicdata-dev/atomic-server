@@ -11,7 +11,10 @@ import {
 } from '@dnd-kit/core';
 import { Resource, core, dataBrowser, useStore } from '@tomic/react';
 import { useCallback, useState } from 'react';
-import { getTransitionName } from '../../helpers/transitionName';
+import {
+  SIDEBAR_TRANSITION_TAG,
+  getTransitionName,
+} from '../../helpers/transitionName';
 import { useSettings } from '../../helpers/AppSettings';
 
 export type SideBarDropData = {
@@ -108,7 +111,7 @@ export const useSidebarDnd = (
         waitForSavePromise?.then(() => {
           const targetNode = document.querySelector(
             `[data-sidebar-id="${getTransitionName(
-              'sidebar',
+              SIDEBAR_TRANSITION_TAG,
               active.id as string,
             )}"]`,
           ) as HTMLElement;

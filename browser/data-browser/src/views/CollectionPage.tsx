@@ -6,7 +6,6 @@ import {
   useNumber,
   useResource,
   useString,
-  useLocalStorage,
   useStore,
   properties,
 } from '@tomic/react';
@@ -14,6 +13,7 @@ import {
   FaArrowLeft,
   FaArrowRight,
   FaInfo,
+  FaPlus,
   FaTable,
   FaThLarge,
 } from 'react-icons/fa';
@@ -35,6 +35,7 @@ import { ResourcePageProps } from './ResourcePage';
 import { useEffectOnce } from '../hooks/useEffectOnce';
 import { Row } from '../components/Row';
 import { EditableTitle } from '../components/EditableTitle';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const displayStyles = [
   {
@@ -171,8 +172,9 @@ function Collection({ resource }: ResourcePageProps): JSX.Element {
         </Button>
         {isClass && (
           <NewInstanceButton
+            IconComponent={FaPlus}
             subtle
-            icon
+            icon={true}
             klass={valueFilter}
             parent={resource.getSubjectNoParams()}
           />

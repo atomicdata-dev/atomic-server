@@ -72,4 +72,6 @@ export const CheckboxLabel = styled.label`
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+  justify-content: flex-start;
+  user-select: none;
 `;

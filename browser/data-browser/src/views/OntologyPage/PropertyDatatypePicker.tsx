@@ -1,5 +1,13 @@
-import { Resource, reverseDatatypeMapping, urls, useArray } from '@tomic/react';
+import {
+  Datatype,
+  Resource,
+  reverseDatatypeMapping,
+  core,
+  useArray,
+  useString,
+} from '@tomic/react';
 import { AtomicSelectInput } from '../../components/forms/AtomicSelectInput';
+import styled from 'styled-components';
 interface PropertyDatatypePickerProps {
   resource: Resource;
   disabled?: boolean;
@@ -12,33 +20,42 @@ const options = Object.entries(reverseDatatypeMapping)
   }))
   .filter(x => x.value !== 'unknown-datatype');
 
+const isResourceLike = (datatype: string) => {
+  return (
+    datatype === Datatype.ATOMIC_URL || datatype === Datatype.RESOURCEARRAY
+  );
+};
+
 export function PropertyDatatypePicker({
   resource,
   disabled,
 }: PropertyDatatypePickerProps): JSX.Element {
-  const [_, setAllowsOnly] = useArray(resource, urls.properties.allowsOnly, {
+  const [, setAllowsOnly] = useArray(resource, core.properties.allowsOnly, {
+    commit: true,
+  });
+  const [, setClassType] = useString(resource, core.properties.classtype, {
     commit: true,
   });
 
-  const removeAllowsOnlyForNonResourceArray = (type: string) => {
-    if (
-      type === urls.datatypes.resourceArray ||
-      type === urls.datatypes.atomicUrl
-    ) {
-      return;
+  const clearInapplicableProps = (datatype: string) => {
+    if (!isResourceLike(datatype)) {
+      setClassType(undefined);
+      setAllowsOnly(undefined);
     }
-
-    setAllowsOnly(undefined);
   };
 
   return (
-    <AtomicSelectInput
+    <StyledAtomicSelectInput
       commit
       disabled={disabled}
       resource={resource}
-      property={urls.properties.datatype}
+      property={core.properties.datatype}
       options={options}
-      onChange={removeAllowsOnlyForNonResourceArray}
+      onChange={clearInapplicableProps}
     />
   );
 }
+
+const StyledAtomicSelectInput = styled(AtomicSelectInput)`
+  min-width: 18ch;
+`;

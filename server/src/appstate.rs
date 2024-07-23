@@ -4,8 +4,10 @@ use crate::{
 };
 use atomic_lib::{
     agents::{generate_public_key, Agent},
+    atomic_url::Routes,
     commit::CommitResponse,
-    Storelike,
+    email::SmtpConfig,
+    Db, Storelike,
 };
 
 /// The AppState contains all the relevant Context for the server.
@@ -25,10 +27,20 @@ pub struct AppState {
     pub search_state: SearchState,
 }
 
+/// Initializes the Store and sets the default agent.
+pub fn init_store(config: &Config) -> AtomicServerResult<Db> {
+    let store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+
+    tracing::info!("Setting default agent");
+    set_default_agent(config, &store)?;
+
+    Ok(store)
+}
+
 /// Creates the AppState (the server's context available in Handlers).
 /// Initializes or opens a store on disk.
 /// Creates a new agent, if necessary.
-pub fn init(config: Config) -> AtomicServerResult<AppState> {
+pub async fn init(config: Config) -> AtomicServerResult<AppState> {
     tracing::info!("Initializing AppState");
 
     // We warn over here because tracing needs to be initialized first.
@@ -40,16 +52,20 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     }
 
     tracing::info!("Opening database at {:?}", &config.store_path);
-    let should_init = !&config.store_path.exists() || config.initialize;
-    let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
-    if should_init {
-        tracing::info!("Initialize: creating and populating new Database...");
-        atomic_lib::populate::populate_default_store(&store)
-            .map_err(|e| format!("Failed to populate default store. {}", e))?;
+    let mut store = init_store(&config)?;
+
+    if let Some(host) = &config.opts.smpt_host {
+        store
+            .set_smtp_config(SmtpConfig {
+                host: host.clone(),
+                port: config.opts.smpt_port,
+            })
+            .await?;
+    } else {
+        tracing::info!("No SMTP_HOST found, not starting email server.")
     }
 
-    tracing::info!("Setting default agent");
-    set_default_agent(&config, &store)?;
+    let should_init = !&config.store_path.exists() || config.initialize;
 
     // Initialize search constructs
     tracing::info!("Starting search service");
@@ -74,7 +90,9 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
     // If the user changes their server_url, the drive will not exist.
     // In this situation, we should re-build a new drive from scratch.
     if should_init {
-        atomic_lib::populate::populate_all(&store)?;
+        tracing::info!("Initialize: creating and populating new Database...");
+
+        atomic_lib::populate::populate_all(&mut store)?;
         // Building the index here is needed to perform Queries on imported resources
         let store_clone = store.clone();
         std::thread::spawn(move || {
@@ -92,6 +110,8 @@ pub fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::info!("Adding all resources to search index");
         crate::search::add_all_resources(&search_state, &store)?
     }
+
+    store.register_default_endpoints()?;
 
     Ok(AppState {
         store,
@@ -119,7 +139,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
                             "server".into(),
                             store,
                             &agent_config.private_key,
-                        );
+                        )?;
                         store.add_resource(&recreated_agent.to_resource()?)?;
                         agent_config
                     } else {
@@ -161,7 +181,7 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
 
 /// Creates the first Invitation that is opened by the user on the Home page.
 fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
-    let subject = format!("{}/setup", store.get_server_url());
+    let subject = store.get_server_url().set_route(Routes::Setup).to_string();
     tracing::info!("Creating initial Invite at {}", subject);
     let mut invite = store.get_resource_new(&subject);
     invite.set_class(atomic_lib::urls::INVITE);
@@ -179,12 +199,12 @@ fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     )?;
     invite.set(
         atomic_lib::urls::TARGET.into(),
-        atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
+        atomic_lib::Value::AtomicUrl(store.get_server_url().to_string()),
         store,
     )?;
     invite.set(
         atomic_lib::urls::PARENT.into(),
-        atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
+        atomic_lib::Value::AtomicUrl(store.get_server_url().to_string()),
         store,
     )?;
     invite.set(

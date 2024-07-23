@@ -26,6 +26,8 @@ import {
   JSONArray,
   OptionalClass,
   proxyResource,
+  type Core,
+  ResourceEvents,
 } from '@tomic/lib';
 import { useDebouncedCallback } from './index.js';
 
@@ -106,47 +108,39 @@ export function useResources(
  * loaded, and add Error strings to shortname and description if something goes wrong.
  */
 export function useProperty(subject: string): Property {
-  const propertyResource = useResource(subject);
+  const resource = useResource<Core.Property>(subject);
 
-  if (propertyResource.loading) {
+  const property: Property = useMemo(() => {
+    if (resource.loading) {
+      return {
+        subject,
+        datatype: Datatype.UNKNOWN,
+        shortname: 'loading',
+        description: `Loading property ${subject}`,
+        loading: true,
+      };
+    }
+
+    if (resource.error) {
+      return {
+        subject,
+        datatype: Datatype.UNKNOWN,
+        shortname: 'error',
+        description: 'Error getting Property. ' + resource.error.message,
+        error: resource.error,
+      };
+    }
+
     return {
       subject,
-      datatype: Datatype.UNKNOWN,
-      shortname: 'loading',
-      description: `Loading property ${subject}`,
-      loading: true,
+      datatype: datatypeFromUrl(resource.props.datatype),
+      shortname: resource.props.shortname,
+      description: resource.props.description,
+      classType: resource.props.classtype,
+      isDynamic: !!resource.props.isDynamic,
+      allowsOnly: resource.props.allowsOnly,
     };
-  }
-
-  if (propertyResource.error) {
-    return {
-      subject,
-      datatype: Datatype.UNKNOWN,
-      shortname: 'error',
-      description: 'Error getting Property. ' + propertyResource.error.message,
-      error: propertyResource.error,
-    };
-  }
-
-  const datatypeUrl = propertyResource.get(urls.properties.datatype) as string;
-  const datatype = datatypeFromUrl(datatypeUrl);
-  const shortname = propertyResource.get(urls.properties.shortname) as string;
-  const description = propertyResource.get(
-    urls.properties.description,
-  ) as string;
-  const classType = propertyResource.get(urls.properties.classType) as string;
-  const isDynamic = !!propertyResource.get(
-    urls.properties.isDynamic,
-  ) as boolean;
-
-  const property: Property = {
-    subject,
-    datatype,
-    shortname,
-    description,
-    classType,
-    isDynamic,
-  };
+  }, [resource]);
 
   return property;
 }
@@ -281,6 +275,14 @@ export function useValue(
 
     setPrevResourceReference(resource);
   }
+
+  useEffect(() => {
+    return resource.on(ResourceEvents.LocalChange, (prop, value) => {
+      if (prop === propertyURL) {
+        set(value);
+      }
+    });
+  }, [resource, propertyURL]);
 
   return [val, validateAndSet];
 }

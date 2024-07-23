@@ -23,11 +23,10 @@ export function ExpandedRowDialog({
 }: ExpandedRowDialogProps): JSX.Element {
   const { tableRef } = useTableEditorContext();
   const resource = useResource(subject);
-  const [dialogProps, show] = useDialog({
+  const { dialogProps, show } = useDialog({
     bindShow: bindOpen,
     triggerRef: tableRef,
   });
-
   useEffect(() => {
     if (open) {
       show();

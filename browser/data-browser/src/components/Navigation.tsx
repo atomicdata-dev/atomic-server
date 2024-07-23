@@ -8,14 +8,13 @@ import { ButtonBar } from './Button';
 import { useCurrentSubject } from '../helpers/useCurrentSubject';
 import { useSettings } from '../helpers/AppSettings';
 import { SideBar } from './SideBar';
-import ResourceContextMenu from './ResourceContextMenu';
 import { isRunningInTauri } from '../helpers/tauri';
 import { shortcuts } from './HotKeyWrapper';
-import { MenuBarDropdownTrigger } from './ResourceContextMenu/MenuBarDropdownTrigger';
 import { NavBarSpacer } from './NavBarSpacer';
 import { Searchbar } from './Searchbar';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
+import { NAVBAR_TRANSITION_TAG } from '../helpers/transitionName';
 
 interface NavWrapperProps {
   children: React.ReactNode;
@@ -134,14 +133,6 @@ function NavBar(): JSX.Element {
         onFocus={maybeHideButtons}
         onBlur={() => setShowButtons(true)}
       />
-
-      {showButtons && subject && (
-        <ResourceContextMenu
-          isMainMenu
-          subject={subject}
-          trigger={MenuBarDropdownTrigger}
-        />
-      )}
     </ConditionalNavbar>
   );
 }
@@ -160,7 +151,7 @@ const NavBarBase = styled.div<NavBarStyledProps>`
   display: flex;
   border: solid 1px ${props => props.theme.colors.bg2};
   background-color: ${props => props.theme.colors.bg};
-  view-transition-name: navbar;
+  view-transition-name: ${NAVBAR_TRANSITION_TAG};
 `;
 
 /** Width of the floating navbar in rem */
@@ -216,4 +207,10 @@ const SideBarWrapper = styled('div')`
   bottom: 0;
   left: 0;
   right: 0;
+
+  opacity: 1;
+  transition: opacity 0.3s ease-out;
+  @starting-style {
+    opacity: 0;
+  }
 `;

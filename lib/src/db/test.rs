@@ -65,7 +65,7 @@ fn populate_collections() {
         .map(|r| r.get_subject().into())
         .collect();
     println!("{:?}", subjects);
-    let collections_collection_url = format!("{}/collections", store.get_server_url());
+    let collections_collection_url = format!("{}collections", store.get_server_url());
     let collections_resource = store
         .get_resource_extended(&collections_collection_url, false, &ForAgent::Public)
         .unwrap();
@@ -90,8 +90,8 @@ fn populate_collections() {
 /// Also counts commits.
 fn destroy_resource_and_check_collection_and_commits() {
     let store = Db::init_temp("counter").unwrap();
+    let agents_url = store.get_server_url().set_route(Routes::Agents).to_string();
     let for_agent = &ForAgent::Public;
-    let agents_url = format!("{}/agents", store.get_server_url());
     let agents_collection_1 = store
         .get_resource_extended(&agents_url, false, for_agent)
         .unwrap();
@@ -110,7 +110,10 @@ fn destroy_resource_and_check_collection_and_commits() {
     );
 
     // We will count the commits, and check if they've incremented later on.
-    let commits_url = format!("{}/commits", store.get_server_url());
+    let commits_url = store
+        .get_server_url()
+        .set_route(Routes::Commits)
+        .to_string();
     let commits_collection_1 = store
         .get_resource_extended(&commits_url, false, for_agent)
         .unwrap();
@@ -189,7 +192,7 @@ fn destroy_resource_and_check_collection_and_commits() {
 fn get_extended_resource_pagination() {
     let store = Db::init_temp("get_extended_resource_pagination").unwrap();
     let subject = format!(
-        "{}/commits?current_page=2&page_size=99999",
+        "{}collections/commits?current_page=2&page_size=99999",
         store.get_server_url()
     );
     let for_agent = &ForAgent::Public;
@@ -199,6 +202,7 @@ fn get_extended_resource_pagination() {
     {
         panic!("Page 2 should not exist, because page size is set to a high value.")
     }
+    let num = 2;
     // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
     let subject_with_page_size = format!("{}&page_size=1", subject);
     let resource = store
@@ -209,7 +213,7 @@ fn get_extended_resource_pagination() {
         .unwrap()
         .to_int()
         .unwrap();
-    assert_eq!(cur_page, 2);
+    assert_eq!(cur_page, num);
     assert_eq!(resource.get_subject(), &subject_with_page_size);
 }
 
@@ -316,7 +320,7 @@ fn queries() {
             r.set(sort_by.into(), Value::Markdown("!first".into()), store)
                 .unwrap();
             let resp = r.save(store).unwrap();
-            resource_changed_order_opt = resp.resource_new.clone();
+            resource_changed_order_opt = resp.resource_new;
         }
         prev_resource = r.clone();
     }

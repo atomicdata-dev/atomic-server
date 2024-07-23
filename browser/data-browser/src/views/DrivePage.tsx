@@ -77,7 +77,7 @@ function DrivePage({ resource }: ResourcePageProps): JSX.Element {
             </CardRow>
           </CardInsideFull>
         </Card>
-        {baseURL.startsWith('http://localhost') && (
+        {baseURL.includes('localhost') && (
           <p>
             You are running Atomic-Server on `localhost`, which means that it
             will not be available from any other machine than your current local

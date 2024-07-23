@@ -2,8 +2,8 @@
 //! It relies on lexicographic ordering of keys, which Sled utilizes using `scan_prefix` queries.
 
 use crate::{
-    agents::ForAgent, atoms::IndexAtom, errors::AtomicResult, storelike::Query,
-    values::SortableValue, Atom, Db, Resource, Storelike, Value,
+    agents::ForAgent, atoms::IndexAtom, errors::AtomicResult, values::SortableValue, Atom, Db,
+    Query, Resource, Storelike, Value,
 };
 use serde::{Deserialize, Serialize};
 
@@ -99,10 +99,6 @@ pub fn query_sorted_indexed(
     let mut resources: Vec<Resource> = vec![];
     let mut count = 0;
 
-    let self_url = store
-        .get_self_url()
-        .ok_or("No self_url set, required for Queries")?;
-
     let limit = q.limit.unwrap_or(std::usize::MAX);
 
     for (i, kv) in iter.enumerate() {
@@ -115,7 +111,7 @@ pub fn query_sorted_indexed(
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
 
             // If no external resources should be included, skip this one if it's an external resource
-            if !q.include_external && !subject.starts_with(&self_url) {
+            if !q.include_external && store.is_external_subject(subject)? {
                 continue;
             }
 

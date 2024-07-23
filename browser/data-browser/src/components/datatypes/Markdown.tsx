@@ -1,5 +1,5 @@
 import ReactMarkdown from 'react-markdown';
-import { styled } from 'styled-components';
+import { css, styled } from 'styled-components';
 import remarkGFM from 'remark-gfm';
 import { Button } from '../Button';
 import { truncateMarkdown } from '../../helpers/markdown';
@@ -44,16 +44,11 @@ Markdown.defaultProps = {
   renderGFM: true,
 };
 
-const MarkdownWrapper = styled.div`
-  width: 100%;
-  overflow-x: hidden;
-  img {
-    max-width: 100%;
-  }
-
-  * {
+/** Styles shared in Markdown View & Edit renderers */
+export const markdownStyles = css`
+  /* * {
     white-space: unset;
-  }
+  } */
 
   p,
   h1,
@@ -69,6 +64,10 @@ const MarkdownWrapper = styled.div`
     margin-bottom: 0;
   }
 
+  ul li {
+    margin-bottom: 1rem;
+  }
+
   blockquote {
     margin-inline-start: 0rem;
     padding-inline-start: 1rem;
@@ -76,11 +75,27 @@ const MarkdownWrapper = styled.div`
     color: ${props => props.theme.colors.textLight};
   }
 
-  pre code {
-    white-space: pre-wrap;
-    padding: 1rem;
-    width: 100%;
+  code {
+    font-family: Monaco, monospace;
+    font-size: 0.8em;
+  }
+
+  :not(pre) > code {
+    background-color: ${props => props.theme.colors.bg1};
+    padding: 0rem 0.2rem;
+    font-family: Monaco, monospace;
+    display: inline-flex;
+    white-space: nowrap;
+    overflow: auto;
+    max-width: 100%;
+  }
+
+  pre {
+    background-color: ${p => p.theme.colors.bg1};
+    padding: 0.5rem ${p => p.theme.margin}rem;
     border-radius: ${p => p.theme.radius};
+    white-space: pre;
+    overflow-x: auto;
   }
 
   table {
@@ -98,6 +113,16 @@ const MarkdownWrapper = styled.div`
 
     border: 1px solid ${props => props.theme.colors.bg2};
   }
+`;
+
+const MarkdownWrapper = styled.div`
+  width: 100%;
+  overflow-x: hidden;
+  img {
+    max-width: 100%;
+  }
+
+  ${markdownStyles}
 `;
 
 export default Markdown;

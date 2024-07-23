@@ -2,10 +2,10 @@
 //! Has methods for saving resources and getting properties inside them.
 
 use crate::commit::{CommitOpts, CommitResponse};
-use crate::storelike::Query;
 use crate::urls;
 use crate::utils::random_string;
 use crate::values::{SubResource, Value};
+use crate::Query;
 use crate::{commit::CommitBuilder, errors::AtomicResult};
 use crate::{
     mapping::is_url,
@@ -211,7 +211,7 @@ impl Resource {
 
     /// Create a new resource with a generated Subject
     pub fn new_generate_subject(store: &impl Storelike) -> Resource {
-        let generated = format!("{}/{}", store.get_server_url(), random_string(10));
+        let generated = format!("{}{}", store.get_server_url(), random_string(10));
 
         Resource::new(generated)
     }
@@ -342,13 +342,7 @@ impl Resource {
         let commit_builder = self.get_commit_builder().clone();
         let commit = commit_builder.sign(&agent, store, self)?;
         // If the current client is a server, and the subject is hosted here, don't post
-        let should_post = if let Some(self_url) = store.get_self_url() {
-            !self.subject.starts_with(&self_url)
-        } else {
-            // Current client is not a server, has no own persisted store
-            true
-        };
-        if should_post {
+        if store.is_external_subject(&commit.subject)? {
             crate::client::post_commit(&commit, store)?;
         }
         let opts = CommitOpts {
@@ -359,6 +353,7 @@ impl Resource {
             validate_for_agent: agent.subject.into(),
             // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-server/issues/412
             validate_previous_commit: false,
+            validate_subject_url_parent: true,
             update_index: true,
         };
         let commit_response = commit.apply_opts(store, &opts)?;
@@ -387,6 +382,8 @@ impl Resource {
             validate_for_agent: agent.subject.into(),
             // https://github.com/atomicdata-dev/atomic-server/issues/412
             validate_previous_commit: false,
+            // This is contentious: https://github.com/atomicdata-dev/atomic-data-rust/issues/556
+            validate_subject_url_parent: false,
             update_index: true,
         };
         let commit_response = commit.apply_opts(store, &opts)?;
@@ -697,6 +694,7 @@ mod test {
                     validate_signature: true,
                     validate_timestamp: true,
                     validate_rights: false,
+                    validate_subject_url_parent: true,
                     validate_previous_commit: true,
                     validate_for_agent: None,
                     update_index: true,

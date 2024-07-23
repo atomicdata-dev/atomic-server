@@ -34,9 +34,11 @@ ExternalLink.defaultProps = {
 };
 
 const ExternalLinkPlain = styled.a`
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6ch;
+  color: ${props => props.theme.colors.main};
+  text-decoration: none;
 `;
 
 const ExternalLinkButton = styled.a`

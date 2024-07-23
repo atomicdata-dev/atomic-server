@@ -59,7 +59,7 @@ function Data(): JSX.Element {
     setTextResponseLoading(true);
 
     try {
-      const resp = await window.fetch(subject!, { headers: headers });
+      const resp = await fetch(subject!, { headers: headers });
       const body = await resp.text();
       setTextResponseLoading(false);
       setTextResponse(body);
@@ -75,8 +75,8 @@ function Data(): JSX.Element {
   };
 
   return (
-    <ContainerNarrow about={subject}>
-      <Main>
+    <Main subject={subject}>
+      <ContainerNarrow about={subject}>
         <Column>
           <Row center gap='1ch'>
             <IconButton
@@ -145,8 +145,8 @@ function Data(): JSX.Element {
           <h2>Usage</h2>
           <ResourceUsage resource={resource} />
         </Column>
-      </Main>
-    </ContainerNarrow>
+      </ContainerNarrow>
+    </Main>
   );
 }
 

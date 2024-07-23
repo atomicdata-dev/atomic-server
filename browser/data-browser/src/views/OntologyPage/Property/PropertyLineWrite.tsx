@@ -25,7 +25,7 @@ export function PropertyLineWrite({
   const resource = useResource(subject);
   const shortnameProp = useProperty(core.properties.shortname);
   const descriptionProp = useProperty(core.properties.description);
-  const [dialogProps, show, hide] = useDialog();
+  const { dialogProps, show, close: hide } = useDialog();
   const [canEdit] = useCanWrite(resource);
 
   const { hasProperty } = useOntologyContext();
@@ -64,21 +64,23 @@ export function PropertyLineWrite({
           resource={resource}
           property={descriptionProp}
         />
-        <PropertyDatatypePicker disabled={disabled} resource={resource} />
-        <IconButton
-          title={`Configure ${resource.title}`}
-          color='textLight'
-          onClick={show}
-        >
-          <FaSlidersH />
-        </IconButton>
-        <IconButton
-          title='remove'
-          color='textLight'
-          onClick={() => onRemove(subject)}
-        >
-          <FaTimes />
-        </IconButton>
+        <Row center>
+          <PropertyDatatypePicker disabled={disabled} resource={resource} />
+          <IconButton
+            title={`Configure ${resource.title}`}
+            color='textLight'
+            onClick={show}
+          >
+            <FaSlidersH />
+          </IconButton>
+          <IconButton
+            title='remove'
+            color='textLight'
+            onClick={() => onRemove(subject)}
+          >
+            <FaTimes />
+          </IconButton>
+        </Row>
       </Row>
       <PropertyWriteDialog resource={resource} {...dialogProps} close={hide} />
     </ListItem>

@@ -6,6 +6,37 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ### Atomic Browser
 
+- [#855](https://github.com/atomicdata-dev/atomic-server/issues/855) Add a dialog that shows how to fetch and use the current resource in your code.
+- [#825](https://github.com/atomicdata-dev/atomic-server/issues/825) Folder display styles are now saved locally instead of on the resource. The display style property will now act as the default view style.
+- [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
+- Updated look of the default resource form.
+- [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
+- Updated the look & feel of the sidebar a bit.
+- [#893](https://github.com/atomicdata-dev/atomic-server/issues/893) Fix tables not showing any rows when viewing from a different server.
+- Fix an issue where the resource-array properties would be set to an empty array instead of removing the property when removing all items in the input.
+- Fix an issue where dropdown menus sometimes jump from the upper left corner of the screen.
+- Added a full page view for tags.
+- Redesigned the ontology page.
+- Moved the resource context menu to the top of the page.
+- [#861](https://github.com/atomicdata-dev/atomic-server/issues/861) Fix long usernames overflowing on the share page.
+- [#906](https://github.com/atomicdata-dev/atomic-server/issues/906) Reset changes after clicking the cancel button in a form or navigating away.
+- [#914](https://github.com/atomicdata-dev/atomic-server/issues/914) Fix an issue where changing the subject in a new resource form could update the parent of existing resources if their subject matched the new subject.
+
+### @tomic/lib
+
+- Added `LocalChange` event to `Resource`.
+- Added `resource.refresh()` method.
+- Removed `cross-fetch`, if your environment does not support fetch make sure to add a polyfill or inject one using `store.injectFetch()`.
+
+### @tomic/react
+
+- BREAKING CHANGE: Removed the `useLocalStorage` hook.
+- When using any `useValue` type hook, values will now update when local changes are made to the resource from elsewhere in the app.
+
+## v0.38.0
+
+### Atomic Browser
+
 - [#845](https://github.com/atomicdata-dev/atomic-server/issues/845) Add option to create instances and tables from the ontology view.
 - [#845](https://github.com/atomicdata-dev/atomic-server/issues/845) Add default Ontology option to drives.
 - [#841](https://github.com/atomicdata-dev/atomic-server/issues/841) Add better inputs for `Timestamp` and `Date` datatypes.
@@ -13,6 +44,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - [#850](https://github.com/atomicdata-dev/atomic-server/issues/850) Add drag & drop sorting to ResourceArray inputs.
 - [#757](https://github.com/atomicdata-dev/atomic-server/issues/757) Add drag & drop sorting to sidebar.
 - [#873](https://github.com/atomicdata-dev/atomic-server/issues/873) Add option to allow multiple resources in relation columns (Tables).
+- [#825](https://github.com/atomicdata-dev/atomic-server/issues/825) Folder display styles are now saved locally instead of on the resource. The display style property will now act as the default view style.
+- [#884](https://github.com/atomicdata-dev/atomic-server/issues/884) Add new markdown editor.
 
 ### @tomic/lib
 
@@ -25,6 +58,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Added `resource.setVersion()` method.
 - Added `collection.getMembersOnPage()` method.
 - Added `collection.totalPages`.
+- Fix lib not working in non-secure browser contexts.
 - BREAKING CHANGE: Renamed `resource.getCommitsCollection` to `resource.getCommitsCollectionSubject`.
 - BREAKING CHANGE: `resource.getChildrenCollection()` now returns a `Promise<Collection>` instead of a subject.
 - BREAKING CHANGE: `resource.createSubject()` no longer accepts a class name as an argument and defaults to a fully random subject.
@@ -140,11 +174,18 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Add `store.getResourceAncestry` method, which returns the ancestry of a resource, including the resource itself.
 - Add `resource.title` property, which returns the name of a resource, or the first property that is can be used to name the resource.
 - `store.createSubject` now accepts a `parent` argument, which allows creating nested subjects.
+- Add `store.getServerSupports` to know which features a Server supports
+
+### @tomic/react
+
+- Add `useServerSupports` hook to see supported features of the server
 
 ## v0.35.0
 
 ### @tomic/browser
 
+- Let users register using e-mail address, improve sign-up UX.
+- Add `Store.parseMetaTags` to load JSON-AD objects stored in the DOM. Speeds up initial page load by allowing server to set JSON-AD objects in the initial HTML response.
 - Move static assets around, align build with server and fix PWA #292
 - Add `useChildren` hook and `Store.getChildren` method
 - Add new file preview UI for images, audio, text and PDF files.
@@ -152,8 +193,14 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Fix Dialogue form #308
 - Refactor search, escape query strings for Tantivy
 - Add `import` context menu, allows importing anywhere
+- Let users register using e-mail address, improve sign-up UX.
 
 ### @tomic/react
+- `store.createSubject` allows creating nested paths
+- `store.createSubject` allows creating nested paths
+- Add `useChildren` hook and `Store.getChildren` method
+- Add `Store.postToServer` method, add `endpoints`, `import_json_ad_string`
+- Add `store.preloadClassesAndProperties` and remove `urls.properties.getAll` and `urls.classes.getAll`. This enables using `atomic-data-browser` without relying on `atomicdata.dev` being available.
 
 - Add more options to `useSearch`
 

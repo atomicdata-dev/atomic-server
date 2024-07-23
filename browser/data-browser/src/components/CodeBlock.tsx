@@ -7,9 +7,11 @@ import { Button } from './Button';
 interface CodeBlockProps {
   content?: string;
   loading?: boolean;
+  wrapContent?: boolean;
 }
 
-export function CodeBlock({ content, loading }: CodeBlockProps) {
+/** Codeblock with copy feature */
+export function CodeBlock({ content, loading, wrapContent }: CodeBlockProps) {
   const [isCopied, setIsCopied] = useState<string | undefined>(undefined);
 
   function copyToClipboard() {
@@ -19,7 +21,7 @@ export function CodeBlock({ content, loading }: CodeBlockProps) {
   }
 
   return (
-    <CodeBlockStyled data-code-content={content}>
+    <CodeBlockStyled data-code-content={content} wrapContent={wrapContent}>
       {loading ? (
         'loading...'
       ) : (
@@ -46,13 +48,22 @@ export function CodeBlock({ content, loading }: CodeBlockProps) {
   );
 }
 
-export const CodeBlockStyled = styled.pre`
+interface Props {
+  /** Renders all in a single line */
+  wrapContent?: boolean;
+}
+
+export const CodeBlockStyled = styled.pre<Props>`
   position: relative;
   background-color: ${p => p.theme.colors.bg1};
   border-radius: ${p => p.theme.radius};
   border: solid 1px ${p => p.theme.colors.bg2};
   padding: 0.3rem;
+  min-height: 2.2rem;
+  font-size: 0.8rem;
   font-family: monospace;
   width: 100%;
   overflow-x: auto;
+  word-wrap: ${p => (p.wrapContent ? 'break-word' : 'initial')};
+  white-space: ${p => (p.wrapContent ? 'pre-wrap' : 'pre')};
 `;

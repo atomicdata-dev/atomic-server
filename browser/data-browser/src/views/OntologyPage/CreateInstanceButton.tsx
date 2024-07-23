@@ -14,7 +14,7 @@ interface CreateInstanceButtonProps {
 export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
   const [active, setActive] = useState(false);
   const [classSubject, setClassSubject] = useState<string | undefined>();
-  const [dialogProps, show, close, isOpen] = useDialog({
+  const { dialogProps, show, close, isOpen } = useDialog({
     onSuccess: () => {
       setClassSubject(undefined);
       setActive(false);

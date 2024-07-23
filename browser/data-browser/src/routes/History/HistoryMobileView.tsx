@@ -23,7 +23,7 @@ export function HistoryMobileView({
   onSelectVersion,
   onVersionAccept,
 }: HistoryViewProps) {
-  const [dialogProps, showDialog, closeDialog] = useDialog();
+  const { dialogProps, show: showDialog, close: closeDialog } = useDialog();
 
   const handleVersionSelect = useCallback((version: Version) => {
     onSelectVersion(version);

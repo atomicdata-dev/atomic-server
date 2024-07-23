@@ -133,7 +133,11 @@ export function NewPropertyDialog({
     setResource(null);
   }, [resource, store, tableClassResource, pushProp]);
 
-  const [dialogProps, show, hide] = useDialog({
+  const {
+    dialogProps,
+    show,
+    close: hide,
+  } = useDialog({
     bindShow,
     onCancel: handleUserCancelAction,
     onSuccess: handleUserSuccessAction,

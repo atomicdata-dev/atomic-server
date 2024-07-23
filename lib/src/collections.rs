@@ -1,10 +1,8 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a [Query]
 use crate::{
-    agents::ForAgent,
-    errors::AtomicResult,
-    storelike::{Query, ResourceCollection},
-    urls, Resource, Storelike, Value,
+    agents::ForAgent, errors::AtomicResult, storelike::ResourceCollection, urls, Query, Resource,
+    Storelike, Value,
 };
 
 const DEFAULT_PAGE_SIZE: usize = 30;
@@ -88,7 +86,7 @@ impl CollectionBuilder {
         store: &impl Storelike,
     ) -> CollectionBuilder {
         CollectionBuilder {
-            subject: format!("{}/{}", store.get_server_url(), path),
+            subject: store.get_server_url().clone().set_path(path).to_string(),
             property: Some(urls::IS_A.into()),
             value: Some(class_url.into()),
             sort_by: None,
@@ -387,6 +385,10 @@ pub fn create_collection_resource_for_class(
 ) -> AtomicResult<Resource> {
     let class = store.get_class(class_subject)?;
 
+    // We use the `Collections` collection as the parent for all collections.
+    // This also influences their URLs.
+    let is_collections_collection = class.subject == urls::COLLECTION;
+
     // Pluralize the shortname
     let pluralized = match class.shortname.as_ref() {
         "class" => "classes".to_string(),
@@ -394,7 +396,13 @@ pub fn create_collection_resource_for_class(
         other => format!("{}s", other),
     };
 
-    let mut collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
+    let path = if is_collections_collection {
+        "/collections".to_string()
+    } else {
+        format!("/collections/{}", pluralized)
+    };
+
+    let mut collection = CollectionBuilder::class_collection(&class.subject, &path, store);
 
     collection.sort_by = match class_subject {
         urls::COMMIT => Some(urls::CREATED_AT.to_string()),
@@ -415,10 +423,12 @@ pub fn create_collection_resource_for_class(
         .ok_or("No self_url present in store, can't populate collections")?;
 
     // Let the Collections collection be the top level item
-    let parent = if class.subject == urls::COLLECTION {
-        drive
+    let parent = if is_collections_collection {
+        drive.to_string()
     } else {
-        format!("{}/collections", drive)
+        drive
+            .set_route(crate::atomic_url::Routes::Collections)
+            .to_string()
     };
 
     collection_resource.set_string(urls::PARENT.into(), &parent, store)?;
@@ -524,7 +534,7 @@ mod test {
         println!("{:?}", subjects);
         let collections_collection = store
             .get_resource_extended(
-                &format!("{}/collections", store.get_server_url()),
+                &format!("{}collections", store.get_server_url()),
                 false,
                 &ForAgent::Public,
             )

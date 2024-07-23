@@ -1,6 +1,6 @@
 import { Resource, Store, core } from '@tomic/react';
 
-const DEFAULT_DESCRIPTION = 'Change me';
+const DEFAULT_DESCRIPTION = 'Default description - Change me';
 
 export const subjectForClass = (parent: Resource, shortName: string): string =>
   `${parent.subject}/class/${shortName}`;

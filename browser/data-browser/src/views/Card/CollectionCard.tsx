@@ -16,7 +16,7 @@ const MAX_COUNT = 5;
  * Renders a Resource and all its Properties in a random order. Title
  * (shortname) is rendered prominently at the top.
  */
-function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
+function CollectionCard({ resource }: CardViewProps): JSX.Element {
   const [description] = useString(resource, core.properties.description);
   const [members] = useArray(resource, collections.properties.members);
   const [showAll, setShowMore] = useState(false);
@@ -32,37 +32,31 @@ function CollectionCard({ resource, small }: CardViewProps): JSX.Element {
     <Column gap='0.5rem'>
       <ResourceCardTitle resource={resource} />
       {description && <Markdown text={description} />}
-      <Show show={!small}>
-        {subjects.length === 0 ? (
-          <Empty>No resources</Empty>
-        ) : (
-          <CardInsideFull>
-            {subjects.map(member => {
-              return (
-                <CardRow key={member}>
-                  <ResourceInline subject={member} />
-                </CardRow>
-              );
-            })}
-            {tooMany && (
-              <CardRow>
-                <Button clean onClick={() => setShowMore(!showAll)}>
-                  {showAll
-                    ? 'show less'
-                    : `show ${members.length - MAX_COUNT} more`}
-                </Button>
+      {subjects.length === 0 ? (
+        <Empty>No resources</Empty>
+      ) : (
+        <CardInsideFull>
+          {subjects.map(member => {
+            return (
+              <CardRow key={member}>
+                <ResourceInline subject={member} />
               </CardRow>
-            )}
-          </CardInsideFull>
-        )}
-      </Show>
+            );
+          })}
+          {tooMany && (
+            <CardRow>
+              <Button clean onClick={() => setShowMore(!showAll)}>
+                {showAll
+                  ? 'show less'
+                  : `show ${members.length - MAX_COUNT} more`}
+              </Button>
+            </CardRow>
+          )}
+        </CardInsideFull>
+      )}
     </Column>
   );
 }
-
-const Show: FC<PropsWithChildren<{ show: boolean }>> = ({ show, children }) => {
-  return show ? children : null;
-};
 
 const Empty = styled.span`
   color: ${({ theme }) => theme.colors.textLight};

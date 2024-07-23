@@ -6,10 +6,11 @@ type Props = React.SelectHTMLAttributes<HTMLSelectElement>;
 
 export const BasicSelect: FC<PropsWithChildren<Props>> = ({
   children,
+  className,
   ...props
 }) => {
   return (
-    <StyledInputWrapper>
+    <StyledInputWrapper className={className}>
       <SelectWrapper disabled={!!props.disabled}>
         <Select {...props}>{children}</Select>
       </SelectWrapper>
@@ -23,7 +24,7 @@ const StyledInputWrapper = styled(InputWrapper)`
 
 const SelectWrapper = styled.span<{ disabled: boolean }>`
   width: 100%;
-  padding-inline: 0.2rem;
+  padding-inline: 0.5rem;
   background-color: ${p =>
     p.disabled ? p.theme.colors.bg1 : p.theme.colors.bg};
 
@@ -32,8 +33,11 @@ const SelectWrapper = styled.span<{ disabled: boolean }>`
   &:after {
     content: '▾';
     position: absolute;
+    display: flex;
     right: 0.5rem;
-    top: 0.5rem;
+    top: 0;
+    height: 100%;
+    align-items: center;
     pointer-events: none;
     color: ${p => p.theme.colors.textLight};
   }

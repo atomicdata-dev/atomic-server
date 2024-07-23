@@ -12,13 +12,16 @@ pub async fn handle_download(
     req: actix_web::HttpRequest,
 ) -> AtomicServerResult<HttpResponse> {
     let headers = req.headers();
-    let server_url = &appstate.config.server_url;
     let store = &appstate.store;
 
     // We replace `/download` with `/` to get the subject of the Resource.
     let subject = if let Some(pth) = path {
-        let subject = format!("{}/{}", server_url, pth);
-        subject
+        appstate
+            .store
+            .get_server_url()
+            .clone()
+            .set_path(pth.as_str())
+            .to_string()
     } else {
         // There is no end string, so It's the root of the URL, the base URL!
         return Err("Put `/download` in front of an File URL to download it.".into());

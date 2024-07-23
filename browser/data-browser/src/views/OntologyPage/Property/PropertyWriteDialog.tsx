@@ -24,8 +24,8 @@ export function PropertyWriteDialog({
   const shortnameProp = useProperty(urls.properties.shortname);
 
   return (
-    <Dialog {...dialogProps}>
-      {dialogProps.show && (
+    <Dialog {...dialogProps} width='min(40rem, 90vw)'>
+      {dialogProps.isVisible && (
         <>
           <DialogTitle>
             <InputSwitcher
@@ -35,19 +35,21 @@ export function PropertyWriteDialog({
               property={shortnameProp}
             />
           </DialogTitle>
-          <WiderDialogContent>
+          <DialogContent>
+            {/* Spacer fixes an issue where the top border of the description field gets cut of by the container */}
+            <Spacer />
             <PropertyFormCommon
               resource={resource}
               canEdit={canEdit}
               onClassCreated={close}
             />
-          </WiderDialogContent>
+          </DialogContent>
         </>
       )}
     </Dialog>
   );
 }
 
-const WiderDialogContent = styled(DialogContent)`
-  width: min(40rem, 90vw);
+const Spacer = styled.div`
+  height: 2px;
 `;

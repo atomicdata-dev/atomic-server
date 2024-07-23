@@ -2,7 +2,11 @@ import * as React from 'react';
 import { Resource } from '@tomic/react';
 
 import { ContainerWide } from '../components/Containers';
-import { ErrorBlock } from '../components/ErrorLook';
+import {
+  createGithubIssueLink,
+  ErrorBlock,
+  GitHubIssueButton,
+} from '../components/ErrorLook';
 import { Button } from '../components/Button';
 import { Column, Row } from '../components/Row';
 
@@ -26,6 +30,8 @@ function CrashPage({
       <Column>
         {children ? children : <ErrorBlock error={error} showTrace />}
         <Row>
+          <a href={createGithubIssueLink(error)}>Create Github issue</a>
+          <GitHubIssueButton error={error} />
           {clearError && <Button onClick={clearError}>Clear error</Button>}
           <Button
             onClick={() =>
@@ -35,7 +41,7 @@ function CrashPage({
               )
             }
           >
-            Try Again
+            Refresh page
           </Button>
         </Row>
       </Column>

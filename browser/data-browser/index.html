@@ -29,6 +29,16 @@
       background-color: var(--background-color);
     }
 
+    .loader {
+      opacity: 1;
+      transition: opacity 300ms ease-out, transform 300ms ease-out;
+      transform: translateY(0);
+
+      @starting-style {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+    }
   </style>
   <!-- Meta tags and code added by Atomic-Server -->
   <!-- { inject_html_head } -->
@@ -39,7 +49,7 @@
 <body>
   <div id="root">
     <svg width="647" height="75" viewBox="0 0 647 75" fill="none" xmlns="http://www.w3.org/2000/svg"
-      style="max-width: 70vw; width: 30rem; margin: auto; display: block; margin-top: 45vh;">
+      style="max-width: 70vw; width: 30rem; margin: auto; display: block; margin-top: 45vh;" class="loader">
       <path
         d="M57.512 58.4H23.712L17.264 74H0L32.448 1.19995H49.088L81.64 74H63.96L57.512 58.4ZM52.208 45.608L40.664 17.736L29.12 45.608H52.208Z"
         fill="var(--text-splash)" />

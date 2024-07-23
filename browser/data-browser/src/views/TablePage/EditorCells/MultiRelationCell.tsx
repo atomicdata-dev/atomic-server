@@ -154,6 +154,7 @@ function MultiRelationCellEdit({
           />
         ))}
         <SearchPopover
+          modal
           Trigger={Trigger}
           open={open}
           onOpenChange={handleOpenChange}

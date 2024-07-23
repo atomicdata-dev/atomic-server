@@ -1,12 +1,18 @@
-//! The Storelike Trait contains many useful methods for maniupulting / retrieving data.
+//! The Storelike Trait contains many useful methods for manipulating / retrieving data.
+//! It is the basis for both the in-memory [Store] and the on-disk [Db]
+
+use tracing::info;
 
 use crate::{
     agents::{Agent, ForAgent},
+    atomic_url::AtomicUrl,
     commit::CommitResponse,
     errors::AtomicError,
     hierarchy,
+    query::QueryResult,
     schema::{Class, Property},
-    urls,
+    urls::LOCAL_STORE,
+    Query,
 };
 use crate::{errors::AtomicResult, parse::parse_json_ad_string};
 use crate::{mapping::Mapping, values::Value, Atom, Resource};
@@ -83,15 +89,15 @@ pub trait Storelike: Sized {
     }
 
     /// Returns the base URL where the default store is.
-    /// E.g. `https://example.com`
+    /// E.g. `https://example.com/`
     /// This is where deltas should be sent to.
     /// Also useful for Subject URL generation.
-    fn get_server_url(&self) -> &str;
+    fn get_server_url(&self) -> &AtomicUrl;
 
     /// Returns the root URL where this instance of the store is hosted.
     /// Should return `None` if this is simply a client and not a server.
-    /// E.g. `https://example.com`
-    fn get_self_url(&self) -> Option<String> {
+    /// E.g. `https://example.com.`
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
         None
     }
 
@@ -180,11 +186,11 @@ pub trait Storelike: Sized {
         Property::from_resource(prop)
     }
 
-    /// Get's the resource, parses the Query parameters and calculates dynamic properties.
+    /// Gets the resource, parses the Query parameters and calculates dynamic properties.
     /// Defaults to get_resource if store doesn't support extended resources
     /// If `for_agent` is None, no authorization checks will be done, and all resources will return.
-    /// If you want public only resurces, pass `Some(crate::authentication::public_agent)` as the agent.
-    /// - *skip_dynamic* Does not calculte dynamic properties. Adds an `incomplete=true` property if the resource should have been dynamic.
+    /// If you want public only resources, pass `Some(crate::authentication::public_agent)` as the agent.
+    /// - *skip_dynamic* Does not calculate dynamic properties. Adds an `incomplete=true` property if the resource should have been dynamic.
     fn get_resource_extended(
         &self,
         subject: &str,
@@ -201,21 +207,16 @@ pub trait Storelike: Sized {
     /// Implement this if you want to have custom handlers for Commits.
     fn handle_commit(&self, _commit_response: &CommitResponse) {}
 
-    fn handle_not_found(
-        &self,
-        subject: &str,
-        _error: AtomicError,
-        for_agent: Option<&Agent>,
-    ) -> AtomicResult<Resource> {
-        if let Some(self_url) = self.get_self_url() {
-            if subject.starts_with(&self_url) {
-                return Err(AtomicError::not_found(format!(
-                    "Failed to retrieve locally: '{}'",
-                    subject
-                )));
-            }
+    fn handle_not_found(&self, subject: &str, _error: AtomicError) -> AtomicResult<Resource> {
+        // This does not work for subdomains
+        if self.is_external_subject(subject)? {
+            self.fetch_resource(subject, None)
+        } else {
+            Err(AtomicError::not_found(format!(
+                "Subject is not stored on this server: '{}'",
+                subject
+            )))
         }
-        self.fetch_resource(subject, for_agent)
     }
 
     /// Imports a JSON-AD string, returns the amount of imported resources.
@@ -223,6 +224,48 @@ pub trait Storelike: Sized {
         let vec = parse_json_ad_string(string, self, parse_opts)?;
         let len = vec.len();
         Ok(len)
+    }
+
+    /// Checks if the URL of some resource is owned by some external store.
+    /// If true, then the Subject points to a different server.
+    /// If you're using `Storelike` on something that does not persist (e.g. a client app),
+    /// the answer should always be `true`.
+    fn is_external_subject(&self, subject: &str) -> AtomicResult<bool> {
+        if let Some(self_url) = self.get_self_url() {
+            if self_url.as_str() == LOCAL_STORE {
+                return Ok(true);
+            }
+            if subject.starts_with(self_url.as_str()) {
+                return Ok(false);
+            } else {
+                // Is it a subdomain of the self_url?
+                let subject_url = url::Url::parse(subject)?;
+                let subject_host = subject_url.host().ok_or_else(|| {
+                    AtomicError::not_found(format!("Subject URL has no host: {}", subject))
+                })?;
+                let self_url = self_url.url();
+                let self_host = self_url.host().ok_or_else(|| {
+                    AtomicError::not_found(format!("Self URL has no host: {}", self_url))
+                })?;
+                // remove the subdomain from subject, if any.
+                // The server can have multiple subdomains
+                let subject_host_string = subject_host.to_string();
+                let subject_host_parts = subject_host_string.split('.').collect::<Vec<&str>>();
+
+                // Check if the last part of the host is equal
+                let Some(subject_host_stripped) = subject_host_parts.last() else {
+                    return Ok(false);
+                };
+                info!(
+                    "Comparing hosts: {} and {}",
+                    subject_host_stripped, self_host
+                );
+                if subject_host_stripped == &self_host.to_string() {
+                    return Ok(false);
+                }
+            }
+        }
+        Ok(true)
     }
 
     /// Removes a resource from the store. Errors if not present.
@@ -352,78 +395,4 @@ pub trait Storelike: Sized {
     fn validate(&self) -> crate::validate::ValidationReport {
         crate::validate::validate_store(self, false)
     }
-}
-
-/// Use this to construct a list of Resources
-#[derive(Debug)]
-pub struct Query {
-    /// Filter by Property
-    pub property: Option<String>,
-    /// Filter by Value
-    pub value: Option<Value>,
-    /// Maximum of items to return, if none returns all items.
-    pub limit: Option<usize>,
-    /// Value at which to begin lexicographically sorting things.
-    pub start_val: Option<Value>,
-    /// Value at which to stop lexicographically sorting things.
-    pub end_val: Option<Value>,
-    /// How many items to skip from the first one
-    pub offset: usize,
-    /// The Property URL that is used to sort the results
-    pub sort_by: Option<String>,
-    /// Sort descending instead of ascending.
-    pub sort_desc: bool,
-    /// Whether to include non-server resources
-    pub include_external: bool,
-    /// Whether to include full Resources in the result, if not, will add empty vector here.
-    pub include_nested: bool,
-    /// For which Agent the query is executed. Pass `None` if you want to skip permission checks.
-    pub for_agent: ForAgent,
-}
-
-impl Query {
-    pub fn new() -> Self {
-        Query {
-            property: None,
-            value: None,
-            limit: None,
-            start_val: None,
-            end_val: None,
-            offset: 0,
-            sort_by: None,
-            sort_desc: false,
-            include_external: false,
-            include_nested: true,
-            for_agent: ForAgent::Sudo,
-        }
-    }
-
-    /// Search for a property-value combination
-    pub fn new_prop_val(prop: &str, val: &str) -> Self {
-        let mut q = Self::new();
-        q.property = Some(prop.to_string());
-        q.value = Some(Value::String(val.to_string()));
-        q
-    }
-
-    /// Search for instances of some Class
-    pub fn new_class(class: &str) -> Self {
-        let mut q = Self::new();
-        q.property = Some(urls::IS_A.into());
-        q.value = Some(Value::AtomicUrl(class.to_string()));
-        q
-    }
-}
-
-impl Default for Query {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-pub struct QueryResult {
-    pub subjects: Vec<String>,
-    pub resources: Vec<Resource>,
-    /// The amount of hits that were found, including the ones that were out of bounds or not authorized.
-    pub count: usize,
 }

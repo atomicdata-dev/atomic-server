@@ -1,6 +1,6 @@
-import { useLocalStorage } from '@tomic/react';
 import { useCallback, useMemo } from 'react';
 import { useSavedDrives } from './useSavedDrives';
+import { useLocalStorage } from './useLocalStorage';
 
 const MAX_DRIVE_HISTORY = 5;
 

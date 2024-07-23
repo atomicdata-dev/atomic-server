@@ -3,6 +3,8 @@ import { styled } from 'styled-components';
 import { useState } from 'react';
 import { transition } from '../../../helpers/transition';
 import { SideBarDropData } from '../useSidebarDnd';
+import { useCanWrite, useResource } from '@tomic/react';
+import { SIDEBAR_WIDTH_PROP } from '../SidebarCSSVars';
 
 interface DropEdgeProps {
   parentHierarchy: string[];
@@ -21,6 +23,9 @@ export function DropEdge({
 
   const parent = parentHierarchy.at(-1)!;
 
+  const parentResource = useResource(parent);
+
+  const [canWrite] = useCanWrite(parentResource);
   useDndMonitor({
     onDragStart: event => setDraggingSubject(event.active.id as string),
     onDragEnd: () => setDraggingSubject(undefined),
@@ -35,6 +40,10 @@ export function DropEdge({
     id: `${parent}-${position}`,
     data,
   });
+
+  if (!canWrite) {
+    return <></>;
+  }
 
   const shouldRender =
     !!activeDraggedSubject && !parentHierarchy.includes(activeDraggedSubject);
@@ -54,7 +63,7 @@ const DropEdgeElement = styled.div<{ visible: boolean; active: boolean }>`
   background: ${p => p.theme.colors.main};
   opacity: ${p => (p.active ? 1 : 0)};
   z-index: 2;
-  width: calc(var(--width) - 2rem);
+  width: calc(var(${SIDEBAR_WIDTH_PROP}) - 2rem);
 
   ${transition('opacity', 'transform')}
 `;

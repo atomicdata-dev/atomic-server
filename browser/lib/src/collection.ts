@@ -35,8 +35,6 @@ export class Collection {
 
   private _totalMembers = 0;
 
-  private _totalPages = 0;
-
   private _waitForReady: Promise<void>;
 
   public constructor(
@@ -190,7 +188,6 @@ export class Collection {
     }
 
     this._totalMembers = totalMembers;
-    this._totalPages = resource.props.totalPages ?? 0;
   }
 }
 

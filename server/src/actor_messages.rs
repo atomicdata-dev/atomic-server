@@ -3,11 +3,6 @@
 
 use actix::{prelude::Message, Addr};
 
-//WebSocketConnection responds to this to pipe it through to the actual client
-#[derive(Message)]
-#[rtype(result = "()")]
-pub struct WsMessage(pub String);
-
 /// Subscribes a WebSocketConnection to a Subject.
 #[derive(Message)]
 #[rtype(result = "()")]

@@ -24,6 +24,8 @@ export interface ResourceSelectorProps {
    * class. Is used for constructing a list of options.
    */
   isA?: string;
+  /** Only let the user select the following resources */
+  allowsOnly?: string[];
   /** If true, the form will show an error if it is left empty. */
   required?: boolean;
   /** A function to remove this item. Only relevant in arrays. */
@@ -63,8 +65,14 @@ export const ResourceSelector = memo(function ResourceSelector({
   first = true,
   last = true,
   prefix,
+  allowsOnly,
 }: ResourceSelectorProps): JSX.Element {
-  const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog();
+  const {
+    dialogProps,
+    show: showDialog,
+    close: closeDialog,
+    isOpen: isDialogOpen,
+  } = useDialog();
   const [initialNewTitle, setInitialNewTitle] = useState('');
   const { drive } = useSettings();
 
@@ -91,6 +99,7 @@ export const ResourceSelector = memo(function ResourceSelector({
         required={required}
         disabled={disabled}
         hideClearButton={hideClearButton}
+        allowsOnly={allowsOnly}
         onCreateItem={handleCreateItem}
       >
         {handleRemove && !disabled && (

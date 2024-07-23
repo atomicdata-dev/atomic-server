@@ -29,7 +29,7 @@ export function ParentPickerDialog({
 }: ParentPickerDialogProps): React.JSX.Element {
   const [selected, setSelected] = useState<string>();
 
-  const [dialogProps, show, close, isOpen] = useDialog({
+  const { dialogProps, show, close, isOpen } = useDialog({
     onCancel,
     bindShow: onOpenChange,
   });

@@ -1,6 +1,7 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
 
+use crate::helpers::get_subject;
 use crate::{appstate::AppState, errors::AtomicServerResult};
 use actix_web::HttpResponse;
 
@@ -9,9 +10,11 @@ use actix_web::HttpResponse;
 pub async fn single_page(
     appstate: actix_web::web::Data<AppState>,
     path: actix_web::web::Path<String>,
+    req: actix_web::HttpRequest,
+    conn: actix_web::dev::ConnectionInfo,
 ) -> AtomicServerResult<HttpResponse> {
     let template = include_str!("../../assets_tmp/index.html");
-    let subject = format!("{}/{}", appstate.store.get_server_url(), path);
+    let (subject, _content_type) = get_subject(&req, &conn, &appstate)?;
     let meta_tags: MetaTags = if let Ok(resource) =
         appstate
             .store
@@ -35,6 +38,7 @@ pub async fn single_page(
             "Cache-Control",
             "no-store, no-cache, must-revalidate, private",
         ))
+        .append_header(("Vary", "Accept"))
         .body(body);
 
     Ok(resp)
@@ -99,7 +103,10 @@ impl Default for MetaTags {
 
 impl Display for MetaTags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let description = escape_html(&self.description);
+        let description = escape_html(&self.description)
+            .chars()
+            .take(250)
+            .collect::<String>();
         let image = &self.image;
         let title = escape_html(&self.title);
 

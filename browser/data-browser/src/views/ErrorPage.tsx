@@ -1,14 +1,14 @@
 import * as React from 'react';
 import { isUnauthorized, useStore } from '@tomic/react';
 import { ContainerWide } from '../components/Containers';
-import { ErrorBlock } from '../components/ErrorLook';
+import { ErrorBlock, GitHubIssueButton } from '../components/ErrorLook';
 import { Button } from '../components/Button';
-import { SignInButton } from '../components/SignInButton';
 import { useSettings } from '../helpers/AppSettings';
 import { ResourcePageProps } from './ResourcePage';
 import { Column, Row } from '../components/Row';
 import CrashPage from './CrashPage';
 import { clearAllLocalData } from '../helpers/clearData';
+import { Guard } from '../components/Guard';
 
 /**
  * A View for Resource Errors. Not to be confused with the CrashPage, which is
@@ -17,15 +17,28 @@ import { clearAllLocalData } from '../helpers/clearData';
 function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
   const { agent } = useSettings();
   const store = useStore();
-  const subject = resource.getSubject();
+  const subject = resource.subject;
+
+  React.useEffect(() => {
+    // Try again when agent changes
+    store.fetchResourceFromServer(subject);
+  }, [agent]);
 
   if (isUnauthorized(resource.error)) {
+    // This might be a bit too aggressive, but it fixes 'Unauthorized' messages after signing in to a new drive.
+    store.fetchResourceFromServer(subject);
+
     return (
       <ContainerWide>
         <Column>
           <h1>Unauthorized</h1>
           {agent ? (
             <>
+              <p>
+                {
+                  "You don't have access to this. Try asking for access, or sign in with a different account."
+                }
+              </p>
               <ErrorBlock error={resource.error!} />
               <span>
                 <Button onClick={() => store.fetchResourceFromServer(subject)}>
@@ -36,7 +49,7 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
           ) : (
             <>
               <p>{"You don't have access to this, try signing in:"}</p>
-              <SignInButton />
+              <Guard />
             </>
           )}
         </Column>
@@ -47,9 +60,10 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <ContainerWide>
       <Column>
-        <h1>Could not open {resource.getSubject()}</h1>
-        <ErrorBlock error={resource.error!} />
+        <h1>Could not open {resource.subject}</h1>
+        <ErrorBlock error={resource.error!} showTrace />
         <Row>
+          <GitHubIssueButton error={resource.error} />
           <Button
             onClick={() =>
               store.fetchResourceFromServer(subject, { setLoading: true })

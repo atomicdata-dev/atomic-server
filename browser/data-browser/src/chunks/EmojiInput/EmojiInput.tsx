@@ -5,7 +5,7 @@ import * as RadixPopover from '@radix-ui/react-popover';
 import { transition } from '../../helpers/transition';
 import { Popover } from '../../components/Popover';
 
-interface EmojiInputProps {
+export interface EmojiInputProps {
   initialValue?: string;
   onChange: (value: string | undefined) => void;
 }
@@ -25,7 +25,7 @@ const fetchAndCacheData = async () => {
   return data;
 };
 
-export default function EmojiInput({
+export default function EmojiInputASYNC({
   initialValue,
   onChange,
 }: EmojiInputProps): JSX.Element {
@@ -63,7 +63,8 @@ export default function EmojiInput({
 }
 
 const Preview = styled.span`
-  transition: ${transition('font-size')};
+  will-change: font-size;
+  ${transition('font-size')};
 `;
 
 const Placeholder = styled(Preview)`
@@ -74,10 +75,10 @@ const PickerButton = styled(RadixPopover.Trigger)`
   border: none;
   border-radius: ${({ theme }) => theme.radius};
   width: 2rem;
+  height: 2rem;
   background: transparent;
   padding: 0;
   cursor: pointer;
-
   user-select: none;
 
   &:hover > ${Preview} {

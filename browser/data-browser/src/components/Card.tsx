@@ -1,5 +1,9 @@
 import { styled } from 'styled-components';
-import { getTransitionStyle } from '../helpers/transitionName';
+import {
+  RESOURCE_PAGE_TRANSITION_TAG,
+  getTransitionStyle,
+} from '../helpers/transitionName';
+import { CARD_CONTAINER } from '../helpers/containers';
 
 type CardProps = {
   /** Adds a colorful border */
@@ -11,22 +15,21 @@ type CardProps = {
 /** A Card with a border. */
 export const Card = styled.div.attrs<CardProps>(p => ({
   // When we render a lot of cards it is more performant to use styles instead of classes when each card has a unique style
-  style: getTransitionStyle('resource-page', p.about),
+  style: getTransitionStyle(RESOURCE_PAGE_TRANSITION_TAG, p.about),
 }))`
-  background-color: ${props => props.theme.colors.bg};
-
+  background-color: ${p => p.theme.colors.bg};
+  container: ${CARD_CONTAINER} / inline-size;
   border: solid 1px
-    ${props =>
-      props.highlight ? props.theme.colors.main : props.theme.colors.bg2};
-  box-shadow: ${props =>
-    props.highlight
-      ? `0 0 0 1px ${props.theme.colors.main}, ${props.theme.boxShadow}`
-      : props.theme.boxShadow};
+    ${p => (p.highlight ? p.theme.colors.main : p.theme.colors.bg2)};
+  box-shadow: ${p =>
+    p.highlight
+      ? `0 0 0 1px ${p.theme.colors.main}, ${p.theme.boxShadow}`
+      : p.theme.boxShadow};
 
-  padding: ${props => props.theme.margin}rem;
-  border-radius: ${props => props.theme.radius};
-  max-height: ${props => (props.small ? '10rem' : 'none')};
-  overflow: ${props => (props.small ? 'hidden' : 'visible')};
+  padding: ${p => p.theme.size()};
+  border-radius: ${p => p.theme.radius};
+  max-height: ${p => (p.small ? p.theme.size(12) : 'initial')};
+  overflow: ${p => (p.small ? 'hidden' : 'visible')};
 `;
 
 export interface CardRowProps {
@@ -35,20 +38,20 @@ export interface CardRowProps {
 
 /** A Row in a Card. Should probably be used inside a CardInsideFull */
 export const CardRow = styled.div<CardRowProps>`
-  --border: solid 1px ${props => props.theme.colors.bg2};
+  --border: solid 1px ${p => p.theme.colors.bg2};
   display: block;
-  border-top: ${props => (props.noBorder ? 'none' : 'var(--border)')};
-  padding: ${props => props.theme.margin / 3}rem
-    ${props => props.theme.margin}rem;
+  border-top: ${p => (p.noBorder ? 'none' : 'var(--border)')};
+  padding: ${p => p.theme.size(2)} ${p => p.theme.size()};
+  overflow-wrap: break-word;
 `;
 
 /** A block inside a Card which has full width */
 export const CardInsideFull = styled.div`
-  margin-left: -${props => props.theme.margin}rem;
-  margin-right: -${props => props.theme.margin}rem;
+  margin-left: -${p => p.theme.size()};
+  margin-right: -${p => p.theme.size()};
 `;
 
 export const Margin = styled.div`
   display: block;
-  height: ${props => props.theme.margin}rem;
+  height: ${p => p.theme.size()};
 `;

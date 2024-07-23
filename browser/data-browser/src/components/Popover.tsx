@@ -24,6 +24,7 @@ export interface PopoverProps {
   className?: string;
   noArrow?: boolean;
   noLock?: boolean;
+  modal?: boolean;
 }
 
 export function Popover({
@@ -33,6 +34,7 @@ export function Popover({
   defaultOpen,
   noArrow,
   noLock,
+  modal,
   onOpenChange,
   Trigger,
 }: PropsWithChildren<PopoverProps>): JSX.Element {
@@ -57,7 +59,7 @@ export function Popover({
 
   return (
     <RadixPopover.Root
-      modal
+      modal={modal}
       open={open}
       onOpenChange={handleOpenChange}
       defaultOpen={defaultOpen}
@@ -84,10 +86,6 @@ const fadeIn = keyframes`
   }
 `;
 
-export const DefaultTrigger = styled(RadixPopover.Trigger)`
-  max-width: 100%;
-`;
-
 const Content = styled(RadixPopover.Content)`
   --popover-close-offset: ${p => p.theme.margin}rem;
   --popover-close-size: 25px;
@@ -99,7 +97,6 @@ const Content = styled(RadixPopover.Content)`
   backdrop-filter: blur(10px);
   box-shadow: ${p => p.theme.boxShadowSoft};
   border-radius: ${p => p.theme.radius};
-  position: relative;
   z-index: 10000000;
   animation: ${fadeIn} 0.1s ease-in-out;
 

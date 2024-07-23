@@ -6,11 +6,13 @@ use actix_web::http::Uri;
 use atomic_lib::agents::ForAgent;
 use atomic_lib::authentication::AuthValues;
 use atomic_lib::AtomicError;
+use atomic_lib::Storelike;
 use percent_encoding::percent_decode_str;
 use std::str::FromStr;
 
+use crate::content_types::{get_accept, ContentType};
 use crate::errors::{AppErrorType, AtomicServerError};
-use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
+use crate::{appstate::AppState, errors::AtomicServerResult};
 
 /// Returns the authentication headers from the request
 #[tracing::instrument(skip_all)]
@@ -67,6 +69,7 @@ fn origin(url: &str) -> String {
     )
 }
 
+/// Checks if the origin in the Cookie matches the requested subject.
 pub fn get_auth_from_cookie(
     headers: &HeaderMap,
     requested_subject: &str,
@@ -164,6 +167,7 @@ pub fn get_auth(
 
 /// Checks for authentication headers and returns Some agent's subject if everything is well.
 /// Skips these checks in public_mode and returns Ok(None).
+/// Returns the Agent's subject or the Public Agent.
 #[tracing::instrument(skip(appstate))]
 pub fn get_client_agent(
     headers: &HeaderMap,
@@ -181,24 +185,6 @@ pub fn get_client_agent(
     )
     .map_err(|e| format!("Authentication failed: {}", e))?;
     Ok(for_agent)
-}
-
-/// Finds the extension
-pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
-    let items: Vec<&str> = path.split('.').collect();
-    if items.len() == 2 {
-        let path = items[0];
-        let content_type = match items[1] {
-            "json" => ContentType::Json,
-            "jsonld" => ContentType::JsonLd,
-            "jsonad" => ContentType::JsonAd,
-            "html" => ContentType::Html,
-            "ttl" => ContentType::Turtle,
-            _ => return None,
-        };
-        return Some((content_type, path));
-    }
-    None
 }
 
 fn session_cookies_from_header(header: &HeaderValue) -> AtomicServerResult<Vec<String>> {
@@ -295,4 +281,78 @@ mod test {
 
         assert_eq!(out.requested_subject, subject);
     }
+}
+
+/// Extracts the full URL from the request, connection and the store.
+// You'd think there would be a simpler way of getting the requested URL...
+// See https://github.com/actix/actix-web/issues/2895
+pub fn get_subject(
+    req: &actix_web::HttpRequest,
+    conn: &actix_web::dev::ConnectionInfo,
+    appstate: &AppState,
+) -> AtomicServerResult<(String, ContentType)> {
+    let content_type = get_accept(req.headers());
+
+    let domain = &appstate.config.opts.domain;
+    let host = conn.host();
+    let subdomain = if let Some(index) = host.find(domain) {
+        if index == 0 {
+            None
+        } else {
+            Some(host[0..index - 1].to_string())
+        }
+    } else {
+        panic!("Wrong domain! A requested URL did not contain the host for this domain. This should not be able to happen.");
+    };
+
+    let mut subject_url = appstate.store.get_server_url().clone();
+    if let Some(sd) = subdomain {
+        subject_url.set_subdomain(Some(&sd))?;
+    }
+    let server_without_last_slash = subject_url.to_string().trim_end_matches('/').to_string();
+    let subject = format!("{}{}", server_without_last_slash, &req.uri().to_string());
+    // if let Some((ct, path)) = try_extension(req.path()) {
+    //     content_type = ct;
+    //     return Ok((path.to_string(), content_type));
+    // }
+    Ok((subject, content_type))
+}
+
+/// Finds the extension of a supported serialization format.
+/// Not used right now, see: https://github.com/atomicdata-dev/atomic-data-rust/issues/601
+#[allow(dead_code)]
+fn try_extension(path: &str) -> Option<(ContentType, &str)> {
+    // Check if path ends with one of the folliwing extensions
+    let extensions = [
+        ".json",
+        ".jsonld",
+        ".jsonad",
+        ".html",
+        ".ttl",
+        ".nt",
+        ".nq",
+        ".ntriples",
+        ".nt",
+    ];
+    let mut found = None;
+    for ext in extensions.iter() {
+        if path.ends_with(ext) {
+            println!("Found extension: {}", ext);
+            let path = &path[0..path.len() - ext.len()];
+            let content_type = match *ext {
+                ".json" => Some(ContentType::Json),
+                ".jsonld" => Some(ContentType::JsonLd),
+                ".jsonad" => Some(ContentType::JsonAd),
+                ".html" => Some(ContentType::Html),
+                ".ttl" => Some(ContentType::Turtle),
+                ".nt" => Some(ContentType::NTriples),
+                ".ntriples" => Some(ContentType::NTriples),
+                _ => None,
+            };
+            if let Some(ct) = content_type {
+                found = Some((ct, path));
+            }
+        }
+    }
+    found
 }

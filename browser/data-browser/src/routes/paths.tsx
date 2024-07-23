@@ -15,6 +15,7 @@ export const paths = {
   history: '/app/history',
   allVersions: '/all-versions',
   sandbox: '/sandbox',
+  confirmEmail: '/confirm-email',
   fetchBookmark: '/fetch-bookmark',
   pruneTests: '/prunetests',
 };

@@ -24,7 +24,8 @@ import { useDialog } from './useDialog';
 import { useControlLock } from '../../hooks/useControlLock';
 
 export interface InternalDialogProps {
-  show: boolean;
+  /** Is the Dialog visible */
+  isVisible: boolean;
   onClose: (success: boolean) => void;
   onClosed: () => void;
   width?: CSS.Property.Width;
@@ -37,6 +38,7 @@ export enum DialogSlot {
 }
 
 export const DIALOG_MEDIA_BREAK_POINT = '640px';
+export const VAR_DIALOG_INNER_WIDTH = '--dialog-inner-width';
 
 const ANIM_MS = 80;
 const ANIM_SPEED = `${ANIM_MS}ms`;
@@ -85,7 +87,7 @@ export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
 
 const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   children,
-  show,
+  isVisible,
   width,
   onClose,
   onClosed,
@@ -94,7 +96,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   const innerDialogRef = useRef<HTMLDivElement>(null);
   const { hasOpenInnerPopup } = useDialogTreeContext();
 
-  useControlLock(show);
+  useControlLock(isVisible);
 
   const cancelDialog = useCallback(() => {
     onClose(false);
@@ -120,22 +122,26 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
     () => {
       cancelDialog();
     },
-    { enabled: show && !hasOpenInnerPopup },
+    { enabled: isVisible && !hasOpenInnerPopup },
   );
 
   // When closing the `data-closing` attribute must be set before rendering so the animation has started when the regular useEffect is called.
   useLayoutEffect(() => {
-    if (!show && dialogRef.current && dialogRef.current.hasAttribute('open')) {
+    if (
+      !isVisible &&
+      dialogRef.current &&
+      dialogRef.current.hasAttribute('open')
+    ) {
       dialogRef.current.setAttribute('data-closing', 'true');
     }
-  }, [show]);
+  }, [isVisible]);
 
   useEffect(() => {
     if (!dialogRef.current) {
       return;
     }
 
-    if (show) {
+    if (isVisible) {
       if (!dialogRef.current.hasAttribute('open'))
         // @ts-ignore
         dialogRef.current.showModal();
@@ -150,7 +156,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
         onClosed();
       }, ANIM_MS);
     }
-  }, [show, onClosed]);
+  }, [isVisible, onClosed]);
 
   return (
     <StyledDialog
@@ -235,6 +241,7 @@ const StyledInnerDialog = styled.div`
   grid-template-rows: 1fr auto auto;
   gap: 1rem;
   grid-template-areas: 'title close' 'content content' 'actions actions';
+  max-block-size: calc(100vh - ${p => p.theme.margin}rem * 2);
 `;
 
 const fadeInForground = keyframes`
@@ -261,6 +268,12 @@ const fadeInBackground = keyframes`
 
 const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
   --animation-speed: 500ms;
+  --dialog-width: min(90vw, ${p => p.$width ?? '60ch'});
+
+  ${VAR_DIALOG_INNER_WIDTH}: calc(
+    var(--dialog-width) - 2 * ${p => p.theme.margin}rem
+  );
+
   box-sizing: border-box;
   inset: 0px;
   position: relative;
@@ -270,11 +283,9 @@ const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
   background-color: ${props => props.theme.colors.bg};
   border-radius: ${props => props.theme.radius};
   border: solid 1px ${props => props.theme.colors.bg2};
-  max-inline-size: min(90vw, ${p => p.$width ?? '100ch'});
-  min-inline-size: min(90vw, ${p => p.$width ?? '60ch'});
+  inline-size: var(--dialog-width);
   max-block-size: 100vh;
   height: fit-content;
-  max-height: 90vh;
   overflow: visible;
   box-shadow: ${p => p.theme.boxShadowSoft};
 

@@ -1,8 +1,8 @@
-import { ulid } from 'ulid';
-
+import { ulid } from 'ulidx';
 import type { Agent } from './agent.js';
 import {
   removeCookieAuthentication,
+  serverSupportsRegister,
   setCookieAuthentication,
 } from './authentication.js';
 import { Client, type FileOrFileLike } from './client.js';
@@ -94,6 +94,10 @@ type StoreEventHandlers = {
 /** Returns True if the client has WebSocket support */
 const supportsWebSockets = () => typeof WebSocket !== 'undefined';
 
+export type ServerSupports = {
+  emailRegister: boolean;
+};
+
 /**
  * An in memory store that has a bunch of usefful methods for retrieving Atomic
  * Data Resources. It is also resposible for keeping the Resources in sync with
@@ -148,7 +152,6 @@ export class Store {
     this.client.setFetch(fetchOverride);
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public addResources(
     resources: Resource | Resource[],
     opts?: AddResourcesOpts,
@@ -328,7 +331,7 @@ export class Store {
     if (opts.setLoading) {
       const newR = new Resource<C>(subject);
       newR.loading = true;
-      this.addResources(newR);
+      this.addResources(newR, { skipCommitCompare: true });
     }
 
     // Use WebSocket if available, else use HTTP(S)
@@ -359,7 +362,7 @@ export class Store {
         },
       );
 
-      this.addResources(createdResources);
+      this.addResources(createdResources, { skipCommitCompare: true });
     }
 
     return this.resources.get(subject)!;
@@ -546,6 +549,7 @@ export class Store {
       shortname: shortname.toString(),
       description: description.toString(),
       datatype: datatypeFromUrl(datatypeUrl.toString()),
+      allowsOnly: resource.get(core.properties.allowsOnly),
     };
 
     return propery;
@@ -737,6 +741,13 @@ export class Store {
     } else {
       console.warn('WebSockets not supported, no window available');
     }
+  }
+
+  /** Checks which features the current Server instance supports */
+  public async getServerSupports(): Promise<ServerSupports> {
+    return {
+      emailRegister: await serverSupportsRegister(this),
+    };
   }
 
   /**
@@ -989,6 +1000,7 @@ export interface Property {
   isDynamic?: boolean;
   /** When the Property is still awaiting a server response */
   loading?: boolean;
+  allowsOnly?: string[];
 }
 
 export interface FetchOpts {

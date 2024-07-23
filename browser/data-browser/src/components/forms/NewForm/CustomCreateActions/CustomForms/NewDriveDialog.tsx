@@ -91,7 +91,11 @@ export const NewDriveDialog: FC<CustomResourceDialogProps> = ({
     onClose();
   }, [name, createAndNavigate, onClose, parent, setDrive, store]);
 
-  const [dialogProps, show, hide] = useDialog({ onSuccess, onCancel: onClose });
+  const {
+    dialogProps,
+    show,
+    close: hide,
+  } = useDialog({ onSuccess, onCancel: onClose });
 
   useEffect(() => {
     show();

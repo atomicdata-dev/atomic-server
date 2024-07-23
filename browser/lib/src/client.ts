@@ -1,9 +1,6 @@
 // Provides functionality to interact with an Atomic Server.
 // Send requests to the server and receive responses.
 
-// Works both in node and the browser
-import fetch from 'cross-fetch';
-
 import { hasBrowserAPI } from './hasBrowserAPI.js';
 import {
   checkAuthenticationCookie,
@@ -70,19 +67,9 @@ export class Client {
   private __fetchOverride?: typeof fetch;
 
   public constructor(fetchOverride?: typeof fetch) {
-    this.__fetchOverride = fetchOverride;
-  }
-
-  private get fetch() {
-    const fetchFunction = this.__fetchOverride ?? fetch;
-
-    if (typeof fetchFunction === 'undefined') {
-      throw new AtomicError(
-        `No fetch available, If the current environment doesn't have a fetch implementation you can pass one yourself.`,
-      );
+    if (fetchOverride) {
+      this.setFetch(fetchOverride);
     }
-
-    return fetchFunction;
   }
 
   /** Throws an error if the subject is not valid */
@@ -117,7 +104,7 @@ export class Client {
   }
 
   public setFetch(fetchOverride: typeof fetch) {
-    this.__fetchOverride = fetchOverride;
+    this.__fetchOverride = fetchOverride.bind(globalThis);
   }
 
   /**
@@ -285,30 +272,11 @@ export class Client {
     return resources;
   }
 
-  // /** Instructs an Atomic Server to fetch a URL and get its JSON-AD */
-  // public async importJsonAdUrl(
-  //   /** The URL of the JSON-AD to import */
-  //   jsonAdUrl: string,
-  //   /** Importer URL. Servers tend to have one at `example.com/import` */
-  //   importerUrl: string,
-  // ): Promise<HTTPResourceResult> {
-  //   const url = new URL(importerUrl);
-  //   url.searchParams.set('url', jsonAdUrl);
+  private fetch(...params: Parameters<typeof fetch>): ReturnType<typeof fetch> {
+    if (this.__fetchOverride) {
+      return this.__fetchOverride(...params);
+    }
 
-  //   return this.fetchResourceHTTP(url.toString());
-  // }
-
-  // /** Instructs an Atomic Server to fetch a URL and get its JSON-AD */
-  // public async importJsonAdString(
-  //   /** The JSON-AD to import */
-  //   jsonAdString: string,
-  //   /** Importer URL. Servers tend to have one at `example.com/import` */
-  //   importerUrl: string,
-  // ): Promise<HTTPResourceResult> {
-  //   const url = new URL(importerUrl);
-
-  //   return this.fetchResourceHTTP(url.toString(), {
-  //     body: jsonAdString,
-  //   });
-  // }
+    return fetch(...params);
+  }
 }

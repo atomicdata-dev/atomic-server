@@ -14,6 +14,7 @@ import { Column } from '../Row';
 import { OntologiesPanel } from './OntologySideBar/OntologiesPanel';
 import { SideBarPanel } from './SideBarPanel';
 import { Panel, usePanelList } from './usePanelList';
+import { SIDEBAR_WIDTH_PROP } from './SidebarCSSVars';
 
 /** Amount of pixels where the sidebar automatically shows */
 export const SIDEBAR_TOGGLE_WIDTH = 600;
@@ -61,7 +62,7 @@ export function SideBar(): JSX.Element {
       <SideBarStyled
         ref={mountRefs}
         size={size}
-        data-test='sidebar'
+        data-testid='sidebar'
         locked={isWideScreen && sideBarLocked}
         exposed={sidebarVisible}
         {...listeners}
@@ -69,7 +70,7 @@ export function SideBar(): JSX.Element {
         <NavBarSpacer position='top' />
         {/* The key is set to make sure the component is re-loaded when the baseURL changes */}
         <SideBarDriveMemo
-          handleClickItem={closeSideBar}
+          onItemClick={closeSideBar}
           key={drive}
           onIsRearangingChange={setIsRearanging}
         />
@@ -119,7 +120,7 @@ interface SideBarOverlayProps {
 //@ts-ignore
 const SideBarStyled = styled.nav.attrs<SideBarStyledProps>(p => ({
   style: {
-    '--width': p.size,
+    [SIDEBAR_WIDTH_PROP]: p.size,
   },
 }))`
   z-index: ${p => p.theme.zIndex.sidebar};
@@ -128,11 +129,12 @@ const SideBarStyled = styled.nav.attrs<SideBarStyledProps>(p => ({
   transition:
     opacity 0.3s,
     left 0.3s;
-  left: ${p => (p.exposed ? '0' : `calc(var(--width) * -1 + 0.5rem)`)};
+  left: ${p =>
+    p.exposed ? '0' : `calc(var(${SIDEBAR_WIDTH_PROP}) * -1 + 0.5rem)`};
   /* When the user is hovering, show half opacity */
   opacity: ${p => (p.exposed ? 1 : 0)};
   height: 100vh;
-  width: var(--width);
+  width: var(${SIDEBAR_WIDTH_PROP});
   position: ${p => (p.locked ? 'relative' : 'absolute')};
   border-right: ${p => `1px solid ${p.theme.colors.bg2}`};
   box-shadow: ${p => (p.locked ? 'none' : p.theme.boxShadowSoft)};

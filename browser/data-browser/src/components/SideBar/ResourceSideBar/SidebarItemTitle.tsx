@@ -7,10 +7,14 @@ import { useResource, useArray, core, useString } from '@tomic/react';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { DraggableAttributes } from '@dnd-kit/core';
 import { StyledLink, TextWrapper } from './shared';
-import { getTransitionName } from '../../../helpers/transitionName';
+import {
+  SIDEBAR_TRANSITION_TAG,
+  getTransitionName,
+} from '../../../helpers/transitionName';
 import { useSettings } from '../../../helpers/AppSettings';
 import { IconButton } from '../../IconButton/IconButton';
 import { FaGripVertical } from 'react-icons/fa6';
+import { UnsavedIndicator } from '../../UnsavedIndicator';
 
 interface SidebarItemTitleProps {
   subject: string;
@@ -47,7 +51,7 @@ export const SidebarItemTitle = forwardRef<
     return (
       <ActionWrapper
         isDragging={isDragging}
-        data-sidebar-id={getTransitionName('sidebar', subject)}
+        data-sidebar-id={getTransitionName(SIDEBAR_TRANSITION_TAG, subject)}
       >
         {sidebarKeyboardDndEnabled ? (
           <StyledLink subject={subject} clean ref={ref}>
@@ -67,6 +71,7 @@ export const SidebarItemTitle = forwardRef<
                   <FaGripVertical />
                 </StyledIconButton>
                 {resource.title}
+                <UnsavedIndicator resource={resource} />
               </TextWrapper>
             </SideBarItem>
           </StyledLink>
@@ -87,6 +92,7 @@ export const SidebarItemTitle = forwardRef<
               <TextWrapper>
                 <Icon />
                 {resource.title}
+                <UnsavedIndicator resource={resource} />
               </TextWrapper>
             </SideBarItem>
           </StyledLink>

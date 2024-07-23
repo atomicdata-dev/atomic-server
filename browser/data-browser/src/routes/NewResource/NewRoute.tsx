@@ -1,4 +1,4 @@
-import { useResource, urls } from '@tomic/react';
+import { useResource, core } from '@tomic/react';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -49,11 +49,13 @@ function NewResourceSelector() {
   }
 
   const onUploadComplete = useCallback(
-    (files: string[]) => {
-      toast.success(`Uploaded ${files.length} files.`);
+    (fileSubjects: string[]) => {
+      toast.success(`Uploaded ${fileSubjects.length} files.`);
 
-      if (calculatedParent) {
-        navigate(constructOpenURL(calculatedParent));
+      if (fileSubjects.length > 1 && parentSubject) {
+        navigate(constructOpenURL(parentSubject));
+      } else {
+        navigate(constructOpenURL(fileSubjects[0]));
       }
     },
     [parentSubject, navigate],
@@ -73,9 +75,8 @@ function NewResourceSelector() {
         </h1>
         <div>
           <ResourceSelector
-            hideCreateOption
             setSubject={handleClassSet}
-            isA={urls.classes.class}
+            classType={core.classes.class}
           />
         </div>
         <BaseButtons parent={calculatedParent} />

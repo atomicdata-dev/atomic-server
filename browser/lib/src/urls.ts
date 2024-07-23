@@ -70,6 +70,10 @@ export const properties = {
   write: 'https://atomicdata.dev/properties/write',
   displayStyle: 'https://atomicdata.dev/property/display-style',
   publishedAt: 'https://atomicdata.dev/properties/published-at',
+  article: {
+    publishedAt: 'https://atomicdata.dev/properties/published-at',
+    tags: 'https://atomicdata.dev/properties/tags',
+  },
   agent: {
     publicKey: 'https://atomicdata.dev/properties/publicKey',
   },

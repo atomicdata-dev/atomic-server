@@ -1,5 +1,11 @@
-import { urls, useResource, useString } from '@tomic/react';
-import { useEffect, useRef } from 'react';
+import {
+  dataBrowser,
+  urls,
+  useResource,
+  useString,
+  type Resource,
+} from '@tomic/react';
+import React, { useEffect, useRef } from 'react';
 import { styled, css } from 'styled-components';
 import { getIconForClass } from '../../../views/FolderPage/iconMap';
 
@@ -45,18 +51,31 @@ export function ResourceResultLine({
   ...props
 }: ResourceResultLineProps): JSX.Element {
   const resource = useResource(subject);
-  const [isA] = useString(resource, urls.properties.isA);
   const [description] = useString(resource, urls.properties.description);
-
-  const Icon = getIconForClass(isA ?? '');
 
   return (
     <ResultLine {...props}>
-      <Icon />
+      <Icon resource={resource} />
       {resource.title}
       {description && <Description> - {description.slice(0, 70)}</Description>}
     </ResultLine>
   );
+}
+
+type IconProps = {
+  resource: Resource;
+};
+
+function Icon({ resource }: IconProps): React.ReactElement {
+  const IconComp = getIconForClass(resource.getClasses()[0] ?? '');
+
+  if (resource.hasClasses(dataBrowser.classes.tag)) {
+    const emoji = resource.get(dataBrowser.properties.emoji);
+
+    return emoji ? <span>{emoji}</span> : <IconComp />;
+  }
+
+  return <IconComp />;
 }
 
 const Description = styled.span`

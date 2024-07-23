@@ -27,17 +27,19 @@ function ResourceField({
   disabled,
   label: labelProp,
 }: IFieldProps): JSX.Element {
-  const id = useId();
+  const fieldId = useId();
+  const labelId = useId();
+
   const property = useProperty(propertyURL);
 
-  if (property === null) {
+  if (!property) {
     return (
-      <Field label={labelProp || 'loading...'} fieldId={id}>
+      <Field label={labelProp || 'loading...'} fieldId={fieldId}>
         <InputWrapper>
           <InputStyled
             disabled={disabled}
             placeholder='loading property...'
-            id={id}
+            id={fieldId}
           />
         </InputWrapper>
       </Field>
@@ -56,12 +58,12 @@ function ResourceField({
         }
         label={label}
         disabled
-        fieldId={id}
+        fieldId={fieldId}
       >
         <InputSwitcher
-          id={id}
+          id={fieldId}
           key={propertyURL + ' input-switcher'}
-          data-test={`input-${property.shortname}`}
+          data-testId={`input-${property.shortname}`}
           resource={resource}
           property={property}
           autoFocus={autoFocus}
@@ -84,10 +86,12 @@ function ResourceField({
       handleDelete={handleDelete}
       required={required}
       disabled={disabled}
-      fieldId={id}
+      fieldId={fieldId}
+      labelId={labelId}
     >
       <InputSwitcher
-        id={id}
+        id={fieldId}
+        labelId={labelId}
         key={propertyURL + ' input-switcher'}
         data-test={`input-${property.shortname}`}
         resource={resource}
@@ -127,6 +131,7 @@ function HelperText({ text, link }: HelperTextProps) {
 /** A single field in a Resource form should receive these */
 export type InputProps = {
   id?: string;
+  labelId?: string;
   /** The resource that is being edited */
   resource: Resource;
   /** The property of the resource that is being edited */
@@ -136,7 +141,10 @@ export type InputProps = {
   disabled?: boolean;
   /** Whether the field should be focused on render */
   autoFocus?: boolean;
+  /** Whether the field should commit on change */
   commit?: boolean;
+  /** The debounce interval for the commit event in miliseconds */
+  commitDebounceInterval?: number;
 };
 
 interface IFieldProps {

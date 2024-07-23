@@ -32,6 +32,7 @@ pub struct HandlePostContext<'a> {
     pub body: Vec<u8>,
 }
 /// An API endpoint at some path which accepts requests and returns some Resource.
+/// Add them by calling [Db::register_endpoint]
 #[derive(Clone)]
 pub struct Endpoint {
     /// The part behind the server domain, e.g. '/versions' or '/collections'. Include the slash.
@@ -58,7 +59,11 @@ pub struct PostEndpoint {
 impl Endpoint {
     /// Converts Endpoint to resource. Does not save it.
     pub fn to_resource(&self, store: &impl Storelike) -> AtomicResult<Resource> {
-        let subject = format!("{}{}", store.get_server_url(), self.path);
+        let subject = store
+            .get_server_url()
+            .clone()
+            .set_path(&self.path)
+            .to_string();
         let mut resource = store.get_resource_new(&subject);
         resource.set_string(urls::DESCRIPTION.into(), &self.description, store)?;
         resource.set_string(urls::SHORTNAME.into(), &self.shortname, store)?;
@@ -74,7 +79,15 @@ impl Endpoint {
     }
 }
 
-pub fn default_endpoints() -> Vec<Endpoint> {
+impl std::fmt::Debug for Endpoint {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Endpoint")
+            .field("path", &self.path)
+            .finish()
+    }
+}
+
+pub fn build_default_endpoints() -> Vec<Endpoint> {
     vec![
         plugins::versioning::version_endpoint(),
         plugins::versioning::all_versions_endpoint(),

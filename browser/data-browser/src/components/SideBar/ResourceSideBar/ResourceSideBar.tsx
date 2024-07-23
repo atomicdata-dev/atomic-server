@@ -1,5 +1,14 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { useString, useResource, useTitle, urls, useArray } from '@tomic/react';
+import {
+  useString,
+  useResource,
+  useTitle,
+  useArray,
+  useCanWrite,
+  core,
+  dataBrowser,
+  unknownSubject,
+} from '@tomic/react';
 import { useCurrentSubject } from '../../../helpers/useCurrentSubject';
 import { SideBarItem } from '../SideBarItem';
 import { AtomicLink } from '../../AtomicLink';
@@ -25,12 +34,12 @@ interface ResourceSideBarProps {
 }
 
 /** Renders a Resource as a nav item for in the sidebar. */
-export function ResourceSideBar({
+export const ResourceSideBar: React.FC<ResourceSideBarProps> = ({
   subject,
   renderedHierargy,
   ancestry,
   onClick,
-}: ResourceSideBarProps): JSX.Element {
+}) => {
   if (renderedHierargy.length === 0) {
     throw new Error('renderedHierargy should not be empty');
   }
@@ -38,13 +47,15 @@ export function ResourceSideBar({
   const resource = useResource(subject, { allowIncomplete: true });
   const [currentUrl] = useCurrentSubject();
   const [title] = useTitle(resource);
-  const [description] = useString(resource, urls.properties.description);
-
+  const [description] = useString(resource, core.properties.description);
+  const [canWrite] = useCanWrite(resource);
   const active = currentUrl === subject;
   const [open, setOpen] = useState(active);
 
-  const [subResources] = useArray(resource, urls.properties.subResources);
-  const hasSubResources = subResources.length > 0;
+  const [subResources] = useArray(
+    resource,
+    dataBrowser.properties.subResources,
+  );
 
   const dragData: SideBarDragData = {
     renderedUnder: renderedHierargy.at(-1)!,
@@ -59,25 +70,8 @@ export function ResourceSideBar({
   } = useDraggable({
     id: subject,
     data: dragData,
+    disabled: !canWrite,
   });
-
-  const isDragging = draggingNode?.id === subject;
-
-  useEffect(() => {
-    if (isDragging) {
-      setOpen(false);
-    }
-  }, [isDragging]);
-
-  const isHoveringOver = over?.data.current?.parent === subject;
-
-  useEffect(() => {
-    if (ancestry.includes(subject) && ancestry[0] !== subject) {
-      setOpen(true);
-    }
-  }, [ancestry]);
-
-  const hierarchyWithItself = [...renderedHierargy, subject];
 
   const TitleComp = useMemo(
     () => (
@@ -90,8 +84,29 @@ export function ResourceSideBar({
         attributes={attributes}
       />
     ),
-    [subject, active, onClick, description, title],
+    [subject, active, onClick, description, title, listeners, attributes],
   );
+
+  const hasSubResources = subResources.length > 0;
+  const isDragging = draggingNode?.id === subject;
+  const isHoveringOver = over?.data.current?.parent === subject;
+  const hierarchyWithItself = [...renderedHierargy, subject];
+
+  useEffect(() => {
+    if (isDragging) {
+      setOpen(false);
+    }
+  }, [isDragging]);
+
+  useEffect(() => {
+    if (ancestry.includes(subject) && ancestry[0] !== subject) {
+      setOpen(true);
+    }
+  }, [ancestry]);
+
+  if (!subject || subject === unknownSubject) {
+    return null;
+  }
 
   if (resource.loading) {
     return (
@@ -137,6 +152,7 @@ export function ResourceSideBar({
                 subject={child}
                 renderedHierargy={hierarchyWithItself}
                 ancestry={ancestry}
+                onClick={onClick}
               />
               <DropEdge
                 parentHierarchy={hierarchyWithItself}
@@ -147,7 +163,7 @@ export function ResourceSideBar({
       </Details>
     </Wrapper>
   );
-}
+};
 
 const Wrapper = styled.div<{ highlight: boolean }>`
   background-color: ${p =>

@@ -1,5 +1,6 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
+//! See [Db]
 
 mod migrations;
 mod prop_val_sub_index;
@@ -10,26 +11,30 @@ mod val_prop_sub_index;
 
 use std::{
     collections::{HashMap, HashSet},
-    sync::{Arc, Mutex},
+    sync::Arc,
     vec,
 };
 
+use mail_send::{Connected, Transport};
+use migrations::{REFERENCE_INDEX_CURRENT, RESOURCE_TREE_CURRENT};
 use tracing::{info, instrument};
 
 use crate::{
     agents::ForAgent,
+    atomic_url::{AtomicUrl, Routes},
     atoms::IndexAtom,
     commit::CommitResponse,
-    db::{
-        query_index::{requires_query_index, NO_VALUE},
-        val_prop_sub_index::find_in_val_prop_sub_index,
-    },
-    endpoints::{default_endpoints, Endpoint, HandleGetContext},
+    db::{query_index::requires_query_index, val_prop_sub_index::find_in_val_prop_sub_index},
+    email::{self, MailMessage},
+    endpoints::{build_default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
+    plugins,
+    query::QueryResult,
     resources::PropVals,
-    storelike::{Query, QueryResult, Storelike},
+    storelike::Storelike,
+    urls,
     values::SortableValue,
-    Atom, Resource,
+    Atom, Query, Resource, Value,
 };
 
 use self::{
@@ -40,7 +45,7 @@ use self::{
     },
     query_index::{
         check_if_atom_matches_watched_query_filters, query_sorted_indexed, should_include_resource,
-        update_indexed_member, IndexIterator, QueryFilter,
+        update_indexed_member, IndexIterator, QueryFilter, NO_VALUE,
     },
     val_prop_sub_index::{add_atom_to_reference_index, remove_atom_from_reference_index},
 };
@@ -52,21 +57,22 @@ type HandleCommit = Box<dyn Fn(&CommitResponse) + Send + Sync>;
 /// The String on the left represents a Property URL, and the second one is the set of subjects.
 pub type PropSubjectMap = HashMap<String, HashSet<String>>;
 
-/// The Db is a persistent on-disk Atomic Data store.
+/// A persistent on-disk Atomic Data store.
 /// It's an implementation of [Storelike].
 /// It uses [sled::Tree]s as Key Value stores.
 /// It stores [Resource]s as [PropVals]s by their subject as key.
 /// It builds a value index for performant [Query]s.
 /// It keeps track of Queries and updates their index when [crate::Commit]s are applied.
-/// You can pass a custom `on_commit` function to run at Commit time.
 /// `Db` should be easily, cheaply clone-able, as users of this library could have one `Db` per connection.
+/// Note that [plugins](crate::plugins) can add their own endpoints to the [Db],
+/// and can use [tokio::spawn] to start concurrent tasks.
 #[derive(Clone)]
 pub struct Db {
     /// The Key-Value store that contains all data.
     /// Resources can be found using their Subject.
     /// Try not to use this directly, but use the Trees.
     db: sled::Db,
-    default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+    default_agent: Arc<std::sync::Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
     /// Index of all Atoms, sorted by {Value}-{Property}-{Subject}.
@@ -80,35 +86,38 @@ pub struct Db {
     /// A list of all the Collections currently being used. Is used to update `query_index`.
     watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
-    server_url: String,
+    server_url: AtomicUrl,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
-    on_commit: Option<Arc<HandleCommit>>,
+    handle_commit: Option<Arc<HandleCommit>>,
+    /// Email SMTP client for sending email.
+    smtp_client: Option<Arc<tokio::sync::Mutex<Transport<'static, Connected>>>>,
 }
 
 impl Db {
     /// Creates a new store at the specified path, or opens the store if it already exists.
     /// The server_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
-    pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
+    pub fn init(path: &std::path::Path, server_url: &str) -> AtomicResult<Db> {
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
-        let resources = db.open_tree("resources_v1").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
-        let reference_index = db.open_tree("reference_index_v1")?;
+        let resources = db.open_tree(RESOURCE_TREE_CURRENT).map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
+        let reference_index = db.open_tree(REFERENCE_INDEX_CURRENT)?;
         let query_index = db.open_tree("members_index")?;
         let prop_val_sub_index = db.open_tree("prop_val_sub_index")?;
         let watched_queries = db.open_tree("watched_queries")?;
         let store = Db {
             db,
-            default_agent: Arc::new(Mutex::new(None)),
+            default_agent: Arc::new(std::sync::Mutex::new(None)),
             resources,
             reference_index,
             query_index,
             prop_val_sub_index,
-            server_url,
+            server_url: AtomicUrl::try_from(server_url)?,
             watched_queries,
-            endpoints: default_endpoints(),
-            on_commit: None,
+            endpoints: Vec::new(),
+            handle_commit: None,
+            smtp_client: None,
         };
         migrate_maybe(&store).map(|e| format!("Error during migration of database: {:?}", e))?;
         crate::populate::populate_base_models(&store)
@@ -121,10 +130,7 @@ impl Db {
     pub fn init_temp(id: &str) -> AtomicResult<Db> {
         let tmp_dir_path = format!(".temp/db/{}", id);
         let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
-        let store = Db::init(
-            std::path::Path::new(&tmp_dir_path),
-            "https://localhost".into(),
-        )?;
+        let store = Db::init(std::path::Path::new(&tmp_dir_path), "https://localhost")?;
         let agent = store.create_agent(None)?;
         store.set_default_agent(agent);
         store.populate()?;
@@ -158,7 +164,7 @@ impl Db {
     /// Sets a function that is called whenever a [Commit::apply] is called.
     /// This can be used to listen to events.
     pub fn set_handle_commit(&mut self, on_commit: HandleCommit) {
-        self.on_commit = Some(Arc::new(on_commit));
+        self.handle_commit = Some(Arc::new(on_commit));
     }
 
     /// Finds resource by Subject, return PropVals HashMap
@@ -181,7 +187,7 @@ impl Db {
                 Ok(propval)
             }
             None => Err(AtomicError::not_found(format!(
-                "Resource {} not found",
+                "Resource {} does not exist",
                 subject
             ))),
         }
@@ -204,6 +210,9 @@ impl Db {
         let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
         let subject: String = String::from_utf8_lossy(&subject).to_string();
 
+        // if !include_external && self.is_external_subject(&subject).ok()? {
+        //     return None;
+        // }
         if !include_external && !subject.starts_with(&self_url) {
             return None;
         }
@@ -212,6 +221,29 @@ impl Db {
             .unwrap_or_else(|e| panic!("{}. {}", corrupt_db_message(&subject), e));
 
         Some(Resource::from_propvals(propvals, subject))
+    }
+
+    pub fn register_default_endpoints(&mut self) -> AtomicResult<()> {
+        // First we delete all existing endpoint resources, as they might not be there in this new run
+        let found_endpoints = self.query(&Query::new_class(urls::ENDPOINT))?.resources;
+
+        for mut found in found_endpoints {
+            found.destroy(self)?;
+        }
+
+        let mut endpoints = build_default_endpoints();
+
+        if self.smtp_client.is_some() {
+            tracing::info!("SMTP client is set, adding register endpoints");
+            endpoints.push(plugins::register::register_endpoint());
+            endpoints.push(plugins::register::confirm_email_endpoint());
+        }
+
+        for endpoint in endpoints {
+            self.register_endpoint(endpoint)?;
+        }
+
+        Ok(())
     }
 
     fn build_index_for_atom(
@@ -249,10 +281,6 @@ impl Db {
     }
 
     fn query_basic(&self, q: &Query) -> AtomicResult<QueryResult> {
-        let self_url = self
-            .get_self_url()
-            .ok_or("No self_url set, required for Queries")?;
-
         let mut subjects: Vec<String> = vec![];
         let mut resources: Vec<Resource> = vec![];
         let mut total_count = 0;
@@ -261,13 +289,14 @@ impl Db {
 
         for (i, atom_res) in atoms.enumerate() {
             let atom = atom_res?;
-            if !q.include_external && !atom.subject.starts_with(&self_url) {
-                continue;
-            }
 
             total_count += 1;
 
             if q.offset > i {
+                continue;
+            }
+
+            if !q.include_external && self.is_external_subject(&atom.subject)? {
                 continue;
             }
 
@@ -315,6 +344,55 @@ impl Db {
             resources,
             count: total_count,
         })
+    }
+
+    /// Adds an [Endpoint] to the store. This means adding a route with custom behavior.
+    pub fn register_endpoint(&mut self, endpoint: Endpoint) -> AtomicResult<()> {
+        let mut resource = endpoint.to_resource(self)?;
+        let endpoints_collection = self.get_server_url().set_route(Routes::Endpoints);
+        resource.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(endpoints_collection.to_string()),
+            self,
+        )?;
+        resource.save_locally(self)?;
+        self.endpoints.push(endpoint);
+        Ok(())
+    }
+
+    /// Registers an SMTP client to the store, allowing the store to send emails.
+    pub async fn set_smtp_config(
+        &mut self,
+        smtp_config: crate::email::SmtpConfig,
+    ) -> AtomicResult<()> {
+        self.smtp_client = Some(Arc::new(tokio::sync::Mutex::new(
+            crate::email::get_smtp_client(smtp_config).await?,
+        )));
+        Ok(())
+    }
+
+    pub async fn send_email(&self, message: MailMessage) -> AtomicResult<()> {
+        let mut client = self
+            .smtp_client
+            .as_ref()
+            .ok_or_else(|| {
+                AtomicError::other_error(
+                    "No SMTP client configured. Please call set_smtp_config first.".into(),
+                )
+            })?
+            .lock()
+            .await;
+        email::send_mail(&mut client, message).await?;
+        Ok(())
+    }
+}
+
+impl Drop for Db {
+    fn drop(&mut self) {
+        match self.db.flush() {
+            Ok(..) => (),
+            Err(e) => eprintln!("Failed to flush the database: {}", e),
+        };
     }
 }
 
@@ -415,14 +493,14 @@ impl Storelike for Db {
         Ok(())
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &AtomicUrl {
         &self.server_url
     }
 
-    // Since the DB is often also the server, this should make sense.
-    // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
+        // Since the DB is often also the server, this should make sense.
+        // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -441,7 +519,7 @@ impl Storelike for Db {
                 let resource = crate::resources::Resource::from_propvals(propvals, subject.into());
                 Ok(resource)
             }
-            Err(e) => self.handle_not_found(subject, e, None),
+            Err(e) => self.handle_not_found(subject, e),
         }
     }
 
@@ -455,16 +533,12 @@ impl Storelike for Db {
         let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
         // This might add a trailing slash
         let url = url::Url::parse(subject)?;
-        let mut removed_query_params = {
+
+        let removed_query_params = {
             let mut url_altered = url.clone();
             url_altered.set_query(None);
             url_altered.to_string()
         };
-
-        // Remove trailing slash
-        if removed_query_params.ends_with('/') {
-            removed_query_params.pop();
-        }
 
         url_span.exit();
 
@@ -564,7 +638,7 @@ impl Storelike for Db {
     }
 
     fn handle_commit(&self, commit_response: &CommitResponse) {
-        if let Some(fun) = &self.on_commit {
+        if let Some(fun) = &self.handle_commit {
             fun(commit_response);
         }
     }
@@ -588,7 +662,8 @@ impl Storelike for Db {
     ) -> Box<dyn std::iter::Iterator<Item = Resource>> {
         let self_url = self
             .get_self_url()
-            .expect("No self URL set, is required in DB");
+            .expect("No self URL set, is required in DB")
+            .to_string();
 
         let result = self.resources.into_iter().filter_map(move |item| {
             Db::map_sled_item_to_resource(item, self_url.clone(), include_external)

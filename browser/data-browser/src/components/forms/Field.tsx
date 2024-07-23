@@ -10,6 +10,7 @@ import {
   LabelHelper,
   LabelWrapper,
 } from './InputStyles';
+import { complement } from 'polished';
 
 /** High level form field skeleton. Pass the actual input as a child component. */
 function Field({
@@ -21,6 +22,7 @@ function Field({
   required,
   disabled,
   fieldId,
+  labelId,
 }: IFieldProps): JSX.Element {
   const [collapsedHelper, setCollapsed] = useState(true);
 
@@ -28,9 +30,13 @@ function Field({
     <FieldStyled>
       <LabelWrapper>
         <Row gap='0.4rem' center>
-          <FieldLabel data-test={`field-label-${label}`} htmlFor={fieldId}>
+          <FieldLabel
+            data-test={`field-label-${label}`}
+            htmlFor={fieldId}
+            id={labelId}
+          >
             <span>{label}</span>
-            {required && <FaAsterisk title='Required field' />}
+            {required && <Astrisk title='Required field' size='0.6em' />}
           </FieldLabel>
           {helper && (
             <IconButton
@@ -81,11 +87,6 @@ export const FieldLabel = styled.label`
   gap: 0.2rem;
   align-items: center;
   font-weight: bold;
-
-  svg {
-    color: ${props => props.theme.colors.textLight};
-    font-size: 0.8rem;
-  }
 `;
 
 interface IFieldProps {
@@ -103,6 +104,7 @@ interface IFieldProps {
 
   /** The id of the field. This is used to link the label with the input */
   fieldId?: string;
+  labelId?: string;
   /**
    * This function will be called when the delete icon is clicked. This should
    * remove the item from any parent list
@@ -111,3 +113,8 @@ interface IFieldProps {
 }
 
 export default Field;
+
+const Astrisk = styled(FaAsterisk)`
+  margin-bottom: 0.5em;
+  color: ${p => complement(p.theme.colors.main)};
+`;

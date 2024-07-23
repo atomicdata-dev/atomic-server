@@ -1,10 +1,7 @@
-import { useResource, useTitle } from '@tomic/react';
 import { useState } from 'react';
-import { FaEllipsisV, FaPlus } from 'react-icons/fa';
+import { FaEllipsisVertical } from 'react-icons/fa6';
 import { styled, css } from 'styled-components';
-import { useNewRoute } from '../../../helpers/useNewRoute';
 import { buildDefaultTrigger } from '../../Dropdown/DefaultTrigger';
-import { IconButton } from '../../IconButton/IconButton';
 import ResourceContextMenu from '../../ResourceContextMenu';
 
 export interface FloatingActionsProps {
@@ -17,21 +14,10 @@ export function FloatingActions({
   subject,
   className,
 }: FloatingActionsProps): JSX.Element {
-  const parentResource = useResource(subject);
-  const [parentName] = useTitle(parentResource);
   const [dropdownActive, setDropdownActive] = useState(false);
-
-  const handleAddClick = useNewRoute(subject);
 
   return (
     <Wrapper className={className} dropdownActive={dropdownActive}>
-      <IconButton
-        data-test='add-subresource'
-        onClick={handleAddClick}
-        title={`Create new resource under ${parentName}`}
-      >
-        <FaPlus />
-      </IconButton>
       <ResourceContextMenu
         simple
         subject={subject}
@@ -43,17 +29,23 @@ export function FloatingActions({
 }
 
 const Wrapper = styled.span<{ dropdownActive: boolean }>`
-  visibility: ${p => (p.dropdownActive ? 'visible' : 'hidden')};
+  visibility: hidden;
   font-size: 0.9rem;
   color: ${p => p.theme.colors.main};
+
+  @media (pointer: fine) {
+    visibility: ${p => (p.dropdownActive ? 'visible' : 'hidden')};
+  }
 `;
 
 export const floatingHoverStyles = css`
   position: relative;
 
   &:hover ${Wrapper}, &:focus-within ${Wrapper} {
-    visibility: visible;
+    @media (pointer: fine) {
+      visibility: visible;
+    }
   }
 `;
 
-const SideBarDropDownTrigger = buildDefaultTrigger(<FaEllipsisV />);
+const SideBarDropDownTrigger = buildDefaultTrigger(<FaEllipsisVertical />);
