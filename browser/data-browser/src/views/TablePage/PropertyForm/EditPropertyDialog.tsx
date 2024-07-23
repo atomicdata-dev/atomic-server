@@ -31,7 +31,7 @@ export function EditPropertyDialog({
     resource.save();
   }, [resource]);
 
-  const [dialogProps, show, hide] = useDialog({ bindShow, onSuccess });
+  const { dialogProps, show, close: hide } = useDialog({ bindShow, onSuccess });
 
   useEffect(() => {
     if (showDialog) {

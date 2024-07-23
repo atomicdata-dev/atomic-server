@@ -89,7 +89,12 @@ export const NewTableDialog: FC<NewTableDialogProps> = ({
     createResourceAndNavigate,
   ]);
 
-  const [dialogProps, show, hide, isOpen] = useDialog({ onCancel, onSuccess });
+  const {
+    dialogProps,
+    show,
+    close: hide,
+    isOpen,
+  } = useDialog({ onCancel, onSuccess });
 
   useEffect(() => {
     show();

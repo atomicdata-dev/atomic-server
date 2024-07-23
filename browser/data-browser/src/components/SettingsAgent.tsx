@@ -108,9 +108,9 @@ export const SettingsAgent: React.FunctionComponent = () => {
   return (
     <form>
       <Field
-        label={agent ? 'Passphrase' : 'Enter your Passphrase'}
+        label={agent ? 'Secret' : 'Enter your Secret'}
         helper={
-          "The Agent Passphrase is a secret, long string of characters that encodes both the Subject and the Private Key. You can think of it as a combined username + password. Store it safely, and don't share it with others."
+          "The Secret is a long string of characters that encodes both the Subject and the Private Key. You can think of it as a combined username + password. Store it safely, and don't share it with others."
         }
         error={error}
       >
@@ -124,7 +124,7 @@ export const SettingsAgent: React.FunctionComponent = () => {
             id='current-password'
             autoComplete='current-password'
             spellCheck='false'
-            placeholder='Paste your Passphrase'
+            placeholder='Paste your Secret'
           />
           <ButtonInput
             type='button'

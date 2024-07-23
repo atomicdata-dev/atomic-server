@@ -494,7 +494,7 @@ mod test {
 
     #[test]
     fn create_collection_nested_members_and_sorting() {
-        let mut store = crate::Store::init().unwrap();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let collection_builder = CollectionBuilder {
             subject: "test_subject".into(),
@@ -560,7 +560,7 @@ mod test {
     #[ignore]
     // TODO: This currently only tests atomicdata.dev, should test local resources. These need to be rewritten
     fn get_collection_params() {
-        let mut store = crate::Store::init().unwrap();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
 
         let collection_page_size = store

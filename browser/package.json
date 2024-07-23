@@ -23,7 +23,7 @@
     "typedoc": "^0.25.3",
     "typedoc-plugin-missing-exports": "^2.1.0",
     "typescript": "^5.4.5",
-    "vite": "^5.0.12",
+    "vite": "^5.3.4",
     "eslint-plugin-import": "^2.26.0"
   },
   "name": "@tomic/root",

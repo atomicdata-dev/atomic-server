@@ -30,7 +30,7 @@ export function ExternalPropertyDialog({
     urls.properties.recommends,
     { commit: true },
   );
-  const [dialogProps, show, hide] = useDialog({ bindShow });
+  const { dialogProps, show, close: hide } = useDialog({ bindShow });
 
   const onAddClick = () => {
     if (subject) {

@@ -93,7 +93,7 @@ fn res_v1_to_v2(store: &Db) -> AtomicResult<()> {
     fn migrate_subject(subject: &str) -> String {
         let url = url::Url::parse(subject).expect("Unable to parse subject URL");
         if subject != url.to_string() {
-            println!("Migrating: {} -> {}", subject, url.to_string())
+            println!("Migrating: {} -> {}", subject, url)
         };
         url.to_string()
     }

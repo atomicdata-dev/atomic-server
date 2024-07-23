@@ -7,7 +7,7 @@ use colored::*;
 
 use crate::{Context, SerializeOptions};
 
-/// Prints a resource for the terminal with readble formatting and colors
+/// Prints a resource for the terminal with readable formatting and colors
 pub fn pretty_print_resource(resource: &Resource, store: &impl Storelike) -> AtomicResult<String> {
     let mut output = String::new();
     output.push_str(&format!(
@@ -32,7 +32,7 @@ pub fn print_resource(
     resource: &Resource,
     serialize: &SerializeOptions,
 ) -> AtomicResult<()> {
-    let format: Format = serialize.clone().into();
+    let format: Format = serialize.into();
     let out = match format {
         Format::Json => resource.to_json(&context.store)?,
         Format::JsonLd => resource.to_json_ld(&context.store)?,

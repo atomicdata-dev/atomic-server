@@ -129,7 +129,7 @@ pub fn handle_register_name_and_email(context: HandleGetContext) -> AtomicResult
             .unwrap_or_else(|e| tracing::error!("Error sending email: {}", e));
     });
 
-    return_success()
+    return_success("Account generated")
 }
 
 #[tracing::instrument()]

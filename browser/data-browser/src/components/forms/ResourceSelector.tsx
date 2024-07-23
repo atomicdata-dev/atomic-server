@@ -21,7 +21,7 @@ import styled from 'styled-components';
 import { NewFormDialog } from './NewForm/NewFormDialog';
 import { DropdownInput } from './ResourceSelector/DropdownInput';
 
-interface ResourceSelectorProps {
+export interface ResourceSelectorProps {
   /**
    * Whether a certain type of Class is required here. Pass the URL of the
    * class. Is used for constructing a list of options.

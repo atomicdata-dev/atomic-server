@@ -21,7 +21,7 @@ export function ResourceCodeUsageDialog({
   bindShow,
 }: ResourceCodeUsageDialogProps): React.JSX.Element {
   const resource = useResource(subject);
-  const [dialogProps, show, hide, isOpen] = useDialog({ bindShow });
+  const { dialogProps, show, close: hide, isOpen } = useDialog({ bindShow });
 
   useEffect(() => {
     if (open) {

@@ -7,8 +7,8 @@ export type UseDialogReturnType = {
   /** Function to show the dialog */
   show: () => void;
   /** Function to close the dialog */
-  close: (success?: boolean) => void,
-  /** Boolean indicating wether the dialog is currently open */
+  close: (success?: boolean) => void;
+  /** Whether the dialog is currently open */
   isOpen: boolean;
 };
 
@@ -25,26 +25,27 @@ export function useDialog<E extends HTMLElement>(
 ): UseDialogReturnType {
   const { bindShow, onCancel, onSuccess, triggerRef } = options ?? {};
 
-  const [showDialog, setShowDialog] = useState(false);
-  const [visible, setVisible] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
   const [wasSuccess, setWasSuccess] = useState(false);
 
   const show = useCallback(() => {
     document.body.setAttribute('inert', '');
-    setShowDialog(true);
-    setVisible(true);
+    setIsVisible(true);
+    setIsOpen(true);
     bindShow?.(true);
   }, []);
 
   const close = useCallback((success = false) => {
     setWasSuccess(success);
-    setShowDialog(false);
+    setIsVisible(false);
+    // The 'isOpen' will be set to false by handleClosed after the animation
   }, []);
 
   const handleClosed = useCallback(() => {
     document.body.removeAttribute('inert');
     bindShow?.(false);
-    setVisible(false);
+    setIsOpen(false);
 
     if (wasSuccess) {
       onSuccess?.();
@@ -60,12 +61,12 @@ export function useDialog<E extends HTMLElement>(
   /** Props that should be passed to a {@link Dialog} component. */
   const dialogProps = useMemo<InternalDialogProps>(
     () => ({
-      show: showDialog,
+      isVisible,
       onClose: close,
       onClosed: handleClosed,
     }),
-    [showDialog, close, handleClosed],
+    [isVisible, close, handleClosed],
   );
 
-  return [dialogProps, show, close, visible];
+  return { dialogProps, show, close, isOpen };
 }

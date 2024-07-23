@@ -67,7 +67,12 @@ export const ResourceSelector = memo(function ResourceSelector({
   prefix,
   allowsOnly,
 }: ResourceSelectorProps): JSX.Element {
-  const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog();
+  const {
+    dialogProps,
+    show: showDialog,
+    close: closeDialog,
+    isOpen: isDialogOpen,
+  } = useDialog();
   const [initialNewTitle, setInitialNewTitle] = useState('');
   const { drive } = useSettings();
 

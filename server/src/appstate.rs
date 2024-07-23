@@ -61,7 +61,9 @@ pub async fn init(config: Config) -> AtomicServerResult<AppState> {
                 port: config.opts.smpt_port,
             })
             .await?;
-    };
+    } else {
+        tracing::info!("No SMTP_HOST found, not starting email server.")
+    }
 
     let should_init = !&config.store_path.exists() || config.initialize;
 
@@ -108,6 +110,8 @@ pub async fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::info!("Adding all resources to search index");
         crate::search::add_all_resources(&search_state, &store)?
     }
+
+    store.register_default_endpoints()?;
 
     Ok(AppState {
         store,

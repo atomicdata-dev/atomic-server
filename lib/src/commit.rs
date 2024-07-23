@@ -749,7 +749,7 @@ mod test {
 
     #[test]
     fn agent_and_commit() {
-        let mut store = crate::Store::init().unwrap();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
         let subject = "https://localhost/new_thing";
@@ -781,7 +781,7 @@ mod test {
 
     #[test]
     fn serialize_commit() {
-        let mut store = crate::Store::init().unwrap();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let mut set: HashMap<String, Value> = HashMap::new();
         let shortname = Value::new("shortname", &DataType::String).unwrap();
@@ -810,7 +810,7 @@ mod test {
     #[test]
     fn signature_matches() {
         let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
-        let mut store = crate::Store::init().unwrap();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = Agent::new_from_private_key(None, &store, private_key).unwrap();
         assert_eq!(
@@ -847,7 +847,7 @@ mod test {
     #[test]
 
     fn invalid_subjects() {
-        let mut store = crate::Store::init().unwrap();
+        let store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = store.create_agent(Some("test_actor")).unwrap();
         let resource = Resource::new("https://localhost/test_resource".into());
