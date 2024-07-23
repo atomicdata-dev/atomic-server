@@ -41,6 +41,11 @@ export const useNewForm = (args: UseNewForm) => {
   // When the resource is created or updated, make sure that the parent and class are present
   useEffect(() => {
     (async () => {
+      if (!resource.new) {
+        // The resource we are trying to create already exists, don't update any values.
+        return;
+      }
+
       if (parentVal !== parent) {
         await resource.set(core.properties.parent, parent);
       }

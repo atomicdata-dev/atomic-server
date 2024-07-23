@@ -20,6 +20,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - Moved the resource context menu to the top of the page.
 - [#861](https://github.com/atomicdata-dev/atomic-server/issues/861) Fix long usernames overflowing on the share page.
 - [#906](https://github.com/atomicdata-dev/atomic-server/issues/906) Reset changes after clicking the cancel button in a form or navigating away.
+- [#914](https://github.com/atomicdata-dev/atomic-server/issues/914) Fix an issue where changing the subject in a new resource form could update the parent of existing resources if their subject matched the new subject.
 
 ### @tomic/lib
 
