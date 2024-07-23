@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { urls, useArray, useProperty, useResource } from '@tomic/react';
+import { core, urls, useArray, useProperty, useResource } from '@tomic/react';
 import { ResourceSelector } from '../components/forms/ResourceSelector';
 
 /**
@@ -18,7 +18,7 @@ export function ClassFilter({ filters, setFilters }): JSX.Element {
     // Set the filters to the default values of the properties
     setFilters({
       ...filters,
-      [urls.properties.isA]: klass,
+      [core.properties.isA]: klass,
     });
   }, [klass, JSON.stringify(filters)]);
 
@@ -27,7 +27,7 @@ export function ClassFilter({ filters, setFilters }): JSX.Element {
       <ResourceSelector
         setSubject={setClass}
         value={klass}
-        isA={urls.classes.class}
+        classType={core.classes.class}
       />
       {allProps?.map(propertySubject => (
         <PropertyFilter

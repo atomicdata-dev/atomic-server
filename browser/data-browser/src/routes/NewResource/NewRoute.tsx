@@ -1,4 +1,4 @@
-import { useResource, urls } from '@tomic/react';
+import { useResource, core } from '@tomic/react';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router';
 
@@ -75,9 +75,8 @@ function NewResourceSelector() {
         </h1>
         <div>
           <ResourceSelector
-            hideCreateOption
             setSubject={handleClassSet}
-            isA={urls.classes.class}
+            classType={core.classes.class}
           />
         </div>
         <BaseButtons parent={calculatedParent} />

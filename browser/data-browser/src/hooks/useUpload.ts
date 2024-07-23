@@ -1,6 +1,6 @@
 import {
   AtomicError,
-  properties,
+  dataBrowser,
   Resource,
   useArray,
   useStore,
@@ -24,7 +24,7 @@ export function useUpload(parentResource: Resource): UseUploadResult {
   const [error, setError] = useState<Error | undefined>(undefined);
   const [subResources, setSubResources] = useArray(
     parentResource,
-    properties.subResources,
+    dataBrowser.properties.subResources,
     opts,
   );
 
@@ -40,7 +40,7 @@ export function useUpload(parentResource: Resource): UseUploadResult {
         const allUploaded = [...netUploaded];
         setIsUploading(false);
         await setSubResources([...subResources, ...allUploaded]);
-        await parentResource.save(store);
+        await parentResource.save();
 
         return allUploaded;
       } catch (e) {

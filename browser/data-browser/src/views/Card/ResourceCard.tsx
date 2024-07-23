@@ -127,20 +127,22 @@ export function ResourceCardDefault({
       <ResourceCardTitle resource={resource}>
         <ClassName>{isAResource.title}</ClassName>
       </ResourceCardTitle>
-      <DescriptionWrapper>
+      <DescriptionWrapper
+        style={{
+          maxHeight: small ? '14rem' : 'auto',
+        }}
+      >
         <ValueForm
           resource={resource}
           propertyURL={core.properties.description}
         />
       </DescriptionWrapper>
-      {!small && (
-        <AllProps
-          basic
-          resource={resource}
-          except={defaultHiddenProps}
-          editable
-        />
-      )}
+      <AllProps
+        basic
+        resource={resource}
+        except={defaultHiddenProps}
+        editable
+      />
     </Column>
   );
 }
@@ -148,8 +150,7 @@ export function ResourceCardDefault({
 export default ResourceCard;
 
 const DescriptionWrapper = styled.div`
-  max-height: 10rem;
-  overflow: hidden;
+  overflow: auto;
 `;
 
 const ClassName = styled.span`
