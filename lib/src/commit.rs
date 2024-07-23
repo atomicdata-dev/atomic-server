@@ -128,6 +128,9 @@ impl Commit {
         if opts.validate_timestamp {
             check_timestamp(self.created_at)?;
         }
+
+        self.check_for_circular_parents()?;
+
         let commit_resource: Resource = self.into_resource(store)?;
         let mut is_new = false;
         // Create a new resource if it doens't exist yet
@@ -261,6 +264,20 @@ impl Commit {
         }
 
         Ok(commit_response)
+    }
+
+    fn check_for_circular_parents(&self) -> AtomicResult<()> {
+        // Check if the set hashset has a parent property and if it matches with this subject.
+        if let Some(set) = self.set.clone() {
+            if let Some(parent) = set.get(urls::PARENT) {
+                if parent.to_string() == self.subject {
+                    return Err("Circular parent reference".into());
+                }
+            }
+        }
+
+        // TODO: Check for circular parents by going up the parent tree.
+        Ok(())
     }
 
     /// Updates the values in the Resource according to the `set`, `remove`, `push`, and `destroy` attributes in the Commit.
