@@ -1,10 +1,4 @@
-# Lapsi- ja nuorisopoliittinen ohjelma
-
 Lapsuus ja nuoruus ovat yksilön kannalta erittäin merkityksellistä aikaa ja perusta koko loppuelämälle. Lapsuuteen ja nuoruuten kohdistuvat taloudelliset ja sosiaaliset panostukset luovat perustan, jonka varaan hyvinvointia voi rakentaa pitkälle tulevaisuuteen. Lapsuus ja nuoruus eivät kuitenkaan ole vain aikuisuuteen ja yhteiskunnan jäsenyyteen johtavia välivaiheita, vaan itsessään tärkeitä, omanlaisiaan ja ainutlaatuisia elämänvaiheita.
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 21.2.2021, päivitetty kokouksessa 20.2.2022*
-
-*Tämä ohjelma korvaa puoluehallituksen 26.11.2010 hyväksymän lapsipoliittisen linjapaperin.*
 
 ## Johdanto
 

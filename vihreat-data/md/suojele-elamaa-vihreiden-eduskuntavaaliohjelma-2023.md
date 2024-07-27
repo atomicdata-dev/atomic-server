@@ -1,7 +1,3 @@
-# Suojele elämää
-
-## Vihreiden eduskuntavaaliohjelma 2023
-
 Tämä ohjelma on kiteytys vihreiden kärkitavoitteista eduskuntavaaleissa 2023. Vihreiden tavoitteita seuraavalle vaalikaudelle on esitetty laajemmin Vihreiden poliittisessa ohjelmassa vuosille 2023–2027
 
 ## Vihreiden 10 kärkitavoitetta eduskuntavaaleihin

@@ -1,11 +1,3 @@
-# Eurovaaliohjelma 2024
-
-## Rakennetaan uutta, luodaan toivoa, suojellaan arvokkainta
-
-**Vihreiden eurovaaliohjelma 2024**
-
-*Hyväksytty puoluevaltuustossa 18.2.2024*
-
 Sodat ja konfliktit, ilmastokriisi ja elinkustannusten nousu ovat muuttaneet maailmaa ja jokaisen eurooppalaisen arkea. Luovimme uudenlaisessa maailmassa, jossa autoritääriset ja äärioikeistosta kumpuavat voimat saavat yhä enemmän jalansijaa. Uudet EU-päättäjät aloittavat toimessaan tilanteessa, jossa yhteisön arvoja ja toimintakykyä tullaan mittaamaan toden teolla.
 
 Vihreät tarjoaa toivoa tulevaisuudesta. Rakennamme EU:ta, joka mahdollistaa hyvän ja turvallisen elämän. Tarvitaan rohkeutta tehdä toisin kuin on aina tehty. Tarvitaan päättäväisyyttä puolustaa kaikkien ihmisten yhdenvertaisuutta, ihmisoikeuksia ja demokratiaa. Tarvitaan myötätuntoa heikommassa asemassa olevia kohtaan – ja tarvitaan yhteistyötä paremman huomisen puolesta. Vaikka Suomi on pieni maa, se on EU:ssa kokoaan suurempi.

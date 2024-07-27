@@ -1,7 +1,3 @@
-# Oikeuspo­liit­tinen ohjelma
-
-*Hyväksytty puoluevaltuuston kokouksessa 18.2.2024*
-
 ## 1. Demokraattisen oikeusvaltion puolustus
 
 Vihreä oikeuspolitiikka perustuu oikeusvaltioperiaatteen edistämiseen. Oikeusvaltiossa kaikki ovat yhdenvertaisia lain edessä, julkisen vallan käyttö perustuu lakiin ja oikeus on yhtäläisesti kaikkien saavutettavissa. Vihreät tulkitsee oikeusvaltioperiaatetta ihmisoikeuksien ja demokratian muodostamassa kokonaisuudessa, jossa tunnistetaan, että säädettävien lakien tulee aina kunnioittaa ihmisoikeuksia, pohjautua demokraattisiin prosesseihin ja turvata asianmukaiset oikeussuojakeinot.
@@ -26,7 +22,7 @@ Sananvapaus ei ole tekosyy rikkoa muiden oikeuksia eikä vihapuheen tule nauttia
 
 Perus- ja ihmisoikeuksien turvaamiseksi oikeuksien valvontamekanismeja on vahvistettava. On välttämätöntä, että perusoikeuskontrolli toteutuu sekä etukäteisesti että jälkikäteisesti, jotta taataan riittävä mahdollisuus puuttua perusoikeusloukkauksiin. Etukäteisyyttä painottava kontrollijärjestelmä rakentuu liiaksi aktiivista poliittista päätösvaltaa käyttävien kansanedustajien tulkinnoille poliittisten päätösten perustuslaillisuudesta, minkä vuoksi jälkikäteistä perusoikeuskontrollia on syytä vahvistaa entisestään. Oikeusvaltioperiaate ja vallanjako edellyttävät, että perustuslain loukkaamattomuus ei jää ainoastaan lainsäätäjän vastuulle, vaan myös tuomioistuimilla tulee olla tosiasiallinen mahdollisuus puuttua vähäisempiinkin perustuslainvastaisuuksiin.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Muutetaan laki naisten ja miesten välisestä tasa-arvosta virallisesti tasa-arvolaiksi ja päivitetään lakiteksti edistämään kaikkien sukupuolten välistä tasa-arvoa niissä kohdissa, joissa edistetään vain naisten ja miesten välistä tasa-arvoa.
 * Korotetaan yhdenvertaisuuslain velvoitteet ja valvonta tasa-arvolain tasolle, jotta oikeus yhdenvertaisuuteen vahvistuu. Pidemmän aikavälin tavoitteena yhdistetään tasa-arvolaki ja yhdenvertaisuuslaki yhtenäiseksi sääntelyksi velvoitteiden ja valvonnan tasosta tinkimättä.
@@ -55,7 +51,7 @@ Oikeusvaltio on heikentynyt viime vuosina useissa maissa, kuten Venäjällä, mu
 
 Oikeusvaltion perusteet on turvattava niin, että niiden muuttaminen vaatii laajan kansallisen yksimielisyyden ja ettei se onnistu pelkillä enemmistöpäätöksillä edes useamman vaalikauden aikana. Perustuslakimme on monelta osin varsin kattava, mutta esimerkiksi tuomioistuinten riippumattomuutta se ei takaa riittävästi. Mahdollisessa kriisitilanteessa vain perustuslain tasoiset säännökset antavat tuomioistuinlaitokselle todellista turvaa eduskunnan ja/tai hallituksen puuttumiselle tuomioistuinten toimintaan. Kaikkialla maailmassa poikkeusolot ja niitä varten ennalta säädetty lainsäädäntö on osoittautunut riskiksi oikeusvaltion kannalta. Suomessa näitä riskejä on pyritty kontrolloimaan sillä, että valmiuslain soveltamisen käyttöönotto- ja jatkamisasetukset saatetaan eduskunnan käsiteltäväksi jälkikäteisesti, mutta esimerkiksi poikkeusolojen toteaminen ja valmiuslain soveltamisen aloittaminen ei edellytä lainkaan eduskunnan myötävaikutusta. Vastaavia mahdollisuuksia hallituksen toimivallan omavaltaiseen lisäämiseen on myös esimerkiksi rajavartiolaissa.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Tehdään “oikeusvaltion stressitesti”. Toteutetaan selvityksessä nousseet toimenpiteet ja lujitetaan oikeusvaltion perusteet horjumattomiksi.
 * Vahvistetaan perustuslaissa säädettyä tuomarien riippumattomuutta. Asetetaan tuomareille ministereitä vastaava kielto hoitaa sellaista tehtävää, joka voi haitata tuomarin tehtävien hoitamista tai vaarantaa luottamusta hänen toimintaansa tuomioistuimen jäsenenä.
@@ -75,7 +71,7 @@ Vihreät perustaa oman vallanjakoihanteensa klassiseen vallan kolmijako-oppiin, 
 
 Reilu vallanjako edellyttää myös, ettei valtaa keskitetä liikaa yksittäisille henkilöille. Vihreät ajaa Suomeen ja Euroopan unioniin järjestelmää, jossa poliitikkojen ei ole mahdollista toimia kaikilla hallinnon tasoilla yhtä aikaa päätöksentekijän asemassa, jolloin voidaan välttyä myös turhilta eturistiriidoilta sekä helpottaa ammattipoliitikkojen haastavia aikataulupaineita. Vihreät sitoutuu muutokseen yhdessä muiden puolueiden kanssa, jottei synny tilannetta, jossa puolueet asettavat ehdokkaita vaaleihin eri säännöillä.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Turvataan eduskunnan asema ylimpänä valtioelimenä ja kaiken toimeenpanovallan parlamentaarinen vastuunalaisuus eduskunnalle Suomen Nato-jäsenyyteen välittömästi tai välillisesti liittyvissä asioissa.
 * Turvataan tuomioistuinlaitoksen riippumattomuus valtionhallinnosta, vahvistamalla Tuomioistuinviraston asemaa ja itsenäisyyttä oikeusministeriöstä tarvittaessa perustuslaintasoisesti.
@@ -106,7 +102,7 @@ Osana vaalialuemalliin siirtymistä vaaleissa ehdokkaiden läpimenojärjestyksen
 
 Puolueiden tukijärjestelmää on uudistettava vastaavasti niin, että puolueiden rahoitus määräytyy valtakunnallisen kannatuksen eikä kansanedustajien määrän perusteella. Tämä koskee myös eduskunnan ulkopuolella olevia ns. pienpuolueita, joiden valtionrahoituksen suhteen on asetettu muita puolueita korkeampi kynnys, mikä muodostaa esteen puolueen kasvulle. Puolueiden rahoituksen ja vaalirahoituksen valvontaa on myös syytä kiristää. Tarvittaessa fasististen ja rasististen puolueiden tuki on voitava lakkauttaa ja puolue poistaa puoluerekisteristä. Vaalirahoituksen ilmoittamatta jättäminen on yleistä ja se tulisi sanktioida.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Lasketaan äänioikeuden ja vaalikelpoisuuden ikäraja 16 vuoteen kaikissa kansallisissa vaaleissa sekä kansalais- ja kuntalaisaloitteissa.
 * Lasketaan eurovaalien äänestysikäraja koko unionin tasolla sekä eurooppalaisen kansalaisaloitteen alulle panemisen ja allekirjoittamisen ikäraja 16 vuoteen.
@@ -129,7 +125,7 @@ Demokraattisessa yhteiskunnassa on toimittava tavoitteellisesti sen puolesta, et
 
 Demokratiaa vahvistetaan lujittamalla sen perustaa. Tämä tapahtuu aktivoimalla ihmisiä osallistumaan vaaleihin ja varmistamalla yhteyttä kansalaisten ja heidän valitsemiensa edustajien välille. Nykyisten osallistumismekanismien tehokkuutta on syytä parantaa tiedottamalla niistä paremmin.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Vahvistetaan puntaroivaa kansalaisvuoropuhelua kaikilla päätöksenteon tasoilla. Vakiinnutetaan kansalaisraadit, kansalaispaneelit, kansalaiskokoukset ja kansalaisparlamentit, sekä osallistuva budjetointi osaksi yhteiskunnallista vaikuttamista.
 * Vahvistetaan vaikuttajatoimielinten osallistumista kunnissa ja hyvinvointialueilla lisäämällä vaikuttajaryhmien edustajille puhe- ja läsnäolo-oikeus valtuustoon, hallitukseen ja lautakuntiin sekä aloiteoikeus valtuustoon.
@@ -160,7 +156,7 @@ Tekoälyn käyttö viranomaistehtävissä tuo mukanaan uusia haasteita, kuten sy
 
 Henkilötietojen suojan merkitys on korostunut digitalisaation myötä. Tämä on lisännyt julkisuusperiaatteen ja henkilötietojen suojan välistä jännitettä. On tärkeää löytää tasapaino tiedonsaantioikeuden ja yksityisyyden suojan välillä. Henkilötietojen suoja ei esimerkiksi saa estää henkilöä saamasta palvelua, jota varten hän on antanut luvan tietojen luovuttamiseen esimerkiksi sosiaali- ja terveyspalveluissa.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Uudistetaan laki viranomaisten toiminnan julkisuudesta (julkisuuslaki) yhteensopivaksi voimassa olevan tietosuojasääntelyn kanssa. Sanktioidaan julkisten asiakirjojen ilmeisen lainvastainen luovuttamatta jättäminen.
 * Laajennetaan julkisuuslain soveltamisalaa julkisomisteisiin yhtiöihin sekä julkisesti rahoitetun toiminnan osalta myös yhdistyksiin ja säätiöihin.
@@ -183,7 +179,7 @@ Erityisesti lakiesitysten vaikutuksenarvioinnit ovat heikkotasoisia. Lainsääd�
 
 Lakien yksityiskohtaiset perustelut ovat usein heikkotasoisia. Yksittäisten pykälien perusteluissa saatetaan vain toistaa säännöksen sanamuoto eikä säännöksen taustalla olevaa laajempaa tulkintakehikkoa avata lainkaan. Tämä on omiaan heikentämään kansalaisen oikeusturvaa, kun säännöksen tulkintavalta jää lakia soveltavalle viranomaiselle. Oikeudenkäytön yhdenmukaisuuden ja oikeusvarmuuden kannalta lakien yksityiskohtaiset perustelut kuitenkin ovat keskeisiä lainvalmistelun laadun tekijöitä.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Varmistetaan lainvalmistelun laatu ja avoimuus varaamalla riittävät resurssit lainvalmisteluun. Lainvalmistelussa on syytä lisätä kansalaisten ja eri tahojen, etenkin lasten ja nuorten, osallistamista ja kuulemista.
 * Lisätään ministeriöiden yhteistyötä lainvalmistelussa ja mahdollistetaan lainvalmistelijoiden lainaaminen ministeriöstä toiseen.
@@ -203,7 +199,7 @@ Harmaa talous viittaa taloudelliseen toimintaan, joka tapahtuu virallisen taloud
 
 Korruption kitkeminen ja harmaan talouden torjuminen edellyttää vahvaa lainsäädäntöä, viranomaisten korkeaa eettistä toimintakykyä sekä tehokasta väärinkäytösten tutkintaa ja seuraamusjärjestelmää, tarvittaessa myös kansainvälistä yhteistyötä. Keskeistä on julkisen sektorin toiminnan avoimuus ja läpinäkyvyys sekä yksityisen taloudellisen toiminnan seuranta. Tarvitaan yksityisiä tahoja valvovia viranomaisia sekä riippumattomia tahoja, jotka valvovat viranomaisten toimintaa, kuten laillisuusvalvojia ja mediaa.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Jatketaan ja laajennetaan valtioneuvoston toteuttamaa harmaan talouden ja talousrikollisuuden torjunnan toimenpideohjelmaa.
 * Kiristetään yritysten ja julkishallinnon velvoitteita noudattaa eettisiä toimintaperiaatteita, vastuullista liiketoimintaa ja hyvää hallintoa. Luodaan ilmoituskanava väärinkäytöksiin puuttumista varten.
@@ -235,7 +231,7 @@ Riita-asioiden ratkaisussa oikeudenkäymiskaari tuntee vaihtoehtoina täysimitta
 
 Yksilöiden oikeusturvaa parantaisi myös nykyistä laajempi mahdollisuus ryhmäkanteisiin. Ryhmäkanteella tarkoitetaan kannetta ja valitusta, jolla ryhmäkanteeseen oikeutettu taho ajaa samankaltaisissa tapauksissa asiaa usean ryhmän jäsenen puolesta. Suomessa ryhmäkannetta voidaan toistaiseksi hyödyntää ainoastaan kuluttajansuoja-asioissa. Sen laajentaminen myös työ- ja virkasuhdetta koskeviin asioihin sekä ympäristövahinkoihin on kuitenkin perusteltua.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Siirretään kaikki työsopimuksia ja virkasuhteita koskevat riidat käsiteltäviksi työtuomioistuimessa. Annetaan työtuomioistuimessa kanneoikeus yksilöille ja lisätään työtuomioistuimen resursointia.
 * Mahdollistetaan markkinaoikeudesta, työtuomioistuimesta ja vakuutusoikeudesta muutoksenhaku korkeimpaan oikeuteen, silloin kun se on tarpeen oikeuskäytännön yhtenäisyyden vuoksi.
@@ -258,7 +254,7 @@ Oikeudenkäyntikuluja lisää myös kelpoisuusehto, jonka mukaan oikeudenkäynti
 
 Oikeusjärjestelmämme kohtaa haasteita syrjintätapausten käsittelyssä, mikä voi estää syrjinnän kohteeksi joutuneita saamasta oikeutta. Muun muassa yksittäisen henkilön kuluriski muodostuu helposti niin suureksi, että se estää syrjintäasioiden ratkaisun oikeusteitse. Syrjintä- ja häirintäasioissa tulisikin voida nostaa kanne ilman kuluriskiä.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Lisätään syyttäjälaitoksen ja tuomioistuinten henkilökunnan määrää. Lisätään tuomioistuinharjoittelun vuosittaista paikkamäärää.
 * Laajennetaan yhden tuomarin kokoonpanon päätösvaltaisuutta käräjäoikeuksissa vähäisiin riita-asioihin.
@@ -290,7 +286,7 @@ Kannabiksen laittomuudesta johtuvat yhteiskunnalliset ongelmat on mahdollista po
 
 Maapallon säilyminen elinkelpoisena ja luonnon monimuotoisuus tulee turvata myös rikosoikeudessa. Suojeltavia oikeushyviä ovat muun ohessa ilma, vesi ja maaperä, eläimet ja muut eliöt sekä laajasti ottaen ihmisten henki ja terveys. Nykyinen rikosoikeudellinen sääntely ei kuitenkaan riitä pysäyttämään ilmastonmuutosta ja luontokatoa. Ympäristörikoksista tuomitaan harvoin ja lievästi eikä varsinkaan poliittisia päättäjiä saada laiminlyönneistä vastuuseen. Vihreät pitää tärkeänä, että myös rikosoikeudellisia vastuusäännöksiä ilmastonmuutoksen ja luontokadon aiheuttamisesta ryhdytään päivittämään pikaisesti. Eläinten asema esineisiin rinnastettavana omaisuutena vaatii muutosta, joka turvaa eläimen hyvinvoinnille välttämättömät perusoikeudet yli ihmisen omistusoikeuden ja toissijaisten tarpeiden.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Toteutetaan rikoslainsäädännön systematiikan yhtenäistävä kokonaisuudistus.
 * Tuodaan lainsäädäntöön selkeämmin käsite joukkoistetuista rikoksista, kuten esimerkiksi osallistuminen joukkovainoamiseen tai viestintärauhan rikkominen joukolla. Joukkoistettujen rikosten on oltava aina virallisen syytteen alaisia.
@@ -330,7 +326,7 @@ Suomessa on liikaa väkivallan tekijöitä ja toistuvasti väkivaltatuomioita sa
 
 Vihreät kannattaa myös sopimushoidon kehittämistä osana seuraamusjärjestelmää. Useilla rikoksentekijöillä päihdeongelma muodostaa pääasiallisen syyn rikolliselle käyttäytymiselle, jolloin tulee ensisijaisesti hoitaa päihdeongelmaa osana seuraamusjärjestelmää, jotta myös rikollista käyttäytymistä voidaan vähentää.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Luovutaan sakon muuntorangaistuksesta. Selvitetään, voidaanko vankeudeksi muuntamisen sijasta henkilö määrätä esimerkiksi päihdekuntoutukseen tai yhdyskuntapalveluun.
 * Ehkäistään nuorten rikollisuuden uusiutumista säätämällä nuorisorangaistus ensisijaiseksi rangaistukseksi nuorille rikoksentekijöille. Nostetaan nuorisorangaistuksen ikäraja 25 vuoteen.
@@ -355,7 +351,7 @@ Vihreät kannattaa tavoitetta kattavasta selviämisasemien verkostosta. Kova pä
 
 Keskeistä on vahvistaa myös rikoksen uhrin asemaa. Sukupuolittuneen, kunniaan liittyvän sekä vähemmistöihin kohdistuvan väkivallan, häirinnän ja vihapuheen tunnistamista on parannettava rikostutkinnan kaikissa vaiheissa. Tämä edellyttää riittävän täydennyskoulutuksen järjestämistä viranomaisille. Rikoksen uhrit voivat jäädä valtakunnan tasolla eriarvoiseen asemaan, koska rikosten uhreille tarkoitetut palvelut tuottaa kolmas sektori eikä Rikosuhripäivystyksellä ole riittävän kattavaa palveluverkkoa koko maassa.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Torjutaan järjestäytynyttä rikollisuutta perustamalla järjestäytyneeseen rikollisuuteen ja rajat ylittävään rikollisuuteen erikoistunut yksikkö.
 * Perustetaan poliisiin ympäristörikoksiin keskittyvä yksikkö ja tehostetaan laittoman kalastuksen ja metsästyksen torjuntaa.
@@ -384,7 +380,7 @@ Vihreät korostaa alaikäisten vankeinhoidossa lastensuojelun ja lasten oikeuksi
 
 Alle 15-vuotiaat eivät ole rikosoikeudellisessa vastuussa, mutta hekin voivat syyllistyä tekoihin, jotka täyttävät rikosten tunnusmerkistön. Vihreät tukee Kaakkois-Suomen poliisilaitoksen alueella toteutetun lainvastaisten tekojen toimintamallin laajentamista koko maahan. On tärkeää, että myös alle 15-vuotiaat ymmärtävät vastuunsa käyttäytymisestään ja sen aiheuttamista seuraamuksista toisille tai yhteiskunnalle, vaikka he eivät olekaan rikosoikeudellisessa vastuussa. Vihreät kannattaa lisäresursseja Ankkuri-poliisin toimintaan ja samassa suhteessa erityisnuorisotyöhön, nuorisosovitteluun, sosiaalityöhön ja lastensuojeluun.
 
-#### Vihreät tavoitteet
+**Vihreät tavoitteet**
 
 * Tunnistetaan ja vahvistetaan rikosten ennaltaehkäisyn merkitystä koko yhteiskunnan yhteisenä tehtävänä. Puututaan poikkihallinnollisesti yhteiskunnan eriytymiskehitykseen ja nuorisorikollisuuden kasvuun.
 * Puututaan ylisukupolvisen rikollisuuteen ja huono-osaisuuteen koulutus-, asunto- sekä sosiaali- ja terveyspoliittisin keinoin.

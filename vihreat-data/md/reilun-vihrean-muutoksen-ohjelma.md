@@ -1,9 +1,3 @@
-# Reilun vihreän muutoksen ohjelma
-
-### Miten päästöjä ja köyhyyttä vähennetään samaan aikaan?
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 23.2.2020*
-
 ## Johdanto: Muutos on vältämätön
 
 Itsenäisen Suomen aikana suomalainen yhteiskunta on muuttunut. Suomalaisten elintaso ja koulutustaso ovat nousseet, tasa-arvo ja yhdenvertaisuus ovat lisääntyneet ja maahamme on luotu kattava sosiaaliturvajärjestelmä ja hyvinvointipalvelut. Samalla ilmastopäästöt ja luonnonvarojen kulutus ovat kuitenkin kasvaneet ja luonnon monimuotoisuus heikentynyt. Suomalaisten kulutusperusteinen hiilijalanjälki ja luonnonvarojen kulutus asukasta kohden ovat maailman suurimpien joukossa.

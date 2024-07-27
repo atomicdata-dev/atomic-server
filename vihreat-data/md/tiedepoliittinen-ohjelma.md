@@ -1,10 +1,4 @@
-# Vihreiden tiedepoliittinen ohjelma
-
-*Hyväksytty puoluevaltuuston kokouksessa 14.5.2023*
-
-*Tarkastusvuosi, jonka aikana puoluevaltuuston kokouksessa linjataan, onko tarvetta uudelle ohjelmalle, ohjelman hienovaraisemmalle päivitykselle tai ohjelman linjaamiselle vanhentuneeksi: 20xx*
-
-*Jokainen tieteellinen väite on alustava. Poliitikot vihaavat tätä. Kuinka kukaan voi luottaa tutkijoihin? Jos uutta näyttöä ilmenee, he muuttavat mielensä. -Terry Pratchett*
+ **Jokainen tieteellinen väite on alustava. Poliitikot vihaavat tätä. Kuinka kukaan voi luottaa tutkijoihin? Jos uutta näyttöä ilmenee, he muuttavat mielensä. -Terry Pratchett**
 
 Tiede ja tiedon lisääminen ovat ihmiskunnan keskeisiä yhteisiä arvoja. Koko historian ja yhteiskuntien olemassaolon ajan on tieteen kehittyminen ollut merkittävä osa yhteiskunnallista kehityskulkua. Poliittisesti tiede on aina ollut päätöksenteon keskiössä. Eri yhteiskunnissa tiedettä on rajoitettu, vapautettu, rahoitettu ja leikattu eri tavoin. Nykyisen kaltainen vapaa ja itseisarvoinen tiede on verrattain uusi asia historiassa.
 

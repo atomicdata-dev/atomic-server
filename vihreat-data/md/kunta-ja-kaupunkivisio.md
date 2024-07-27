@@ -1,7 +1,3 @@
-# Kunta- ja kaupunkivisio
-
-Hyväksytty puoluevaltuuskunnan kokouksessa 27.9.2020
-
 ## 1. Johdanto
 
 Tämä Vihreiden kunta- ja kaupunkivisio kuvaa tulevaisuuden kaupungin ja kunnan ideaalia muutaman kymmenen vuoden aikajänteellä – välillä on suunnattava katsetta pidemmälle. On tietysti selvää, että kunnat ovat erilaisia ja samat asiat eivät toimi kaikkialla. Tämän kirjoittajat ovat pyrkineet muistamaan ja toivovat lukijankin muistavan.

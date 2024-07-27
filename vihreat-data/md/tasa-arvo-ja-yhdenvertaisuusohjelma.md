@@ -1,11 +1,3 @@
-# *Tasa-arvo- ja yhdenvertaisuusohjelma*
-
-*Hyväksytty puoluevaltuuston kokouksessa 26.11.2023*
-
-*Tämä ohjelma korvaa aiemman Vihreiden yhdenvertaisuusohjelman (2010) ja Vihreiden tasa-arvopoliittisen linjapaperin ”Tasa-arvo ei ole valmis” (2014), sekä kannanoton ”Askeleet translain uudistamiseksi” (2019).*
-
-*Tarkastusvuosi, jonka aikana puoluevaltuuston kokouksessa linjataan, onko tarvetta uudelle ohjelmalle, ohjelman hienovaraisemmalle päivitykselle tai ohjelman linjaamiselle vanhentuneeksi: 2027.*
-
 ## Johdanto: Kunnes kaikki ovat vapaita ja tasavertaisia
 
 Tasa-arvo ja yhdenvertaisuus ovat vakaan, kestävän yhteiskunnan tae. Ne muodostavat omat politiikkalohkonsa, mutta myös läpileikkaavat kaikkea päätöksentekoa ja koko yhteiskuntaa. Vihreille tasa-arvo ja yhdenvertaisuus muodostavat politiikan kovan ytimen, josta ei tingitä tiukoissakaan paikoissa. Tavoitteemme on kaikille oikeudenmukainen yhteiskunta ja työtä sen eteen jatketaan, kunnes kaikki ovat vapaita ja tasavertaisia.

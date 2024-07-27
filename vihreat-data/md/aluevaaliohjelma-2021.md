@@ -1,7 +1,3 @@
-# Vihreiden aluevaaliohjelma
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 21.11.2021.*
-
 ## Johdanto
 
 Aluevaaleissa jokainen meistä voi olla vaalivoittaja.

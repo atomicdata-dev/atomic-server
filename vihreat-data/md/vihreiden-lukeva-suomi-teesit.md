@@ -1,7 +1,3 @@
-# Vihreiden Lukeva Suomi -teesit
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 3.12.2017*
-
 ## Hyvä luku- ja kirjoitustaito kuuluu kaikille
 
 1. Lukutaito on kansalaistaito ja -oikeus. Luodaan kansallinen strategia lukutaitoerojen vähentämiseksi.

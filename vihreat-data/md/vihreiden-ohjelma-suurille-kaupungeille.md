@@ -1,9 +1,4 @@
-
-Vihreiden puoluevaltuuston hyväksymä 19.5.2024
-
-# Vihreiden ohjelma suurille kaupungeille: Huomisen kestävät ja viihtyisät kaupungit
-
-*Miltä muutos nykyisistä ympäristön kannalta kestämättömistä autokaupungeista kestäviksi ja viihtyisiksi 15 minuutin kaupungeiksi voisi näyttää.*
+ **Miltä muutos nykyisistä ympäristön kannalta kestämättömistä autokaupungeista kestäviksi ja viihtyisiksi 15 minuutin kaupungeiksi voisi näyttää.**
 
 ## Johdanto
 
@@ -25,7 +20,7 @@ Kaupungeissa voimme torjua ilmastokriisiä ja luontokatoa, parantaa ihmisten ark
 
 *Ohjelmaluonnoksen on valmistellut kaupunkipoliittinen työryhmä.*
 
-*Puheenjohtajat: Elina Rantanen ja Sameli Sivonen, työryhmän jäsenet: Mikko Airikkala, Ilona Helle, Paula Himanen, Julianna Kentala, Otso Kivekäs, Minna Kuusela, Hannu Oskala, Riina Puusaari, Saana Rossi, Anton Silvo, Jaakko Stenhäll & Emilia Syväjärvi*
+ **Puheenjohtajat: Elina Rantanen ja Sameli Sivonen, työryhmän jäsenet: Mikko Airikkala, Ilona Helle, Paula Himanen, Julianna Kentala, Otso Kivekäs, Minna Kuusela, Hannu Oskala, Riina Puusaari, Saana Rossi, Anton Silvo, Jaakko Stenhäll & Emilia Syväjärvi**
 
 ## 1. Kaupungit ilmastokriisin ratkaisijoina
 

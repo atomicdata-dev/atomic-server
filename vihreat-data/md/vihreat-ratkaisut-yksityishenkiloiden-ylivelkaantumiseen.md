@@ -1,10 +1,4 @@
-# **Ei enää toivottomia velkavuoria**
-
-## **Vihreät ratkaisut yksityishenkilöiden ylivelkaantumiseen**
-
-*Hyväksytty puoluevaltuuston kokouksessa 18.2.2024*
-
-### Koskaan ei saa syntyä tilannetta, josta ei ole ulospääsyä
+## Koskaan ei saa syntyä tilannetta, josta ei ole ulospääsyä
 
 *Raha ei ole ihmistä arvokkaampaa, eikä velan pidä määrittää ihmisen koko elämää.*
 

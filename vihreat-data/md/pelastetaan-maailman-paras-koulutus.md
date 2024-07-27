@@ -1,9 +1,3 @@
-# Pelastetaan maailman paras koulutus
-
-## Vihreiden koulutuspoliittinen ohjelma
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 17.11.2018. Tämä ohjelma korvaa 23.11.2014 hyväksytyn koulutuspoliittisen ohjelman.*
-
 ## Johdanto
 
 Laadukas koulutus ja yhdenvertaiset mahdollisuudet itsensä kehittämiseen ovat toimivan yhteiskunnan tulevaisuuden turva. Monipuolisesti osaavat ja sivistyneet ihmiset kykenevät hallitsemaan elämäänsä, tekemään siitä mielekästä ja kehittämään ratkaisuja havaitsemiinsa ongelmiin. Koulutettu kansa kykenee ratkomaan myös yhteiskunnallisia ongelmia ja pitämään huolen demokratian säilymisestä. Työelämän muuttuessa ja kansainvälistyessä korkea osaaminen on Suomelle tärkein pääoma ja kilpailuetu. Siksi koulutuksesta ei saa muodostua vain hyvistä lähtökohdista tulevien etuoikeus, vaan koulutuspolun täytyy pitää kaikki mukana. Suomalaisen koulutusjärjestelmän ja sivistyksen rapauttaminen on lopetettava välittömästi ja koulutuksesta on tehtävä taas maailman parasta.

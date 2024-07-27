@@ -1,9 +1,3 @@
-# Vihreä maaseutu- ja aluepoliittinen ohjelma
-
-## Vihreässä Suomessa ihmisillä on toivoa ympäri maata
-
-*Hyväksytty puoluevaltuuston kokouksessa 25.9.2022*
-
 ## 1. Johdanto
 
 Suomi on monipuolinen maa, jonka jokaisella alueella on omat erityispiirteensä. Alueiden erilaisuus on vahvuus, jonka hyödyntämiseen esitämme ratkaisuja tässä maaseutu- ja aluepoliittisessa ohjelmassa. Vihreät haluaa luoda Suomen, jossa erilaisia alueita kehitetään niiden omista lähtökohdista. Vihreä aluepolitiikka torjuu ihmisten eriarvoisuutta, ilmastokriisiä ja luontokatoa joka puolella maata huomioiden sen että eri alueilla toimivat erilaiset ratkaisut.

@@ -1,18 +1,12 @@
-# Vihreät muuttavat maailmaa, jotta elämä maapallolla voi kukoistaa
-
-## Vihreiden periaateohjelma 2020-2028
-
 Vihreiden periaateohjelman tavoitteena on kuvata, millaista maailmaa haluamme rakentaa ja miten sen haluamme tehdä. Tämä ohjelma kertoo keskeisistä arvoista ja periaatteista, jotka ohjaavat Vihreiden poliittista ajattelua ja toimintaa kaikilla päätöksenteon tasoilla. Poliittinen tavoiteohjelma ja muut puolueen ohjelmat sisältävät tässä esitettyjä periaatteita yksityiskohtaisempia linjauksia.
 
-*Hyväksytty puoluekokouksessa 20.9.2020. Tämä ohjelma korvaa edellisen, vuoden 2012 puoluekokouksessa hyväksytyn periaateohjelman.*
-
-## 1. VIHREÄT MUUTTAVAT MAAILMAA, JOTTA ELÄMÄ MAAPALLOLLA VOI KUKOISTAA
+## 1. Vihreät muuttavat maailmaa, jotta elämä maapallolla voi kukoistaa
 
 Teemme työtä ilmastonmuutoksen ja kuudennen sukupuuttoaallon pysäyttämiseksi, jotta tuleville sukupolville jää elinvoimainen maapallo. Taistelemme tasa-arvoisen, turvallisen ja oikeudenmukaisen tulevaisuuden puolesta. Puolustamme luontoa ja ihmisiä ahneutta ja lyhytnäköisyyttä vastaan. Teemme politiikkaa periaatteidemme ja tutkitun tiedon pohjalta emmekä eturyhmien lähtökohdista. Annamme äänen niille, joiden ääni ei muuten kuulu – luonnolle, eläimille ja tuleville sukupolville – ja varmistamme, että haavoittuvassa asemassa olevat saavat äänensä kuuluviin.
 
 Vihreät on tulevaisuuspuolue ja yhteiskunnallinen liike, joka kokoaa erilaisista taustoista tulevat ihmiset muuttamaan yhdessä maailmaa. Rakennamme parempaa arkea ja parempaa huomista jokaiselle. Teemme työtä sellaisen maailman puolesta, joka säilyttää toimintakykynsä kaikissa tilanteissa ja kykenee kohtaamaan yllättäviäkin vastoinkäymisiä rajat ylittävällä yhteistyöllä.
 
-## 2. KESTÄVÄ MAAILMA
+## 2. Kestävä maailma
 
 ### 2.1 Ratkaisemme ilmastokriisin ja puolustamme luontoa ja eläimiä
 
@@ -58,7 +52,7 @@ Erilaiset jakolinjat, vastakkainasettelu ja voimapolitiikan paluu tekevät sää
 
 Kansainvälisen yhteistyön syventäminen, demokraattisten rakenteiden vahvistaminen ja yhteisten pelisääntöjen kirkastaminen ovat tarpeen, jotta esimerkiksi lasten oikeuksien sopimuksen, vammaisten henkilöiden oikeuksien sopimuksen, muiden ihmis-oikeussopimusten, YK:n kestävän kehityksen ja Pariisin ilmastosopimuksen tavoitteet voidaan saavuttaa.
 
-## 3. JOKAISELLE HYVÄ ELÄMÄ
+## 3. Jokaiselle hyvä elämä
 
 ### 3.1 Perus- ja ihmisoikeudet ovat ihmiskäsityksemme perusta
 
@@ -136,7 +130,7 @@ Globaalia taloudellista eriarvoisuutta on vähennettävä niin kauppapolitiikan 
 
 Teknologinen kehitys ja tiedon lisääntyminen muuttavat maailmaamme kiihtyvässä tahdissa. Samalla kehittyvä informaatioteknologia vapauttaa ihmisiä rakentamaan yksilöllisesti oman elämänsä suuntaa. Vihreät haluaa tukea sellaisen teknologian kehitystä, joka auttaa rakentamaan kestävämpää maailmaa. Teknologian nopea kehitys voi kuitenkin tuoda eteen uusia eettisiä kysymyksiä, joissa yksilön ja yhteisön vapaudet ja oikeudet ovat eri tavoin ristiriidassa keskenään. Sääntelyn on seurattava teknologista kehitystä ripeästi ja sillä on varmistettava esimerkiksi kestävän kehityksen, yritysvastuun ja ihmisten perusoikeuksien toteutuminen.
 
-## 4. DEMOKRATIA KAIKEN PERUSTANA
+## 4. Demokratia kaiken perustana
 
 ### 4.1 Vahvistamme vapaata, avointa ja demokraattista yhteiskuntaa
 
@@ -174,7 +168,7 @@ Vihreät sitoutuu ehdottomaan väkivallattomuuteen kaikessa toiminnassa. Olemme 
 
 Vihreät ei rakenna tulevaisuutta yksin, vaan aktiivisessa yhteistyössä muiden kanssa niin kotimaassa kuin maailmanlaajuisesti. Pyrimme päätöksissä tasapainoon ja oikeudenmukaisuuteen välttääksemme politiikkaa, joka ohjaa hyvää vain tietyille ryhmille. Kannatamme toimivia ratkaisuja riippumatta siitä, keneltä ne ovat lähtöisin tai kuka niistä lopulta kerää kunnian. Meille tärkeintä on, että maailma muuttuu paremmaksi.
 
-### 5. HUOMINEN RAKENNETAAN YHDESSÄ
+### 5. Huominen rakennetaan yhdessä
 
 *Globaalissa maailmassa ja muutosten keskellä kukaan meistä ei ole yksin. Jokainen tarvitsee läheisyyttä, henkistä kontaktia, vertaisuutta ja mukaan kuulumista. Yli satavuotisen itsenäisyytemme aikana me suomalaiset olemme luoneet monella mittarilla menestyvän maan, jossa on mahdollisuus katsoa luottavaisin mielin eteenpäin. Olemme rakentaneet, puolustaneet, uudistaneet ja rakastaneet. Tämän ohjelman periaatteita vaalien rakennamme huomisenkin yhdessä.*
 

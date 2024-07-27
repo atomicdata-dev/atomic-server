@@ -1,7 +1,3 @@
-# Luonto vastuullamme - Vihreiden luonnonsuojeluohjelma
-
-*Hyväksytty valtuuskunnan kokouksessa 4.3.2018. Tämä ohjelma korvaa puoluehallituksen 1.10.2010 hyväksymät ja puoluevaltuuskunnan 30.9.2012 muokkaamat Vihreiden luonnonsuojelutavoitteet.*
-
 ## Johdanto
 
 Ihminen on osa luontoa, ja luonto on osa ihmistä. Tämän unohtuminen ihmiseltä on johtanut maapallon tasapainoa järkyttäviin ympäristöongelmiin. Ihmisen on korkea aika tunnistaa olevansa osa luontoa ja myös vastuussa aiheuttamistaan muutoksista ympäristössään.

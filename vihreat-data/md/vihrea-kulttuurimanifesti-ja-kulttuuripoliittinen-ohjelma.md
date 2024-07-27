@@ -1,6 +1,6 @@
-# Vihreä kulttuurimanifesti
+**Sivun alussa Vihreä kulttuurimanifesti, jonka alla Vihreiden kulttuuripoliittinen ohjelma.**
 
-*Hyväksytty valtuuskunnan kokouksessa 20.2.2022*
+# Vihreä kulttuurimanifesti
 
 ## Kulttuuripolitiikan uusi luku
 
@@ -62,10 +62,6 @@ Taide ja kulttuuri ovat keskeinen osa suomalaista yhteiskuntaa. Taiteen ja kultt
 * Kulttuurin hyvinvointivaikutusten huomioimista kunnissa ja kulttuurilähetteiden käyttöä hyvinvointialueilla.
 
 # Kulttuuripoliittinen ohjelma
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 20.2.2022.*
-
-*Tämä ohjelma korvaa valtuuskunnan 27.5.2018 hyväksymän kulttuuripoliittisen ohjelman.*
 
 ## Johdanto
 

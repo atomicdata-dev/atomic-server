@@ -87,12 +87,12 @@ Tuloverotuksen läpinäkyvyyttä ja johdonmukaisuutta lisätään luopumalla eri
 
 Ansiotulojen verotuksen byrokratiaa vähennetään ottamalla käyttöön kansalaisen verotili. Sen avulla työnantaja tai yrittäjä maksaa pelkän bruttopalkan palkansaajan verotilille, josta verottaja automaattisesti perii palkansaajan tai yrittäjän ennakkoverot, minkä jälkeen nettopalkka maksetaan tulonsaajan tilille. Nykyisellään joitain etuuksia verotetaan, kun toiset ovat verottomia. Järjestelmän selkeyttämiseksi muutetaan kaikki etuudet verottomiksi työeläkkeitä lukuunottamatta.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Automatisoidaan tuloverotuksen ennakonpidätys ottamalla käyttöön kansalaisen verotili.
 * Lisätään palkan muodostumisen läpinäkyvyyttä kirjaamalla työnantajamaksut palkansaajan kuittiin.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Muutetaan kaikki sosiaaliturvaetuudet verottomiksi lukuun ottamatta työeläkkeitä.
 * Yksinkertaistetaan ansiotuloverotusta poistamalla verottajan viran puolesta tehtävät tuloveron vähennykset. Kompensoidaan muutos veroasteiden uudelleenmäärittelyllä siten, että käteen jää aina ennustettava ja toimeliaisuuteen kannustava summa.
@@ -104,7 +104,7 @@ Erilaisia työn muotoja kohdellaan nykyään eri säännöillä sosiaaliturvassa
 
 Kun kaikki työ on sosiaaliturvan piirissä samoilla säännöillä, alivakuuttaminen ei ole enää mahdollista. Näin myös työsuoritteita välittävässä alustataloudessa toimivien itsensätyöllistäjien asema paranee. Yrittäminen tai yrityksen perustaminen ei saa olla este yhtenäisten etuuksien saamiselle.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Tuodaan yrittäjät työmarkkinatuen piiriin. Tätä ennen päivitetään tulorekisteri sisällyttämään yrittäjän ansio- ja osinkotulot.
 * Tuodaan työskentelyapurahat kokonaisuudessaan ansiotuloverotuksen ja sosiaaliturvamaksujen piiriin. Väliaikaisena ratkaisuna helpotetaan eri lähteistä tulevien lyhyiden apurahojen laskemista yhteen sosiaaliturvan määräytymisessä.
@@ -112,7 +112,7 @@ Kun kaikki työ on sosiaaliturvan piirissä samoilla säännöillä, alivakuutta
 * Poistetaan väliaikaisena ratkaisuna tekijänoikeuskorvausten huomioiminen sosiaaliturvaetuuksien sovittelusta kunnes kaikkien veronalaisten ansiotulojen kohtelu on yhtenäistetty sosiaaliturvassa.
 * Mahdollistetaan käyttökorvaukset kuten tekijänoikeustulojen ohjaaminen elinkeinonharjoittajan yritykselle.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Yhtenäistetään kaiken veronalaisen ansiotulon kohtelu sosiaaliturvassa, kuten sosiaaliturvamaksujen suuruus, siten että palkkatulo, yritystulon ansiotulo-osuus ja muu veronalainen ansiotulo ovat yhdenvertaisessa asemassa.
 * Tuodaan kaikki veronalaiset ansiotulot sosiaaliturvan piiriin siten, että niistä maksetaan sosiaaliturvamaksut, ne kerryttävät ansiosidonnaista turvaa ja eläkkeitä ja ne huomioidaan tuloharkintaisten etuuksien sovittelussa. Näitä tuloja ovat muun muassa yrittäjän ansiotulo-osuus, työkorvaukset, laskutuspalvelupalkkiot, lomarahat ja -korvaukset ja luottamustoimipalkkiot.
@@ -126,12 +126,12 @@ Vihreiden sosiaaliturvamallissa perustulo koostuu perusosasta sekä asumisosasta
 
 Perustulo on veroton etuus, joka voidaan toteuttaa kiinteän perustulon tai negatiivisen tuloveron mallina. Kiinteän perustulon mallissa perustulon täysi summa maksetaan ihmiselle 1-2 kertaa kuukaudessa hänen ansiotuloistaan riippumatta, eli ilman tuloharkintaa. Negatiivisen tuloveron mallissa perustuloa maksetaan vain niiltä kuukausilta, joilta ansiotulot jäävät alle tietyn rajan. Tämän rajan ylittävistä tuloista maksetaan ansiotuloveroa, kun taas kiinteän perustulon mallissa veroa maksetaan jo pienistä tuloista. Molemmissa malleissa käteen jäävä tulo ja todellinen veroprosentti ovat samat. Negatiivisen tuloveron malli edellyttää tulorekisterin hyödyntämistä.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Otetaan käyttöön 200 euron vastikkeeton ja veroton takuutulo kaikille Suomen sosiaaliturvan piirissä oleville täysi-ikäisille sekä itsenäisesti asuville alaikäisille. Tämä toteutetaan tulorekisteriä hyödyntävällä mallilla, jossa ansiotulot sekä muut ensisijaiset sosiaaliturvaetuudet asumistukea ja lapsilisää lukuun ottamatta leikkaavat takuutuloa 27 % leikkautumisasteella, jolloin takuutulo täydentää hyvin matalia tuloja. Sidotaan takuutulo kansaneläkeindeksiin.
 * Kompensoidaan ilmasto- ja ympäristötoimien vaikutuksia ottamalla käyttöön hiiliosinko. Hiiliosinko kompensoi päästöverojen korotuksia jakamalla verotuotot tulonsiirtona.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Otetaan käyttöön perustulo, johon kuuluu 600 euron perusosa sekä asumisosa ja perustulon lapsikorotus. Perustulo korvaa sen ensiaskeleena toimineen takuutulon, ja erillisen tuloharkinnan sijaan perustulo integroidaan ansiotuloverotukseen joko kiinteän perustulon tai negatiivisen tuloveron mallilla. Sopeutetaan vähimmäismääräisten päivärahojen taso huomioiden perustulon vaikutus käteen jääviin tuloihin. Tasapainotetaan perustulon kuluja tuloveron korotuksilla siten, että keski- ja suurituloisille käteen jää suunnilleen saman verran tuloa kuin ilman perustuloa.
 
@@ -145,14 +145,14 @@ Koska toteutuneista asumiskustannuksista riippumaton asumisosa tukee samalla sum
 
 Ennen siirtymistä perustuloon tulee yleinen asumistuki muuttaa yksilökohtaiseksi, jolloin ruokakunnan muiden jäsenten tulot eivät vaikuta tuen määrään. Tällöin yksilökohtainen enimmäisasumismeno saadaan jakamalla ruokakunnan koon mukainen enimmäisasumismeno ruokakunnan aikuisten kesken huomioiden lapset huoltajien osuudessa.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Automatisoidaan tulorekisterin avulla yleisen asumistuen tuloharkinta eli tuen leikkautuminen tulojen noustessa.
 * Palautetaan yleinen asumistuki vuokratasoindeksiin.
 * Poistetaan asunnon pääomavastikkeen huomioiminen yleisessä asumistuessa riittävän pitkällä siirtymäajalla.
 * Muutetaan yleisen asumistuen laskennassa työttömyysturvan lapsikorotus etuoikeutetuksi tuloksi eläkkeensaajan lapsikorotuksen ja opintotuen huoltajakorotuksen tapaan.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Korotetaan yleisen asumistuen enimmäistasoa keskimäärin 100 eurolla. Kohdennetaan korotus pienituloisille laskemalla asumistuen ansiotulovähennys 100 euroon.
 * Uudistetaan yleisen asumistuen laskentaa siten, että vuoroasuvat lapset huomioidaan kunkin huoltajan ruokakunnan koossa.
@@ -165,12 +165,12 @@ Lapsilisä Suomessa on universaali vastikkeeton etuus, jolla tuetaan lapsen hoit
 
 Nuoren itsenäistymistä ja taloustaitojen opettelua tuetaan siirtämällä portaittain 15 ikävuodesta eteenpäin osa lapsilisästä tai perustulon lapsikorotuksesta nuorelle itselleen nuorisorahan muodossa. Omillaan asuvalle alaikäiselle maksetaan perustulon lapsikorotuksen tai nuorisorahan sijaan täyttä perustuloa samoin ehdoin kuin aikuiselle.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Mahdollistetaan lapsilisän maksaminen tasan huoltajien kesken omalla ilmoituksella.
 * Otetaan käyttöön 15-, 16- ja 17-vuotiaille tarkoitettu nuorisoraha, joka siirtyy portaittain iän karttuessa 25 %, 25 % ja 50 % osuutena huoltajalle maksettavasta lapsilisästä tai perustulon lapsikorotuksesta nuorelle itselleen. Nuorisorahan perusteena on keskiarvo perheen saamista lapsiluvun mukaan vaihtelevista lapsilisistä.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Sidotaan lapsilisä kansaneläkeindeksiin.
 * Pidennetään lapsilisän maksamista siihen asti, kunnes lapsi täyttää 18 vuotta.
@@ -186,7 +186,7 @@ Tuen tarpeen syystä riippumatta osallisuusraha on aina samansuuruinen ja se koo
 
 Kuten nykyäänkin syyperusteisia etuuksia, osallisuusrahaa haetaan erikseen, ja tuen saamisen perusteena toimii yksi tai useampi elämäntilanteeseen liittyvä syy. Toisin kuin nykyään, etuuden syyperusteena voidaan huomioida useamman samanaikaisen elämäntilanteen yhdistelmä. Oikeus osallisuusrahaan alkaa täysi-ikäisenä, kun oikeus perustulon lapsikorotukseen ja nuorisorahaan lakkaa.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Yhdistetään työttömyyden, sairauden ja opiskelun perusteella maksettavat perusturvaetuudet osallisuusrahaksi, jota maksetaan syyperusteisesti Vihreiden sosiaaliturvamallin mukaisen perustulon päälle. Osallisuusraha koostuu 300 euron perusosasta sekä ansiosidonnaisesta ansio- osasta.
 * Korvataan ansiosidonnaiset päivärahat vanhempainpäivärahoja lukuun ottamatta osallisuusrahan ansio-osalla. Osallisuusraha on täysin Kelan maksama, jolloin työttömyyskassoilta poistuu tehtävä päivärahojen maksajana.
@@ -203,7 +203,7 @@ Toisaalta ero perusturvan ja ansioturvan välillä ei voi olla niin suuri, että
 
 Vihreiden sosiaaliturvamallissa ansiosidonnaista turvaa voi saada osana osallisuusrahaa, vanhempainpäivärahoja, saattohoitorahaa ja sururahaa näiden etuuksien perustasoa korkeampana ansio- osana.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Tuodaan kaikki palkansaajat, yrittäjät sekä muut veronalaista ansiotuloa saavat työn muotoja erottelematta yhteisen ansiosidonnaisen sosiaaliturvan piiriin.
 * Luodaan Kelaan työttömän ansiopäiväraha, jota maksetaan niille, jotka eivät kuulu työttömyyskassaan.
@@ -221,7 +221,7 @@ Siirtymässä kohti Vihreiden sosiaaliturvamallia on tärkeää kehittää nykyi
 
 Työttömyyden kohdatessa jokaisella on oltava oikeus riittävään toimeentuloon. Vihreille on työttömyysturvajärjestelmässä tärkeää painottaa ihmislähtöisyyttä ja työttömän omaa toimijuutta valvonnan ja sanktioiden sijaan. Työttömyysetuuksien lisäksi tukea tarvitsevalle tulee tarjota asiakaslähtöisiä palveluja hänen yksilöllisten tarpeidensa mukaisesti. Palveluihin tulee olla riittävät resurssit koko maassa. Järjestelmän tulee tunnistaa tilanteet, joissa työttömän terveyden tai voimavarojen kannalta häntä ei voi velvoittaa työn hakemiseen tai tekemiseen. Pitkäaikaistyöttömyys on merkittävä riski köyhyydelle ja terveysongelmille, eivätkä pitkäaikaistyöttömät saa jäädä unohdetuksi ihmisryhmäksi. On pidettävä huoli, että pitkäaikaistyöttömät eivät joudu sinnittelemään pitkäaikaisesti sellaisten sosiaaliturvaetuuksien varassa, jotka eivät vastaa heidän tarpeisiinsa. Heille on mahdollistettava nopea pääsy kuntoutukseen, työkokeiluihin ja täsmätyökykyisten palveluihin sekä etsittävä reittejä takaisin työelämään.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Korotetaan työmarkkinatukea ja peruspäivärahaa asteittain 100 eurolla niin, että ensimmäinen askel on 50 euroa.
 * Luovutaan työttömyysturvan korvauksettomista määräajoista, eli niin sanotuista karensseista, sekä samaan sanktiojärjestelmään kuuluvista työssäolovelvoitteista.
@@ -248,7 +248,7 @@ Opiskelijan tulee voida halutessaan keskittyä opiskeluun ilman turvautumista op
 
 Lyhyellä aikavälillä opiskelijoiden toimeentuloa tulee parantaa nostamalla opintorahan tasoa, sillä yhdessä yleisen asumistuen kanssa se ei riitä kattamaan opiskelijan elinkustannuksia. Lisäksi opiskelun ja työnteon yhdistämistä tulee selkiyttää muun muassa korvaamalla vuositulorajat tasaisella etuuden leikkautumisella työtulojen myötä.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Korotetaan opintorahaa 100 eurolla.
 * Sidotaan opintotuen vuosituloraja soveltuviin indekseihin.
@@ -263,7 +263,7 @@ Lyhyellä aikavälillä opiskelijoiden toimeentuloa tulee parantaa nostamalla op
 * Luodaan kaikenikäisille tarkoitettu kansallinen osaamisohjelma, jonka kautta mikä tahansa toisen asteen tutkintoon tai osatutkintoon tähtäävä koulutus on maksutonta henkilöille, joilta puuttuu toisen asteen tutkinto. Mahdollistetaan osana ohjelmaa koulutuksen ajaksi tulottomille opiskelijoille työmarkkinatuen tasoinen perusturvaetuus.
 * Perustetaan julkisesti hallinnoitu apurahajärjestelmä ulkomailta saapuvien, vainoa ja väkivaltaa lähtömaasta pakenevien opiskelijoiden tukemiseksi.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Korvataan opintoraha perustulolla ja osallisuusrahalla.
 * Luovutaan opintolainajärjestelmästä muuten kuin ulkomailla opiskelevien osalta.
@@ -274,7 +274,7 @@ Lapsiköyhyys on lisääntynyt Suomessa viime vuosina. Sillä on tutkimusten muk
 
 Perheet ovat moninaisia, mikä tulee huomioida myös sosiaaliturvassa. Jokaisella lapsella tulee olla subjektiivinen oikeus maksuttomaan varhaiskasvatukseen, minkä myötä voidaan luopua työnteon kannusteita heikentävistä varhaiskasvatusmaksuista.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Korotetaan vähimmäismääräisiä vanhempainpäivärahoja asteittain 100 eurolla niin, että ensimmäinen askel on 50 euroa.
 * Tehdään varhaiskasvatuksesta asteittain maksutonta.
@@ -287,7 +287,7 @@ Perheet ovat moninaisia, mikä tulee huomioida myös sosiaaliturvassa. Jokaisell
 * Tehdään Lukulahja lapselle -kirjakassista pysyvä luontoisetuus vauvaperheille osana neuvolajärjestelmää.
 * Lisätään perhekeskuksissa ja neuvoloissa perheen sosiaaliturvaan liittyvää neuvontaa ja ohjausta.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Muutetaan vanhempainpäivärahat vastaamaan osallisuusrahan tasoa niiden säilyessä erillisinä etuuksina.
 * Taataan yksinhuoltajille subjektiivinen oikeus lapsiperheiden kotipalveluun.
@@ -300,7 +300,7 @@ Vammaisperusteisten tukien on oltava ihmislähtöisiä ja palveluiden on perustu
 
 Silloin kun vammaisella henkilöllä on vähän tai ei ollenkaan työtuloja, hän voi Vihreiden sosiaaliturvamallissa saada perustulon lisäksi osallisuusrahaa tai eläkettä. Vammaisperusteisilla tuilla taas tuetaan vammaisen osallistumista yhteiskuntaan ja korvataan vammaiserityisiä kuluja yksilöllisten tarpeiden mukaisesti.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Automatisoidaan vammaisperusteisia etuuspäätöksiä ja lisätään ajallisesti pitkiä päätöksiä tilanteissa, joissa vamman aste ei oletettavasti muutu, jotta tarveharkinta ja asiakkaan pallottelu vähenee.
 * Varmistetaan että vammaisen palveluita koskevat päätökset tehdään aina ensisijaisesti pysyväisluonteisina toistaiseksi voimassa olevina, ellei vammaisen oma etu, yksilöllinen tilanne tai palvelun tilapäinen luonne edellytä määräaikaista päätöstä.
@@ -318,7 +318,7 @@ Jokaisen toimeentulo on turvattava inhimillisesti sairauden aikana ja silloin ku
 
 Sairauteen ja terveydenhoitoon voi liittyä myös pitkäaikaisia tai pysyviä kuluja. Merkittävä köyhyyttä ja etenkin eläkeläisköyhyyttä lisäävä ongelma on korkeat terveydenhoito- ja lääkekulut. Tähän tulee puuttua muun muassa alentamalla näiden kulujen omavastuuosuuksia, lisäämällä asiakasmaksujen perimättä jättämistä ja ottamalla käyttöön henkilön terveysmenojen yhdistetty maksukatto olemassa olevien kuluerityisten kattojen päälle.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Korotetaan vähimmäistasoista sairauspäivärahaa ja kuntoutusrahaa asteittain 100 eurolla niin, että ensimmäinen askel on 50 euroa.
 * Kehitetään sosiaaliturvaetuuksien myöntämisperusteita siten, että diagnoosiperusteisen luokituksen rinnalla mahdollistetaan nykyistä selkeämmin myös yhtenäisin kriteerein selvitetty toimintakyvyn lasku ja oireisto silloinkin, kun selkeää diagnoosia ei löydy. Näin tukien piiriin voivat päästä vaikeasti diagnosoitavia tai toiminnallisia häiriöitä sairastavat henkilöt.
@@ -337,7 +337,7 @@ Sairauteen ja terveydenhoitoon voi liittyä myös pitkäaikaisia tai pysyviä ku
 * Pienennetään terveydenhoito-, lääke- ja matkakustannusten alkuomavastuita ja otetaan käyttöön henkilön kaikkien terveysmenojen yhteinen maksukatto olemassa olevien kuluerityisten kattojen lisäksi.
 * Otetaan käyttöön automaattinen tulosidonnainen terveydenhoitomaksujen ja lääkekorvausten omavastuun huojennus ja lääkemenojen korvausten järjestelmä hyödyntäen reaaliaikaista tulorekisteriä.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Korvataan sairauspäiväraha ja kuntoutustuki perustulolla ja osallisuusrahalla. Kuntoutusraha säilyy erillisenä mutta osallisuusrahan tasoa vastaavana etuutena.
 * Korvataan matalimmat omaishoitajien hoitorahat kokonaan ja suuremmat osittain perustulolla ja osallisuusrahalla. Perustuloa voi käyttää joustavasti silloin, kun läheiset tarvitsevat tukea ja hoivaa, mutta sitä ei tarvitse erikseen hakea. Muita omaishoitajien palveluita tarvitaan jatkossakin.
@@ -352,7 +352,7 @@ Eläkejärjestelmä tarvitsee pitkän aikavälin uudistuksen, jolla hillitään 
 
 Vihreiden sosiaaliturvamallissa eläke koostuu perustulosta ja ansioeläkkeestä. Jokainen työuralla ansaittu euro kasvattaa ansioeläkettä ja käteen jäävää eläkettä. Eläkkeellä ihminen saa perustuloa kuten työelämässä ollessaan, mutta korotettuna perustulon eläkeläiskorotuksella. Perustulo korvaa nykyiset Kelan maksamat eläkkeet eli kansaneläkkeen ja takuueläkkeen. Koska eläkeläisen perustulo sisältää myös asumisosan, ei jatkossa tarvita eläkkeensaajan asumistukea kuten ei yleistä asumistukeakaan.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Otetaan eläkkeissä ja työkyvyttömyyseläkkeessä käyttöön tasaisen leikkautumisen lineaarimalli, jossa suojaosan ylittävät työtulot leikkaavat eläkettä tasaisesti.
 * Mahdollistetaan kaikkien eläkkeiden hakeminen sähköisesti.
@@ -360,7 +360,7 @@ Vihreiden sosiaaliturvamallissa eläke koostuu perustulosta ja ansioeläkkeestä
 * Varmistetaan ettei työkyvyttömyyden vuoksi eläkkeellä olevan henkilön oikeus etuuteen vaarannu työnteon kokeilemisen vuoksi.
 * Korjataan Kelan maksamaa leskeneläkettä siten, ettei lesken kansaneläke tai vastaava eläke ulkomailta vaikuta leskeneläkkeen alkueläkkeen määrään.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Otetaan käyttöön Vihreiden sosiaaliturvamallin mukainen perustulo ja sen lisäosana eläkeläiskorotus. Nämä korvaavat takuueläkkeen ja kansaneläkkeen, sekä eläkkeensaajan asumistuen.
 * Uudistetaan perhe-eläkkeitä niin, että henkilön kuollessa tämän leski tai lapsi saa kuolleen ansiotasoon perustuvaa tukea vastaavalta ajalta kuin mitä voidaan myöntää työttömän ansioturvaa. Näin tuki kohdistuu paremmin äkilliseen muutokseen sopeutumiseen.
@@ -376,7 +376,7 @@ Jotta työeläkejärjestelmän rahoitus olisi kestävällä pohjalla ja eläkema
 
 Työeläkemaksuun liittyvää hallintoa kevennetään automatisoimalla sen maksatus kansalaisen verotilin avulla. Verottaja ohjaa eläkemaksun oikealle eläkelaitokselle. Jotta suuri eläkerahastovarallisuus ei olisi vain yhden tahon sijoituspäätösten käytössä, tulee eläkevarojen hallinnointi olla hajautettua. Sijoituksissa tulee olla riittävästi hajautusta kansainvälisesti ja vakavaraisuussääntöjen tulee mahdollistaa nykyistä korkeamman tuottotavoitteen samalla, kun nostetaan sijoitusten vastuullisuusvaatimuksia.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Otetaan käyttöön automaattinen työeläkemaksun vakautusmekanismi.
 * Toteutetaan eläkemaksun tarpeellinen korotus ja tasapainotetaan järjestelmän kustannuksia korottamalla työeläkkeiden verotusta tai pienentämällä niihin kohdistuvia verovähennyksiä.
@@ -384,7 +384,7 @@ Työeläkemaksuun liittyvää hallintoa kevennetään automatisoimalla sen maksa
 * Otetaan käyttöön kansalaisen verotili, jonka kautta hoidetaan verojen ja eläkemaksujen tilitys.
 * Lisätään vuosittain myönnettävien ylimääräisten taiteilijaeläkkeiden määrää ensi vaiheessa sadalla kappaleella ja pitemmällä aikavälillä todellista tarvetta vastaavalle tasolle.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Korjataan työeläkkeiden verotus perustulon käyttöönoton myötä tasolle, jolla eläkeläiselle jää käteen vastaava summa kuin ennen perustulon käyttöönottoa.
 * Ulotetaan eläketurva koskemaan kaikkea työtä siten, että kaikki veronalainen ansiotulo kerryttää työeläkettä samalla tavalla riippumatta siitä, tekeekö työtä palkkasuhteessa, yrittäjänä tai muussa muodossa.
@@ -399,7 +399,7 @@ Täydentävän ja ehkäisevän toimeentulotuen saamisen yhteydessä sosiaalityö
 
 Kelan myöntämä perustoimeentulotuki korvautuu Vihreiden sosiaaliturvamallissa perustulolla, jonka perusosan taso on nykyistä toimeentulotuen perusosaa korkeampi. Näin kunnan tai hyvinvointialueen myöntämä harkinnanvarainen toimeentulotuki jää aidosti viimesijaiseksi tueksi. Tämä ratkaisee nykyisen ongelman, jossa toimeentulotukea voi joutua hakemaan kahdelta eri taholta, minkä vuoksi tilanteen selvittämiseen voi kulua kohtuuttomasti aikaa.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Yhdistetään ehkäisevä ja täydentävä toimeentulotuki yhdeksi lisätoimeentulotueksi, jota myöntää kunta tai hyvinvointialue.
 * Digitalisoidaan ja automatisoidaan kaikki toimeentulotuen eri maksusitoumukset mahdollisimman kattavasti apteekkeihin myönnettävän maksusitoumuksen mallilla. Yhtenäistetään eri maksusitoumusten myöntäminen siten, että niitä voi myöntää sekä perustoimeentulotuen että ehkäisevän ja täydentävän toimeentulotuen yhteydessä.
@@ -413,7 +413,7 @@ Kelan myöntämä perustoimeentulotuki korvautuu Vihreiden sosiaaliturvamallissa
 * Luovutaan toimeentulotukikäsittelyssä vaatimuksesta muuttaa rahaksi tukea hakevan fyysistä irtaimistoa.
 * Luovutaan toimeentulotukikäsittelyssä vaatimuksesta toimittaa muiden ihmisten tilitietoja kuin hakijan omia.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Korvataan perustoimeentulotuki perustulolla.
 * Muutetaan toimeentulotuki yksilökohtaiseksi siten, etteivät muiden täysi-ikäisten henkilöiden tulot, varallisuus tai elämäntilanne vaikuta hakijan tukeen.
@@ -423,7 +423,7 @@ Kelan myöntämä perustoimeentulotuki korvautuu Vihreiden sosiaaliturvamallissa
 
 Perustoimeentulotuen korjaussarja on paketti toimenpiteitä, jotka parantavat merkittävästi perustoimeentulotuen saajien oikeusturvaa ja toimeentulon varmuutta jo lyhyellä aikavälillä. Koska perustoimeentulotuki on tärkeä viimesijainen etuus, sen korjaukset ja parannukset tulee aloittaa viipymättä.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Kumotaan toimeentulotukilaista mahdollisuus alentaa perustoimeentulotukea rangaistuksenomaisesti.
 * Korjataan yksinhuoltajien tilannetta nostamalla perustoimeentulotuen yksinhuoltajakorotus 20 %:iin yksin asuvan lapsettoman aikuisen perusosasta.
@@ -444,7 +444,7 @@ Perustoimeentulotuen korjaussarja on paketti toimenpiteitä, jotka parantavat me
 
 Oikeusturva tarkoittaa hyvän hallinnon toteutumista ja se on edellytys kansalaisten sosiaalisten oikeuksien toteutumiselle. Oikeusturvan ja oikeusvaltion kehittäminen linkittyy keskeisesti yhteiskunnan sosiaaliturvajärjestelmän oikeudenmukaisuuteen. Sosiaaliturvauudistusten edetessä tulee tukien oikeudenmukaiseen käsittelyyn ja sosiaaliturvaan liittyviin tukipalveluihin kiinnittää enemmän huomiota.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Lisätään toimintaresursseja ja nopeutetaan sosiaaliturvan muutoksenhakuelimien ja vakuutusoikeuden käsittelyä, etteivät asiakkaat joudu odottamaan tilanteensa ratkaisua kohtuuttoman pitkään.
 * Parannetaan etuuksia ja korvauksia hakevien vakuutusoikeudellista turvaa kehittämällä avoimuus- ja selkeyskäytäntöjä vakuutuslääkärien toiminnassa, ja mahdollistamalla tarvittaessa toisen lääkärin mielipiteen vaatimisen.
@@ -462,7 +462,7 @@ Sosiaaliturvan hallinnan ja maksatuksen keskittäminen Kelalle turvaa sosiaalitu
 
 Kelan soveltamisohjeissa korostetaan yksilöllistä kokonaisharkintaa ja päätöksiä asiakkaiden eduksi. Tämän tulee entistä vahvemmin näkyä myös käytännössä. Etuuspäätöksissä tulee rutiininomaisesti huomioida asiakkaan ongelmien ennaltaehkäisy ja päätöksien pitkäaikaiset vaikutukset asiakkaan hyvinvointiin. Etuuspäätöksiin liittyvissä kiista- ja ongelmatilanteissa Kelan tulee nojata vahvemmin itseoikaisukäytäntöihin ja asiakkaan tilanteen syvempään perehtymiseen ennen asian lähettämistä sosiaaliturvanmuutoksenhakulautakuntaan.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Automatisoidaan ei-harkinnanvaraisten tukien päätöksentekoa, jolloin manuaalista käsittelyä ja tapauskohtaista harkintaa vaativien hakemusten käsittelyyn jää enemmän resursseja.
 * Yhtenäistetään Kelan etuuksien laskentajaksot kuukausittain maksettavissa tuissa noudattamaan kalenterikuukausia.
@@ -480,7 +480,7 @@ Sosiaaliturvajärjestelmä voi pahimmillaan syventää ylivelkaantuneisuudesta s
 
 Tärkeimpänä toimenpiteenä tulee ottaa Kelan hallinnoima sosiaalinen luototus kiinteäksi osaksi suomalaista sosiaaliturvajärjestelmää. Sosiaalista luototusta ei kuitenkaan saa käyttää välineenä hivuttaa lainapainotteisuutta osaksi sosiaaliturvaa, vaan luototuksen tarkoituksen on oltava yksityishenkilöiden taloudellisen tilanteen kriisiytymisen ehkäisy tai jo syntyneen kriisin korjaaminen.
 
-#### Toimenpiteet lyhyellä aikavälillä
+**Toimenpiteet lyhyellä aikavälillä:**
 
 * Otetaan käyttöön valtakunnallinen Kelan myöntämä sosiaalinen luototus selkein ja yhdenvertaisin kriteerein. Luototusta voi hakea tilanteissa, joissa luototuksella on mahdollista ehkäistä yksityishenkilön taloudellisen tilanteen kriisiytymistä tai korjata jo syntynyttä kriisiä.
 * Velvoitetaan vakuutusyhtiöt tarjoamaan ennalta maksettava perustasoinen kotivakuutus. Tämä mahdollistaa esimerkiksi maksuhäiriömerkintäisille kotivakuutuksen hankkimisen.
@@ -495,7 +495,7 @@ Tärkeimpänä toimenpiteenä tulee ottaa Kelan hallinnoima sosiaalinen luototus
 * Tehostetaan yksityisten perintätoimistojen valvontaa ja helpotetaan joukkokanteiden nostamista perintätoimistojen väärinkäytösten ehkäisemiseksi ja korjaamiseksi.
 * Tiukennetaan korkeakorkoisten ja vakuudettomien kuluttajaluottojen sääntelyä. Lasketaan näiden luottojen korkokatto 10 prosenttiin ja edellytetään entistä selkeämpää luoton kokonaiskustannusten esittämistä. Puututaan määrätietoisesti aggressiiviseen ja ylivelkaantumista lisäävään markkinointiin, tarvittaessa lakirajoituksin.
 
-#### Toimenpiteet pitkällä aikavälillä
+**Toimenpiteet pitkällä aikavälillä:**
 
 * Muutetaan lailla velan perimisjärjestys siten, että ensin takaisinmaksusta kuitataan alkuperäinen pääoma, sen jälkeen perimiskulut ja lopuksi korot.
 * Parannetaan velallisen oikeusturvaa kieltämällä koron periminen koroista kun velallisena on yksityishenkilö.
@@ -524,7 +524,7 @@ Myös perheiden saamia tukia on syytä kehittää paremmin tämän päivän tarp
 
 Näillä toimilla haluamme ottaa seuraavalla hallituskaudella askeleita kohti vihreää sosiaaliturvajärjestelmää, joka tarjoaa ihmisille turvaa muuttuvassa maailmassa.
 
-#### Toimet tulevalla hallituskaudella
+**Toimet tulevalla hallituskaudella**
 
 * Otetaan käyttöön 200 euron vastikkeeton ja veroton takuutulo kaikille sosiaaliturvan piirissä oleville täysi-ikäisille. Ansiotulot leikkaavat takuutuloa, jolloin takuutulo täydentää hyvin matalia tuloja.
 * Nostetaan perusturvaa 50 eurolla.

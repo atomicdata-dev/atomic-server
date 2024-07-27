@@ -1,8 +1,3 @@
-# Metsäpoliittinen ohjelma
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 29.11.2020. Tämä ohjelma korvaa ohjelmapaperin "Vihreät timantit – metsäsektorin kestävä uudistaminen (2008)"*  
-Lisenssi: CC0
-
 ## Esipuhe
 
 Suomen metsäluonnolla on itseisarvo osana elonkirjoa. Samalla metsät ovat meille tärkeä luonnonvara. Metsät ovat vuosien varrella tarjonneet suojaa, ravintoa, työtä ja toimeentuloa sekä toimineet yhtenä maaseudun elinkeinoista. Metsillä on tärkeä rooli myös kaupungeissa, joissa ne ovat erityisen tärkeä osa biodiversiteettiä ja ilmastonmuutokseen sopeutumista sekä virkistyksen lähde. Me arvostamme metsäluontoa ja metsiin liittyvää kulttuuriperintöä sekä liikumme mielellään luonnossa. Viime aikoina metsien yhteiskunnallinen merkitys on korostunut entisestään, kun etsimme ratkaisuja kahden aikamme vakavimpiin kuuluvien kriisien, ilmastonmuutoksen ja luonnon monimuotoisuuskadon, torjumiseksi. Metsät ovat osa Suomen ratkaisua molempiin ongelmiin.

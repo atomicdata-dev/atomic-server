@@ -1,7 +1,3 @@
-# Vihreiden maahanmuuttopoliittinen ohjelma
-
-*Hyväksytty puoluevaltuuston kokouksessa 27.11.2022*
-
 ## Johdanto
 
 Vihreän maahanmuuttopolitiikan lähtökohtana ovat ihmisoikeudet. Haluamme edistää maailmaa, jossa mahdollisimman monelle on mahdollista muuttaa sujuvasti ja turvallisesti maasta toiseen, oli syynä sitten turvan tarve, työ, opiskelu, perhe tai rakkaus.

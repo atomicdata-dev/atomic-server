@@ -1,7 +1,3 @@
-# Vihreiden poliittinen ohjelma 2023–2027
-
-*Hyväksytty puoluekokouksessa 22.5.2022*
-
 ## Johdanto
 
 Vihreät hakevat yhdessä vastauksia tämän päivän ja huomisen haasteisiin. Tarvitsemme sekä ihmisen että ihmiskunnan kokoisia ratkaisuja. Maailman tapahtumat vaikuttavat yli valtiorajojen. Vihreät edistävät kestävää tulevaisuutta vaikuttamalla rohkeasti maailmaan yhteisten arvojemme mukaisesti.

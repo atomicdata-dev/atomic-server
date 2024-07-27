@@ -1,7 +1,3 @@
-# Elinkeinopoliittinen ohjelma
-
-## Talouden avulla tavoitteisiin
-
 ## 1. Vihreä talous elinkeinopilitiikan lähtökohtana
 
  **Hyvän elinkeinopolitiikan edellytys on vihreän talouden kokonaiskuvan hahmottaminen. Markkinoiden ja talouden keinoja tulee käyttää mahdollisimman vaikuttavasti yhteiskunnallisten tavoitteiden saavuttamiseksi.**

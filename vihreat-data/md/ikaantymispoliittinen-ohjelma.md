@@ -1,7 +1,3 @@
-# IKÄÄNTYMISPOLIITTINEN OHJELMA
-
-*HYVÄKSYTTY PUOLUEVALTUUSKUNNAN KOKOUKSESSA 27.9.2020*
-
 ## 1. Johdanto
 
 Väestön ikääntyminen on tämän vuosituhannen megatrendi. Keskimääräinen elinajanodote on kasvanut merkittävästi. Tähän on vaikuttanut yleinen elintason ja hygienian parantuminen sekä lääketieteen kehitys. Se, että elämme yhä vanhemmiksi ja vieläpä yhä parempikuntoisina, on yksi ihmiskunnan suurimpia saavutuksia.

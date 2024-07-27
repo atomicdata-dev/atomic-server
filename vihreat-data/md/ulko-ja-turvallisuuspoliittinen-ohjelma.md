@@ -1,9 +1,3 @@
-# Ulko- ja turvalli­suus­po­liit­tinen ohjelma
-
- *Hyväksytty puoluevaltuuston kokouksessa 24.9.2023.*
-
-*Tarkastusvuosi, jonka aikana puoluevaltuuston kokouksessa linjataan, onko tarvetta uudelle ohjelmalle, ohjelman hienovaraisemmalle päivitykselle tai ohjelman linjaamiselle vanhentuneeksi: 2027.*
-
 ## 1. Vihreiden näkemys maailmasta ja turvallisuudesta
 
 ### 1.1 Ohjelman rakenne

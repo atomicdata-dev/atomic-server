@@ -1,7 +1,3 @@
-# Vihreä Eurooppa -ohjelma
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 3.10.2021*
-
 ## Johdanto
 
 Kasvavan keskinäisriippuvuuden maailmassa turvallisuusuhat eivät piittaa kansallisista rajoista. Sen ovat todistaneet niin vuonna 2008 alkanut talouskriisi kuin 2020-luvun korona-pandemia. Epävakaus näkyy hauraassa ympäristössämme ja ilmastokriisin käsittelyssä. EU-kansalaisina suomalaisten on pystyttävä vaikuttamaan, säätelemään ja demokraattisesti päättämään asioista, jotka vaikuttavat elämäämme. Entistä kattavampi ja vahvempi kyky vaikuttaa ympäröivään maailmaan demokraattisen oikeusvaltion periaattein on tarpeen. Euroopan unioni vastaa tähän tarpeeseen ja on yhteistyön välineenä paras mahdollisuutemme kasvattaa turvallisuutta ja hyvinvointia sekä aktiivisesti torjua uhkia.

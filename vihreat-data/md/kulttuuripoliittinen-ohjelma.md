@@ -1,7 +1,3 @@
-# Kulttuuripoliittinen ohjelma
-
-*Hyväksytty puoluevaltuuskunnan kokouksessa 27.5.2018*
-
 ## Johdanto
 
 Kulttuuri on sivistyksellinen perusoikeus. Oikeus omaan kulttuuriin ja jokaisen oikeus päästä osalliseksi sivistyksestä ja kulttuurista on turvattu niin Suomen perustuslaissa kuin Yhdistyneiden Kansakuntien yleissopimuksessa. Kulttuuri on myös olennainen työkalu itsensä ja ympäröivän maailman hahmottamiseen sekä yksilön ja yhteisön identiteetin rakentamiseen. Kulttuuri on merkitysten antamista ja välittämistä, ja menneiden sukupolvien kädenjäljen ja kulttuuriperintöjen vaaliminen luo vahvan perustan tämän päivän ja huomisen rikkaalle kulttuurielämälle. Kaikki inhimillinen toiminta on pohjimmiltaan kulttuuria, mutta luovuudella ja itseilmaisulla on kulttuurissa erityinen rooli. Tässä ohjelmassa kulttuurilla tarkoitetaan toimintaa, jossa ihminen käyttää omaa luovuuttaan ja itseilmaisuaan tai osallistuu taiteeseen ja luovaan toimintaan. Taide on tärkeä osa kulttuuria - kaikki taide on kulttuuria, mutta kaikki kulttuuri ei ole taidetta.
