@@ -505,6 +505,7 @@ impl Storelike for Db {
 
         let dynamic_span =
             tracing::span!(tracing::Level::TRACE, "get_resource_extended (dynamic)").entered();
+        println!("get_resource_extended: {}", &removed_query_params);
         let mut resource = self.get_resource(&removed_query_params)?;
 
         let _explanation = crate::hierarchy::check_read(self, &resource, for_agent)?;
