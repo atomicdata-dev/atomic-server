@@ -431,40 +431,6 @@ importers:
         specifier: ^2.0.0
         version: 2.0.5(@types/node@20.11.5)(terser@5.31.0)
 
-  svelte_old:
-    dependencies:
-      '@tomic/lib':
-        specifier: workspace:*
-        version: link:../lib
-      svelte:
-        specifier: ^3.55.0
-        version: 3.59.2
-    devDependencies:
-      '@rollup/plugin-typescript':
-        specifier: ^10.0.1
-        version: 10.0.1(rollup@2.79.1)(tslib@2.6.2)(typescript@5.4.5)
-      '@sveltejs/vite-plugin-svelte':
-        specifier: ^3.1.1
-        version: 3.1.1(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))
-      '@typescript-eslint/parser':
-        specifier: ^5.47.0
-        version: 5.62.0(eslint@9.8.0)(typescript@5.4.5)
-      rollup-plugin-typescript-paths:
-        specifier: ^1.4.0
-        version: 1.4.0(typescript@5.4.5)
-      tslib:
-        specifier: ^2.4.1
-        version: 2.6.2
-      typescript:
-        specifier: ^5.4.5
-        version: 5.4.5
-      vite:
-        specifier: ^5.3.4
-        version: 5.3.5(@types/node@20.11.5)(terser@5.31.0)
-      vitest:
-        specifier: ^0.34.6
-        version: 0.34.6(playwright@1.43.1)(terser@5.31.0)
-
 packages:
 
   '@aashutoshrathi/word-wrap@1.2.6':
@@ -3392,19 +3358,6 @@ packages:
       rollup:
         optional: true
 
-  '@rollup/plugin-typescript@10.0.1':
-    resolution: {integrity: sha512-wBykxRLlX7EzL8BmUqMqk5zpx2onnmRMSw/l9M1sVfkJvdwfxogZQVNUM9gVMJbjRLDR5H6U0OMOrlDGmIV45A==}
-    engines: {node: '>=14.0.0'}
-    peerDependencies:
-      rollup: ^2.14.0||^3.0.0
-      tslib: '*'
-      typescript: '>=3.7.0'
-    peerDependenciesMeta:
-      rollup:
-        optional: true
-      tslib:
-        optional: true
-
   '@rollup/pluginutils@3.1.0':
     resolution: {integrity: sha512-GksZ6pr6TpIjHm8h9lSQ8pi8BE9VeubNT0OMJ3B5uZJ8pz73NPiqOtCog/x2/QzM1ENChPKxMDhiQuRHsqc+lg==}
     engines: {node: '>= 8.0.0'}
@@ -4219,16 +4172,6 @@ packages:
       typescript:
         optional: true
 
-  '@typescript-eslint/parser@5.62.0':
-    resolution: {integrity: sha512-VlJEV0fOQ7BExOsHYAGrgbEiZoi8D+Bl2+f6V2RrXerRSylnp+ZBHmPvaIa8cz0Ajx7WO7Z5RqfgYg7ED1nRhA==}
-    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
-    peerDependencies:
-      eslint: ^6.0.0 || ^7.0.0 || ^8.0.0
-      typescript: '*'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
   '@typescript-eslint/parser@7.8.0':
     resolution: {integrity: sha512-KgKQly1pv0l4ltcftP59uQZCi4HUYswCLbTqVZEJu7uLX8CTLyswqMLqLN+2QFz4jCptqWVV4SB7vdxcH2+0kQ==}
     engines: {node: ^18.18.0 || >=20.0.0}
@@ -4248,10 +4191,6 @@ packages:
     peerDependenciesMeta:
       typescript:
         optional: true
-
-  '@typescript-eslint/scope-manager@5.62.0':
-    resolution: {integrity: sha512-VXuvVvZeQCQb5Zgf4HAxc04q5j+WrNAtNh9OwCsCgpKqESMTu3tF/jhZ3xG6T4NZwWl65Bg8KuS2uEvhSfLl0w==}
-    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
 
   '@typescript-eslint/scope-manager@7.8.0':
     resolution: {integrity: sha512-viEmZ1LmwsGcnr85gIq+FCYI7nO90DVbE37/ll51hjv9aG+YZMb4WDE2fyWpUR4O/UrhGRpYXK/XajcGTk2B8g==}
@@ -9493,11 +9432,6 @@ packages:
     peerDependencies:
       rollup: ^2.0.0
 
-  rollup-plugin-typescript-paths@1.4.0:
-    resolution: {integrity: sha512-6EgeLRjTVmymftEyCuYu91XzY5XMB5lR0YrJkeT0D7OG2RGSdbNL+C/hfPIdc/sjMa9Sl5NLsxIr6C/+/5EUpA==}
-    peerDependencies:
-      typescript: '>=3.4'
-
   rollup@2.79.1:
     resolution: {integrity: sha512-uKxbd0IhMZOhjAiD5oAFp7BqvkA4Dv47qpOCtaNvng4HBwdbWtdOh8f5nZNuk2rp51PMGk3bzfWu5oayNEuYnw==}
     engines: {node: '>=10.0.0'}
@@ -10088,10 +10022,6 @@ packages:
     peerDependencies:
       svelte: ^3.55 || ^4.0.0-next.0 || ^4.0 || ^5.0.0-next.0
       typescript: ^4.9.4 || ^5.0.0
-
-  svelte@3.59.2:
-    resolution: {integrity: sha512-vzSyuGr3eEoAtT/A6bmajosJZIUWySzY2CzB3w2pgPvnkUjGqlDnsNnA0PMO+mMAhuyMul6C2uuZzY6ELSkzyA==}
-    engines: {node: '>= 8'}
 
   svelte@4.2.18:
     resolution: {integrity: sha512-d0FdzYIiAePqRJEb90WlJDkjUEx42xhivxN8muUBmfZnP+tzUgz12DJ2hRJi8sIHCME7jeK1PTMgKPSfTd8JrA==}
@@ -14701,15 +14631,6 @@ snapshots:
     optionalDependencies:
       rollup: 2.79.1
 
-  '@rollup/plugin-typescript@10.0.1(rollup@2.79.1)(tslib@2.6.2)(typescript@5.4.5)':
-    dependencies:
-      '@rollup/pluginutils': 5.1.0(rollup@2.79.1)
-      resolve: 1.22.8
-      typescript: 5.4.5
-    optionalDependencies:
-      rollup: 2.79.1
-      tslib: 2.6.2
-
   '@rollup/pluginutils@3.1.0(rollup@2.79.1)':
     dependencies:
       '@types/estree': 0.0.39
@@ -14926,35 +14847,12 @@ snapshots:
     transitivePeerDependencies:
       - typescript
 
-  '@sveltejs/vite-plugin-svelte-inspector@2.1.0(@sveltejs/vite-plugin-svelte@3.1.1(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0)))(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))':
-    dependencies:
-      '@sveltejs/vite-plugin-svelte': 3.1.1(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))
-      debug: 4.3.4(supports-color@9.4.0)
-      svelte: 3.59.2
-      vite: 5.3.5(@types/node@20.11.5)(terser@5.31.0)
-    transitivePeerDependencies:
-      - supports-color
-
   '@sveltejs/vite-plugin-svelte-inspector@2.1.0(@sveltejs/vite-plugin-svelte@3.1.1(svelte@4.2.18)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0)))(svelte@4.2.18)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))':
     dependencies:
       '@sveltejs/vite-plugin-svelte': 3.1.1(svelte@4.2.18)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))
       debug: 4.3.4(supports-color@9.4.0)
       svelte: 4.2.18
       vite: 5.3.5(@types/node@20.11.5)(terser@5.31.0)
-    transitivePeerDependencies:
-      - supports-color
-
-  '@sveltejs/vite-plugin-svelte@3.1.1(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))':
-    dependencies:
-      '@sveltejs/vite-plugin-svelte-inspector': 2.1.0(@sveltejs/vite-plugin-svelte@3.1.1(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0)))(svelte@3.59.2)(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))
-      debug: 4.3.4(supports-color@9.4.0)
-      deepmerge: 4.3.1
-      kleur: 4.1.5
-      magic-string: 0.30.10
-      svelte: 3.59.2
-      svelte-hmr: 0.16.0(svelte@3.59.2)
-      vite: 5.3.5(@types/node@20.11.5)(terser@5.31.0)
-      vitefu: 0.2.5(vite@5.3.5(@types/node@20.11.5)(terser@5.31.0))
     transitivePeerDependencies:
       - supports-color
 
@@ -15568,18 +15466,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/parser@5.62.0(eslint@9.8.0)(typescript@5.4.5)':
-    dependencies:
-      '@typescript-eslint/scope-manager': 5.62.0
-      '@typescript-eslint/types': 5.62.0
-      '@typescript-eslint/typescript-estree': 5.62.0(supports-color@9.4.0)(typescript@5.4.5)
-      debug: 4.3.4(supports-color@9.4.0)
-      eslint: 9.8.0
-    optionalDependencies:
-      typescript: 5.4.5
-    transitivePeerDependencies:
-      - supports-color
-
   '@typescript-eslint/parser@7.8.0(eslint@8.57.0)(typescript@5.4.5)':
     dependencies:
       '@typescript-eslint/scope-manager': 7.8.0
@@ -15605,11 +15491,6 @@ snapshots:
       typescript: 5.4.5
     transitivePeerDependencies:
       - supports-color
-
-  '@typescript-eslint/scope-manager@5.62.0':
-    dependencies:
-      '@typescript-eslint/types': 5.62.0
-      '@typescript-eslint/visitor-keys': 5.62.0
 
   '@typescript-eslint/scope-manager@7.8.0':
     dependencies:
@@ -22009,10 +21890,6 @@ snapshots:
       serialize-javascript: 4.0.0
       terser: 5.19.2
 
-  rollup-plugin-typescript-paths@1.4.0(typescript@5.4.5):
-    dependencies:
-      typescript: 5.4.5
-
   rollup@2.79.1:
     optionalDependencies:
       fsevents: 2.3.3
@@ -22637,10 +22514,6 @@ snapshots:
     optionalDependencies:
       svelte: 4.2.18
 
-  svelte-hmr@0.16.0(svelte@3.59.2):
-    dependencies:
-      svelte: 3.59.2
-
   svelte-hmr@0.16.0(svelte@4.2.18):
     dependencies:
       svelte: 4.2.18
@@ -22665,8 +22538,6 @@ snapshots:
       pascal-case: 3.1.2
       svelte: 4.2.18
       typescript: 5.4.5
-
-  svelte@3.59.2: {}
 
   svelte@4.2.18:
     dependencies:
