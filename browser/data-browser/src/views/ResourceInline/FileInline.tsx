@@ -1,15 +1,15 @@
-import { useString, properties, useResource } from '@tomic/react';
+import { useString, useResource, server, Image } from '@tomic/react';
 import { imageMimeTypes, getFileIcon } from '../../helpers/filetypes';
 import { ResourceInlineInstanceProps } from './ResourceInline';
 import { styled } from 'styled-components';
+const THUMB_SIZE = '2rem';
 
 export function FileInline({
   subject,
 }: ResourceInlineInstanceProps): JSX.Element {
   const resource = useResource(subject);
-  const [filename] = useString(resource, properties.file.filename);
-  const [mimeType] = useString(resource, properties.file.mimetype);
-  const [downloadUrl] = useString(resource, properties.file.downloadUrl);
+  const [filename] = useString(resource, server.properties.filename);
+  const [mimeType] = useString(resource, server.properties.mimetype);
 
   const isImage = imageMimeTypes.has(mimeType ?? '');
   const Icon = getFileIcon(mimeType ?? '');
@@ -17,7 +17,12 @@ export function FileInline({
   return (
     <Wrapper>
       {isImage ? (
-        <Img src={downloadUrl} alt={resource.title} loading='lazy' />
+        <Img
+          subject={subject}
+          alt={resource.title}
+          loading='lazy'
+          sizeIndication={THUMB_SIZE}
+        />
       ) : (
         <Icon />
       )}
@@ -29,16 +34,16 @@ export function FileInline({
 const Wrapper = styled.span`
   display: inline-flex;
   align-items: center;
-  height: 2rem;
+  height: ${THUMB_SIZE};
   gap: 0.7ch;
   & svg {
     font-size: 1rem;
   }
 `;
 
-const Img = styled.img`
-  aspect-ratio: 1/1;
+const Img = styled(Image)`
   object-fit: cover;
   border-radius: 5px;
-  height: 100%;
+  height: ${THUMB_SIZE};
+  width: ${THUMB_SIZE};
 `;

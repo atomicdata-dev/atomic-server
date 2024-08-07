@@ -111,6 +111,8 @@ pub const MIMETYPE: &str = "https://atomicdata.dev/properties/mimetype";
 pub const INTERNAL_ID: &str = "https://atomicdata.dev/properties/internalId";
 pub const DOWNLOAD_URL: &str = "https://atomicdata.dev/properties/downloadURL";
 pub const ATTACHMENTS: &str = "https://atomicdata.dev/properties/attachments";
+pub const IMAGE_WIDTH: &str = "https://atomicdata.dev/properties/imageWidth";
+pub const IMAGE_HEIGHT: &str = "https://atomicdata.dev/properties/imageHeight";
 // ... for ChatRooms and Messages
 pub const MESSAGES: &str = "https://atomicdata.dev/properties/messages";
 pub const NEXT_PAGE: &str = "https://atomicdata.dev/properties/nextPage";

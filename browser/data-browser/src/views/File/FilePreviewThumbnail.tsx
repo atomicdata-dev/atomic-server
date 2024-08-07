@@ -39,14 +39,14 @@ function FilePreviewThumbnailInner({
 }: FilePreviewThumbnailProps): JSX.Element {
   const { downloadUrl, mimeType, bytes } = useFileInfo(resource);
   const previewSizeLimit = useFilePreviewSizeLimit();
-  const transitionStyles = useFileImageTransitionStyles(resource.getSubject());
+  const transitionStyles = useFileImageTransitionStyles(resource.subject);
 
   if (bytes >= previewSizeLimit) {
     return <TextWrapper>To large for preview</TextWrapper>;
   }
 
   if (isImageFile(mimeType)) {
-    return <Thumbnail src={downloadUrl} style={transitionStyles} />;
+    return <Thumbnail subject={resource.subject} style={transitionStyles} />;
   }
 
   if (isTextFile(mimeType)) {

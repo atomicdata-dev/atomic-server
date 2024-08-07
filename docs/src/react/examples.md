@@ -7,8 +7,14 @@ If you were to make this in vanilla react without any kind of persistence it wou
 The main difference is the use of the `useArray` and `useBoolean` hooks instead of `useState`.
 
 ```jsx
-import { useArray, useBoolean, useResource } from '@tomic/react';
 import { useState } from 'react';
+import {
+  useStore,
+  useArray,
+  useBoolean,
+  useResource
+ } from '@tomic/react';
+import { type Checklist, todoApp } from './ontologies/todoApp';
 
  export const TodoList = () => {
   const store = useStore();

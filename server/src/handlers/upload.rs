@@ -1,11 +1,12 @@
 use std::{ffi::OsStr, io::Write, path::Path};
 
-use actix_multipart::Multipart;
+use actix_multipart::{Field, Multipart};
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
     commit::CommitResponse, hierarchy::check_write, urls, utils::now, Resource, Storelike, Value,
 };
-use futures::{StreamExt, TryStreamExt};
+use futures::{io::Cursor, StreamExt, TryStreamExt};
+use image::GenericImageView;
 use serde::Deserialize;
 
 use crate::{appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent};
@@ -44,54 +45,8 @@ pub async fn upload_handler(
     let mut created_resources: Vec<Resource> = Vec::new();
     let mut commit_responses: Vec<CommitResponse> = Vec::new();
 
-    while let Ok(Some(mut field)) = body.try_next().await {
-        let content_type = field.content_disposition().clone();
-        let filename = content_type.get_filename().ok_or("Filename is missing")?;
-
-        std::fs::create_dir_all(&appstate.config.uploads_path)?;
-
-        let file_id = format!(
-            "{}-{}",
-            now(),
-            sanitize_filename::sanitize(filename)
-                // Spacebars lead to very annoying bugs in browsers
-                .replace(' ', "-")
-        );
-
-        let mut file_path = appstate.config.uploads_path.clone();
-        file_path.push(&file_id);
-        let mut file = std::fs::File::create(file_path)?;
-
-        // Field in turn is stream of *Bytes* object
-        while let Some(chunk) = field.next().await {
-            let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
-            // TODO: Update a SHA256 hash here for checksum
-            file.write_all(&data)?;
-        }
-
-        let byte_count: i64 = file
-            .metadata()?
-            .len()
-            .try_into()
-            .map_err(|_e| "Too large")?;
-
-        let subject_path = format!("files/{}", urlencoding::encode(&file_id));
-        let new_subject = format!("{}/{}", store.get_server_url(), subject_path);
-        let download_url = format!("{}/download/{}", store.get_server_url(), subject_path);
-
-        let mut resource = atomic_lib::Resource::new_instance(urls::FILE, store)?;
-        resource
-            .set_subject(new_subject)
-            .set_string(urls::PARENT.into(), &query.parent, store)?
-            .set_string(urls::INTERNAL_ID.into(), &file_id, store)?
-            .set(urls::FILESIZE.into(), Value::Integer(byte_count), store)?
-            .set_string(
-                urls::MIMETYPE.into(),
-                &guess_mime_for_filename(filename),
-                store,
-            )?
-            .set_string(urls::FILENAME.into(), filename, store)?
-            .set_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
+    while let Ok(Some(field)) = body.try_next().await {
+        let mut resource = save_file_and_create_resource(field, &appstate, &query.parent).await?;
         commit_responses.push(resource.save(store)?);
         created_resources.push(resource);
     }
@@ -114,6 +69,78 @@ pub async fn upload_handler(
     Ok(builder.body(atomic_lib::serialize::resources_to_json_ad(
         &created_resources,
     )?))
+}
+
+async fn save_file_and_create_resource(
+    mut field: Field,
+    appstate: &web::Data<AppState>,
+    parent: &str,
+) -> AtomicServerResult<Resource> {
+    let store = &appstate.store;
+    let content_type = field.content_disposition().clone();
+    let filename = content_type.get_filename().ok_or("Filename is missing")?;
+
+    std::fs::create_dir_all(&appstate.config.uploads_path)?;
+
+    let file_id = format!(
+        "{}-{}",
+        now(),
+        sanitize_filename::sanitize(filename)
+            // Spacebars lead to very annoying bugs in browsers
+            .replace(' ', "-")
+    );
+
+    let mut file_path = appstate.config.uploads_path.clone();
+    file_path.push(&file_id);
+
+    let mut file = std::fs::File::create(&file_path)?;
+
+    // Field in turn is stream of *Bytes* object
+    while let Some(chunk) = field.next().await {
+        let data = chunk.map_err(|e| format!("Error while reading multipart data. {}", e))?;
+        // TODO: Update a SHA256 hash here for checksum
+        file.write_all(&data)?;
+    }
+
+    let byte_count: i64 = file
+        .metadata()?
+        .len()
+        .try_into()
+        .map_err(|_e| "Too large")?;
+
+    let mimetype = guess_mime_for_filename(filename);
+    let subject_path = format!("files/{}", urlencoding::encode(&file_id));
+    let new_subject = format!("{}/{}", store.get_server_url(), subject_path);
+    let download_url = format!("{}/download/{}", store.get_server_url(), subject_path);
+
+    let mut resource = atomic_lib::Resource::new_instance(urls::FILE, store)?;
+    resource
+        .set_subject(new_subject)
+        .set_string(urls::PARENT.into(), parent, store)?
+        .set_string(urls::INTERNAL_ID.into(), &file_id, store)?
+        .set(urls::FILESIZE.into(), Value::Integer(byte_count), store)?
+        .set_string(urls::MIMETYPE.into(), &mimetype, store)?
+        .set_string(urls::FILENAME.into(), filename, store)?
+        .set_string(urls::DOWNLOAD_URL.into(), &download_url, store)?;
+
+    if mimetype.starts_with("image/") {
+        if let Ok(img) = image::ImageReader::open(&file_path)?.decode() {
+            let (width, height) = img.dimensions();
+            resource
+                .set(
+                    urls::IMAGE_WIDTH.into(),
+                    Value::Integer(width as i64),
+                    store,
+                )?
+                .set(
+                    urls::IMAGE_HEIGHT.into(),
+                    Value::Integer(height as i64),
+                    store,
+                )?;
+        }
+    }
+
+    Ok(resource)
 }
 
 fn guess_mime_for_filename(filename: &str) -> String {

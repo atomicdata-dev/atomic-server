@@ -5,6 +5,10 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## Unreleased
+
+- The download endpoint can now optimize images on the fly. This is controlled via query parameters. #257
+
 ## [v0.38.0] - 2024-06-08
 
 - Remove `process-management` feature #324 #334

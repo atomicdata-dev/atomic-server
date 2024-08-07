@@ -33,7 +33,7 @@ This library is still at an early stage and the API is subject to change.
   const name = getValue(resource, core.properties.name); // Writable<string>
 </script>
 
-<input bind:value="{$name}" />
+<input bind:value={$name} />
 ```
 
 ## Getting started
@@ -73,7 +73,7 @@ Initialise the store
 
 You can now access this store from any component in your app with the store store.
 
-```svelte
+```html
 // Some random component.svelte
 
 <script lang="ts">

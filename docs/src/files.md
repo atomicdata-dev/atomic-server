@@ -13,6 +13,7 @@ _url: [https://atomicdata.dev/classes/File](https://atomicdata.dev/classes/File)
 Files always have a downloadURL.
 They often also have a filename, a filesize, a checksum, a mimetype, and an internal ID (more on that later).
 They also often have a [`parent`](https://atomicdata.dev/properties/parent), which can be used to set permissions / rights.
+If the file is an image they will also get an `imageWidth` and `imageHeight` property.
 
 ## Uploading a file
 
@@ -27,6 +28,21 @@ In `atomic-server`, a `/upload` endpoint exists for uploading a file.
 ## Downloading a file
 
 Simply send an HTTP GET request to the File's [`download-url`](https://atomicdata.dev/properties/downloadURL) (make sure to authenticate this request).
+
+### Image compression
+
+AtomicServer can automatically generate compressed versions of images in modern image formats (WebP, AVIF).
+To do this add one or more of the following query parameters to the download URL:
+
+| Query parameter | Description |
+| --- | --- |
+| f | The format of the image. Can be `webp` or `avif`. |
+| q | The quality used to encode the image. Can be a number between 0 and 100. (Only works when `f` is set to `webp` or `avif`). Default is 75|
+| w | The width of the image. Height will be scaled based on the width to keep the right aspect-ratio |
+
+Example: `https://atomicdata.dev/download/files/1668879942069-funny-meme.jpg?f=avif&q=60&w=500`
+
+## Discussion
 
 - [Discussion on specification](https://github.com/ontola/atomic-data-docs/issues/57)
 - [Discussion on Rust server implementation](https://github.com/atomicdata-dev/atomic-server/issues/72)

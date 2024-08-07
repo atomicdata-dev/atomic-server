@@ -2,7 +2,7 @@
 
 The API of AtomicServer uses _Atomic Data_.
 
-All Atomic Data resources have a unique URL, which van be fetched using HTTP.
+All Atomic Data resources have a unique URL, which can be fetched using HTTP.
 Every single Class, Property or Endpoint also is a resource, which means you can visit these in the browser!
 This effectively makes most of the API **browsable** and **self-documenting**.
 
@@ -26,7 +26,6 @@ curl -i -H "Accept: text/turtle" https://atomicdata.dev/properties/shortname
 The various [Endpoints](../endpoints.md) in AtomicServer can be seen at `/endpoints` of your local instance.
 These include functionality to create changes using `/commits`, query data using `/query`, get `/versions`, or do full-text search queries using `/search`.
 Typically, you pass query parameters to these endpoints to specify what you want to do.
-
 
 <!-- We have a subset of the [API documented using Swagger / OpenAPI](https://editor.swagger.io/?url=https://raw.githubusercontent.com/atomicdata-dev/atomic-server/master/server/openapi.yml). -->
 

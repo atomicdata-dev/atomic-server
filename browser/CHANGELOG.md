@@ -32,6 +32,11 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 - BREAKING CHANGE: Removed the `useLocalStorage` hook.
 - When using any `useValue` type hook, values will now update when local changes are made to the resource from elsewhere in the app.
+- [#257](https://github.com/atomicdata-dev/atomic-server/issues/257) Added `<Image />` component that automatically optimizes images for the web.
+
+### @tomic/svelte
+
+- [#257](https://github.com/atomicdata-dev/atomic-server/issues/257) Added `<Image />` component that automatically optimizes images for the web.
 
 ## v0.38.0
 
