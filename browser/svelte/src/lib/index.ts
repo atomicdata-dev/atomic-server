@@ -4,7 +4,7 @@ import type { Store } from '@tomic/lib';
 import { __store_internal } from './stores/store.js';
 
 export const initStore = (store: Store) => {
-	__store_internal.set(store);
+  __store_internal.set(store);
 };
 
 export * from './components/Image/index.js';

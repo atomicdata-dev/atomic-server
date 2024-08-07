@@ -3,19 +3,19 @@ import { get } from 'svelte/store';
 import { store as storeStore } from './stores/store.js';
 
 export interface ResourceTreeTemplate {
-	[property: string]: true | ResourceTreeTemplate;
+  [property: string]: true | ResourceTreeTemplate;
 }
 
 const normalize = (value: JSONValue): string[] => {
-	if (typeof value === 'string') {
-		return [value];
-	}
+  if (typeof value === 'string') {
+    return [value];
+  }
 
-	if (Array.isArray(value)) {
-		return value as string[];
-	}
+  if (Array.isArray(value)) {
+    return value as string[];
+  }
 
-	return [];
+  return [];
 };
 
 /**
@@ -37,32 +37,37 @@ const normalize = (value: JSONValue): string[] => {
  * ```
  */
 export const loadResourceTree = async (
-	subject: string,
-	treeTemplate: ResourceTreeTemplate
+  subject: string,
+  treeTemplate: ResourceTreeTemplate,
 ): Promise<void> => {
-	const store = get(storeStore);
+  const store = get(storeStore);
 
-	const loadResourceTreeInner = async (resource: Resource, tree: ResourceTreeTemplate) => {
-		const promises: Promise<unknown>[] = [];
+  const loadResourceTreeInner = async (
+    resource: Resource,
+    tree: ResourceTreeTemplate,
+  ) => {
+    const promises: Promise<unknown>[] = [];
 
-		for (const [property, branch] of Object.entries(tree)) {
-			await store.getResource(property);
-			const values = normalize(resource.get(property));
-			const resources = await Promise.all(values.map((value) => store.getResource(value)));
+    for (const [property, branch] of Object.entries(tree)) {
+      await store.getResource(property);
+      const values = normalize(resource.get(property));
+      const resources = await Promise.all(
+        values.map(value => store.getResource(value)),
+      );
 
-			if (typeof branch === 'boolean') {
-				continue;
-			}
+      if (typeof branch === 'boolean') {
+        continue;
+      }
 
-			for (const res of resources) {
-				promises.push(loadResourceTreeInner(res, branch));
-			}
-		}
+      for (const res of resources) {
+        promises.push(loadResourceTreeInner(res, branch));
+      }
+    }
 
-		return Promise.allSettled(promises.flat());
-	};
+    return Promise.allSettled(promises.flat());
+  };
 
-	const resource = await store.getResource(subject);
+  const resource = await store.getResource(subject);
 
-	await loadResourceTreeInner(resource, treeTemplate);
+  await loadResourceTreeInner(resource, treeTemplate);
 };
