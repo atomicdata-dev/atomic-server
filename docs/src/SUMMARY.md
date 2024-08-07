@@ -10,9 +10,8 @@
 # AtomicServer
 
 - [AtomicServer](atomic-server.md)
-  - [When (not) to use it](atomicserver/when-to-use.md))]
+  - [When (not) to use it](atomicserver/when-to-use.md)
   - [Installation](atomicserver/installation.md)
-  - [FAQ & troubleshooting](atomicserver/faq.md)
   - [Getting started with the GUI](atomicserver/gui.md)
   - [API](atomicserver/API.md)
   - [Creating a JSON-AD file](create-json-ad.md)
@@ -32,8 +31,10 @@
       - [useServerSearch](react/useServerSearch.md)
       - [useCurrentAgent](react/useCurrentAgent.md)
       - [useCanWrite](react/useCanWrite.md)
+      - [Image](react/Image.md)
       - [Examples](react/examples.md)
     - [@tomic/svelte](svelte.md)
+      - [Image](svelte/image.md)
     - [JS CLI](js-cli.md)
   - [Rust](rust-lib.md)
     - [Rust lib](rust-lib.md)

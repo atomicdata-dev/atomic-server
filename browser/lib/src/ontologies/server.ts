@@ -43,6 +43,8 @@ export const server = {
       'https://atomicdata.dev/ontology/server/property/response-message',
     defaultOntology:
       'https://atomicdata.dev/ontology/server/property/default-ontology',
+    imageWidth: 'https://atomicdata.dev/properties/imageWidth',
+    imageHeight: 'https://atomicdata.dev/properties/imageHeight',
   },
 } as const;
 
@@ -92,7 +94,9 @@ declare module '../index.js' {
         | typeof server.properties.filename
         | typeof server.properties.checksum
         | typeof server.properties.mimetype
-        | typeof server.properties.internalId;
+        | typeof server.properties.internalId
+        | typeof server.properties.imageWidth
+        | typeof server.properties.imageHeight;
     };
     [server.classes.invite]: {
       requires: BaseProps | typeof server.properties.target;
@@ -136,6 +140,8 @@ declare module '../index.js' {
     [server.properties.status]: number;
     [server.properties.responseMessage]: string;
     [server.properties.defaultOntology]: string;
+    [server.properties.imageWidth]: number;
+    [server.properties.imageHeight]: number;
   }
 
   interface PropSubjectToNameMapping {
@@ -163,5 +169,7 @@ declare module '../index.js' {
     [server.properties.status]: 'status';
     [server.properties.responseMessage]: 'responseMessage';
     [server.properties.defaultOntology]: 'defaultOntology';
+    [server.properties.imageWidth]: 'imageWidth';
+    [server.properties.imageHeight]: 'imageHeight';
   }
 }

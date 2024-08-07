@@ -49,6 +49,9 @@ tracing-chrome = "0.7"
 tracing-log = "0.2"
 ureq = "2"
 urlencoding = "2"
+image = "0.25.2"
+webp = "0.3"
+ravif = "0.11.8"
 
 [dependencies.instant-acme]
 optional = true

@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaEdit } from 'react-icons/fa';
 import { styled } from 'styled-components';
-import { useProperty, useValue, Datatype, Resource } from '@tomic/react';
+import {
+  useProperty,
+  useValue,
+  Datatype,
+  Resource,
+  useCanWrite,
+} from '@tomic/react';
 import ValueComp from '../../ValueComp';
 import { useSettings } from '../../../helpers/AppSettings';
 import { ValueFormEdit } from './ValueFormEdit';
@@ -27,6 +33,7 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
   const property = useProperty(propertyURL);
   const [value] = useValue(resource, propertyURL);
   const { agent } = useSettings();
+  const [canWrite] = useCanWrite(resource);
 
   useHotkeys(
     'esc',
@@ -40,6 +47,8 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
 
   const hasAgent = agent !== undefined;
 
+  const shouldShowEditButton = hasAgent && canWrite && !property.isDynamic;
+
   if (value === undefined) {
     return null;
   }
@@ -52,7 +61,7 @@ export function ValueForm({ resource, propertyURL, datatype }: ValueFormProps) {
     return (
       <ValueFormWrapper>
         <ValueComp value={value} datatype={datatype || property.datatype} />
-        {hasAgent && (
+        {shouldShowEditButton && (
           <EditButton title='Edit value'>
             <FaEdit onClick={() => setEditMode(!editMode)} />
           </EditButton>
