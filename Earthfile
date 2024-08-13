@@ -2,7 +2,7 @@ VERSION --try 0.8
 PROJECT ontola/atomic-server
 IMPORT ./browser AS browser
 IMPORT github.com/earthly/lib/rust AS rust
-FROM rust:buster
+FROM rust:bookworm
 WORKDIR /code
 
 pipeline:
@@ -33,6 +33,8 @@ docker-all:
 
 install:
   RUN apt-get update -qq
+  # NASM is required for the image library
+  RUN apt install nasm
   RUN rustup component add clippy
   RUN rustup component add rustfmt
   RUN cargo install cross
