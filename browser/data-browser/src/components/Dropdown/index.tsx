@@ -394,7 +394,6 @@ const MenuItemStyled = styled(Button)<MenuItemStyledProps>`
   color: ${p => p.theme.colors.text};
   padding: 0.4rem 1rem;
   height: auto;
-  text-transform: capitalize;
   background-color: ${p =>
     p.selected ? p.theme.colors.bg1 : p.theme.colors.bg};
   text-decoration: ${p => (p.selected ? 'underline' : 'none')};

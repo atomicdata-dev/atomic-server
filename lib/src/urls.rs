@@ -22,6 +22,7 @@ pub const BOOKMARK: &str = "https://atomicdata.dev/class/Bookmark";
 pub const ONTOLOGY: &str = "https://atomicdata.dev/class/ontology";
 pub const ENDPOINT_RESPONSE: &str =
     "https://atomicdata.dev/ontology/server/class/endpoint-response";
+pub const TABLE: &str = "https://atomicdata.dev/classes/Table";
 
 // Properties
 pub const SHORTNAME: &str = "https://atomicdata.dev/properties/shortname";

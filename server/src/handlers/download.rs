@@ -28,9 +28,6 @@ pub async fn handle_download(
     let server_url = &appstate.config.server_url;
     let store = &appstate.store;
 
-    if let Some(quality) = &params.q {
-        println!("Quality: {}", quality);
-    }
     // We replace `/download` with `/` to get the subject of the Resource.
     let subject = if let Some(pth) = path {
         let subject = format!("{}/{}", server_url, pth);

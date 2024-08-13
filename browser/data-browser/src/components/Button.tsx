@@ -165,10 +165,9 @@ export const ButtonDefault = styled(ButtonBase)<ButtonPropsStyled>`
   --button-text-color: ${p => p.theme.colors.bg};
   --button-text-color-hover: ${p => p.theme.colors.bg};
 
-  padding: 0.4rem;
   border-radius: ${p => p.theme.radius};
-  padding-left: ${p => p.theme.margin}rem;
-  padding-right: ${p => p.theme.margin}rem;
+  padding-block: 0.4rem;
+  padding-inline: ${p => p.theme.margin}rem;
   display: inline-flex;
   background-color: var(--button-bg-color);
   color: var(--button-text-color);
