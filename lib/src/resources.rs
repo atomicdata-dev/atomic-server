@@ -15,6 +15,7 @@ use crate::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::instrument;
+use ulid::Ulid;
 
 /// A Resource is a set of Atoms that shares a single Subject.
 /// A Resource only contains valid Values, but it _might_ lack required properties.
@@ -209,11 +210,15 @@ impl Resource {
         }
     }
 
+    pub fn random_subject(store: &impl Storelike) -> String {
+        format!("{}/{}", store.get_server_url(), Ulid::new().to_string())
+    }
+
     /// Create a new resource with a generated Subject
     pub fn new_generate_subject(store: &impl Storelike) -> Resource {
-        let generated = format!("{}/{}", store.get_server_url(), random_string(10));
+        let subject = Resource::random_subject(store);
 
-        Resource::new(generated)
+        Resource::new(subject)
     }
 
     /// Create a new instance of some Class.

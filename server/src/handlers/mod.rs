@@ -7,6 +7,7 @@ However, some features reside in atomic-server.
 
 pub mod commit;
 pub mod download;
+pub mod export;
 pub mod get_resource;
 pub mod post_resource;
 pub mod search;

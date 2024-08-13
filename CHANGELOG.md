@@ -8,6 +8,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 ## Unreleased
 
 - The download endpoint can now optimize images on the fly. This is controlled via query parameters. #257
+- Added export endpoint for exporting resources to other formats. Currently only supports exporting tables to csv. [#925](https://github.com/atomicdata-dev/atomic-server/issues/925)
 
 ## [v0.38.0] - 2024-06-08
 

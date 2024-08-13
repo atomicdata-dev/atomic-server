@@ -363,11 +363,12 @@ impl fmt::Display for Value {
             Value::Float(float) => write!(f, "{}", float),
             Value::Markdown(i) => write!(f, "{}", i),
             Value::ResourceArray(v) => {
-                let mut s: String = String::new();
-                for i in v {
-                    s.push_str(&i.to_string());
-                }
-                write!(f, "{}", s)
+                let out = v
+                    .iter()
+                    .map(|i| i.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",");
+                write!(f, "{}", out)
             }
             Value::Slug(s) => write!(f, "{}", s),
             Value::String(s) => write!(f, "{}", s),

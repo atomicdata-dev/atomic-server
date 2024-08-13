@@ -1,6 +1,12 @@
 import { useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Client, core, useCanWrite, useResource } from '@tomic/react';
+import {
+  Client,
+  core,
+  dataBrowser,
+  useCanWrite,
+  useResource,
+} from '@tomic/react';
 import {
   editURL,
   dataURL,
@@ -25,6 +31,7 @@ import {
   FaShare,
   FaTrash,
   FaPlus,
+  FaFileCsv,
 } from 'react-icons/fa6';
 import { useQueryScopeHandler } from '../../hooks/useQueryScope';
 import {
@@ -37,6 +44,7 @@ import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ResourceCodeUsageDialog } from '../../views/CodeUsage/ResourceCodeUsageDialog';
 import { useNewRoute } from '../../helpers/useNewRoute';
 import { addIf } from '../../helpers/addIf';
+import { TableExportDialog } from '../../views/TablePage/TableExportDialog';
 
 export enum ContextMenuOptions {
   View = 'view',
@@ -49,6 +57,7 @@ export enum ContextMenuOptions {
   Import = 'import',
   UseInCode = 'useInCode',
   NewChild = 'newChild',
+  Export = 'export',
 }
 
 export interface ResourceContextMenuProps {
@@ -81,6 +90,7 @@ function ResourceContextMenu({
   const resource = useResource(subject);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const handleAddClick = useNewRoute(subject);
   const [currentSubject] = useCurrentSubject();
   const [canWrite] = useCanWrite(resource);
@@ -117,14 +127,14 @@ function ResourceContextMenu({
       {
         disabled: location.pathname.startsWith(paths.show),
         id: ContextMenuOptions.View,
-        label: 'normal view',
+        label: 'Normal View',
         helper: 'Open the regular, default View.',
         onClick: () => navigate(constructOpenURL(subject)),
       },
       {
         disabled: location.pathname.startsWith(paths.data),
         id: ContextMenuOptions.Data,
-        label: 'data view',
+        label: 'Data View',
         helper: 'View the resource and its properties in the Data View.',
         shortcut: shortcuts.data,
         onClick: () => navigate(dataURL(subject)),
@@ -136,7 +146,7 @@ function ResourceContextMenu({
       {
         // disabled: !canWrite || location.pathname.startsWith(paths.edit),
         id: ContextMenuOptions.Edit,
-        label: 'edit',
+        label: 'Edit',
         helper: 'Open the edit form.',
         icon: <FaPencil />,
         shortcut: simple ? '' : shortcuts.edit,
@@ -144,7 +154,7 @@ function ResourceContextMenu({
       },
       {
         id: ContextMenuOptions.NewChild,
-        label: 'add child',
+        label: 'Add child',
         helper: 'Create a new resource under this resource.',
         icon: <FaPlus />,
         onClick: handleAddClick,
@@ -152,7 +162,7 @@ function ResourceContextMenu({
     ),
     {
       id: ContextMenuOptions.UseInCode,
-      label: 'use in code',
+      label: 'Use in code',
       helper:
         'Usage instructions for how to fetch and use the resource in your code.',
       icon: <FaCode />,
@@ -160,7 +170,7 @@ function ResourceContextMenu({
     },
     {
       id: ContextMenuOptions.Scope,
-      label: 'search children',
+      label: 'Search children',
       helper: 'Scope search to resource',
       icon: <FaMagnifyingGlass />,
       onClick: enableScope,
@@ -176,7 +186,7 @@ function ResourceContextMenu({
     {
       id: ContextMenuOptions.History,
       icon: <FaClock />,
-      label: 'history',
+      label: 'History',
       helper: 'Show the history of this resource',
       onClick: () => navigate(historyURL(subject)),
     },
@@ -185,7 +195,7 @@ function ResourceContextMenu({
       {
         id: ContextMenuOptions.Import,
         icon: <FaDownload />,
-        label: 'import',
+        label: 'Import',
         helper: 'Import Atomic Data to this resource',
         onClick: () => navigate(importerURL(subject)),
       },
@@ -193,11 +203,18 @@ function ResourceContextMenu({
         disabled: !canWrite,
         id: ContextMenuOptions.Delete,
         icon: <FaTrash />,
-        label: 'delete',
+        label: 'Delete',
         helper: 'Delete this resource.',
         onClick: () => setShowDeleteDialog(true),
       },
     ),
+    ...addIf(resource.hasClasses(dataBrowser.classes.table), {
+      id: ContextMenuOptions.Export,
+      icon: <FaFileCsv />,
+      label: 'Export to csv',
+      helper: 'Export the table as a CSV file',
+      onClick: () => setShowExportDialog(true),
+    }),
   ];
 
   const filteredItems = showOnly
@@ -237,6 +254,11 @@ function ResourceContextMenu({
           <ResourceUsage resource={resource} />
         </>
       </ConfirmationDialog>
+      <TableExportDialog
+        subject={subject}
+        show={showExportDialog}
+        bindShow={setShowExportDialog}
+      />
       {currentSubject && (
         <ResourceCodeUsageDialog
           subject={currentSubject}
