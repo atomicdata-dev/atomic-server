@@ -15,7 +15,7 @@ const aboutMenuItems: AboutItem[] = [
   {
     icon: <FaGithub />,
     helper: 'Github; View the source code for this application',
-    href: 'https://github.com/atomicdata-dev/atomic-data-browser',
+    href: 'https://github.com/atomicdata-dev/atomic-server',
   },
   {
     icon: <FaDiscord />,
