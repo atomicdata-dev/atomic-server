@@ -15,6 +15,7 @@ import { InputStyled, InputWrapper } from '../../components/forms/InputStyles';
 import { stringToSlug } from '../../helpers/stringToSlug';
 import { Column } from '../../components/Row';
 import { newClass, subjectForClass } from './newClass';
+import { toAnchorId } from './toAnchorId';
 
 interface NewClassButtonProps {
   resource: Resource;
@@ -29,8 +30,10 @@ export function NewClassButton({ resource }: NewClassButtonProps): JSX.Element {
   const subject = subjectForClass(resource, inputValue);
 
   const [dialogProps, show, hide, isOpen] = useDialog({
-    onSuccess: () => {
-      newClass(inputValue, resource, store);
+    onSuccess: async () => {
+      const createdClass = await newClass(inputValue, resource, store);
+      const id = toAnchorId(createdClass);
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
     },
   });
 

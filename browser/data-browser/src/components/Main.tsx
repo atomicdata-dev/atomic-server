@@ -38,4 +38,11 @@ const StyledMain = memo(styled.main<ViewTransitionProps>`
   ${p => transitionName(RESOURCE_PAGE_TRANSITION_TAG, p.subject)};
   height: calc(100vh - ${p => p.theme.heights.breadCrumbBar});
   overflow-y: auto;
+  scroll-padding: calc(
+    ${p => p.theme.heights.breadCrumbBar} + ${p => p.theme.size(2)}
+  );
+
+  @media (prefers-reduced-motion: no-preference) {
+    scroll-behavior: smooth;
+  }
 `);

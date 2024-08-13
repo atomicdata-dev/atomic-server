@@ -58,6 +58,11 @@ export function OntologyPage({ resource }: ResourcePageProps) {
             <OntologyDescription edit={editMode} resource={resource} />
             <h2>Classes</h2>
             <StyledUl>
+              {editMode && (
+                <li>
+                  <NewClassButton resource={resource} />
+                </li>
+              )}
               {classes.map(c => (
                 <li key={c}>
                   {editMode ? (
@@ -67,11 +72,6 @@ export function OntologyPage({ resource }: ResourcePageProps) {
                   )}
                 </li>
               ))}
-              {editMode && (
-                <li>
-                  <NewClassButton resource={resource} />
-                </li>
-              )}
             </StyledUl>
             <h2>Properties</h2>
             <StyledUl>
@@ -118,7 +118,6 @@ const ListSlot = styled.div`
 const FullPageWrapper = styled.div<{ edit: boolean }>`
   --ontology-graph-position: sticky;
   --ontology-graph-ratio: 9 / 16;
-
   display: grid;
   grid-template-areas: ${p =>
     p.edit
