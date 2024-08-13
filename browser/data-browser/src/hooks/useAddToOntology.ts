@@ -5,16 +5,18 @@ import {
   Server,
   unknownSubject,
   core,
+  Core,
 } from '@tomic/react';
 import { useSettings } from '../helpers/AppSettings';
 import { useCallback } from 'react';
+import { sortSubjectList } from '../views/OntologyPage/sortSubjectList';
 
 export function useAddToOntology(ontologySubject?: string) {
   const store = useStore();
   const { drive: driveSubject } = useSettings();
   const drive = useResource<Server.Drive>(driveSubject);
 
-  const ontology = useResource(
+  const ontology = useResource<Core.Ontology>(
     ontologySubject ?? drive.props.defaultOntology ?? unknownSubject,
   );
 
@@ -31,9 +33,21 @@ export function useAddToOntology(ontologySubject?: string) {
       await resource.save();
 
       if (resource.hasClasses(core.classes.class)) {
-        ontology.push(core.properties.classes, [resource.subject], true);
+        await ontology.set(
+          core.properties.classes,
+          await sortSubjectList(store, [
+            ...(ontology.props.classes ?? []),
+            resource.subject,
+          ]),
+        );
       } else if (resource.hasClasses(core.classes.property)) {
-        ontology.push(core.properties.properties, [resource.subject], true);
+        await ontology.set(
+          core.properties.properties,
+          await sortSubjectList(store, [
+            ...(ontology.props.properties ?? []),
+            resource.subject,
+          ]),
+        );
       } else {
         ontology.push(core.properties.instances, [resource.subject], true);
       }

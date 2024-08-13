@@ -1,5 +1,13 @@
-import { Resource, unknownSubject, urls, useArray } from '@tomic/react';
+import {
+  core,
+  Resource,
+  unknownSubject,
+  urls,
+  useArray,
+  useStore,
+} from '@tomic/react';
 import { createContext, useCallback, useContext, useMemo } from 'react';
+import { sortSubjectList } from './sortSubjectList';
 
 interface OntologyContext {
   addClass: (subject: string) => Promise<void>;
@@ -29,7 +37,8 @@ export function OntologyContextProvider({
   ontology,
   children,
 }: React.PropsWithChildren<OntologyContextProviderProps>) {
-  const [classes, setClasses] = useArray(ontology, urls.properties.classes, {
+  const store = useStore();
+  const [classes, setClasses] = useArray(ontology, core.properties.classes, {
     commit: true,
   });
 
@@ -55,7 +64,9 @@ export function OntologyContextProvider({
 
   const addProperty = useCallback(
     async (subject: string) => {
-      await setProperties([...properties, subject]);
+      await setProperties(
+        await sortSubjectList(store, [...properties, subject]),
+      );
     },
     [properties, setProperties],
   );

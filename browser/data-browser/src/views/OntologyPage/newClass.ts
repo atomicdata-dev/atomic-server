@@ -1,4 +1,5 @@
-import { Resource, Store, core } from '@tomic/react';
+import { Resource, Store, core, type Core } from '@tomic/react';
+import { sortSubjectList } from './sortSubjectList';
 
 const DEFAULT_DESCRIPTION = 'Change me';
 
@@ -7,7 +8,7 @@ export const subjectForClass = (parent: Resource, shortName: string): string =>
 
 export async function newClass(
   shortName: string,
-  parent: Resource,
+  parent: Resource<Core.Ontology>,
   store: Store,
 ): Promise<string> {
   const subject = subjectForClass(parent, shortName);
@@ -24,7 +25,12 @@ export async function newClass(
 
   await resource.save();
 
-  parent.push(core.properties.classes, [subject]);
+  const classes = parent.props.classes ?? [];
+
+  await parent.set(
+    core.properties.classes,
+    await sortSubjectList(store, [...classes, subject]),
+  );
 
   await parent.save();
 

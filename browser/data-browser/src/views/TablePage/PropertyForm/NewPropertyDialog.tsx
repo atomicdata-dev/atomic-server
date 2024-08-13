@@ -21,6 +21,7 @@ import { FormValidationContextProvider } from '../../../components/forms/formVal
 import { randomString } from '../../../helpers/randomString';
 import { PropertyForm } from './PropertyForm';
 import { PropertyFormCategory } from './categories';
+import { sortSubjectList } from '../../OntologyPage/sortSubjectList';
 
 interface NewPropertyDialogProps {
   showDialog: boolean;
@@ -117,10 +118,12 @@ export function NewPropertyDialog({
     if (tableClassParent.hasClasses(core.classes.ontology)) {
       await resource.set(core.properties.parent, tableClassParent.subject);
 
-      tableClassParent.push(
+      const ontologyProps =
+        tableClassParent.get(core.properties.properties) ?? [];
+
+      await tableClassParent.set(
         core.properties.properties,
-        [resource.subject],
-        true,
+        await sortSubjectList(store, [...ontologyProps, resource.subject]),
       );
 
       await tableClassParent.save();
