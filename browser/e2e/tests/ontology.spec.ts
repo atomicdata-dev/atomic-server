@@ -222,8 +222,8 @@ test.describe('Ontology', async () => {
 
       await expect(page.getByText('new arrow-kind')).toBeVisible();
 
-      await expect(page.getByLabel('name')).toBeVisible();
-      await page.getByLabel('name').fill(name);
+      await expect(currentDialog(page).getByLabel('name')).toBeVisible();
+      await currentDialog(page).getByLabel('name').fill(name);
       await currentDialog(page).getByRole('button', { name: 'Save' }).click();
 
       await expect(page.getByRole('heading', { name })).toBeVisible();
