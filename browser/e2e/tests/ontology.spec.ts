@@ -236,7 +236,7 @@ test.describe('Ontology', async () => {
 
     await page
       .getByRole('button', { name: 'add an item to the allows-only list' })
-      .nth(1)
+      .nth(0)
       .click();
     await page.getByRole('button', { name: 'Search for a arrow-kind' }).click();
     await page
@@ -248,7 +248,7 @@ test.describe('Ontology', async () => {
 
     await page
       .getByRole('button', { name: 'add an item to the allows-only list' })
-      .nth(1)
+      .nth(0)
       .click();
     await page.getByRole('button', { name: 'Search for a arrow-kind' }).click();
     await page
