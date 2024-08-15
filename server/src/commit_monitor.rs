@@ -176,6 +176,7 @@ impl Handler<CommitMessage> for CommitMonitor {
 
 /// Spawns a commit monitor actor
 pub fn create_commit_monitor(store: Db, search_state: SearchState) -> Addr<CommitMonitor> {
+    tracing::info!("spawning commit monitor");
     crate::commit_monitor::CommitMonitor::create(|_ctx: &mut Context<CommitMonitor>| {
         CommitMonitor {
             subscriptions: HashMap::new(),

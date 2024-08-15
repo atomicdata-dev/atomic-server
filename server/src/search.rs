@@ -41,6 +41,7 @@ pub struct SearchState {
 impl SearchState {
     /// Create a new SearchState for the Server, which includes building the schema and index.
     pub fn new(config: &Config) -> AtomicServerResult<SearchState> {
+        tracing::info!("Starting search service");
         let schema = crate::search::build_schema()?;
         let (writer, index) = crate::search::get_index(config)?;
         let reader = crate::search::get_reader(&index)?;

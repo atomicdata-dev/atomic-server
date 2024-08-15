@@ -5,7 +5,7 @@ use actix_web::{web, HttpResponse};
 use atomic_lib::{
     commit::CommitResponse, hierarchy::check_write, urls, utils::now, Resource, Storelike, Value,
 };
-use futures::{io::Cursor, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use image::GenericImageView;
 use serde::Deserialize;
 

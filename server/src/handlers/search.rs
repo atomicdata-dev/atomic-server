@@ -30,8 +30,6 @@ type Queries = Vec<(Occur, Box<dyn Query>)>;
 pub struct SearchQuery {
     /// The text search query entered by the user in the search box
     pub q: Option<String>,
-    /// Include the full resources in the response
-    pub include: Option<bool>,
     /// Maximum amount of results
     pub limit: Option<usize>,
     /// Only include resources that have one of these resources as its ancestor

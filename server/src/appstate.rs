@@ -25,84 +25,98 @@ pub struct AppState {
     pub search_state: SearchState,
 }
 
-/// Creates the AppState (the server's context available in Handlers).
-/// Initializes or opens a store on disk.
-/// Creates a new agent, if necessary.
-pub fn init(config: Config) -> AtomicServerResult<AppState> {
-    tracing::info!("Initializing AppState");
+impl AppState {
+    /// Creates the AppState (the server's context available in Handlers).
+    /// Initializes or opens a store on disk.
+    /// Creates a new agent, if necessary.
+    pub fn init(config: Config) -> AtomicServerResult<AppState> {
+        tracing::info!("Initializing AppState");
 
-    // We warn over here because tracing needs to be initialized first.
-    if config.opts.slow_mode {
-        tracing::warn!("Slow mode is enabled. This will introduce random delays in the server, to simulate a slow connection.");
+        // We warn over here because tracing needs to be initialized first.
+        if config.opts.slow_mode {
+            tracing::warn!("Slow mode is enabled. This will introduce random delays in the server, to simulate a slow connection.");
+        }
+        if config.opts.development {
+            tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
+        }
+
+        let should_init = !&config.store_path.exists() || config.initialize;
+        let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
+        if should_init {
+            tracing::info!("Initialize: creating and populating new Database...");
+            atomic_lib::populate::populate_default_store(&store)
+                .map_err(|e| format!("Failed to populate default store. {}", e))?;
+        }
+
+        set_default_agent(&config, &store)?;
+
+        // Initialize search constructs
+        let search_state = SearchState::new(&config)
+            .map_err(|e| format!("Failed to start search service: {}", e))?;
+
+        // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
+        let commit_monitor =
+            crate::commit_monitor::create_commit_monitor(store.clone(), search_state.clone());
+
+        let commit_monitor_clone = commit_monitor.clone();
+
+        // This closure is called every time a Commit is created
+        let send_commit = move |commit_response: &CommitResponse| {
+            commit_monitor_clone.do_send(crate::actor_messages::CommitMessage {
+                commit_response: commit_response.clone(),
+            });
+        };
+        store.set_handle_commit(Box::new(send_commit));
+
+        // If the user changes their server_url, the drive will not exist.
+        // In this situation, we should re-build a new drive from scratch.
+        if should_init {
+            atomic_lib::populate::populate_all(&store)?;
+            // Building the index here is needed to perform Queries on imported resources
+            let store_clone = store.clone();
+            std::thread::spawn(move || {
+                let res = store_clone.build_index(true);
+                if let Err(e) = res {
+                    tracing::error!("Failed to build index: {}", e);
+                }
+            });
+
+            set_up_initial_invite(&store)
+                .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
+            // This means that editing the .env does _not_ grant you the rights to edit the Drive.
+
+            tracing::info!("Adding all resources to search index");
+            crate::search::add_all_resources(&search_state, &store)?
+        }
+
+        Ok(AppState {
+            store,
+            config,
+            commit_monitor,
+            search_state,
+        })
     }
-    if config.opts.development {
-        tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
+
+    /// Is called when AppState goes out of scope (e.g. when the application closes)
+    /// Cleanup code, writing buffers, committing changes, etc.
+    fn exit(&self) -> AtomicServerResult<()> {
+        self.search_state.writer.write()?.commit()?;
+        Ok(())
     }
+}
 
-    tracing::info!("Opening database at {:?}", &config.store_path);
-    let should_init = !&config.store_path.exists() || config.initialize;
-    let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
-    if should_init {
-        tracing::info!("Initialize: creating and populating new Database...");
-        atomic_lib::populate::populate_default_store(&store)
-            .map_err(|e| format!("Failed to populate default store. {}", e))?;
+impl Drop for AppState {
+    fn drop(&mut self) {
+        if let Err(e) = self.exit() {
+            tracing::error!("Error during AppState exit: {}", e);
+        }
     }
-
-    tracing::info!("Setting default agent");
-    set_default_agent(&config, &store)?;
-
-    // Initialize search constructs
-    tracing::info!("Starting search service");
-    let search_state =
-        SearchState::new(&config).map_err(|e| format!("Failed to start search service: {}", e))?;
-
-    // Initialize commit monitor, which watches commits and sends these to the commit_monitor actor
-    tracing::info!("Starting commit monitor");
-    let commit_monitor =
-        crate::commit_monitor::create_commit_monitor(store.clone(), search_state.clone());
-
-    let commit_monitor_clone = commit_monitor.clone();
-
-    // This closure is called every time a Commit is created
-    let send_commit = move |commit_response: &CommitResponse| {
-        commit_monitor_clone.do_send(crate::actor_messages::CommitMessage {
-            commit_response: commit_response.clone(),
-        });
-    };
-    store.set_handle_commit(Box::new(send_commit));
-
-    // If the user changes their server_url, the drive will not exist.
-    // In this situation, we should re-build a new drive from scratch.
-    if should_init {
-        atomic_lib::populate::populate_all(&store)?;
-        // Building the index here is needed to perform Queries on imported resources
-        let store_clone = store.clone();
-        std::thread::spawn(move || {
-            let res = store_clone.build_index(true);
-            if let Err(e) = res {
-                tracing::error!("Failed to build index: {}", e);
-            }
-        });
-
-        set_up_initial_invite(&store)
-            .map_err(|e| format!("Error while setting up initial invite: {}", e))?;
-        // This means that editing the .env does _not_ grant you the rights to edit the Drive.
-        tracing::info!("Setting rights to Drive {}", store.get_server_url());
-
-        tracing::info!("Adding all resources to search index");
-        crate::search::add_all_resources(&search_state, &store)?
-    }
-
-    Ok(AppState {
-        store,
-        config,
-        commit_monitor,
-        search_state,
-    })
 }
 
 /// Create a new agent if it does not yet exist.
 fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerResult<()> {
+    tracing::info!("Setting default agent");
+
     let ag_cfg: atomic_lib::config::Config = match atomic_lib::config::read_config(Some(
         &config.config_file_path,
     )) {

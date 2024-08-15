@@ -4,6 +4,7 @@ use atomic_lib::Storelike;
 
 use crate::errors::AtomicServerResult;
 
+/// Clears and rebuilds the Store & Search indexes
 fn rebuild_indexes(appstate: &crate::appstate::AppState) -> AtomicServerResult<()> {
     let appstate_clone = appstate.clone();
 
@@ -17,14 +18,15 @@ fn rebuild_indexes(appstate: &crate::appstate::AppState) -> AtomicServerResult<(
             .build_index(true)
             .expect("Failed to build value index");
     });
+
     tracing::info!("Removing existing search index...");
-    appstate_clone
+    appstate
         .search_state
         .writer
         .write()
         .expect("Could not get a lock on search writer")
         .delete_all_documents()?;
-    crate::search::add_all_resources(&appstate_clone.search_state, &appstate.store)?;
+    crate::search::add_all_resources(&appstate.search_state, &appstate.store)?;
     Ok(())
 }
 
@@ -37,7 +39,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     let tracing_chrome_flush_guard = crate::trace::init_tracing(&config);
 
     // Setup the database and more
-    let appstate = crate::appstate::init(config.clone())?;
+    let appstate = crate::appstate::AppState::init(config.clone())?;
 
     // Start async processes
     if config.opts.rebuild_indexes {
@@ -104,9 +106,10 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
             .run()
             .await?;
     }
-    tracing::info!("Cleaning up");
 
+    tracing::info!("Cleaning up");
     // Cleanup, runs when server is stopped
+    // Note that more cleanup code is in Appstate::exit
     if let Some(guard) = tracing_chrome_flush_guard {
         guard.flush()
     }
