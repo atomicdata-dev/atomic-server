@@ -123,13 +123,13 @@ impl CommitMonitor {
         if let Some(resource) = &msg.commit_response.resource_new {
             // We could one day re-(allow) to keep old resources,
             // but then we also should index the older versions when re-indexing.
-            crate::search::remove_resource(&self.search_state, &target)?;
+            self.search_state.remove_resource(&target)?;
             // Add new resource to search index
-            crate::search::add_resource(&self.search_state, resource, &self.store)?;
+            self.search_state.add_resource(resource, &self.store)?;
             self.run_expensive_next_tick = true;
         } else {
             // If there is no new resource, it must have been deleted, so let's remove it from the search index.
-            crate::search::remove_resource(&self.search_state, &target)?;
+            self.search_state.remove_resource(&target)?;
         }
         Ok(())
     }
@@ -162,6 +162,7 @@ impl Handler<CommitMessage> for CommitMonitor {
     #[tracing::instrument(name = "handle_commit_message", skip_all, fields(subscriptions = &self.subscriptions.len(), s = %msg.commit_response.commit_resource.get_subject()))]
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
         // We have moved the logic to the `handle_internal` function for decent error handling
+        println!("HANDLE COMMITMESSAGE RECEIVED");
         match self.handle_internal(msg) {
             Ok(_) => {}
             Err(e) => {

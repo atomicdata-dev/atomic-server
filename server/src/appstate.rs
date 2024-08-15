@@ -86,7 +86,7 @@ impl AppState {
             // This means that editing the .env does _not_ grant you the rights to edit the Drive.
 
             tracing::info!("Adding all resources to search index");
-            crate::search::add_all_resources(&search_state, &store)?
+            search_state.add_all_resources(&store)?;
         }
 
         Ok(AppState {

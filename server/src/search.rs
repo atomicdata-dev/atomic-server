@@ -4,7 +4,10 @@
 use atomic_lib::Db;
 use atomic_lib::Resource;
 use atomic_lib::Storelike;
-use tantivy::schema::*;
+use tantivy::schema::Facet;
+use tantivy::schema::Field;
+use tantivy::schema::STORED;
+use tantivy::schema::TEXT;
 use tantivy::Index;
 use tantivy::IndexWriter;
 use tantivy::ReloadPolicy;
@@ -54,11 +57,101 @@ impl SearchState {
             writer: arced,
         })
     }
+
+    /// Returns the schema for the search index.
+    pub fn get_schema_fields(&self) -> AtomicServerResult<Fields> {
+        let subject = self.schema.get_field("subject")?;
+        let title = self.schema.get_field("title")?;
+        let description = self.schema.get_field("description")?;
+        let propvals = self.schema.get_field("propvals")?;
+        let hierarchy = self.schema.get_field("hierarchy")?;
+
+        Ok(Fields {
+            subject,
+            title,
+            description,
+            propvals,
+            hierarchy,
+        })
+    }
+
+    /// Indexes all resources from the store to search.
+    /// At this moment does not remove existing index.
+    pub fn add_all_resources(&self, store: &Db) -> AtomicServerResult<()> {
+        tracing::info!("Building search index...");
+
+        let resources = store
+            .all_resources(true)
+            .filter(|resource| !resource.get_subject().contains("/commits/"));
+
+        for resource in resources {
+            self.add_resource(&resource, store).map_err(|e| {
+                format!(
+                    "Failed to add resource to search index: {}. Error: {}",
+                    resource.get_subject(),
+                    e
+                )
+            })?
+        }
+
+        self.writer.write()?.commit()?;
+        tracing::info!("Search index finished!");
+        Ok(())
+    }
+
+    /// Adds a single resource to the search index, but does _not_ commit!
+    /// Does not index outgoing links, or resourcesArrays
+    /// `appstate.search_index_writer.write()?.commit()?;`
+    #[tracing::instrument(skip(self, store))]
+    pub fn add_resource(&self, resource: &Resource, store: &Db) -> AtomicServerResult<()> {
+        let fields = self.get_schema_fields()?;
+        let subject = resource.get_subject();
+        let writer = self.writer.read()?;
+
+        let mut doc = tantivy::Document::default();
+        doc.add_json_object(
+            fields.propvals,
+            serde_json::from_str(&resource.to_json_ad()?).map_err(|e| {
+                format!(
+                "Failed to convert resource to json for search indexing. Subject: {}. Error: {}",
+                subject, e
+            )
+            })?,
+        );
+
+        doc.add_text(fields.subject, subject);
+        doc.add_text(fields.title, get_resource_title(resource));
+
+        if let Ok(atomic_lib::Value::Markdown(description)) =
+            resource.get(atomic_lib::urls::DESCRIPTION)
+        {
+            doc.add_text(fields.description, description);
+        };
+
+        let hierarchy = resource_to_facet(resource, store)?;
+        doc.add_facet(fields.hierarchy, hierarchy);
+
+        writer.add_document(doc)?;
+
+        Ok(())
+    }
+
+    /// Removes a single resource from the search index, but does _not_ commit!
+    /// Does not index outgoing links, or resourcesArrays
+    /// `appstate.search_index_writer.write()?.commit()?;`
+    #[tracing::instrument(skip(self))]
+    pub fn remove_resource(&self, subject: &str) -> AtomicServerResult<()> {
+        let fields = self.get_schema_fields()?;
+        let writer = self.writer.read()?;
+        let term = tantivy::Term::from_field_text(fields.subject, subject);
+        writer.delete_term(term);
+        Ok(())
+    }
 }
 
 /// Returns the schema for the search index.
 pub fn build_schema() -> AtomicServerResult<tantivy::schema::Schema> {
-    let mut schema_builder = Schema::builder();
+    let mut schema_builder = tantivy::schema::Schema::builder();
     // The STORED flag makes the index store the full values. Can be useful.
     schema_builder.add_text_field("subject", TEXT | STORED);
     schema_builder.add_text_field("title", TEXT | STORED);
@@ -70,7 +163,7 @@ pub fn build_schema() -> AtomicServerResult<tantivy::schema::Schema> {
 }
 
 /// Creates or reads the index from the `search_index_path` and allocates some heap size.
-pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, Index)> {
+pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, tantivy::Index)> {
     let schema = build_schema()?;
     std::fs::create_dir_all(&config.search_index_path)?;
     if config.opts.rebuild_indexes {
@@ -87,100 +180,6 @@ pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, Index)> {
     let heap_size_bytes = 50_000_000;
     let index_writer = index.writer(heap_size_bytes)?;
     Ok((index_writer, index))
-}
-
-/// Returns the schema for the search index.
-pub fn get_schema_fields(appstate: &SearchState) -> AtomicServerResult<Fields> {
-    let subject = appstate.schema.get_field("subject")?;
-    let title = appstate.schema.get_field("title")?;
-    let description = appstate.schema.get_field("description")?;
-    let propvals = appstate.schema.get_field("propvals")?;
-    let hierarchy = appstate.schema.get_field("hierarchy")?;
-
-    Ok(Fields {
-        subject,
-        title,
-        description,
-        propvals,
-        hierarchy,
-    })
-}
-
-/// Indexes all resources from the store to search.
-/// At this moment does not remove existing index.
-pub fn add_all_resources(search_state: &SearchState, store: &Db) -> AtomicServerResult<()> {
-    tracing::info!("Building search index...");
-
-    let resources = store
-        .all_resources(true)
-        .filter(|resource| !resource.get_subject().contains("/commits/"));
-
-    for resource in resources {
-        add_resource(search_state, &resource, store).map_err(|e| {
-            format!(
-                "Failed to add resource to search index: {}. Error: {}",
-                resource.get_subject(),
-                e
-            )
-        })?
-    }
-
-    search_state.writer.write()?.commit()?;
-    tracing::info!("Search index finished!");
-    Ok(())
-}
-
-/// Adds a single resource to the search index, but does _not_ commit!
-/// Does not index outgoing links, or resourcesArrays
-/// `appstate.search_index_writer.write()?.commit()?;`
-#[tracing::instrument(skip(appstate, store))]
-pub fn add_resource(
-    appstate: &SearchState,
-    resource: &Resource,
-    store: &Db,
-) -> AtomicServerResult<()> {
-    let fields = get_schema_fields(appstate)?;
-    let subject = resource.get_subject();
-    let writer = appstate.writer.read()?;
-
-    let mut doc = Document::default();
-    doc.add_json_object(
-        fields.propvals,
-        serde_json::from_str(&resource.to_json_ad()?).map_err(|e| {
-            format!(
-                "Failed to convert resource to json for search indexing. Subject: {}. Error: {}",
-                subject, e
-            )
-        })?,
-    );
-
-    doc.add_text(fields.subject, subject);
-    doc.add_text(fields.title, get_resource_title(resource));
-
-    if let Ok(atomic_lib::Value::Markdown(description)) =
-        resource.get(atomic_lib::urls::DESCRIPTION)
-    {
-        doc.add_text(fields.description, description);
-    };
-
-    let hierarchy = resource_to_facet(resource, store)?;
-    doc.add_facet(fields.hierarchy, hierarchy);
-
-    writer.add_document(doc)?;
-
-    Ok(())
-}
-
-/// Removes a single resource from the search index, but does _not_ commit!
-/// Does not index outgoing links, or resourcesArrays
-/// `appstate.search_index_writer.write()?.commit()?;`
-#[tracing::instrument(skip(search_state))]
-pub fn remove_resource(search_state: &SearchState, subject: &str) -> AtomicServerResult<()> {
-    let fields = get_schema_fields(search_state)?;
-    let writer = search_state.writer.read()?;
-    let term = tantivy::Term::from_field_text(fields.subject, subject);
-    writer.delete_term(term);
-    Ok(())
 }
 
 // For a search server you will typically create one reader for the entire lifetime of your program, and acquire a new searcher for every single request.

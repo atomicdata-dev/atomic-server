@@ -57,7 +57,7 @@ pub async fn search_query(
     let mut timer = Timer::new();
     let store = &appstate.store;
     let searcher = appstate.search_state.reader.searcher();
-    let fields = crate::search::get_schema_fields(&appstate.search_state)?;
+    let fields = appstate.search_state.get_schema_fields()?;
     let limit = if let Some(l) = params.limit {
         if l > 0 {
             l
