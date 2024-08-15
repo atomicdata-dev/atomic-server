@@ -83,8 +83,9 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             };
             println!("Importing...");
             appstate.store.import(&readstring, &parse_opts)?;
-
-            println!("Sucesfully imported {:?} to store.", import_opts.file);
+            appstate.search_state.add_all_resources(&appstate.store)?;
+            println!("Successfully imported {:?} to store.", import_opts.file);
+            println!("WARNING: Your search index is not yet updated with these imported items. Run `--rebuild-index` to fix that.");
             Ok(())
         }
         Some(config::Command::ShowConfig) => {
