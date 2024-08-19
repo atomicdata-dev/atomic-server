@@ -1,6 +1,6 @@
 import { Client, useResource, useTitle } from '@tomic/react';
 import { transparentize } from 'polished';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaTimes } from 'react-icons/fa';
 import { useNavigate } from 'react-router';
@@ -14,6 +14,8 @@ import { useFocus } from '../helpers/useFocus';
 import { useQueryScopeHandler } from '../hooks/useQueryScope';
 import { shortcuts } from './HotKeyWrapper';
 import { IconButton, IconButtonVariant } from './IconButton/IconButton';
+import { FaMagnifyingGlass } from 'react-icons/fa6';
+import { isURL } from '../helpers/isURL';
 
 export interface SearchbarProps {
   onFocus?: React.FocusEventHandler<HTMLInputElement>;
@@ -29,13 +31,16 @@ export function Searchbar({
   const [input, setInput] = useState<string | undefined>('');
   const [query] = useSearchQuery();
   const { scope, clearScope } = useQueryScopeHandler();
-
+  const searchBarRef = useRef<HTMLFormElement>(null);
   const [inputRef, setInputFocus] = useFocus();
   const navigate = useNavigate();
 
-  function handleSelect(e) {
-    e.target.select();
-  }
+  const handleSelect: React.MouseEventHandler<HTMLInputElement> = e => {
+    if (isURL(input ?? '')) {
+      // @ts-ignore
+      e.target.select();
+    }
+  };
 
   function handleChange(e) {
     setInput(e.target.value);
@@ -60,6 +65,11 @@ export function Searchbar({
     //@ts-ignore this does seem callable
     document.activeElement.blur();
     navigate(constructOpenURL(subject));
+  };
+
+  const onSearchButtonClick = () => {
+    navigate(searchURL('', scope), { replace: true });
+    setInputFocus();
   };
 
   useHotkeys(shortcuts.search, e => {
@@ -104,7 +114,15 @@ export function Searchbar({
   }, [query, scope, subject]);
 
   return (
-    <Form onSubmit={handleSubmit} autoComplete='off'>
+    <Form onSubmit={handleSubmit} autoComplete='off' ref={searchBarRef}>
+      <IconButton
+        color='textLight'
+        title='Start searching'
+        type='button'
+        onClick={onSearchButtonClick}
+      >
+        <FaMagnifyingGlass />
+      </IconButton>
       {scope && <ParentTag subject={scope} onClick={clearScope} />}
       <Input
         autoComplete='false'
@@ -153,11 +171,13 @@ function ParentTag({ subject, onClick }: ParentTagProps): JSX.Element {
 const Input = styled.input`
   border: none;
   font-size: 0.9rem;
-  padding: 0.4rem 1.2rem;
+  padding-block: 0.4rem;
+  padding-inline-start: 0rem;
   color: ${props => props.theme.colors.text};
   width: 100%;
   flex: 1;
   min-width: 1rem;
+  height: 100%;
   background-color: ${props => props.theme.colors.bg};
   // Outline is handled by the Navbar.
   outline: none;
@@ -167,9 +187,10 @@ const Input = styled.input`
 const Form = styled.form`
   flex: 1;
   height: 100%;
+  gap: 0.5rem;
   display: flex;
   align-items: center;
-  padding-inline: 1rem;
+  padding-inline: ${p => p.theme.size(3)};
   border-radius: 999px;
 
   :hover {

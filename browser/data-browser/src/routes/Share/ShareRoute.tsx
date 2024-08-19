@@ -49,7 +49,7 @@ export function ShareRoute(): JSX.Element {
     <Main subject={subject}>
       <ContainerNarrow>
         <Column>
-          <Title resource={resource} prefix='Share settings' link />
+          <Title resource={resource} prefix='Permissions for' link />
           {canWrite && !showInviteForm && (
             <span>
               <Button onClick={() => setShowInviteForm(true)}>
@@ -61,7 +61,7 @@ export function ShareRoute(): JSX.Element {
           {showInviteForm && <InviteForm target={resource} />}
           <Card>
             <Column>
-              <RightsHeader>Rights set here:</RightsHeader>
+              <RightsHeader>Permissions set here:</RightsHeader>
               <CardInsideFull>
                 {/* This key might be a bit too much, but the component wasn't properly re-rendering before */}
                 {resourceRights.map(right => (
@@ -93,7 +93,7 @@ export function ShareRoute(): JSX.Element {
           {inheritedRights.length > 0 && (
             <Card>
               <Column>
-                <RightsHeader>Inherited rights:</RightsHeader>
+                <RightsHeader>Inherited permissions:</RightsHeader>
                 <CardInsideFull>
                   {inheritedRights.map(right => (
                     <AgentRights
@@ -108,6 +108,16 @@ export function ShareRoute(): JSX.Element {
               </Column>
             </Card>
           )}
+          <p>
+            Read more about permissions in the{' '}
+            <a
+              target='_blank'
+              href='https://docs.atomicdata.dev/hierarchy'
+              rel='noreferrer'
+            >
+              Atomic Data Docs
+            </a>
+          </p>
         </Column>
       </ContainerNarrow>
     </Main>

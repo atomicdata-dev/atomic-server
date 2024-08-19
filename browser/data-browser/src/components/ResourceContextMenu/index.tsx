@@ -167,9 +167,9 @@ function ResourceContextMenu({
     },
     {
       id: ContextMenuOptions.Share,
-      label: 'share',
+      label: 'Permissions & Invites',
       icon: <FaShare />,
-      helper: 'Open the share menu',
+      helper: 'Edit permissions and create invites.',
       onClick: () => navigate(shareURL(subject)),
     },
 

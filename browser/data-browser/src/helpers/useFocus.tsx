@@ -5,7 +5,7 @@ export const useFocus = (): [React.RefObject<unknown>, () => void] => {
   const htmlElRef = useRef<HTMLElement>(null);
 
   const setFocus = () => {
-    htmlElRef.current && htmlElRef.current.focus();
+    htmlElRef.current?.focus();
   };
 
   return [htmlElRef, setFocus];

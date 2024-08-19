@@ -22,6 +22,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 - [#906](https://github.com/atomicdata-dev/atomic-server/issues/906) Reset changes after clicking the cancel button in a form or navigating away.
 - [#914](https://github.com/atomicdata-dev/atomic-server/issues/914) Fix an issue where changing the subject in a new resource form could update the parent of existing resources if their subject matched the new subject.
 - [#919](https://github.com/atomicdata-dev/atomic-server/issues/919) Automatically sort classes and properties in the ontology editor.
+- [#936](https://github.com/atomicdata-dev/atomic-server/issues/936) Updated the address bar to make it clearer it's also search bar.
 
 ### @tomic/lib
 

@@ -128,6 +128,7 @@ function NavBar(): JSX.Element {
           )}
         </>
       )}
+      <VerticalDivider />
       <Searchbar
         subject={subject}
         onFocus={maybeHideButtons}
@@ -199,6 +200,12 @@ const NavBarFixed = styled(NavBarBase)`
   }
 `;
 
+const VerticalDivider = styled.div`
+  width: 1px;
+  background-color: ${props => props.theme.colors.bg2};
+  height: 100%;
+  margin-left: ${p => p.theme.size(2)};
+`;
 const SideBarWrapper = styled('div')`
   display: flex;
   height: 100vh;
