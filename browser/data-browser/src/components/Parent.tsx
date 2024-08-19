@@ -167,6 +167,7 @@ const Spacer = styled.span`
 
 const ButtonArea = styled.div`
   justify-self: flex-end;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 export default Parent;

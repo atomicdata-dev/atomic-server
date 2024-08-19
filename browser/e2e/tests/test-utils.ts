@@ -121,7 +121,7 @@ export async function newDrive(page: Page) {
 export async function makeDrivePublic(page: Page) {
   await currentDriveTitle(page).click();
   await page.click(contextMenu);
-  await page.click('button:has-text("share")');
+  await page.getByRole('menuitem', { name: 'Permissions & Invites' }).click();
   await expect(
     publicReadRightLocator(page),
     'The drive was public from the start',
