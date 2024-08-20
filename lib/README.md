@@ -9,7 +9,7 @@
 _Status: Beta. [Breaking changes](../CHANGELOG.md) are expected until 1.0._
 
 **Rust library for using [Atomic Data](https://docs.atomicdata.dev).
-Powers [`atomic-cli`](../cli/readme.md) and [`atomic-server`](../server/readme.md).**
+Powers [`atomic-cli`](../cli/README.md) and [`atomic-server`](../server/README.md).**
 
 [Check out the docs on docs.rs](https://docs.rs/atomic_lib/latest/atomic_lib/).
 For code examples, see [`examples/basic.rs`](examples/basic.rs) and the many tests in the code.
