@@ -10,7 +10,12 @@ import { constructOpenURL } from '../../helpers/navigation';
 import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { SideBarMenuItem } from './SideBarMenuItem';
 import { paths } from '../../routes/paths';
-import { unknownSubject, useCurrentAgent, useResource } from '@tomic/react';
+import {
+  core,
+  unknownSubject,
+  useCurrentAgent,
+  useResource,
+} from '@tomic/react';
 
 // Non standard event type so we have to type it ourselfs for now.
 type BeforeInstallPromptEvent = {
@@ -59,7 +64,11 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
     <section aria-label='App menu'>
       <SideBarMenuItem
         icon={<FaUser />}
-        label={agent ? agentResource.title : 'Login'}
+        label={
+          agent
+            ? agentResource.get(core.properties.name) ?? 'User Settings'
+            : 'Login'
+        }
         helper='See and edit the current Agent / User (u)'
         path={paths.agentSettings}
         onClick={onItemClick}

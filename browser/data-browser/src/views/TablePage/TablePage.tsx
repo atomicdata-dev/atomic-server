@@ -16,9 +16,14 @@ import {
   createResourceDeletedHistoryItem,
   useTableHistory,
 } from './helpers/useTableHistory';
+import { Row as FlexRow, Column } from '../../components/Row';
 import { useHandleClearCells } from './helpers/useHandleClearCells';
 import { useHandleCopyCommand } from './helpers/useHandleCopyCommand';
 import { ExpandedRowDialog } from './ExpandedRowDialog';
+import { IconButton } from '../../components/IconButton/IconButton';
+import { FaCode, FaFileCsv } from 'react-icons/fa6';
+import { ResourceCodeUsageDialog } from '../CodeUsage/ResourceCodeUsageDialog';
+import { TableExportDialog } from './TableExportDialog';
 
 const columnToKey = (column: Property) => column.subject;
 
@@ -26,6 +31,8 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
   const store = useStore();
   const titleId = useId();
 
+  const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const { tableClass, sorting, setSortBy, collection, invalidateCollection } =
     useTableData(resource);
 
@@ -114,32 +121,60 @@ export function TablePage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <ContainerFull>
       <TablePageContext.Provider value={tablePageContext}>
-        <EditableTitle resource={resource} id={titleId} />
-        <FancyTable
-          columns={columns}
-          columnSizes={columnSizes}
-          itemCount={collection.totalMembers + 1}
-          columnToKey={columnToKey}
-          labelledBy={titleId}
-          onClearRow={handleDeleteRow}
-          onCellResize={handleColumnResize}
-          onClearCells={handleClearCells}
-          onCopyCommand={handleCopyCommand}
-          onPasteCommand={handlePaste}
-          onUndoCommand={undoLastItem}
-          onColumnReorder={reorderColumns}
-          onRowExpand={handleRowExpand}
-          HeadingComponent={TableHeading}
-          NewColumnButtonComponent={NewColumnButton}
-        >
-          {Row}
-        </FancyTable>
+        <Column>
+          <FlexRow justify='space-between'>
+            <EditableTitle resource={resource} id={titleId} />
+            <FlexRow style={{ marginRight: '1rem' }}>
+              <IconButton
+                title='Use in code'
+                onClick={() => setShowCodeUsageDialog(true)}
+              >
+                <FaCode />
+              </IconButton>
+              <IconButton
+                title='Use in code'
+                onClick={() => setShowExportDialog(true)}
+              >
+                <FaFileCsv />
+              </IconButton>
+            </FlexRow>
+          </FlexRow>
+          <FancyTable
+            columns={columns}
+            columnSizes={columnSizes}
+            itemCount={collection.totalMembers + 1}
+            columnToKey={columnToKey}
+            labelledBy={titleId}
+            onClearRow={handleDeleteRow}
+            onCellResize={handleColumnResize}
+            onClearCells={handleClearCells}
+            onCopyCommand={handleCopyCommand}
+            onPasteCommand={handlePaste}
+            onUndoCommand={undoLastItem}
+            onColumnReorder={reorderColumns}
+            onRowExpand={handleRowExpand}
+            HeadingComponent={TableHeading}
+            NewColumnButtonComponent={NewColumnButton}
+          >
+            {Row}
+          </FancyTable>
+        </Column>
         <ExpandedRowDialog
           subject={expandedRowSubject ?? unknownSubject}
           open={showExpandedRowDialog}
           bindOpen={setShowExpandedRowDialog}
         />
       </TablePageContext.Provider>
+      <ResourceCodeUsageDialog
+        subject={resource.subject}
+        show={showCodeUsageDialog}
+        bindShow={setShowCodeUsageDialog}
+      />
+      <TableExportDialog
+        subject={resource.subject}
+        show={showExportDialog}
+        bindShow={setShowExportDialog}
+      />
     </ContainerFull>
   );
 }
