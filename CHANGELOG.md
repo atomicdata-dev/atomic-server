@@ -5,7 +5,7 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
-## Unreleased
+## [v0.39.0] - 2024-08-21
 
 - The download endpoint can now optimize images on the fly. This is controlled via query parameters. #257
 - Added export endpoint for exporting resources to other formats. Currently only supports exporting tables to csv. [#925](https://github.com/atomicdata-dev/atomic-server/issues/925)
