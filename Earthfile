@@ -5,15 +5,20 @@ IMPORT github.com/earthly/lib/rust AS rust
 FROM rust:bookworm
 WORKDIR /code
 
-pipeline:
+tests:
   BUILD browser+test
   BUILD browser+lint
   BUILD +fmt
-  BUILD +docs-pages
   BUILD +lint
   BUILD +test
   BUILD +build
   BUILD +e2e
+
+# Should only run _after_ tests have passed
+# Requires --push to update things externally
+builds:
+  BUILD +docs-pages
+  BUILD +docker-all
 
 # Creates a `./artifact/bin` folder with all the atomic-server binaries
 build-all:
