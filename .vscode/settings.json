@@ -3,7 +3,6 @@
   "editor.formatOnSave": true,
   "files.autoSave": "onFocusChange",
   "rust-analyzer.checkOnSave.command": "clippy",
-
   "search.exclude": {
     "**/.git": true,
     "**/node_modules": true,
@@ -25,9 +24,6 @@
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": "explicit"
   },
-  "jest.enableInlineErrorMessages": true,
-  "jest.showCoverageOnLoad": true,
-  "jest.runAllTestsFirst": false,
   "eslint.workingDirectories": [
     "./data-browser",
     "./react",

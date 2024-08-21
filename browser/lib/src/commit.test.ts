@@ -8,9 +8,6 @@ import {
 } from './commit.js';
 import { Store } from './store.js';
 
-// These are disabled for now, as they require TextEncoder to be available
-// https://github.com/facebook/jest/issues/9983
-
 describe('Commit signing and keys', () => {
   const privateKey = 'CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=';
   const publicKey = '7LsjMW5gOfDdJzK/atgjQ1t20J/rw8MjVg6xwqm+h8U=';
