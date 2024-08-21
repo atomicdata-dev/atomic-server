@@ -33,14 +33,14 @@ jobs:
         run: echo "RELEASE_VERSION=$(echo ${GITHUB_REF#refs/*/})" >> $GITHUB_ENV
 
       - name: Earthly build
-        run: earthly --org ontola --sat henk -P +build
+        run: earthly --org ontola --sat henk -P +cross-build -TARGET=x86_64-unknown-linux-musl
 
       - name: Transfer binary rsync
         uses: easingthemes/ssh-deploy@v3
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           ARGS: "-rltgoDzvO"
-          SOURCE: "./artifact/bin/atomic-server-x86_64-unknown-linux-gnu"
+          SOURCE: "./artifact/bin/atomic-server-x86_64-unknown-linux-musl"
           REMOTE_HOST: ${{ inputs.remote_host }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           TARGET: ~/
@@ -52,7 +52,7 @@ jobs:
           username: ${{ secrets.REMOTE_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            mv ~/atomic-server-x86_64-unknown-linux-gnu ~/atomic-server
+            mv ~/atomic-server-x86_64-unknown-linux-musl ~/atomic-server
             cp ~/atomic-server ~/atomic-server-$(date +'%Y-%m-%dT%H:%M:%S')
             systemctl stop atomic
             ./atomic-server export &&

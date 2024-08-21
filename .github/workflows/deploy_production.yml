@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'master'
+      - "master"
 jobs:
   deploy-production:
-    uses: './.github/workflows/deployment.yml'
+    uses: "./.github/workflows/deployment.yml"
     with:
       environment: production
       remote_host: atomicdata.dev

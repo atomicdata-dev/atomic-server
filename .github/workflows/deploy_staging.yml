@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - 'develop'
+      - "develop"
 jobs:
   deploy-staging:
-    uses: './.github/workflows/deployment.yml'
+    uses: "./.github/workflows/deployment.yml"
     with:
       environment: staging
       remote_host: staging.atomicdata.dev
