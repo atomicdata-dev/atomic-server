@@ -10,6 +10,6 @@ Library that powers `atomic-server` and `atomic-cli`. Features:
 - Path traversal
 - Basic validation
 
-[docs.rs](https://docs.rs/atomic_lib/0.37.0/atomic_lib/)
+[docs.rs](https://docs.rs/atomic_lib/latest/atomic_lib/)
 
 [repository + issue tracker](https://github.com/atomicdata-dev/atomic-server).

@@ -13,11 +13,13 @@ Talk with other devs on our [Discord][discord-url]!
 - `pnpm lint-fix`
 - commit any changes (if they are there)
 - `pnpm build` to build typescript files (don't skip this!)
-- `pnpm build-server` builds and copies assets to `../atomic-data-rust` folder (.js builds and playwright end-to-end tests). Make sure that `atomic-data-rust` directory exists on your machine as a sibling of `atomic-data-browser`.
-- `pnpm test` (don't you publish a broken build!), make sure `atomic-server` is running on `localhost`.
-- Update the `package.json` files for `lib`, `rust`, and `data-browser` with a new version number. Try to match the version number with `atomic-data-rust`
+- make sure `atomic-server` is running on `localhost`.
+- `pnpm test`
+- `pnpm test-e2e`
+- Update the `package.json` files for `lib`, `rust`, and `data-browser` with a new version number. Match the version number with `atomic-data-rust`
 - Check the [changelog](changelog.md), make sure the headers are correct
-- commit any changes, name it `vX.XX.XX`
+- Now do the rust libraries
+- Commit any changes, name it `vX.XX.XX`
 - `pnpm publish -r`
   - Choose a new version. Versions should match `atomic-data-rs`.
   - This updates the `package.json` files, creates a commit, tags it, pushes it to github, and publishes the builds to npm.

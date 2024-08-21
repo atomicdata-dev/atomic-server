@@ -200,7 +200,7 @@ So please first send an e-mail to joep@ontola.io describing the issue, and then 
 
 1. Commit changes
 1. Make sure all tests run properly
-1. Test, build and update the `/browser` versions (`package.json` files, see contribute.md)
+1. Test, build and update the `/browser` versions (`package.json` files, see `./browser/contributing.md`)
 1. Use `cargo workspaces version patch --no-git-commit` (and maybe replace `patch` with the `minor`) to update all `cargo.toml` files in one command. You'll need to `cargo install cargo-workspaces` if this command is not possible.
 1. Publish to cargo: `cargo publish`. First `lib`, then `cli` and `server`.
 1. Publish to `npm` (see `browser/contribute.md`)

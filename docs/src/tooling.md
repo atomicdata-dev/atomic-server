@@ -8,7 +8,7 @@ Libraries and clients (all MIT licenced) that work great with [atomic-server](at
 - Type CLI (npm): [@tomic/cli](js-cli.md) for generating TS types from ontologies
 - Svelte library: [@tomic/svelte](svelte.md)
 - Client CLI (rust): [atomic-cli](rust-cli.md) for fetching & editing data
-- Rust library: [atomic-lib](rust-lib.md) powers `atomic-server` and `atomic-cli`, and can be used in other Rust projects ([docs.rs](https://docs.rs/atomic_lib/0.37.0/atomic_lib/))
+- Rust library: [atomic-lib](rust-lib.md) powers `atomic-server` and `atomic-cli`, and can be used in other Rust projects ([docs.rs](https://docs.rs/atomic_lib/latest/atomic_lib/))
 - [Raycast Extension](https://www.raycast.com/atomicdata-dev/atomic-data-browser): full-text search
 
 ## Want to add to this list? Some ideas for tooling

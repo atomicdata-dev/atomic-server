@@ -162,7 +162,6 @@ impl Handler<CommitMessage> for CommitMonitor {
     #[tracing::instrument(name = "handle_commit_message", skip_all, fields(subscriptions = &self.subscriptions.len(), s = %msg.commit_response.commit_resource.get_subject()))]
     fn handle(&mut self, msg: CommitMessage, _: &mut Context<Self>) {
         // We have moved the logic to the `handle_internal` function for decent error handling
-        println!("HANDLE COMMITMESSAGE RECEIVED");
         match self.handle_internal(msg) {
             Ok(_) => {}
             Err(e) => {

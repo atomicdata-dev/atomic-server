@@ -2,12 +2,11 @@
 
 This changelog covers all five packages, as they are (for now) updated as a whole
 
-## Unreleased
+## v0.39.0
 
 ### Atomic Browser
 
 - [#855](https://github.com/atomicdata-dev/atomic-server/issues/855) Add a dialog that shows how to fetch and use the current resource in your code.
-- [#825](https://github.com/atomicdata-dev/atomic-server/issues/825) Folder display styles are now saved locally instead of on the resource. The display style property will now act as the default view style.
 - [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
 - Updated look of the default resource form.
 - [#896](https://github.com/atomicdata-dev/atomic-server/issues/896) Fix an issue where sidebar items require a double tap on iOS.
