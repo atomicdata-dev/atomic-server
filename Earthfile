@@ -33,6 +33,7 @@ docker-all:
 
 install:
   RUN apt-get update -qq
+  # Libraries that we install here, may also need to be added to `Cross.toml`
   # NASM is required for the image library
   RUN apt install nasm
   RUN rustup component add clippy
@@ -42,7 +43,7 @@ install:
 
 source:
   FROM +install
-  COPY --keep-ts Cargo.toml Cargo.lock ./
+  COPY --keep-ts Cargo.toml Cargo.lock Cross.toml ./
   COPY --keep-ts --dir server lib cli  ./
   COPY browser+build/dist /code/server/assets_tmp
   DO rust+CARGO --args=fetch
@@ -67,6 +68,7 @@ test:
 
 cross-build:
   FROM +source
+  # The TARGETs may need custom libraries defined in `atomic-server/Cross.toml`
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
   DO rust+CROSS --target ${TARGET}
