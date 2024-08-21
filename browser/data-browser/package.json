@@ -95,7 +95,7 @@
     "predeploy": "build && touch build/.nojekyll",
     "preview": "vite preview",
     "start": "vite",
-    "test": "jest",
+    "test": "vitest run",
     "typecheck": "pnpm exec tsc --noEmit"
   }
 }
