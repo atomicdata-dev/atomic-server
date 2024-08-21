@@ -125,10 +125,9 @@ fn build_js(dirs: &Dirs) {
     if out.status.success() {
         p!("js build successful");
     } else {
-        panic!(
-            "js build failed: {}",
-            String::from_utf8(out.stderr).unwrap()
-        );
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        panic!("js build failed:\nStdout:\n{}\nStderr:\n{}", stdout, stderr);
     }
 }
 
