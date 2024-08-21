@@ -27,5 +27,5 @@ jobs:
       - name: Earthly +tests
         run: earthly --org ontola --ci --sat henk -P +tests
       - name: Earthly +builds
-        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
         run: earthly --org ontola --ci --sat henk -P --push +builds --tags="${{ steps.meta.outputs.tags }}"
