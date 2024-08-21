@@ -107,12 +107,12 @@ export abstract class CodeGenerator {
     }
 
     const [propResource, ontology] = await Promise.all([
-      this.store.getResource(property),
+      this.store.getResource<Core.Property>(property),
       this.store.getResource(ontologySubject),
     ]);
 
     const ontName = toCamelCase(ontology.title);
-    const propName = toCamelCase(propResource.title);
+    const propName = toCamelCase(propResource.props.shortname);
 
     return {
       propImport: this.isOntologyIncludedInLib(ontology.subject)
