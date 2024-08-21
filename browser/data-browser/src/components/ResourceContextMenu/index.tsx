@@ -1,12 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import {
-  Client,
-  core,
-  dataBrowser,
-  useCanWrite,
-  useResource,
-} from '@tomic/react';
+import { Client, core, useCanWrite, useResource } from '@tomic/react';
 import {
   editURL,
   dataURL,
@@ -31,7 +25,6 @@ import {
   FaShare,
   FaTrash,
   FaPlus,
-  FaFileCsv,
 } from 'react-icons/fa6';
 import { useQueryScopeHandler } from '../../hooks/useQueryScope';
 import {
@@ -44,7 +37,6 @@ import { useCurrentSubject } from '../../helpers/useCurrentSubject';
 import { ResourceCodeUsageDialog } from '../../views/CodeUsage/ResourceCodeUsageDialog';
 import { useNewRoute } from '../../helpers/useNewRoute';
 import { addIf } from '../../helpers/addIf';
-import { TableExportDialog } from '../../views/TablePage/TableExportDialog';
 
 export enum ContextMenuOptions {
   View = 'view',
@@ -90,7 +82,6 @@ function ResourceContextMenu({
   const resource = useResource(subject);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
-  const [showExportDialog, setShowExportDialog] = useState(false);
   const handleAddClick = useNewRoute(subject);
   const [currentSubject] = useCurrentSubject();
   const [canWrite] = useCanWrite(resource);
@@ -208,13 +199,6 @@ function ResourceContextMenu({
         onClick: () => setShowDeleteDialog(true),
       },
     ),
-    ...addIf(resource.hasClasses(dataBrowser.classes.table), {
-      id: ContextMenuOptions.Export,
-      icon: <FaFileCsv />,
-      label: 'Export to csv',
-      helper: 'Export the table as a CSV file',
-      onClick: () => setShowExportDialog(true),
-    }),
   ];
 
   const filteredItems = showOnly
@@ -254,11 +238,6 @@ function ResourceContextMenu({
           <ResourceUsage resource={resource} />
         </>
       </ConfirmationDialog>
-      <TableExportDialog
-        subject={subject}
-        show={showExportDialog}
-        bindShow={setShowExportDialog}
-      />
       {currentSubject && (
         <ResourceCodeUsageDialog
           subject={currentSubject}
