@@ -387,7 +387,7 @@ pub trait Storelike: Sized {
     }
 
     /// Loads the default store. For DBs it also adds default Collections and Endpoints.
-    fn populate(&self) -> AtomicResult<()> {
+    fn populate(&mut self) -> AtomicResult<()> {
         crate::populate::populate_base_models(self)?;
         crate::populate::populate_default_store(self)
     }

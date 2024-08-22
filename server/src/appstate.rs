@@ -29,11 +29,10 @@ pub struct AppState {
 
 /// Initializes the Store and sets the default agent.
 pub fn init_store(config: &Config) -> AtomicServerResult<Db> {
-    let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+    let store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
 
     tracing::info!("Setting default agent");
     set_default_agent(config, &store)?;
-    store.register_default_endpoints()?;
 
     Ok(store)
 }

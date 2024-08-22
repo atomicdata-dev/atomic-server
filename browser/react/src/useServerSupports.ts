@@ -1,8 +1,9 @@
-import { ServerSupports, useStore } from './index.js';
+import { ServerSupports, useServerURL, useStore } from './index.js';
 import { useEffect, useState } from 'react';
 
 export function useServerSupports(): ServerSupports {
   const store = useStore();
+  const serverURL = useServerURL();
   const [supports, setSupports] = useState<ServerSupports>({
     emailRegister: false,
   });
@@ -14,7 +15,7 @@ export function useServerSupports(): ServerSupports {
     }
 
     check();
-  }, [store]);
+  }, [store, serverURL]);
 
   return supports;
 }
