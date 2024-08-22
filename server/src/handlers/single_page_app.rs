@@ -100,7 +100,10 @@ impl Default for MetaTags {
 
 impl Display for MetaTags {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let description = escape_html(&self.description);
+        let description = escape_html(&self.description)
+            .chars()
+            .take(250)
+            .collect::<String>();
         let image = &self.image;
         let title = escape_html(&self.title);
 
