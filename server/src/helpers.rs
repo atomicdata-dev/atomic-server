@@ -187,24 +187,6 @@ pub fn get_client_agent(
     Ok(for_agent)
 }
 
-/// Finds the extension
-pub fn try_extension(path: &str) -> Option<(ContentType, &str)> {
-    let items: Vec<&str> = path.split('.').collect();
-    if items.len() == 2 {
-        let path = items[0];
-        let content_type = match items[1] {
-            "json" => ContentType::Json,
-            "jsonld" => ContentType::JsonLd,
-            "jsonad" => ContentType::JsonAd,
-            "html" => ContentType::Html,
-            "ttl" => ContentType::Turtle,
-            _ => return None,
-        };
-        return Some((content_type, path));
-    }
-    None
-}
-
 fn session_cookies_from_header(header: &HeaderValue) -> AtomicServerResult<Vec<String>> {
     let cookies: Vec<&str> = header
         .to_str()
