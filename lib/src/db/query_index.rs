@@ -117,7 +117,7 @@ pub fn query_sorted_indexed(
             let (_q_filter, _val, subject) = parse_collection_members_key(&k)?;
 
             // If no external resources should be included, skip this one if it's an external resource
-            if !q.include_external && !subject.starts_with(&self_url) {
+            if !q.include_external && store.is_external_subject(subject)? {
                 continue;
             }
 

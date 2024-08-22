@@ -347,13 +347,7 @@ impl Resource {
         let commit_builder = self.get_commit_builder().clone();
         let commit = commit_builder.sign(&agent, store, self)?;
         // If the current client is a server, and the subject is hosted here, don't post
-        let should_post = if let Some(self_url) = store.get_self_url() {
-            !self.subject.starts_with(&self_url)
-        } else {
-            // Current client is not a server, has no own persisted store
-            true
-        };
-        if should_post {
+        if store.is_external_subject(&commit.subject)? {
             crate::client::post_commit(&commit, store)?;
         }
         let opts = CommitOpts {

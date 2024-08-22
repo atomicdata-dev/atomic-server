@@ -193,12 +193,12 @@ fn set_up_initial_invite(store: &impl Storelike) -> AtomicServerResult<()> {
     )?;
     invite.set(
         atomic_lib::urls::TARGET.into(),
-        atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
+        atomic_lib::Value::AtomicUrl(store.get_server_url().to_string()),
         store,
     )?;
     invite.set(
         atomic_lib::urls::PARENT.into(),
-        atomic_lib::Value::AtomicUrl(store.get_server_url().into()),
+        atomic_lib::Value::AtomicUrl(store.get_server_url().to_string()),
         store,
     )?;
     invite.set(

@@ -18,6 +18,7 @@ use std::{
 
 use tracing::{info, instrument};
 use trees::{Method, Operation, Transaction, Tree};
+use url::Url;
 
 use crate::{
     agents::ForAgent,
@@ -79,7 +80,7 @@ pub struct Db {
     /// [Tree::WatchedQueries]
     watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
-    server_url: String,
+    server_url: Url,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
@@ -109,7 +110,7 @@ impl Db {
             reference_index,
             query_index,
             prop_val_sub_index,
-            server_url,
+            server_url: Url::parse(&server_url)?,
             watched_queries,
             endpoints: default_endpoints(),
             on_commit: None,
@@ -268,6 +269,7 @@ impl Db {
     }
 
     fn map_sled_item_to_resource(
+        &self,
         item: Result<(sled::IVec, sled::IVec), sled::Error>,
         self_url: String,
         include_external: bool,
@@ -275,7 +277,7 @@ impl Db {
         let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
         let subject: String = String::from_utf8_lossy(&subject).to_string();
 
-        if !include_external && !subject.starts_with(&self_url) {
+        if !include_external && self.is_external_subject(&subject).ok()? {
             return None;
         }
 
@@ -398,7 +400,7 @@ impl Db {
 
         for (i, atom_res) in atoms.enumerate() {
             let atom = atom_res?;
-            if !q.include_external && !atom.subject.starts_with(&self_url) {
+            if !q.include_external && self.is_external_subject(&atom.subject).unwrap() {
                 continue;
             }
 
@@ -660,14 +662,14 @@ impl Storelike for Db {
         Ok(commit_response)
     }
 
-    fn get_server_url(&self) -> &str {
+    fn get_server_url(&self) -> &Url {
         &self.server_url
     }
 
-    // Since the DB is often also the server, this should make sense.
-    // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
-    fn get_self_url(&self) -> Option<String> {
-        Some(self.get_server_url().into())
+    fn get_self_url(&self) -> Option<&Url> {
+        // Since the DB is often also the server, this should make sense.
+        // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
+        Some(self.get_server_url())
     }
 
     fn get_default_agent(&self) -> AtomicResult<crate::agents::Agent> {
@@ -686,7 +688,7 @@ impl Storelike for Db {
                 let resource = crate::resources::Resource::from_propvals(propvals, subject.into());
                 Ok(resource)
             }
-            Err(e) => self.handle_not_found(subject, e, None),
+            Err(e) => self.handle_not_found(subject, e),
         }
     }
 
@@ -836,7 +838,7 @@ impl Storelike for Db {
             .expect("No self URL set, is required in DB");
 
         let result = self.resources.into_iter().filter_map(move |item| {
-            Db::map_sled_item_to_resource(item, self_url.clone(), include_external)
+            Db::map_sled_item_to_resource(self, item, self_url.to_string(), include_external)
         });
 
         Box::new(result)
@@ -889,7 +891,8 @@ impl Storelike for Db {
     }
 
     fn populate(&self) -> AtomicResult<()> {
-        crate::populate::populate_all(self)
+        crate::populate::populate_all(self)?;
+        Ok(())
     }
 
     #[instrument(skip(self))]

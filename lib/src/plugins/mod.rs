@@ -46,5 +46,6 @@ pub mod files;
 pub mod path;
 pub mod prunetests;
 pub mod query;
+pub mod register;
 pub mod search;
 pub mod versioning;

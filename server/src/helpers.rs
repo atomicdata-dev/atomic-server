@@ -164,6 +164,7 @@ pub fn get_auth(
 
 /// Checks for authentication headers and returns Some agent's subject if everything is well.
 /// Skips these checks in public_mode and returns Ok(None).
+/// Returns the Agent's subject or the Public Agent.
 #[tracing::instrument(skip(appstate))]
 pub fn get_client_agent(
     headers: &HeaderMap,
