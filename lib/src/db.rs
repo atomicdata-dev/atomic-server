@@ -22,6 +22,7 @@ use url::Url;
 
 use crate::{
     agents::ForAgent,
+    atomic_url::AtomicUrl,
     atoms::IndexAtom,
     commit::{CommitOpts, CommitResponse},
     db::{
@@ -80,7 +81,7 @@ pub struct Db {
     /// [Tree::WatchedQueries]
     watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
-    server_url: Url,
+    server_url: AtomicUrl,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
@@ -93,7 +94,7 @@ impl Db {
     /// Creates a new store at the specified path, or opens the store if it already exists.
     /// The server_url is the domain where the db will be hosted, e.g. http://localhost/
     /// It is used for distinguishing locally defined items from externally defined ones.
-    pub fn init(path: &std::path::Path, server_url: String) -> AtomicResult<Db> {
+    pub fn init(path: &std::path::Path, server_url: &str) -> AtomicResult<Db> {
         tracing::info!("Opening database at {:?}", path);
 
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
@@ -110,7 +111,7 @@ impl Db {
             reference_index,
             query_index,
             prop_val_sub_index,
-            server_url: Url::parse(&server_url)?,
+            server_url: AtomicUrl::try_from(server_url)?,
             watched_queries,
             endpoints: default_endpoints(),
             on_commit: None,
@@ -126,10 +127,7 @@ impl Db {
     pub fn init_temp(id: &str) -> AtomicResult<Db> {
         let tmp_dir_path = format!(".temp/db/{}", id);
         let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
-        let store = Db::init(
-            std::path::Path::new(&tmp_dir_path),
-            "https://localhost".into(),
-        )?;
+        let store = Db::init(std::path::Path::new(&tmp_dir_path), "https://localhost")?;
         let agent = store.create_agent(None)?;
         store.set_default_agent(agent);
         store.populate()?;
@@ -243,7 +241,7 @@ impl Db {
                 Ok(propval)
             }
             None => Err(AtomicError::not_found(format!(
-                "Resource {} not found",
+                "Resource {} does not exist",
                 subject
             ))),
         }
@@ -530,6 +528,7 @@ impl Storelike for Db {
         update_index: bool,
         overwrite_existing: bool,
     ) -> AtomicResult<()> {
+        println!("add_resource_opts {}", resource.get_subject());
         // This only works if no external functions rely on using add_resource for atom-like operations!
         // However, add_atom uses set_propvals, which skips the validation.
         let existing = self.get_propvals(resource.get_subject()).ok();
@@ -662,11 +661,11 @@ impl Storelike for Db {
         Ok(commit_response)
     }
 
-    fn get_server_url(&self) -> &Url {
+    fn get_server_url(&self) -> &AtomicUrl {
         &self.server_url
     }
 
-    fn get_self_url(&self) -> Option<&Url> {
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
         // Since the DB is often also the server, this should make sense.
         // Some edge cases might appear later on (e.g. a slave DB that only stores copies?)
         Some(self.get_server_url())
@@ -702,16 +701,12 @@ impl Storelike for Db {
         let url_span = tracing::span!(tracing::Level::TRACE, "URL parse").entered();
         // This might add a trailing slash
         let url = url::Url::parse(subject)?;
-        let mut removed_query_params = {
+
+        let removed_query_params = {
             let mut url_altered = url.clone();
             url_altered.set_query(None);
             url_altered.to_string()
         };
-
-        // Remove trailing slash
-        if removed_query_params.ends_with('/') {
-            removed_query_params.pop();
-        }
 
         url_span.exit();
 

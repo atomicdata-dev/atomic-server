@@ -7,6 +7,11 @@ use crate::agents::Agent;
 use crate::storelike::QueryResult;
 use crate::Value;
 use crate::{atoms::Atom, storelike::Storelike};
+use crate::{
+    atomic_url::AtomicUrl,
+    atoms::Atom,
+    storelike::{ResourceCollection, Storelike},
+};
 use crate::{errors::AtomicResult, Resource};
 use std::{collections::HashMap, sync::Arc, sync::Mutex};
 
@@ -20,10 +25,11 @@ pub struct Store {
 }
 
 /// The URL used for stores that are not accessible on the web.
-pub const LOCAL_STORE_URL_STR: &str = "local:store";
+// I'd prefer this to a non-HTTP URI, but that causes parsing issues when we combine it with some paths (at least with Commits)
+pub const LOCAL_STORE_URL_STR: &str = "http://noresolve.localhost";
 
 lazy_static::lazy_static! {
-    static ref LOCAL_STORE_URL: Url = Url::parse(LOCAL_STORE_URL_STR).unwrap();
+    static ref LOCAL_STORE_URL: AtomicUrl = AtomicUrl::try_from(LOCAL_STORE_URL_STR).unwrap();
 }
 
 impl Store {
@@ -167,13 +173,13 @@ impl Storelike for Store {
         Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
-    fn get_server_url(&self) -> &Url {
+    fn get_server_url(&self) -> &AtomicUrl {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/atomicdata-dev/atomic-server/issues/6
         &LOCAL_STORE_URL
     }
 
-    fn get_self_url(&self) -> Option<&Url> {
+    fn get_self_url(&self) -> Option<&AtomicUrl> {
         Some(self.get_server_url())
     }
 
