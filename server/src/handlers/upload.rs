@@ -9,7 +9,11 @@ use futures::{StreamExt, TryStreamExt};
 use image::GenericImageView;
 use serde::Deserialize;
 
-use crate::{appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent};
+use crate::{
+    appstate::AppState,
+    errors::AtomicServerResult,
+    helpers::{get_client_agent, get_subject},
+};
 
 #[derive(Deserialize, Debug)]
 pub struct UploadQuery {
@@ -28,19 +32,19 @@ pub async fn upload_handler(
     appstate: web::Data<AppState>,
     query: web::Query<UploadQuery>,
     req: actix_web::HttpRequest,
+    conn: actix_web::dev::ConnectionInfo,
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
     let parent = store.get_resource(&query.parent)?;
-    let subject = format!(
-        "{}{}",
-        store.get_server_url(),
-        req.head()
-            .uri
-            .path_and_query()
-            .ok_or("Path must be given")?
-    );
-    let agent = get_client_agent(req.headers(), &appstate, subject)?;
-    check_write(store, &parent, &agent)?;
+    let subject = get_subject(&req, &conn, &appstate)?;
+    if let Some(agent) = get_client_agent(req.headers(), &appstate, subject)? {
+        check_write(store, &parent, &agent)?;
+    } else {
+        return Err(AtomicError::unauthorized(
+            "No authorization headers present. These are required when uploading files.".into(),
+        )
+        .into());
+    }
 
     let mut created_resources: Vec<Resource> = Vec::new();
     let mut commit_responses: Vec<CommitResponse> = Vec::new();
