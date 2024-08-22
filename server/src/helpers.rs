@@ -6,11 +6,12 @@ use actix_web::http::Uri;
 use atomic_lib::agents::ForAgent;
 use atomic_lib::authentication::AuthValues;
 use atomic_lib::AtomicError;
+use atomic_lib::Storelike;
 use percent_encoding::percent_decode_str;
 use std::str::FromStr;
 
 use crate::errors::{AppErrorType, AtomicServerError};
-use crate::{appstate::AppState, content_types::ContentType, errors::AtomicServerResult};
+use crate::{appstate::AppState, errors::AtomicServerResult};
 
 /// Returns the authentication headers from the request
 #[tracing::instrument(skip_all)]

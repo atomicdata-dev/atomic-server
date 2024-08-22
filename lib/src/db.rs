@@ -16,9 +16,9 @@ use std::{
     vec,
 };
 
-use tracing::{info, instrument};
+use tracing::info;
+use tracing::instrument;
 use trees::{Method, Operation, Transaction, Tree};
-use url::Url;
 
 use crate::{
     agents::ForAgent,
@@ -267,7 +267,6 @@ impl Db {
     }
 
     fn map_sled_item_to_resource(
-        &self,
         item: Result<(sled::IVec, sled::IVec), sled::Error>,
         self_url: String,
         include_external: bool,
@@ -275,7 +274,10 @@ impl Db {
         let (subject, resource_bin) = item.expect(DB_CORRUPT_MSG);
         let subject: String = String::from_utf8_lossy(&subject).to_string();
 
-        if !include_external && self.is_external_subject(&subject).ok()? {
+        // if !include_external && self.is_external_subject(&subject).ok()? {
+        //     return None;
+        // }
+        if !include_external && !subject.starts_with(&self_url) {
             return None;
         }
 
@@ -386,10 +388,6 @@ impl Db {
     }
 
     fn query_basic(&self, q: &Query) -> AtomicResult<QueryResult> {
-        let self_url = self
-            .get_self_url()
-            .ok_or("No self_url set, required for Queries")?;
-
         let mut subjects: Vec<String> = vec![];
         let mut resources: Vec<Resource> = vec![];
         let mut total_count = 0;
@@ -829,10 +827,11 @@ impl Storelike for Db {
     ) -> Box<dyn std::iter::Iterator<Item = Resource>> {
         let self_url = self
             .get_self_url()
-            .expect("No self URL set, is required in DB");
+            .expect("No self URL set, is required in DB")
+            .to_string();
 
         let result = self.resources.into_iter().filter_map(move |item| {
-            Db::map_sled_item_to_resource(self, item, self_url.to_string(), include_external)
+            Db::map_sled_item_to_resource(item, self_url.clone(), include_external)
         });
 
         Box::new(result)
