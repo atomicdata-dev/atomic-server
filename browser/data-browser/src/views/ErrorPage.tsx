@@ -17,7 +17,7 @@ import { Guard } from '../components/Guard';
 function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
   const { agent } = useSettings();
   const store = useStore();
-  const subject = resource.getSubject();
+  const subject = resource.subject;
 
   React.useEffect(() => {
     // Try again when agent changes
@@ -60,8 +60,8 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <ContainerWide>
       <Column>
-        <h1>Could not open {resource.getSubject()}</h1>
-        <ErrorBlock error={resource.error!} />
+        <h1>Could not open {resource.subject}</h1>
+        <ErrorBlock error={resource.error!} showTrace />
         <Row>
           <Button
             onClick={() =>

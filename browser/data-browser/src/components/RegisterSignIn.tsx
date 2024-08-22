@@ -82,7 +82,7 @@ export function RegisterSignIn({
           Sign In
         </Button>
       </Row>
-      <Dialog {...dialogProps}>
+      {/* <Dialog {...dialogProps}>
         {pageState === PageStateOpts.register && (
           <Register
             setPageState={setPageState}
@@ -114,7 +114,7 @@ export function RegisterSignIn({
             message={'Click that link to create a new PassPhrase.'}
           />
         )}
-      </Dialog>
+      </Dialog> */}
     </>
   );
 }
