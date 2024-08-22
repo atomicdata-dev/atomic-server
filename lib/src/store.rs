@@ -38,7 +38,7 @@ impl Store {
     /// Returns an empty array if nothing is found.
     // Very costly, slow implementation.
     // Does not assume any indexing.
-    fn tpf(
+    pub fn tpf(
         &self,
         q_subject: Option<&str>,
         q_property: Option<&str>,
