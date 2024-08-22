@@ -109,6 +109,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - `Store::all_resources` returns `Iterator` instead of `Vec` #522 #487
 - Change authentication order #525
 - Fix cookie subject check #525
+- Refactored Subject URLs to use `AtomicUrl`
 
 ## [v0.33.1] - 2022-09-25
 

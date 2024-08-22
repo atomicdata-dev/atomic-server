@@ -443,7 +443,6 @@ impl Commit {
                     .to_string()
             }
         };
-        println!("commit subject: {}", commit_subject);
         let mut resource = Resource::new_instance(urls::COMMIT, store)?;
         resource.set_subject(commit_subject);
         resource.set_unsafe(
