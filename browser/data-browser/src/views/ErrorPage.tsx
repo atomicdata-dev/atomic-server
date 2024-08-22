@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { isUnauthorized, useStore } from '@tomic/react';
 import { ContainerWide } from '../components/Containers';
-import { ErrorBlock } from '../components/ErrorLook';
+import { ErrorBlock, GitHubIssueButton } from '../components/ErrorLook';
 import { Button } from '../components/Button';
 import { useSettings } from '../helpers/AppSettings';
 import { ResourcePageProps } from './ResourcePage';
@@ -63,6 +63,7 @@ function ErrorPage({ resource }: ResourcePageProps): JSX.Element {
         <h1>Could not open {resource.subject}</h1>
         <ErrorBlock error={resource.error!} showTrace />
         <Row>
+          <GitHubIssueButton error={resource.error} />
           <Button
             onClick={() =>
               store.fetchResourceFromServer(subject, { setLoading: true })

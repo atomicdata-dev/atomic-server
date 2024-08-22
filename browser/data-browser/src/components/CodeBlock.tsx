@@ -59,6 +59,8 @@ export const CodeBlockStyled = styled.pre<Props>`
   border-radius: ${p => p.theme.radius};
   border: solid 1px ${p => p.theme.colors.bg2};
   padding: 0.3rem;
+  min-height: 2.2rem;
+  font-size: 0.8rem;
   font-family: monospace;
   width: 100%;
   overflow-x: auto;
