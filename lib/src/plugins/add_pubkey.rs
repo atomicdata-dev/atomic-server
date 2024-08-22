@@ -29,7 +29,7 @@ pub fn confirm_add_pubkey() -> Endpoint {
     Endpoint {
         path: urls::PATH_CONFIRM_PUBKEY.to_string(),
         params: [urls::TOKEN.to_string(), urls::INVITE_PUBKEY.to_string()].into(),
-        description: "Confirms a token to add a new Public Key.".to_string(),
+        description: "Confirms a token to add a new PublicKey.".to_string(),
         shortname: "request-pubkey-reset".to_string(),
         handle: Some(handle_confirm_add_pubkey),
         handle_post: None,
@@ -58,12 +58,12 @@ pub fn handle_request_email_pubkey(context: HandleGetContext) -> AtomicResult<Re
         return request_email_add_pubkey().to_resource(store);
     };
 
-    // Find the agent by their email
+    // If we can't find the agent by email, we should still return a `success` response,
+    // in order to prevent users to know that the email exists.
+    let msg = "Email sent (if available)!";
     let agent = match Agent::from_email(&email.to_string(), store) {
         Ok(a) => a,
-        // If we can't find the agent, we should still return a `success` response,
-        // in order to prevent users to know that the email exists.
-        Err(_) => return return_success(),
+        Err(_) => return return_success(msg),
     };
 
     // send the user an e-mail to confirm sign up
@@ -80,11 +80,10 @@ pub fn handle_request_email_pubkey(context: HandleGetContext) -> AtomicResult<Re
     confirm_url.set_query(Some(&format!("token={}", token)));
     let message = MailMessage {
         to: email,
-        subject: "Add a new Passphrase to your account".to_string(),
-        body: "You've requested adding a new Passphrase. Click the link below to do so!"
-            .to_string(),
+        subject: "Add a new Secret to your account".to_string(),
+        body: "You've requested adding a new Secret. Click the link below to do so!".to_string(),
         action: Some(MailAction {
-            name: "Add new Passphrase to account".to_string(),
+            name: "Add new Secret to account".to_string(),
             url: confirm_url.into(),
         }),
     };
@@ -96,7 +95,7 @@ pub fn handle_request_email_pubkey(context: HandleGetContext) -> AtomicResult<Re
             .unwrap_or_else(|e| tracing::error!("Error sending email: {}", e));
     });
 
-    return_success()
+    return_success(msg)
 }
 
 pub fn handle_confirm_add_pubkey(context: HandleGetContext) -> AtomicResult<Resource> {
@@ -131,5 +130,5 @@ pub fn handle_confirm_add_pubkey(context: HandleGetContext) -> AtomicResult<Reso
     agent.push(urls::ACTIVE_KEYS, pubkey.into(), true)?;
     agent.save(store)?;
 
-    return_success()
+    return_success("")
 }

@@ -44,7 +44,10 @@ export const NewArticleDialog: FC<CustomResourceDialogProps> = ({
     onClose();
   }, [name, createResourceAndNavigate, onClose, parent]);
 
-  const [dialogProps, show, hide] = useDialog({ onSuccess, onCancel: onClose });
+  const { dialogProps, show, close } = useDialog({
+    onSuccess,
+    onCancel: onClose,
+  });
 
   const onNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setName(e.target.value);
@@ -69,7 +72,7 @@ export const NewArticleDialog: FC<CustomResourceDialogProps> = ({
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            hide(true);
+            close(true);
           }}
         >
           <Field required label='Title'>
@@ -89,10 +92,10 @@ export const NewArticleDialog: FC<CustomResourceDialogProps> = ({
         </form>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => hide(false)} subtle>
+        <Button onClick={() => close(false)} subtle>
           Cancel
         </Button>
-        <Button onClick={() => hide(true)} disabled={!valid}>
+        <Button onClick={() => close(true)} disabled={!valid}>
           Create
         </Button>
       </DialogActions>

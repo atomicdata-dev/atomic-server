@@ -25,7 +25,7 @@ export function PropertyWriteDialog({
 
   return (
     <Dialog {...dialogProps} width='min(40rem, 90vw)'>
-      {dialogProps.show && (
+      {dialogProps.isVisible && (
         <>
           <DialogTitle>
             <InputSwitcher

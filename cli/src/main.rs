@@ -1,5 +1,4 @@
 use atomic_lib::serialize::Format;
-use atomic_lib::atomic_url::Routes;
 use atomic_lib::{agents::generate_public_key, mapping::Mapping};
 use atomic_lib::{agents::Agent, config::Config};
 use atomic_lib::{errors::AtomicResult, Storelike};
@@ -114,9 +113,9 @@ pub enum SerializeOptions {
     NTriples,
 }
 
-impl Into<Format> for SerializeOptions {
-    fn into(self) -> Format {
-        match self {
+impl From<&SerializeOptions> for Format {
+    fn from(val: &SerializeOptions) -> Self {
+        match val {
             SerializeOptions::Pretty => Format::Pretty,
             SerializeOptions::Json => Format::Json,
             SerializeOptions::NTriples => Format::NTriples,

@@ -41,7 +41,11 @@ export const NewOntologyDialog: FC<CustomResourceDialogProps> = ({
     onClose();
   }, [shortname, createResourceAndNavigate, onClose, parent]);
 
-  const [dialogProps, show, hide] = useDialog({ onSuccess, onCancel: onClose });
+  const {
+    dialogProps,
+    show,
+    close: hide,
+  } = useDialog({ onSuccess, onCancel: onClose });
 
   const onShortnameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = stringToSlug(e.target.value);

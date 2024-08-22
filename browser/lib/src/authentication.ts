@@ -1,8 +1,9 @@
 import { Agent } from './agent.js';
 import type { HeadersObject } from './client.js';
 import { generateKeyPair, getTimestampNow, signToBase64 } from './commit.js';
-import { core } from './ontologies/core.js';
 import type { Store } from './store.js';
+import type { Resource } from './resource.js';
+import { core } from './ontologies/core.js';
 
 /** Returns a JSON-AD resource of an Authentication */
 export async function createAuthentication(subject: string, agent: Agent) {
@@ -122,7 +123,7 @@ export const nameRegex = '^[a-z0-9_-]+';
 
 export async function serverSupportsRegister(store: Store) {
   const url = new URL('/register', store.getServerUrl());
-  const resource = await store.getResourceAsync(url.toString());
+  const resource = await store.getResource(url.toString());
 
   if (!resource) {
     return false;
@@ -133,6 +134,23 @@ export async function serverSupportsRegister(store: Store) {
   }
 
   return true;
+}
+
+/** Run this after making a call to an endpoint. Throws if something went wrong. */
+function checkResourceSuccess(resource?: Resource) {
+  if (!resource) {
+    throw new Error('No resource received');
+  }
+
+  if (resource.error) {
+    throw resource.error;
+  }
+
+  const respName = resource.get(core.properties.name) as string;
+
+  if (!respName.includes('Success')) {
+    throw new Error('Expected a `success` message, did not receive one');
+  }
 }
 
 /** Asks the server to create an Agent + a Drive.
@@ -148,20 +166,7 @@ export async function register(
   url.searchParams.set('name', name);
   url.searchParams.set('email', email);
   const resource = await store.getResourceAsync(url.toString());
-
-  if (!resource) {
-    throw new Error('No resource received');
-  }
-
-  if (resource.error) {
-    throw resource.error;
-  }
-
-  const description = resource.get(core.properties.description) as string;
-
-  if (!description.includes('success')) {
-    throw new Error('Expected a `success` message, did not receive one');
-  }
+  checkResourceSuccess(resource);
 
   return;
 }
@@ -175,20 +180,7 @@ export async function addPublicKey(store: Store, email: string): Promise<void> {
   const url = new URL('/add-public-key', store.getServerUrl());
   url.searchParams.set('email', email);
   const resource = await store.getResourceAsync(url.toString());
-
-  if (!resource) {
-    throw new Error('No resource received');
-  }
-
-  if (resource.error) {
-    throw resource.error;
-  }
-
-  const description = resource.get(core.properties.description) as string;
-
-  if (!description.includes('success')) {
-    throw new Error('Expected a `success` message, did not receive one');
-  }
+  checkResourceSuccess(resource);
 
   return;
 }
@@ -231,7 +223,7 @@ export async function confirmEmail(
   }
 
   url.searchParams.set('public-key', await agent.getPublicKey());
-  const resource = await store.getResourceAsync(url.toString());
+  const resource = await store.getResource(url.toString());
 
   if (!resource) {
     throw new Error('no resource!');
@@ -254,7 +246,7 @@ export async function confirmEmail(
   return { agent, destination };
 }
 
-function parseJwt(token) {
+function parseJwt(token: string) {
   try {
     const base64Url = token.split('.')[1];
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');

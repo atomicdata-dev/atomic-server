@@ -1,5 +1,3 @@
-import * as React from 'react';
-
 import { useSettings } from '../helpers/AppSettings';
 import { Button } from '../components/Button';
 import { Margin } from '../components/Card';

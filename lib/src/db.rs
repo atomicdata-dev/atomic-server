@@ -133,7 +133,7 @@ impl Db {
     pub fn init_temp(id: &str) -> AtomicResult<Db> {
         let tmp_dir_path = format!(".temp/db/{}", id);
         let _try_remove_existing = std::fs::remove_dir_all(&tmp_dir_path);
-        let mut store = Db::init(std::path::Path::new(&tmp_dir_path), "https://localhost")?;
+        let store = Db::init(std::path::Path::new(&tmp_dir_path), "https://localhost")?;
         let agent = store.create_agent(None)?;
         store.set_default_agent(agent);
         store.populate()?;
@@ -953,9 +953,8 @@ impl Storelike for Db {
         )
     }
 
-    fn populate(&mut self) -> AtomicResult<()> {
-        crate::populate::populate_all(self)?;
-        Ok(())
+    fn populate(&self) -> AtomicResult<()> {
+        crate::populate::populate_all(self)
     }
 
     #[instrument(skip(self))]

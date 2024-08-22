@@ -25,7 +25,7 @@ export function PropertyLineWrite({
   const resource = useResource(subject);
   const shortnameProp = useProperty(core.properties.shortname);
   const descriptionProp = useProperty(core.properties.description);
-  const [dialogProps, show, hide] = useDialog();
+  const { dialogProps, show, close: hide } = useDialog();
   const [canEdit] = useCanWrite(resource);
 
   const { hasProperty } = useOntologyContext();

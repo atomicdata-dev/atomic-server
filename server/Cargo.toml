@@ -16,7 +16,7 @@ name = "atomic-server"
 path = "src/bin.rs"
 
 [build-dependencies]
-dircpy = "0.3.15"
+dircpy = "0.3.19"
 static-files = "0.2"
 walkdir = "2"
 
@@ -41,7 +41,7 @@ sanitize-filename = "0.5"
 serde_json = "1"
 serde_with = "3.3.0"
 simple-server-timing-header = "0.1.0"
-tantivy = "0.21"
+tantivy = "0.22"
 static-files = "0.2.3"
 tracing = "0.1"
 tracing-actix-web = "0.7"

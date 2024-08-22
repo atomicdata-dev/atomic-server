@@ -6,7 +6,6 @@
     "styled-components.vscode-styled-components",
     "svelte.svelte-vscode",
     "vadimcn.vscode-lldb",
-    "rust-lang.rust-analyzer",
-    "serayuzgur.crates"
+    "rust-lang.rust-analyzer"
   ]
 }

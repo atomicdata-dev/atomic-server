@@ -29,7 +29,12 @@ export function NewClassButton({ resource }: NewClassButtonProps): JSX.Element {
 
   const subject = subjectForClass(resource, inputValue);
 
-  const [dialogProps, show, hide, isOpen] = useDialog({
+  const {
+    dialogProps,
+    show,
+    close: hide,
+    isOpen,
+  } = useDialog({
     onSuccess: async () => {
       const createdClass = await newClass(inputValue, resource, store);
       const id = toAnchorId(createdClass);

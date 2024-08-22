@@ -57,3 +57,6 @@ config = ["directories", "toml"]
 html = ["kuchikiki", "lol_html", "html2md"]
 db = ["sled", "bincode", "mail-send", "tokio", "async-mutex", "jwt-simple"]
 rdf = ["rio_api", "rio_turtle"]
+
+[profile.dev]
+incremental = true

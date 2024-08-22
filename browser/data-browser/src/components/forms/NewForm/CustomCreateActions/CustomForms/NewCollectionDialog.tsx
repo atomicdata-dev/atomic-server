@@ -22,7 +22,7 @@ export const NewCollectionDialog: FC<CustomResourceDialogProps> = ({
   const [valueFilter, setValue] = useState<string | undefined>();
   const [propertyFilter, setProperty] = useState<string | undefined>();
 
-  const [dialogProps, show, hide] = useDialog({ onCancel: onClose });
+  const { dialogProps, show, close } = useDialog({ onCancel: onClose });
 
   const createResourceAndNavigate = useCreateAndNavigate();
 
@@ -91,7 +91,7 @@ export const NewCollectionDialog: FC<CustomResourceDialogProps> = ({
         </form>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => hide(false)} subtle>
+        <Button onClick={() => close(false)} subtle>
           Cancel
         </Button>
         <Button onClick={onDone} disabled={!propertyFilter && !valueFilter}>

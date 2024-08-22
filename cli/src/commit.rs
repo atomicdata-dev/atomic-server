@@ -8,7 +8,7 @@ pub fn set(context: &Context, subject: &str, property: &str, value: &str) -> Ato
         Ok(r) => r,
         Err(_) => atomic_lib::Resource::new(subject.into()),
     };
-    resource.set_shortname(&property, &value, &context.store)?;
+    resource.set_shortname(property, value, &context.store)?;
     resource.save(&context.store)?;
     Ok(())
 }
@@ -17,19 +17,19 @@ pub fn set(context: &Context, subject: &str, property: &str, value: &str) -> Ato
 #[cfg(feature = "native")]
 pub fn edit(context: &Context, subject: &str, prop: &str) -> AtomicResult<()> {
     // If the resource is not found, create it
-    let mut resource = match context.store.get_resource(&subject) {
+    let mut resource = match context.store.get_resource(subject) {
         Ok(r) => r,
         Err(_) => atomic_lib::Resource::new(subject.into()),
     };
     // If the prop is not found, create it
-    let current_val = match resource.get_shortname(&prop, &context.store) {
+    let current_val = match resource.get_shortname(prop, &context.store) {
         Ok(val) => val.to_string(),
         Err(_) => "".to_string(),
     };
     let edited = edit::edit(current_val)?;
     // Remove newline - or else I can's save shortnames or numbers using vim;
     let trimmed = edited.trim_end_matches('\n');
-    resource.set_shortname(&prop, trimmed, &context.store)?;
+    resource.set_shortname(prop, trimmed, &context.store)?;
     resource.save(&context.store)?;
     Ok(())
 }
@@ -37,7 +37,7 @@ pub fn edit(context: &Context, subject: &str, prop: &str) -> AtomicResult<()> {
 /// Apply a Commit using the Remove method - removes a property from a resource
 pub fn remove(context: &Context, subject: &str, prop: &str) -> AtomicResult<()> {
     let mut resource = context.store.get_resource(subject)?;
-    resource.remove_propval_shortname(&prop, &context.store)?;
+    resource.remove_propval_shortname(prop, &context.store)?;
     resource.save(&context.store)?;
     Ok(())
 }

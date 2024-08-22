@@ -5,8 +5,7 @@ import {
   DialogTitle,
   useDialog,
 } from './Dialog';
-import React, { FormEvent, useCallback, useEffect, useState } from 'react';
-import { useSettings } from '../helpers/AppSettings';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Button } from './Button';
 import {
   addPublicKey,
@@ -22,16 +21,15 @@ import { Row } from './Row';
 import { ErrorLook } from './ErrorLook';
 import { SettingsAgent } from './SettingsAgent';
 
-interface RegisterSignInProps {
-  // URL where to send the user to after successful registration
-  redirect?: string;
-}
-
 /** What is currently showing */
 enum PageStateOpts {
+  /** Start state, select register or sign in */
   none,
+  /** Enter Secret*/
   signIn,
+  /** Register new Email address */
   register,
+  /** Reset existing email, send Secret reset email link */
   reset,
   mailSentRegistration,
   mailSentAddPubkey,
@@ -41,22 +39,17 @@ enum PageStateOpts {
  * Two buttons: Register / Sign in.
  * Opens a Dialog / Modal with the appropriate form.
  */
-export function RegisterSignIn({
-  children,
-}: React.PropsWithChildren<RegisterSignInProps>): JSX.Element {
+export function RegisterSignIn(): JSX.Element {
   const { dialogProps, show, close } = useDialog();
-  const { agent } = useSettings();
   const [pageState, setPageState] = useState<PageStateOpts>(PageStateOpts.none);
   const [email, setEmail] = useState('');
   const { emailRegister } = useServerSupports();
 
-  if (agent) {
-    return <>{children}</>;
-  } else if (!emailRegister) {
+  if (!emailRegister) {
     return (
       <>
         <SettingsAgent />
-        <ErrorLook>No e-mail support on this server...</ErrorLook>
+        <ErrorLook>No email support on this server...</ErrorLook>
       </>
     );
   }
@@ -82,7 +75,7 @@ export function RegisterSignIn({
           Sign In
         </Button>
       </Row>
-      {/* <Dialog {...dialogProps}>
+      <Dialog {...dialogProps}>
         {pageState === PageStateOpts.register && (
           <Register
             setPageState={setPageState}
@@ -111,10 +104,10 @@ export function RegisterSignIn({
           <MailSentConfirm
             email={email}
             close={close}
-            message={'Click that link to create a new PassPhrase.'}
+            message={'Click that link to create a new Secret.'}
           />
         )}
-      </Dialog> */}
+      </Dialog>
     </>
   );
 }
@@ -135,7 +128,7 @@ function Reset({ email, setEmail, setPageState }) {
   return (
     <>
       <DialogTitle>
-        <h1>Reset your PassKey</h1>
+        <h1>Reset your Secret</h1>
       </DialogTitle>
       <DialogContent>
         <p>
@@ -145,7 +138,7 @@ function Reset({ email, setEmail, setPageState }) {
         </p>
         <EmailField
           email={email}
-          setEmail={(e: any) => {
+          setEmail={(e: unknown) => {
             setErr(undefined);
             setEmail(e);
           }}
@@ -277,7 +270,7 @@ function SignIn({ setPageState }) {
           Register
         </Button>
         <Button subtle onClick={() => setPageState(PageStateOpts.reset)}>
-          I lost my passphrase
+          I lost my Secret
         </Button>
       </DialogActions>
     </>

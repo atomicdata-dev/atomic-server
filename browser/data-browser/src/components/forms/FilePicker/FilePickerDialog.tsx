@@ -34,7 +34,11 @@ export function FilePickerDialog({
   noUpload = false,
 }: FilePickerProps): React.JSX.Element {
   const { drive } = useSettings();
-  const [dialogProps, showDialog, closeDialog] = useDialog({
+  const {
+    dialogProps,
+    show: showDialog,
+    close: closeDialog,
+  } = useDialog({
     bindShow: onShowChange,
   });
 

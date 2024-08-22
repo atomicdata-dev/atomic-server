@@ -328,7 +328,7 @@ fn queries() {
             r.set(sort_by.into(), Value::Markdown("!first".into()), store)
                 .unwrap();
             let resp = r.save(store).unwrap();
-            resource_changed_order_opt = resp.resource_new.clone();
+            resource_changed_order_opt = resp.resource_new;
         }
         prev_resource = r.clone();
     }

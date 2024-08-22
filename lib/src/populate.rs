@@ -360,7 +360,7 @@ pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
 
 /// Runs all populate commands. Optionally runs index (blocking), which can be slow!
 #[cfg(feature = "db")]
-pub fn populate_all(store: &mut crate::Db) -> AtomicResult<()> {
+pub fn populate_all(store: &crate::Db) -> AtomicResult<()> {
     // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
     populate_default_store(store)
         .map_err(|e| format!("Failed to populate default store. {}", e))?;
@@ -372,6 +372,5 @@ pub fn populate_all(store: &mut crate::Db) -> AtomicResult<()> {
     populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
     populate_sidebar_items(store)
         .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
-    store.register_default_endpoints()?;
     Ok(())
 }

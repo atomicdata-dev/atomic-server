@@ -67,13 +67,13 @@ const ConfirmEmail: React.FunctionComponent = () => {
   }
 
   if (secret) {
-    return <SavePassphrase secret={secret} destination={destinationToGo} />;
+    return <SaveSecret secret={secret} destination={destinationToGo} />;
   }
 
   return <ContainerNarrow>Verifying token...</ContainerNarrow>;
 };
 
-function SavePassphrase({ secret, destination }) {
+function SaveSecret({ secret, destination }) {
   const [copied, setCopied] = useState(false);
 
   function copyToClipboard() {
@@ -84,9 +84,9 @@ function SavePassphrase({ secret, destination }) {
 
   return (
     <ContainerNarrow>
-      <h1>Mail confirmed, please save your passphrase</h1>
+      <h1>Mail confirmed, please save your Secret</h1>
       <p>
-        Your Passphrase is like your password. Never share it with anyone. Use a
+        Your Secret is like your password. Never share it with anyone. Use a
         password manager like{' '}
         <a href='https://bitwarden.com/' target='_blank' rel='noreferrer'>
           BitWarden
@@ -96,10 +96,10 @@ function SavePassphrase({ secret, destination }) {
       <CodeBlockStyled wrapContent>{secret}</CodeBlockStyled>
       {copied ? (
         <a href={destination} target='_blank' rel='noreferrer'>
-          {"I've saved my PassPhrase, open my new Drive!"}
+          {"I've saved my Secret, open my new Drive!"}
         </a>
       ) : (
-        <Button onClick={copyToClipboard}>Copy Passphrase</Button>
+        <Button onClick={copyToClipboard}>Copy Secret</Button>
       )}
     </ContainerNarrow>
   );

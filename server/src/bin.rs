@@ -68,7 +68,8 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             let importer_subject = if let Some(i) = &import_opts.parent {
                 i.into()
             } else {
-                store
+                appstate
+                    .store
                     .get_self_url()
                     .expect("No self URL")
                     .set_route(Routes::Import)
@@ -83,7 +84,7 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                 } else {
                     atomic_lib::parse::SaveOpts::Commit
                 },
-                signer: Some(store.get_default_agent()?),
+                signer: Some(appstate.store.get_default_agent()?),
             };
             println!("Importing...");
             appstate.store.import(&readstring, &parse_opts)?;

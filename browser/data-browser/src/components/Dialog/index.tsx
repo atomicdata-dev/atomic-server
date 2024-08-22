@@ -24,7 +24,8 @@ import { useDialog } from './useDialog';
 import { useControlLock } from '../../hooks/useControlLock';
 
 export interface InternalDialogProps {
-  show: boolean;
+  /** Is the Dialog visible */
+  isVisible: boolean;
   onClose: (success: boolean) => void;
   onClosed: () => void;
   width?: CSS.Property.Width;
@@ -86,7 +87,7 @@ export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
 
 const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   children,
-  show,
+  isVisible,
   width,
   onClose,
   onClosed,
@@ -95,7 +96,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   const innerDialogRef = useRef<HTMLDivElement>(null);
   const { hasOpenInnerPopup } = useDialogTreeContext();
 
-  useControlLock(show);
+  useControlLock(isVisible);
 
   const cancelDialog = useCallback(() => {
     onClose(false);
@@ -121,22 +122,26 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
     () => {
       cancelDialog();
     },
-    { enabled: show && !hasOpenInnerPopup },
+    { enabled: isVisible && !hasOpenInnerPopup },
   );
 
   // When closing the `data-closing` attribute must be set before rendering so the animation has started when the regular useEffect is called.
   useLayoutEffect(() => {
-    if (!show && dialogRef.current && dialogRef.current.hasAttribute('open')) {
+    if (
+      !isVisible &&
+      dialogRef.current &&
+      dialogRef.current.hasAttribute('open')
+    ) {
       dialogRef.current.setAttribute('data-closing', 'true');
     }
-  }, [show]);
+  }, [isVisible]);
 
   useEffect(() => {
     if (!dialogRef.current) {
       return;
     }
 
-    if (show) {
+    if (isVisible) {
       if (!dialogRef.current.hasAttribute('open'))
         // @ts-ignore
         dialogRef.current.showModal();
@@ -151,7 +156,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
         onClosed();
       }, ANIM_MS);
     }
-  }, [show, onClosed]);
+  }, [isVisible, onClosed]);
 
   return (
     <StyledDialog
