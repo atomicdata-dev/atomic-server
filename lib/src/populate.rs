@@ -187,7 +187,20 @@ pub fn create_drive(
         store.get_resource_new(&drive_subject)
     };
     drive.set_class(urls::DRIVE);
-    drive.set_string(urls::NAME.into(), drive_name.unwrap_or("New Drive"), store)?;
+    let host = self_url
+        .url()
+        .host()
+        .ok_or("no host in URL found")?
+        .to_string();
+    drive.set_string(urls::NAME.into(), drive_name.unwrap_or(&host), store)?;
+
+    // Set rights
+    drive.push(urls::WRITE, for_agent.into(), true)?;
+    drive.push(urls::READ, for_agent.into(), true)?;
+    if public_read {
+        drive.push(urls::READ, urls::PUBLIC_AGENT.into(), true)?;
+    }
+
     drive.save_locally(store)?;
 
     Ok(drive)
@@ -351,13 +364,8 @@ pub fn populate_all(store: &mut crate::Db) -> AtomicResult<()> {
     // populate_base_models should be run in init, instead of here, since it will result in infinite loops without
     populate_default_store(store)
         .map_err(|e| format!("Failed to populate default store. {}", e))?;
-    create_drive(
-        store,
-        None,
-        &store.get_default_agent().unwrap().subject,
-        true,
-    )
-    .map_err(|e| format!("Failed to create drive. {}", e))?;
+    create_drive(store, None, &store.get_default_agent()?.subject, true)
+        .map_err(|e| format!("Failed to create drive. {}", e))?;
     create_default_ontology(store)
         .map_err(|e| format!("Failed to create default ontology. {}", e))?;
     set_drive_rights(store, true)?;
