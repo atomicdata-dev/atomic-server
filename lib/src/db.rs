@@ -13,9 +13,11 @@ mod val_prop_sub_index;
 use std::{
     collections::{HashMap, HashSet},
     fs,
-    sync::{Arc, Mutex},
+    sync::Arc,
     vec,
 };
+
+use tokio::sync::Mutex;
 
 use mail_send::{Connected, Transport};
 use tracing::info;
@@ -72,7 +74,7 @@ pub struct Db {
     /// Resources can be found using their Subject.
     /// Try not to use this directly, but use the Trees.
     db: sled::Db,
-    default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+    default_agent: Arc<std::sync::Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
     /// [Tree::ValPropSub]
@@ -112,7 +114,7 @@ impl Db {
         let store = Db {
             path: path.into(),
             db,
-            default_agent: Arc::new(Mutex::new(None)),
+            default_agent: Arc::new(std::sync::Mutex::new(None)),
             resources,
             reference_index,
             on_commit: None,
@@ -543,7 +545,8 @@ impl Db {
                     "No SMTP client configured. Please call set_smtp_config first.".into(),
                 )
             })?
-            .lock()?;
+            .lock()
+            .await;
         email::send_mail(&mut client, message).await?;
         Ok(())
     }

@@ -33,4 +33,5 @@ export * from './useCollection.js';
 export * from './useMemberFromCollection.js';
 export * from './useCollectionPage.js';
 export * from './components/Image.js';
+export * from './useServerSupports.js';
 export * from '@tomic/lib';

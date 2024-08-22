@@ -39,7 +39,8 @@ export function useUpload(parentResource: Resource): UseUploadResult {
         );
         const allUploaded = [...netUploaded];
         setIsUploading(false);
-        setSubResources([...subResources, ...allUploaded]);
+        await setSubResources([...subResources, ...allUploaded]);
+        await parentResource.save(store);
 
         return allUploaded;
       } catch (e) {

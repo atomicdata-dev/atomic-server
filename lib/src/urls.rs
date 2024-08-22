@@ -173,7 +173,6 @@ pub const PATH_CONFIRM_EMAIL: &str = "/confirm-email";
 pub const PATH_RESET_PUBKEY: &str = "/reset-public-key";
 pub const PATH_CONFIRM_PUBKEY: &str = "/confirm-public-key";
 pub const PATH_ADD_PUBKEY: &str = "/add-public-key";
-pub const PATH_CONFIRM_PUBKEY: &str = "/confirm-add-public-key";
 pub const PATH_CONFIRM_RESET: &str = "/confirm-reset-public-key";
 pub const PATH_QUERY: &str = "/query";
 pub const PATH_PRUNE_TESTS: &str = "/prunetests";

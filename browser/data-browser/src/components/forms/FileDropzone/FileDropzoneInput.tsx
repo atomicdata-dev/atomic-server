@@ -8,11 +8,11 @@ import { useUpload } from '../../../hooks/useUpload';
 
 export interface FileDropzoneInputProps {
   parentResource: Resource;
-  onFilesUploaded?: (files: string[]) => void;
   text?: string;
   maxFiles?: number;
   className?: string;
   accept?: string[];
+  onFilesUploaded?: (fileSubjects: string[]) => void;
 }
 
 /**

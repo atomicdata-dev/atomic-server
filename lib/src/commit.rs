@@ -679,7 +679,6 @@ mod test {
             validate_previous_commit: true,
             validate_rights: false,
             validate_for_agent: None,
-            validate_subject_url_parent: true,
             update_index: true,
         };
     }

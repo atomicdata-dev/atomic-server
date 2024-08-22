@@ -1,6 +1,8 @@
-import type { Agent } from './agent.js';
+import { Agent } from './agent.js';
 import type { HeadersObject } from './client.js';
-import { getTimestampNow, signToBase64 } from './commit.js';
+import { generateKeyPair, getTimestampNow, signToBase64 } from './commit.js';
+import { core } from './ontologies/core.js';
+import type { Store } from './store.js';
 
 /** Returns a JSON-AD resource of an Authentication */
 export async function createAuthentication(subject: string, agent: Agent) {
@@ -72,6 +74,7 @@ export async function signRequest(
 }
 
 const ONE_DAY = 24 * 60 * 60 * 1000;
+const COOKIE_NAME_AUTH = 'atomic_session';
 
 const setCookieExpires = (
   name: string,
@@ -88,13 +91,17 @@ const setCookieExpires = (
   document.cookie = cookieString;
 };
 
-const COOKIE_NAME_AUTH = 'atomic_session';
-
 /** Sets a cookie for the current Agent, signing the Authentication. It expires after some default time. */
 export const setCookieAuthentication = (serverURL: string, agent: Agent) => {
   createAuthentication(serverURL, agent).then(auth => {
     setCookieExpires(COOKIE_NAME_AUTH, btoa(JSON.stringify(auth)), serverURL);
   });
+};
+
+export const removeCookieAuthentication = () => {
+  if (typeof document !== 'undefined') {
+    document.cookie = `${COOKIE_NAME_AUTH}=;Max-Age=-99999999`;
+  }
 };
 
 /** Returns false if the auth cookie is not set / expired */
@@ -110,6 +117,159 @@ export const checkAuthenticationCookie = (): boolean => {
   return matches.length > 0;
 };
 
-export const removeCookieAuthentication = () => {
-  document.cookie = `${COOKIE_NAME_AUTH}=;Max-Age=-99999999`;
-};
+/** Only allows lowercase chars and numbers  */
+export const nameRegex = '^[a-z0-9_-]+';
+
+export async function serverSupportsRegister(store: Store) {
+  const url = new URL('/register', store.getServerUrl());
+  const resource = await store.getResourceAsync(url.toString());
+
+  if (!resource) {
+    return false;
+  }
+
+  if (resource.error) {
+    return false;
+  }
+
+  return true;
+}
+
+/** Asks the server to create an Agent + a Drive.
+ * Sends the confirmation email to the user.
+ * Throws if the name is not available or the email is invalid.
+ * The Agent and Drive are only created after the Email is confirmed. */
+export async function register(
+  store: Store,
+  name: string,
+  email: string,
+): Promise<void> {
+  const url = new URL('/register', store.getServerUrl());
+  url.searchParams.set('name', name);
+  url.searchParams.set('email', email);
+  const resource = await store.getResourceAsync(url.toString());
+
+  if (!resource) {
+    throw new Error('No resource received');
+  }
+
+  if (resource.error) {
+    throw resource.error;
+  }
+
+  const description = resource.get(core.properties.description) as string;
+
+  if (!description.includes('success')) {
+    throw new Error('Expected a `success` message, did not receive one');
+  }
+
+  return;
+}
+
+/** Asks the server to add a public key to an account. Will lead to a confirmation link being sent */
+export async function addPublicKey(store: Store, email: string): Promise<void> {
+  if (!email) {
+    throw new Error('No email provided');
+  }
+
+  const url = new URL('/add-public-key', store.getServerUrl());
+  url.searchParams.set('email', email);
+  const resource = await store.getResourceAsync(url.toString());
+
+  if (!resource) {
+    throw new Error('No resource received');
+  }
+
+  if (resource.error) {
+    throw resource.error;
+  }
+
+  const description = resource.get(core.properties.description) as string;
+
+  if (!description.includes('success')) {
+    throw new Error('Expected a `success` message, did not receive one');
+  }
+
+  return;
+}
+
+/** When the user receives a confirmation link, call this function with the provided URL.
+ * If there is no agent in the store, a new one will be created.  */
+export async function confirmEmail(
+  store: Store,
+  /** Full http URL including the `token` query parameter */
+  tokenURL: string,
+): Promise<{ agent: Agent; destination: string }> {
+  const url = new URL(tokenURL);
+  const token = url.searchParams.get('token');
+
+  if (!token) {
+    throw new Error('No token provided');
+  }
+
+  const parsed = parseJwt(token);
+
+  if (!parsed.name || !parsed.email) {
+    throw new Error('token does not contain name or email');
+  }
+
+  let agent = store.getAgent();
+
+  // No agent, create a new one
+  if (!agent) {
+    const keypair = await generateKeyPair();
+    const newAgent = new Agent(keypair.privateKey);
+    newAgent.subject = `${store.getServerUrl()}/agents/${parsed.name}`;
+    agent = newAgent;
+  }
+
+  // An agent already exists, make sure it matches the confirm email token
+  if (!agent?.subject?.includes(parsed.name)) {
+    throw new Error(
+      'You cannot confirm this email, you are already logged in as a different user',
+    );
+  }
+
+  url.searchParams.set('public-key', await agent.getPublicKey());
+  const resource = await store.getResourceAsync(url.toString());
+
+  if (!resource) {
+    throw new Error('no resource!');
+  }
+
+  if (resource.error) {
+    throw resource.error;
+  }
+
+  const destination = resource.get(
+    'https://atomicdata.dev/properties/destination',
+  ) as string;
+
+  if (!destination) {
+    throw new Error('No redirect destination in response');
+  }
+
+  store.setAgent(agent);
+
+  return { agent, destination };
+}
+
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      window
+        .atob(base64)
+        .split('')
+        .map(function (c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join(''),
+    );
+
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    throw new Error('Invalid token: ' + e);
+  }
+}

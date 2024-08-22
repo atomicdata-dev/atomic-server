@@ -1,16 +1,16 @@
 import { useCallback, useMemo, useState } from 'react';
 import { InternalDialogProps } from './index';
 
-export type UseDialogReturnType = [
+export type UseDialogReturnType = {
   /** Props meant to pass to a {@link Dialog} component */
-  dialogProps: InternalDialogProps,
+  dialogProps: InternalDialogProps;
   /** Function to show the dialog */
-  show: () => void,
+  show: () => void;
   /** Function to close the dialog */
   close: (success?: boolean) => void,
   /** Boolean indicating wether the dialog is currently open */
-  isOpen: boolean,
-];
+  isOpen: boolean;
+};
 
 export type UseDialogOptions<E extends HTMLElement> = {
   bindShow?: React.Dispatch<boolean>;

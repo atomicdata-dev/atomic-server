@@ -14,6 +14,32 @@ type ErrorPageProps = {
   clearError: () => void;
 };
 
+const githubIssueTemplate = (
+  message,
+  stack,
+) => `**Describe what you did to produce the bug**
+
+## Error message
+\`\`\`
+${message}
+\`\`\`
+
+## Stack trace
+\`\`\`
+${stack}
+\`\`\`
+`;
+
+function createGithubIssueLink(error: Error): string {
+  const url = new URL(
+    'https://github.com/atomicdata-dev/atomic-data-browser/issues/new',
+  );
+  url.searchParams.set('body', githubIssueTemplate(error.message, error.stack));
+  url.searchParams.set('labels', 'bug');
+
+  return url.href;
+}
+
 /** If the entire app crashes, show this page */
 function CrashPage({
   resource,
@@ -26,6 +52,7 @@ function CrashPage({
       <Column>
         {children ? children : <ErrorBlock error={error} showTrace />}
         <Row>
+          <a href={createGithubIssueLink(error)}>Create Github issue</a>
           {clearError && <Button onClick={clearError}>Clear error</Button>}
           <Button
             onClick={() =>
@@ -35,7 +62,7 @@ function CrashPage({
               )
             }
           >
-            Try Again
+            Refresh page
           </Button>
         </Row>
       </Column>

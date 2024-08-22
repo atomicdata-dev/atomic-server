@@ -50,6 +50,7 @@ TL;DR Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server
 - Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:5173/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you update JS assets in `browser`
 - use `cargo watch -- cargo run --bin atomic-server -- --env-file server/.env` to automatically recompile `atomic-server` when you update code or JS assets.
+- If you want to debug emails: `brew install mailhog` => `mailhog` => `http://localhost:8025` and add `ATOMIC_SMTP_HOST=localhost` `ATOMIC_SMTP_PORT=1025` to your `.env`.
 
 ### IDE setup (VSCode)
 

@@ -1,4 +1,10 @@
-import { Resource, core, server, useResources } from '@tomic/react';
+import {
+  Resource,
+  server,
+  truncateUrl,
+  urls,
+  useResources,
+} from '@tomic/react';
 import { useMemo } from 'react';
 import {
   FaCog,
@@ -21,7 +27,8 @@ const Trigger = buildDefaultTrigger(<FaHdd />, 'Open Drive Settings');
 
 function getTitle(resource: Resource): string {
   return (
-    (resource.get(core.properties.name) as string) ?? resource.getSubject()
+    (resource.get(urls.properties.name) as string) ??
+    truncateUrl(resource.getSubject(), 20)
   );
 }
 
@@ -45,6 +52,7 @@ export function DriveSwitcher() {
   };
 
   const createNewResource = useNewResourceUI();
+  // const createNewDrive = useDefaultNewInstanceHandler(classes.drive);
 
   const items = useMemo(
     () => [

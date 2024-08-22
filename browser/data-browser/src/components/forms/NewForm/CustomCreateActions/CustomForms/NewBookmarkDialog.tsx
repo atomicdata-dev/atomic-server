@@ -27,7 +27,7 @@ export const NewBookmarkDialog: FC<CustomResourceDialogProps> = ({
 }) => {
   const [url, setUrl] = useState('');
 
-  const [dialogProps, show, hide] = useDialog({ onCancel: onClose });
+  const { dialogProps, show, close } = useDialog({ onCancel: onClose });
 
   const createResourceAndNavigate = useCreateAndNavigate();
 
@@ -58,32 +58,34 @@ export const NewBookmarkDialog: FC<CustomResourceDialogProps> = ({
   }, []);
 
   return (
-    <Dialog {...dialogProps}>
-      <DialogTitle>
-        <h1>New Bookmark</h1>
-      </DialogTitle>
-      <DialogContent>
-        <form onSubmit={onDone}>
-          <Field required label='url'>
-            <InputWrapper>
-              <InputStyled
-                placeholder='https://example.com'
-                value={url}
-                autoFocus={true}
-                onChange={e => setUrl(e.target.value)}
-              />
-            </InputWrapper>
-          </Field>
-        </form>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => hide(false)} subtle>
-          Cancel
-        </Button>
-        <Button onClick={onDone} disabled={url.trim() === ''}>
-          Ok
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <>
+      <Dialog {...dialogProps}>
+        <DialogTitle>
+          <h1>New Bookmark</h1>
+        </DialogTitle>
+        <DialogContent>
+          <form onSubmit={onDone}>
+            <Field required label='url'>
+              <InputWrapper>
+                <InputStyled
+                  placeholder='https://example.com'
+                  value={url}
+                  autoFocus={true}
+                  onChange={e => setUrl(e.target.value)}
+                />
+              </InputWrapper>
+            </Field>
+          </form>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={close} subtle>
+            Cancel
+          </Button>
+          <Button onClick={onDone} disabled={url.trim() === ''}>
+            Ok
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 };
