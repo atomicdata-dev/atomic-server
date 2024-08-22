@@ -154,7 +154,7 @@ pub fn populate_base_models(store: &impl Storelike) -> AtomicResult<()> {
 }
 
 /// Creates a Drive resource at the base URL if no name is passed.
-#[tracing::instrument(skip(store), level = "info")]
+// #[tracing::instrument(skip(store), level = "info")]
 pub fn create_drive(
     store: &impl Storelike,
     drive_name: Option<&str>,
@@ -188,11 +188,7 @@ pub fn create_drive(
         store.get_resource_new(&drive_subject)
     };
     drive.set_class(urls::DRIVE);
-    drive.set_string(
-        urls::NAME.into(),
-        drive_name.unwrap_or_else(|| self_url.host_str().unwrap()),
-        store,
-    )?;
+    drive.set_string(urls::NAME.into(), drive_name.unwrap_or("New Drive"), store)?;
     drive.save_locally(store)?;
 
     Ok(drive)
@@ -338,10 +334,13 @@ pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
 /// Adds default Endpoints (versioning) to the Db.
 /// Makes sure they are fetchable
 pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
-    let base = store
+    use crate::urls::IMPORTER;
+
+    let mut base = store
         .get_self_url()
-        .ok_or("No self URL in this Store - required for populating importer")?;
-    let mut importer = crate::Resource::new(urls::construct_path_import(&base));
+        .ok_or("No self URL in this Store - required for populating importer")?
+        .clone();
+    let mut importer = crate::Resource::new(base.set_path(IMPORTER).to_string());
     importer.set_class(urls::IMPORTER);
     importer.set(
         urls::PARENT.into(),
@@ -359,13 +358,13 @@ pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     let base = store.get_self_url().ok_or("No self_url")?;
     let mut drive = store.get_resource(base.as_str())?;
-    let arr = vec![
+    let sidebar_items = vec![
         base.set_route(crate::atomic_url::Routes::Setup),
         base.set_route(crate::atomic_url::Routes::Import),
         base.set_route(crate::atomic_url::Routes::Collections),
     ];
-    for item in arr {
-        drive.push(urls::SUBRESOURCES, item.into(), true)?;
+    for item in sidebar_items {
+        drive.push(urls::SUBRESOURCES, item.to_string().into(), true)?;
     }
     drive.save_locally(store)?;
     Ok(())

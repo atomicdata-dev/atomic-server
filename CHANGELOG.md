@@ -81,8 +81,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Refactor `Endpoint` handlers, uses a Context now #592
 - Re-build store + invite when adjusting server url #607
 - Use local atomic-server for properties and classes, improves atomic-server #604
+- New sign up / register flow. Add `/register` Endpoint #489 #254
 - Add multi-tenancy support. Users can create their own `Drives` on subdomains. #288
-- Add `/register` Endpoint #489 #254
 - Refactor URLs. `store.self_url()` returns an `AtomicUrl`, which provides methods to easily add paths, find subdomains and more.
 - Add support for subdomains, use a Wildcard TLS certificate #502
 
@@ -91,6 +91,11 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Replace `acme_lib` with `instant-acme`, drop OpenSSL dependency, add DNS verification for TLS option with `--https-dns` #192
 - Improved error handling for HTTPS initialization #530
 - Add `--force` to `atomic-server import` #536
+- Email support. Connect to external SMTP servers. #276
+- Basic plugin support through Endpoints. For now only works if you use `**Atomic**-Lib` as a library. Add your plugins by calling `Db::register_endpoint`.
+- Allow parsing `.env` files from custom locations using the `--env-file` flag.
+- Plugins support `tokio`, so you can spawn async tasks from plugins.
+- Add JWT token support, used for emails and registration #544
 - Fix index issue happening when deleting a single property in a sorted collection #545
 - Update JS assets & playwright
 - Fix initial indexing bug #560

@@ -57,6 +57,7 @@ pub const LAST_COMMIT: &str = "https://atomicdata.dev/properties/lastCommit";
 pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
 pub const NAME: &str = "https://atomicdata.dev/properties/name";
 pub const DRIVES: &str = "https://atomicdata.dev/properties/drives";
+pub const EMAIL: &str = "https://atomicdata.dev/properties/email";
 // ... for Collections
 pub const COLLECTION_PROPERTY: &str = "https://atomicdata.dev/properties/collection/property";
 pub const COLLECTION_VALUE: &str = "https://atomicdata.dev/properties/collection/value";
@@ -82,6 +83,7 @@ pub const SEARCH_LIMIT: &str = "https://atomicdata.dev/properties/search/limit";
 pub const SEARCH_PROPERTY: &str = "https://atomicdata.dev/properties/search/property";
 pub const URL: &str = "https://atomicdata.dev/property/url";
 pub const PREVIEW: &str = "https://atomicdata.dev/property/preview";
+pub const TOKEN: &str = "https://atomicdata.dev/property/token";
 // ... for Bookmarks
 pub const IMAGE_URL: &str = "https://atomicdata.dev/properties/imageUrl";
 // ... for Hierarchy / Drive
@@ -161,8 +163,5 @@ pub const PATH_TPF: &str = "/tpf";
 pub const PATH_PATH: &str = "/path";
 pub const PATH_COMMITS: &str = "/commits";
 pub const PATH_ENDPOINTS: &str = "/endpoints";
-
-pub const PATH_IMPORT: &str = "/import";
-pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
 pub const PATH_QUERY: &str = "/query";
 pub const PATH_PRUNE_TESTS: &str = "/prunetests";

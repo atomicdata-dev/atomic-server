@@ -6,6 +6,7 @@ use atomic_lib::{
     agents::{generate_public_key, Agent},
     atomic_url::Routes,
     commit::CommitResponse,
+    email::SmtpConfig,
     Storelike,
 };
 
@@ -30,7 +31,7 @@ impl AppState {
     /// Creates the AppState (the server's context available in Handlers).
     /// Initializes or opens a store on disk.
     /// Creates a new agent, if necessary.
-    pub fn init(config: Config) -> AtomicServerResult<AppState> {
+    pub async fn init(config: Config) -> AtomicServerResult<AppState> {
         tracing::info!("Initializing AppState");
 
         // We warn over here because tracing needs to be initialized first.
@@ -42,7 +43,7 @@ impl AppState {
         }
 
         let should_init = !&config.store_path.exists() || config.initialize;
-        let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
+        let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
         if should_init {
             tracing::info!("Initialize: creating and populating new Database...");
             atomic_lib::populate::populate_default_store(&store)
@@ -68,6 +69,15 @@ impl AppState {
             });
         };
         store.set_handle_commit(Box::new(send_commit));
+
+        if let Some(host) = &config.opts.smpt_host {
+            store
+                .set_smtp_config(SmtpConfig {
+                    host: host.clone(),
+                    port: config.opts.smpt_port,
+                })
+                .await?;
+        };
 
         // If the user changes their server_url, the drive will not exist.
         // In this situation, we should re-build a new drive from scratch.

@@ -38,7 +38,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     let tracing_chrome_flush_guard = crate::trace::init_tracing(&config);
 
     // Setup the database and more
-    let appstate = crate::appstate::AppState::init(config.clone())?;
+    let appstate = crate::appstate::AppState::init(config.clone()).await?;
 
     // Start async processes
     if config.opts.rebuild_indexes {

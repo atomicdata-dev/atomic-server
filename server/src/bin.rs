@@ -1,4 +1,4 @@
-use atomic_lib::{agents::ForAgent, urls, Storelike};
+use atomic_lib::{agents::ForAgent, atomic_url::Routes, Storelike};
 use atomic_server_lib::config::Opts;
 use std::{fs::File, io::Write};
 
@@ -48,7 +48,7 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                     pt
                 }
             };
-            let appstate = appstate::AppState::init(config.clone())?;
+            let appstate = appstate::AppState::init(config.clone()).await?;
             let outstr = appstate.store.export(!e.only_internal)?;
             std::fs::create_dir_all(path.parent().unwrap())
                 .map_err(|e| format!("Failed to create directory {:?}. {}", path, e))?;
@@ -64,7 +64,7 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
                 std::fs::read_to_string(path)?
             };
 
-            let appstate = appstate::AppState::init(config.clone())?;
+            let appstate = appstate::AppState::init(config.clone()).await?;
             let importer_subject = if let Some(i) = &import_opts.parent {
                 i.into()
             } else {
