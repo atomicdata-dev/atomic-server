@@ -114,7 +114,6 @@ impl Db {
             default_agent: Arc::new(std::sync::Mutex::new(None)),
             resources,
             reference_index,
-            on_commit: None,
             query_index,
             prop_val_sub_index,
             server_url: AtomicUrl::try_from(server_url)?,
