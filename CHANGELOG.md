@@ -109,6 +109,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Add systemd instructions to readme #271
 - Improve check_append error #558
 - Fix errors on successful export / import #565
+- Most Collection routes now live under `/collections`, e.g. `/collections/agents` instead of `/agents`. #556
+- Constrain new URLs. Commits for new Resources are now only valid if their parent is part of the current URL. So it's no longer possible to create `/some-path/new-resource` if `new-resource` is its parent is not in its URL. #556
 
 ## [v0.34.0] - 2022-10-31
 

@@ -385,6 +385,10 @@ pub fn create_collection_resource_for_class(
 ) -> AtomicResult<Resource> {
     let class = store.get_class(class_subject)?;
 
+    // We use the `Collections` collection as the parent for all collections.
+    // This also influences their URLs.
+    let is_collections_collection = class.subject == urls::COLLECTION;
+
     // Pluralize the shortname
     let pluralized = match class.shortname.as_ref() {
         "class" => "classes".to_string(),
@@ -392,7 +396,13 @@ pub fn create_collection_resource_for_class(
         other => format!("{}s", other),
     };
 
-    let mut collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store);
+    let path = if is_collections_collection {
+        "/collections".to_string()
+    } else {
+        format!("/collections/{}", pluralized)
+    };
+
+    let mut collection = CollectionBuilder::class_collection(&class.subject, &path, store);
 
     collection.sort_by = match class_subject {
         urls::COMMIT => Some(urls::CREATED_AT.to_string()),
@@ -413,7 +423,7 @@ pub fn create_collection_resource_for_class(
         .ok_or("No self_url present in store, can't populate collections")?;
 
     // Let the Collections collection be the top level item
-    let parent = if class.subject == urls::COLLECTION {
+    let parent = if is_collections_collection {
         drive.to_string()
     } else {
         drive

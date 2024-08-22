@@ -357,6 +357,7 @@ impl Resource {
             validate_for_agent: agent.subject.into(),
             // TODO: auto-merge should work before we enable this https://github.com/atomicdata-dev/atomic-server/issues/412
             validate_previous_commit: false,
+            validate_subject_url_parent: true,
             update_index: true,
         };
         let commit_response = store.apply_commit(commit, &opts)?;
@@ -385,6 +386,8 @@ impl Resource {
             validate_for_agent: agent.subject.into(),
             // https://github.com/atomicdata-dev/atomic-server/issues/412
             validate_previous_commit: false,
+            // This is contentious: https://github.com/atomicdata-dev/atomic-data-rust/issues/556
+            validate_subject_url_parent: false,
             update_index: true,
         };
         let commit_response = store.apply_commit(commit, &opts)?;
@@ -695,6 +698,7 @@ mod test {
                     validate_signature: true,
                     validate_timestamp: true,
                     validate_rights: false,
+                    validate_subject_url_parent: true,
                     validate_previous_commit: true,
                     validate_for_agent: None,
                     update_index: true,

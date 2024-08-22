@@ -19,7 +19,7 @@ pub async fn post_commit(
     let mut builder = HttpResponse::Ok();
     let incoming_commit_resource = parse_json_ad_commit_resource(&body, store)?;
     let incoming_commit = Commit::from_resource(incoming_commit_resource)?;
-if store.is_external_subject(&incoming_commit.subject)? {
+    if store.is_external_subject(&incoming_commit.subject)? {
         return Err("Subject of commit is external, and should be sent to its origin domain. This store can not own this resource. See https://github.com/atomicdata-dev/atomic-data-rust/issues/509".into());
     }
     let opts = CommitOpts {
@@ -30,6 +30,7 @@ if store.is_external_subject(&incoming_commit.subject)? {
         // https://github.com/atomicdata-dev/atomic-server/issues/412
         validate_previous_commit: false,
         validate_for_agent: Some(incoming_commit.signer.to_string()),
+        validate_subject_url_parent: true,
         update_index: true,
     };
     let commit_response = store.apply_commit(incoming_commit, &opts)?;

@@ -36,9 +36,9 @@ impl AtomicUrl {
     pub fn set_route(&self, route: Routes) -> Self {
         let path = match route {
             Routes::AllVersions => "/all-versions".to_string(),
-            Routes::Agents => "/agents".to_string(),
+            Routes::Agents => "/collections/agents".to_string(),
             Routes::Collections => "/collections".to_string(),
-            Routes::Commits => "/commits".to_string(),
+            Routes::Commits => "/collections/commits".to_string(),
             Routes::CommitsUnsigned => "/commits-unsigned".to_string(),
             Routes::Endpoints => "/endpoints".to_string(),
             Routes::Import => "/import".to_string(),
