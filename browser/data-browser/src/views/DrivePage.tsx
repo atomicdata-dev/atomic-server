@@ -52,6 +52,13 @@ function DrivePage({ resource }: ResourcePageProps): JSX.Element {
         propertyURL={core.properties.description}
         datatype={Datatype.MARKDOWN}
       />
+      <Heading>Default Ontology</Heading>
+      <InputSwitcher
+        commit
+        resource={resource}
+        property={defaultOntologyProp}
+        disabled={!canEdit}
+      />
       <div>
         <Heading>Default Ontology</Heading>
         <InputSwitcher

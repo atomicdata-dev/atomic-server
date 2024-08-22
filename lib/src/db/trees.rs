@@ -1,6 +1,10 @@
 use crate::atoms::IndexAtom;
 
-use super::{prop_val_sub_index::propvalsub_key, val_prop_sub_index::valpropsub_key};
+use super::{
+    migrations::{REFERENCE_INDEX_CURRENT, RESOURCE_TREE_CURRENT},
+    prop_val_sub_index::propvalsub_key,
+    val_prop_sub_index::valpropsub_key,
+};
 
 #[derive(Debug)]
 pub enum Tree {
@@ -18,8 +22,8 @@ pub enum Tree {
     ValPropSub,
 }
 
-const RESOURCES: &str = "resources_v1";
-const VALPROPSUB: &str = "reference_index_v1";
+const RESOURCES: &str = RESOURCE_TREE_CURRENT;
+const VALPROPSUB: &str = REFERENCE_INDEX_CURRENT;
 const QUERY_MEMBERS: &str = "members_index";
 const PROPVALSUB: &str = "prop_val_sub_index";
 const QUERIES_WATCHED: &str = "watched_queries";
@@ -27,7 +31,7 @@ const QUERIES_WATCHED: &str = "watched_queries";
 impl std::fmt::Display for Tree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Tree::Resources => f.write_str(RESOURCES),
+            Tree::Resources => f.write_str(RESOURCE_TREE_CURRENT),
             Tree::WatchedQueries => f.write_str(QUERIES_WATCHED),
             Tree::PropValSub => f.write_str(PROPVALSUB),
             Tree::ValPropSub => f.write_str(VALPROPSUB),
