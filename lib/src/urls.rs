@@ -55,6 +55,7 @@ pub const PREVIOUS_COMMIT: &str = "https://atomicdata.dev/properties/previousCom
 pub const LAST_COMMIT: &str = "https://atomicdata.dev/properties/lastCommit";
 // ... for Agents
 pub const PUBLIC_KEY: &str = "https://atomicdata.dev/properties/publicKey";
+pub const ACTIVE_KEYS: &str = "https://atomicdata.dev/properties/activeKeys";
 pub const NAME: &str = "https://atomicdata.dev/properties/name";
 pub const DRIVES: &str = "https://atomicdata.dev/properties/drives";
 pub const EMAIL: &str = "https://atomicdata.dev/properties/email";
@@ -156,6 +157,10 @@ pub const PUBLIC_AGENT: &str = "https://atomicdata.dev/agents/publicAgent";
 // We don't want a user to actually control this URL.
 pub const SUDO_AGENT: &str = "sudo:agent";
 
+/// The URL used for stores that are not accessible on the web.
+// I'd prefer this to a non-HTTP URI, but that causes parsing issues when we combine it with some paths (at least with Commits)
+pub const LOCAL_STORE: &str = "http://noresolve.localhost";
+
 // Paths
 pub const PATH_IMPORT: &str = "/import";
 pub const PATH_FETCH_BOOKMARK: &str = "/fetch-bookmark";
@@ -166,6 +171,8 @@ pub const PATH_ENDPOINTS: &str = "/endpoints";
 pub const PATH_REGISTER: &str = "/register";
 pub const PATH_CONFIRM_EMAIL: &str = "/confirm-email";
 pub const PATH_RESET_PUBKEY: &str = "/reset-public-key";
+pub const PATH_CONFIRM_PUBKEY: &str = "/confirm-public-key";
+pub const PATH_ADD_PUBKEY: &str = "/add-public-key";
 pub const PATH_CONFIRM_RESET: &str = "/confirm-reset-public-key";
 pub const PATH_QUERY: &str = "/query";
 pub const PATH_PRUNE_TESTS: &str = "/prunetests";

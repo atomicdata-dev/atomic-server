@@ -2,8 +2,6 @@
 //! Has methods for saving resources and getting properties inside them.
 
 use crate::commit::{CommitOpts, CommitResponse};
-use crate::storelike::Query;
-use crate::urls;
 use crate::utils::random_string;
 use crate::values::{SubResource, Value};
 use crate::{commit::CommitBuilder, errors::AtomicResult};
@@ -12,6 +10,7 @@ use crate::{
     schema::{Class, Property},
     Atom, Storelike,
 };
+use crate::{urls, Query};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::instrument;

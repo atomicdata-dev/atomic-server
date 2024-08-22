@@ -26,17 +26,17 @@ use crate::{
     agents::ForAgent,
     atomic_url::AtomicUrl,
     atoms::IndexAtom,
-    commit::CommitOpts,
-    commit::CommitResponse,
+    commit::{CommitOpts, CommitResponse},
     db::{query_index::requires_query_index, val_prop_sub_index::find_in_val_prop_sub_index},
     email::{self, MailMessage},
     endpoints::{default_endpoints, Endpoint, HandleGetContext},
     errors::{AtomicError, AtomicResult},
+    query::QueryResult,
     resources::PropVals,
-    storelike::{Query, QueryResult, Storelike},
+    storelike::Storelike,
     urls,
     values::SortableValue,
-    Atom, Commit, Resource,
+    Atom, Commit, Query, Resource,
 };
 
 use self::{
@@ -511,8 +511,7 @@ impl Db {
                     "No SMTP client configured. Please call set_smtp_config first.".into(),
                 )
             })?
-            .lock()
-            .await;
+            .lock()?;
         email::send_mail(&mut client, message).await?;
         Ok(())
     }

@@ -1,10 +1,8 @@
 //! Collections are dynamic resources that refer to multiple resources.
 //! They are constructed using a [Query]
 use crate::{
-    agents::ForAgent,
-    errors::AtomicResult,
-    storelike::{Query, ResourceCollection},
-    urls, Resource, Storelike, Value,
+    agents::ForAgent, errors::AtomicResult, storelike::ResourceCollection, urls, Query, Resource,
+    Storelike, Value,
 };
 
 const DEFAULT_PAGE_SIZE: usize = 30;

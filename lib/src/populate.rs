@@ -8,8 +8,7 @@ use crate::{
     errors::AtomicResult,
     parse::ParseOpts,
     schema::{Class, Property},
-    storelike::Query,
-    urls, Resource, Storelike, Value,
+    urls, Query, Resource, Storelike, Value,
 };
 
 const DEFAULT_ONTOLOGY_PATH: &str = "defaultOntology";
@@ -303,7 +302,7 @@ pub fn populate_collections(store: &impl Storelike) -> AtomicResult<()> {
 
     for subject in result.subjects {
         let mut collection =
-            crate::collections::create_collection_resource_for_class(store, &subject)?;
+            crate::collections::create_collection_resource_for_class(store, &subject.to_string())?;
         collection.save_locally(store)?;
     }
 
@@ -331,28 +330,6 @@ pub fn populate_endpoints(store: &crate::Db) -> AtomicResult<()> {
 }
 
 #[cfg(feature = "db")]
-/// Adds default Endpoints (versioning) to the Db.
-/// Makes sure they are fetchable
-pub fn populate_importer(store: &crate::Db) -> AtomicResult<()> {
-    use crate::urls::IMPORTER;
-
-    let mut base = store
-        .get_self_url()
-        .ok_or("No self URL in this Store - required for populating importer")?
-        .clone();
-    let mut importer = crate::Resource::new(base.set_path(IMPORTER).to_string());
-    importer.set_class(urls::IMPORTER);
-    importer.set(
-        urls::PARENT.into(),
-        Value::AtomicUrl(base.to_string()),
-        store,
-    )?;
-    importer.set(urls::NAME.into(), Value::String("Import".into()), store)?;
-    importer.save_locally(store)?;
-    Ok(())
-}
-
-#[cfg(feature = "db")]
 /// Adds items to the SideBar as subresources.
 /// Useful for helping a new user get started.
 pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
@@ -360,7 +337,6 @@ pub fn populate_sidebar_items(store: &crate::Db) -> AtomicResult<()> {
     let mut drive = store.get_resource(base.as_str())?;
     let sidebar_items = vec![
         base.set_route(crate::atomic_url::Routes::Setup),
-        base.set_route(crate::atomic_url::Routes::Import),
         base.set_route(crate::atomic_url::Routes::Collections),
     ];
     for item in sidebar_items {
