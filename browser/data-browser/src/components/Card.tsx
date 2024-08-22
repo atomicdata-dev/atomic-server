@@ -42,6 +42,7 @@ export const CardRow = styled.div<CardRowProps>`
   display: block;
   border-top: ${p => (p.noBorder ? 'none' : 'var(--border)')};
   padding: ${p => p.theme.size(2)} ${p => p.theme.size()};
+  overflow-wrap: break-word;
 `;
 
 /** A block inside a Card which has full width */

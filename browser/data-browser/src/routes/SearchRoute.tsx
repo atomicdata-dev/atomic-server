@@ -141,6 +141,7 @@ export function Search(): JSX.Element {
             <Column ref={resultsDiv} gap='1rem'>
               {results.map((subject, index) => (
                 <ResourceCard
+                  small
                   initialInView={index < 5}
                   subject={subject}
                   key={subject}

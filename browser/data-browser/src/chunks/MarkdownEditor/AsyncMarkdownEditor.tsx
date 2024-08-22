@@ -14,6 +14,7 @@ import { ToggleButton } from './ToggleButton';
 import { SlashCommands, suggestion } from './SlashMenu/CommandsExtension';
 import { ExtendedImage } from './ImagePicker';
 import { transition } from '../../helpers/transition';
+import { markdownStyles } from '../../components/datatypes/Markdown';
 
 export type AsyncMarkdownEditorProps = {
   placeholder?: string;
@@ -110,7 +111,7 @@ export default function AsyncMarkdownEditor({
           />
         )}
         <EditorContent key='rich-editor' editor={editor}>
-          <FloatingMenu editor={editor ?? undefined}>
+          <FloatingMenu editor={editor}>
             <FloatingMenuText>Type &apos;/&apos; for options</FloatingMenuText>
           </FloatingMenu>
           <BubbleMenu />
@@ -137,6 +138,7 @@ const calcHeight = (value: string) => {
   return `calc(${lines * LINE_HEIGHT}em + 5px)`;
 };
 
+// WARNING: Only add styles specific to editing. For other styles, add to `MarkdownWrapper`
 const EditorWrapper = styled.div<{ hideEditor: boolean }>`
   position: relative;
   background-color: ${p => p.theme.colors.bg};
@@ -171,27 +173,7 @@ const EditorWrapper = styled.div<{ hideEditor: boolean }>`
       height: auto;
     }
 
-    pre {
-      padding: 0.75rem 1rem;
-      background-color: ${p => p.theme.colors.bg1};
-      border-radius: ${p => p.theme.radius};
-      font-family: monospace;
-
-      code {
-        white-space: pre;
-        color: inherit;
-        padding: 0;
-        background: none;
-        font-size: 0.8rem;
-      }
-    }
-
-    blockquote {
-      margin-inline-start: 0;
-      border-inline-start: 3px solid ${p => p.theme.colors.textLight2};
-      color: ${p => p.theme.colors.textLight};
-      padding-inline-start: 1rem;
-    }
+    ${markdownStyles}
   }
 `;
 
