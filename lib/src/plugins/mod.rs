@@ -34,8 +34,6 @@ They are used for performing custom queries, or calculating dynamic attributes.
 Add these by registering the handler at [crate::db::Db::get_resource_extended].
 */
 
-use crate::endpoints::Endpoint;
-
 // Class Extenders
 pub mod chatroom;
 pub mod importer;
@@ -56,19 +54,3 @@ pub mod versioning;
 
 // Utilities / helpers
 mod utils;
-
-pub fn default_endpoints() -> Vec<Endpoint> {
-    vec![
-        versioning::version_endpoint(),
-        versioning::all_versions_endpoint(),
-        path::path_endpoint(),
-        search::search_endpoint(),
-        files::upload_endpoint(),
-        register::register_endpoint(),
-        register::confirm_email_endpoint(),
-        add_pubkey::request_email_add_pubkey(),
-        add_pubkey::confirm_add_pubkey(),
-        #[cfg(feature = "html")]
-        bookmark::bookmark_endpoint(),
-    ]
-}

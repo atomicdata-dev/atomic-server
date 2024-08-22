@@ -27,6 +27,17 @@ pub struct AppState {
     pub search_state: SearchState,
 }
 
+/// Initializes the Store and sets the default agent.
+pub fn init_store(config: &Config) -> AtomicServerResult<Db> {
+    let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
+
+    tracing::info!("Setting default agent");
+    set_default_agent(config, &store)?;
+    store.register_default_endpoints()?;
+
+    Ok(store)
+}
+
 impl AppState {
     /// Creates the AppState (the server's context available in Handlers).
     /// Initializes or opens a store on disk.
@@ -42,15 +53,14 @@ impl AppState {
             tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
         }
 
-        let should_init = !&config.store_path.exists() || config.initialize;
-        let mut store = atomic_lib::Db::init(&config.store_path, &config.server_url)?;
-        if should_init {
+        let mut store = init_store(&config)?;
+
+        let should_initialize = &config.store_path.exists() || config.initialize;
+        if should_initialize {
             tracing::info!("Initialize: creating and populating new Database...");
             atomic_lib::populate::populate_default_store(&store)
                 .map_err(|e| format!("Failed to populate default store. {}", e))?;
         }
-
-        set_default_agent(&config, &store)?;
 
         // Initialize search constructs
         let search_state = SearchState::new(&config)
@@ -179,8 +189,8 @@ fn set_default_agent(config: &Config, store: &impl Storelike) -> AtomicServerRes
         created_at: 0,
         name: None,
     };
-    tracing::info!("Default Agent is set: {}", &agent.subject);
     store.set_default_agent(agent);
+    tracing::info!("Default Agent is set: {}", &agent.subject);
     Ok(())
 }
 

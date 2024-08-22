@@ -363,7 +363,6 @@ pub fn populate_all(store: &crate::Db) -> AtomicResult<()> {
         .map_err(|e| format!("Failed to create default ontology. {}", e))?;
     set_drive_rights(store, true)?;
     populate_collections(store).map_err(|e| format!("Failed to populate collections. {}", e))?;
-    populate_endpoints(store).map_err(|e| format!("Failed to populate endpoints. {}", e))?;
     populate_sidebar_items(store)
         .map_err(|e| format!("Failed to populate sidebar items. {}", e))?;
     Ok(())

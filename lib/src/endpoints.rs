@@ -87,7 +87,7 @@ impl std::fmt::Debug for Endpoint {
     }
 }
 
-pub fn default_endpoints() -> Vec<Endpoint> {
+pub fn build_default_endpoints() -> Vec<Endpoint> {
     vec![
         plugins::versioning::version_endpoint(),
         plugins::versioning::all_versions_endpoint(),
