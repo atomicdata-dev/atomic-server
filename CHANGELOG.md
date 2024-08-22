@@ -100,7 +100,6 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Fix index issue happening when deleting a single property in a sorted collection #545
 - Update JS assets & playwright
 - Fix initial indexing bug #560
-- Fix errors on succesful export / import #565
 - Fix envs for store path, change `ATOMIC_STORE_DIR` to `ATOMIC_DATA_DIR` #567
 - Refactor static file asset hosting #578
 - Meta tags server side #577
@@ -108,6 +107,8 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 - Remove feature to index external RDF files and search them #579
 - Add staging environment #588
 - Add systemd instructions to readme #271
+- Improve check_append error #558
+- Fix errors on successful export / import #565
 
 ## [v0.34.0] - 2022-10-31
 
