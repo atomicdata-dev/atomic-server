@@ -14,7 +14,7 @@ use crate::{
 
 pub fn register_endpoint() -> Endpoint {
     Endpoint {
-      path: "/register".to_string(),
+      path: urls::PATH_REGISTER.to_string(),
       params: [
         urls::NAME.to_string(),
         urls::EMAIL.to_string(),
@@ -28,7 +28,7 @@ pub fn register_endpoint() -> Endpoint {
 
 pub fn confirm_email_endpoint() -> Endpoint {
     Endpoint {
-        path: "/confirmEmail".to_string(),
+        path: urls::PATH_CONFIRM_EMAIL.to_string(),
         params: [urls::TOKEN.to_string(), urls::INVITE_PUBKEY.to_string()].into(),
         description: "Confirm email address and set a key for your Agent.".to_string(),
         shortname: "confirm-email".to_string(),
@@ -110,6 +110,7 @@ pub fn construct_confirm_email_redirect(context: HandleGetContext) -> AtomicResu
     let mut token_opt: Option<String> = None;
     let mut pubkey_option = None;
 
+    println!("url: {:?}", url);
     for (k, v) in url.query_pairs() {
         match k.as_ref() {
             "token" | urls::TOKEN => token_opt = Some(v.to_string()),
@@ -131,11 +132,15 @@ pub fn construct_confirm_email_redirect(context: HandleGetContext) -> AtomicResu
     // Note: this happens before the drive is saved, which checks if the name is available.
     // We get new agents that just do nothing, but perhaps that's not a problem.
     let drive_creator_agent: String = {
-        let mut new = Agent::new_from_public_key(store, &pubkey)?;
-        new.name = Some(confirmation.name.clone());
-        let net_agent_subject = new.subject.to_string();
-        new.to_resource()?.save(store)?;
-        net_agent_subject
+        let mut new_agent = Agent::new_from_public_key(store, &pubkey)?;
+        new_agent.name = Some(confirmation.name.clone());
+        let net_agent_subject = store
+            .get_server_url()
+            .clone()
+            .set_path(&format!("agents/{}", confirmation.name));
+        new_agent.subject = net_agent_subject.to_string();
+        new_agent.to_resource()?.save(store)?;
+        net_agent_subject.to_string()
     };
 
     // Create the new Drive

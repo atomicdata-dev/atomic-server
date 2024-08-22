@@ -47,5 +47,6 @@ pub mod path;
 pub mod prunetests;
 pub mod query;
 pub mod register;
+pub mod reset_pubkey;
 pub mod search;
 pub mod versioning;
