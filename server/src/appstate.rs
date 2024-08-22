@@ -7,7 +7,7 @@ use atomic_lib::{
     atomic_url::Routes,
     commit::CommitResponse,
     email::SmtpConfig,
-    Storelike,
+    Db, Storelike,
 };
 
 /// The AppState contains all the relevant Context for the server.
