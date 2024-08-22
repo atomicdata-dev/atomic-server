@@ -14,12 +14,12 @@ import React, {
   useCallback,
 } from 'react';
 import { ErrMessage, InputWrapper } from './InputStyles';
-import { DropdownInput } from './DropdownInput';
 import { Dialog, useDialog } from '../Dialog';
 import { DialogTreeContext } from '../Dialog/dialogContext';
 import { useSettings } from '../../helpers/AppSettings';
 import styled from 'styled-components';
 import { NewFormDialog } from './NewForm/NewFormDialog';
+import { DropdownInput } from './ResourceSelector/DropdownInput';
 
 interface ResourceSelectorProps {
   /**

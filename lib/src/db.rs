@@ -17,8 +17,6 @@ use std::{
     vec,
 };
 
-use tokio::sync::Mutex;
-
 use mail_send::{Connected, Transport};
 use tracing::info;
 use tracing::instrument;
@@ -89,13 +87,12 @@ pub struct Db {
     server_url: AtomicUrl,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
-    /// Function called whenever a Commit is applied.
-    on_commit: Option<Arc<HandleCommit>>,
     /// Where the DB is stored on disk.
     path: std::path::PathBuf,
+    /// Function called whenever a Commit is applied.
     handle_commit: Option<Arc<HandleCommit>>,
     /// Email SMTP client for sending email.
-    smtp_client: Option<Arc<Mutex<Transport<'static, Connected>>>>,
+    smtp_client: Option<Arc<tokio::sync::Mutex<Transport<'static, Connected>>>>,
 }
 
 impl Db {
@@ -531,7 +528,7 @@ impl Db {
         &mut self,
         smtp_config: crate::email::SmtpConfig,
     ) -> AtomicResult<()> {
-        self.smtp_client = Some(Arc::new(Mutex::new(
+        self.smtp_client = Some(Arc::new(tokio::sync::Mutex::new(
             crate::email::get_smtp_client(smtp_config).await?,
         )));
         Ok(())

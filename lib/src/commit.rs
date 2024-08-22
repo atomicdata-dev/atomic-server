@@ -749,7 +749,7 @@ mod test {
     #[test]
     fn signature_matches() {
         let private_key = "CapMWIhFUT+w7ANv9oCPqrHrwZpkP2JhzF9JnyT6WcI=";
-        let store = crate::Store::init().unwrap();
+        let mut store = crate::Store::init().unwrap();
         store.populate().unwrap();
         let agent = Agent::new_from_private_key(None, &store, private_key).unwrap();
         assert_eq!(
