@@ -8,12 +8,14 @@
 
 No, AtomicServer has its own HTTPS support. Just pass a `--https` flag!
 
-## Can / should I create backups?
+## Can I create backups?
 
-You should.
-Run `atomic-server export` to create a JSON-AD backup in your `~/.config/atomic/backups` folder.
+There are two ways you can create backups:
+
+1. **Export the JSON-AD**. Run `atomic-server export` to create a JSON-AD backup in your `~/.config/atomic/backups` folder.
 Import them using `atomic-server import -p ~/.config/atomic/backups/${date}.json`.'
 You could also copy all folders `atomic-server` uses. To see what these are, see `atomic-server show-config`.
+1.  **Backup the database file**. use `atomic-server show-config` to find the `store_path` and copy the path to some place where you store the backup.
 
 ## I lost the key / secret to my Root Agent, and the `/setup` invite is no longer usable! What now?
 
@@ -26,7 +28,7 @@ This could especially be helpful if you're running at `localhost:9883` and want 
 
 ## How do I reset my database?
 
-`atomic-server reset`
+`atomic-server reset`. This deletes all of your data. Be careful!
 
 ## How do I make my data private, yet available online?
 
