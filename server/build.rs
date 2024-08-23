@@ -21,25 +21,13 @@ fn main() -> std::io::Result<()> {
     // Uncomment this line if you want faster builds during development
     // return Ok(());
     const BROWSER_ROOT: &str = "../browser/";
-    let dirs: Dirs = {
-        Dirs {
-            js_dist_source: PathBuf::from("../browser/data-browser/dist"),
-            js_dist_tmp: PathBuf::from("./assets_tmp"),
-            src_browser: PathBuf::from("../browser/data-browser/src"),
-            browser_root: PathBuf::from(BROWSER_ROOT),
-        }
-    };
-    println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
-    // Check if we're likely running in a check-like context
-    let opt_level = std::env::var("OPT_LEVEL").unwrap_or_else(|_| "0".to_string());
-    let profile = std::env::var("PROFILE").unwrap_or_else(|_| "release".to_string());
+    // Env is set in .vscode/settings.json when rust-analyzer runs
+    let is_rust_analyzer = !std::env::var("IS_RUST_ANALYZER")
+        .unwrap_or_default()
+        .is_empty();
 
-    let is_check_like = profile == "debug" && opt_level == "0";
-
-    if is_check_like {
-        println!("cargo:rerun-if-changed=build.rs");
-        // Skip the heavy logic
-        println!("Skipping build.rs logic for cargo check/clippy.");
+    if is_rust_analyzer {
+        p!("Skipping build.rs logic to keep rust-analyzer fast. If you see this message in some other context: the JS build not run!");
     } else {
         const BROWSER_ROOT: &str = "../browser/";
         println!("cargo:rerun-if-changed={}", BROWSER_ROOT);

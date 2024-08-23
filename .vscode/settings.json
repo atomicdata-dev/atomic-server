@@ -1,4 +1,8 @@
 {
+  // This is used to prevent `build.rs` from running every time you make a change to a file.
+  "rust-analyzer.check.extraEnv": {
+    "IS_RUST_ANALYZER": "true"
+  },
   // The linter in the CI is quite strict, so running `cargo fmt` on save is probably a good idea!
   "editor.formatOnSave": true,
   "files.autoSave": "onFocusChange",
