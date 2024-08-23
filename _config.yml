@@ -7,3 +7,7 @@ include:
   - README.md
   - LICENSE.md
   - CONTRIBUTING.md
+exclude:
+  - browser
+  - server
+  - lib
