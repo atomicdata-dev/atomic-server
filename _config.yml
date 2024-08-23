@@ -11,3 +11,4 @@ exclude:
   - browser
   - server
   - lib
+  - docs
