@@ -15,8 +15,7 @@
     "tslib": "^2.4.1",
     "typescript": "^5.4.5",
     "vite": "^5.2.10",
-    "vite-plugin-dts": "^3.9.0",
-    "vitest": "^0.34.6"
+    "vite-plugin-dts": "^3.9.0"
   },
   "files": [
     "dist"

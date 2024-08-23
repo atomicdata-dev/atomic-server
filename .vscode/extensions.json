@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "swellaby.vscode-rust-test-adapter",
+    "vadimcn.vscode-lldb",
+    "rust-lang.rust-analyzer",
+    "styled-components.vscode-styled-components",
+    "svelte.svelte-vscode"
+  ]
+}

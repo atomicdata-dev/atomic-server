@@ -32,4 +32,5 @@
     "./svelte"
   ],
   "typescript.preferences.preferTypeOnlyAutoImports": true,
+  "rustTestExplorer.rootCargoManifestFilePath": "./Cargo.toml"
 }

@@ -7,6 +7,4 @@ trace-*.json
 .tmp-earthly-out
 artifact
 server/assets_tmp
-
-# Local Netlify folder
 .netlify
