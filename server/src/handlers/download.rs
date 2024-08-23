@@ -5,6 +5,7 @@ use atomic_lib::{urls, Resource, Storelike};
 use image::GenericImageView;
 use image::{codecs::avif::AvifEncoder, ImageReader};
 use serde::Deserialize;
+use std::path::Path;
 use std::{collections::HashSet, io::Write, path::PathBuf};
 
 #[serde_with::serde_as]
@@ -164,8 +165,8 @@ fn process_image(
     Err(format!("Unsupported format: {}", format).into())
 }
 
-fn create_processed_folder_if_not_exists(base_path: &PathBuf) -> AtomicServerResult<()> {
-    let mut processed_folder = base_path.clone();
+fn create_processed_folder_if_not_exists(base_path: &Path) -> AtomicServerResult<()> {
+    let mut processed_folder = base_path.to_path_buf();
     processed_folder.push("processed");
     std::fs::create_dir_all(processed_folder)?;
     Ok(())
