@@ -1,0 +1,631 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [0.39.1](https://github.com/atomicdata-dev/atomic-server/compare/atomic_lib-v0.39.0...atomic_lib-v0.39.1) - 2024-08-27
+
+### Fixed
+- fix collection not working with non url values
+- run rustfmt
+- fix updating index on commit.remove
+- handle removes in commit
+- fix TPF ownership strings
+
+### Other
+- Fix docs
+- [#925](https://github.com/atomicdata-dev/atomic-server/pull/925) Add csv export to tables
+- intended README links
+- Fix commitmonitor search commit [#939](https://github.com/atomicdata-dev/atomic-server/pull/939)
+- [#257](https://github.com/atomicdata-dev/atomic-server/pull/257) Use multiline string in files.rs
+- [#257](https://github.com/atomicdata-dev/atomic-server/pull/257) Image optimization in download endpoint
+- [#914](https://github.com/atomicdata-dev/atomic-server/pull/914) Fix changing subject in new form could cause parent change in existing resources
+- Fix default ontology not generating on first server setup
+- Add flush-to-disk destructor for Db
+- v0.38
+- Add `atomic-cli search` command [#778](https://github.com/atomicdata-dev/atomic-server/pull/778)
+- Add search client to atomic_lib [#778](https://github.com/atomicdata-dev/atomic-server/pull/778)
+- Add ontolgy class and props to populate step
+- Fix collection count offset incorrect
+- Fix collection total_member count offset incorrect
+- v0.37.0
+- update deps
+- Refactor propval methods. closes [#822](https://github.com/atomicdata-dev/atomic-server/pull/822)
+- WIP refactor resource
+- Improve `Agent` API
+- Deterministic serialization JSON AD [#794](https://github.com/atomicdata-dev/atomic-server/pull/794)
+- Fix build
+- Don't use default agent when fetching with Db [#787](https://github.com/atomicdata-dev/atomic-server/pull/787)
+- Fix duplicate tag defitinion
+- Simplify setting up existing agent in atomic_lib [#785](https://github.com/atomicdata-dev/atomic-server/pull/785)
+- Fix deploy script
+- v0.36.1
+- [#706](https://github.com/atomicdata-dev/atomic-server/pull/706) fix search atomicdata.dev
+- Update instant_acme
+- Host typedoc on netlify [#707](https://github.com/atomicdata-dev/atomic-server/pull/707)
+- Run tests and lint in CI [#576](https://github.com/atomicdata-dev/atomic-server/pull/576)
+- Prepare for v0.36.0 release
+- Add resource deletion to tracing info
+- Prune testdrives before running e2e
+- [#678](https://github.com/atomicdata-dev/atomic-server/pull/678) Dont index unfiltered queries
+- Fix allows only has classtype
+- Fix parent property has classtype
+- [#648](https://github.com/atomicdata-dev/atomic-server/pull/648) Ontology read view
+- Try fix title edit test
+- Readme fixes
+- Release 0.34.5
+- Update html2md
+- Destroy children when deleting resource
+- Create Query endpoint
+- Clippy fixes
+- Rename repo [#630](https://github.com/atomicdata-dev/atomic-server/pull/630)
+- Refactor ForAgent [#623](https://github.com/atomicdata-dev/atomic-server/pull/623)
+- Don't require building index for populate commands
+- Rebuilding indexes done on separate thread, only once [#616](https://github.com/atomicdata-dev/atomic-server/pull/616) [#615](https://github.com/atomicdata-dev/atomic-server/pull/615)
+- Fix tests table ontology, remove dead examples
+- [#25](https://github.com/atomicdata-dev/atomic-server/pull/25) Resolve table ontology feedback
+- [#25](https://github.com/atomicdata-dev/atomic-server/pull/25) Add table ontology
+- Fix Post endpoints returning incorrect subject
+- Fix `pageSize` property in Collections not using persistence
+- Remove `tpf` queries from `atomic-cli` [#610](https://github.com/atomicdata-dev/atomic-server/pull/610)
+- Upgrade dependencies, clap in CLI
+- Fix build error
+- Update deps
+- Release 0.34.2
+- Update JS assets, allow local atomic ontologies [#604](https://github.com/atomicdata-dev/atomic-server/pull/604)
+- Fix grabby endpoint
+- - Add `POST` + `body` support for Endpoints [#592](https://github.com/atomicdata-dev/atomic-server/pull/592)
+- Add `POST` + `body` support for Endpoints [#592](https://github.com/atomicdata-dev/atomic-server/pull/592)
+- Add `post_resource` method [#592](https://github.com/atomicdata-dev/atomic-server/pull/592)
+- Clippy improvements
+- less clones again
+- Fix multi-word fuzzy queries [#336](https://github.com/atomicdata-dev/atomic-server/pull/336)
+- [#581](https://github.com/atomicdata-dev/atomic-server/pull/581) Fix allows-only check on arrays when setting values
+- [#581](https://github.com/atomicdata-dev/atomic-server/pull/581) Change allows-only to resource-array
+- [#336](https://github.com/atomicdata-dev/atomic-server/pull/336) Add filter to search and index all props
+- Release 0.34.1
+- Add `https-dns` option [#192](https://github.com/atomicdata-dev/atomic-server/pull/192)
+- Fix doc URLs
+- [#575](https://github.com/atomicdata-dev/atomic-server/pull/575) CI issues, use older ring version & cross
+- [#545](https://github.com/atomicdata-dev/atomic-server/pull/545) [#395](https://github.com/atomicdata-dev/atomic-server/pull/395) Fix index logic
+- Add failing test for [#395](https://github.com/atomicdata-dev/atomic-server/pull/395)  and [#546](https://github.com/atomicdata-dev/atomic-server/pull/546)
+- [#545](https://github.com/atomicdata-dev/atomic-server/pull/545) simplify should_update
+- [#545](https://github.com/atomicdata-dev/atomic-server/pull/545) fix
+- [#545](https://github.com/atomicdata-dev/atomic-server/pull/545) add failing test for indexing bug
+- Improve and update tracing
+- Improved error for non-public resources
+- Add migration for [#529](https://github.com/atomicdata-dev/atomic-server/pull/529)
+- Remove TPF [#529](https://github.com/atomicdata-dev/atomic-server/pull/529)
+- [#529](https://github.com/atomicdata-dev/atomic-server/pull/529) add property index, speed up queries
+- Release 0.34.0
+- [#522](https://github.com/atomicdata-dev/atomic-server/pull/522) Return iterator from all_resources
+- [#521](https://github.com/atomicdata-dev/atomic-server/pull/521) Give server default agent sudo rights
+- [#226](https://github.com/atomicdata-dev/atomic-server/pull/226) Add parent filter to search
+- Fix various linting errors
+- [#512](https://github.com/atomicdata-dev/atomic-server/pull/512) authentication resource spec added
+- Extract image and description from webpage
+- Update links to atomicdata-dev repo
+- Release 0.33.1
+- Update JS assets, fix clippy warnings
+- Add published-at property to class
+- Add populate siderbar, update JS assets
+- [#494](https://github.com/atomicdata-dev/atomic-server/pull/494) conversion cow
+- [#495](https://github.com/atomicdata-dev/atomic-server/pull/495) document bookmark.rs
+- Add subresources
+- [#493](https://github.com/atomicdata-dev/atomic-server/pull/493) indexing issue
+- Fix drives property
+- [#492](https://github.com/atomicdata-dev/atomic-server/pull/492) throw when unknown query param in Collection endpoint
+- Release 0.33.0
+- [#488](https://github.com/atomicdata-dev/atomic-server/pull/488) missing commit fix
+- [#485](https://github.com/atomicdata-dev/atomic-server/pull/485) WIP handle get Websocket messages
+- Trace fetch body
+- Update JS
+- Add Article classes / props
+- Allow new `Drive` resources without a parent
+- [#432](https://github.com/atomicdata-dev/atomic-server/pull/432) fix html parse bug
+- [#432](https://github.com/atomicdata-dev/atomic-server/pull/432) Unfold sup elements
+- [#474](https://github.com/atomicdata-dev/atomic-server/pull/474) bookmark empty chars fix
+- [#432](https://github.com/atomicdata-dev/atomic-server/pull/432) remove unwraps from bookmarks
+- [#432](https://github.com/atomicdata-dev/atomic-server/pull/432) bookmark linter, remove deps, make deps optional
+- [#432](https://github.com/atomicdata-dev/atomic-server/pull/432) Add fetchbookmark route
+- [#432](https://github.com/atomicdata-dev/atomic-server/pull/432) Add bookmark endpoint
+- [#390](https://github.com/atomicdata-dev/atomic-server/pull/390) prevent malicious imports
+- [#390](https://github.com/atomicdata-dev/atomic-server/pull/390) fix test importer
+- [#465](https://github.com/atomicdata-dev/atomic-server/pull/465) Importer working basically
+- [#468](https://github.com/atomicdata-dev/atomic-server/pull/468) fix flaky query test
+- Fix config dir
+- Fix clippy & fmt warnings
+- Speed up some tests
+- [#390](https://github.com/atomicdata-dev/atomic-server/pull/390) test for references
+- [#390](https://github.com/atomicdata-dev/atomic-server/pull/390) basic importer test working
+- [#458](https://github.com/atomicdata-dev/atomic-server/pull/458) Structured Errors as Resources WIP
+- Improve `class-type` description
+- WIP
+- WIP
+- WIP Parse
+- WIP importer
+- atomic-data-browser[#172](https://github.com/atomicdata-dev/atomic-server/pull/172) Make error messages more specific
+- Add URI to default store
+- [#450](https://github.com/atomicdata-dev/atomic-server/pull/450) invite usese push_propval
+- [#450](https://github.com/atomicdata-dev/atomic-server/pull/450) speed up invite accepting
+- Fix linter warnings - box resource enum
+- [#446](https://github.com/atomicdata-dev/atomic-server/pull/446) flaky test fix
+- Bump to v0.32.1
+- [#430](https://github.com/atomicdata-dev/atomic-server/pull/430) create agent does not depend on store
+- [#416](https://github.com/atomicdata-dev/atomic-server/pull/416) add opentelemetry support
+- [#413](https://github.com/atomicdata-dev/atomic-server/pull/413) invite commit issue
+- Update github repo urls
+- Release 0.32.0
+- disable previous commit validation until we fix [#412](https://github.com/atomicdata-dev/atomic-server/pull/412)
+- Add append right [#373](https://github.com/atomicdata-dev/atomic-server/pull/373)
+- Cleanup tracing
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) performance improvements chatroom
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) Chatroom cleanup and linting
+- Fix populate tests
+- Cleanup, fix concurrent tests
+- Cleanup println
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) fix chatroom pagination
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) WIP chatroom
+- [#395](https://github.com/atomicdata-dev/atomic-server/pull/395) fix commit query indexing bug sort_by
+- [#392](https://github.com/atomicdata-dev/atomic-server/pull/392) Fix items sometimes ignored in indexing
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) tests working, cleanup
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) Chat working
+- [#387](https://github.com/atomicdata-dev/atomic-server/pull/387) fix upload dir attachments
+- [#253](https://github.com/atomicdata-dev/atomic-server/pull/253) send DB side commits to commit monitor
+- [#373](https://github.com/atomicdata-dev/atomic-server/pull/373) WIP chatroom
+- Fix bug when opening the same invite twice with the same agent
+- Use commits in populate and init
+- [#172](https://github.com/atomicdata-dev/atomic-server/pull/172) fix CLI
+- Reminder to fix [#315](https://github.com/atomicdata-dev/atomic-server/pull/315)
+- improve error
+- [#172](https://github.com/atomicdata-dev/atomic-server/pull/172) check previous commit
+- [#172](https://github.com/atomicdata-dev/atomic-server/pull/172) add previousCommit and lastCommit
+- [#172](https://github.com/atomicdata-dev/atomic-server/pull/172) improve commit description
+- Add benchmark for `all_resources`
+- Added `test_db_resources_all`
+- remove .DS_Store
+- Migrations in Sled KV store ([#382](https://github.com/atomicdata-dev/atomic-server/pull/382) [#102](https://github.com/atomicdata-dev/atomic-server/pull/102))
+- Less flaky test
+- [#331](https://github.com/atomicdata-dev/atomic-server/pull/331) directories - dirs
+- Upgrades ([#364](https://github.com/atomicdata-dev/atomic-server/pull/364))
+- Less strict versions in cargo.toml ([#362](https://github.com/atomicdata-dev/atomic-server/pull/362))
+- Bump to v0.31.1
+- [#337](https://github.com/atomicdata-dev/atomic-server/pull/337) code coverage in contribute, action script [#338](https://github.com/atomicdata-dev/atomic-server/pull/338) try nextest ([#339](https://github.com/atomicdata-dev/atomic-server/pull/339))
+- In Queries, respect a `limit` of `None` and `include_external` [#317](https://github.com/atomicdata-dev/atomic-server/pull/317)
+- [#307](https://github.com/atomicdata-dev/atomic-server/pull/307) allow reading commits ([#308](https://github.com/atomicdata-dev/atomic-server/pull/308))
+- Clippy
+- [#175](https://github.com/atomicdata-dev/atomic-server/pull/175) add benchmarks for json-ld and json
+- [#175](https://github.com/atomicdata-dev/atomic-server/pull/175) add json-ad benchmark
+- Upgrade clap
+- [#303](https://github.com/atomicdata-dev/atomic-server/pull/303) no mutex for store in actix
+- Capitalize CHANGELOG references in readme files
+- Improve documentation
+- [#293](https://github.com/atomicdata-dev/atomic-server/pull/293) Add Benchmarking ([#294](https://github.com/atomicdata-dev/atomic-server/pull/294))
+- [#291](https://github.com/atomicdata-dev/atomic-server/pull/291) simplify HTTPS file check
+- [#114](https://github.com/atomicdata-dev/atomic-server/pull/114) collection / query cache ([#285](https://github.com/atomicdata-dev/atomic-server/pull/285)) - Bump to v0.31.0
+- v0.30.4
+- [#282](https://github.com/atomicdata-dev/atomic-server/pull/282) refactor value index ([#284](https://github.com/atomicdata-dev/atomic-server/pull/284))
+- Trace add_atom
+- Remove printlns
+- Update to v0.30.3
+- [#270](https://github.com/atomicdata-dev/atomic-server/pull/270) Less sled logs
+- Give endpoints parents
+- Make various file related properties isDynamic
+- Fix search endpoint description
+- rename `base_url` to `server_url`
+- Release 0.30.1
+- [#259](https://github.com/atomicdata-dev/atomic-server/pull/259) endpoints [#250](https://github.com/atomicdata-dev/atomic-server/pull/250) openapi
+- [#261](https://github.com/atomicdata-dev/atomic-server/pull/261) add tracing to lib
+- [#261](https://github.com/atomicdata-dev/atomic-server/pull/261) flamegraph in chrome working
+- [#261](https://github.com/atomicdata-dev/atomic-server/pull/261) WIP chrome tracing
+- Remove alpha from readme
+- [#261](https://github.com/atomicdata-dev/atomic-server/pull/261) replace log with tracing
+- Fix welcome text (was indented)
+- Status code 404
+- Release 0.30.0
+- [#255](https://github.com/atomicdata-dev/atomic-server/pull/255) fix signing upload
+- Add payment pointer property
+- Saving a resource returns CommitResponse
+- [#72](https://github.com/atomicdata-dev/atomic-server/pull/72) downloads and uploads
+- [#72](https://github.com/atomicdata-dev/atomic-server/pull/72) uploading files, add models
+- Fix parent of children Property
+- [#247](https://github.com/atomicdata-dev/atomic-server/pull/247) fix setting agent rights
+- [#247](https://github.com/atomicdata-dev/atomic-server/pull/247) public agents
+- [#247](https://github.com/atomicdata-dev/atomic-server/pull/247) simpler check_rights return
+- [#247](https://github.com/atomicdata-dev/atomic-server/pull/247) Filter collections using authorization
+- [#247](https://github.com/atomicdata-dev/atomic-server/pull/247) exclude illegal members
+- Fix tests
+- [#247](https://github.com/atomicdata-dev/atomic-server/pull/247) collection authorization
+- [#243](https://github.com/atomicdata-dev/atomic-server/pull/243) append rights to drive in initialize
+- [#219](https://github.com/atomicdata-dev/atomic-server/pull/219) add default store structure
+- [#182](https://github.com/atomicdata-dev/atomic-server/pull/182) strictrer authorization checks invites
+- [#182](https://github.com/atomicdata-dev/atomic-server/pull/182) Add Expires At
+- v0.29.2
+- Also add Read rights when Invite Write
+- Make setting public drive more explicit
+- Prevent fetch in populate
+- Add publicAgent to default store
+- Sort collections by subject by default
+- Improve setup instructions
+- Improve authentication header errors
+- [#220](https://github.com/atomicdata-dev/atomic-server/pull/220) always allow agents to view and edit themselves
+- [#224](https://github.com/atomicdata-dev/atomic-server/pull/224) Nest collections under collections resource
+- Make descriptions required
+- [#13](https://github.com/atomicdata-dev/atomic-server/pull/13) add authorization test in server, make drive public by default
+- [#13](https://github.com/atomicdata-dev/atomic-server/pull/13) add read write at drive by default, check public agent
+- Improve errors cli server
+- Improve client error handling
+- [#13](https://github.com/atomicdata-dev/atomic-server/pull/13) client auth headers
+- Pass agent as &str
+- [#13](https://github.com/atomicdata-dev/atomic-server/pull/13) authenticate construct version
+- Bump version to v0.29.0
+- [#13](https://github.com/atomicdata-dev/atomic-server/pull/13) authenticate websockets
+- [#13](https://github.com/atomicdata-dev/atomic-server/pull/13) authorize search endpoint, add public mode
+- [#11](https://github.com/atomicdata-dev/atomic-server/pull/11) refactor error model
+- [#108](https://github.com/atomicdata-dev/atomic-server/pull/108) Add authentication, read right checks
+- [#40](https://github.com/atomicdata-dev/atomic-server/pull/40) update search index on commit
+- Fix classtype JSON
+- [#40](https://github.com/atomicdata-dev/atomic-server/pull/40) Improve rdf-search docs, bump version
+- [#40](https://github.com/atomicdata-dev/atomic-server/pull/40) isDynamic for results
+- [#40](https://github.com/atomicdata-dev/atomic-server/pull/40) add properties for search
+- [#40](https://github.com/atomicdata-dev/atomic-server/pull/40) indexing endpoint, subject results
+- [#40](https://github.com/atomicdata-dev/atomic-server/pull/40) Search - construct resource, perform query
+- [#206](https://github.com/atomicdata-dev/atomic-server/pull/206) add allows-only as recommended prop
+- [#206](https://github.com/atomicdata-dev/atomic-server/pull/206) check allows-only values in resource.set
+- [#206](https://github.com/atomicdata-dev/atomic-server/pull/206) add allows-only property to store
+- Fix test
+- Bump to v0.28.1
+- Fix path ENV variables
+- [#202](https://github.com/atomicdata-dev/atomic-server/pull/202) create parent dirs for config
+- v0.28.0
+- [#194](https://github.com/atomicdata-dev/atomic-server/pull/194) Fix indexing commits, add tests
+- [#195](https://github.com/atomicdata-dev/atomic-server/pull/195) WIP parse nested subjects
+- Fix CONFIG_DIR env
+- Add drives property to agent
+- Add demo_resources.json
+- Stricter classtype for collection/property
+- Fix typo in default store
+- Fix drives property url
+- Add paragraph class
+- Bump to v0.27.1
+- [#193](https://github.com/atomicdata-dev/atomic-server/pull/193) fix db init
+- Improved errors for populate functions
+- [#193](https://github.com/atomicdata-dev/atomic-server/pull/193) db init and deploy script
+- Bump to v0.27.0
+- Upgrade rust edition to 2021
+- Fix clippy warnings
+- [#163](https://github.com/atomicdata-dev/atomic-server/pull/163) Sort properties, add export flag
+- [#62](https://github.com/atomicdata-dev/atomic-server/pull/62) option to skip dynamic resources
+- Add classtype to atom/property
+- [#62](https://github.com/atomicdata-dev/atomic-server/pull/62) nested collections working
+- WIP [#62](https://github.com/atomicdata-dev/atomic-server/pull/62) nested members in collections
+- Release 0.26.2
+- Upgrade some deps
+- Release 0.26.1
+- Remove usage of deprecated url string method
+- Add test for deletion [#173](https://github.com/atomicdata-dev/atomic-server/pull/173)
+- Update Subject prop [#179](https://github.com/atomicdata-dev/atomic-server/pull/179)
+- Move base models to seperate file [#160](https://github.com/atomicdata-dev/atomic-server/pull/160)
+- [#177](https://github.com/atomicdata-dev/atomic-server/pull/177) Property property more props
+- No commits with query parameters in subjects [#179](https://github.com/atomicdata-dev/atomic-server/pull/179)
+- Fix property property [#177](https://github.com/atomicdata-dev/atomic-server/pull/177)
+- Return false for circular parents [#178](https://github.com/atomicdata-dev/atomic-server/pull/178)
+- Release 0.26.0
+- Fix format
+- Improve hierarchy error
+- Remove dead code
+- Better function names
+- [#173](https://github.com/atomicdata-dev/atomic-server/pull/173) specify actions apply_changes
+- [#173](https://github.com/atomicdata-dev/atomic-server/pull/173) Fix destroy indexing logic
+- [#171](https://github.com/atomicdata-dev/atomic-server/pull/171) Websockets working! Also, cleanup
+- Add is-locked property
+- Add Drives property
+- [#171](https://github.com/atomicdata-dev/atomic-server/pull/171) WIP websockets
+- Bump to v0.25.6
+- Release 0.25.5
+- Fix fmt
+- Release 0.25.4
+- [#165](https://github.com/atomicdata-dev/atomic-server/pull/165) CI setup
+- Move CLI tests
+- Fix tests in populate
+- Less strict clippy
+- [#165](https://github.com/atomicdata-dev/atomic-server/pull/165) Fix clippy
+- Format using cargo fmt
+- Add flags to server
+- [#159](https://github.com/atomicdata-dev/atomic-server/pull/159) Improve initial setup, cache issues
+- Fix tests, Cache bugs [#14](https://github.com/atomicdata-dev/atomic-server/pull/14) [#161](https://github.com/atomicdata-dev/atomic-server/pull/161)
+- Bump to v0.25.1
+- [#14](https://github.com/atomicdata-dev/atomic-server/pull/14) only build index if none has been built
+- Remove dead code
+- [#14](https://github.com/atomicdata-dev/atomic-server/pull/14) fix remove atom from index
+- [#14](https://github.com/atomicdata-dev/atomic-server/pull/14) Add minimal index test
+- Add isDynamic property
+- [#14](https://github.com/atomicdata-dev/atomic-server/pull/14) value index
+- Improve rights check for new resource commits
+- Update repo url
+- Stop using .jsonld, use.json extension
+- bump to v0.24.2
+- [#150](https://github.com/atomicdata-dev/atomic-server/pull/150) TPF support JSON-AD
+- Get rid of AD3 remnants [#148](https://github.com/atomicdata-dev/atomic-server/pull/148)
+- Remove String Atom, only use rich
+- Add classtype to remove
+- [#146](https://github.com/atomicdata-dev/atomic-server/pull/146) improve version construction
+- [#145](https://github.com/atomicdata-dev/atomic-server/pull/145) collection properties
+- More readme improvements
+- [#143](https://github.com/atomicdata-dev/atomic-server/pull/143) return resources for values at path endpoint
+- Move shortname property always to first one
+- Optional name in agents, fix tests
+- Move init store test util
+- Prevent unauthorized commits
+- Fix boolean in invites
+- Invite usages [#134](https://github.com/atomicdata-dev/atomic-server/pull/134) RDF fix [#141](https://github.com/atomicdata-dev/atomic-server/pull/141)
+- Fix dicsord link in lib readme
+- Update lib readme
+- Add privateKey, secret properties
+- newline in jsonld [#133](https://github.com/atomicdata-dev/atomic-server/pull/133)
+- Bump to v0.24
+- Fix test collection member count
+- [#134](https://github.com/atomicdata-dev/atomic-server/pull/134) fix base URL, invite IDs, verify invite input
+- [#134](https://github.com/atomicdata-dev/atomic-server/pull/134) Add invites
+- Add Invite model [#134](https://github.com/atomicdata-dev/atomic-server/pull/134) WIP
+- [#135](https://github.com/atomicdata-dev/atomic-server/pull/135) fix query params versioning
+- Use shorter collection names
+- [#132](https://github.com/atomicdata-dev/atomic-server/pull/132) rights check working, permissive cors
+- [#132](https://github.com/atomicdata-dev/atomic-server/pull/132) add hierarchy, tests passing
+- Fix serialization tests Agent model changes
+- [#132](https://github.com/atomicdata-dev/atomic-server/pull/132) Add children
+- [#132](https://github.com/atomicdata-dev/atomic-server/pull/132) write and read rights on init
+- [#132](https://github.com/atomicdata-dev/atomic-server/pull/132) Create a Drive for the primary Agent on init
+- Rename edit / read properties
+- Add canRead and canEdit props
+- Sort default_store alphabetically
+- Add Drive and Parent resources to json-ad
+- Agent model props fix
+- newline in jsonld  [#133](https://github.com/atomicdata-dev/atomic-server/pull/133)
+- Docs & clippy improvements
+- Add new JS path, change Agent model
+- Update docs
+- Cleanup
+- use JSON-LD default store [#79](https://github.com/atomicdata-dev/atomic-server/pull/79)
+- Working import / export [#125](https://github.com/atomicdata-dev/atomic-server/pull/125)
+- JSON-AD serialize / parse roundtrip
+- WIP json-ad parsing [#123](https://github.com/atomicdata-dev/atomic-server/pull/123)
+- Fix commit serialization [#122](https://github.com/atomicdata-dev/atomic-server/pull/122)
+- Fix default_store again
+- Fix triple default store
+- Add classtype property to Property class
+- bump lib
+- Enable CLI tests, minor fixes
+- Move static folder to user config [#118](https://github.com/atomicdata-dev/atomic-server/pull/118)
+- Bump versions to 23.0
+- Upgrade various dependencies
+- Add `/all-verisons` endpoint
+- Fix tests
+- [#108](https://github.com/atomicdata-dev/atomic-server/pull/108) rename collections path
+- [#108](https://github.com/atomicdata-dev/atomic-server/pull/108) Better paths for generated collections
+- Move /path to endpoint [#110](https://github.com/atomicdata-dev/atomic-server/pull/110)
+- Generate collections dynamically [#108](https://github.com/atomicdata-dev/atomic-server/pull/108)
+- Dynamic handlers for endpoints [#73](https://github.com/atomicdata-dev/atomic-server/pull/73) [#42](https://github.com/atomicdata-dev/atomic-server/pull/42)
+- WIP endpoints, versioning
+- WIP Endpoints [#73](https://github.com/atomicdata-dev/atomic-server/pull/73)
+- Refactor commits, allow options, move to Commit.rs
+- versioning [#42](https://github.com/atomicdata-dev/atomic-server/pull/42)
+- set lower default page size
+- Throw for non posive ints in collections
+- Return requested subject extended resources [#109](https://github.com/atomicdata-dev/atomic-server/pull/109)
+- Add datatypes collection, classCollections
+- Reject invalid commits [#106](https://github.com/atomicdata-dev/atomic-server/pull/106), return 404 [#105](https://github.com/atomicdata-dev/atomic-server/pull/105)
+- Use atomic-data-browser js frontent  [#103](https://github.com/atomicdata-dev/atomic-server/pull/103)
+- Improve DB errors, add warnings in changelog
+- Add float datatype [#93](https://github.com/atomicdata-dev/atomic-server/pull/93), db path in tests,
+- Better timing error
+- Throw error on non-applied detroys, docs
+- Fix server not removing resources, add test [#101](https://github.com/atomicdata-dev/atomic-server/pull/101)
+- Fix tests, cleanup
+- Use JSON-AD serializer and parser for commits [#100](https://github.com/atomicdata-dev/atomic-server/pull/100)
+- Fix generate public key in cli
+- Bump to v0.22.0
+- Change commit serialization no pkcs8 [#98](https://github.com/atomicdata-dev/atomic-server/pull/98)
+- Use externally hosted atomic react
+- Add another signing test
+- Add signature test
+- Add save_locally [#51](https://github.com/atomicdata-dev/atomic-server/pull/51)
+- Servers are aware of own URL, cli imrpovements
+- Use JSON-AD urls in commits
+- Stricter JSON-AD parsing [#79](https://github.com/atomicdata-dev/atomic-server/pull/79)
+- JSON-AD Parsing [#79](https://github.com/atomicdata-dev/atomic-server/pull/79)
+- serialize resource to json-ad [#79](https://github.com/atomicdata-dev/atomic-server/pull/79)
+- Fix and refactor cli commit commands [#83](https://github.com/atomicdata-dev/atomic-server/pull/83)
+- Improve error messages [#11](https://github.com/atomicdata-dev/atomic-server/pull/11)
+- Improved WASM compliance [#76](https://github.com/atomicdata-dev/atomic-server/pull/76)
+- Fix clippy warnings
+- Remove ResourceString
+- Improve config log, add docker cmd to homepage
+- Improve server errors, changelog in readme
+- Fix array length bug in paths
+- Improve app errors, add .env to docker ignore
+- Regenerate agent on DB init [#68](https://github.com/atomicdata-dev/atomic-server/pull/68), improve errors
+- Faster docker build [#69](https://github.com/atomicdata-dev/atomic-server/pull/69), update readme, bump version
+- Fix usage of base url and slashes
+- Add dockerfile
+- Fix test markdown string
+- Render datetimes
+- Descriptions use markdown, not string
+- Set up basic CLI tests [#67](https://github.com/atomicdata-dev/atomic-server/pull/67)
+- Add datatype to populate [#65](https://github.com/atomicdata-dev/atomic-server/pull/65)
+- bump to 0.20
+- Fix test. All green
+- Collection sorting [#63](https://github.com/atomicdata-dev/atomic-server/pull/63)
+- Fix agents and commits, tests are green
+- No clippy warnings
+- Major cleanup
+- Remove strings from store
+- WIP refactor
+- WIP huge refactor
+- Destroy command fix [#57](https://github.com/atomicdata-dev/atomic-server/pull/57)
+- Fix Commits class [#56](https://github.com/atomicdata-dev/atomic-server/pull/56)
+- Bump to 0.19
+- Add table view [#53](https://github.com/atomicdata-dev/atomic-server/pull/53)
+- Fix errors, clippy warnings and tests
+- replace dyn with impl, require sized in trait [#45](https://github.com/atomicdata-dev/atomic-server/pull/45)
+- Remove store ref from resource [#45](https://github.com/atomicdata-dev/atomic-server/pull/45)
+- Resource iteration test
+- table view WIP [#53](https://github.com/atomicdata-dev/atomic-server/pull/53)
+- Remove some muts
+- TPF in CLI using client, bump version
+- Check required props on commit [#52](https://github.com/atomicdata-dev/atomic-server/pull/52)
+- Fix setting default agent cli
+- Post_commit uses default URL
+- Use Commits in cli new [#49](https://github.com/atomicdata-dev/atomic-server/pull/49)
+- Remove empty file
+- Cleanup prints, mutations
+- Improve errors while signing Commit
+- Remove prinlns
+- commit_resource_changes method in store [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- use commit in resource.save() [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- Set default agent, use in commits
+- Fix type resources
+- Remove prop in commit [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- Remove some where clauses [#45](https://github.com/atomicdata-dev/atomic-server/pull/45)
+- Fix refactor issue
+- Refactor signing
+- Set propval rename [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- Dashes in shortnames
+- Upgrade dependencies, bump versions
+- Test fixes and minor imps
+- Fix panic for removing unknown items [#46](https://github.com/atomicdata-dev/atomic-server/pull/46)
+- Add CLI edit command [#6](https://github.com/atomicdata-dev/atomic-server/pull/6)
+- Update to v0.17.0
+- Fix collections property, remove hardcoded collections
+- Fix dead URL link
+- Collections classes as array
+- Consruct default collections in populate [#43](https://github.com/atomicdata-dev/atomic-server/pull/43), fix duplicate collection
+- add remove function
+- Fix commit resources, use array
+- Commits from CLI, use config file,
+- Update Agent Config in lib [#38](https://github.com/atomicdata-dev/atomic-server/pull/38)
+- WIP root agent
+- improve set_propval documentation
+- Add isA to Commits
+- Add isA to collection [#39](https://github.com/atomicdata-dev/atomic-server/pull/39)
+- Rename item count to member count
+- Add pageSize to defaultStore
+- Page size in collections, add tests
+- Better descriptions in default store
+- Fix descriptions default
+- Fix collection members URL
+- Move serialization of resources to resource
+- Refactor collections, move to own file
+- Better deserialize error
+- Bump versions to 0.15
+- Functional pagination [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- :integer uses isize
+- Add itemcount to collections [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- Better collection API [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- Collections pages, testing and refactor [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- Explicit resource saving [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- Fix default store
+- Add 'collections' default collection
+- Add default collections [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- Fix TPF prop & val queries [#32](https://github.com/atomicdata-dev/atomic-server/pull/32)
+- WIP Collections [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- Fix discord link
+- Add test for deterministic serialization [#27](https://github.com/atomicdata-dev/atomic-server/pull/27)
+- Deterministic serialization [#27](https://github.com/atomicdata-dev/atomic-server/pull/27)
+- Implement signatures & verification [#27](https://github.com/atomicdata-dev/atomic-server/pull/27)
+- base_url simpler
+- WIP version up
+- Fix signature datatype
+- Commits to resources, persist 'em [#16](https://github.com/atomicdata-dev/atomic-server/pull/16)
+- Store propvals in Db [#16](https://github.com/atomicdata-dev/atomic-server/pull/16)
+- Increase timeout
+- Refactor commits, default store improvements
+- Add client::post_delta, optional Commit params
+- Better validation errors parsing AD3
+- Less panics and prints
+- Add Commits to default store [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- Commits and PartialCommits [#24](https://github.com/atomicdata-dev/atomic-server/pull/24)
+- Fix parser panic
+- Remove panics in get_class
+- Fix deadlock
+- Commit endpoint [#23](https://github.com/atomicdata-dev/atomic-server/pull/23)
+- Resource API in basic example
+- Resources API, link to store [#21](https://github.com/atomicdata-dev/atomic-server/pull/21), tests
+- ValidationReport [#20](https://github.com/atomicdata-dev/atomic-server/pull/20)
+- bump to v0.13
+- Fix tests, warnings
+- Save reference to store in resource [#19](https://github.com/atomicdata-dev/atomic-server/pull/19)
+- Get rid of &mut [#15](https://github.com/atomicdata-dev/atomic-server/pull/15)
+- get_classes in Resource
+- Also match TPF values in arrays with literal match
+- TPF test, collections feature [#17](https://github.com/atomicdata-dev/atomic-server/pull/17)
+- Update todo server
+- Extended descriptions
+- Delta to resource model [#11](https://github.com/atomicdata-dev/atomic-server/pull/11)
+- Mutate store on get...
+- prevent bug in path
+- Fix tests
+- Add atomicURL datatype
+- Fix local urls - looping, timeout, base_url
+- bump, minor refactors
+- Remove local schema _: [#9](https://github.com/atomicdata-dev/atomic-server/pull/9)
+- Refactor https, add cargodoc comments, prompt mail
+- NTriples serialization using rio
+- Upgrade actix
+- refactors, mime types
+- Add badges
+- Add isA to datatypes
+- Bump versions
+- Fix fetchting, better errors, optional path map
+- Content-type negotation in server
+- Clippy refactoring
+- clippy wip
+- ignore tmp folder from tests
+- Improve tests, add benchmark
+- set resource prop
+- CLI refactor, bug fixes
+- String -> &str performance + RDF serialization
+- Populate in lib, fix tests, move default, contrib
+- Remove load_default
+- Refactor parse, add Fetch
+- Add delta, validate, populate CLI commands
+- Delta basics, JSONLD, some bugs, propvals model
+- TPF working on server with Db
+- DB working!
+- Import ad3 on init (crashes)
+- It stores to disk!
+- Fix lib test
+- working!
+- storelike trait wip
+- Resource API get_string_resource in lib
+- Refactor Resource & Value, macros in server
+- Fix missing .ad3
+- Bump to 0.9
+- Fix plain / rich atoms
+- Path on server, value rendering
+- Path on server, value rendering
+- Add datatypes
+- init default store from binary
+- TPF support in server, better ENV handling
+- Add TPF to cli and lib
+- cli wapm start
+- subject generation, shortnames, mapping refactor
+- Improve validation, check required props
+- Add validation function
+- Improve JSON serialization + docs lib
+- Bump lib version
+- Remove warnings, fix build
+- WIP refactor store (overflow still)
+- Remove github releases, update to v0.5, test
+- bump version lib
+- Fix renames, add example + test for lib
+- Renaname atomic_lib
+- lib readme
+- Add license, use virtual manifest
+- Fix MDString URL
+- Add status warnings
+- Improve README
+- refactor into workspaces
