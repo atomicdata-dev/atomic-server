@@ -39,6 +39,7 @@ pub struct SearchQuery {
     /// e.g. `prop:val` or `prop:val~1` or `prop:val~1 AND prop2:val2`
     /// See https://docs.rs/tantivy/latest/tantivy/query/struct.QueryParser.html
     pub filters: Option<String>,
+    pub include: Option<bool>,
 }
 
 const DEFAULT_RETURN_LIMIT: usize = 30;
@@ -91,9 +92,13 @@ pub async fn search_query(
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());
 
-    let resources = get_resources(req, &appstate, &subject, subjects, limit)?;
-    timer.add("get_resources");
-    results_resource.set(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
+    if params.include.unwrap_or(false) {
+        timer.add("get_resources");
+        let resources = get_resources(req, &appstate, &subject, subjects.clone(), limit)?;
+        results_resource.set(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
+    } else {
+        results_resource.set(urls::ENDPOINT_RESULTS.into(), subjects.into(), store)?;
+    }
     let mut builder = HttpResponse::Ok();
     builder.append_header(("Server-Timing", timer.header_value()));
 
