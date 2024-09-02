@@ -1,0 +1,36 @@
+{
+  "version": "0.39.0",
+  "author": "Polle Pas",
+  "dependencies": {
+    "@tomic/lib": "workspace:*",
+    "chalk": "^5.3.0",
+    "prettier": "3.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.5",
+    "typescript": "^5.4.5"
+  },
+  "description": "",
+  "license": "MIT",
+  "name": "create-atomic",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint ./src --ext .js,.ts",
+    "lint-fix": "eslint ./src --ext .js,.ts --fix",
+    "prepublishOnly": "pnpm run build && pnpm run lint-fix",
+    "watch": "tsc --build --watch",
+    "start": "pnpm exec tsc --build --watch",
+    "tsc": "pnpm exec tsc --build",
+    "typecheck": "pnpm exec tsc --noEmit"
+  },
+  "bin": {
+    "create-template": "./bin/src/index.js"
+  },
+  "type": "module",
+  "peerDependencies": {
+    "@tomic/lib": "workspace:*"
+  }
+}

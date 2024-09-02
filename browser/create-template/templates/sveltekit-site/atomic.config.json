@@ -1,0 +1,6 @@
+{
+  "outputFolder": "./src/lib/ontologies",
+  "ontologies": [
+    <WEBSITE_ONTOLOGY>
+  ]
+}

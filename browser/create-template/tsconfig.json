@@ -1,0 +1,18 @@
+{
+    "compilerOptions": {
+        "outDir": "./bin",
+        "rootDir": ".",
+        "target": "ESNext",
+        "moduleResolution": "nodeNext",
+        "module": "nodeNext",
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        // We don't need type declarations for a cli app.
+        "declaration": false,
+        "allowJs": true,
+    },
+    "include": [
+        "./src",
+     ],
+    "references": [],
+}
