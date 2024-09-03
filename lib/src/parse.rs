@@ -127,15 +127,7 @@ pub fn parse_json_ad_string(
         ),
         _other => return Err("Root JSON element must be an object or array.".into()),
     }
-    // For most save menthods, we need to add the atoms to the index here.
-    // The `Commit` feature adds to index by itself, so we can skip that step here.
-    if parse_opts.save != SaveOpts::Commit {
-        for res in &vec {
-            for atom in res.to_atoms() {
-                store.add_atom_to_index(&atom, res)?;
-            }
-        }
-    }
+
     Ok(vec)
 }
 

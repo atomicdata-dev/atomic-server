@@ -33,12 +33,6 @@ pub trait Storelike: Sized {
     )]
     fn add_atoms(&self, atoms: Vec<Atom>) -> AtomicResult<()>;
 
-    /// Adds an Atom to the PropSubjectMap. Overwrites if already present.
-    /// The default implementation for this does not do anything, so overwrite it if your store needs indexing.
-    fn add_atom_to_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
-        Ok(())
-    }
-
     /// Adds a Resource to the store.
     /// Replaces existing resource with the contents.
     /// Updates the index.
@@ -71,19 +65,6 @@ pub trait Storelike: Sized {
         commit: &crate::Commit,
         opts: &crate::commit::CommitOpts,
     ) -> AtomicResult<CommitResponse>;
-
-    /// Constructs the value index from all resources in the store. Could take a while.
-    fn build_index(&self, include_external: bool) -> AtomicResult<()> {
-        tracing::info!("Building index (this could take a few minutes for larger databases)");
-        for r in self.all_resources(include_external) {
-            for atom in r.to_atoms() {
-                self.add_atom_to_index(&atom, &r)
-                    .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
-            }
-        }
-        tracing::info!("Building index finished!");
-        Ok(())
-    }
 
     /// Returns a single [Value] from a [Resource]
     fn get_value(&self, subject: &str, property: &str) -> AtomicResult<Value> {
@@ -348,11 +329,6 @@ pub trait Storelike: Sized {
 
     /// Search the Store, returns the matching subjects.
     fn query(&self, q: &Query) -> AtomicResult<QueryResult>;
-
-    /// Removes an Atom from the PropSubjectMap.
-    fn remove_atom_from_index(&self, _atom: &Atom, _resource: &Resource) -> AtomicResult<()> {
-        Ok(())
-    }
 
     /// Sets the default Agent for applying commits.
     fn set_default_agent(&self, agent: crate::agents::Agent);
