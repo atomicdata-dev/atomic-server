@@ -2,9 +2,10 @@
 
 use crate::{
     agents::{decode_base64, ForAgent},
-    commit::check_timestamp,
     errors::AtomicResult,
-    urls, Storelike,
+    urls,
+    utils::check_timestamp_in_past,
+    Storelike,
 };
 
 /// Set of values extracted from the request.
@@ -47,6 +48,8 @@ pub fn check_auth_signature(subject: &str, auth_header: &AuthValues) -> AtomicRe
     Ok(())
 }
 
+const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
+
 /// Get the Agent's subject from [AuthValues]
 /// Checks if the auth headers are correct, whether signature matches the public key, whether the timestamp is valid.
 /// by default, returns the public agent
@@ -60,7 +63,7 @@ pub fn get_agent_from_auth_values_and_check(
         check_auth_signature(&auth_vals.requested_subject, &auth_vals)
             .map_err(|e| format!("Error checking authentication headers. {}", e))?;
         // check if the timestamp is valid
-        check_timestamp(auth_vals.timestamp)?;
+        check_timestamp_in_past(auth_vals.timestamp, ACCEPTABLE_TIME_DIFFERENCE)?;
         // check if the public key belongs to the agent
         let found_public_key = store.get_value(&auth_vals.agent_subject, urls::PUBLIC_KEY)?;
         if found_public_key.to_string() != auth_vals.public_key {

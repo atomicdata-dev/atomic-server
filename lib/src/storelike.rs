@@ -63,6 +63,15 @@ pub trait Storelike: Sized {
     /// If Include_external is false, this is filtered by selecting only resoureces that match the `self` URL of the store.
     fn all_resources(&self, include_external: bool) -> Box<dyn Iterator<Item = Resource>>;
 
+    /// Takes a Commit and applies it to the Store.
+    /// This includes changing the resource, writing the changes, verifying the checks specified in your CommitOpts
+    /// The returned CommitResponse contains the new resource and the saved Commit Resource.
+    fn apply_commit(
+        &self,
+        commit: &crate::Commit,
+        opts: &crate::commit::CommitOpts,
+    ) -> AtomicResult<CommitResponse>;
+
     /// Constructs the value index from all resources in the store. Could take a while.
     fn build_index(&self, include_external: bool) -> AtomicResult<()> {
         tracing::info!("Building index (this could take a few minutes for larger databases)");

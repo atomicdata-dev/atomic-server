@@ -45,3 +45,15 @@ pub fn random_string(n: usize) -> String {
         .collect();
     random_string.to_lowercase()
 }
+
+pub fn check_timestamp_in_past(timestamp: i64, difference: i64) -> AtomicResult<()> {
+    let now = crate::utils::now();
+    if timestamp > now + difference {
+        return Err(format!(
+                "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
+                now, timestamp
+            )
+            .into());
+    }
+    return Ok(());
+}
