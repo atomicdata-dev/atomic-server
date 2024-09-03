@@ -12,5 +12,5 @@ export async function getAllBlogposts(): Promise<string[]> {
 		.setSortDesc(true)
 		.build();
 
-	return await collection.getAllMembers();
+	return collection.getAllMembers();
 }
