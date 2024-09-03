@@ -136,6 +136,20 @@ impl Db {
     }
 
     #[instrument(skip(self))]
+    fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
+        for index_atom in atom.to_indexable_atoms() {
+            add_atom_to_reference_index(&index_atom, self)?;
+            add_atom_to_prop_val_sub_index(&index_atom, self)?;
+            // Also update the query index to keep collections performant
+            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, false, resource)
+                .map_err(|e| {
+                    format!("Failed to check_if_atom_matches_watched_collections. {}", e)
+                })?;
+        }
+        Ok(())
+    }
+
+    #[instrument(skip(self))]
     fn all_index_atoms(&self, include_external: bool) -> IndexIterator {
         Box::new(
             self.all_resources(include_external)
@@ -149,6 +163,19 @@ impl Db {
                 })
                 .map(Ok),
         )
+    }
+
+    /// Constructs the value index from all resources in the store. Could take a while.
+    pub fn build_index(&self, include_external: bool) -> AtomicResult<()> {
+        tracing::info!("Building index (this could take a few minutes for larger databases)");
+        for r in self.all_resources(include_external) {
+            for atom in r.to_atoms() {
+                self.add_atom_to_index(&atom, &r)
+                    .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
+            }
+        }
+        tracing::info!("Building index finished!");
+        Ok(())
     }
 
     /// Internal method for fetching Resource data.
@@ -320,6 +347,18 @@ impl Db {
             count: total_count,
         })
     }
+
+    #[instrument(skip(self))]
+    fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
+        for index_atom in atom.to_indexable_atoms() {
+            remove_atom_from_reference_index(&index_atom, self)?;
+            remove_atom_from_prop_val_sub_index(&index_atom, self)?;
+
+            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)
+                .map_err(|e| format!("Checking atom went wrong: {}", e))?;
+        }
+        Ok(())
+    }
 }
 
 impl Drop for Db {
@@ -358,20 +397,6 @@ impl Storelike for Db {
             self.add_resource(resource)?
         }
         self.db.flush()?;
-        Ok(())
-    }
-
-    #[instrument(skip(self))]
-    fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        for index_atom in atom.to_indexable_atoms() {
-            add_atom_to_reference_index(&index_atom, self)?;
-            add_atom_to_prop_val_sub_index(&index_atom, self)?;
-            // Also update the query index to keep collections performant
-            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, false, resource)
-                .map_err(|e| {
-                    format!("Failed to check_if_atom_matches_watched_collections. {}", e)
-                })?;
-        }
         Ok(())
     }
 
@@ -494,7 +519,7 @@ impl Storelike for Db {
             }
         };
 
-        let mut resource_new = commit
+        let applied = commit
             .apply_changes(resource_old.clone(), store, false)
             .map_err(|e| {
                 format!(
@@ -502,6 +527,7 @@ impl Storelike for Db {
                     commit.subject, e
                 )
             })?;
+        let mut resource_new = applied.resource;
 
         if opts.validate_rights {
             let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&commit.signer);
@@ -570,8 +596,18 @@ impl Storelike for Db {
         // Save the resource, but skip updating the index - that has been done in a previous step.
         store.add_resource_opts(&resource_new, false, false, true)?;
 
-        // We apply the changes again, but this time also update the index
-        commit.apply_changes(resource_old.clone(), store, opts.update_index)?;
+        if opts.update_index {
+            for atom in applied.remove_atoms {
+                store
+                    .remove_atom_from_index(&atom, &resource_old)
+                    .map_err(|e| format!("Error removing atom from index: {e}  Atom: {e}"))?
+            }
+            for atom in applied.add_atoms {
+                store
+                    .add_atom_to_index(&atom, &resource_new)
+                    .map_err(|e| format!("Error adding atom to index: {e}  Atom: {e}"))?;
+            }
+        }
 
         let commit_response = CommitResponse {
             resource_new: Some(resource_new.clone()),
@@ -598,18 +634,6 @@ impl Storelike for Db {
         }
 
         Ok(commit_response)
-    }
-
-    #[instrument(skip(self))]
-    fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
-        for index_atom in atom.to_indexable_atoms() {
-            remove_atom_from_reference_index(&index_atom, self)?;
-            remove_atom_from_prop_val_sub_index(&index_atom, self)?;
-
-            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)
-                .map_err(|e| format!("Checking atom went wrong: {}", e))?;
-        }
-        Ok(())
     }
 
     fn get_server_url(&self) -> &str {

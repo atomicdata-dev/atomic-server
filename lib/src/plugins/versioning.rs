@@ -135,8 +135,8 @@ pub fn construct_version(
     let mut version = Resource::new(subject.into());
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
-            let updated = commit.apply_changes(version, store, false)?;
-            version = updated;
+            let applied = commit.apply_changes(version, store, false)?;
+            version = applied.resource;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {
                 break;
