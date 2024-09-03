@@ -25,6 +25,15 @@ pub struct CommitResponse {
     pub commit_struct: Commit,
 }
 
+pub struct CommitApplied {
+    /// The modified resources where the commit has been applied to
+    pub resource: Resource,
+    /// The atoms that should be added to the store (for updating indexes)
+    pub add_atoms: Vec<Atom>,
+    /// The atoms that should be removed from the store (for updating indexes)
+    pub remove_atoms: Vec<Atom>,
+}
+
 #[derive(Clone, Debug)]
 /// Describes options for applying a Commit.
 /// Skip the checks you don't need to get better performance, or if you want to break the rules a little.
@@ -113,7 +122,7 @@ impl Commit {
         mut resource: Resource,
         store: &impl Storelike,
         update_index: bool,
-    ) -> AtomicResult<Resource> {
+    ) -> AtomicResult<CommitApplied> {
         let resource_unedited = resource.clone();
 
         let mut remove_atoms: Vec<Atom> = Vec::new();
@@ -197,19 +206,11 @@ impl Commit {
             }
         }
 
-        if update_index {
-            for atom in remove_atoms {
-                store
-                    .remove_atom_from_index(&atom, &resource_unedited)
-                    .map_err(|e| format!("Error removing atom from index: {e}  Atom: {e}"))?
-            }
-            for atom in add_atoms {
-                store
-                    .add_atom_to_index(&atom, &resource)
-                    .map_err(|e| format!("Error adding atom to index: {e}  Atom: {e}"))?;
-            }
-        }
-        Ok(resource)
+        Ok(CommitApplied {
+            resource,
+            add_atoms,
+            remove_atoms,
+        })
     }
 
     /// Converts a Resource of a Commit into a Commit
