@@ -12,7 +12,7 @@
   },
   "description": "",
   "license": "MIT",
-  "name": "create-atomic",
+  "name": "@tomic/create-template",
   "publishConfig": {
     "access": "public"
   },
