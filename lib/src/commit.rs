@@ -8,7 +8,6 @@ use crate::{
     agents::{decode_base64, encode_base64},
     datatype::DataType,
     errors::AtomicResult,
-    hierarchy,
     resources::PropVals,
     urls,
     values::SubResource,
@@ -84,189 +83,8 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Apply a single signed Commit to the store.
-    /// Creates, edits or destroys a resource.
-    /// Allows for control over which validations should be performed.
-    /// Returns the generated Commit, the old Resource and the new Resource.
-    #[tracing::instrument(skip(store))]
-    pub fn apply_opts(
-        &self,
-        store: &impl Storelike,
-        opts: &CommitOpts,
-    ) -> AtomicResult<CommitResponse> {
-        let subject_url = url::Url::parse(&self.subject)
-            .map_err(|e| format!("Subject '{}' is not a URL. {}", &self.subject, e))?;
-
-        if subject_url.query().is_some() {
-            return Err("Subject URL cannot have query parameters".into());
-        }
-
-        if opts.validate_signature {
-            let signature = match self.signature.as_ref() {
-                Some(sig) => sig,
-                None => return Err("No signature set".into()),
-            };
-            let pubkey_b64 = store
-                .get_resource(&self.signer)?
-                .get(urls::PUBLIC_KEY)?
-                .to_string();
-            let agent_pubkey = decode_base64(&pubkey_b64)?;
-            let stringified_commit = self.serialize_deterministically_json_ad(store)?;
-            let peer_public_key =
-                ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
-            let signature_bytes = decode_base64(signature)?;
-            peer_public_key
-                .verify(stringified_commit.as_bytes(), &signature_bytes)
-                .map_err(|_e| {
-                    format!(
-                        "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: {}",
-                        stringified_commit,
-                    )
-                })?;
-        }
-        // Check if the created_at lies in the past
-        if opts.validate_timestamp {
-            check_timestamp(self.created_at)?;
-        }
-
-        self.check_for_circular_parents()?;
-
-        let commit_resource: Resource = self.into_resource(store)?;
-        let mut is_new = false;
-        // Create a new resource if it doens't exist yet
-        let mut resource_old = match store.get_resource(&self.subject) {
-            Ok(rs) => rs,
-            Err(_) => {
-                is_new = true;
-                Resource::new(self.subject.clone())
-            }
-        };
-
-        // Make sure the one creating the commit had the same idea of what the current state is.
-        if !is_new && opts.validate_previous_commit {
-            if let Ok(last_commit_val) = resource_old.get(urls::LAST_COMMIT) {
-                let last_commit = last_commit_val.to_string();
-
-                if let Some(prev_commit) = self.previous_commit.clone() {
-                    // TODO: try auto merge
-                    if last_commit != prev_commit {
-                        return Err(format!(
-                            "previousCommit mismatch. Had lastCommit '{}' in Resource {}, but got in Commit '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
-                            last_commit, subject_url, prev_commit,
-                        )
-                        .into());
-                    }
-                } else {
-                    return Err(format!("Missing `previousCommit`. Resource {} already exists, and it has a `lastCommit` field, so a `previousCommit` field is required in your Commit.", self.subject).into());
-                }
-            } else {
-                // If there is no lastCommit in the Resource, we'll accept the Commit.
-                tracing::warn!("No `lastCommit` in Resource. This can be a bug, or it could be that the resource was never properly updated.");
-            }
-        };
-
-        let mut resource_new = self
-            .apply_changes(resource_old.clone(), store, false)
-            .map_err(|e| format!("Error applying changes to Resource {}. {}", self.subject, e))?;
-
-        if opts.validate_rights {
-            let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&self.signer);
-            if is_new {
-                hierarchy::check_append(store, &resource_new, &validate_for.into())?;
-            } else {
-                // Set a parent only if the rights checks are to be validated.
-                // If there is no explicit parent set on the previous resource, use a default.
-                // Unless it's a Drive!
-                if resource_old.get(urls::PARENT).is_err() {
-                    let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
-                    resource_old.set(
-                        urls::PARENT.into(),
-                        Value::AtomicUrl(default_parent),
-                        store,
-                    )?;
-                }
-                // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
-                hierarchy::check_write(store, &resource_old, &validate_for.into())?;
-            }
-        };
-        // Check if all required props are there
-        if opts.validate_schema {
-            resource_new.check_required_props(store)?;
-        }
-
-        // Set the `lastCommit` to the newly created Commit
-        resource_new.set(
-            urls::LAST_COMMIT.to_string(),
-            Value::AtomicUrl(commit_resource.get_subject().into()),
-            store,
-        )?;
-
-        let _resource_new_classes = resource_new.get_classes(store)?;
-
-        // BEFORE APPLY COMMIT HANDLERS
-        #[cfg(feature = "db")]
-        for class in &_resource_new_classes {
-            match class.subject.as_str() {
-                urls::COMMIT => return Err("Commits can not be edited or created directly.".into()),
-                urls::INVITE => {
-                    crate::plugins::invite::before_apply_commit(store, self, &resource_new)?
-                }
-                _other => {}
-            };
-        }
-
-        // If a Destroy field is found, remove the resource and return early
-        // TODO: Should we remove the existing commits too? Probably.
-        if let Some(destroy) = self.destroy {
-            if destroy {
-                // Note: the value index is updated before this action, in resource.apply_changes()
-                store.remove_resource(&self.subject)?;
-                store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
-                return Ok(CommitResponse {
-                    resource_new: None,
-                    resource_old: Some(resource_old),
-                    commit_resource,
-                    commit_struct: self.clone(),
-                });
-            }
-        }
-
-        // We apply the changes again, but this time also update the index
-        self.apply_changes(resource_old.clone(), store, opts.update_index)?;
-
-        // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
-        store.add_resource_opts(&commit_resource, false, opts.update_index, false)?;
-        // Save the resource, but skip updating the index - that has been done in a previous step.
-        store.add_resource_opts(&resource_new, false, false, true)?;
-
-        let commit_response = CommitResponse {
-            resource_new: Some(resource_new.clone()),
-            resource_old: Some(resource_old),
-            commit_resource,
-            commit_struct: self.clone(),
-        };
-
-        store.handle_commit(&commit_response);
-
-        // AFTER APPLY COMMIT HANDLERS
-        // Commit has been checked and saved.
-        // Here you can add side-effects, such as creating new Commits.
-        #[cfg(feature = "db")]
-        for class in _resource_new_classes {
-            match class.subject.as_str() {
-                urls::MESSAGE => crate::plugins::chatroom::after_apply_commit_message(
-                    store,
-                    self,
-                    &resource_new,
-                )?,
-                _other => {}
-            };
-        }
-
-        Ok(commit_response)
-    }
-
-    fn check_for_circular_parents(&self) -> AtomicResult<()> {
+    /// Throws an error if the parent is set to itself
+    pub fn check_for_circular_parents(&self) -> AtomicResult<()> {
         // Check if the set hashset has a parent property and if it matches with this subject.
         if let Some(set) = self.set.clone() {
             if let Some(parent) = set.get(urls::PARENT) {
@@ -278,6 +96,12 @@ impl Commit {
 
         // TODO: Check for circular parents by going up the parent tree.
         Ok(())
+    }
+
+    /// Checks if the Commit has been created in the future or if it is expired.
+    #[tracing::instrument(skip_all)]
+    pub fn check_timestamp(&self) -> AtomicResult<()> {
+        crate::utils::check_timestamp_in_past(self.created_at, ACCEPTABLE_TIME_DIFFERENCE)
     }
 
     /// Updates the values in the Resource according to the `set`, `remove`, `push`, and `destroy` attributes in the Commit.
@@ -386,21 +210,6 @@ impl Commit {
             }
         }
         Ok(resource)
-    }
-
-    /// Applies a commit without performing authorization / signature / schema checks.
-    /// Does not update the index.
-    pub fn apply_unsafe(&self, store: &impl Storelike) -> AtomicResult<CommitResponse> {
-        let opts = CommitOpts {
-            validate_schema: false,
-            validate_signature: false,
-            validate_timestamp: false,
-            validate_rights: false,
-            validate_previous_commit: false,
-            validate_for_agent: None,
-            update_index: false,
-        };
-        self.apply_opts(store, &opts)
     }
 
     /// Converts a Resource of a Commit into a Commit
@@ -683,21 +492,6 @@ pub fn sign_message(message: &str, private_key: &str, public_key: &str) -> Atomi
 /// The amount of milliseconds that a Commit signature is valid for.
 const ACCEPTABLE_TIME_DIFFERENCE: i64 = 10000;
 
-/// Checks if the Commit has been created in the future or if it is expired.
-#[tracing::instrument(skip_all)]
-pub fn check_timestamp(timestamp: i64) -> AtomicResult<()> {
-    let now = crate::utils::now();
-    if timestamp > now + ACCEPTABLE_TIME_DIFFERENCE {
-        return Err(format!(
-                    "Commit CreatedAt timestamp must lie in the past. Check your clock. Timestamp now: {} CreatedAt is: {}",
-                    now, timestamp
-                )
-                .into());
-        // TODO: also check that no younger commits exist
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod test {
     lazy_static::lazy_static! {
@@ -731,7 +525,7 @@ mod test {
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
         let commit_subject = commit.get_subject().to_string();
-        let _created_resource = commit.apply_opts(&store, &OPTS).unwrap();
+        let _created_resource = store.apply_commit(&commit, &OPTS).unwrap();
 
         let resource = store.get_resource(subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
@@ -829,13 +623,13 @@ mod test {
             let subject = "https://localhost/?q=invalid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
-            commit.apply_opts(&store, &OPTS).unwrap_err();
+            store.apply_commit(&commit, &OPTS).unwrap_err();
         }
         {
             let subject = "https://localhost/valid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
-            commit.apply_opts(&store, &OPTS).unwrap();
+            store.apply_commit(&commit, &OPTS).unwrap();
         }
     }
 }
