@@ -12,3 +12,8 @@ export function ask(question: string): Promise<string> {
     });
   });
 }
+
+export function log(message: unknown, ...optionalParams: unknown[]): void {
+  // eslint-disable-next-line no-console
+  console.log(message, ...(optionalParams ?? []));
+}
