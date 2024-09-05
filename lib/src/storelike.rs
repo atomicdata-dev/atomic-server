@@ -62,14 +62,34 @@ pub trait Storelike: Sized {
     /// The returned CommitResponse contains the new resource and the saved Commit Resource.
     fn apply_commit(
         &self,
-        commit: &crate::Commit,
+        commit: crate::Commit,
         opts: &crate::commit::CommitOpts,
-    ) -> AtomicResult<CommitResponse>;
+    ) -> AtomicResult<CommitResponse> {
+        let applied = commit.validate_and_apply(opts, self)?;
+
+        match (&applied.resource_old, &applied.resource_new) {
+            (None, None) => {
+                return Err("Neither an old nor a new resource is returned from the commit - something went wrong.".into())
+            },
+            (None, Some(new)) => {
+                self.add_resource(new)?;
+            },
+            (Some(_old), Some(new)) => {
+                self.add_resource(new)?;
+            },
+            (Some(_old), None) => {
+                assert_eq!(_old.get_subject(), &applied.commit.subject);
+                self.remove_resource(&applied.commit.subject)?;
+            }
+        }
+
+        Ok(applied)
+    }
 
     /// Returns a single [Value] from a [Resource]
     fn get_value(&self, subject: &str, property: &str) -> AtomicResult<Value> {
         self.get_resource(subject)
-            .and_then(|r| r.get(property).map(|v| v.clone()))
+            .and_then(|r| r.get(property).cloned())
     }
 
     /// Returns the base URL where the default store is.
