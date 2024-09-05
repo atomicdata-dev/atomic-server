@@ -6,7 +6,7 @@ They list a bunch of Messages.
 
 use crate::{
     agents::ForAgent,
-    commit::{CommitBuilder, CommitResponse},
+    commit::{CommitBuilder, CommitOpts},
     errors::AtomicResult,
     storelike::Query,
     urls::{self, PARENT},
@@ -101,15 +101,9 @@ pub fn after_apply_commit_message(
         let new_message = crate::values::SubResource::Resource(Box::new(resource_new.to_owned()));
         commit_builder.push_propval(urls::MESSAGES, new_message)?;
         let commit = commit_builder.sign(&store.get_default_agent()?, store, &chat_room)?;
+        let resp = commit.validate_and_apply(&CommitOpts::no_validations_no_index(), store)?;
 
-        let commit_response = CommitResponse {
-            commit_resource: commit.into_resource(store)?,
-            resource_new: None,
-            resource_old: None,
-            commit_struct: commit,
-        };
-
-        store.handle_commit(&commit_response);
+        store.handle_commit(&resp);
     }
     Ok(())
 }

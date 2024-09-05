@@ -158,14 +158,6 @@ impl Storelike for Store {
         Box::new(self.hashmap.lock().unwrap().clone().into_values())
     }
 
-    fn apply_commit(
-        &self,
-        commit: &crate::Commit,
-        opts: &crate::commit::CommitOpts,
-    ) -> AtomicResult<crate::commit::CommitResponse> {
-        todo!()
-    }
-
     fn get_server_url(&self) -> &str {
         // TODO Should be implemented later when companion functionality is here
         // https://github.com/atomicdata-dev/atomic-server/issues/6

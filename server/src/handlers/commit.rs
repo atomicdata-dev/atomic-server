@@ -36,7 +36,7 @@ pub async fn post_commit(
         validate_for_agent: Some(incoming_commit.signer.to_string()),
         update_index: true,
     };
-    let commit_response = store.apply_commit(&incoming_commit, &opts)?;
+    let commit_response = store.apply_commit(incoming_commit, &opts)?;
 
     let message = commit_response.commit_resource.to_json_ad()?;
 

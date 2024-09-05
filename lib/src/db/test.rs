@@ -155,7 +155,15 @@ fn destroy_resource_and_check_collection_and_commits() {
         "The commits collection did not increase after saving the resource."
     );
 
-    _res.resource_new.unwrap().destroy(&store).unwrap();
+    let clone = _res.resource_new.clone().unwrap();
+    let resp = _res.resource_new.unwrap().destroy(&store).unwrap();
+    assert!(resp.resource_new.is_none());
+    assert_eq!(
+        resp.resource_old.as_ref().unwrap().to_json_ad().unwrap(),
+        clone.to_json_ad().unwrap(),
+        "JSON AD differs between removed resource and resource passed back from commit"
+    );
+    assert!(resp.resource_old.is_some());
     let agents_collection_3 = store
         .get_resource_extended(&agents_url, false, for_agent)
         .unwrap();

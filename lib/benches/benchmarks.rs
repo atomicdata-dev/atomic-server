@@ -23,14 +23,6 @@ fn random_resource(atom: &Atom) -> Resource {
 fn criterion_benchmark(c: &mut Criterion) {
     let store = Db::init_temp("bench").unwrap();
 
-    c.bench_function("add_atom_to_index", |b| {
-        b.iter(|| {
-            let atom = random_atom();
-            let resource = random_resource(&random_atom());
-            store.add_atom_to_index(&atom, &resource).unwrap();
-        })
-    });
-
     c.bench_function("add_resource", |b| {
         b.iter(|| {
             let resource = random_resource(&random_atom());

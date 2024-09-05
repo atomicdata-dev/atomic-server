@@ -344,7 +344,7 @@ fn parse_json_ad_map_to_resource(
                 };
 
                 store
-                    .apply_commit(&commit, &opts)
+                    .apply_commit(commit, &opts)
                     .map_err(|e| format!("Failed to save {}: {}", r.get_subject(), e))?
                     .resource_new
                     .unwrap()
