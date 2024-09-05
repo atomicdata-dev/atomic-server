@@ -103,7 +103,7 @@ impl CommitMonitor {
     /// and update the value index.
     /// The search index is only updated if the last search commit is 15 seconds or older.
     fn handle_internal(&mut self, msg: CommitMessage) -> AtomicServerResult<()> {
-        let target = msg.commit_response.commit_struct.subject.clone();
+        let target = msg.commit_response.commit.subject.clone();
 
         // Notify websocket listeners
         if let Some(subscribers) = self.subscriptions.get(&target) {

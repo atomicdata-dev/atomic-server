@@ -136,7 +136,7 @@ pub fn construct_version(
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
             let applied = commit.apply_changes(version, store, false)?;
-            version = applied.resource;
+            version = applied.resource_new;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {
                 break;

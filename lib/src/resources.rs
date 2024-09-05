@@ -366,7 +366,7 @@ impl Resource {
             validate_previous_commit: false,
             update_index: true,
         };
-        let commit_response = store.apply_commit(&commit, &opts)?;
+        let commit_response = store.apply_commit(commit, &opts)?;
         if let Some(new) = &commit_response.resource_new {
             self.subject = new.subject.clone();
             self.propvals = new.propvals.clone();
@@ -394,7 +394,7 @@ impl Resource {
             validate_previous_commit: false,
             update_index: true,
         };
-        let commit_response = store.apply_commit(&commit, &opts)?;
+        let commit_response = store.apply_commit(commit, &opts)?;
         if let Some(new) = &commit_response.resource_new {
             self.subject = new.subject.clone();
             self.propvals = new.propvals.clone();
@@ -696,7 +696,7 @@ mod test {
             .unwrap();
         store
             .apply_commit(
-                &commit,
+                commit,
                 &CommitOpts {
                     validate_schema: true,
                     validate_signature: true,
@@ -792,7 +792,7 @@ mod test {
             "The first element should be the appended value"
         );
         let resp = resource.save_locally(&store).unwrap();
-        assert!(resp.commit_struct.push.is_some());
+        assert!(resp.commit_resource.get(urls::PUSH).is_ok());
 
         let new_val = resp
             .resource_new

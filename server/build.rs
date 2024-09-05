@@ -18,6 +18,7 @@ struct Dirs {
 }
 
 fn main() -> std::io::Result<()> {
+    // return Ok(());
     const BROWSER_ROOT: &str = "../browser/";
     let dirs: Dirs = {
         Dirs {

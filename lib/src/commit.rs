@@ -19,15 +19,19 @@ use crate::{
 /// When deleting a resource, the `resource_new` field is None.
 #[derive(Clone, Debug)]
 pub struct CommitResponse {
+    pub commit: Commit,
     pub commit_resource: Resource,
     pub resource_new: Option<Resource>,
     pub resource_old: Option<Resource>,
-    pub commit_struct: Commit,
+    pub add_atoms: Vec<Atom>,
+    pub remove_atoms: Vec<Atom>,
 }
 
 pub struct CommitApplied {
+    /// The resource before the Commit was applied
+    pub resource_old: Resource,
     /// The modified resources where the commit has been applied to
-    pub resource: Resource,
+    pub resource_new: Resource,
     /// The atoms that should be added to the store (for updating indexes)
     pub add_atoms: Vec<Atom>,
     /// The atoms that should be removed from the store (for updating indexes)
@@ -53,6 +57,20 @@ pub struct CommitOpts {
     pub update_index: bool,
     /// For who the right checks will be perormed. If empty, the signer of the Commit will be used.
     pub validate_for_agent: Option<String>,
+}
+
+impl CommitOpts {
+    pub fn no_validations_no_index() -> Self {
+        Self {
+            validate_schema: false,
+            validate_signature: false,
+            validate_timestamp: false,
+            validate_rights: false,
+            validate_previous_commit: false,
+            update_index: false,
+            validate_for_agent: None,
+        }
+    }
 }
 
 /// A Commit is a set of changes to a Resource.
@@ -107,21 +125,177 @@ impl Commit {
         Ok(())
     }
 
+    pub fn validate_previous_commit(
+        &self,
+        resource_old: &Resource,
+        subject_url: &str,
+    ) -> AtomicResult<()> {
+        let commit = self;
+        if let Ok(last_commit_val) = resource_old.get(urls::LAST_COMMIT) {
+            let last_commit = last_commit_val.to_string();
+
+            if let Some(prev_commit) = commit.previous_commit.clone() {
+                // TODO: try auto merge
+                if last_commit != prev_commit {
+                    return Err(format!(
+                        "previousCommit mismatch. Had lastCommit '{}' in Resource {}, but got in Commit '{}'. Perhaps you created the Commit based on an outdated version of the Resource.",
+                        last_commit, subject_url, prev_commit,
+                    )
+                    .into());
+                }
+            } else {
+                return Err(format!("Missing `previousCommit`. Resource {} already exists, and it has a `lastCommit` field, so a `previousCommit` field is required in your Commit.", commit.subject).into());
+            }
+        } else {
+            // If there is no lastCommit in the Resource, we'll accept the Commit.
+            tracing::warn!("No `lastCommit` in Resource. This can be a bug, or it could be that the resource was never properly updated.");
+        }
+        Ok(())
+    }
+
+    /// Check if the Commit's signature matches the signer's public key.
+    pub fn validate_signature(&self, store: &impl Storelike) -> AtomicResult<()> {
+        let commit = self;
+        let signature = match commit.signature.as_ref() {
+            Some(sig) => sig,
+            None => return Err("No signature set".into()),
+        };
+        let pubkey_b64 = store
+            .get_resource(&commit.signer)?
+            .get(urls::PUBLIC_KEY)?
+            .to_string();
+        let agent_pubkey = decode_base64(&pubkey_b64)?;
+        let stringified_commit = commit.serialize_deterministically_json_ad(store)?;
+        let peer_public_key =
+            ring::signature::UnparsedPublicKey::new(&ring::signature::ED25519, agent_pubkey);
+        let signature_bytes = decode_base64(signature)?;
+        peer_public_key
+            .verify(stringified_commit.as_bytes(), &signature_bytes)
+            .map_err(|_e| {
+                format!(
+                    "Incorrect signature for Commit. This could be due to an error during signing or serialization of the commit. Compare this to the serialized commit in the client: {}",
+                    stringified_commit,
+                )
+            })?;
+        Ok(())
+    }
+
+    /// Performs the checks specified in CommitOpts and constructs a new Resource.
+    /// Warning: Does not save the new resource to the Store - doet not delete if it `destroy: true`.
+    /// Use [Storelike::apply_commit] to save the resource to the Store.
+    pub fn validate_and_apply(
+        self,
+        opts: &CommitOpts,
+        store: &impl Storelike,
+    ) -> AtomicResult<CommitResponse> {
+        let commit = self;
+        let subject_url = url::Url::parse(&commit.subject)
+            .map_err(|e| format!("Subject '{}' is not a URL. {}", commit.subject, e))?;
+
+        if subject_url.query().is_some() {
+            return Err("Subject URL cannot have query parameters".into());
+        }
+
+        if opts.validate_signature {
+            commit.validate_signature(store)?;
+        }
+        if opts.validate_timestamp {
+            commit.validate_timestamp()?;
+        }
+
+        commit.check_for_circular_parents()?;
+        let mut is_new = false;
+        // Create a new resource if it doesn't exist yet
+        let mut resource_old = match store.get_resource(&commit.subject) {
+            Ok(rs) => rs,
+            Err(_) => {
+                is_new = true;
+                Resource::new(commit.subject.clone())
+            }
+        };
+
+        // Make sure the one creating the commit had the same idea of what the current state is.
+        if !is_new && opts.validate_previous_commit {
+            commit.validate_previous_commit(&resource_old, subject_url.as_str())?;
+        };
+
+        let mut applied = commit
+            .apply_changes(resource_old.clone(), store, false)
+            .map_err(|e| {
+                format!(
+                    "Error applying changes to Resource {}. {}",
+                    commit.subject, e
+                )
+            })?;
+
+        if opts.validate_rights {
+            let validate_for = opts.validate_for_agent.as_ref().unwrap_or(&commit.signer);
+            if is_new {
+                crate::hierarchy::check_append(store, &applied.resource_new, &validate_for.into())?;
+            } else {
+                // Set a parent only if the rights checks are to be validated.
+                // If there is no explicit parent set on the previous resource, use a default.
+                // Unless it's a Drive!
+                if resource_old.get(urls::PARENT).is_err() {
+                    let default_parent = store.get_self_url().ok_or("There is no self_url set, and no parent in the Commit. The commit can not be applied.")?;
+                    resource_old.set(
+                        urls::PARENT.into(),
+                        Value::AtomicUrl(default_parent),
+                        store,
+                    )?;
+                }
+                // This should use the _old_ resource, no the new one, as the new one might maliciously give itself write rights.
+                crate::hierarchy::check_write(store, &resource_old, &validate_for.into())?;
+            }
+        };
+        // Check if all required props are there
+        if opts.validate_schema {
+            applied.resource_new.check_required_props(store)?;
+        }
+
+        let commit_resource: Resource = commit.into_resource(store)?;
+
+        // Set the `lastCommit` to the newly created Commit
+        applied.resource_new.set(
+            urls::LAST_COMMIT.to_string(),
+            Value::AtomicUrl(commit_resource.get_subject().into()),
+            store,
+        )?;
+
+        let destroyed = commit.destroy.unwrap_or_default();
+
+        Ok(CommitResponse {
+            commit,
+            add_atoms: applied.add_atoms,
+            remove_atoms: applied.remove_atoms,
+            commit_resource,
+            resource_new: if destroyed {
+                None
+            } else {
+                Some(applied.resource_new)
+            },
+            resource_old: if is_new {
+                None
+            } else {
+                Some(applied.resource_old)
+            },
+        })
+    }
+
     /// Checks if the Commit has been created in the future or if it is expired.
     #[tracing::instrument(skip_all)]
-    pub fn check_timestamp(&self) -> AtomicResult<()> {
+    pub fn validate_timestamp(&self) -> AtomicResult<()> {
         crate::utils::check_timestamp_in_past(self.created_at, ACCEPTABLE_TIME_DIFFERENCE)
     }
 
     /// Updates the values in the Resource according to the `set`, `remove`, `push`, and `destroy` attributes in the Commit.
-    /// Optionally also updates the index in the Store.
-    /// The Old Resource is only needed when `update_index` is true, and is used for checking
+    /// Optionally also returns the updated Atoms.
     #[tracing::instrument(skip(store))]
     pub fn apply_changes(
         &self,
         mut resource: Resource,
         store: &impl Storelike,
-        update_index: bool,
+        return_atoms: bool,
     ) -> AtomicResult<CommitApplied> {
         let resource_unedited = resource.clone();
 
@@ -132,7 +306,7 @@ impl Commit {
             for prop in remove.iter() {
                 resource.remove_propval(prop);
 
-                if update_index {
+                if return_atoms {
                     if let Ok(val) = resource_unedited.get(prop) {
                         let atom =
                             Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
@@ -158,7 +332,7 @@ impl Commit {
                         )
                     })?;
 
-                if update_index {
+                if return_atoms {
                     let new_atom =
                         Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
                     if let Ok(old_val) = resource_unedited.get(prop) {
@@ -185,7 +359,7 @@ impl Commit {
                 };
                 old_vec.append(&mut new_vec.clone());
                 resource.set_unsafe(prop.into(), old_vec.into());
-                if update_index {
+                if return_atoms {
                     for added_resource in new_vec {
                         let atom = Atom::new(
                             resource.get_subject().clone(),
@@ -207,7 +381,8 @@ impl Commit {
         }
 
         Ok(CommitApplied {
-            resource,
+            resource_old: resource_unedited,
+            resource_new: resource,
             add_atoms,
             remove_atoms,
         })
@@ -526,7 +701,7 @@ mod test {
         commitbuiler.set(property2.into(), value2);
         let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
         let commit_subject = commit.get_subject().to_string();
-        let _created_resource = store.apply_commit(&commit, &OPTS).unwrap();
+        let _created_resource = store.apply_commit(commit, &OPTS).unwrap();
 
         let resource = store.get_resource(subject).unwrap();
         assert!(resource.get(property1).unwrap().to_string() == value1.to_string());
@@ -624,13 +799,13 @@ mod test {
             let subject = "https://localhost/?q=invalid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
-            store.apply_commit(&commit, &OPTS).unwrap_err();
+            store.apply_commit(commit, &OPTS).unwrap_err();
         }
         {
             let subject = "https://localhost/valid";
             let commitbuiler = crate::commit::CommitBuilder::new(subject.into());
             let commit = commitbuiler.sign(&agent, &store, &resource).unwrap();
-            store.apply_commit(&commit, &OPTS).unwrap();
+            store.apply_commit(commit, &OPTS).unwrap();
         }
     }
 }
