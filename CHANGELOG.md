@@ -5,6 +5,12 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+## [UNRELEASED]
+
+- Speed up Commits by bundling DB transactions #297
+- Introduce `Db::apply_transaction` and `Storelike::apply_commit`
+- Deprecate `add_atom_to_index` and `remove_atom_from_index` as public methods.
+
 ## [v0.39.0] - 2024-08-21
 
 - The download endpoint can now optimize images on the fly. This is controlled via query parameters. #257
