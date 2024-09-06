@@ -4,7 +4,10 @@ use tracing::instrument;
 
 use crate::{atoms::IndexAtom, errors::AtomicResult, Db, Value};
 
-use super::query_index::{IndexIterator, SEPARATION_BIT};
+use super::{
+    query_index::{IndexIterator, SEPARATION_BIT},
+    trees::{Method, Operation, Transaction, Tree},
+};
 
 /// Finds all Atoms for a given {property}-{value} tuple.
 pub fn find_in_prop_val_sub_index(store: &Db, prop: &str, val: Option<&Value>) -> IndexIterator {
@@ -19,22 +22,27 @@ pub fn find_in_prop_val_sub_index(store: &Db, prop: &str, val: Option<&Value>) -
     }))
 }
 
-#[instrument(skip(store))]
-pub fn add_atom_to_prop_val_sub_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
-    let _existing = store
-        .prop_val_sub_index
-        .insert(key_from_atom(index_atom), b"");
+pub fn add_atom_to_prop_val_sub_index(
+    index_atom: &IndexAtom,
+    transaction: &mut Transaction,
+) -> AtomicResult<()> {
+    transaction.push(Operation {
+        key: propvalsub_key(index_atom),
+        val: Some(b"".to_vec()),
+        tree: Tree::PropValSub,
+        method: Method::Insert,
+    });
     Ok(())
 }
 
 #[instrument(skip(store))]
 pub fn remove_atom_from_prop_val_sub_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
-    let _existing = store.prop_val_sub_index.remove(key_from_atom(index_atom));
+    let _existing = store.prop_val_sub_index.remove(propvalsub_key(index_atom));
     Ok(())
 }
 
 /// Constructs the Key for the prop_val_sub_index.
-fn key_from_atom(atom: &IndexAtom) -> Vec<u8> {
+pub fn propvalsub_key(atom: &IndexAtom) -> Vec<u8> {
     [
         atom.property.as_bytes(),
         &[SEPARATION_BIT],
@@ -79,7 +87,7 @@ mod test {
             sort_value: "2".into(),
             subject: "http://example.com/subj".into(),
         };
-        let key = key_from_atom(&atom);
+        let key = propvalsub_key(&atom);
         let atom2 = key_to_index_atom(&key).unwrap();
         assert_eq!(atom, atom2);
     }
