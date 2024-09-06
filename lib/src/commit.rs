@@ -183,7 +183,7 @@ impl Commit {
     /// Performs the checks specified in CommitOpts and constructs a new Resource.
     /// Warning: Does not save the new resource to the Store - doet not delete if it `destroy: true`.
     /// Use [Storelike::apply_commit] to save the resource to the Store.
-    pub fn validate_and_apply(
+    pub fn validate_and_build_response(
         self,
         opts: &CommitOpts,
         store: &impl Storelike,
@@ -220,7 +220,7 @@ impl Commit {
         };
 
         let mut applied = commit
-            .apply_changes(resource_old.clone(), store, false)
+            .apply_changes(resource_old.clone(), store)
             .map_err(|e| {
                 format!(
                     "Error applying changes to Resource {}. {}",
@@ -262,7 +262,7 @@ impl Commit {
             store,
         )?;
 
-        let destroyed = commit.destroy.unwrap_or_default();
+        let destroyed = commit.destroy.unwrap_or(false);
 
         Ok(CommitResponse {
             commit,
@@ -295,7 +295,6 @@ impl Commit {
         &self,
         mut resource: Resource,
         store: &impl Storelike,
-        return_atoms: bool,
     ) -> AtomicResult<CommitApplied> {
         let resource_unedited = resource.clone();
 
@@ -306,18 +305,15 @@ impl Commit {
             for prop in remove.iter() {
                 resource.remove_propval(prop);
 
-                if return_atoms {
-                    if let Ok(val) = resource_unedited.get(prop) {
-                        let atom =
-                            Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
-                        remove_atoms.push(atom);
-                    } else {
-                        // The property does not exist, so nothing to remove.
-                        //
-                        // This may happen if another concurrent commit has removed it first, or
-                        // client removed it without validating it exists. (Currently rust and
-                        // typescript clients do not validate that.)
-                    }
+                if let Ok(val) = resource_unedited.get(prop) {
+                    let atom = Atom::new(resource.get_subject().clone(), prop.into(), val.clone());
+                    remove_atoms.push(atom);
+                } else {
+                    // The property does not exist, so nothing to remove.
+                    //
+                    // This may happen if another concurrent commit has removed it first, or
+                    // client removed it without validating it exists. (Currently rust and
+                    // typescript clients do not validate that.)
                 }
             }
         }
@@ -332,16 +328,14 @@ impl Commit {
                         )
                     })?;
 
-                if return_atoms {
-                    let new_atom =
-                        Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
-                    if let Ok(old_val) = resource_unedited.get(prop) {
-                        let old_atom =
-                            Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
-                        remove_atoms.push(old_atom);
-                    }
-                    add_atoms.push(new_atom);
+                let new_atom =
+                    Atom::new(resource.get_subject().clone(), prop.into(), new_val.clone());
+                if let Ok(old_val) = resource_unedited.get(prop) {
+                    let old_atom =
+                        Atom::new(resource.get_subject().clone(), prop.into(), old_val.clone());
+                    remove_atoms.push(old_atom);
                 }
+                add_atoms.push(new_atom);
             }
         }
         if let Some(push) = self.push.clone() {
@@ -359,15 +353,13 @@ impl Commit {
                 };
                 old_vec.append(&mut new_vec.clone());
                 resource.set_unsafe(prop.into(), old_vec.into());
-                if return_atoms {
-                    for added_resource in new_vec {
-                        let atom = Atom::new(
-                            resource.get_subject().clone(),
-                            prop.into(),
-                            added_resource.into(),
-                        );
-                        add_atoms.push(atom);
-                    }
+                for added_resource in new_vec {
+                    let atom = Atom::new(
+                        resource.get_subject().clone(),
+                        prop.into(),
+                        added_resource.into(),
+                    );
+                    add_atoms.push(atom);
                 }
             }
         }

@@ -7,6 +7,8 @@ use crate::{
 };
 use serde::{Deserialize, Serialize};
 
+use super::trees::{self, Operation, Transaction, Tree};
+
 /// Returned by functions that iterate over [IndexAtom]s
 pub type IndexIterator = Box<dyn Iterator<Item = AtomicResult<IndexAtom>>>;
 
@@ -103,7 +105,7 @@ pub fn query_sorted_indexed(
         .get_self_url()
         .ok_or("No self_url set, required for Queries")?;
 
-    let limit = q.limit.unwrap_or(std::usize::MAX);
+    let limit = q.limit.unwrap_or(usize::MAX);
 
     for (i, kv) in iter.enumerate() {
         // The user's maximum amount of results has not yet been reached
@@ -258,6 +260,7 @@ pub fn check_if_atom_matches_watched_query_filters(
     atom: &Atom,
     delete: bool,
     resource: &Resource,
+    transaction: &mut Transaction,
 ) -> AtomicResult<()> {
     for query in store.watched_queries.iter() {
         // The keys store all the data
@@ -270,7 +273,7 @@ pub fn check_if_atom_matches_watched_query_filters(
                     Ok(val) => val.to_sortable_string(),
                     Err(_e) => NO_VALUE.to_string(),
                 };
-                update_indexed_member(store, &q_filter, &atom.subject, &update_val, delete)?;
+                update_indexed_member(&q_filter, &atom.subject, &update_val, delete, transaction)?;
             }
         } else {
             return Err(format!("Can't deserialize collection index: {:?}", query).into());
@@ -279,14 +282,14 @@ pub fn check_if_atom_matches_watched_query_filters(
     Ok(())
 }
 
-/// Adds or removes a single item (IndexAtom) to the index_members cache.
-#[tracing::instrument(skip(store))]
+/// Adds or removes a single item (IndexAtom) to the [Tree::QueryMembers] cache.
+#[tracing::instrument(skip())]
 pub fn update_indexed_member(
-    store: &Db,
     collection: &QueryFilter,
     subject: &str,
     value: &SortableValue,
     delete: bool,
+    transaction: &mut Transaction,
 ) -> AtomicResult<()> {
     let key = create_query_index_key(
         collection,
@@ -295,9 +298,19 @@ pub fn update_indexed_member(
         Some(subject),
     )?;
     if delete {
-        store.query_index.remove(key)?;
+        transaction.push(Operation {
+            tree: Tree::QueryMembers,
+            method: trees::Method::Delete,
+            key,
+            val: None,
+        })
     } else {
-        store.query_index.insert(key, b"")?;
+        transaction.push(Operation {
+            tree: Tree::QueryMembers,
+            method: trees::Method::Insert,
+            key,
+            val: Some(b"".into()),
+        });
     }
     Ok(())
 }

@@ -95,6 +95,7 @@ fn get_commits_for_resource(subject: &str, store: &impl Storelike) -> AtomicResu
     let mut q = Query::new_prop_val(urls::SUBJECT, subject);
     q.sort_by = Some(urls::CREATED_AT.into());
     let result = store.query(&q)?;
+
     let filtered: Vec<Commit> = result
         .resources
         .iter()
@@ -135,7 +136,7 @@ pub fn construct_version(
     let mut version = Resource::new(subject.into());
     for commit in commits {
         if let Some(current_commit) = commit.url.clone() {
-            let applied = commit.apply_changes(version, store, false)?;
+            let applied = commit.apply_changes(version, store)?;
             version = applied.resource_new;
             // Stop iterating when the target commit has been applied.
             if current_commit == commit_url {
@@ -199,7 +200,8 @@ mod test {
         resource
             .set_string(crate::urls::DESCRIPTION.into(), second_val, &store)
             .unwrap();
-        let second_commit = resource.save_locally(&store).unwrap().commit_resource;
+        let commit_resp = resource.save_locally(&store).unwrap();
+        let second_commit = commit_resp.commit_resource;
         let commits = get_commits_for_resource(subject, &store).unwrap();
         assert_eq!(commits.len(), 2, "We should have two commits");
 

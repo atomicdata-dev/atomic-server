@@ -1,25 +1,26 @@
 //! Index sorted by {Value}-{Property}-{Subject}.
 use crate::{atoms::IndexAtom, errors::AtomicResult, Db, Value};
-use tracing::instrument;
 
-use super::query_index::{IndexIterator, SEPARATION_BIT};
+use super::{
+    query_index::{IndexIterator, SEPARATION_BIT},
+    trees::{Method, Operation, Transaction, Tree},
+};
 
-#[instrument(skip(store))]
-pub fn add_atom_to_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
-    let _existing = store
-        .reference_index
-        .insert(key_from_atom(index_atom), b"")?;
-    Ok(())
-}
-
-#[instrument(skip(store))]
-pub fn remove_atom_from_reference_index(index_atom: &IndexAtom, store: &Db) -> AtomicResult<()> {
-    store.reference_index.remove(key_from_atom(index_atom))?;
+pub fn add_atom_to_valpropsub_index(
+    index_atom: &IndexAtom,
+    transaction: &mut Transaction,
+) -> AtomicResult<()> {
+    transaction.push(Operation {
+        key: valpropsub_key(index_atom),
+        val: Some(b"".to_vec()),
+        tree: Tree::ValPropSub,
+        method: Method::Insert,
+    });
     Ok(())
 }
 
 /// Constructs the Key for the prop_val_sub_index.
-fn key_from_atom(atom: &IndexAtom) -> Vec<u8> {
+pub fn valpropsub_key(atom: &IndexAtom) -> Vec<u8> {
     [
         atom.ref_value.as_bytes(),
         &[SEPARATION_BIT],
@@ -87,7 +88,7 @@ mod test {
             sort_value: "2".into(),
             subject: "http://example.com/subj".into(),
         };
-        let key = key_from_atom(&atom);
+        let key = valpropsub_key(&atom);
         let atom2 = key_to_index_atom(&key).unwrap();
         assert_eq!(atom, atom2);
     }
