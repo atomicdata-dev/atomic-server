@@ -101,7 +101,8 @@ pub fn after_apply_commit_message(
         let new_message = crate::values::SubResource::Resource(Box::new(resource_new.to_owned()));
         commit_builder.push_propval(urls::MESSAGES, new_message)?;
         let commit = commit_builder.sign(&store.get_default_agent()?, store, &chat_room)?;
-        let resp = commit.validate_and_apply(&CommitOpts::no_validations_no_index(), store)?;
+        let resp =
+            commit.validate_and_build_response(&CommitOpts::no_validations_no_index(), store)?;
 
         store.handle_commit(&resp);
     }

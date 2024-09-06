@@ -65,7 +65,9 @@ pub trait Storelike: Sized {
         commit: crate::Commit,
         opts: &crate::commit::CommitOpts,
     ) -> AtomicResult<CommitResponse> {
-        let applied = commit.validate_and_apply(opts, self)?;
+        let applied = commit.validate_and_build_response(opts, self)?;
+
+        self.add_resource(&applied.commit_resource)?;
 
         match (&applied.resource_old, &applied.resource_new) {
             (None, None) => {

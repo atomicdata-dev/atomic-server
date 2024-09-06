@@ -6,6 +6,7 @@ mod prop_val_sub_index;
 mod query_index;
 #[cfg(test)]
 pub mod test;
+mod trees;
 mod val_prop_sub_index;
 
 use std::{
@@ -15,6 +16,7 @@ use std::{
 };
 
 use tracing::{info, instrument};
+use trees::{Method, Operation, Transaction, Tree};
 
 use crate::{
     agents::ForAgent,
@@ -35,15 +37,12 @@ use crate::{
 
 use self::{
     migrations::migrate_maybe,
-    prop_val_sub_index::{
-        add_atom_to_prop_val_sub_index, find_in_prop_val_sub_index,
-        remove_atom_from_prop_val_sub_index,
-    },
+    prop_val_sub_index::{add_atom_to_prop_val_sub_index, find_in_prop_val_sub_index},
     query_index::{
         check_if_atom_matches_watched_query_filters, query_sorted_indexed, should_include_resource,
         update_indexed_member, IndexIterator, QueryFilter,
     },
-    val_prop_sub_index::{add_atom_to_reference_index, remove_atom_from_reference_index},
+    val_prop_sub_index::add_atom_to_valpropsub_index,
 };
 
 // A function called by the Store when a Commit is accepted
@@ -70,15 +69,13 @@ pub struct Db {
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
     /// Stores all resources. The Key is the Subject as a `string.as_bytes()`, the value a [PropVals]. Propvals must be serialized using [bincode].
     resources: sled::Tree,
-    /// Index of all Atoms, sorted by {Value}-{Property}-{Subject}.
-    /// See [reference_index]
+    /// [Tree::ValPropSub]
     reference_index: sled::Tree,
-    /// Index sorted by property + value.
-    /// Used for queries where the property is known.
+    /// [Tree::PropValSub]
     prop_val_sub_index: sled::Tree,
-    /// Stores the members of Collections, easily sortable.
+    /// [Tree::QueryMembers]
     query_index: sled::Tree,
-    /// A list of all the Collections currently being used. Is used to update `query_index`.
+    /// [Tree::WatchedQueries]
     watched_queries: sled::Tree,
     /// The address where the db will be hosted, e.g. http://localhost/
     server_url: String,
@@ -96,11 +93,11 @@ impl Db {
         tracing::info!("Opening database at {:?}", path);
 
         let db = sled::open(path).map_err(|e|format!("Failed opening DB at this location: {:?} . Is another instance of Atomic Server running? {}", path, e))?;
-        let resources = db.open_tree("resources_v1").map_err(|e|format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
-        let reference_index = db.open_tree("reference_index_v1")?;
-        let query_index = db.open_tree("members_index")?;
-        let prop_val_sub_index = db.open_tree("prop_val_sub_index")?;
-        let watched_queries = db.open_tree("watched_queries")?;
+        let resources = db.open_tree(Tree::Resources).map_err(|e| format!("Failed building resources. Your DB might be corrupt. Go back to a previous version and export your data. {}", e))?;
+        let reference_index = db.open_tree(Tree::ValPropSub)?;
+        let query_index = db.open_tree(Tree::QueryMembers)?;
+        let prop_val_sub_index = db.open_tree(Tree::PropValSub)?;
+        let watched_queries = db.open_tree(Tree::WatchedQueries)?;
         let store = Db {
             db,
             default_agent: Arc::new(Mutex::new(None)),
@@ -135,16 +132,43 @@ impl Db {
     }
 
     #[instrument(skip(self))]
-    fn add_atom_to_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
+    fn add_atom_to_index(
+        &self,
+        atom: &Atom,
+        resource: &Resource,
+        transaction: &mut Transaction,
+    ) -> AtomicResult<()> {
         for index_atom in atom.to_indexable_atoms() {
-            add_atom_to_reference_index(&index_atom, self)?;
-            add_atom_to_prop_val_sub_index(&index_atom, self)?;
+            add_atom_to_valpropsub_index(&index_atom, transaction)?;
+            add_atom_to_prop_val_sub_index(&index_atom, transaction)?;
             // Also update the query index to keep collections performant
-            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, false, resource)
-                .map_err(|e| {
-                    format!("Failed to check_if_atom_matches_watched_collections. {}", e)
-                })?;
+            check_if_atom_matches_watched_query_filters(
+                self,
+                &index_atom,
+                atom,
+                false,
+                resource,
+                transaction,
+            )
+            .map_err(|e| format!("Failed to check_if_atom_matches_watched_collections. {}", e))?;
         }
+        Ok(())
+    }
+
+    fn add_resource_tx(
+        &self,
+        resource: &Resource,
+        transaction: &mut Transaction,
+    ) -> AtomicResult<()> {
+        let subject = resource.get_subject();
+        let propvals = resource.get_propvals();
+        let resource_bin = bincode::serialize(propvals)?;
+        transaction.push(Operation {
+            tree: Tree::Resources,
+            method: Method::Insert,
+            key: subject.as_bytes().to_vec(),
+            val: Some(resource_bin),
+        });
         Ok(())
     }
 
@@ -168,10 +192,13 @@ impl Db {
     pub fn build_index(&self, include_external: bool) -> AtomicResult<()> {
         tracing::info!("Building index (this could take a few minutes for larger databases)");
         for r in self.all_resources(include_external) {
+            let mut transaction = Transaction::new();
             for atom in r.to_atoms() {
-                self.add_atom_to_index(&atom, &r)
+                self.add_atom_to_index(&atom, &r, &mut transaction)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", atom, e))?;
             }
+            self.apply_transaction(&mut transaction)
+                .map_err(|e| format!("Failed to commit transaction. {}", e))?;
         }
         tracing::info!("Building index finished!");
         Ok(())
@@ -248,6 +275,7 @@ impl Db {
         &self,
         atom: &IndexAtom,
         query_filter: &QueryFilter,
+        transaction: &mut Transaction,
     ) -> AtomicResult<()> {
         // Get the SortableValue either from the Atom or the Resource.
         let sort_val: SortableValue = if let Some(sort) = &query_filter.sort_by {
@@ -266,7 +294,7 @@ impl Db {
             atom.sort_value.clone()
         };
 
-        update_indexed_member(self, query_filter, &atom.subject, &sort_val, false)?;
+        update_indexed_member(query_filter, &atom.subject, &sort_val, false, transaction)?;
         Ok(())
     }
 
@@ -276,6 +304,71 @@ impl Db {
             (None, None) => self.all_index_atoms(q.include_external),
             (None, Some(val)) => find_in_val_prop_sub_index(self, val, None),
         }
+    }
+
+    /// Apply made changes to the store.
+    #[instrument(skip(self))]
+    fn apply_transaction(&self, transaction: &mut Transaction) -> AtomicResult<()> {
+        let mut batch_resources = sled::Batch::default();
+        let mut batch_propvalsub = sled::Batch::default();
+        let mut batch_valpropsub = sled::Batch::default();
+        let mut batch_watched_queries = sled::Batch::default();
+        let mut batch_query_members = sled::Batch::default();
+
+        for op in transaction.iter() {
+            match op.tree {
+                trees::Tree::Resources => match op.method {
+                    trees::Method::Insert => {
+                        batch_resources.insert::<&[u8], &[u8]>(&op.key, op.val.as_ref().unwrap());
+                    }
+                    trees::Method::Delete => {
+                        batch_resources.remove(op.key.clone());
+                    }
+                },
+                trees::Tree::PropValSub => match op.method {
+                    trees::Method::Insert => {
+                        batch_propvalsub.insert::<&[u8], &[u8]>(&op.key, op.val.as_ref().unwrap());
+                    }
+                    trees::Method::Delete => {
+                        batch_propvalsub.remove(op.key.clone());
+                    }
+                },
+                trees::Tree::ValPropSub => match op.method {
+                    trees::Method::Insert => {
+                        batch_valpropsub.insert::<&[u8], &[u8]>(&op.key, op.val.as_ref().unwrap());
+                    }
+                    trees::Method::Delete => {
+                        batch_valpropsub.remove(op.key.clone());
+                    }
+                },
+                trees::Tree::WatchedQueries => match op.method {
+                    trees::Method::Insert => {
+                        batch_watched_queries
+                            .insert::<&[u8], &[u8]>(&op.key, op.val.as_ref().unwrap());
+                    }
+                    trees::Method::Delete => {
+                        batch_watched_queries.remove(op.key.clone());
+                    }
+                },
+                trees::Tree::QueryMembers => match op.method {
+                    trees::Method::Insert => {
+                        batch_query_members
+                            .insert::<&[u8], &[u8]>(&op.key, op.val.as_ref().unwrap());
+                    }
+                    trees::Method::Delete => {
+                        batch_query_members.remove(op.key.clone());
+                    }
+                },
+            }
+        }
+
+        self.resources.apply_batch(batch_resources)?;
+        self.prop_val_sub_index.apply_batch(batch_propvalsub)?;
+        self.reference_index.apply_batch(batch_valpropsub)?;
+        self.watched_queries.apply_batch(batch_watched_queries)?;
+        self.query_index.apply_batch(batch_query_members)?;
+
+        Ok(())
     }
 
     fn query_basic(&self, q: &Query) -> AtomicResult<QueryResult> {
@@ -331,10 +424,12 @@ impl Db {
             let atoms = self.get_index_iterator_for_query(q);
             q_filter.watch(self)?;
 
+            let mut transaction = Transaction::new();
             // Build indexes
             for atom in atoms.flatten() {
-                self.build_index_for_atom(&atom, &q_filter)?;
+                self.build_index_for_atom(&atom, &q_filter, &mut transaction)?;
             }
+            self.apply_transaction(&mut transaction)?;
 
             // Query through the new indexes.
             (subjects, resources, total_count) = query_sorted_indexed(self, q)?;
@@ -348,13 +443,25 @@ impl Db {
     }
 
     #[instrument(skip(self))]
-    fn remove_atom_from_index(&self, atom: &Atom, resource: &Resource) -> AtomicResult<()> {
+    fn remove_atom_from_index(
+        &self,
+        atom: &Atom,
+        resource: &Resource,
+        transaction: &mut Transaction,
+    ) -> AtomicResult<()> {
         for index_atom in atom.to_indexable_atoms() {
-            remove_atom_from_reference_index(&index_atom, self)?;
-            remove_atom_from_prop_val_sub_index(&index_atom, self)?;
+            transaction.push(Operation::remove_atom_from_reference_index(&index_atom));
+            transaction.push(Operation::remove_atom_from_prop_val_sub_index(&index_atom));
 
-            check_if_atom_matches_watched_query_filters(self, &index_atom, atom, true, resource)
-                .map_err(|e| format!("Checking atom went wrong: {}", e))?;
+            check_if_atom_matches_watched_query_filters(
+                self,
+                &index_atom,
+                atom,
+                true,
+                resource,
+                transaction,
+            )
+            .map_err(|e| format!("Checking atom went wrong: {}", e))?;
         }
         Ok(())
     }
@@ -421,21 +528,23 @@ impl Storelike for Db {
             resource.check_required_props(self)?;
         }
         if update_index {
+            let mut transaction = Transaction::new();
             if let Some(pv) = existing {
                 let subject = resource.get_subject();
                 for (prop, val) in pv.iter() {
                     // Possible performance hit - these clones can be replaced by modifying remove_atom_from_index
                     let remove_atom = crate::Atom::new(subject.into(), prop.into(), val.clone());
-                    self.remove_atom_from_index(&remove_atom, resource)
+                    self.remove_atom_from_index(&remove_atom, resource, &mut transaction)
                         .map_err(|e| {
                             format!("Failed to remove atom from index {}. {}", remove_atom, e)
                         })?;
                 }
             }
             for a in resource.to_atoms() {
-                self.add_atom_to_index(&a, resource)
+                self.add_atom_to_index(&a, resource, &mut transaction)
                     .map_err(|e| format!("Failed to add atom to index {}. {}", a, e))?;
             }
+            self.apply_transaction(&mut transaction)?;
         }
         self.set_propvals(resource.get_subject(), resource.get_propvals())
     }
@@ -448,7 +557,9 @@ impl Storelike for Db {
     fn apply_commit(&self, commit: Commit, opts: &CommitOpts) -> AtomicResult<CommitResponse> {
         let store = self;
 
-        let commit_response = commit.validate_and_apply(opts, store)?;
+        let commit_response = commit.validate_and_build_response(opts, store)?;
+
+        let mut transaction = Transaction::new();
 
         // BEFORE APPLY COMMIT HANDLERS
         // TODO: Move to something dynamic
@@ -463,50 +574,54 @@ impl Storelike for Db {
                     urls::INVITE => crate::plugins::invite::before_apply_commit(
                         store,
                         &commit_response.commit,
-                        &resource_new,
+                        resource_new,
                     )?,
                     _other => {}
                 };
             }
         }
+
         // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
-        store.add_resource_opts(
-            &commit_response.commit_resource,
-            false,
-            opts.update_index,
-            false,
-        )?;
+        store.add_resource_tx(&commit_response.commit_resource, &mut transaction)?;
+        // We still need to index the Commit!
+        for atom in commit_response.commit_resource.to_atoms() {
+            store.add_atom_to_index(&atom, &commit_response.commit_resource, &mut transaction)?;
+        }
 
         match (&commit_response.resource_old, &commit_response.resource_new) {
             (None, None) => {
                 return Err("Neither an old nor a new resource is returned from the commit - something went wrong.".into())
             },
-            (None, Some(new)) => {
-                self.add_resource(new)?;
-            },
-            (Some(_old), Some(new)) => {
-                self.add_resource(new)?;
-
-                if opts.update_index {
-                    for atom in &commit_response.remove_atoms {
-                        store
-                            .remove_atom_from_index(&atom, &_old)
-                            .map_err(|e| format!("Error removing atom from index: {e}  Atom: {e}"))?
-                    }
-                    for atom in &commit_response.add_atoms {
-                        store
-                            .add_atom_to_index(&atom, &new)
-                            .map_err(|e| format!("Error adding atom to index: {e}  Atom: {e}"))?;
-                    }
-                }
-            },
             (Some(_old), None) => {
                 assert_eq!(_old.get_subject(), &commit_response.commit.subject);
                 assert!(&commit_response.commit.destroy.expect("Resource was removed but `commit.destroy` was not set!"));
                 self.remove_resource(&commit_response.commit.subject)?;
-                return Ok(commit_response)
-            }
+            },
+            _ => {}
         };
+
+        if let Some(new) = &commit_response.resource_new {
+            self.add_resource_tx(new, &mut transaction)?;
+        }
+
+        if opts.update_index {
+            if let Some(old) = &commit_response.resource_old {
+                for atom in &commit_response.remove_atoms {
+                    store
+                        .remove_atom_from_index(atom, old, &mut transaction)
+                        .map_err(|e| format!("Error removing atom from index: {e}  Atom: {e}"))?
+                }
+            }
+            if let Some(new) = &commit_response.resource_new {
+                for atom in &commit_response.add_atoms {
+                    store
+                        .add_atom_to_index(atom, new, &mut transaction)
+                        .map_err(|e| format!("Error adding atom to index: {e}  Atom: {e}"))?
+                }
+            }
+        }
+
+        store.apply_transaction(&mut transaction)?;
 
         store.handle_commit(&commit_response);
 
@@ -522,7 +637,7 @@ impl Storelike for Db {
                     urls::MESSAGE => crate::plugins::chatroom::after_apply_commit_message(
                         store,
                         &commit_response.commit,
-                        &resource_new,
+                        resource_new,
                     )?,
                     _other => {}
                 };
@@ -765,11 +880,12 @@ impl Storelike for Db {
 
     #[instrument(skip(self))]
     fn remove_resource(&self, subject: &str) -> AtomicResult<()> {
+        let mut transaction = Transaction::new();
         if let Ok(found) = self.get_propvals(subject) {
             let resource = Resource::from_propvals(found, subject.to_string());
             for (prop, val) in resource.get_propvals() {
                 let remove_atom = crate::Atom::new(subject.into(), prop.clone(), val.clone());
-                self.remove_atom_from_index(&remove_atom, &resource)?;
+                self.remove_atom_from_index(&remove_atom, &resource, &mut transaction)?;
             }
             let _found = self.resources.remove(subject.as_bytes())?;
         } else {
@@ -779,6 +895,7 @@ impl Storelike for Db {
             )
             .into());
         }
+        self.apply_transaction(&mut transaction)?;
         Ok(())
     }
 

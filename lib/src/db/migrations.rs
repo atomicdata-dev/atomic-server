@@ -9,7 +9,7 @@ Therefore, we need migrations to convert the old schema to the new one.
 - Write a function called `v{OLD}_to_v{NEW} that takes a [Db]. Make sure it removed the old `Tree`. Use [assert] to check if the process worked.
 - In [migrate_maybe] add the key of the outdated Tree
 - Add the function to the [migrate_maybe] `match` statement, select the older version of the Tree
-- Update the Tree key used in [Db::init]
+- Update the Tree key used in [crate::db::trees]
  */
 
 use crate::{errors::AtomicResult, Db};
