@@ -11,6 +11,7 @@ mod val_prop_sub_index;
 
 use std::{
     collections::{HashMap, HashSet},
+    fs,
     sync::{Arc, Mutex},
     vec,
 };
@@ -83,6 +84,8 @@ pub struct Db {
     endpoints: Vec<Endpoint>,
     /// Function called whenever a Commit is applied.
     on_commit: Option<Arc<HandleCommit>>,
+    /// Where the DB is stored on disk.
+    path: std::path::PathBuf,
 }
 
 impl Db {
@@ -99,6 +102,7 @@ impl Db {
         let prop_val_sub_index = db.open_tree(Tree::PropValSub)?;
         let watched_queries = db.open_tree(Tree::WatchedQueries)?;
         let store = Db {
+            path: path.into(),
             db,
             default_agent: Arc::new(Mutex::new(None)),
             resources,
@@ -250,6 +254,16 @@ impl Db {
         self.prop_val_sub_index.clear()?;
         self.query_index.clear()?;
         self.watched_queries.clear()?;
+        Ok(())
+    }
+
+    /// Removes the DB and all content from disk.
+    /// WARNING: This is irreversible.
+    pub fn clear_all_danger(self) -> AtomicResult<()> {
+        self.clear_index()?;
+        let path = self.path.clone();
+        drop(self);
+        fs::remove_dir_all(path)?;
         Ok(())
     }
 
