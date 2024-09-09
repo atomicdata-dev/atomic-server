@@ -6,11 +6,27 @@ use atomic_lib::utils::random_string;
 use atomic_lib::*;
 use criterion::{criterion_group, criterion_main, Criterion};
 
-fn random_atom() -> Atom {
+fn random_atom_string() -> Atom {
     Atom::new(
         format!("https://localhost/{}", random_string(10)),
         urls::DESCRIPTION.into(),
         Value::Markdown(random_string(200)),
+    )
+}
+
+fn random_subject() -> String {
+    format!("https://localhost/{}", random_string(10))
+}
+
+fn random_array(n: usize) -> Vec<String> {
+    (0..n).map(|_| random_subject()).collect()
+}
+
+fn random_atom_array() -> Atom {
+    Atom::new(
+        format!("https://localhost/{}", random_string(10)),
+        urls::COLLECTION_MEMBERS.into(),
+        random_array(200).into(),
     )
 }
 
@@ -25,16 +41,23 @@ fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("add_resource", |b| {
         b.iter(|| {
-            let resource = random_resource(&random_atom());
+            let resource = random_resource(&random_atom_string());
             store
                 .add_resource_opts(&resource, true, true, false)
                 .unwrap();
         })
     });
 
-    c.bench_function("resource.save()", |b| {
+    c.bench_function("resource.save() string", |b| {
         b.iter(|| {
-            let mut resource = random_resource(&random_atom());
+            let mut resource = random_resource(&random_atom_string());
+            resource.save(&store).unwrap();
+        })
+    });
+
+    c.bench_function("resource.save() array", |b| {
+        b.iter(|| {
+            let mut resource = random_resource(&random_atom_array());
             resource.save(&store).unwrap();
         })
     });
@@ -76,6 +99,8 @@ fn criterion_benchmark(c: &mut Criterion) {
             let _all = store.all_resources(false).collect::<Vec<Resource>>();
         })
     });
+
+    store.clear_all_danger().unwrap();
 }
 
 criterion_group!(benches, criterion_benchmark);
