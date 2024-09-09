@@ -2,7 +2,7 @@ on:
   push:
     branches:
       - main
-      - replease-please-test
+      - release-please-test
 
 permissions:
   contents: write
