@@ -33,6 +33,7 @@ export const core = {
     properties: 'https://atomicdata.dev/properties/properties',
     classes: 'https://atomicdata.dev/properties/classes',
     isLocked: 'https://atomicdata.dev/properties/isLocked',
+    localId: 'https://atomicdata.dev/properties/localId',
   },
 } as const;
 
@@ -114,6 +115,7 @@ declare module '../index.js' {
     [core.properties.properties]: string[];
     [core.properties.classes]: string[];
     [core.properties.isLocked]: boolean;
+    [core.properties.localId]: string;
   }
 
   interface PropSubjectToNameMapping {
@@ -136,5 +138,6 @@ declare module '../index.js' {
     [core.properties.properties]: 'properties';
     [core.properties.classes]: 'classes';
     [core.properties.isLocked]: 'isLocked';
+    [core.properties.localId]: 'localId';
   }
 }

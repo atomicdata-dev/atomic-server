@@ -8,9 +8,36 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useStore } from './hooks.js';
 
+export type CollectionItemProps = { collection: Collection; index: number };
 export type UseCollectionResult = {
   collection: Collection;
   invalidateCollection: () => Promise<void>;
+  /**
+   * Helper function for rendering a list of all a collections members.
+   * @example
+   * ```tsx
+   * const List = () => {
+   *  const { mapAll } = useCollection(queryFilter);
+   *
+   *  return (
+   *    <ul>
+   *    {mapAll((props) => (
+   *      <li key={props.index}>
+   *        <Item {...props}/>
+   *      </li>
+   *      ))}
+   *    </ul>
+   *  );
+   * }
+   *
+   * const Item = ({ index, collection }) => {
+   *  const member = useMemberFromCollection(collection, index);
+   *
+   *  return <div>{member.title}</div>;
+   * }
+   * ```
+   */
+  mapAll: <T>(func: (props: CollectionItemProps) => T) => T[];
 };
 
 export type UseCollectionOptions = {
@@ -58,6 +85,19 @@ export function useCollection(
     buildCollection(store, server, queryFilterMemo, pageSize),
   );
 
+  const mapAll = useCallback(
+    <T>(func: ({ index, collection }: CollectionItemProps) => T): T[] => {
+      const list: T[] = [];
+
+      for (let index = 0; index < collection.totalMembers; index++) {
+        list.push(func({ index, collection }));
+      }
+
+      return list;
+    },
+    [collection],
+  );
+
   useEffect(() => {
     collection.waitForReady().then(() => {
       setCollection(proxyCollection(collection.__internalObject));
@@ -88,7 +128,7 @@ export function useCollection(
     setCollection(proxyCollection(collection.__internalObject));
   }, [collection, store, server, queryFilter, pageSize]);
 
-  return { collection, invalidateCollection };
+  return { collection, invalidateCollection, mapAll };
 }
 
 function useQueryFilterMemo(queryFilter: QueryFilter) {
