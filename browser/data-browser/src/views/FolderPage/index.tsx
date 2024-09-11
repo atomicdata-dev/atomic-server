@@ -54,7 +54,7 @@ export function FolderPage({
     [displayStyle],
   );
 
-  const subResources = useResources(resource.props.subResources ?? []);
+  const subResources = useResources(resource.props.subResources);
   const navigateToNewRoute = useNewRoute(resource.subject);
   const [canEdit] = useCanWrite(resource);
 

@@ -42,6 +42,8 @@ const StyledMain = memo(styled.main<ViewTransitionProps>`
     ${p => p.theme.heights.breadCrumbBar} + ${p => p.theme.size(2)}
   );
 
+  width: 100%;
+
   @media (prefers-reduced-motion: no-preference) {
     scroll-behavior: smooth;
   }

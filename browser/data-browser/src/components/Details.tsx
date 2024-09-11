@@ -15,7 +15,7 @@ export interface DetailsProps {
 
 /** A collapsible item with a title. Similar to the <details> HTML element. */
 export function Details({
-  open,
+  open = false,
   initialState,
   children,
   title,
@@ -61,10 +61,6 @@ export function Details({
     </>
   );
 }
-
-Details.defaultProps = {
-  open: false,
-};
 
 const SummaryWrapper = styled.div`
   max-width: 100%;

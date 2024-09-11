@@ -39,6 +39,7 @@ export function Search(): JSX.Element {
     debounce: 0,
     parents: scope || drive,
     filters,
+    include: true,
   });
   const navigate = useNavigate();
   const resultsDiv = useRef<HTMLDivElement | null>(null);

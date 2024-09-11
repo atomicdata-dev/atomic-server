@@ -19,6 +19,8 @@ export const SettingsTheme: React.FunctionComponent = () => {
     setViewTransitionsDisabled,
     sidebarKeyboardDndEnabled,
     setSidebarKeyboardDndEnabled,
+    hideTemplates,
+    setHideTemplates,
   } = useSettings();
 
   const { enabledPanels, enablePanel, disablePanel } = usePanelList();
@@ -66,6 +68,11 @@ export const SettingsTheme: React.FunctionComponent = () => {
           </Row>
           <Heading>Main color</Heading>
           <MainColorPicker />
+          <Heading>Templates</Heading>
+          <CheckboxLabel>
+            <Checkbox checked={hideTemplates} onChange={setHideTemplates} />{' '}
+            Hide templates on new resource page.
+          </CheckboxLabel>
           <Heading>Panels</Heading>
           <CheckboxLabel>
             <Checkbox

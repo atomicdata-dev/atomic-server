@@ -17,5 +17,8 @@
         {
             "path": "react"
         }
+    ],
+    "exclude": [
+        "create-template/templates/**/*"
     ]
 }
