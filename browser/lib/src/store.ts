@@ -20,6 +20,7 @@ import { type SearchOpts, buildSearchSubject } from './search.js';
 import { stringToSlug } from './stringToSlug.js';
 import type { JSONValue } from './value.js';
 import { authenticate, fetchWebSocket, startWebsocket } from './websockets.js';
+import { endpoints } from './urls.js';
 
 /** Function called when a resource is updated or removed */
 type ResourceCallback<C extends OptionalClass = UnknownClass> = (
@@ -76,6 +77,13 @@ export enum StoreEvents {
   ServerURLChanged = 'server-url-changed',
   /** Event that gets called whenever the store encounters an error */
   Error = 'error',
+}
+
+export interface ImportJsonADOptions {
+  /** Where the resources will be imported to  */
+  parent: string;
+  /** Danger: Replaces Resources with matching subjects, even if they are not Children of the specified Parent. */
+  overwriteOutside?: boolean;
 }
 
 /**
@@ -926,6 +934,24 @@ export class Store {
     }
 
     this.batchedResources.delete(subject);
+  }
+
+  public async importJsonAD(
+    jsonADString: string,
+    options: ImportJsonADOptions,
+  ): Promise<void> {
+    const url = new URL(endpoints.import, this.serverUrl);
+    url.searchParams.set('parent', options.parent);
+    url.searchParams.set(
+      'overwrite-outside',
+      options.overwriteOutside ? 'true' : 'false',
+    );
+
+    const result = await this.postToServer(url.toString(), jsonADString);
+
+    if (result.error) {
+      throw result.error;
+    }
   }
 
   private randomPart(): string {

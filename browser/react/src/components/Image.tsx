@@ -1,6 +1,6 @@
 import type { Resource, Server } from '@tomic/lib';
 import React from 'react';
-import { server, useResource, useString } from '../index.js';
+import { server, unknownSubject, useResource, useString } from '../index.js';
 
 const imageFormatsWithBasicSupport = new Set([
   'image/svg+xml',
@@ -107,7 +107,7 @@ export const Image: React.FC<ImageProps> = ({ subject, ...props }) => {
   const resource = useResource(subject);
   const [mimeType] = useString(resource, server.properties.mimetype);
 
-  if (resource.loading) {
+  if (resource.loading || resource.subject === unknownSubject) {
     return null;
   }
 

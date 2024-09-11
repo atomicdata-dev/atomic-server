@@ -17,7 +17,12 @@ type Props = {
 };
 
 /** Renders a markdown value */
-const Markdown: FC<Props> = ({ text, renderGFM, maxLength, className }) => {
+const Markdown: FC<Props> = ({
+  text,
+  renderGFM = true,
+  maxLength,
+  className,
+}) => {
   const [collapsed, setCollapsed] = useState(true);
 
   maxLength = maxLength || 5000;
@@ -38,10 +43,6 @@ const Markdown: FC<Props> = ({ text, renderGFM, maxLength, className }) => {
       )}
     </MarkdownWrapper>
   );
-};
-
-Markdown.defaultProps = {
-  renderGFM: true,
 };
 
 const MarkdownWrapper = styled.div`

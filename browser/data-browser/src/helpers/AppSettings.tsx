@@ -24,6 +24,11 @@ export const AppSettingsContextProvider = (
   const [darkMode, setDarkMode, darkModeSetting] = useDarkMode();
   const [mainColor, setMainColor] = useLocalStorage('mainColor', '#1b50d8');
   const [navbarTop, setNavbarTop] = useLocalStorage('navbarTop', false);
+  const [hideTemplates, setHideTemplates] = useLocalStorage(
+    'hideTemplates',
+    false,
+  );
+
   const [viewTransitionsDisabled, setViewTransitionsDisabled] = useLocalStorage(
     'viewTransitionsDisabled',
     false,
@@ -88,6 +93,8 @@ export const AppSettingsContextProvider = (
       setViewTransitionsDisabled,
       sidebarKeyboardDndEnabled,
       setSidebarKeyboardDndEnabled,
+      hideTemplates,
+      setHideTemplates,
     }),
     [
       drive,
@@ -109,6 +116,8 @@ export const AppSettingsContextProvider = (
       setViewTransitionsDisabled,
       sidebarKeyboardDndEnabled,
       setSidebarKeyboardDndEnabled,
+      hideTemplates,
+      setHideTemplates,
     ],
   );
 
@@ -151,6 +160,8 @@ export interface AppSettings {
   setViewTransitionsDisabled: (b: boolean) => void;
   sidebarKeyboardDndEnabled: boolean;
   setSidebarKeyboardDndEnabled: (b: boolean) => void;
+  hideTemplates: boolean;
+  setHideTemplates: (b: boolean) => void;
 }
 
 const initialState: AppSettings = {
@@ -173,6 +184,8 @@ const initialState: AppSettings = {
   setViewTransitionsDisabled: () => undefined,
   sidebarKeyboardDndEnabled: false,
   setSidebarKeyboardDndEnabled: () => undefined,
+  hideTemplates: false,
+  setHideTemplates: () => undefined,
 };
 
 /** Hook for using App Settings, such as theme and darkmode */

@@ -57,12 +57,14 @@ export function useResource<C extends OptionalClass = never>(
   return resource;
 }
 
+const stableEmptyArray = [];
+
 /**
- * Converts an array of Atomic URL strings to an array of Resources. Could take
- * a long time.
+ * Converts an array of Atomic URL strings to an array of Resources.
+ * !! Make sure the array is stable by memoizing it !!
  */
 export function useResources(
-  subjects: string[],
+  subjects: string[] | undefined = stableEmptyArray,
   opts: FetchOpts = {},
 ): Map<string, Resource> {
   const [resources, setResources] = useState(new Map<string, Resource>());
@@ -396,11 +398,11 @@ export function useArray(
   opts?: useValueOptions,
 ): [string[], SetValue<JSONArray>, (vals: string[]) => void] {
   const [value, set] = useValue(resource, propertyURL, opts);
-  const stableEmptyArray = useRef<JSONArray>([]);
+  const stableEmptyResourceArray = useRef<JSONArray>([]);
 
   const values = useMemo(() => {
     if (value === undefined) {
-      return stableEmptyArray.current;
+      return stableEmptyResourceArray.current;
     }
 
     try {
@@ -408,11 +410,11 @@ export function useArray(
       // https://github.com/atomicdata-dev/atomic-data-browser/issues/219
       return valToArray(value);
     } catch (e) {
-      console.error(e, value, propertyURL, resource.getSubject());
+      console.error(e, value, propertyURL, resource.subject);
 
       // If .toArray() errors, return an empty array. Useful in forms when datatypes haves changed!
       // https://github.com/atomicdata-dev/atomic-data-browser/issues/85
-      return stableEmptyArray.current;
+      return stableEmptyResourceArray.current;
     }
   }, [value, resource, propertyURL]);
 

@@ -1,9 +1,4 @@
-import {
-  importJsonAdString,
-  Resource,
-  useResource,
-  useStore,
-} from '@tomic/react';
+import { Resource, useResource, useStore } from '@tomic/react';
 import { useCallback, useId, useState } from 'react';
 import { Button } from '../components/Button.jsx';
 import { ContainerNarrow } from '../components/Containers';
@@ -39,10 +34,11 @@ export function ImporterPage({ resource }: ImporterPageProps) {
   const handleImport = useCallback(async () => {
     try {
       setIsImporting(true);
-      await importJsonAdString(store, jsonAd, {
+      await store.importJsonAD(jsonAd, {
         overwriteOutside,
         parent: parent!,
       });
+
       toast.success('Imported!');
       setIsImporting(false);
     } catch (e) {
@@ -75,17 +71,6 @@ export function ImporterPage({ resource }: ImporterPageProps) {
             </TextAreaStyled>
           </InputWrapper>
         </Field>
-
-        {/* <Field label='URL' helper='http URL where a JSON-AD resource is hosted'>
-          <InputWrapper>
-            <InputStyled
-              disabled={!!jsonAd}
-              placeholder='enter a URL...'
-              value={url}
-              onChange={e => setUrl(e.target.value)}
-            />
-          </InputWrapper>
-        </Field> */}
         <Header>Options</Header>
         <Group>
           <Label>
