@@ -92,13 +92,24 @@ pub async fn search_query(
     let mut results_resource = atomic_lib::plugins::search::search_endpoint().to_resource(store)?;
     results_resource.set_subject(subject.clone());
 
+    timer.add("get_resources");
+    // Get all resources returned by the search, this also performs authorization checks!
+    let resources = get_resources(req, &appstate, &subject, subjects.clone(), limit)?;
+
     if params.include.unwrap_or(false) {
-        timer.add("get_resources");
-        let resources = get_resources(req, &appstate, &subject, subjects.clone(), limit)?;
         results_resource.set(urls::ENDPOINT_RESULTS.into(), resources.into(), store)?;
     } else {
-        results_resource.set(urls::ENDPOINT_RESULTS.into(), subjects.into(), store)?;
+        // Convert the list of resources back into subjects.
+        let filtered_subjects: Vec<String> =
+            resources.iter().map(|r| r.get_subject().clone()).collect();
+
+        results_resource.set(
+            urls::ENDPOINT_RESULTS.into(),
+            filtered_subjects.into(),
+            store,
+        )?;
     }
+
     let mut builder = HttpResponse::Ok();
     builder.append_header(("Server-Timing", timer.header_value()));
 
