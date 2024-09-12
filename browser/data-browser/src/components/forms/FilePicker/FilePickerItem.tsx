@@ -18,6 +18,15 @@ export function FilePickerItem({
 
   const isAllowed = allowedMimes?.has(resource.props.mimetype ?? '') ?? true;
 
+  if (resource.error) {
+    return (
+      <ItemWrapper disabled>
+        <ItemCard></ItemCard>
+        <span>Resource not found</span>
+      </ItemWrapper>
+    );
+  }
+
   if (resource.loading) {
     return <div>loading</div>;
   }
