@@ -8,6 +8,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 - [#952](https://github.com/atomicdata-dev/atomic-server/issues/952) Add templates containing pre made ontologies and resources.
 - [#970](https://github.com/atomicdata-dev/atomic-server/issues/970) Add "show commit" button in History
+- [#968](https://github.com/atomicdata-dev/atomic-server/issues/968) Allow users to pick files by entering a subject into the file picker search bar.
 
 ### @tomic/lib
 
