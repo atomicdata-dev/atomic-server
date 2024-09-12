@@ -110,7 +110,7 @@ export default function AsyncMarkdownEditor({
           />
         )}
         <EditorContent key='rich-editor' editor={editor}>
-          <FloatingMenu editor={editor ?? undefined}>
+          <FloatingMenu editor={editor ?? null}>
             <FloatingMenuText>Type &apos;/&apos; for options</FloatingMenuText>
           </FloatingMenu>
           <BubbleMenu />
