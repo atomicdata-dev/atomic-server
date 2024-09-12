@@ -36,6 +36,7 @@ export function BubbleMenu(): React.JSX.Element {
           active={!!editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()}
           disabled={!editor.can().chain().focus().toggleBold().run()}
+          type='button'
         >
           <FaBold />
         </ToggleButton>
@@ -44,6 +45,7 @@ export function BubbleMenu(): React.JSX.Element {
           active={!!editor.isActive('italic')}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           disabled={!editor.can().chain().focus().toggleItalic().run()}
+          type='button'
         >
           <FaItalic />
         </ToggleButton>
@@ -52,6 +54,7 @@ export function BubbleMenu(): React.JSX.Element {
           active={!!editor.isActive('strike')}
           onClick={() => editor.chain().focus().toggleStrike().run()}
           disabled={!editor.can().chain().focus().toggleStrike().run()}
+          type='button'
         >
           <FaStrikethrough />
         </ToggleButton>
@@ -60,6 +63,7 @@ export function BubbleMenu(): React.JSX.Element {
           active={!!editor.isActive('blockquote')}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           disabled={!editor.can().chain().focus().toggleBlockquote().run()}
+          type='button'
         >
           <FaQuoteLeft />
         </ToggleButton>
@@ -68,6 +72,7 @@ export function BubbleMenu(): React.JSX.Element {
           active={!!editor.isActive('code')}
           onClick={() => editor.chain().focus().toggleCode().run()}
           disabled={!editor.can().chain().focus().toggleCode().run()}
+          type='button'
         >
           <FaCode />
         </ToggleButton>
@@ -80,6 +85,7 @@ export function BubbleMenu(): React.JSX.Element {
               as={RadixPopover.Trigger}
               active={!!editor.isActive('link')}
               disabled={!editor.can().chain().focus().toggleCode().run()}
+              type='button'
             >
               <FaLink />
             </ToggleButton>

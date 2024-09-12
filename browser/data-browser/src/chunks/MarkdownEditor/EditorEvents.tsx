@@ -24,7 +24,7 @@ export function EditorEvents({ onChange }: EditorEventsProps): null {
         editor.off('update', callback);
       }
     };
-  }, [editor]);
+  }, [editor, onChange]);
 
   return null;
 }
