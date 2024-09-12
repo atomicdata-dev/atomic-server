@@ -8,7 +8,7 @@ import {
 } from '../../Dialog';
 import { InputStyled, InputWrapper } from '../InputStyles';
 import { FaPlus, FaSearch } from 'react-icons/fa';
-import { core, server, useServerSearch } from '@tomic/react';
+import { Client, core, server, useServerSearch } from '@tomic/react';
 import { styled } from 'styled-components';
 import { FilePickerItem } from './FilePickerItem';
 import { Button } from '../../Button';
@@ -44,6 +44,7 @@ export function FilePickerDialog({
   );
 
   const [query, setQuery] = useState('');
+  const [queryIsURL, setQueryIsURL] = useState(false);
 
   const { results } = useServerSearch(query, {
     filters: {
@@ -52,6 +53,8 @@ export function FilePickerDialog({
     allowEmptyQuery: true,
     parents: [drive],
   });
+
+  const shownResults = queryIsURL ? [query] : results;
 
   const handleResourcePicked = (subject: string) => {
     onResourcePicked(subject);
@@ -67,10 +70,20 @@ export function FilePickerDialog({
     }
   };
 
+  const updateQuery = (value: string) => {
+    if (Client.isValidSubject(value)) {
+      setQueryIsURL(true);
+      setQuery(value);
+    } else {
+      setQueryIsURL(false);
+      setQuery(value);
+    }
+  };
+
   useEffect(() => {
     if (show) {
       showDialog();
-      setQuery('');
+      updateQuery('');
     }
   }, [show, showDialog]);
 
@@ -84,9 +97,9 @@ export function FilePickerDialog({
                 <FaSearch />
                 <InputStyled
                   type='search'
-                  placeholder='Search...'
+                  placeholder='Search or enter a URL...'
                   value={query}
-                  onChange={e => setQuery(e.target.value)}
+                  onChange={e => updateQuery(e.target.value)}
                 />
               </InputWrapper>
               {!noUpload && (
@@ -104,7 +117,7 @@ export function FilePickerDialog({
             </Row>
           </DialogTitle>
           <StyledDialogContent>
-            {results.map(subject => (
+            {shownResults.map(subject => (
               <FilePickerItem
                 allowedMimes={allowedMimes}
                 subject={subject}
