@@ -3,8 +3,8 @@
 	import { getResource } from '@tomic/svelte';
 	import PageFullPage from './PageFullPage.svelte';
 	import DefaultFullPage from './DefaultFullPage.svelte';
-	import BlogIndexPage from './BlogIndexPage.svelte';
-	import BlogpostPage from './BlogpostPage.svelte';
+	import BlogIndexPageFullPage from './BlogIndexPageFullPage.svelte';
+	import BlogpostFullPage from './BlogpostFullPage.svelte';
 
 	/*
 		Renders a full page view. The actual view component is determined by the resource's class.
@@ -17,8 +17,8 @@
 	$: component = $resource.matchClass(
 		{
 			[website.classes.page]: PageFullPage,
-			[website.classes.blogIndexPage]: BlogIndexPage,
-			[website.classes.blogpost]: BlogpostPage
+			[website.classes.blogIndexPage]: BlogIndexPageFullPage,
+			[website.classes.blogpost]: BlogpostFullPage
 		},
 		DefaultFullPage
 	);
