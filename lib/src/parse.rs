@@ -93,6 +93,21 @@ fn json_ad_object_to_resource(
     }
 }
 
+fn object_is_property(object: &serde_json::Value) -> bool {
+    if let serde_json::Value::Object(map) = object {
+        if let Some(serde_json::Value::Array(arr)) = map.get(urls::IS_A) {
+            for item in arr {
+                if let serde_json::Value::String(s) = item {
+                    if s == urls::PROPERTY {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
+
 /// Parses JSON-AD string.
 /// Accepts an array containing multiple objects, or one single object.
 #[tracing::instrument(skip(store))]
@@ -105,7 +120,13 @@ pub fn parse_json_ad_string(
         .map_err(|e| AtomicError::parse_error(&format!("Invalid JSON: {}", e), None, None))?;
     let mut vec = Vec::new();
     match parsed {
-        serde_json::Value::Array(arr) => {
+        serde_json::Value::Array(mut arr) => {
+            arr.sort_by(|a, b| {
+                let a_is_prop = object_is_property(a);
+                let b_is_prop = object_is_property(b);
+                a_is_prop.cmp(&b_is_prop)
+            });
+
             for item in arr {
                 match item {
                     serde_json::Value::Object(obj) => {
@@ -186,7 +207,7 @@ fn parse_json_ad_map_to_resource(
         }
     };
 
-    for (prop, val) in json {
+    for (mut prop, val) in json {
         if prop == "@id" {
             subject = if let serde_json::Value::String(s) = val {
                 check_valid_url(&s).map_err(|e| {
@@ -206,6 +227,8 @@ fn parse_json_ad_map_to_resource(
             };
             continue;
         }
+
+        prop = try_to_subject(&prop, &prop)?;
 
         let atomic_val = match val {
             serde_json::Value::Null => {
