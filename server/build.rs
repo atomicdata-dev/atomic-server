@@ -19,7 +19,7 @@ struct Dirs {
 
 fn main() -> std::io::Result<()> {
     // Uncomment this line if you want faster builds during development
-    // return Ok(());
+    return Ok(());
     const BROWSER_ROOT: &str = "../browser/";
     let dirs: Dirs = {
         Dirs {

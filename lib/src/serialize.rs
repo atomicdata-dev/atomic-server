@@ -175,78 +175,37 @@ pub fn serialize_json_array(items: &[String]) -> AtomicResult<String> {
 #[cfg(feature = "rdf")]
 /// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
 pub fn atoms_to_ntriples(atoms: Vec<crate::Atom>, store: &impl Storelike) -> AtomicResult<String> {
-    use rio_api::formatter::TriplesFormatter;
-    use rio_api::model::{Literal, NamedNode, Term, Triple};
-    use rio_turtle::NTriplesFormatter;
+    use oxrdf::{Literal, NamedNode, Subject, Term, TripleRef};
+    use oxttl::NTriplesSerializer;
 
-    let mut formatter = NTriplesFormatter::new(Vec::default());
+    let mut formatter = NTriplesSerializer::new().for_writer(Vec::new());
     for atom in atoms {
-        let subject = NamedNode { iri: &atom.subject }.into();
-        let predicate = NamedNode {
-            iri: &atom.property,
-        };
+        let subject = Subject::NamedNode(
+            NamedNode::new(atom.subject).map_err(|e| crate::AtomicError::from(e.to_string()))?,
+        );
+        let predicate = NamedNode::new(atom.property.clone())
+            .map_err(|e| crate::AtomicError::from(e.to_string()))?;
         let datatype = store.get_property(&atom.property)?.data_type;
-        let value = &atom.value.to_string();
+        let value = atom.value.to_string();
         let datatype_url = datatype.to_string();
         let object: Term = match &datatype {
-            DataType::AtomicUrl => NamedNode { iri: value }.into(),
-            // Maybe these should be converted to RDF collections / lists?
-            // DataType::ResourceArray => {}
-            DataType::String => Literal::Simple { value }.into(),
-            _dt => Literal::Typed {
+            DataType::AtomicUrl => Term::NamedNode(
+                NamedNode::new(value).map_err(|e| crate::AtomicError::from(e.to_string()))?,
+            ),
+            DataType::String => Term::Literal(Literal::new_simple_literal(value)),
+            _dt => Term::Literal(Literal::new_typed_literal(
                 value,
-                datatype: NamedNode { iri: &datatype_url },
-            }
-            .into(),
+                NamedNode::new(datatype_url)
+                    .map_err(|e| crate::AtomicError::from(e.to_string()))?,
+            )),
         };
 
-        formatter.format(&Triple {
-            subject,
-            predicate,
-            object,
-        })?
+        let triple = TripleRef::new(&subject, &predicate, &object);
+
+        formatter.serialize_triple(triple);
     }
-    let out = String::from_utf8(formatter.finish()?)?;
-    Ok(out)
-}
 
-#[cfg(feature = "rdf")]
-/// Serializes Atoms to Ntriples (which is also valid Turtle / Notation3).
-pub fn atoms_to_turtle(atoms: Vec<crate::Atom>, store: &impl Storelike) -> AtomicResult<String> {
-    use rio_api::formatter::TriplesFormatter;
-    use rio_api::model::{Literal, NamedNode, Term, Triple};
-    use rio_turtle::TurtleFormatter;
-
-    let mut formatter = TurtleFormatter::new(Vec::default());
-
-    for atom in atoms {
-        let subject = NamedNode { iri: &atom.subject }.into();
-        let predicate = NamedNode {
-            iri: &atom.property,
-        };
-        let datatype = store.get_property(&atom.property)?.data_type;
-        let value = &atom.value.to_string();
-        let datatype_url = datatype.to_string();
-        let object: Term = match &datatype {
-            DataType::AtomicUrl => NamedNode { iri: value }.into(),
-            // Maybe these should be converted to RDF collections / lists?
-            // DataType::ResourceArray => {}
-            DataType::String => Literal::Simple { value }.into(),
-            _dt => Literal::Typed {
-                value,
-                datatype: NamedNode { iri: &datatype_url },
-            }
-            .into(),
-        };
-
-        formatter.format(&Triple {
-            subject,
-            predicate,
-            object,
-        })?
-    }
-    let out = String::from_utf8(formatter.finish()?)?;
-    Ok(out)
+    Ok(String::from_utf8(formatter.finish())?)
 }
 
 /// Should list all the supported serialization formats
