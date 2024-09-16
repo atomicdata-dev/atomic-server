@@ -565,10 +565,11 @@ dependencies = [
  "lazy_static",
  "lol_html",
  "ntest",
+ "oxrdf 0.1.7",
+ "oxttl",
  "rand 0.8.5",
  "regex",
  "ring 0.17.6",
- "rio_api",
  "rio_turtle",
  "serde",
  "serde_jcs",
@@ -2791,9 +2792,45 @@ checksum = "8d91edf4fbb970279443471345a4e8c491bf05bb283b3e6c88e4e606fd8c181b"
 
 [[package]]
 name = "oxiri"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb175ec8981211357b7b379869c2f8d555881c55ea62311428ec0de46d89bd5c"
+checksum = "85d9439ace287894b327bd5522d4f3d813311c719143a1af37826c6a12f808d0"
+
+[[package]]
+name = "oxrdf"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "309287c8a757e25e06a6156acbd73770bac3e319123f5b4bc0a42e232caf97a5"
+dependencies = [
+ "oxilangtag",
+ "oxiri",
+ "rand 0.8.5",
+]
+
+[[package]]
+name = "oxrdf"
+version = "0.2.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1606c7721d7bae945e9b90f3d7a9cfb9e0e7e3e2ec6ff5d53c290fb8336b187"
+dependencies = [
+ "oxilangtag",
+ "oxiri",
+ "rand 0.8.5",
+ "thiserror",
+]
+
+[[package]]
+name = "oxttl"
+version = "0.1.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7081a82ab0371b3ab5d9411531fe1de5b594a7fcf36f3b70f3f70ce417c9e11f"
+dependencies = [
+ "memchr",
+ "oxilangtag",
+ "oxiri",
+ "oxrdf 0.2.0-rc.2",
+ "thiserror",
+]
 
 [[package]]
 name = "parking_lot"

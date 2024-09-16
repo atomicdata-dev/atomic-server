@@ -25,7 +25,8 @@ lol_html = { version = "1", optional = true }
 rand = { version = "0.8" }
 regex = "1"
 ring = "0.17.6"
-rio_api = { version = "0.8", optional = true }
+oxrdf = { version = "0.1", optional = true }
+oxttl = { version = "0.1.0-rc.2", optional = true }
 rio_turtle = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_jcs = "0.1.0"
@@ -48,4 +49,4 @@ ntest = "0.9"
 config = ["directories", "toml"]
 db = ["sled", "bincode"]
 html = ["kuchikiki", "lol_html", "html2md"]
-rdf = ["rio_api", "rio_turtle"]
+rdf = ["oxrdf", "oxttl"]
