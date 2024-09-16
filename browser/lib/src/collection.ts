@@ -86,7 +86,7 @@ export class Collection {
     return this._waitForReady;
   }
 
-  public async getMemberWithIndex(index: number): Promise<string> {
+  public async getMemberWithIndex(index: number): Promise<string | undefined> {
     if (index >= this.totalMembers) {
       throw new Error('Index out of bounds');
     }
@@ -128,7 +128,13 @@ export class Collection {
     await this.waitForReady();
 
     for (let i = 0; i < this.totalMembers; i++) {
-      yield await this.getMemberWithIndex(i);
+      const member = await this.getMemberWithIndex(i);
+
+      if (member === undefined) {
+        continue;
+      }
+
+      yield member;
     }
   }
 
@@ -149,7 +155,7 @@ export class Collection {
 
     const resource = this.pages.get(page)!;
 
-    return resource.props.members ?? [];
+    return (resource.props.members ?? []).filter(m => m !== undefined);
   }
 
   private buildSubject(page: number): string {

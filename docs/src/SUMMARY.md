@@ -36,6 +36,7 @@
       - [Examples](react/examples.md)
     - [@tomic/svelte](svelte.md)
       - [Image](svelte/image.md)
+    - [@tomic/template](create-template/atomic-template.md)
     - [JS CLI](js-cli.md)
   - [Rust](rust-lib.md)
     - [Rust lib](rust-lib.md)

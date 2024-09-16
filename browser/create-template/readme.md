@@ -1,15 +1,9 @@
 # @tomic/template
 
 ```cli
-npm create @tomic/template
+npm create @tomic/template my-project -- --template <TEMPLATE> --server-url <SERVER_URL>
+pnpm create @tomic/template my-project --template <TEMPLATE> --server-url <SERVER_URL>
+bun create @tomic/template my-project --template <TEMPLATE> --server-url <SERVER_URL>
 ```
 
-Preconfigured:
-
-```cli
-npm create @tomic/template my-project -- --template sveltekit-site --server-url https://my-atomic-server.com
-pnpm create @tomic/template my-project --template sveltekit-site --server-url https://my-atomic-server.com
-bun create @tomic/template my-project --template sveltekit-site --server-url https://my-atomic-server.com
-```
-
-_Check out [the docs here](https://docs.atomicdata.dev/js-cli)._
+_Check out [the docs here](https://docs.atomicdata.dev/create-template/atomic-template)._

@@ -18,7 +18,7 @@ export function useMemberFromCollection<C extends OptionalClass = never>(
   const resource = useResource(subject);
 
   useEffect(() => {
-    collection.getMemberWithIndex(index).then(setSubject);
+    collection.getMemberWithIndex(index).then(s => s && setSubject(s));
   }, [collection, index]);
 
   return resource;
