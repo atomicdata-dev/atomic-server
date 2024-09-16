@@ -2,11 +2,13 @@ import { HistoryViewProps } from './HistoryViewProps';
 import { styled } from 'styled-components';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
-import { Column } from '../../components/Row';
+import { Column, Row } from '../../components/Row';
 import { Title } from '../../components/Title';
 import { ResourceCardDefault } from '../../views/Card/ResourceCard';
 import { VersionTitle } from './VersionTitle';
 import { VersionScroller } from './VersionScroller';
+import { useNavigateWithTransition } from '../../hooks/useNavigateWithTransition';
+import { constructOpenURL } from '../../helpers/navigation';
 
 export function HistoryDesktopView({
   resource,
@@ -18,6 +20,8 @@ export function HistoryDesktopView({
   onSelectVersion,
   onVersionAccept,
 }: HistoryViewProps) {
+  const navigate = useNavigateWithTransition();
+
   return (
     <>
       <CurrentItem>
@@ -29,9 +33,18 @@ export function HistoryDesktopView({
               <StyledCard>
                 <ResourceCardDefault resource={selectedVersion.resource} />
               </StyledCard>
-              <Button onClick={onVersionAccept} disabled={isCurrentVersion}>
-                Make current version
-              </Button>
+              <Row>
+                <Button onClick={onVersionAccept} disabled={isCurrentVersion}>
+                  Make current version
+                </Button>
+                <Button
+                  onClick={() =>
+                    navigate(constructOpenURL(selectedVersion.commit.id!))
+                  }
+                >
+                  Show Commit
+                </Button>
+              </Row>
             </>
           )}
         </Column>

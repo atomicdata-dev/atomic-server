@@ -2,6 +2,10 @@
 
 This changelog covers all five packages, as they are (for now) updated as a whole
 
+## UNRELEASED
+
+- #970 Add "show commit" button in History view
+
 ## v0.39.0
 
 ### Atomic Browser
