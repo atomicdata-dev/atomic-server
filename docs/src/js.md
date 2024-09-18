@@ -4,6 +4,8 @@
 
 Core typescript library for fetching data, handling JSON-AD parsing, storing data, signing Commits, setting up WebSockets and full-text search and more.
 
+Runs in most common JS contexts like the browser, node, bun etc.
+
 ## Installation
 
 ```sh
@@ -12,39 +14,60 @@ npm install @tomic/lib
 
 ## TL;DR
 
+### Create a Store
+
 ```ts
 import { Store, Agent, core } from '@tomic/lib';
 
-// --------- Create a Store ---------.
 const store = new Store({
   // You can create a secret from the `User settings` page using the AtomicServer UI
   agent: Agent.fromSecret('my-secret-key'),
   // Set a default server URL
   serverUrl: 'https://my-atomic-server.dev',
 });
+```
 
-// --------- Get a resource ---------
-const gotResource = await store.getResource(subject);
+### Fetching a resource and reading its data
 
-const atomString = gotResource.get(core.properties.description);
+```ts
+// When the class is known.
+const resource = await store.getResource<Person>('https://my-atomic-server.dev/some-resource');
+const job = resource.props.job;
 
-// --------- Create & save a new resource ---------
+// When the class is unknown
+const resource = await store.getResource('https://my-atomic-server.dev/some-resource');
+const job = resource.get(myOntology.properties.job);
+```
+
+### Editing a resource
+
+```ts
+resource.set(core.properties.description, 'Hello World');
+
+// Commit the changes to the server.
+await resource.save();
+```
+
+### Creating a new resource
+
+```ts
 const newResource = await store.newResource({
-  subject: 'https://my-atomic-server.dev/test',
+  isA: myOntology.classes.person,
   propVals: {
-    [core.properties.description]: 'Hi World :)',
+    [core.properties.name]: 'Jeff',
   },
 });
 
+// Commit the new resource to the server.
 await newResource.save();
+```
 
-// --------- Write data to a resource ---------
-newResource.set(core.properties.description, 'Hello World');
-await newResource.save();
+### Subscribing to changes
 
+```ts
 // --------- Subscribe to changes (using websockets) ---------
-const unsub = store.subscribe('https://my-atomic-server.dev/test', resource => {
-  // This callback is called each time a change is made to the resource client or serverside.
+const unsub = store.subscribe('https://my-atomic-server.dev/some-resource', resource => {
+  // This callback is called each time a change is made to the resource on the server.
   // Do something with the changed resource...
 });
 ```
