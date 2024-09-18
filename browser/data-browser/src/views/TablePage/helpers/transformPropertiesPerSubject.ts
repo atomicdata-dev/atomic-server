@@ -10,6 +10,10 @@ export const transformToPropertiesPerSubject = async (
   for (const [rowIndex, property] of cells) {
     const subject = await collection.getMemberWithIndex(rowIndex);
 
+    if (!subject) {
+      continue;
+    }
+
     result[subject] = [...(result[subject] ?? []), property];
   }
 

@@ -1,6 +1,5 @@
 import { core, useResources, useServerSearch } from '@tomic/react';
 import {
-  ChangeEvent,
   ClipboardEventHandler,
   KeyboardEventHandler,
   RefObject,
@@ -22,6 +21,8 @@ import { useAvailableSpace } from '../hooks/useAvailableSpace';
 import { remToPixels } from '../../../helpers/remToPixels';
 import { useSettings } from '../../../helpers/AppSettings';
 import { QuickScore } from 'quick-score';
+import { useTitlePropOfClass } from '../ResourceSelector/useTitlePropOfClass';
+import { stringToSlug } from '../../../helpers/stringToSlug';
 
 const BOX_HEIGHT_REM = 20;
 
@@ -56,6 +57,7 @@ export function SearchBoxWindow({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [results, setResults] = useState<string[]>([]);
   const [searchError, setSearchError] = useState<Error | undefined>();
+  const { titleProp, classTitle } = useTitlePropOfClass(isA);
 
   const isAboveTrigger = below < remToPixels(BOX_HEIGHT_REM);
 
@@ -161,6 +163,14 @@ export function SearchBoxWindow({
     }
   };
 
+  const handleChange: React.ChangeEventHandler<HTMLInputElement> = e => {
+    if (titleProp === core.properties.shortname) {
+      onChange(stringToSlug(e.target.value));
+    } else {
+      onChange(e.target.value);
+    }
+  };
+
   if (searchError) {
     return (
       <Wrapper onBlur={handleBlur} ref={wrapperRef} $above={isAboveTrigger}>
@@ -177,9 +187,7 @@ export function SearchBoxWindow({
           autoFocus
           placeholder={placeholder}
           value={searchValue}
-          onChange={(e: ChangeEvent<HTMLInputElement>) =>
-            onChange(e.target.value)
-          }
+          onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
         />
@@ -196,7 +204,14 @@ export function SearchBoxWindow({
                 onMouseOver={() => handleMouseMove(0)}
                 onClick={() => onCreateItem(searchValue)}
               >
-                Create <CreateLineInputText>{searchValue}</CreateLineInputText>
+                {titleProp ? (
+                  <>
+                    Create{' '}
+                    <CreateLineInputText>{searchValue}</CreateLineInputText>
+                  </>
+                ) : (
+                  `Create new ${classTitle}`
+                )}
               </ResultLine>
             ) : null}
             {results.map((result, i) => (

@@ -49,7 +49,7 @@ export function FormValidationContextProvider({
       validations,
       setValidations,
     }),
-    [validations],
+    [validations, setValidations],
   );
 
   return (
