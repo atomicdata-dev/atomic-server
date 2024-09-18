@@ -21,6 +21,7 @@ export type AsyncMarkdownEditorProps = {
   onChange?: (content: string) => void;
   id?: string;
   labelId?: string;
+  onBlur?: () => void;
 };
 
 const MIN_EDITOR_HEIGHT = '10rem';
@@ -33,6 +34,7 @@ export default function AsyncMarkdownEditor({
   id,
   labelId,
   onChange,
+  onBlur,
 }: AsyncMarkdownEditorProps): React.JSX.Element {
   const [extensions] = useState(() => [
     StarterKit,
@@ -73,7 +75,7 @@ export default function AsyncMarkdownEditor({
   const editor = useEditor({
     extensions,
     content: markdown,
-
+    onBlur,
     editorProps: {
       attributes: {
         ...(id && { id }),
@@ -118,7 +120,7 @@ export default function AsyncMarkdownEditor({
         </EditorContent>
         <FloatingCodeButton
           type='button'
-          active={codeMode}
+          $active={codeMode}
           title='Edit raw markdown'
           onClick={() => handleCodeModeChange(!codeMode)}
         >

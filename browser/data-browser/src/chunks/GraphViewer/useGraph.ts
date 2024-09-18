@@ -9,7 +9,7 @@ import { EdgeData, NodeData, applyNodeStyling } from './buildGraph';
 import { useCallback, useMemo, useState } from 'react';
 import Dagre from '@dagrejs/dagre';
 import { useTheme } from 'styled-components';
-import { Resource, urls, useString } from '@tomic/react';
+import { dataBrowser, Resource, useString } from '@tomic/react';
 
 interface CustomNodePositioning {
   [key: string]: [x: number, y: number];
@@ -29,9 +29,7 @@ const getLayoutedElements = (nodes: Node[], edges: Edge[]) => {
   g.setGraph({ rankdir: 'vertical', ranksep: 70 });
 
   edges.forEach(edge => g.setEdge(edge.source, edge.target));
-  nodes.forEach(node =>
-    g.setNode(node.id, { label: node, width: 120, height: 100 }),
-  );
+  nodes.forEach(node => g.setNode(node.id, { width: 120, height: 100 }));
 
   Dagre.layout(g);
 
@@ -73,7 +71,7 @@ export function useGraph(ontology: Resource): UseNodeReturn {
 
   const [customPositioningSTR, setCustomPositioningSTR] = useString(
     ontology,
-    urls.properties.ontology.customNodePositioning,
+    dataBrowser.properties.customNodePositioning,
     { commit: true },
   );
 

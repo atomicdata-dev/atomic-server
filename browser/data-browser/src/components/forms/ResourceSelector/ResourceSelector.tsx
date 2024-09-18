@@ -7,8 +7,8 @@ import { NewFormDialog } from '../NewForm/NewFormDialog';
 import { SearchBox } from '../SearchBox';
 import { FaTrash } from 'react-icons/fa';
 import { ErrorChip } from '../ErrorChip';
-import { urls } from '@tomic/react';
 import { SearchBoxButton } from '../SearchBox/SearchBoxButton';
+import { useTitlePropOfClass } from './useTitlePropOfClass';
 
 export interface ResourceSelectorProps {
   /**
@@ -67,8 +67,16 @@ export const ResourceSelector = memo(function ResourceSelector({
   prefix,
   allowsOnly,
 }: ResourceSelectorProps): JSX.Element {
-  const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog();
+  const [pickedSubject, setPickedSubject] = useState<string | undefined>();
+  const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog({
+    onSuccess: () => {
+      setSubject(pickedSubject);
+    },
+  });
+
   const [initialNewTitle, setInitialNewTitle] = useState('');
+  const { titleProp } = useTitlePropOfClass(isA);
+
   const { drive } = useSettings();
 
   const { inDialog } = useDialogTreeContext();
@@ -78,11 +86,19 @@ export const ResourceSelector = memo(function ResourceSelector({
       return undefined;
     }
 
-    return (name: string) => {
-      setInitialNewTitle(name);
+    return (name: string | undefined) => {
+      if (name !== undefined) {
+        setInitialNewTitle(name);
+      }
+
       showDialog();
     };
-  }, [hideCreateOption, setSubject, showDialog, isA]);
+  }, [hideCreateOption, showDialog, isA]);
+
+  const handleSaveClick = (subject: string) => {
+    setPickedSubject(subject);
+    closeDialog(true);
+  };
 
   return (
     <Wrapper first={first} last={last}>
@@ -105,16 +121,20 @@ export const ResourceSelector = memo(function ResourceSelector({
       </StyledSearchBox>
       {error && <PositionedErrorChip>{error.message}</PositionedErrorChip>}
       {!inDialog && isA && (
-        <Dialog {...dialogProps}>
+        <Dialog {...dialogProps} width='50rem'>
           {isDialogOpen && (
             <NewFormDialog
               parent={parent || drive}
               classSubject={isA}
-              closeDialog={closeDialog}
-              initialProps={{
-                [urls.properties.shortname]: initialNewTitle,
-              }}
-              onSave={setSubject}
+              onCancel={() => closeDialog(false)}
+              initialProps={
+                titleProp
+                  ? {
+                      [titleProp]: initialNewTitle,
+                    }
+                  : undefined
+              }
+              onSaveClick={handleSaveClick}
             />
           )}
         </Dialog>

@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { useString } from '@tomic/react';
+import { useCallback } from 'react';
+import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { ErrMessage } from './InputStyles';
 import { MarkdownInput } from './MarkdownInput';
+import { useValidation } from './formValidation/useValidation';
 
 export default function InputMarkdown({
   resource,
@@ -10,27 +11,44 @@ export default function InputMarkdown({
   commit,
   id,
   labelId,
+  ...props
 }: InputProps): JSX.Element {
-  const [err, setErr] = useState<Error | undefined>(undefined);
   const [value, setValue] = useString(resource, property.subject, {
-    handleValidationError: setErr,
+    validate: false,
     commit: commit,
   });
+  const [err, setErr, onBlur] = useValidation(
+    props.required ? (!value ? 'Required' : undefined) : undefined,
+  );
 
-  const handleChange = (val: string) => {
-    setValue(val);
-  };
+  const handleChange = useCallback(
+    (val: string) => {
+      try {
+        validateDatatype(val, property.datatype);
+        setErr(undefined);
+      } catch (e) {
+        setErr('Invalid value');
+      }
+
+      if (props.required && (val === '' || val === undefined)) {
+        setErr('Required');
+      }
+
+      setValue(val);
+    },
+    [property.datatype, props.required, setErr, setValue],
+  );
 
   return (
     <>
       <MarkdownInput
         initialContent={value}
-        onChange={handleChange}
         id={id}
         labelId={labelId}
+        onChange={handleChange}
+        onBlur={onBlur}
       />
-      {value !== '' && err && <ErrMessage>{err.message}</ErrMessage>}
-      {value === '' && <ErrMessage>Required</ErrMessage>}
+      {err && <ErrMessage>{err}</ErrMessage>}
     </>
   );
 }

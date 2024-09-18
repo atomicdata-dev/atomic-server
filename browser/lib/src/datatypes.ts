@@ -66,6 +66,15 @@ export const validateDatatype = (
       break;
     }
 
+    case Datatype.MARKDOWN: {
+      if (!isString(value)) {
+        err = 'Not a string';
+        break;
+      }
+
+      break;
+    }
+
     case Datatype.SLUG: {
       if (!isString(value)) {
         err = 'Not a slug, not even a string';

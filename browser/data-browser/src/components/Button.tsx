@@ -99,6 +99,7 @@ export const ButtonBase = styled(ButtonClean)`
     'transform',
     'color',
     'border-color',
+    'opacity',
   )};
 
   // Prevent sticky hover buttons on touch devices

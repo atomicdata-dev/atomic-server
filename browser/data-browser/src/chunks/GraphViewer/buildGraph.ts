@@ -1,4 +1,4 @@
-import { Datatype, Resource, Store, urls } from '@tomic/react';
+import { core, Datatype, Resource, Store } from '@tomic/react';
 import { Node, Edge, MarkerType } from 'reactflow';
 import { randomString } from '../../helpers/randomString';
 import { DefaultTheme } from 'styled-components';
@@ -89,7 +89,7 @@ export async function buildGraph(
   ontology: Resource,
   store: Store,
 ): Promise<[Node<NodeData>[], Edge<EdgeData>[]]> {
-  const classes = ontology.get(urls.properties.classes) as string[];
+  const classes = ontology.get(core.properties.classes);
   // Any classes that are not in the ontology but are referenced by classes that are in the ontology.
   const externalClasses: Set<string> = new Set();
 
@@ -100,7 +100,7 @@ export async function buildGraph(
     classSubject: string,
     isExtra = false,
   ): Promise<Node<NodeData>> => {
-    const res = await store.getResourceAsync(classSubject);
+    const res = await store.getResource(classSubject);
 
     if (!isExtra) {
       await createEdges(res);
@@ -116,9 +116,9 @@ export async function buildGraph(
   };
 
   const createEdges = async (classResource: Resource) => {
-    const recommends = (classResource.get(urls.properties.recommends) ??
+    const recommends = (classResource.get(core.properties.recommends) ??
       []) as string[];
-    const requires = (classResource.get(urls.properties.requires) ??
+    const requires = (classResource.get(core.properties.requires) ??
       []) as string[];
 
     for (const subject of [...recommends, ...requires]) {
@@ -131,7 +131,7 @@ export async function buildGraph(
         property.classType
       ) {
         const routing = {
-          source: classResource.getSubject(),
+          source: classResource.subject,
           target: property.classType,
         };
 

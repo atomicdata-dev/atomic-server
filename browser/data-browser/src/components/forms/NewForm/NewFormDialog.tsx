@@ -1,4 +1,4 @@
-import { Core, JSONValue, useResource, useStore } from '@tomic/react';
+import { Core, JSONValue, useResource } from '@tomic/react';
 import { useState, useCallback } from 'react';
 import { useEffectOnce } from '../../../hooks/useEffectOnce';
 import { Button } from '../../Button';
@@ -13,25 +13,23 @@ import { SubjectField } from './SubjectField';
 import { useNewForm } from './useNewForm';
 
 export interface NewFormDialogProps extends NewFormProps {
-  closeDialog: (success?: boolean) => void;
   initialProps?: Record<string, JSONValue>;
-  onSave: (subject: string) => void;
   parent: string;
+  onSaveClick: (subject: string) => void;
+  onCancel: () => void;
 }
 
 /** Form for instantiating a new Resource from some Class in a Modal / Dialog view */
 export const NewFormDialog = ({
   classSubject,
-  closeDialog,
+  onCancel,
   initialProps,
-  onSave,
+  onSaveClick,
   parent,
 }: NewFormDialogProps): JSX.Element => {
   const klass = useResource<Core.Class>(classSubject);
-  const store = useStore();
-
   const [subject, setSubject] = useState<string>();
-
+  const [isFormValid, setIsFormValid] = useState(false);
   const { subjectErr, subjectValue, setSubjectValue, resource } = useNewForm({
     klass,
     setSubject,
@@ -39,19 +37,24 @@ export const NewFormDialog = ({
     parent,
   });
 
+  const handleValidationChange = useCallback((valid: boolean) => {
+    setIsFormValid(valid);
+  }, []);
+
+  const [initialValuesSet, setInitialValuesSet] = useState(false);
+
   const onResourceSave = useCallback(() => {
-    onSave(resource.subject);
-    closeDialog(true);
-  }, [onSave, closeDialog, resource]);
+    onSaveClick(resource.subject);
+  }, [onSaveClick, resource]);
 
   // Onmount we generate a new subject based on the classtype and the user input.
   useEffectOnce(() => {
     (async () => {
-      await setSubjectValue(store.createSubject());
-
       for (const [prop, value] of Object.entries(initialProps ?? {})) {
         await resource.set(prop, value);
       }
+
+      setInitialValuesSet(true);
     })();
   });
 
@@ -63,6 +66,10 @@ export const NewFormDialog = ({
 
   if (resource.error) {
     return <ErrorBlock error={resource.error}></ErrorBlock>;
+  }
+
+  if (!initialValuesSet) {
+    return <>loading</>;
   }
 
   return (
@@ -86,14 +93,15 @@ export const NewFormDialog = ({
           key={`${classSubject}+${subjectValue}`}
           variant={ResourceFormVariant.Dialog}
           onSave={onResourceSave}
+          onValidationChange={handleValidationChange}
         />
       </DialogContent>
       <DialogActions>
         {error && <InlineErrMessage>{error.message}</InlineErrMessage>}
-        <Button subtle onClick={() => closeDialog(false)}>
+        <Button subtle onClick={onCancel}>
           Cancel
         </Button>
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} disabled={saving || !isFormValid}>
           Save
         </Button>
       </DialogActions>
