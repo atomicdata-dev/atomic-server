@@ -33,7 +33,7 @@ export function useValidation(
         setTouched(true);
       }
     },
-    [],
+    [setValidations, id],
   );
 
   const handleBlur = useCallback(() => {

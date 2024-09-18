@@ -12,15 +12,18 @@ export default function InputString({
   commitDebounceInterval,
   ...props
 }: InputProps): JSX.Element {
-  const [err, setErr, onBlur] = useValidation();
   const [value, setValue] = useString(resource, property.subject, {
     commit,
     commitDebounce: commitDebounceInterval,
     validate: false,
   });
 
+  const [err, setErr, onBlur] = useValidation(
+    props.required ? (!value ? 'Required' : undefined) : undefined,
+  );
+
   function handleUpdate(event: React.ChangeEvent<HTMLInputElement>): void {
-    const newval = event.target.value || undefined;
+    const newval = event.target.value ?? undefined;
     setValue(newval);
 
     try {

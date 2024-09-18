@@ -18,6 +18,7 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
     onSuccess: () => {
       setClassSubject(undefined);
       setActive(false);
+      ontology.save();
     },
   });
 
@@ -31,9 +32,9 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
     show();
   };
 
-  const handleSave = (subject: string) => {
+  const handleSaveClick = (subject: string) => {
     ontology.push(core.properties.instances, [subject], true);
-    ontology.save();
+    close(true);
   };
 
   return (
@@ -60,8 +61,8 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
             {isOpen && classSubject && (
               <NewFormDialog
                 classSubject={classSubject}
-                closeDialog={close}
-                onSave={handleSave}
+                onCancel={() => close(false)}
+                onSaveClick={handleSaveClick}
                 parent={ontology.subject}
               />
             )}

@@ -25,6 +25,7 @@ import { Column, Row } from '../Row';
 import { Collapse } from '../Collapse';
 import styled from 'styled-components';
 import { FaFloppyDisk } from 'react-icons/fa6';
+import { FormValidationContextProvider } from './formValidation/FormValidationContextProvider';
 
 export enum ResourceFormVariant {
   Default,
@@ -43,6 +44,7 @@ export interface ResourceFormProps {
   variant?: ResourceFormVariant;
   onSave?: () => void;
   onCancel?: () => void;
+  onValidationChange?: (valid: boolean) => void;
 }
 
 const nonEssentialProps: string[] = [
@@ -60,6 +62,7 @@ export function ResourceForm({
   variant,
   onSave,
   onCancel,
+  onValidationChange,
 }: ResourceFormProps): JSX.Element {
   const [isAArray] = useArray(resource, core.properties.isA);
 
@@ -68,6 +71,8 @@ export function ResourceForm({
     // classes for a single resource.
     classSubject = isAArray[0];
   }
+
+  const [isFormValid, setIsFormValid] = useState(false);
 
   const klass = useResource(classSubject);
   const [requires] = useArray(klass, core.properties.requires);
@@ -112,6 +117,11 @@ export function ResourceForm({
     // I actually want to run this memo every time the requires / recommends
     // array changes, but that leads to a weird loop, so that's what the length is for
   }, [resource, tempOtherProps, requires.length, recommends.length]);
+
+  const handleValidate = (valid: boolean) => {
+    setIsFormValid(valid);
+    onValidationChange?.(valid);
+  };
 
   if (!resource.new && resource.loading) {
     return <>Loading resource...</>;
@@ -168,98 +178,112 @@ export function ResourceForm({
   }
 
   return (
-    <form about={resource.subject} onSubmit={save}>
-      <Column>
-        {classSubject && klass.error && (
-          <ErrMessage>
-            Error in class, so this form could miss properties. You can still
-            edit the resource, though. Error message: `{klass.error.message}`
-          </ErrMessage>
-        )}
-        {canWriteErr && (
-          <ErrMessage>Cannot save edits: {canWriteErr}</ErrMessage>
-        )}
-        {requires.map(property => {
-          return (
-            <ResourceField
-              key={property + ' field'}
-              propertyURL={property}
-              resource={resource}
-              required
-            />
-          );
-        })}
-        {recommends.map(property => {
-          return (
-            <ResourceField
-              key={property + ' field'}
-              propertyURL={property}
-              resource={resource}
-            />
-          );
-        })}
-        {otherProps.map(property => {
-          return (
-            <ResourceField
-              key={property + ' field'}
-              propertyURL={property}
-              resource={resource}
-              handleDelete={() => handleDelete(property)}
-            />
-          );
-        })}
-      </Column>
-      <Gutter />
-      <Button
-        title={'show / hide advanced form fields'}
-        clean
-        style={{ display: 'flex', marginBottom: '1rem', alignItems: 'center' }}
-        onClick={() => setShowAdvanced(!showAdvanced)}
-      >
-        <Row as='strong' gap='0.4rem' center>
-          {showAdvanced ? <FaCaretDown /> : <FaCaretRight />} Advanced
-        </Row>
-      </Button>
-      <StyledCollapse open={showAdvanced}>
+    <FormValidationContextProvider onValidationChange={handleValidate}>
+      <form about={resource.subject} onSubmit={save}>
         <Column>
-          <Field
-            label='add another property...'
-            helper='In Atomic Data, any Resource could have any single Property. Use this field to add new property-value combinations to your resource.'
-          >
-            <div>
-              <ResourceSelector
-                value={undefined}
-                setSubject={set => {
-                  handleAddProp(set);
-                }}
-                error={newPropErr}
-                isA={core.classes.property}
+          {classSubject && klass.error && (
+            <ErrMessage>
+              Error in class, so this form could miss properties. You can still
+              edit the resource, though. Error message: `{klass.error.message}`
+            </ErrMessage>
+          )}
+          {canWriteErr && (
+            <ErrMessage>Cannot save edits: {canWriteErr}</ErrMessage>
+          )}
+          {requires.map(property => {
+            return (
+              <ResourceField
+                key={property + ' field'}
+                propertyURL={property}
+                resource={resource}
+                required
               />
-            </div>
-            {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
-          </Field>
-          {nonEssentialProps.map(prop => (
-            <ResourceField key={prop} propertyURL={prop} resource={resource} />
-          ))}
+            );
+          })}
+          {recommends.map(property => {
+            return (
+              <ResourceField
+                key={property + ' field'}
+                propertyURL={property}
+                resource={resource}
+              />
+            );
+          })}
+          {otherProps.map(property => {
+            return (
+              <ResourceField
+                key={property + ' field'}
+                propertyURL={property}
+                resource={resource}
+                handleDelete={() => handleDelete(property)}
+              />
+            );
+          })}
         </Column>
-      </StyledCollapse>
-      {variant !== ResourceFormVariant.Dialog && (
-        <>
-          {err && <ErrMessage>{err.message}</ErrMessage>}
-          <Row justify='flex-end'>
-            {onCancel && (
-              <Button subtle onClick={onCancel}>
-                Cancel
-              </Button>
-            )}
-            <Button disabled={saving} data-test='save' type='submit'>
-              <FaFloppyDisk />
-              {saving ? 'wait...' : 'Save'}
-            </Button>
+        <Gutter />
+        <Button
+          title={'show / hide advanced form fields'}
+          clean
+          style={{
+            display: 'flex',
+            marginBottom: '1rem',
+            alignItems: 'center',
+          }}
+          onClick={() => setShowAdvanced(!showAdvanced)}
+        >
+          <Row as='strong' gap='0.4rem' center>
+            {showAdvanced ? <FaCaretDown /> : <FaCaretRight />} Advanced
           </Row>
-        </>
-      )}
-    </form>
+        </Button>
+        <StyledCollapse open={showAdvanced}>
+          <Column>
+            <Field
+              label='add another property...'
+              helper='In Atomic Data, any Resource could have any single Property. Use this field to add new property-value combinations to your resource.'
+            >
+              <div>
+                <ResourceSelector
+                  value={undefined}
+                  setSubject={set => {
+                    handleAddProp(set);
+                  }}
+                  error={newPropErr}
+                  isA={core.classes.property}
+                />
+              </div>
+              {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
+            </Field>
+            {nonEssentialProps.map(prop => (
+              <ResourceField
+                key={prop}
+                propertyURL={prop}
+                resource={resource}
+              />
+            ))}
+          </Column>
+        </StyledCollapse>
+        {variant !== ResourceFormVariant.Dialog && (
+          <>
+            {err && <ErrMessage>{err.message}</ErrMessage>}
+            <Row justify='flex-end'>
+              {onCancel && (
+                <Button subtle onClick={onCancel}>
+                  Cancel
+                </Button>
+              )}
+              <Button
+                disabled={saving || !isFormValid}
+                data-test='save'
+                type='submit'
+              >
+                <FaFloppyDisk />
+                {saving ? 'wait...' : 'Save'}
+              </Button>
+            </Row>
+          </>
+        )}
+      </form>
+    </FormValidationContextProvider>
   );
 }
 
