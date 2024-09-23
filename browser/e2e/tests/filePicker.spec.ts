@@ -28,7 +28,7 @@ const uploadFile = async (page: Page, fileName: string) => {
 
   const fileChooser = await fileChooserPromise;
 
-  fileChooser.setFiles(testFilePath(fileName));
+  await fileChooser.setFiles(testFilePath(fileName));
 
   await expect(page.getByText(fileName)).toHaveCount(2);
 };
@@ -83,6 +83,8 @@ test.describe('File Picker', () => {
   test.beforeEach(before);
 
   test('select file and upload using the filepicker', async ({ page }) => {
+    const SEARCH_BAR_PLACEHOLDER = 'Search or enter a URL...';
+
     await signIn(page);
     await newDrive(page);
 
@@ -109,13 +111,15 @@ test.describe('File Picker', () => {
       await page.getByRole('button', { name: 'Select File' }).click();
 
       const filepicker = currentDialog(page);
-      await expect(filepicker.getByPlaceholder('Search...')).toBeVisible();
+      await expect(
+        filepicker.getByPlaceholder(SEARCH_BAR_PLACEHOLDER),
+      ).toBeVisible();
       await expect(
         filepicker.getByText('Contents of test file 1'),
       ).toBeVisible();
       await expect(filepicker.getByText('testFile2.md')).toBeVisible();
 
-      await filepicker.getByPlaceholder('Search...').fill('.md');
+      await filepicker.getByPlaceholder(SEARCH_BAR_PLACEHOLDER).fill('.md');
 
       await expect(
         filepicker.getByText('Contents of test file 1'),
@@ -143,7 +147,9 @@ test.describe('File Picker', () => {
       await page.getByRole('button', { name: 'Select File' }).click();
 
       const filepicker = currentDialog(page);
-      await expect(filepicker.getByPlaceholder('Search...')).toBeVisible();
+      await expect(
+        filepicker.getByPlaceholder(SEARCH_BAR_PLACEHOLDER),
+      ).toBeVisible();
 
       await filepicker
         .getByLabel('Upload')

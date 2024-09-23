@@ -1,14 +1,13 @@
 import { useCallback, useContext, useId, useState } from 'react';
 import { FormValidationContext } from './FormValidationContextProvider';
 import { useLifecycleWithDependencies } from './useLifecycleWithDependencies';
+import type { JSONValue } from '@tomic/react';
 
-export function useValidation(
-  initialValue?: string | undefined,
-): [
-  error: string | undefined,
-  setError: (error: Error | string | undefined, immediate?: boolean) => void,
-  onBlur: () => void,
-] {
+export function useValidation(initialValue?: string | undefined): {
+  error: string | undefined;
+  setError: (error: Error | string | undefined, immediate?: boolean) => void;
+  setTouched: () => void;
+} {
   const id = useId();
 
   const [touched, setTouched] = useState(false);
@@ -36,7 +35,7 @@ export function useValidation(
     [setValidations, id],
   );
 
-  const handleBlur = useCallback(() => {
+  const handleTouched = useCallback(() => {
     setTouched(true);
   }, []);
 
@@ -60,5 +59,28 @@ export function useValidation(
 
   const error = touched ? validations[id] : undefined;
 
-  return [error, setError, handleBlur];
+  return { error, setError, setTouched: handleTouched };
+}
+
+export function checkForInitialRequiredValue(
+  value: JSONValue,
+  required: boolean | undefined,
+): string | undefined {
+  if (typeof value === 'string') {
+    if (required && value === '') {
+      return 'Required';
+    }
+  }
+
+  if (Array.isArray(value)) {
+    if (required && value.length === 0) {
+      return 'Required';
+    }
+  }
+
+  if (required && value === undefined) {
+    return 'Required';
+  }
+
+  return undefined;
 }

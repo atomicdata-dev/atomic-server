@@ -15,8 +15,12 @@ export const testFilePath = (filename: string) => {
   // In the CI, the tests dir is missing for some reason?
   if (processPath.endsWith('tests')) {
     return `${processPath}/${filename}`;
-  } else {
+  } else if (processPath.endsWith('e2e')) {
     return `${processPath}/tests/${filename}`;
+  } else if (processPath.endsWith('browser')) {
+    return `${processPath}/e2e/tests/${filename}`;
+  } else {
+    return `${processPath}/browser/e2e/tests/${filename}`;
   }
 };
 
@@ -232,7 +236,7 @@ export async function fillSearchBox(
     await selector.getByRole('button', { name: label ?? placeholder }).click();
   }
 
-  await selector.getByPlaceholder(placeholder).type(fillText);
+  await selector.getByPlaceholder(placeholder).fill(fillText);
 
   return async (name: string) => {
     await selector.getByTestId('searchbox-results').getByText(name).hover();

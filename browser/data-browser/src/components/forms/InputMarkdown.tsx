@@ -3,7 +3,10 @@ import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { ErrMessage } from './InputStyles';
 import { MarkdownInput } from './MarkdownInput';
-import { useValidation } from './formValidation/useValidation';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from './formValidation/useValidation';
 
 export default function InputMarkdown({
   resource,
@@ -17,26 +20,26 @@ export default function InputMarkdown({
     validate: false,
     commit: commit,
   });
-  const [err, setErr, onBlur] = useValidation(
-    props.required ? (!value ? 'Required' : undefined) : undefined,
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, props.required),
   );
 
   const handleChange = useCallback(
     (val: string) => {
       try {
         validateDatatype(val, property.datatype);
-        setErr(undefined);
+        setError(undefined);
       } catch (e) {
-        setErr('Invalid value');
+        setError('Invalid value');
       }
 
       if (props.required && (val === '' || val === undefined)) {
-        setErr('Required');
+        setError('Required');
       }
 
       setValue(val);
     },
-    [property.datatype, props.required, setErr, setValue],
+    [property.datatype, props.required, setError, setValue],
   );
 
   return (
@@ -46,9 +49,9 @@ export default function InputMarkdown({
         id={id}
         labelId={labelId}
         onChange={handleChange}
-        onBlur={onBlur}
+        onBlur={setTouched}
       />
-      {err && <ErrMessage>{err}</ErrMessage>}
+      {error && <ErrMessage>{error}</ErrMessage>}
     </>
   );
 }

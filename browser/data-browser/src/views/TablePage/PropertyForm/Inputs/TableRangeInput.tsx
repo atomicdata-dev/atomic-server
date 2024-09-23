@@ -23,7 +23,7 @@ export function TableRangeInput({
   const [minLength, setMinLength] = useNumber(resource, minProp);
   const [maxLength, setMaxLength] = useNumber(resource, maxProp);
 
-  const [error, setError, onBlur] = useValidation();
+  const { error, setError, setTouched } = useValidation();
 
   const handleRangeChange = useCallback(
     (min: number | undefined, max: number | undefined) => {
@@ -53,7 +53,7 @@ export function TableRangeInput({
         maxValue={maxLength}
         minValue={minLength}
         invalid={!!error}
-        onBlur={onBlur}
+        onBlur={setTouched}
         onChange={handleRangeChange}
       />
       {error && <ErrorChip>{error}</ErrorChip>}

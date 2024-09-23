@@ -455,6 +455,12 @@ export function useBoolean(
 ): [boolean, SetValue<boolean>] {
   const [value, set] = useValue(resource, propertyURL, opts);
 
+  useEffect(() => {
+    if (value === undefined) {
+      set(false);
+    }
+  }, [value, set]);
+
   if (value === undefined) {
     return [false, set];
   }

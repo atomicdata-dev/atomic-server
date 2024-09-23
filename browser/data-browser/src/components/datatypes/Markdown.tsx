@@ -14,7 +14,10 @@ type Props = {
    */
   maxLength?: number;
   className?: string;
+  nestedInLink?: boolean;
 };
+
+const disableElementsInLink = ['a'];
 
 /** Renders a markdown value */
 const Markdown: FC<Props> = ({
@@ -22,6 +25,7 @@ const Markdown: FC<Props> = ({
   renderGFM = true,
   maxLength,
   className,
+  nestedInLink = false,
 }) => {
   const [collapsed, setCollapsed] = useState(true);
 
@@ -33,7 +37,10 @@ const Markdown: FC<Props> = ({
 
   return (
     <MarkdownWrapper className={className}>
-      <ReactMarkdown remarkPlugins={renderGFM ? [remarkGFM] : []}>
+      <ReactMarkdown
+        remarkPlugins={renderGFM ? [remarkGFM] : []}
+        disallowedElements={nestedInLink ? disableElementsInLink : undefined}
+      >
         {collapsed ? truncateMarkdown(text, maxLength) : text}
       </ReactMarkdown>
       {text.length > maxLength && collapsed && (
