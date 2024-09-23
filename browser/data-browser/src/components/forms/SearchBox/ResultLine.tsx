@@ -7,7 +7,7 @@ import {
 } from '@tomic/react';
 import React, { useEffect, useRef } from 'react';
 import { styled, css } from 'styled-components';
-import { getIconForClass } from '../../../views/FolderPage/iconMap';
+import { getIconForClass } from '../../../helpers/iconMap';
 
 interface ResultLineProps {
   selected: boolean;

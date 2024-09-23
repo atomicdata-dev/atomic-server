@@ -9,7 +9,7 @@ import {
 import { useCallback, useMemo } from 'react';
 import { styled } from 'styled-components';
 import { constructOpenURL } from '../../../helpers/navigation';
-import { getIconForClass } from '../iconMap';
+import { getIconForClass } from '../../../helpers/iconMap';
 import { BookmarkGridItem } from './BookmarkGridItem';
 import { BasicGridItem } from './BasicGridItem';
 import { GridCard, GridItemTitle, GridItemWrapper } from './components';

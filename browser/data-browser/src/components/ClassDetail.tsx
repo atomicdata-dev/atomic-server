@@ -1,8 +1,9 @@
 import React from 'react';
 import { Resource, useResource } from '@tomic/react';
 import { Detail } from './Detail';
-import { getIconForClass } from '../views/FolderPage/iconMap';
+import { getIconForClass } from '../helpers/iconMap';
 import { InlineFormattedResourceList } from './InlineFormattedResourceList';
+import { AtomicLink } from './AtomicLink';
 
 type ClassDetailProps = {
   resource: Resource;
@@ -35,7 +36,7 @@ const ClassItem = ({ subject }: ClassItemProps): JSX.Element => {
   return (
     <Detail>
       <Icon />
-      {classResource.title}
+      <AtomicLink subject={subject}>{classResource.title}</AtomicLink>
     </Detail>
   );
 };

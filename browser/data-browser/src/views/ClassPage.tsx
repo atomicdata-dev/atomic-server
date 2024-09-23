@@ -16,13 +16,13 @@ import { defaultHiddenProps } from './ResourcePageDefault';
 export function ClassPage({ resource }: ResourcePageProps) {
   return (
     <ContainerNarrow about={resource.subject}>
-      <Title resource={resource} />
-      <ClassDetail resource={resource} />
-      <ValueForm
-        resource={resource}
-        propertyURL={core.properties.description}
-      />
       <Column>
+        <Title resource={resource} />
+        <ClassDetail resource={resource} />
+        <ValueForm
+          resource={resource}
+          propertyURL={core.properties.description}
+        />
         <AllProps
           resource={resource}
           except={defaultHiddenProps}
