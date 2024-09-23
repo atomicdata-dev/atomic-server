@@ -10,13 +10,13 @@ import {
 import { FaAngleDown, FaAngleUp, FaAtom } from 'react-icons/fa';
 import { FaGripVertical } from 'react-icons/fa6';
 import { styled } from 'styled-components';
-import { dataTypeIconMap } from './dataTypeMaps';
 import { TableHeadingMenu } from './TableHeadingMenu';
 import { TablePageContext } from './tablePageContext';
 import { IconType } from 'react-icons';
 import { TableSorting } from './tableSorting';
 import { useContext, useState } from 'react';
 import { TableHeadingComponent } from '../../components/TableEditor/TableHeader';
+import { dataTypeIconMap } from '../../helpers/iconMap';
 
 function getIcon(
   propResource: Resource,

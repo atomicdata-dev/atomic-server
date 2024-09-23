@@ -1,4 +1,4 @@
-import { useString, core, server, commits } from '@tomic/react';
+import { useString, core, server, commits, useCanWrite } from '@tomic/react';
 import AllProps from '../components/AllProps';
 import { ClassDetail } from '../components/ClassDetail';
 import { ContainerNarrow } from '../components/Containers';
@@ -7,6 +7,14 @@ import { ResourcePageProps } from './ResourcePage';
 import { CommitDetail } from '../components/CommitDetail';
 import { Details } from '../components/Detail';
 import { EditableTitle } from '../components/EditableTitle';
+import { FaPencil } from 'react-icons/fa6';
+import {
+  IconButton,
+  IconButtonVariant,
+} from '../components/IconButton/IconButton';
+import { Column, Row } from '../components/Row';
+import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
+import { editURL } from '../helpers/navigation';
 
 /**
  * The properties that are shown in an alternative, custom way in default views.
@@ -32,31 +40,46 @@ export const defaultHiddenProps = [
 ];
 
 /**
- * The Resource view that is used when no specific one fits better. It lists all
+ * The Resource view that is used when no specific one fits better. It lists most
  * properties.
  */
 export function ResourcePageDefault({
   resource,
 }: ResourcePageProps): JSX.Element {
   const [lastCommit] = useString(resource, commits.properties.lastCommit);
+  const [canEdit] = useCanWrite(resource);
+  const navigate = useNavigateWithTransition();
 
   return (
     <ContainerNarrow>
-      <EditableTitle resource={resource} />
-      <Details>
-        <ClassDetail resource={resource} />
-        <CommitDetail commitSubject={lastCommit} />
-      </Details>
-      <ValueForm
-        resource={resource}
-        propertyURL={core.properties.description}
-      />
-      <AllProps
-        resource={resource}
-        except={defaultHiddenProps}
-        editable
-        columns
-      />
+      <Column>
+        <Row justify='space-between'>
+          <EditableTitle resource={resource} />
+          {canEdit && (
+            <IconButton
+              title='Edit'
+              variant={IconButtonVariant.Square}
+              onClick={() => navigate(editURL(resource.subject))}
+            >
+              <FaPencil />
+            </IconButton>
+          )}
+        </Row>
+        <Details>
+          <ClassDetail resource={resource} />
+          <CommitDetail commitSubject={lastCommit} />
+        </Details>
+        <ValueForm
+          resource={resource}
+          propertyURL={core.properties.description}
+        />
+        <AllProps
+          resource={resource}
+          except={defaultHiddenProps}
+          editable
+          columns
+        />
+      </Column>
     </ContainerNarrow>
   );
 }

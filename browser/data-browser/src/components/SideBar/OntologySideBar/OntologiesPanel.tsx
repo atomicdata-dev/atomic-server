@@ -9,7 +9,7 @@ import {
 import { SideBarItem } from '../SideBarItem';
 import { Row } from '../../Row';
 import { AtomicLink } from '../../AtomicLink';
-import { getIconForClass } from '../../../views/FolderPage/iconMap';
+import { getIconForClass } from '../../../helpers/iconMap';
 import { ScrollArea } from '../../ScrollArea';
 import { ErrorLook } from '../../ErrorLook';
 import { useCallback, useEffect, useState } from 'react';

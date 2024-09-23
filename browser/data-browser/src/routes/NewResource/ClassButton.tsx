@@ -1,5 +1,5 @@
 import { useResource, useTitle } from '@tomic/react';
-import { getIconForClass } from '../../views/FolderPage/iconMap';
+import { getIconForClass } from '../../helpers/iconMap';
 import { NewInstanceButton } from '../../components/NewInstanceButton';
 
 interface ClassButtonProps {

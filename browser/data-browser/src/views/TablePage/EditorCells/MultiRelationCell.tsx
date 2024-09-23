@@ -14,7 +14,7 @@ import {
   InputWrapper,
 } from '../../../components/forms/InputStyles';
 import { useTableEditorContext } from '../../../components/TableEditor/TableEditorContext';
-import { getIconForClass } from '../../FolderPage/iconMap';
+import { getIconForClass } from '../../../helpers/iconMap';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
 import { useResourceSearch } from './useResourceSearch';
 import { IconButton } from '../../../components/IconButton/IconButton';

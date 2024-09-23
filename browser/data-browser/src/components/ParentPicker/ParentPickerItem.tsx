@@ -10,7 +10,7 @@ import {
 } from '@tomic/react';
 import { Details } from '../Details';
 import { useEffect, useState } from 'react';
-import { getIconForClass } from '../../views/FolderPage/iconMap';
+import { getIconForClass } from '../../helpers/iconMap';
 import { styled } from 'styled-components';
 
 const shouldBeRendered = (resource: Resource) =>

@@ -1,15 +1,4 @@
 import { Datatype, JSONValue } from '@tomic/react';
-import type { IconType } from 'react-icons';
-import {
-  FaCalendar,
-  FaCheckSquare,
-  FaClock,
-  FaExternalLinkAlt,
-  FaFont,
-  FaHashtag,
-  FaListUl,
-  FaMarkdown,
-} from 'react-icons/fa';
 import { CellAlign } from '../../components/TableEditor/Cell';
 import { AtomicURLCell } from './EditorCells/AtomicURLCell';
 import { BooleanCell } from './EditorCells/BooleanCell';
@@ -21,19 +10,6 @@ import { ResourceArrayCell } from './EditorCells/ResourceArrayCell';
 import { SlugCell } from './EditorCells/SlugCell';
 import { StringCell } from './EditorCells/StringCell';
 import { CellContainer } from './EditorCells/Type';
-
-export const dataTypeIconMap = new Map<string, IconType>([
-  [Datatype.STRING, FaFont],
-  [Datatype.SLUG, FaFont],
-  [Datatype.MARKDOWN, FaMarkdown],
-  [Datatype.ATOMIC_URL, FaExternalLinkAlt],
-  [Datatype.INTEGER, FaHashtag],
-  [Datatype.FLOAT, FaHashtag],
-  [Datatype.RESOURCEARRAY, FaListUl],
-  [Datatype.BOOLEAN, FaCheckSquare],
-  [Datatype.DATE, FaCalendar],
-  [Datatype.TIMESTAMP, FaClock],
-]);
 
 export const dataTypeCellMap = new Map<Datatype, CellContainer<JSONValue>>([
   [Datatype.STRING, StringCell],

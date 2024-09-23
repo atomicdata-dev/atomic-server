@@ -3,10 +3,10 @@ import { useCallback, useContext, useMemo, useState } from 'react';
 import { FaChevronCircleDown, FaFile, FaHashtag, FaPlus } from 'react-icons/fa';
 import { DIVIDER, DropdownMenu, DropdownItem } from '../../components/Dropdown';
 import { buildDefaultTrigger } from '../../components/Dropdown/DefaultTrigger';
-import { dataTypeIconMap } from './dataTypeMaps';
 import { NewPropertyDialog } from './PropertyForm/NewPropertyDialog';
 import { TablePageContext } from './tablePageContext';
 import { ExternalPropertyDialog } from './PropertyForm/ExternalPropertyDialog';
+import { dataTypeIconMap } from '../../helpers/iconMap';
 
 const NewColumnTrigger = buildDefaultTrigger(<FaPlus />, 'Add column');
 
