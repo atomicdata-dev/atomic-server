@@ -17,19 +17,27 @@ export function InlineFormattedResourceList({
 }: InlineFormattedResourceListProps): JSX.Element {
   // There are rare cases where a resource array can locally have an undefined value, we filter these out to prevent the formatter from throwing an error.
   const filteredSubjects = subjects.filter(subject => subject !== undefined);
+  const parts = formatter.formatToParts(filteredSubjects);
 
   return (
     <>
-      {formatter.formatToParts(filteredSubjects).map(({ type, value }) => {
+      {parts.map(({ type, value }, i) => {
         if (type === 'literal') {
           return value;
         }
 
-        if (RenderComp) {
-          return <RenderComp subject={value} key={value} />;
+        let key = value;
+
+        // If the value is repeated, we add a suffix to make it unique
+        if (parts.findIndex(p => p.value === value) !== i) {
+          key = `${value}-${i}`;
         }
 
-        return <ResourceInline subject={value} key={value} />;
+        if (RenderComp) {
+          return <RenderComp subject={value} key={key} />;
+        }
+
+        return <ResourceInline subject={value} key={key} />;
       })}
     </>
   );

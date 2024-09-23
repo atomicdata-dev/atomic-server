@@ -1,5 +1,5 @@
-import { useCallback, useState } from 'react';
-import { ArrayError, useArray, validateDatatype } from '@tomic/react';
+import React, { useState } from 'react';
+import { useArray, validateDatatype } from '@tomic/react';
 import { Button } from '../Button';
 import { InputProps } from './ResourceField';
 import { ErrMessage } from './InputStyles';
@@ -18,6 +18,7 @@ import { transition } from '../../helpers/transition';
 import { FaGripVertical, FaPlus, FaTrash } from 'react-icons/fa6';
 import { createPortal } from 'react-dom';
 import { transparentize } from 'polished';
+import { useValidation } from './formValidation/useValidation';
 
 interface InputResourceArrayProps extends InputProps {
   isA?: string;
@@ -27,14 +28,18 @@ export default function InputResourceArray({
   resource,
   property,
   commit,
+  required,
   ...props
 }: InputResourceArrayProps): JSX.Element {
-  const [err, setErr] = useState<ArrayError | undefined>(undefined);
   const [draggingSubject, setDraggingSubject] = useState<string>();
   const [array, setArray] = useArray(resource, property.subject, {
     validate: false,
     commit,
   });
+
+  const { error, setError, setTouched } = useValidation(
+    required ? (array.length > 0 ? undefined : 'Required') : undefined,
+  );
 
   function handleAddRow() {
     setArray([...array, undefined]);
@@ -49,28 +54,39 @@ export default function InputResourceArray({
       const newArray = [...array];
       newArray.splice(index, 1);
       setArray(newArray.length === 0 ? undefined : newArray);
+
+      if (required && newArray.length === 0) {
+        setError('Required');
+      }
     },
     array,
-    [setArray],
+    [setArray, required, setError],
   );
 
   const handleSetSubjectList = useIndexDependantCallback(
     (index: number) => (value: string | undefined) => {
+      const newArray = [...array];
+
       if (value) {
-        const newArray = [...array];
         newArray[index] = value;
 
         try {
           validateDatatype(newArray, property.datatype);
           setArray(newArray);
-          setErr(undefined);
+          setError(undefined);
         } catch (e) {
-          setErr(e);
+          setError(e.message);
+
+          return;
         }
+      }
+
+      if (required) {
+        setError(newArray.length === 0 ? 'Required' : undefined);
       }
     },
     array,
-    [property.datatype, setArray],
+    [property.datatype, setArray, setError, required],
   );
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
@@ -88,17 +104,6 @@ export default function InputResourceArray({
     setArray(newArray);
   };
 
-  const errMaybe = useCallback(
-    (index: number) => {
-      if (err && err.index === index) {
-        return err;
-      }
-
-      return undefined;
-    },
-    [err],
-  );
-
   return (
     <Column>
       {array.length > 0 && (
@@ -110,26 +115,25 @@ export default function InputResourceArray({
           <RelativeContainer>
             <DropEdge visible={!!draggingSubject} index={0} />
             {array.map((subject, index) => (
-              <>
+              <React.Fragment key={`${property.subject}${index}`}>
                 <DraggableResourceSelector
                   first={index === 0}
                   last={index === array.length - 1}
                   subject={subject}
-                  key={`${property.subject}${index}`}
                   value={subject}
                   setSubject={handleSetSubjectList[index]}
-                  error={errMaybe(index)}
                   isA={property.classType}
                   handleRemove={handleRemoveRowList[index]}
                   parent={resource.subject}
                   allowsOnly={property.allowsOnly}
                   hideClearButton
+                  onBlur={setTouched}
                   {...props}
                 />
                 {!(subject === undefined && index === array.length - 1) && (
                   <DropEdge visible={!!draggingSubject} index={index + 1} />
                 )}
-              </>
+              </React.Fragment>
             ))}
             {createPortal(
               <StyledDragOverlay>
@@ -143,6 +147,7 @@ export default function InputResourceArray({
                     isA={property.classType}
                     handleRemove={() => undefined}
                     hideClearButton
+                    onBlur={setTouched}
                     parent={resource.subject}
                     {...props}
                   />
@@ -179,7 +184,7 @@ export default function InputResourceArray({
           )}
         </Row>
       )}
-      {!!err && <ErrMessage>{err?.message}</ErrMessage>}
+      {!!error && <ErrMessage>{error}</ErrMessage>}
     </Column>
   );
 }

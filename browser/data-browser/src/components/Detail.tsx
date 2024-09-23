@@ -4,7 +4,7 @@ import { styled } from 'styled-components';
 export const Detail = styled.div`
   display: inline-flex;
   align-items: center;
-  gap: 1ch;
+  gap: 0.5ch;
   margin-right: 2rem;
 `;
 

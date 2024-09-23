@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { InputProps } from './ResourceField';
 import { noNestedSupport, useSubject } from '@tomic/react';
 import { ResourceSelector } from './ResourceSelector';
@@ -11,9 +10,7 @@ export function InputResource({
   commit,
   ...props
 }: InputProps): JSX.Element {
-  const [error, setError] = useState<Error | undefined>(undefined);
   const [subject, setSubject] = useSubject(resource, property.subject, {
-    handleValidationError: setError,
     commit,
   });
 
@@ -28,7 +25,6 @@ export function InputResource({
   return (
     <div>
       <ResourceSelector
-        error={error}
         isA={property.classType}
         setSubject={setSubject}
         value={subject}

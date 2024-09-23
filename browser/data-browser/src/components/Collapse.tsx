@@ -37,7 +37,7 @@ export function Collapse({
 
   return (
     <GridCollapser open={open} className={className}>
-      <InnerWrapper overflow={enableOverflow}>
+      <InnerWrapper $overflow={enableOverflow}>
         {mountChildren && children}
       </InnerWrapper>
     </GridCollapser>
@@ -59,7 +59,7 @@ const GridCollapser = styled.div<GridCollapserProps>`
   }
 `;
 
-const InnerWrapper = styled.div<{ overflow: boolean }>`
+const InnerWrapper = styled.div<{ $overflow: boolean }>`
   width: 100%;
-  overflow: ${({ overflow }) => (overflow ? 'visible' : 'hidden')};
+  overflow: ${({ $overflow }) => ($overflow ? 'visible' : 'hidden')};
 `;

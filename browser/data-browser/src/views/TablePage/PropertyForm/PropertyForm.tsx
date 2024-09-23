@@ -23,7 +23,11 @@ export function PropertyForm({
   existingProperty,
   category,
 }: PropertyFormProps): JSX.Element {
-  const [nameError, setNameError, onNameBlur] = useValidation('Required');
+  const {
+    error: nameError,
+    setError: setNameError,
+    setTouched: setNameTouched,
+  } = useValidation('Required');
   const valueOptions = useMemo(
     () => ({
       handleValidationError(e: Error | undefined) {
@@ -91,7 +95,7 @@ export function PropertyForm({
             value={name}
             onChange={handleNameChange}
             placeholder='New Column'
-            onBlur={onNameBlur}
+            onBlur={setNameTouched}
           />
         </InputWrapper>
         {nameError && <ErrorChip>{nameError}</ErrorChip>}

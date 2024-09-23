@@ -1,6 +1,9 @@
 import { useNumber } from '@tomic/react';
 import { InputProps } from './ResourceField';
-import { useValidation } from './formValidation/useValidation';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from './formValidation/useValidation';
 import { styled } from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
 import { InputStyled, InputWrapper } from './InputStyles';
@@ -13,20 +16,23 @@ export function InputTimestamp({
   required,
   ...props
 }: InputProps): React.JSX.Element {
-  const [err, setErr, onBlur] = useValidation();
   const [value, setValue] = useNumber(resource, property.subject, {
     commit,
     validate: false,
   });
 
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, required),
+  );
+
   const [localDate, handleChange] = useDateTimeInput(
     value,
     (time: number | undefined) => {
       if (required && time === undefined) {
-        setErr('Required');
+        setError('Required');
         setValue(undefined);
       } else {
-        setErr(undefined);
+        setError(undefined);
         setValue(time);
       }
     },
@@ -34,17 +40,17 @@ export function InputTimestamp({
 
   return (
     <Wrapper>
-      <StyledInputWrapper $invalid={!!err}>
+      <StyledInputWrapper $invalid={!!error}>
         <InputStyled
           type='datetime-local'
           value={localDate}
           required={required}
           onChange={handleChange}
-          onBlur={onBlur}
+          onBlur={setTouched}
           {...props}
         />
       </StyledInputWrapper>
-      {err && <ErrorChipInput>{err}</ErrorChipInput>}
+      {error && <ErrorChipInput>{error}</ErrorChipInput>}
     </Wrapper>
   );
 }
