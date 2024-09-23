@@ -6,6 +6,11 @@ import { useUpload } from '../../../hooks/useUpload';
 import { VisuallyHidden } from '../../VisuallyHidden';
 import { styled } from 'styled-components';
 import { ClearType, FilePickerButton } from './FilePickerButton';
+import {
+  useValidation,
+  checkForInitialRequiredValue,
+} from '../formValidation/useValidation';
+import { ErrMessage } from '../InputStyles';
 
 /**
  * Button that opens a dialog that lists all files in the drive and allows the user to upload a new file.
@@ -24,6 +29,10 @@ export function FilePicker({
     validate: false,
     commit: commit,
   });
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, required),
+  );
+
   const [show, setShow] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string | undefined>(
     value,
@@ -64,7 +73,15 @@ export function FilePicker({
       }
     } else {
       setValue(undefined);
+
+      if (required) {
+        setError('Required');
+      }
+
+      return;
     }
+
+    setError(undefined);
   }, [selectedSubject, selectedFile]);
 
   return (
@@ -74,7 +91,7 @@ export function FilePicker({
         <input
           aria-hidden
           type='text'
-          value={value ?? ''}
+          defaultValue={value ?? ''}
           required={required}
           disabled={disabled}
         />
@@ -83,7 +100,10 @@ export function FilePicker({
         file={selectedFile}
         subject={selectedSubject}
         disabled={disabled}
-        onButtonClick={() => setShow(true)}
+        onButtonClick={() => {
+          setShow(true);
+          setTouched();
+        }}
         onClear={clearType => {
           if (clearType === ClearType.File) {
             setSelectedFile(undefined);
@@ -99,6 +119,7 @@ export function FilePicker({
         onResourcePicked={setSelectedSubject}
         onNewFilePicked={setSelectedFile}
       />
+      {error && <ErrMessage>{error}</ErrMessage>}
     </Wrapper>
   );
 }

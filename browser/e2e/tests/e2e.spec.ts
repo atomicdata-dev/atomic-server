@@ -375,13 +375,8 @@ test.describe('data-browser', async () => {
     await page.keyboard.type('asdf1');
     await expect(page.locator('text=asdf')).not.toBeVisible();
 
-    // Try to save without a description
-    page.locator('button:has-text("Save")').click();
-    await expect(
-      page.locator(
-        'text=Property https://atomicdata.dev/properties/description missing',
-      ),
-    ).toBeVisible();
+    // Check if save button is disabled
+    await expect(page.getByRole('button', { name: 'Save' })).toBeDisabled();
 
     // Add a description
     await page.getByLabel('Description').click();

@@ -33,7 +33,7 @@ export function BubbleMenu(): React.JSX.Element {
         <NodeSelectMenu />
         <ToggleButton
           title='Toggle bold'
-          active={!!editor.isActive('bold')}
+          $active={!!editor.isActive('bold') ?? undefined}
           onClick={() => editor.chain().focus().toggleBold().run()}
           disabled={!editor.can().chain().focus().toggleBold().run()}
           type='button'
@@ -42,7 +42,7 @@ export function BubbleMenu(): React.JSX.Element {
         </ToggleButton>
         <ToggleButton
           title='Toggle italic'
-          active={!!editor.isActive('italic')}
+          $active={!!editor.isActive('italic') ?? undefined}
           onClick={() => editor.chain().focus().toggleItalic().run()}
           disabled={!editor.can().chain().focus().toggleItalic().run()}
           type='button'
@@ -51,7 +51,7 @@ export function BubbleMenu(): React.JSX.Element {
         </ToggleButton>
         <ToggleButton
           title='Toggle strikethrough'
-          active={!!editor.isActive('strike')}
+          $active={!!editor.isActive('strike') ?? undefined}
           onClick={() => editor.chain().focus().toggleStrike().run()}
           disabled={!editor.can().chain().focus().toggleStrike().run()}
           type='button'
@@ -60,7 +60,7 @@ export function BubbleMenu(): React.JSX.Element {
         </ToggleButton>
         <ToggleButton
           title='Toggle blockquote'
-          active={!!editor.isActive('blockquote')}
+          $active={!!editor.isActive('blockquote') ?? undefined}
           onClick={() => editor.chain().focus().toggleBlockquote().run()}
           disabled={!editor.can().chain().focus().toggleBlockquote().run()}
           type='button'
@@ -69,7 +69,7 @@ export function BubbleMenu(): React.JSX.Element {
         </ToggleButton>
         <ToggleButton
           title='Toggle inline code'
-          active={!!editor.isActive('code')}
+          $active={!!editor.isActive('code') ?? undefined}
           onClick={() => editor.chain().focus().toggleCode().run()}
           disabled={!editor.can().chain().focus().toggleCode().run()}
           type='button'
@@ -83,7 +83,7 @@ export function BubbleMenu(): React.JSX.Element {
           Trigger={
             <ToggleButton
               as={RadixPopover.Trigger}
-              active={!!editor.isActive('link')}
+              $active={!!editor.isActive('link') ?? undefined}
               disabled={!editor.can().chain().focus().toggleCode().run()}
               type='button'
             >
@@ -101,7 +101,7 @@ export function BubbleMenu(): React.JSX.Element {
 const BubbleMenuInner = styled(Row)`
   background-color: ${p => p.theme.colors.bg};
   border-radius: ${p => p.theme.radius};
-  padding: ${p => p.theme.margin / 2}rem;
+  padding: ${p => p.theme.size(2)};
   box-shadow: ${p => p.theme.boxShadowSoft};
 
   @supports (backdrop-filter: blur(5px)) {
@@ -113,7 +113,7 @@ const BubbleMenuInner = styled(Row)`
 const StyledPopover = styled(Popover)`
   background-color: ${p => p.theme.colors.bg};
   backdrop-filter: blur(5px);
-  padding: ${p => p.theme.margin}rem;
+  padding: ${p => p.theme.size()};
   border-radius: ${p => p.theme.radius};
 
   @supports (backdrop-filter: blur(5px)) {

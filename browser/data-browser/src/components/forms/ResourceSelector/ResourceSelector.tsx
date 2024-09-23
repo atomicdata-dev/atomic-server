@@ -6,9 +6,12 @@ import { css, styled } from 'styled-components';
 import { NewFormDialog } from '../NewForm/NewFormDialog';
 import { SearchBox } from '../SearchBox';
 import { FaTrash } from 'react-icons/fa';
-import { ErrorChip } from '../ErrorChip';
 import { SearchBoxButton } from '../SearchBox/SearchBoxButton';
 import { useTitlePropOfClass } from './useTitlePropOfClass';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from '../formValidation/useValidation';
 
 export interface ResourceSelectorProps {
   /**
@@ -30,7 +33,6 @@ export interface ResourceSelectorProps {
   required?: boolean;
   /** A function to remove this item. Only relevant in arrays. */
   handleRemove?: () => void;
-  error?: Error;
   disabled?: boolean;
   autoFocus?: boolean;
   /** Is used when a new item is created using the ResourceSelector */
@@ -45,7 +47,12 @@ export interface ResourceSelectorProps {
 
   /** Some react node that is displayed in front of the text inside the input wrapper*/
   prefix?: React.ReactNode;
+
+  /** Callback function to be called when the input loses focus */
+  onBlur?: () => void;
 }
+
+const INVALID_RESOURCE_ERROR = 'Invalid Resource';
 
 /**
  * Form field for selecting a single resource. Needs external subject &
@@ -56,7 +63,6 @@ export const ResourceSelector = memo(function ResourceSelector({
   setSubject,
   value,
   handleRemove,
-  error,
   isA,
   disabled,
   parent,
@@ -66,6 +72,7 @@ export const ResourceSelector = memo(function ResourceSelector({
   last = true,
   prefix,
   allowsOnly,
+  onBlur,
 }: ResourceSelectorProps): JSX.Element {
   const [pickedSubject, setPickedSubject] = useState<string | undefined>();
   const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog({
@@ -73,6 +80,10 @@ export const ResourceSelector = memo(function ResourceSelector({
       setSubject(pickedSubject);
     },
   });
+
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, required),
+  );
 
   const [initialNewTitle, setInitialNewTitle] = useState('');
   const { titleProp } = useTitlePropOfClass(isA);
@@ -98,6 +109,30 @@ export const ResourceSelector = memo(function ResourceSelector({
   const handleSaveClick = (subject: string) => {
     setPickedSubject(subject);
     closeDialog(true);
+    setError(undefined);
+  };
+
+  const handleResourceError = (hasError: boolean) => {
+    if (hasError) {
+      setError(INVALID_RESOURCE_ERROR);
+    } else {
+      if (error === INVALID_RESOURCE_ERROR) {
+        setError(undefined);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    setTouched();
+    onBlur?.();
+  };
+
+  const handleSubjectChange = (subject: string | undefined) => {
+    setSubject(subject);
+
+    if (required) {
+      setError(subject ? undefined : 'Required');
+    }
   };
 
   return (
@@ -105,13 +140,16 @@ export const ResourceSelector = memo(function ResourceSelector({
       <StyledSearchBox
         prefix={prefix}
         value={value}
-        onChange={setSubject}
         isA={isA}
         required={required}
         disabled={disabled}
         hideClearButton={hideClearButton}
         allowsOnly={allowsOnly}
-        onCreateItem={handleCreateItem}
+        visualError={error}
+        onChange={handleSubjectChange}
+        onCreateItem={!inDialog ? handleCreateItem : undefined}
+        onClose={handleBlur}
+        onResourceError={handleResourceError}
       >
         {handleRemove && !disabled && (
           <SearchBoxButton onClick={handleRemove} title='Remove' type='button'>
@@ -119,7 +157,6 @@ export const ResourceSelector = memo(function ResourceSelector({
           </SearchBoxButton>
         )}
       </StyledSearchBox>
-      {error && <PositionedErrorChip>{error.message}</PositionedErrorChip>}
       {!inDialog && isA && (
         <Dialog {...dialogProps} width='50rem'>
           {isDialogOpen && (
@@ -169,10 +206,4 @@ const Wrapper = styled.div<{ first?: boolean; last?: boolean }>`
         border-bottom: none;
       `}
   }
-`;
-
-const PositionedErrorChip = styled(ErrorChip)`
-  position: absolute;
-  top: 2rem;
-  z-index: 100;
 `;

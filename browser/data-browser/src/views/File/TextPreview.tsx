@@ -6,6 +6,7 @@ interface TextPreviewProps {
   downloadUrl: string;
   mimeType: string;
   className?: string;
+  nestedInLink?: boolean;
 }
 
 const fetchFile = async (
@@ -28,15 +29,20 @@ export function TextPreview({
   downloadUrl,
   mimeType,
   className,
+  nestedInLink = false,
 }: TextPreviewProps): JSX.Element {
   const [data, setData] = useState('');
 
   useEffect(() => {
+    if (!downloadUrl) return;
+
     const abortController = new AbortController();
 
-    fetchFile(downloadUrl, abortController.signal, mimeType).then(res =>
-      setData(res),
-    );
+    fetchFile(downloadUrl, abortController.signal, mimeType)
+      .then(res => setData(res))
+      .catch(e => {
+        if (e.name !== 'AbortError') throw e;
+      });
 
     return () => abortController.abort();
   }, [downloadUrl]);
@@ -44,7 +50,7 @@ export function TextPreview({
   if (mimeType === 'text/markdown') {
     return (
       <div className={className}>
-        <Markdown text={data} />
+        <Markdown text={data} nestedInLink={nestedInLink} />
       </div>
     );
   }

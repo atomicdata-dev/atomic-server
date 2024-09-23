@@ -57,6 +57,7 @@ export function SearchBoxWindow({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [results, setResults] = useState<string[]>([]);
   const [searchError, setSearchError] = useState<Error | undefined>();
+  const [valueIsURL, setValueIsURL] = useState(false);
   const { titleProp, classTitle } = useTitlePropOfClass(isA);
 
   const isAboveTrigger = below < remToPixels(BOX_HEIGHT_REM);
@@ -164,11 +165,23 @@ export function SearchBoxWindow({
   };
 
   const handleChange: React.ChangeEventHandler<HTMLInputElement> = e => {
+    if (
+      e.target.value.startsWith('http:') ||
+      e.target.value.startsWith('https:')
+    ) {
+      onChange(e.target.value);
+      setValueIsURL(true);
+
+      return;
+    }
+
     if (titleProp === core.properties.shortname) {
       onChange(stringToSlug(e.target.value));
     } else {
       onChange(e.target.value);
     }
+
+    setValueIsURL(false);
   };
 
   if (searchError) {
@@ -198,7 +211,7 @@ export function SearchBoxWindow({
         )}
         <StyledScrollArea>
           <ul>
-            {onCreateItem && searchValue ? (
+            {onCreateItem && searchValue && !valueIsURL ? (
               <ResultLine
                 selected={selectedIndex === 0}
                 onMouseOver={() => handleMouseMove(0)}

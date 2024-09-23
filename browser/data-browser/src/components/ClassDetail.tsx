@@ -1,27 +1,41 @@
-import { properties, Resource, useArray } from '@tomic/react';
+import React from 'react';
+import { Resource, useResource } from '@tomic/react';
 import { Detail } from './Detail';
 import { getIconForClass } from '../views/FolderPage/iconMap';
 import { InlineFormattedResourceList } from './InlineFormattedResourceList';
 
-type Props = {
+type ClassDetailProps = {
   resource: Resource;
 };
 
 /** Renders the is-a Class for some resource */
-export function ClassDetail({ resource }: Props): JSX.Element {
-  const [classes] = useArray(resource, properties.isA);
+export const ClassDetail: React.FC<ClassDetailProps> = ({ resource }) => {
+  if (resource.getClasses().length === 0) {
+    return null;
+  }
 
   return (
-    <>
-      {classes && (
-        <Detail>
-          <>
-            {'is a '}
-            {getIconForClass(classes[0])}
-            <InlineFormattedResourceList subjects={classes} />
-          </>
-        </Detail>
-      )}
-    </>
+    <Detail>
+      <InlineFormattedResourceList
+        subjects={resource.getClasses()}
+        RenderComp={ClassItem}
+      />
+    </Detail>
   );
+};
+
+interface ClassItemProps {
+  subject: string;
 }
+
+const ClassItem = ({ subject }: ClassItemProps): JSX.Element => {
+  const classResource = useResource(subject);
+  const Icon = getIconForClass(subject);
+
+  return (
+    <Detail>
+      <Icon />
+      {classResource.title}
+    </Detail>
+  );
+};

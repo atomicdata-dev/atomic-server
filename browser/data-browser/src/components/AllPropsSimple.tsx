@@ -9,6 +9,7 @@ import {
 } from '@tomic/react';
 import { useMemo } from 'react';
 import { styled } from 'styled-components';
+import { InlineFormattedResourceList } from './InlineFormattedResourceList';
 
 export interface AllPropsSimpleProps {
   resource: Resource;
@@ -37,11 +38,16 @@ function Row({ prop, val }: RowProps): JSX.Element {
 
   const value = useMemo(() => {
     if (dataType === datatypes.atomicUrl) {
-      return <Value val={val as string} />;
+      return <Value subject={val as string} />;
     }
 
     if (dataType === datatypes.resourceArray) {
-      return <ResourceArray val={val as string[]} />;
+      return (
+        <InlineFormattedResourceList
+          subjects={val as string[]}
+          RenderComp={Value}
+        />
+      );
     }
 
     return <>{val as string}</>;
@@ -67,21 +73,8 @@ const List = styled.ul`
   color: ${p => p.theme.colors.textLight};
 `;
 
-function ResourceArray({ val }: { val: string[] }): JSX.Element {
-  return (
-    <>
-      {val.map((v, i) => (
-        <>
-          <Value val={v} key={v} />
-          {i === val.length - 1 ? '' : ', '}
-        </>
-      ))}
-    </>
-  );
-}
-
-function Value({ val }: { val: string }): JSX.Element {
-  const valueResource = useResource(val);
+function Value({ subject }: { subject: string }): JSX.Element {
+  const valueResource = useResource(subject);
   const [valueName] = useTitle(valueResource);
 
   return <>{valueName}</>;

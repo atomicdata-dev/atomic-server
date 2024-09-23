@@ -1,5 +1,8 @@
 import { InputProps } from './ResourceField';
-import { useValidation } from './formValidation/useValidation';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from './formValidation/useValidation';
 import { styled } from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
 import { useString, validateDatatype } from '@tomic/react';
@@ -13,25 +16,27 @@ export function InputDate({
   required,
   ...props
 }: InputProps): React.JSX.Element {
-  const [err, setErr, onBlur] = useValidation();
   const [value, setValue] = useString(resource, property.subject, {
     commit,
     validate: false,
   });
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, required),
+  );
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const dateStr = event.target.value;
 
     if (required && dateStr) {
-      setErr('Required');
+      setError('Required');
       setValue(undefined);
     } else {
       try {
         validateDatatype(dateStr, property.datatype);
         setValue(dateStr);
-        setErr(undefined);
+        setError(undefined);
       } catch (e) {
-        setErr(e);
+        setError(e);
       }
     }
   };
@@ -43,11 +48,12 @@ export function InputDate({
           type='date'
           value={value}
           onChange={handleChange}
-          onBlur={onBlur}
+          onBlur={setTouched}
+          required={required}
           {...props}
         />
       </StyledInputWrapper>
-      {err && <ErrorChipInput>{err}</ErrorChipInput>}
+      {error && <ErrorChipInput>{error}</ErrorChipInput>}
     </Wrapper>
   );
 }

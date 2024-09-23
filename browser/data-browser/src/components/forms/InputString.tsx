@@ -3,7 +3,10 @@ import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
 import { styled } from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
-import { useValidation } from './formValidation/useValidation';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from './formValidation/useValidation';
 
 export default function InputString({
   resource,
@@ -18,8 +21,8 @@ export default function InputString({
     validate: false,
   });
 
-  const [err, setErr, onBlur] = useValidation(
-    props.required ? (!value ? 'Required' : undefined) : undefined,
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, props.required),
   );
 
   function handleUpdate(event: React.ChangeEvent<HTMLInputElement>): void {
@@ -28,27 +31,27 @@ export default function InputString({
 
     try {
       validateDatatype(newval, property.datatype);
-      setErr(undefined);
+      setError(undefined);
     } catch (e) {
-      setErr('Invalid value');
+      setError('Invalid value');
     }
 
     if (props.required && newval === '') {
-      setErr('Required');
+      setError('Required');
     }
   }
 
   return (
     <Wrapper>
-      <InputWrapper $invalid={!!err}>
+      <InputWrapper $invalid={!!error}>
         <InputStyled
           value={value === undefined ? '' : value}
           onChange={handleUpdate}
           {...props}
-          onBlur={onBlur}
+          onBlur={setTouched}
         />
       </InputWrapper>
-      {err && <ErrorChipInput>{err}</ErrorChipInput>}
+      {error && <ErrorChipInput>{error}</ErrorChipInput>}
     </Wrapper>
   );
 }

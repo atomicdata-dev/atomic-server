@@ -1,7 +1,10 @@
 import { Datatype, useNumber, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
-import { useValidation } from './formValidation/useValidation';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from './formValidation/useValidation';
 import { ErrorChipInput } from './ErrorChip';
 import { styled } from 'styled-components';
 
@@ -11,19 +14,21 @@ export default function InputNumber({
   commit,
   ...props
 }: InputProps): JSX.Element {
-  const [err, setErr, onBlur] = useValidation();
   const [value, setValue] = useNumber(resource, property.subject, {
-    handleValidationError: setErr,
     validate: false,
     commit,
   });
 
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, props.required),
+  );
+
   function handleUpdate(e: React.ChangeEvent<HTMLInputElement>) {
-    setErr(undefined);
+    setError(undefined);
 
     if (e.target.value === '') {
       if (props.required) {
-        setErr('Required');
+        setError('Required');
       }
 
       setValue(undefined);
@@ -33,29 +38,29 @@ export default function InputNumber({
         validateDatatype(newVal, property.datatype);
         setValue(newVal);
       } catch (er) {
-        setErr('Invalid Number');
+        setError('Invalid Number');
       }
     }
 
     if (props.required && e.target.value === '') {
-      setErr('Required');
+      setError('Required');
     }
   }
 
   return (
     <Wrapper>
-      <InputWrapper $invalid={!!err}>
+      <InputWrapper $invalid={!!error}>
         <InputStyled
           placeholder='Enter a number...'
           type='number'
           value={value === undefined ? '' : Number.isNaN(value) ? '' : value}
           step={property.datatype === Datatype.INTEGER ? 1 : 'any'}
           onChange={handleUpdate}
-          onBlur={onBlur}
+          onBlur={setTouched}
           {...props}
         />
       </InputWrapper>
-      {err && <ErrorChipInput top='2rem'>{err}</ErrorChipInput>}
+      {error && <ErrorChipInput top='2rem'>{error}</ErrorChipInput>}
     </Wrapper>
   );
 }

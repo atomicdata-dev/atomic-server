@@ -14,7 +14,7 @@ export interface ExternalLinkProps {
 export function ExternalLink({
   to,
   children,
-  variant,
+  variant = ExternalLinkVariant.Plain,
 }: React.PropsWithChildren<ExternalLinkProps>): JSX.Element {
   const Comp =
     variant === ExternalLinkVariant.Button
@@ -28,10 +28,6 @@ export function ExternalLink({
     </Comp>
   );
 }
-
-ExternalLink.defaultProps = {
-  variant: ExternalLinkVariant.Plain,
-};
 
 const ExternalLinkPlain = styled.a`
   display: inline-flex;

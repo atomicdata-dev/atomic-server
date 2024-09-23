@@ -50,7 +50,13 @@ function FilePreviewThumbnailInner({
   }
 
   if (isTextFile(mimeType)) {
-    return <StyledTextPreview downloadUrl={downloadUrl} mimeType={mimeType} />;
+    return (
+      <StyledTextPreview
+        nestedInLink
+        downloadUrl={downloadUrl}
+        mimeType={mimeType}
+      />
+    );
   }
 
   return <TextWrapper>No preview available</TextWrapper>;

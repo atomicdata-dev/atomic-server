@@ -3,7 +3,10 @@ import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
 import { stringToSlug } from '../../helpers/stringToSlug';
-import { useValidation } from './formValidation/useValidation';
+import {
+  checkForInitialRequiredValue,
+  useValidation,
+} from './formValidation/useValidation';
 import { styled } from 'styled-components';
 import { ErrorChipInput } from './ErrorChip';
 
@@ -14,14 +17,15 @@ export default function InputSlug({
   commitDebounceInterval,
   ...props
 }: InputProps): JSX.Element {
-  const [err, setErr, onBlur] = useValidation();
-
   const [value, setValue] = useString(resource, property.subject, {
-    handleValidationError: setErr,
     validate: false,
     commit,
     commitDebounce: commitDebounceInterval,
   });
+
+  const { error, setError, setTouched } = useValidation(
+    checkForInitialRequiredValue(value, props.required),
+  );
 
   const [inputValue, setInputValue] = useState(value);
 
@@ -29,7 +33,7 @@ export default function InputSlug({
     const newValue = stringToSlug(event.target.value);
     setInputValue(newValue);
 
-    setErr(undefined);
+    setError(undefined);
 
     try {
       if (newValue === '') {
@@ -39,25 +43,25 @@ export default function InputSlug({
         setValue(newValue);
       }
     } catch (e) {
-      setErr('Invalid Slug');
+      setError('Invalid Slug');
     }
 
     if (props.required && newValue === '') {
-      setErr('Required');
+      setError('Required');
     }
   }
 
   return (
     <Wrapper>
-      <InputWrapper $invalid={!!err}>
+      <InputWrapper $invalid={!!error}>
         <InputStyled
           value={inputValue ?? ''}
           onChange={handleUpdate}
-          onBlur={onBlur}
+          onBlur={setTouched}
           {...props}
         />
       </InputWrapper>
-      {err && <ErrorChipInput top='2rem'>{err}</ErrorChipInput>}
+      {error && <ErrorChipInput top='2rem'>{error}</ErrorChipInput>}
     </Wrapper>
   );
 }

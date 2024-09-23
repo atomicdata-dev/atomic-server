@@ -59,7 +59,7 @@ const nonEssentialProps: string[] = [
 export function ResourceForm({
   classSubject,
   resource,
-  variant,
+  variant = ResourceFormVariant.Default,
   onSave,
   onCancel,
   onValidationChange,
@@ -290,7 +290,3 @@ export function ResourceForm({
 const StyledCollapse = styled(Collapse)`
   max-width: 70ch;
 `;
-
-ResourceForm.defaultProps = {
-  variant: ResourceFormVariant.Default,
-};

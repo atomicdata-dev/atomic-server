@@ -13,10 +13,11 @@ import * as RadixPopover from '@radix-ui/react-popover';
 import { SearchBoxWindow } from './SearchBoxWindow';
 import { FaExternalLinkAlt, FaSearch, FaTimes } from 'react-icons/fa';
 import { ErrorChip } from '../ErrorChip';
-import { useValidation } from '../formValidation/useValidation';
 import { constructOpenURL } from '../../../helpers/navigation';
 import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransition';
 import { SearchBoxButton } from './SearchBoxButton';
+
+export type OnResourceError = (hasError: boolean) => void;
 
 interface SearchBoxProps {
   autoFocus?: boolean;
@@ -30,9 +31,11 @@ interface SearchBoxProps {
   className?: string;
   prefix?: React.ReactNode;
   hideClearButton?: boolean;
+  visualError?: string;
   onChange: (value: string | undefined) => void;
   onCreateItem?: (name: string) => void;
   onClose?: () => void;
+  onResourceError?: OnResourceError;
 }
 
 export function SearchBox({
@@ -42,15 +45,16 @@ export function SearchBox({
   scopes,
   placeholder,
   disabled,
-  required,
   className,
   children,
   prefix,
   hideClearButton,
   allowsOnly,
+  visualError,
   onChange,
   onCreateItem,
   onClose,
+  onResourceError,
 }: React.PropsWithChildren<SearchBoxProps>): JSX.Element {
   const store = useStore();
   const navigate = useNavigateWithTransition();
@@ -62,8 +66,6 @@ export function SearchBox({
   const containerRef = useContext(DropdownPortalContext);
   const [justFocussed, setJustFocussed] = useState(false);
 
-  const [error, setError, handleBlur] = useValidation();
-
   const placeholderText =
     placeholder ??
     `Search for a ${isA ? typeResource.title : 'resource'} or enter a URL...`;
@@ -71,7 +73,6 @@ export function SearchBox({
   const handleExit = useCallback(
     (lostFocus: boolean) => {
       setOpen(false);
-      handleBlur();
 
       if (!lostFocus) {
         triggerRef.current?.focus();
@@ -113,20 +114,18 @@ export function SearchBox({
   };
 
   useEffect(() => {
-    if (!!required && !value) {
-      setError('Required');
-
+    if (!selectedResource) {
       return;
     }
 
     if (selectedResource.error) {
-      setError('Invalid Resource', true);
+      onResourceError?.(true);
 
       return;
     }
 
-    setError(undefined);
-  }, [setError, required, value, selectedResource]);
+    onResourceError?.(false);
+  }, [onResourceError, selectedResource]);
 
   const openLink =
     !value || selectedResource.error
@@ -150,7 +149,7 @@ export function SearchBox({
         <TriggerButtonWrapper
           disabled={!!disabled}
           className={className}
-          invalid={!!error}
+          invalid={!!visualError}
         >
           {prefix}
           <TriggerButton
@@ -199,8 +198,8 @@ export function SearchBox({
             </>
           )}
           {children}
-          {error && (
-            <PositionedErrorChip noMovement>{error}</PositionedErrorChip>
+          {visualError && (
+            <PositionedErrorChip noMovement>{visualError}</PositionedErrorChip>
           )}
         </TriggerButtonWrapper>
       </RadixPopover.Anchor>

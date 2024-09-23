@@ -16,7 +16,7 @@ export function DecimalPlacesInput({
   resource,
 }: DecimalPlacesInputProps): JSX.Element {
   const id = useId();
-  const [error, setError, onBlur] = useValidation();
+  const { error, setError, setTouched } = useValidation();
   const [_, setDataType] = useString(resource, urls.properties.datatype, {
     commit: true,
   });
@@ -68,7 +68,7 @@ export function DecimalPlacesInput({
             defaultValue={decimalPlaces}
             min={0}
             max={20}
-            onBlur={onBlur}
+            onBlur={setTouched}
             onChange={handleDecimalPointChange}
           />
         </InputWrapper>
