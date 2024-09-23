@@ -94,6 +94,7 @@ const IconButtonBase = styled.button<ButtonBaseProps>`
   user-select: none;
   padding: var(--button-padding);
   aspect-ratio: 1/1;
+  height: 2em;
   margin-inline-start: ${p =>
     p.edgeAlign === 'start' ? 'calc(var(--button-padding) * -1)' : '0'};
 

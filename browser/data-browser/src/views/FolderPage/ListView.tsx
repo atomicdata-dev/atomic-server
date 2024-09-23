@@ -10,7 +10,7 @@ import { styled } from 'styled-components';
 import { AtomicLink } from '../../components/AtomicLink';
 import { CommitDetail } from '../../components/CommitDetail';
 import { ViewProps } from './FolderDisplayStyle';
-import { getIconForClass } from './iconMap';
+import { getIconForClass } from '../../helpers/iconMap';
 import { FaPlus } from 'react-icons/fa';
 import { Button } from '../../components/Button';
 

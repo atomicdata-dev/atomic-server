@@ -11,6 +11,4 @@ export const Detail = styled.div`
 /** A wrapper for the Detail component . */
 export const Details = styled.div`
   font-style: italic;
-  margin-bottom: 0.5rem;
-  margin-top: -0.5rem;
 `;

@@ -7,7 +7,7 @@ import {
   PAGE_TITLE_TRANSITION_TAG,
   transitionName,
 } from '../../helpers/transitionName';
-import { getIconForClass } from '../FolderPage/iconMap';
+import { getIconForClass } from '../../helpers/iconMap';
 import { Row } from '../../components/Row';
 
 interface ResourceCardTitleProps {

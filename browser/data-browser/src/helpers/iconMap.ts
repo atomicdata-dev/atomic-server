@@ -1,4 +1,11 @@
-import { collections, commits, core, dataBrowser, server } from '@tomic/react';
+import {
+  collections,
+  commits,
+  core,
+  dataBrowser,
+  Datatype,
+  server,
+} from '@tomic/react';
 import { IconType } from 'react-icons';
 import {
   FaTag,
@@ -18,6 +25,12 @@ import {
   FaShapes,
   FaShareFromSquare,
   FaTable,
+  FaArrowUpRightFromSquare,
+  FaCalendar,
+  FaFont,
+  FaListUl,
+  FaMarkdown,
+  FaRegSquareCheck,
 } from 'react-icons/fa6';
 
 const iconMap = new Map<string, IconType>([
@@ -45,3 +58,16 @@ export function getIconForClass(
 ): IconType {
   return iconMap.get(classSubject) ?? fallback;
 }
+
+export const dataTypeIconMap = new Map<string, IconType>([
+  [Datatype.STRING, FaFont],
+  [Datatype.SLUG, FaFont],
+  [Datatype.MARKDOWN, FaMarkdown],
+  [Datatype.ATOMIC_URL, FaArrowUpRightFromSquare],
+  [Datatype.INTEGER, FaHashtag],
+  [Datatype.FLOAT, FaHashtag],
+  [Datatype.RESOURCEARRAY, FaListUl],
+  [Datatype.BOOLEAN, FaRegSquareCheck],
+  [Datatype.DATE, FaCalendar],
+  [Datatype.TIMESTAMP, FaClock],
+]);

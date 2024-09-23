@@ -1,10 +1,12 @@
-import { urls, useResource, useString } from '@tomic/react';
+import { urls, useResource, useString, type Core } from '@tomic/react';
 
 import { styled } from 'styled-components';
 import Markdown from '../../../components/datatypes/Markdown';
 import { InlineDatatype } from '../InlineDatatype';
 import { ErrorLook } from '../../../components/ErrorLook';
 import { CARD_CONTAINER } from '../../../helpers/containers';
+import { dataTypeIconMap } from '../../../helpers/iconMap';
+import { Row } from '../../../components/Row';
 
 interface PropertyLineReadProps {
   subject: string;
@@ -13,8 +15,9 @@ interface PropertyLineReadProps {
 export function PropertyLineRead({
   subject,
 }: PropertyLineReadProps): JSX.Element {
-  const resource = useResource(subject);
+  const resource = useResource<Core.Property>(subject);
   const [description] = useString(resource, urls.properties.description);
+  const Icon = dataTypeIconMap.get(resource.props.datatype);
 
   if (resource.error) {
     return (
@@ -26,7 +29,10 @@ export function PropertyLineRead({
 
   return (
     <SubGrid>
-      <PropTitle>{resource.title}</PropTitle>
+      <Row center gap='1ch'>
+        {Icon && <Icon />}
+        <PropTitle>{resource.title}</PropTitle>
+      </Row>
       <DatatypeSlot>
         <InlineDatatype resource={resource} />
       </DatatypeSlot>
@@ -48,8 +54,12 @@ const SubGrid = styled.div`
     grid-template-columns: 1fr;
   }
 
-  &:nth-child(odd) {
+  &:nth-child(even) {
     background-color: ${p => p.theme.colors.bg1};
+  }
+
+  & svg {
+    fill: ${p => p.theme.colors.textLight};
   }
 `;
 

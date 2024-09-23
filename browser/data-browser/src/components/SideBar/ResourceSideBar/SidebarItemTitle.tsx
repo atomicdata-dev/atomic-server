@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { styled, css, keyframes } from 'styled-components';
 import { SideBarItem } from '../SideBarItem';
 import { FloatingActions, floatingHoverStyles } from './FloatingActions';
-import { getIconForClass } from '../../../views/FolderPage/iconMap';
+import { getIconForClass } from '../../../helpers/iconMap';
 import { useResource, useArray, core, useString } from '@tomic/react';
 import { SyntheticListenerMap } from '@dnd-kit/core/dist/hooks/utilities';
 import { DraggableAttributes } from '@dnd-kit/core';
