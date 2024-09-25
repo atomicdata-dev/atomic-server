@@ -2,9 +2,7 @@ use std::{ffi::OsStr, io::Write, path::Path};
 
 use actix_multipart::{Field, Multipart};
 use actix_web::{web, HttpResponse};
-use atomic_lib::{
-    commit::CommitResponse, hierarchy::check_write, urls, utils::now, Resource, Storelike, Value,
-};
+use atomic_lib::{hierarchy::check_write, urls, utils::now, Resource, Storelike, Value};
 use futures::{StreamExt, TryStreamExt};
 use image::GenericImageView;
 use serde::Deserialize;
@@ -21,7 +19,6 @@ pub struct UploadQuery {
 /// Creates new File resources for every submitted file.
 /// Submission is done using multipart/form-data.
 /// The file is stored in the `/uploads` directory.
-/// An `attachment` relationship is created from the parent
 #[tracing::instrument(skip(appstate, req, body))]
 pub async fn upload_handler(
     mut body: Multipart,
@@ -43,26 +40,12 @@ pub async fn upload_handler(
     check_write(store, &parent, &agent)?;
 
     let mut created_resources: Vec<Resource> = Vec::new();
-    let mut commit_responses: Vec<CommitResponse> = Vec::new();
 
     while let Ok(Some(field)) = body.try_next().await {
         let mut resource = save_file_and_create_resource(field, &appstate, &query.parent).await?;
-        commit_responses.push(resource.save(store)?);
+        resource.save(store)?;
         created_resources.push(resource);
     }
-
-    let created_file_subjects = created_resources
-        .iter()
-        .map(|r| r.get_subject().to_string())
-        .collect::<Vec<String>>();
-
-    // Add the files as `attachments` to the parent
-    let mut parent = store.get_resource(&query.parent)?;
-    // parent.append_subjects(urls::ATTACHMENTS, created_file_subjects, false, store)?;
-    for created in created_file_subjects {
-        parent.push(urls::ATTACHMENTS, created.into(), false)?;
-    }
-    commit_responses.push(parent.save(store)?);
 
     let mut builder = HttpResponse::Ok();
 
