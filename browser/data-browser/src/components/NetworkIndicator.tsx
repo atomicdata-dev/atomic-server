@@ -15,7 +15,7 @@ export function NetworkIndicator() {
   }, [isOnline]);
 
   return (
-    <Wrapper shown={!isOnline}>
+    <Wrapper shown={!isOnline} aria-hidden={isOnline}>
       <MdSignalWifiOff title='No Internet Connection.' />
     </Wrapper>
   );

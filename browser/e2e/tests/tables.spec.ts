@@ -48,7 +48,9 @@ test.describe('tables', async () => {
           `[aria-rowindex="${rowIndex}"] > [aria-colindex="2"] > input`,
         ),
       ).toBeFocused();
-      await page.keyboard.type(name);
+      await page
+        .locator(`[aria-rowindex="${rowIndex}"] > [aria-colindex="2"] > input`)
+        .fill(name);
       await page.waitForTimeout(300);
       await tab();
       // Flay newline

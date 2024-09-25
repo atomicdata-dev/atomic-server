@@ -1,6 +1,5 @@
 import { useState, useMemo, memo } from 'react';
 import { Dialog, useDialog } from '../../Dialog';
-import { useDialogTreeContext } from '../../Dialog/dialogContext';
 import { useSettings } from '../../../helpers/AppSettings';
 import { css, styled } from 'styled-components';
 import { NewFormDialog } from '../NewForm/NewFormDialog';
@@ -75,6 +74,7 @@ export const ResourceSelector = memo(function ResourceSelector({
   onBlur,
 }: ResourceSelectorProps): JSX.Element {
   const [pickedSubject, setPickedSubject] = useState<string | undefined>();
+  const [warning, setWarning] = useState<string | undefined>();
   const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog({
     onSuccess: () => {
       setSubject(pickedSubject);
@@ -89,8 +89,6 @@ export const ResourceSelector = memo(function ResourceSelector({
   const { titleProp } = useTitlePropOfClass(isA);
 
   const { drive } = useSettings();
-
-  const { inDialog } = useDialogTreeContext();
 
   const handleCreateItem = useMemo(() => {
     if (hideCreateOption || !isA) {
@@ -114,11 +112,9 @@ export const ResourceSelector = memo(function ResourceSelector({
 
   const handleResourceError = (hasError: boolean) => {
     if (hasError) {
-      setError(INVALID_RESOURCE_ERROR);
+      setWarning(INVALID_RESOURCE_ERROR);
     } else {
-      if (error === INVALID_RESOURCE_ERROR) {
-        setError(undefined);
-      }
+      setWarning(undefined);
     }
   };
 
@@ -145,9 +141,9 @@ export const ResourceSelector = memo(function ResourceSelector({
         disabled={disabled}
         hideClearButton={hideClearButton}
         allowsOnly={allowsOnly}
-        visualError={error}
+        visualError={error || warning}
         onChange={handleSubjectChange}
-        onCreateItem={!inDialog ? handleCreateItem : undefined}
+        onCreateItem={handleCreateItem}
         onClose={handleBlur}
         onResourceError={handleResourceError}
       >
@@ -157,7 +153,7 @@ export const ResourceSelector = memo(function ResourceSelector({
           </SearchBoxButton>
         )}
       </StyledSearchBox>
-      {!inDialog && isA && (
+      {isA && (
         <Dialog {...dialogProps} width='50rem'>
           {isDialogOpen && (
             <NewFormDialog
