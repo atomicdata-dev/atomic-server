@@ -206,8 +206,8 @@ export async function editProfileAndCommit(page: Page) {
   await page.getByRole('button', { name: 'Advanced' }).click();
   await expect(page.locator('text=add another property')).toBeVisible();
   const username = `Test user edited at ${new Date().toLocaleDateString()}`;
-  await page.fill('[data-test="input-name"]', username);
-  await page.click('[data-test="save"]');
+  await page.getByLabel('Name').fill(username);
+  await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.locator('text=Resource saved')).toBeVisible();
   await page.waitForURL(/\/app\/show/);
   await page.reload();
@@ -325,5 +325,5 @@ export const waitForCommit = async (page: Page) =>
   page.waitForResponse(`${SERVER_URL}/commit`);
 
 export function currentDialog(page: Page) {
-  return page.locator('dialog[open]');
+  return page.locator('dialog[data-top-level="true"]');
 }

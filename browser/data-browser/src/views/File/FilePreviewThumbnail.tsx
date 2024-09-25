@@ -69,11 +69,11 @@ const TextWrapper = styled(InnerWrapper)<{ error?: boolean }>`
 `;
 
 const StyledTextPreview = styled(TextPreview)`
-  padding: ${p => p.theme.margin}rem;
+  padding: ${p => p.theme.size()};
   color: ${p => p.theme.colors.textLight};
 
   &:is(pre) {
     padding: 0;
-    padding-inline: ${p => p.theme.margin}rem;
+    padding-inline: ${p => p.theme.size()};
   }
 `;

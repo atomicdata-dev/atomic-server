@@ -1,10 +1,10 @@
-import { useContext, useState } from 'react';
+import { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 
 import { styled } from 'styled-components';
-import { DialogPortalContext } from './Dialog/dialogContext';
 import { useFileImageTransitionStyles } from '../views/File/useFileImageTransitionStyles';
+import { useDialogGlobalContext } from './Dialog/DialogGlobalContextProvider';
 
 interface ImageViewerProps {
   src: string;
@@ -21,12 +21,12 @@ export function ImageViewer({
   subject,
 }: ImageViewerProps): JSX.Element {
   const [showFull, setShowFull] = useState(false);
-  const portalRef = useContext(DialogPortalContext);
+  const { portal } = useDialogGlobalContext(false);
 
   const transitionStyles = useFileImageTransitionStyles(subject);
   useHotkeys('esc', () => setShowFull(false), { enabled: showFull });
 
-  if (!portalRef.current) {
+  if (!portal.current) {
     return <></>;
   }
 
@@ -51,7 +51,7 @@ export function ImageViewer({
           <Viewer>
             <img src={src} alt={alt ?? ''} data-test={`image-viewer`} />
           </Viewer>,
-          portalRef.current,
+          portal.current,
         )}
     </WrapperButton>
   );

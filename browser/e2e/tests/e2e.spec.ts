@@ -458,8 +458,7 @@ test.describe('data-browser', async () => {
 
     await page.getByLabel('Shortname').fill('test-shortname');
     await page.getByLabel('Description').fill('test-description');
-    await page.click('[data-test="save"]');
-    await page.locator('text=Resource Saved');
+    await page.getByRole('button', { name: 'Save' }).click();
     await contextMenuClick('edit', page);
 
     await page
@@ -490,14 +489,10 @@ test.describe('data-browser', async () => {
     await currentDialog(page)
       .getByLabel('Description')
       .fill('This is a test prop');
-    await page.locator('dialog footer >> text=Save').click();
 
-    await page.locator('text=Resource Saved');
-    expect(
-      await page.locator(
-        '[data-test="input-recommends"] >> nth=0 >> "test-prop"',
-      ),
-    );
+    await currentDialog(page).getByRole('button', { name: 'Save' }).click();
+
+    await expect(page.getByRole('button', { name: 'test-prop' })).toBeVisible();
   });
 
   test('history page', async ({ page }) => {

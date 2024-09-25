@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useArray, validateDatatype } from '@tomic/react';
 import { Button } from '../Button';
 import { InputProps } from './ResourceField';
@@ -32,6 +32,8 @@ export default function InputResourceArray({
   ...props
 }: InputResourceArrayProps): JSX.Element {
   const [draggingSubject, setDraggingSubject] = useState<string>();
+  const [addingNewItem, setAddingNewItem] = useState(false);
+
   const [array, setArray] = useArray(resource, property.subject, {
     validate: false,
     commit,
@@ -42,11 +44,12 @@ export default function InputResourceArray({
   );
 
   function handleAddRow() {
-    setArray([...array, undefined]);
+    setAddingNewItem(true);
   }
 
   function handleClear() {
     setArray(undefined);
+    setAddingNewItem(false);
   }
 
   const handleRemoveRowList = useIndexDependantCallback(
@@ -63,8 +66,8 @@ export default function InputResourceArray({
     [setArray, required, setError],
   );
 
-  const handleSetSubjectList = useIndexDependantCallback(
-    (index: number) => (value: string | undefined) => {
+  const handleSetSubject = useCallback(
+    (index: number, value: string | undefined) => {
       const newArray = [...array];
 
       if (value) {
@@ -85,9 +88,14 @@ export default function InputResourceArray({
         setError(newArray.length === 0 ? 'Required' : undefined);
       }
     },
-    array,
-    [property.datatype, setArray, setError, required],
+    [property.datatype, setArray, setError, required, addingNewItem, array],
   );
+
+  const handleSetSubjectMemos = useMemo(() => {
+    return array.map(
+      (_, i) => (value: string | undefined) => handleSetSubject(i, value),
+    );
+  }, [array, handleSetSubject]);
 
   const handleDragEnd = ({ active, over }: DragEndEvent) => {
     setDraggingSubject(undefined);
@@ -106,7 +114,7 @@ export default function InputResourceArray({
 
   return (
     <Column>
-      {array.length > 0 && (
+      {(array.length > 0 || addingNewItem) && (
         <DndContext
           onDragStart={event => setDraggingSubject(event.active.id as string)}
           onDragCancel={() => setDraggingSubject(undefined)}
@@ -118,10 +126,10 @@ export default function InputResourceArray({
               <React.Fragment key={`${property.subject}${index}`}>
                 <DraggableResourceSelector
                   first={index === 0}
-                  last={index === array.length - 1}
+                  last={index === array.length - 1 && !addingNewItem}
                   subject={subject}
                   value={subject}
-                  setSubject={handleSetSubjectList[index]}
+                  setSubject={handleSetSubjectMemos[index]}
                   isA={property.classType}
                   handleRemove={handleRemoveRowList[index]}
                   parent={resource.subject}
@@ -135,6 +143,24 @@ export default function InputResourceArray({
                 )}
               </React.Fragment>
             ))}
+            {addingNewItem && (
+              <ResourceSelector
+                first={array.length === 0}
+                last={true}
+                value={undefined}
+                setSubject={v => {
+                  handleSetSubject(array.length, v);
+                  setAddingNewItem(false);
+                }}
+                isA={property.classType}
+                handleRemove={() => setAddingNewItem(false)}
+                parent={resource.subject}
+                allowsOnly={property.allowsOnly}
+                hideClearButton
+                onBlur={setTouched}
+                {...props}
+              />
+            )}
             {createPortal(
               <StyledDragOverlay>
                 {!!draggingSubject && (
@@ -166,6 +192,7 @@ export default function InputResourceArray({
             subtle
             type='button'
             onClick={handleAddRow}
+            disabled={addingNewItem}
           >
             <FaPlus />
           </AddButton>
@@ -307,10 +334,12 @@ const AddButton = styled(Button)`
   border: 1px dashed ${p => p.theme.colors.bg2};
   background: none;
 
-  &:hover,
-  &:focus-visible {
-    border: 1px solid ${p => p.theme.colors.main};
-    box-shadow: none !important;
+  &:not(:disabled) {
+    &:hover,
+    &:focus-visible {
+      border: 1px solid ${p => p.theme.colors.main};
+      box-shadow: none !important;
+    }
   }
 `;
 

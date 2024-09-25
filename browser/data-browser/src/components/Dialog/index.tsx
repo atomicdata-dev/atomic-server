@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { FaTimes } from 'react-icons/fa';
@@ -16,12 +10,12 @@ import { DropdownContainer } from '../Dropdown/DropdownContainer';
 import { PopoverContainer } from '../Popover';
 import { Slot } from '../Slot';
 import {
-  DialogPortalContext,
   DialogTreeContextProvider,
   useDialogTreeContext,
 } from './dialogContext';
 import { useDialog } from './useDialog';
 import { useControlLock } from '../../hooks/useControlLock';
+import { useDialogGlobalContext } from './DialogGlobalContextProvider';
 
 export interface InternalDialogProps {
   show: boolean;
@@ -70,9 +64,9 @@ type DialogSlotComponent = React.FC<React.PropsWithChildren<DialogSlotProps>>;
  * ```
  */
 export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
-  const portalRef = useContext(DialogPortalContext);
+  const { portal } = useDialogGlobalContext(false);
 
-  if (!portalRef.current) {
+  if (!portal.current) {
     return null;
   }
 
@@ -80,7 +74,7 @@ export function Dialog(props: React.PropsWithChildren<InternalDialogProps>) {
     <DialogTreeContextProvider>
       <InnerDialog {...props} />
     </DialogTreeContextProvider>,
-    portalRef.current,
+    portal.current,
   );
 }
 
@@ -94,6 +88,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
   const dialogRef = useRef<HTMLDialogElement>(null);
   const innerDialogRef = useRef<HTMLDivElement>(null);
   const { hasOpenInnerPopup } = useDialogTreeContext();
+  const { isTopLevel } = useDialogGlobalContext(show);
 
   useControlLock(show);
 
@@ -105,6 +100,12 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
     React.MouseEventHandler<HTMLDialogElement>
   >(
     e => {
+      if (!isTopLevel) {
+        // Don't react to closing events if the dialog is not on top.
+
+        return;
+      }
+
       if (
         !innerDialogRef.current?.contains(e.target as HTMLElement) &&
         innerDialogRef.current !== e.target
@@ -112,7 +113,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
         cancelDialog();
       }
     },
-    [innerDialogRef.current, cancelDialog],
+    [innerDialogRef.current, cancelDialog, isTopLevel],
   );
 
   // Close the dialog when the escape key is pressed
@@ -121,7 +122,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
     () => {
       cancelDialog();
     },
-    { enabled: show && !hasOpenInnerPopup },
+    { enabled: show && !hasOpenInnerPopup && isTopLevel },
   );
 
   // When closing the `data-closing` attribute must be set before rendering so the animation has started when the regular useEffect is called.
@@ -158,6 +159,7 @@ const InnerDialog: React.FC<React.PropsWithChildren<InternalDialogProps>> = ({
       ref={dialogRef}
       onMouseDown={handleOutSideClick}
       $width={width}
+      data-top-level={isTopLevel}
     >
       <StyledInnerDialog ref={innerDialogRef}>
         <PopoverContainer>
@@ -294,7 +296,7 @@ const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
 
   &::backdrop {
     background-color: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(0px);
+    backdrop-filter: blur(0px) grayscale(0%);
     transition:
       background-color ${ANIM_SPEED} ease-out,
       backdrop-filter ${ANIM_SPEED} ease-out;
@@ -316,13 +318,13 @@ const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
 
   &[open]::backdrop {
     background-color: rgba(0, 0, 0, 0.383);
-    backdrop-filter: blur(5px);
+    backdrop-filter: blur(5px) grayscale(90%);
     animation: ${fadeInBackground} ${ANIM_SPEED} ease-out;
   }
 
   &[data-closing='true']::backdrop {
     background-color: rgba(0, 0, 0, 0);
-    backdrop-filter: blur(0px);
+    backdrop-filter: blur(0px) grayscale(0%);
   }
 
   @media (max-width: ${DIALOG_MEDIA_BREAK_POINT}) {

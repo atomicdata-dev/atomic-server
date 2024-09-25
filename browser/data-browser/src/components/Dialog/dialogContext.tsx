@@ -3,16 +3,11 @@ import {
   Dispatch,
   FC,
   PropsWithChildren,
-  RefObject,
   SetStateAction,
   useContext,
   useMemo,
   useState,
 } from 'react';
-
-export const DialogPortalContext = createContext<RefObject<HTMLDivElement>>(
-  null!,
-);
 
 interface DialogTreeContext {
   inDialog: boolean;
@@ -29,6 +24,7 @@ export const DialogTreeContext = createContext<DialogTreeContext>({
 export const DialogTreeContextProvider: FC<PropsWithChildren> = ({
   children,
 }) => {
+  // Keep track of whether there is an open inner popup. This can be used to disable dismissal controls in dialogs while a popup is open.
   const [hasOpenInnerPopup, setHasOpenInnerPopup] = useState<boolean>(false);
 
   const context = useMemo(
@@ -37,7 +33,7 @@ export const DialogTreeContextProvider: FC<PropsWithChildren> = ({
       hasOpenInnerPopup,
       setHasOpenInnerPopup,
     }),
-    [hasOpenInnerPopup],
+    [hasOpenInnerPopup, setHasOpenInnerPopup],
   );
 
   return (
@@ -46,6 +42,17 @@ export const DialogTreeContextProvider: FC<PropsWithChildren> = ({
     </DialogTreeContext.Provider>
   );
 };
+
+export function useDialogTreeInfo() {
+  const { inDialog, hasOpenInnerPopup, setHasOpenInnerPopup } =
+    useContext(DialogTreeContext);
+
+  return {
+    inDialog,
+    hasOpenInnerPopup,
+    setHasOpenInnerPopup,
+  };
+}
 
 export function useDialogTreeContext() {
   return useContext(DialogTreeContext);

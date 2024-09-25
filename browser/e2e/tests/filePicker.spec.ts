@@ -127,9 +127,18 @@ test.describe('File Picker', () => {
 
       await filepicker.getByRole('button', { name: 'testFile2.md' }).click();
 
+      await expect(
+        filepicker.getByRole('heading', {
+          name: 'first step in understanding recursion?',
+        }),
+      ).not.toBeVisible();
       await expect(filepicker).not.toBeVisible();
       await expect(
-        page.getByText('first step in understanding recursion?'),
+        page
+          .getByRole('region', { name: 'testFile2.md preview' })
+          .getByRole('heading', {
+            name: 'first step in understanding recursion?',
+          }),
       ).toBeVisible();
 
       await page.getByRole('button', { name: 'Save' }).click();
@@ -157,7 +166,9 @@ test.describe('File Picker', () => {
 
       await expect(filepicker).not.toBeVisible();
       await expect(
-        page.getByText('File preview not available at this time'),
+        page
+          .getByRole('region', { name: 'testFile3.txt preview' })
+          .getByText('File preview not available at this time'),
       ).toBeVisible();
 
       await page.getByRole('button', { name: 'Save' }).click();

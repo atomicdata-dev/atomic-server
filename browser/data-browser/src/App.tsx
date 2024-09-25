@@ -13,7 +13,7 @@ import { initBugsnag } from './helpers/loggingHandlers';
 import HotKeysWrapper from './components/HotKeyWrapper';
 import { AppSettingsContextProvider } from './helpers/AppSettings';
 import CrashPage from './views/CrashPage';
-import { DialogContainer } from './components/Dialog/DialogContainer';
+import { DialogGlobalContextProvider } from './components/Dialog/DialogGlobalContextProvider';
 import { registerHandlers } from './handlers';
 import { ErrorBoundary } from './views/ErrorPage';
 import { NetworkIndicator } from './components/NetworkIndicator';
@@ -108,7 +108,7 @@ function App(): JSX.Element {
                         <Toaster />
                         <MetaSetter />
                         <DropdownContainer>
-                          <DialogContainer>
+                          <DialogGlobalContextProvider>
                             <PopoverContainer>
                               <DropdownContainer>
                                 <NewResourceUIProvider>
@@ -120,7 +120,7 @@ function App(): JSX.Element {
                               </DropdownContainer>
                             </PopoverContainer>
                             <NetworkIndicator />
-                          </DialogContainer>
+                          </DialogGlobalContextProvider>
                         </DropdownContainer>
                       </FormValidationContextProvider>
                     </ErrBoundary>
