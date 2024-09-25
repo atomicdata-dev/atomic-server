@@ -86,10 +86,10 @@ export function FilePicker({
 
   return (
     <Wrapper>
-      <VisuallyHidden>
+      <VisuallyHidden aria-hidden='true'>
         {value}
         <input
-          aria-hidden
+          tabIndex={-1}
           type='text'
           defaultValue={value ?? ''}
           required={required}

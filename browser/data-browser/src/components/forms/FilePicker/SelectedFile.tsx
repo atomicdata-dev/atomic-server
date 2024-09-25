@@ -23,7 +23,9 @@ export function SelectedFileResource({
       onClear={onClear}
       disabled={disabled}
     >
-      <FilePreviewThumbnail resource={resource} />
+      <Section aria-label={`${resource.title} preview`}>
+        <FilePreviewThumbnail resource={resource} />
+      </Section>
     </SelectedFileLayout>
   );
 }
@@ -46,11 +48,13 @@ export function SelectedFileBlob({
       onClear={onClear}
       disabled={disabled}
     >
-      {isImageFile(file.type) ? (
-        <Image src={URL.createObjectURL(file)} alt={file.name} />
-      ) : (
-        <NoPreview>File preview not available at this time</NoPreview>
-      )}
+      <Section aria-label={`${file.name} preview`}>
+        {isImageFile(file.type) ? (
+          <Image src={URL.createObjectURL(file)} alt={file.name} />
+        ) : (
+          <NoPreview>File preview not available at this time</NoPreview>
+        )}
+      </Section>
     </SelectedFileLayout>
   );
 }
@@ -69,4 +73,8 @@ const NoPreview = styled.div`
   color: ${({ theme }) => theme.colors.textLight};
   text-wrap: balance;
   text-align: center;
+`;
+
+const Section = styled.section`
+  display: contents;
 `;
