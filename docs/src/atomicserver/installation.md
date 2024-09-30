@@ -146,6 +146,52 @@ systemctl restart atomic
 journalctl -u atomic.service --since "1 hour ago" -f
 ```
 
+# Install Atomic Data Server with docker-compose and cloudflare tunnel
+
+To install atomic server with docker-compose and cloudflared tunnel, create docker-compose.yml
+
+```yaml
+version: "3.4"
+
+services:
+  atomic-server:
+    image: joepmeneer/atomic-server
+    container_name: atomic-server
+    restart: unless-stopped
+    environment:
+      ATOMIC_DOMAIN: ${ATOMIC_DOMAIN}
+      ATOMIC_SERVER_URL: ${ATOMIC_SERVER_URL}
+    ports:
+      - 8080:80
+    volumes:
+      - data:/atomic-storage
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    environment:
+      TUNNEL_URL: ${TUNNEL_URL}
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    command: "tunnel run"
+    volumes:
+      - ./cloudflared:/etc/cloudflared
+    links:
+      - atomic-server
+    depends_on:
+      - atomic-server
+volumes:
+  data:
+```
+
+and .env file with:
+
+```
+TUNNEL_URL=http://atomic-server:8080
+TUNNEL_TOKEN=op://at.terraphim.dev/token
+ATOMIC_SERVER_URL=op://Shared/at.terraphim.dev/server_url
+ATOMIC_DOMAIN=op://Shared/at.terraphim.dev/domain
+```
+
+to use with one password cli `op run --no-masking --env-file .env -- docker-compose up`
+
 ## AtomicServer CLI options / ENV vars
 
 (run `atomic-server --help` to see the latest options)
