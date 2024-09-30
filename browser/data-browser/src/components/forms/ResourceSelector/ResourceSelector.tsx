@@ -6,11 +6,14 @@ import { NewFormDialog } from '../NewForm/NewFormDialog';
 import { SearchBox } from '../SearchBox';
 import { FaTrash } from 'react-icons/fa';
 import { SearchBoxButton } from '../SearchBox/SearchBoxButton';
-import { useTitlePropOfClass } from './useTitlePropOfClass';
+import { getTitlePropOfClass } from './useTitlePropOfClass';
 import {
   checkForInitialRequiredValue,
   useValidation,
 } from '../formValidation/useValidation';
+import { ClassSelectorDialog } from './ClassSelectorDialog';
+import { core, useStore } from '@tomic/react';
+import { stringToSlug } from '../../../helpers/stringToSlug';
 
 export interface ResourceSelectorProps {
   /**
@@ -73,8 +76,15 @@ export const ResourceSelector = memo(function ResourceSelector({
   allowsOnly,
   onBlur,
 }: ResourceSelectorProps): JSX.Element {
+  const store = useStore();
   const [pickedSubject, setPickedSubject] = useState<string | undefined>();
+  const [newResourceClass, setNewResourceClass] = useState<string | undefined>(
+    isA,
+  );
   const [warning, setWarning] = useState<string | undefined>();
+  const [classSelectorOpen, setClassSelectorOpen] = useState(false);
+  const [titleProp, setTitleProp] = useState<string>();
+
   const [dialogProps, showDialog, closeDialog, isDialogOpen] = useDialog({
     onSuccess: () => {
       setSubject(pickedSubject);
@@ -86,23 +96,35 @@ export const ResourceSelector = memo(function ResourceSelector({
   );
 
   const [initialNewTitle, setInitialNewTitle] = useState('');
-  const { titleProp } = useTitlePropOfClass(isA);
 
   const { drive } = useSettings();
 
   const handleCreateItem = useMemo(() => {
-    if (hideCreateOption || !isA) {
+    if (hideCreateOption) {
       return undefined;
     }
 
-    return (name: string | undefined) => {
+    return async (name: string | undefined, classType?: string) => {
       if (name !== undefined) {
         setInitialNewTitle(name);
       }
 
+      if (!classType) {
+        setClassSelectorOpen(true);
+
+        return;
+      }
+
+      const { titleProp: foundTitleProp } = await getTitlePropOfClass(
+        classType,
+        store,
+      );
+
+      setTitleProp(foundTitleProp);
+      setNewResourceClass(classType);
       showDialog();
     };
-  }, [hideCreateOption, showDialog, isA]);
+  }, [hideCreateOption, showDialog, isA, store]);
 
   const handleSaveClick = (subject: string) => {
     setPickedSubject(subject);
@@ -153,17 +175,20 @@ export const ResourceSelector = memo(function ResourceSelector({
           </SearchBoxButton>
         )}
       </StyledSearchBox>
-      {isA && (
+      {newResourceClass && (
         <Dialog {...dialogProps} width='50rem'>
           {isDialogOpen && (
             <NewFormDialog
               parent={parent || drive}
-              classSubject={isA}
+              classSubject={newResourceClass}
               onCancel={() => closeDialog(false)}
               initialProps={
                 titleProp
                   ? {
-                      [titleProp]: initialNewTitle,
+                      [titleProp]:
+                        titleProp === core.properties.shortname
+                          ? stringToSlug(initialNewTitle)
+                          : initialNewTitle,
                     }
                   : undefined
               }
@@ -171,6 +196,15 @@ export const ResourceSelector = memo(function ResourceSelector({
             />
           )}
         </Dialog>
+      )}
+      {!isA && (
+        <ClassSelectorDialog
+          show={classSelectorOpen}
+          bindShow={setClassSelectorOpen}
+          onClassSelect={c => {
+            handleCreateItem?.(initialNewTitle, c);
+          }}
+        />
       )}
     </Wrapper>
   );

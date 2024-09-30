@@ -1,4 +1,4 @@
-import { ButtonSection } from './ButtonSection';
+import { OutlinedSection } from '../../components/OutlinedSection';
 import { Core, core, useResource, useServerSearch } from '@tomic/react';
 import { ClassButton } from './ClassButton';
 import { FC } from 'react';
@@ -45,10 +45,10 @@ const OntologySection: FC<OntologySectionProps> = ({ subject, parent }) => {
   }
 
   return (
-    <ButtonSection title={ontology.title}>
+    <OutlinedSection title={ontology.title}>
       {classes.map(classType => (
         <ClassButton key={classType} classType={classType} parent={parent} />
       ))}
-    </ButtonSection>
+    </OutlinedSection>
   );
 };
