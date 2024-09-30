@@ -30,6 +30,8 @@ Check out the [Roadmap](https://docs.atomicdata.dev/roadmap.html) if you want to
   - [Criterion benchmarks](#criterion-benchmarks)
   - [Drill](#drill)
 - [Responsible disclosure / Coordinated Vulnerability Disclosure](#responsible-disclosure--coordinated-vulnerability-disclosure)
+- [Automated releases and versioning](#automated-releases-and-versioning)
+- [Commits](#commits)
 - [Releases, Versioning and Tagging](#releases-versioning-and-tagging)
   - [CI situation](#ci-situation)
   - [Publishing manually - doing the CI's work](#publishing-manually---doing-the-cis-work)
@@ -195,6 +197,23 @@ drill -b benchmark.yml --stats
 If you encounter serious security risks, please refrain from posting these publicly in the issue tracker.
 We could minimize the impact by first patching the issue, publishing the patch, and then (after 30 days) disclose the bug.
 So please first send an e-mail to joep@ontola.io describing the issue, and then we will work on fixing it as soon as possible.
+
+## Automated releases and versioning
+
+We use `release-please` to automatically create version bumps and PRs.
+The `.release-please-manifest.json` file contains the configuration for this (see [docs](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)).
+
+## Commits
+
+Use [ConventionalCommits](https://www.conventionalcommits.org/) for commit messages.
+
+- `fix: ...` for bugfixes
+- `feat: ...` for new features
+- `chore: ...` for changes that don't affect the code (e.g. updating dependencies)
+
+Be sure to link to issues using `#123`.
+
+The Changelog is automatically updated!
 
 ## Releases, Versioning and Tagging
 
