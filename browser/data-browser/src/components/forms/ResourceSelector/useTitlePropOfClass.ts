@@ -1,13 +1,29 @@
-import { core, useResource, type Core } from '@tomic/react';
+import { core, useStore, type Core, type Store } from '@tomic/react';
+import { useState, useEffect } from 'react';
 
-export function useTitlePropOfClass(isA: string | undefined): {
+type TitlePropResult = {
   titleProp: string | undefined;
   classTitle: string | undefined;
-} {
-  const classResource = useResource<Core.Class>(isA);
+};
 
-  if (isA === undefined || classResource.loading || classResource.error) {
-    return { titleProp: undefined, classTitle: undefined };
+export async function getTitlePropOfClass(
+  isA: string | undefined,
+  store: Store,
+): Promise<TitlePropResult> {
+  if (isA === undefined) {
+    return {
+      titleProp: undefined,
+      classTitle: undefined,
+    };
+  }
+
+  const classResource = await store.getResource<Core.Class>(isA);
+
+  if (classResource.error) {
+    return {
+      titleProp: undefined,
+      classTitle: undefined,
+    };
   }
 
   const props = [
@@ -33,4 +49,22 @@ export function useTitlePropOfClass(isA: string | undefined): {
     titleProp: undefined,
     classTitle: classResource.title,
   };
+}
+
+export function useTitlePropOfClass(isA: string | undefined): TitlePropResult {
+  const store = useStore();
+  const [result, setResult] = useState<TitlePropResult>({
+    titleProp: undefined,
+    classTitle: undefined,
+  });
+
+  useEffect(() => {
+    if (isA === undefined) {
+      return;
+    }
+
+    getTitlePropOfClass(isA, store).then(setResult);
+  }, [isA, store]);
+
+  return result;
 }

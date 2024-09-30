@@ -477,7 +477,9 @@ test.describe('data-browser', async () => {
 
     await clickOption('Create test-prop');
 
-    await expect(page.locator('h1:has-text("new property")')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'New Property' }),
+    ).toBeVisible();
     // Set datatype of new property to boolean
 
     const selectDatatypeOption = await fillSearchBox(

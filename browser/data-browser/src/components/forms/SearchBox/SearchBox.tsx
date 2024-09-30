@@ -33,7 +33,7 @@ interface SearchBoxProps {
   hideClearButton?: boolean;
   visualError?: string;
   onChange: (value: string | undefined) => void;
-  onCreateItem?: (name: string) => void;
+  onCreateItem?: (name: string, isA?: string) => void;
   onClose?: () => void;
   onResourceError?: OnResourceError;
 }

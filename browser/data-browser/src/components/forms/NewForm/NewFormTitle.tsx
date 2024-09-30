@@ -1,7 +1,6 @@
-import { properties, useResource, useString, useTitle } from '@tomic/react';
+import { core, useResource, useString, useTitle } from '@tomic/react';
 import { useState } from 'react';
 import { FaInfo } from 'react-icons/fa';
-import { AtomicLink } from '../../AtomicLink';
 import Markdown from '../../datatypes/Markdown';
 import { Column, Row } from '../../Row';
 import { styled } from 'styled-components';
@@ -33,7 +32,7 @@ export const NewFormTitle: React.FC<NewFormTitleProps> = ({
   const klass = useResource(classSubject);
   const [klassTitle] = useTitle(klass);
 
-  const [klassDescription] = useString(klass, properties.description);
+  const [klassDescription] = useString(klass, core.properties.description);
   const [showDetails, setShowDetails] = useState(false);
 
   const headingType = variantHeaderMapping.get(variant!) ?? 'h2';
@@ -42,12 +41,7 @@ export const NewFormTitle: React.FC<NewFormTitleProps> = ({
     <Column>
       <Row center>
         <Heading as={headingType}>
-          new{' '}
-          {classSubject ? (
-            <AtomicLink subject={classSubject}>{klassTitle}</AtomicLink>
-          ) : (
-            'Resource'
-          )}
+          new {classSubject ? klassTitle : 'Resource'}
         </Heading>
         <IconButton
           variant={IconButtonVariant.Outline}
