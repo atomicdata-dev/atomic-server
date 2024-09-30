@@ -36,7 +36,7 @@ interface SearchBoxWindowProps {
   onExit: (lostFocus: boolean) => void;
   onChange: (value: string) => void;
   onSelect: (value: string) => void;
-  onCreateItem?: (name: string) => void;
+  onCreateItem?: (name: string, isA?: string) => void;
 }
 
 export function SearchBoxWindow({
@@ -52,17 +52,22 @@ export function SearchBoxWindow({
   onCreateItem,
 }: SearchBoxWindowProps): JSX.Element {
   const { drive } = useSettings();
+
   const [realIndex, setIndex] = useState<number | undefined>(undefined);
-  const { below } = useAvailableSpace(true, triggerRef);
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const [results, setResults] = useState<string[]>([]);
   const [searchError, setSearchError] = useState<Error | undefined>();
   const [valueIsURL, setValueIsURL] = useState(false);
+
+  const { below } = useAvailableSpace(true, triggerRef);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const { titleProp, classTitle } = useTitlePropOfClass(isA);
 
   const isAboveTrigger = below < remToPixels(BOX_HEIGHT_REM);
 
-  const offset = onCreateItem ? 1 : 0;
+  const showCreateOption =
+    onCreateItem && searchValue && !valueIsURL && !allowsOnly;
+
+  const offset = showCreateOption ? 1 : 0;
 
   const selectedIndex =
     realIndex !== undefined
@@ -126,6 +131,14 @@ export function SearchBoxWindow({
     setIndex(i);
   };
 
+  const createItem = (name: string) => {
+    if (!onCreateItem) {
+      throw new Error('No onCreateItem function provided');
+    }
+
+    onCreateItem(name, isA);
+  };
+
   const pickSelectedItem = () => {
     if (selectedIndex === undefined) {
       onSelect(searchValue);
@@ -133,8 +146,8 @@ export function SearchBoxWindow({
       return;
     }
 
-    if (selectedIndex === 0 && onCreateItem) {
-      onCreateItem(searchValue);
+    if (selectedIndex === 0 && showCreateOption) {
+      createItem(searchValue);
 
       return;
     }
@@ -211,11 +224,11 @@ export function SearchBoxWindow({
         )}
         <StyledScrollArea>
           <ul>
-            {onCreateItem && searchValue && !valueIsURL ? (
+            {showCreateOption ? (
               <ResultLine
                 selected={selectedIndex === 0}
                 onMouseOver={() => handleMouseMove(0)}
-                onClick={() => onCreateItem(searchValue)}
+                onClick={() => createItem(searchValue)}
               >
                 {titleProp ? (
                   <>
@@ -223,7 +236,7 @@ export function SearchBoxWindow({
                     <CreateLineInputText>{searchValue}</CreateLineInputText>
                   </>
                 ) : (
-                  `Create new ${classTitle}`
+                  `Create new ${classTitle ?? 'resource'}`
                 )}
               </ResultLine>
             ) : null}

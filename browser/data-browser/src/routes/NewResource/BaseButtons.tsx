@@ -1,5 +1,5 @@
 import { core, dataBrowser } from '@tomic/react';
-import { ButtonSection } from './ButtonSection';
+import { OutlinedSection } from '../../components/OutlinedSection';
 import { ClassButton } from './ClassButton';
 
 interface BaseButtonsProps {
@@ -17,10 +17,10 @@ const buttons = [
 
 export function BaseButtons({ parent }: BaseButtonsProps): JSX.Element {
   return (
-    <ButtonSection title='Base classes'>
+    <OutlinedSection title='Base classes'>
       {buttons.map(classType => (
         <ClassButton key={classType} classType={classType} parent={parent} />
       ))}
-    </ButtonSection>
+    </OutlinedSection>
   );
 }
