@@ -6,11 +6,16 @@
 	export let resource: Resource<MenuItem>;
 	export let active = false;
 
+	let href = '';
+
 	$: page = getResource(resource.props.linksTo ?? unknownSubject);
-	$: path = getValue(page, website.properties.href);
+	$: pageHrefValue = getValue(page, website.properties.href);
+
+	// If the menu item has a linksTo prop we want the href value of the page it links to. If that doesn't exist we check for an external link.
+	$: href = $pageHrefValue ?? resource.props.externalLink ?? '';
 </script>
 
-<a href={$path} aria-current={active ? 'page' : 'false'}>{resource.title}</a>
+<a {href} aria-current={active ? 'page' : 'false'}>{resource.title}</a>
 
 <style>
 	a {
