@@ -168,6 +168,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.properties]: [
         '01j6zqa7qgamwh5960dzy99j70/property/blocks',
         '01j6zqa7qgamwh5960dzy99j70/property/cover-image',
+        '01j6zqa7qgamwh5960dzy99j70/property/external-link',
         '01j6zqa7qgamwh5960dzy99j70/property/homepage',
         '01j6zqa7qgamwh5960dzy99j70/property/path',
         '01j6zqa7qgamwh5960dzy99j70/property/images',
@@ -230,6 +231,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.recommends]: [
         '01j6zqa7qgamwh5960dzy99j70/property/sub-items',
         '01j6zqa7qgamwh5960dzy99j70/property/links-to',
+        '01j6zqa7qgamwh5960dzy99j70/property/external-link',
       ],
       [core.properties.requires]: [core.properties.name],
       [core.properties.shortname]: 'menu-item',
@@ -296,6 +298,16 @@ Currently available @tomic/templates for the website template are:
 
       [core.properties.parent]: '01j6zqa7qgamwh5960dzy99j70',
       [core.properties.shortname]: 'cover-image',
+    },
+    {
+      [core.properties.localId]:
+        '01j6zqa7qgamwh5960dzy99j70/property/external-link',
+      [core.properties.datatype]: 'https://atomicdata.dev/datatypes/string',
+      [core.properties.description]: 'Link to an external website',
+      [core.properties.isA]: [core.classes.property],
+
+      [core.properties.parent]: '01j6zqa7qgamwh5960dzy99j70',
+      [core.properties.shortname]: 'external-link',
     },
     {
       [core.properties.localId]: '01j6zqa7qgamwh5960dzy99j70/property/homepage',
@@ -480,6 +492,29 @@ Currently available @tomic/templates for the website template are:
         '01j69w16079grvs7x9x0bk5kjb',
         '01j69weee5kvxedekcsm9z8hgd',
       ],
+    },
+    {
+      [core.properties.localId]: '01j69w16079grvs7x9x0bk5kjb',
+      [core.properties.description]:
+        'This is a template site generated with @tomic/template.\n\nThis content can be changed in the AtomicServer UI.\n\nLorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum',
+      [core.properties.isA]: ['01j6zqa7qgamwh5960dzy99j70/class/text-block'],
+      [core.properties.parent]: '01j5zrd23mxam4mdg2ak97gqcm',
+    },
+    {
+      [core.properties.localId]: '01j69weee5kvxedekcsm9z8hgd',
+      '01j6zqa7qgamwh5960dzy99j70/property/images': [
+        'https://atomicdata.dev/files/1726131947878-matt-flores-auOYGNcPSw8-unsplash.jpg',
+        'https://atomicdata.dev/files/1726131961564-carson-arias-7Z03R1wOdmI-unsplash.jpg',
+        'https://atomicdata.dev/files/1726131980022-nick-baker-VuPIUePS_vU-unsplash.jpg',
+        'https://atomicdata.dev/files/1726131992774-crawford-jolly--gFxMygtgsg-unsplash.jpg',
+        'https://atomicdata.dev/files/1726131984886-philipp-hofmann-q8FpoS21UQE-unsplash.jpg',
+        'https://atomicdata.dev/files/1726131998153-mike-dorner-sf_1ZDA1YFw-unsplash.jpg',
+      ],
+      [core.properties.isA]: [
+        '01j6zqa7qgamwh5960dzy99j70/class/image-gallery-block',
+      ],
+      [core.properties.name]: 'Some pictures',
+      [core.properties.parent]: '01j5zrd23mxam4mdg2ak97gqcm',
     },
     {
       [core.properties.localId]: '01j67112t57y1nefp8gerjz4ba',
