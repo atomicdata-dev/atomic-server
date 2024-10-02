@@ -480,14 +480,15 @@ test.describe('data-browser', async () => {
     await expect(
       page.getByRole('heading', { name: 'New Property' }),
     ).toBeVisible();
-    // Set datatype of new property to boolean
 
+    // Set datatype of new property to boolean
     const selectDatatypeOption = await fillSearchBox(
       page,
       'Search for a datatype or enter a URL',
       'boolean',
     );
     await selectDatatypeOption('boolean - Either `true` or `false`');
+
     await currentDialog(page)
       .getByLabel('Description')
       .fill('This is a test prop');
