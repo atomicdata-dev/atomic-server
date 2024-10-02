@@ -1,4 +1,4 @@
-import { Resource } from '@tomic/react';
+import { Resource, useResource, type Core } from '@tomic/react';
 
 import { styled, css } from 'styled-components';
 import PropVal from './PropVal';
@@ -20,9 +20,7 @@ type Props = {
 
 /** Lists all PropVals for some resource. Optionally ignores a bunch of subjects */
 function AllProps({ resource, except = [], editable, columns, basic }: Props) {
-  const propvals = [...resource.getPropVals()].filter(
-    ([prop]) => !except.includes(prop),
-  );
+  const propvals = useSortedPropVals(resource, except);
 
   if (!propvals || propvals.length === 0) {
     return null;
@@ -44,6 +42,28 @@ function AllProps({ resource, except = [], editable, columns, basic }: Props) {
       )}
     </AllPropsWrapper>
   );
+}
+
+function useSortedPropVals(resource: Resource, exept: string[]) {
+  const classResource = useResource<Core.Class>(resource.getClasses()[0]);
+  const classProps = [
+    ...(classResource.props.requires ?? []),
+    ...(classResource.props.recommends ?? []),
+  ];
+
+  const propvals = [...resource.getPropVals()];
+  propvals.sort((a, b) => {
+    const pA = classProps.indexOf(a[0]);
+    const pB = classProps.indexOf(b[0]);
+
+    if (pA === -1) {
+      return 1;
+    }
+
+    return pA - pB;
+  });
+
+  return propvals.filter(([prop]) => !exept.includes(prop));
 }
 
 const AllPropsWrapper = styled.div<{ basic: boolean | undefined }>`
