@@ -1,4 +1,4 @@
-import { useResource } from '@tomic/react';
+import { commits, core, useResource } from '@tomic/react';
 import { useEffect } from 'react';
 import {
   Dialog,
@@ -15,6 +15,12 @@ interface ExpandedRowDialogProps {
   open: boolean;
   bindOpen: (open: boolean) => void;
 }
+
+const EXCLUDED_PROPS = [
+  commits.properties.lastCommit,
+  core.properties.parent,
+  core.properties.isA,
+];
 
 export function ExpandedRowDialog({
   subject,
@@ -40,7 +46,12 @@ export function ExpandedRowDialog({
         <Title resource={resource} link />
       </DialogTitle>
       <DialogContent>
-        <AllProps editable columns resource={resource} />
+        <AllProps
+          editable
+          columns
+          resource={resource}
+          except={EXCLUDED_PROPS}
+        />
       </DialogContent>
     </Dialog>
   );
