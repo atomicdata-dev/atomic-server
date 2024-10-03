@@ -247,7 +247,6 @@ export function ResourceForm({
                   setSubject={set => {
                     handleAddProp(set);
                   }}
-                  error={newPropErr}
                   isA={core.classes.property}
                 />
               </div>

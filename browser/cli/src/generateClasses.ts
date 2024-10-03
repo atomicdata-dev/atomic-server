@@ -1,14 +1,15 @@
-import { Core, Resource } from '@tomic/lib';
+import { type Core, type Resource } from '@tomic/lib';
 import { store } from './store.js';
 import { ReverseMapping } from './generateBaseObject.js';
 import { PropertyRecord } from './PropertyRecord.js';
+import { dedupe } from './utils.js';
 
 export const generateClasses = (
   ontology: Resource<Core.Ontology>,
   reverseMapping: ReverseMapping,
   propertyRecord: PropertyRecord,
 ): string => {
-  const classes = ontology.props.classes ?? [];
+  const classes = dedupe(ontology.props.classes ?? []);
 
   const classStringList = classes.map(subject => {
     return generateClass(subject, reverseMapping, propertyRecord);

@@ -1,6 +1,6 @@
-import { Resource, urls } from '@tomic/lib';
+import { core, Resource } from '@tomic/lib';
 import { store } from './store.js';
-import { camelCaseify } from './utils.js';
+import { camelCaseify, dedupe } from './utils.js';
 
 export type ReverseMapping = Record<string, string>;
 
@@ -16,8 +16,10 @@ export const generateBaseObject = async (
     throw ontology.error;
   }
 
-  const classes = ontology.get(urls.properties.classes) as string[];
-  const properties = ontology.get(urls.properties.properties) as string[];
+  const classes = dedupe(ontology.get(core.properties.classes)) as string[];
+  const properties = dedupe(
+    ontology.get(core.properties.properties),
+  ) as string[];
   const name = camelCaseify(ontology.title);
 
   const baseObj = {
@@ -36,7 +38,7 @@ export const generateBaseObject = async (
 const listToObj = async (list: string[]): Promise<Record<string, string>> => {
   const entries = await Promise.all(
     list.map(async subject => {
-      const resource = await store.getResourceAsync(subject);
+      const resource = await store.getResource(subject);
 
       return [camelCaseify(resource.title), subject];
     }),

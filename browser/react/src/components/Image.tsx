@@ -1,6 +1,6 @@
-import type { Resource, Server } from '@tomic/lib';
+import { type Resource, type Server, unknownSubject, server } from '@tomic/lib';
 import React from 'react';
-import { server, unknownSubject, useResource, useString } from '../index.js';
+import { useResource, useString } from '../index.js';
 
 const imageFormatsWithBasicSupport = new Set([
   'image/svg+xml',
