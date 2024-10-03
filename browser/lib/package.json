@@ -22,7 +22,11 @@
   ],
   "gitHead": "2172c73d8df4e5f273e6386676abc91b6c5b2707",
   "license": "MIT",
-  "main": "dist/index.js",
+  "exports": {
+    "import": "./dist/index.js",
+    "require": "./dist/index.cjs",
+    "types": "./dist/src/index.d.ts"
+  },
   "main-dev": "src/index.ts",
   "name": "@tomic/lib",
   "publishConfig": {

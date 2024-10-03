@@ -18,6 +18,12 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 - BREAKING CHANGE: removed the `importJsonAdString` function.
 - Added `store.importJsonAD()` method.
+- Added support for commonJS modules.
+
+### @tomic/cli
+
+- Fix shortnames in externals.ts are not converted to camelCase.
+- Filter out duplicate classes and properties in generated types.
 
 ### @tomic/create-template
 
