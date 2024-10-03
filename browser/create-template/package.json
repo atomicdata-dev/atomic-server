@@ -1,5 +1,5 @@
 {
-  "version": "0.39.0",
+  "version": "0.40.0",
   "author": "Polle Pas",
   "dependencies": {
     "@tomic/lib": "workspace:*",
@@ -10,7 +10,7 @@
     "@types/node": "^20.11.5",
     "typescript": "^5.4.5"
   },
-  "description": "",
+  "description": "Generate templates using Atomic Data",
   "license": "MIT",
   "name": "@tomic/create-template",
   "publishConfig": {
