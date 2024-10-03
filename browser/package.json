@@ -21,7 +21,7 @@
     "vitest": "^2.0.5"
   },
   "name": "@tomic/root",
-  "version": "0.39.0",
+  "version": "0.40.0",
   "private": true,
   "type": "module",
   "scripts": {
