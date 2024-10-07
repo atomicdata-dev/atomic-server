@@ -697,7 +697,6 @@ mod test {
                     validate_signature: true,
                     validate_timestamp: true,
                     validate_rights: false,
-                    validate_subject_url_parent: true,
                     validate_previous_commit: true,
                     validate_for_agent: None,
                     update_index: true,

@@ -112,6 +112,7 @@ pub async fn serve(config: crate::config::Config) -> AtomicServerResult<()> {
     if let Some(guard) = tracing_chrome_flush_guard {
         guard.flush()
     }
+    drop(config);
 
     tracing::info!("Server stopped");
     Ok(())

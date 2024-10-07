@@ -213,6 +213,12 @@ impl Db {
         Ok(())
     }
 
+    /// Closes the database.
+    pub fn flush(&self) -> AtomicResult<()> {
+        self.db.flush()?;
+        Ok(())
+    }
+
     /// Internal method for fetching Resource data.
     #[instrument(skip(self))]
     fn set_propvals(&self, subject: &str, propvals: &PropVals) -> AtomicResult<()> {

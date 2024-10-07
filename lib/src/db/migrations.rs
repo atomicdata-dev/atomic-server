@@ -91,11 +91,15 @@ fn res_v1_to_v2(store: &Db) -> AtomicResult<()> {
     let mut count = 0;
 
     fn migrate_subject(subject: &str) -> String {
-        let url = url::Url::parse(subject).expect("Unable to parse subject URL");
-        if subject != url.to_string() {
-            println!("Migrating: {} -> {}", subject, url)
-        };
-        url.to_string()
+        if let Ok(url) = url::Url::parse(subject) {
+            if subject != url.to_string() {
+                tracing::warn!("Migrating subject is different: {} -> {}", subject, url)
+            };
+            url.to_string()
+        } else {
+            tracing::warn!("Unable to parse subject URL: '{subject}', keeping original");
+            subject.to_string()
+        }
     }
 
     for item in old.into_iter() {

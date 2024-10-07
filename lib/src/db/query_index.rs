@@ -491,79 +491,95 @@ pub mod test {
 
     #[test]
     fn should_update_or_not() {
-        let store = &Db::init_temp("should_update_or_not").unwrap();
+        let instant = std::time::Instant::now();
 
-        let prop = urls::IS_A.to_string();
-        let class = urls::AGENT;
+        {
+            let store = &Db::init_temp("should_update_or_not").unwrap();
 
-        let qf_prop_val = QueryFilter {
-            property: Some(prop.clone()),
-            value: Some(Value::AtomicUrl(class.to_string())),
-            sort_by: None,
-        };
+            let prop = urls::IS_A.to_string();
+            let class = urls::AGENT;
 
-        let qf_prop = QueryFilter {
-            property: Some(prop.clone()),
-            value: None,
-            sort_by: None,
-        };
+            let qf_prop_val = QueryFilter {
+                property: Some(prop.clone()),
+                value: Some(Value::AtomicUrl(class.to_string())),
+                sort_by: None,
+            };
 
-        let qf_val = QueryFilter {
-            property: None,
-            value: Some(Value::AtomicUrl(class.to_string())),
-            sort_by: None,
-        };
+            let qf_prop = QueryFilter {
+                property: Some(prop.clone()),
+                value: None,
+                sort_by: None,
+            };
 
-        let resource_correct_class = Resource::new_instance(class, store).unwrap();
+            let qf_val = QueryFilter {
+                property: None,
+                value: Some(Value::AtomicUrl(class.to_string())),
+                sort_by: None,
+            };
 
-        let subject: String = "https://example.com/someAgent".into();
+            let resource_correct_class = Resource::new_instance(class, store).unwrap();
 
-        let index_atom = IndexAtom {
-            subject,
-            property: prop.clone(),
-            ref_value: class.to_string(),
-            sort_value: class.to_string(),
-        };
+            let subject: String = "https://example.com/someAgent".into();
 
-        // We should be able to find the resource by propval, val, and / or prop.
-        assert!(should_update_property(&qf_val, &index_atom, &resource_correct_class).is_some());
-        assert!(
-            should_update_property(&qf_prop_val, &index_atom, &resource_correct_class,).is_some()
-        );
-        assert!(should_update_property(&qf_prop, &index_atom, &resource_correct_class).is_some());
+            let index_atom = IndexAtom {
+                subject,
+                property: prop.clone(),
+                ref_value: class.to_string(),
+                sort_value: class.to_string(),
+            };
 
-        // Test when a different value is passed
-        let resource_wrong_class = Resource::new_instance(urls::PARAGRAPH, store).unwrap();
-        assert!(should_update_property(&qf_prop, &index_atom, &resource_wrong_class).is_some());
-        assert!(should_update_property(&qf_val, &index_atom, &resource_wrong_class).is_none());
-        assert!(should_update_property(&qf_prop_val, &index_atom, &resource_wrong_class).is_none());
+            // We should be able to find the resource by propval, val, and / or prop.
+            assert!(
+                should_update_property(&qf_val, &index_atom, &resource_correct_class).is_some()
+            );
+            assert!(
+                should_update_property(&qf_prop_val, &index_atom, &resource_correct_class,)
+                    .is_some()
+            );
+            assert!(
+                should_update_property(&qf_prop, &index_atom, &resource_correct_class).is_some()
+            );
 
-        let qf_prop_val_sort = QueryFilter {
-            property: Some(prop.clone()),
-            value: Some(Value::AtomicUrl(class.to_string())),
-            sort_by: Some(urls::DESCRIPTION.to_string()),
-        };
-        let qf_prop_sort = QueryFilter {
-            property: Some(prop.clone()),
-            value: None,
-            sort_by: Some(urls::DESCRIPTION.to_string()),
-        };
-        let qf_val_sort = QueryFilter {
-            property: Some(prop),
-            value: Some(Value::AtomicUrl(class.to_string())),
-            sort_by: Some(urls::DESCRIPTION.to_string()),
-        };
+            // Test when a different value is passed
+            let resource_wrong_class = Resource::new_instance(urls::PARAGRAPH, store).unwrap();
+            assert!(should_update_property(&qf_prop, &index_atom, &resource_wrong_class).is_some());
+            assert!(should_update_property(&qf_val, &index_atom, &resource_wrong_class).is_none());
+            assert!(
+                should_update_property(&qf_prop_val, &index_atom, &resource_wrong_class).is_none()
+            );
 
-        // We should update with a sort_by attribute
-        assert!(
-            should_update_property(&qf_prop_val_sort, &index_atom, &resource_correct_class,)
-                .is_some()
-        );
-        assert!(
-            should_update_property(&qf_prop_sort, &index_atom, &resource_correct_class,).is_some()
-        );
-        assert!(
-            should_update_property(&qf_val_sort, &index_atom, &resource_correct_class,).is_some()
-        );
+            let qf_prop_val_sort = QueryFilter {
+                property: Some(prop.clone()),
+                value: Some(Value::AtomicUrl(class.to_string())),
+                sort_by: Some(urls::DESCRIPTION.to_string()),
+            };
+            let qf_prop_sort = QueryFilter {
+                property: Some(prop.clone()),
+                value: None,
+                sort_by: Some(urls::DESCRIPTION.to_string()),
+            };
+            let qf_val_sort = QueryFilter {
+                property: Some(prop),
+                value: Some(Value::AtomicUrl(class.to_string())),
+                sort_by: Some(urls::DESCRIPTION.to_string()),
+            };
+
+            // We should update with a sort_by attribute
+            assert!(should_update_property(
+                &qf_prop_val_sort,
+                &index_atom,
+                &resource_correct_class,
+            )
+            .is_some());
+            assert!(
+                should_update_property(&qf_prop_sort, &index_atom, &resource_correct_class,)
+                    .is_some()
+            );
+            assert!(
+                should_update_property(&qf_val_sort, &index_atom, &resource_correct_class,)
+                    .is_some()
+            );
+        }
+        println!("Took {:?}", instant.elapsed())
     }
 }

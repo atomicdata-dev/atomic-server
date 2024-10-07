@@ -30,7 +30,6 @@ pub async fn post_commit(
         // https://github.com/atomicdata-dev/atomic-server/issues/412
         validate_previous_commit: false,
         validate_for_agent: Some(incoming_commit.signer.to_string()),
-        validate_subject_url_parent: true,
         update_index: true,
     };
     let commit_response = store.apply_commit(incoming_commit, &opts)?;

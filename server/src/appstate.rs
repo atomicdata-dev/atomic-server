@@ -131,6 +131,7 @@ impl AppState {
     /// Cleanup code, writing buffers, committing changes, etc.
     fn exit(&self) -> AtomicServerResult<()> {
         self.search_state.writer.write()?.commit()?;
+        self.store.flush()?;
         Ok(())
     }
 }

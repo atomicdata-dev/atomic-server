@@ -33,7 +33,7 @@ export function TableExportDialog({
   bindShow,
 }: TableExportDialogProps): React.JSX.Element {
   const store = useStore();
-  const [dialogProps, showDialog] = useDialog({ bindShow });
+  const { dialogProps, show: showDialog } = useDialog({ bindShow });
   const [refAsSubject, setRefAsSubject] = useState(false);
 
   const url = buildLink(subject, refAsSubject, store);

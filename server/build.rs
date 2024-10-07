@@ -20,7 +20,6 @@ struct Dirs {
 fn main() -> std::io::Result<()> {
     // Uncomment this line if you want faster builds during development
     // return Ok(());
-    const BROWSER_ROOT: &str = "../browser/";
     // Env is set in .vscode/settings.json when rust-analyzer runs
     let is_rust_analyzer = !std::env::var("IS_RUST_ANALYZER")
         .unwrap_or_default()
