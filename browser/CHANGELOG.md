@@ -2,7 +2,7 @@
 
 This changelog covers all five packages, as they are (for now) updated as a whole
 
-## Unreleased
+## [v0.40.0] - 2024-10-07
 
 ### Atomic Browser
 
