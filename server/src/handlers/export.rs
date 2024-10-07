@@ -8,7 +8,7 @@ use atomic_lib::errors::AtomicResult;
 use atomic_lib::storelike::Query;
 use atomic_lib::values::SubResource;
 use atomic_lib::{urls, Db, Resource, Storelike, Value};
-use chrono::{DateTime, NaiveDateTime};
+use chrono::DateTime;
 use serde::Deserialize;
 
 #[serde_with::serde_as]
@@ -229,18 +229,14 @@ impl<'a> CSVExporter<'a> {
                 let seconds = ts / 1000;
                 let remaining_nanoseconds = (ts % 1000) * 1_000_000; // Convert remaining milliseconds to nanoseconds
 
-                let Some(naive_datetime) =
-                    NaiveDateTime::from_timestamp_opt(seconds, remaining_nanoseconds as u32)
+                let Some(datetime) =
+                    DateTime::from_timestamp(seconds, remaining_nanoseconds as u32)
                 else {
                     return ts.to_string();
                 };
 
-                // Convert NaiveDateTime to a DateTime<Utc>
-                let datetime_utc: DateTime<chrono::Utc> =
-                    DateTime::<chrono::Utc>::from_utc(naive_datetime, chrono::Utc);
-
                 // Format the DateTime<Utc> as a string in RFC3339 format (e.g., "2023-03-20T12:34:56Z")
-                datetime_utc.to_rfc3339()
+                datetime.to_rfc3339()
             }
             Value::ResourceArray(values) => {
                 let names: Vec<String> = values
