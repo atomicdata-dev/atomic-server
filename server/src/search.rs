@@ -108,8 +108,8 @@ impl SearchState {
         let subject = resource.get_subject();
         let writer = self.writer.read()?;
 
-        let mut doc = tantivy::Document::default();
-        doc.add_json_object(
+        let mut doc = tantivy::TantivyDocument::default();
+        doc.add_object(
             fields.propvals,
             serde_json::from_str(&resource.to_json_ad()?).map_err(|e| {
                 format!(
@@ -186,7 +186,7 @@ pub fn get_index(config: &Config) -> AtomicServerResult<(IndexWriter, tantivy::I
 pub fn get_reader(index: &tantivy::Index) -> AtomicServerResult<tantivy::IndexReader> {
     Ok(index
         .reader_builder()
-        .reload_policy(ReloadPolicy::OnCommit)
+        .reload_policy(ReloadPolicy::OnCommitWithDelay)
         .try_into()?)
 }
 

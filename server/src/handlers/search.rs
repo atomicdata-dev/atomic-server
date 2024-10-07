@@ -266,12 +266,12 @@ fn build_parent_query(subject: &str, fields: &Fields, store: &Db) -> AtomicServe
 }
 
 fn unpack_value(
-    value: &tantivy::schema::Value,
-    document: &tantivy::Document,
+    value: &tantivy::schema::OwnedValue,
+    document: &tantivy::TantivyDocument,
     name: String,
 ) -> Result<String, AtomicServerError> {
     match value {
-        tantivy::schema::Value::Str(s) => Ok(s.to_string()),
+        tantivy::schema::OwnedValue::Str(s) => Ok(s.to_string()),
         _else => Err(format!(
             "Search schema error: {} is not a string! Doc: {:?}",
             name, document
@@ -290,7 +290,7 @@ fn docs_to_subjects(
 
     // convert found documents to resources
     for (_score, doc_address) in docs {
-        let retrieved_doc = searcher.doc(doc_address)?;
+        let retrieved_doc: tantivy::TantivyDocument = searcher.doc(doc_address)?;
         let subject_val = retrieved_doc.get_first(fields.subject).ok_or("No 'subject' in search doc found. This is required when indexing. Run with --rebuild-index")?;
 
         let subject = unpack_value(subject_val, &retrieved_doc, "Subject".to_string())?;
