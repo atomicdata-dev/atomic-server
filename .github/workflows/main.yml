@@ -29,3 +29,8 @@ jobs:
       - name: Earthly +builds
         if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
         run: earthly --org ontola --ci --sat henk -P --push +builds --tags="${{ steps.meta.outputs.tags }}"
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: build-artifacts
+          path: ./artifact
