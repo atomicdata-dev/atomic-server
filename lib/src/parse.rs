@@ -124,7 +124,7 @@ pub fn parse_json_ad_string(
             arr.sort_by(|a, b| {
                 let a_is_prop = object_is_property(a);
                 let b_is_prop = object_is_property(b);
-                a_is_prop.cmp(&b_is_prop)
+                b_is_prop.cmp(&a_is_prop)
             });
 
             for item in arr {
@@ -648,5 +648,69 @@ mod test {
         // If we explicitly allow overwriting resources outside scope, we should be able to import it
         parse_opts.overwrite_outside = true;
         store.import(&json, &parse_opts).unwrap();
+    }
+
+    #[test]
+    fn is_property() {
+        let json = r#"
+        {
+    "https://atomicdata.dev/properties/localId": "newprop",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "test property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "homepage"
+}
+        "#;
+
+        let object: serde_json::Value = serde_json::from_str(json).unwrap();
+
+        assert!(
+            object_is_property(&object),
+            "This JSON should be parsed as a property"
+        )
+    }
+
+    #[test]
+    /// The importer should import properties first
+    fn parse_sorted_properties() {
+        let (store, importer) = create_store_and_importer();
+        store.populate().unwrap();
+
+        let json = r#"[
+{
+    "@id": "local:test1",
+    "newprop": "val"
+},
+  {
+    "https://atomicdata.dev/properties/localId": "newprop",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "test property",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/shortname": "homepage"
+}]"#;
+
+        let parse_opts = crate::parse::ParseOpts {
+            for_agent: ForAgent::Sudo,
+            importer: Some(importer.clone()),
+            overwrite_outside: false,
+            // We sign the importer Commits with the default agent,
+            // not the one performing the import, because we don't have their private key.
+            signer: Some(store.get_default_agent().unwrap()),
+            save: crate::parse::SaveOpts::Commit,
+        };
+
+        store.import(json, &parse_opts).unwrap();
+
+        let found = store.get_resource("local:test1").unwrap();
+        assert_eq!(found.get(urls::PARENT).unwrap().to_string(), importer);
+
+        let newprop_subject = format!("{importer}/newprop");
+        store
+            .get_resource(&newprop_subject)
+            .expect("newprop not found");
     }
 }
