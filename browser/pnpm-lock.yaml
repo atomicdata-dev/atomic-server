@@ -43,7 +43,7 @@ importers:
         version: 8.0.3
       netlify-cli:
         specifier: 16.2.0
-        version: 16.2.0(@swc/core@1.7.14)(@types/node@20.16.1)
+        version: 16.2.0(@swc/core@1.7.14)(@types/node@20.16.1)(picomatch@4.0.2)
       prettier:
         specifier: 3.2.5
         version: 3.2.5
@@ -294,8 +294,8 @@ importers:
         specifier: ^0.0.11
         version: 0.0.11(prismjs@1.29.0)
       vite-plugin-pwa:
-        specifier: ^0.17.0
-        version: 0.17.5(vite@5.4.2(@types/node@20.16.1)(terser@5.31.6))(workbox-build@7.1.1)(workbox-window@7.1.0)
+        specifier: ^0.20.5
+        version: 0.20.5(vite@5.4.2(@types/node@20.16.1)(terser@5.31.6))(workbox-build@7.1.1)(workbox-window@7.1.0)
       vite-plugin-webfont-dl:
         specifier: ^3.9.1
         version: 3.9.5(vite@5.4.2(@types/node@20.16.1)(terser@5.31.6))
@@ -5122,6 +5122,14 @@ packages:
       picomatch:
         optional: true
 
+  fdir@6.4.0:
+    resolution: {integrity: sha512-3oB133prH1o4j/L5lLW7uOCF1PlD+/It2L0eL/iAqWMB91RBbqTewABqxhj0ibBd90EEmWZq7ntIWzVaWcXTGQ==}
+    peerDependencies:
+      picomatch: ^3 || ^4
+    peerDependenciesMeta:
+      picomatch:
+        optional: true
+
   fecha@4.2.3:
     resolution: {integrity: sha512-OP2IUU6HeYKJi3i0z4A19kHMQoLVs4Hc+DPqqxI2h/DPZHTm/vjsfC6P0b4jCMy14XizLBqvndQ+UilD7707Jw==}
 
@@ -7452,6 +7460,10 @@ packages:
     resolution: {integrity: sha512-JU3teHTNjmE2VCGFzuY8EXzCDVwEqB2a8fsIvwaStHhAWJEeVd1o1QD80CU6+ZdEXXSLbSsuLwJjkCBWqRQUVA==}
     engines: {node: '>=8.6'}
 
+  picomatch@4.0.2:
+    resolution: {integrity: sha512-M7BAV6Rlcy5u+m6oPhAPFgJTzAioX/6B0DxyvDlo9l8+T3nLKbrczg2WLUyzd45L8RqfUMyGPzekbMvX2Ldkwg==}
+    engines: {node: '>=12'}
+
   pify@2.3.0:
     resolution: {integrity: sha512-udgsAY+fTnvv7kI7aaxbqwWNb0AHiB0qBO89PZKPkoTmGOgdbrHDKD+0B2X4uTfJ/FT1R09r9gTsjUjNJotuog==}
     engines: {node: '>=0.10.0'}
@@ -8842,6 +8854,10 @@ packages:
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
 
+  tinyglobby@0.2.9:
+    resolution: {integrity: sha512-8or1+BGEdk1Zkkw2ii16qSS7uVrQJPre5A9o/XkWPATkk23FZh/15BKFxPnlTy6vkljZxLqYCzzBMj30ZrSvjw==}
+    engines: {node: '>=12.0.0'}
+
   tinypool@1.0.1:
     resolution: {integrity: sha512-URZYihUbRPcGv95En+sz6MfghfIc2OJ1sv/RmhWZLouPY0/8Vo80viwPvg3dlaS9fuq7fQMEfgRRK7BBZThBEA==}
     engines: {node: ^18.0.0 || >=20.0.0}
@@ -9313,13 +9329,17 @@ packages:
     resolution: {integrity: sha512-20NBQxg/zH+3FTrlU6BQTob720xkuXNYtrx7psAQ4E6pMcRDeLEK77QU9kXURU587+f2To7ASH1JVTGbXVV/vQ==}
     engines: {node: '>=12.0.0'}
 
-  vite-plugin-pwa@0.17.5:
-    resolution: {integrity: sha512-UxRNPiJBzh4tqU/vc8G2TxmrUTzT6BqvSzhszLk62uKsf+npXdvLxGDz9C675f4BJi6MbD2tPnJhi5txlMzxbQ==}
+  vite-plugin-pwa@0.20.5:
+    resolution: {integrity: sha512-aweuI/6G6n4C5Inn0vwHumElU/UEpNuO+9iZzwPZGTCH87TeZ6YFMrEY6ZUBQdIHHlhTsbMDryFARcSuOdsz9Q==}
     engines: {node: '>=16.0.0'}
     peerDependencies:
+      '@vite-pwa/assets-generator': ^0.2.6
       vite: ^3.1.0 || ^4.0.0 || ^5.0.0
-      workbox-build: ^7.0.0
-      workbox-window: ^7.0.0
+      workbox-build: ^7.1.0
+      workbox-window: ^7.1.0
+    peerDependenciesMeta:
+      '@vite-pwa/assets-generator':
+        optional: true
 
   vite-plugin-webfont-dl@3.9.5:
     resolution: {integrity: sha512-PSVM7s1XurzMPYXgUHBpZOJYsuzRNq3DGIABdUyq/mNFan1n434+NbmGTK9f9+dIDVHpitXFiE3CmbAdDyDQMg==}
@@ -11093,7 +11113,7 @@ snapshots:
       yaml: 2.5.0
       yargs: 17.7.2
 
-  '@netlify/build@29.20.8(@swc/core@1.7.14)(@types/node@20.16.1)(debug@4.3.4)':
+  '@netlify/build@29.20.8(@swc/core@1.7.14)(@types/node@20.16.1)(debug@4.3.4)(picomatch@4.0.2)':
     dependencies:
       '@bugsnag/js': 7.20.2
       '@honeycombio/opentelemetry-node': 0.4.0(debug@4.3.4)(supports-color@9.4.0)
@@ -11112,7 +11132,7 @@ snapshots:
       chalk: 5.3.0
       clean-stack: 4.2.0
       execa: 6.1.0
-      fdir: 6.2.0
+      fdir: 6.2.0(picomatch@4.0.2)
       figures: 5.0.0
       filter-obj: 5.1.0
       got: 12.6.1
@@ -15305,7 +15325,13 @@ snapshots:
     dependencies:
       pend: 1.2.0
 
-  fdir@6.2.0: {}
+  fdir@6.2.0(picomatch@4.0.2):
+    optionalDependencies:
+      picomatch: 4.0.2
+
+  fdir@6.4.0(picomatch@4.0.2):
+    optionalDependencies:
+      picomatch: 4.0.2
 
   fecha@4.2.3: {}
 
@@ -17423,11 +17449,11 @@ snapshots:
 
   nested-error-stacks@2.1.1: {}
 
-  netlify-cli@16.2.0(@swc/core@1.7.14)(@types/node@20.16.1):
+  netlify-cli@16.2.0(@swc/core@1.7.14)(@types/node@20.16.1)(picomatch@4.0.2):
     dependencies:
       '@bugsnag/js': 7.20.2
       '@fastify/static': 6.10.2
-      '@netlify/build': 29.20.8(@swc/core@1.7.14)(@types/node@20.16.1)(debug@4.3.4)
+      '@netlify/build': 29.20.8(@swc/core@1.7.14)(@types/node@20.16.1)(debug@4.3.4)(picomatch@4.0.2)
       '@netlify/build-info': 7.7.4
       '@netlify/config': 20.8.0
       '@netlify/edge-bundler': 8.19.0
@@ -18000,6 +18026,8 @@ snapshots:
   picocolors@1.0.1: {}
 
   picomatch@2.3.1: {}
+
+  picomatch@4.0.2: {}
 
   pify@2.3.0: {}
 
@@ -19600,6 +19628,11 @@ snapshots:
 
   tinybench@2.9.0: {}
 
+  tinyglobby@0.2.9:
+    dependencies:
+      fdir: 6.4.0(picomatch@4.0.2)
+      picomatch: 4.0.2
+
   tinypool@1.0.1: {}
 
   tinyrainbow@1.2.0: {}
@@ -20098,11 +20131,11 @@ snapshots:
       - prismjs
       - supports-color
 
-  vite-plugin-pwa@0.17.5(vite@5.4.2(@types/node@20.16.1)(terser@5.31.6))(workbox-build@7.1.1)(workbox-window@7.1.0):
+  vite-plugin-pwa@0.20.5(vite@5.4.2(@types/node@20.16.1)(terser@5.31.6))(workbox-build@7.1.1)(workbox-window@7.1.0):
     dependencies:
       debug: 4.3.6(supports-color@9.4.0)
-      fast-glob: 3.3.2
       pretty-bytes: 6.1.1
+      tinyglobby: 0.2.9
       vite: 5.4.2(@types/node@20.16.1)(terser@5.31.6)
       workbox-build: 7.1.1
       workbox-window: 7.1.0

@@ -2,6 +2,12 @@
 
 This changelog covers all five packages, as they are (for now) updated as a whole
 
+## UNRELEASED
+
+### Atomic Browser
+
+- [#981](https://github.com/atomicdata-dev/atomic-server/issues/981) Fix bug where the service worker would not update cache with updated code.
+
 ## [v0.40.0] - 2024-10-07
 
 ### Atomic Browser

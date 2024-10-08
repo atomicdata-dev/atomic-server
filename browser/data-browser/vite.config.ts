@@ -3,18 +3,13 @@ import react from '@vitejs/plugin-react-swc';
 import { VitePWA } from 'vite-plugin-pwa';
 import webfontDownload from 'vite-plugin-webfont-dl';
 import prismjs from 'vite-plugin-prismjs';
-
 export default defineConfig({
   plugins: [
     webfontDownload(),
     react({ plugins: [['@swc/plugin-styled-components', {}]] }),
     VitePWA({
       registerType: 'autoUpdate',
-      devOptions: {
-        // If you want to test the service worker in development.
-        // Note that if this was registered, you'll need to unregister it first
-        // enabled: true
-      },
+      injectRegister: 'auto',
       manifest: {
         name: 'Atomic Data Browser',
         short_name: 'Atomic',
@@ -115,8 +110,8 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name].js`,
-        chunkFileNames: `assets/chunk_[name].js`,
+        entryFileNames: `assets/[name]-[hash].js`,
+        chunkFileNames: `assets/chunk_[name]-[hash].js`,
         assetFileNames: `assets/[name].[ext]`,
       },
     },
