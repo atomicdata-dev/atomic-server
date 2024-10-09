@@ -145,7 +145,7 @@ yarn create @tomic/template my-project --template sveltekit-site --server-url ${
 Currently available @tomic/templates for the website template are:
 - sveltekit-site`,
   Image,
-  rootResourceLocalIDs: ['website', '01j5zr8e919ph7g5xgyehv0g17'],
+  rootResourceLocalIDs: ['website', 'site-data'],
   resources: [
     // =============== TEMPLATE ONTOLOGY ===============
     {
@@ -372,7 +372,7 @@ Currently available @tomic/templates for the website template are:
     },
     // =============== TEMPLATE SITE ===============
     {
-      [core.properties.localId]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.localId]: 'site-data',
       [core.properties.isA]: [dataBrowser.classes.folder],
       [core.properties.name]: 'Site Data',
       [dataBrowser.properties.subResources]: [
@@ -398,7 +398,7 @@ Currently available @tomic/templates for the website template are:
       ],
       [core.properties.isA]: ['website/class/website'],
       [core.properties.name]: 'Atomic Website Template',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
       [dataBrowser.properties.subResources]: [
         '01j670xy9me8yk6fte8wrqwxfd',
         '01j5zrecgbejcbpvtkj1g8f2cn',
@@ -465,7 +465,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.description]: 'A Sveltekit site made with Atomic Data',
       [core.properties.isA]: ['website/class/page'],
       [core.properties.name]: 'Atomic Website Template',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
       [dataBrowser.properties.subResources]: [
         '01j69w16079grvs7x9x0bk5kjb',
         '01j69weee5kvxedekcsm9z8hgd',
@@ -499,7 +499,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.description]: 'About this template site',
       [core.properties.isA]: ['website/class/page'],
       [core.properties.name]: 'About',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
       [dataBrowser.properties.subResources]: ['01j6c7hs5z48pgdxrms4a3n91h'],
     },
     {
@@ -516,7 +516,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.description]: 'I made my own cheese!',
       [core.properties.isA]: ['website/class/page'],
       [core.properties.name]: 'Making Cheese',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
       [dataBrowser.properties.subResources]: ['01j7jyh9e626k4gb1w0c7mkjp1'],
     },
     {
@@ -534,7 +534,7 @@ Currently available @tomic/templates for the website template are:
         'I created this website to try out AtomicServer',
       [core.properties.isA]: ['website/class/page'],
       [core.properties.name]: 'This website',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
       [dataBrowser.properties.subResources]: ['01j7jzsj3ec6twny6wp1g3gcx3'],
     },
     {
@@ -548,7 +548,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.localId]: '01j6cbg9djf269zdwwv5114jsd',
       [core.properties.isA]: [dataBrowser.classes.folder],
       [core.properties.name]: 'Blog posts',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
       [dataBrowser.properties.subResources]: [
         '01j6cbmtr2nq8fhhjkq764rcf3',
         '01j6cc8pn7rpg4pymv6v0bvx2c',
@@ -616,7 +616,7 @@ Currently available @tomic/templates for the website template are:
       [core.properties.description]: 'List of blog posts',
       [core.properties.isA]: ['website/class/blog-index-page'],
       [core.properties.name]: 'Blog',
-      [core.properties.parent]: '01j5zr8e919ph7g5xgyehv0g17',
+      [core.properties.parent]: 'site-data',
     },
   ],
 };
