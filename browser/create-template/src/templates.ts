@@ -9,7 +9,7 @@ export type BaseTemplate = {
 const baseTemplates = {
   website: {
     name: 'website',
-    ontologyID: '01j6zqa7qgamwh5960dzy99j70',
+    ontologyID: 'website',
     generateEnv: ({ serverUrl }) => {
       const siteSubject = new URL(
         '01j5zrevq917dp0wm4p2vnd7nr',

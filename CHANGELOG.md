@@ -7,7 +7,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
 
 ## [v0.40.2]
 
-- fix property sort order + add tests #980
+- fix property sort order when importing + add tests #980
 
 ## [v0.40.0] - 2024-10-07
 
