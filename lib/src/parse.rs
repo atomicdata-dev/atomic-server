@@ -108,6 +108,58 @@ fn object_is_property(object: &serde_json::Value) -> bool {
     false
 }
 
+fn get_parent_to_pull(value: &serde_json::Value) -> Option<String> {
+    if let serde_json::Value::Object(map) = value {
+        if let Some(serde_json::Value::String(s)) = map.get(urls::PARENT) {
+            if check_valid_url(s).is_err() {
+                return Some(s.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn find_parent_in_array(
+    parent_subject: &str,
+    array: &Vec<serde_json::Value>,
+) -> Option<serde_json::Value> {
+    for value in array {
+        let serde_json::Value::Object(object) = value else {
+            continue;
+        };
+
+        let Some(serde_json::Value::String(s)) = object.get(&urls::LOCAL_ID.to_string()) else {
+            continue;
+        };
+
+        if s == parent_subject {
+            return Some(value.clone());
+        }
+    }
+    None
+}
+
+/// Loops over the array, for each property check if their parent is a local_id. If true find the parent and move it to the front of the array.
+fn pull_parents_of_props_to_front(array: &Vec<serde_json::Value>) -> Vec<serde_json::Value> {
+    let mut new_vec: Vec<serde_json::Value> = Vec::new();
+
+    for value in array {
+        if object_is_property(value) {
+            if let Some(parent_subject) = get_parent_to_pull(value) {
+                if let Some(parent) = find_parent_in_array(&parent_subject, array) {
+                    new_vec.insert(0, parent);
+                }
+            }
+        }
+
+        if !new_vec.contains(value) {
+            new_vec.push(value.clone());
+        }
+    }
+
+    new_vec
+}
+
 /// Parses JSON-AD string.
 /// Accepts an array containing multiple objects, or one single object.
 #[tracing::instrument(skip(store))]
@@ -121,11 +173,15 @@ pub fn parse_json_ad_string(
     let mut vec = Vec::new();
     match parsed {
         serde_json::Value::Array(mut arr) => {
+            // Move all properties to the front of the array because some of the other resouces might use these properties.
             arr.sort_by(|a, b| {
                 let a_is_prop = object_is_property(a);
                 let b_is_prop = object_is_property(b);
                 b_is_prop.cmp(&a_is_prop)
             });
+
+            // Also move the parents of the properties to the front when they are included in the data.
+            arr = pull_parents_of_props_to_front(&arr);
 
             for item in arr {
                 match item {
@@ -680,8 +736,11 @@ mod test {
 
         let json = r#"[
 {
-    "@id": "local:test1",
+    "https://atomicdata.dev/properties/localId": "test1",
     "newprop": "val"
+},
+{
+"https://atomicdata.dev/properties/localId": "test2"
 },
   {
     "https://atomicdata.dev/properties/localId": "newprop",
@@ -690,11 +749,12 @@ mod test {
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
+    "https://atomicdata.dev/properties/parent": "test2",
     "https://atomicdata.dev/properties/shortname": "homepage"
 }]"#;
 
         let parse_opts = crate::parse::ParseOpts {
-            for_agent: ForAgent::Sudo,
+            for_agent: ForAgent::AgentSubject(store.get_default_agent().unwrap().subject),
             importer: Some(importer.clone()),
             overwrite_outside: false,
             // We sign the importer Commits with the default agent,
@@ -705,12 +765,40 @@ mod test {
 
         store.import(json, &parse_opts).unwrap();
 
-        let found = store.get_resource("local:test1").unwrap();
+        let parent_subject = generate_id_from_local_id(&importer, "test1");
+        let found = store.get_resource(&parent_subject).unwrap();
         assert_eq!(found.get(urls::PARENT).unwrap().to_string(), importer);
 
         let newprop_subject = format!("{importer}/newprop");
-        store
-            .get_resource(&newprop_subject)
-            .expect("newprop not found");
+        let _prop = store.get_resource(&newprop_subject).unwrap();
     }
+
+    // TODO: Add support for parent sorting in the parser.
+
+    // #[test]
+    // fn import_parent_chain() {
+    //     let (store, importer) = create_store_and_importer();
+
+    //     let json = r#"[
+    // {
+    // "https://atomicdata.dev/properties/localId": "test2",
+    // "https://atomicdata.dev/properties/parent": "test1"
+    // },
+    // {
+    // "https://atomicdata.dev/properties/localId": "test1"
+    // }
+    //     ]"#;
+
+    //     let parse_opts = crate::parse::ParseOpts {
+    //         for_agent: ForAgent::AgentSubject(store.get_default_agent().unwrap().subject),
+    //         importer: Some(importer.clone()),
+    //         overwrite_outside: false,
+    //         signer: Some(store.get_default_agent().unwrap()),
+    //         save: crate::parse::SaveOpts::Commit,
+    //     };
+
+    //     store.import(json, &parse_opts).unwrap();
+
+    //     let _test2_resource = store.get_resource(&format!("{importer}/test2")).unwrap();
+    // }
 }
