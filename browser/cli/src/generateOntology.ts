@@ -1,7 +1,7 @@
 import { generateBaseObject } from './generateBaseObject.js';
 import { generateClasses } from './generateClasses.js';
 import { store } from './store.js';
-import { camelCaseify } from './utils.js';
+import { camelCaseify, dedupe } from './utils.js';
 import { generatePropTypeMapping } from './generatePropTypeMapping.js';
 import { generateSubjectToNameMapping } from './generateSubjectToNameMapping.js';
 import { generateClassExports } from './generateClassExports.js';
@@ -47,9 +47,9 @@ export const generateOntology = async (
   filename: string;
   content: string;
 }> => {
-  const ontology = await store.getResourceAsync<Core.Ontology>(subject);
+  const ontology = await store.getResource<Core.Ontology>(subject);
 
-  const properties = ontology.props.properties ?? [];
+  const properties = dedupe(ontology.props.properties ?? []);
 
   for (const prop of properties) {
     propertyRecord.repordPropertyDefined(prop);

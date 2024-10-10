@@ -8,6 +8,10 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 - [#981](https://github.com/atomicdata-dev/atomic-server/issues/981) Fix bug where the service worker would not update cache with updated code.
 
+### @tomic/cli
+
+- [#983](https://github.com/atomicdata-dev/atomic-server/issues/983) Give clear error when name collisions are found in an ontology.
+
 ## [v0.40.0] - 2024-10-07
 
 ### Atomic Browser
