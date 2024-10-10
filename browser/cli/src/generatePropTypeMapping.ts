@@ -1,15 +1,14 @@
-import { Datatype, Resource } from '@tomic/lib';
+import { Datatype, Resource, type Core } from '@tomic/lib';
 import { store } from './store.js';
 import { ReverseMapping } from './generateBaseObject.js';
 import { DatatypeToTSTypeMap } from './DatatypeToTSTypeMap.js';
+import { dedupe } from './utils.js';
 
 export const generatePropTypeMapping = (
-  ontology: Resource,
+  ontology: Resource<Core.Ontology>,
   reverseMapping: ReverseMapping,
 ): string => {
-  const properties = (ontology.get(
-    'https://atomicdata.dev/properties/properties',
-  ) ?? []) as string[];
+  const properties = dedupe(ontology.props.properties ?? []);
 
   const lines = properties
     .map(subject => generateLine(subject, reverseMapping))
@@ -21,10 +20,8 @@ export const generatePropTypeMapping = (
 };
 
 const generateLine = (subject: string, reverseMapping: ReverseMapping) => {
-  const resource = store.getResourceLoading(subject);
-  const datatype = resource.get(
-    'https://atomicdata.dev/properties/datatype',
-  ) as Datatype;
+  const resource = store.getResourceLoading<Core.Property>(subject);
+  const datatype = resource.props.datatype as Datatype;
 
   return `[${reverseMapping[subject]}]: ${DatatypeToTSTypeMap[datatype]}`;
 };
