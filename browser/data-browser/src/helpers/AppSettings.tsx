@@ -9,9 +9,9 @@ import { DarkModeOption, useDarkMode } from './useDarkMode';
 import { useCurrentAgent, useServerURL, Agent } from '@tomic/react';
 import toast from 'react-hot-toast';
 import { SIDEBAR_TOGGLE_WIDTH } from '../components/SideBar';
-import { handleError } from './loggingHandlers';
 import { serverURLStorage } from './serverURLStorage';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { errorHandler } from '../handlers/errorHandler';
 
 interface ProviderProps {
   children: ReactNode;
@@ -66,7 +66,7 @@ export const AppSettingsContextProvider = (
         newAgent?.subject && toast.success('Signed in!');
         newAgent === undefined && toast.success('Signed out.');
       } catch (e) {
-        handleError(new Error('Agent setting failed: ' + e.message));
+        errorHandler(new Error('Agent setting failed: ' + e.message));
       }
     },
     [setAgent],

@@ -1,8 +1,10 @@
 import toast from 'react-hot-toast';
-import { handleError } from '../helpers/loggingHandlers';
+import { handleErrorBugsnag } from '../helpers/loggingHandlers';
 
+/// Logs the error to Bugsnag, throws a toast message
 export const errorHandler = (e: Error) => {
-  handleError(e);
+  console.error(e);
+  handleErrorBugsnag(e);
 
   const message = e.message;
 
