@@ -6,28 +6,8 @@ import BugsnagPluginReact, {
 
 import { isDev } from '../config';
 
-export function handleError(e: Error): void {
-  // We already toast in the `errorHandler`
-  // toast.error(e.message);
-  console.error(e);
-
+export function handleErrorBugsnag(e: Error): void {
   if (!isDev) {
-    Bugsnag.notify(e);
-  }
-}
-
-export function handleWarning(e: Error | string): void {
-  // eslint-disable-next-line no-console
-  console.warn(e);
-  // TODO maybe handle these in Bugsnag?
-}
-
-export function handleInfo(e: Error): void {
-  // eslint-disable-next-line no-console
-  console.info(e);
-
-  // ONLY Notify Errors on Atomicdata.dev, We don't want to be able to read errors from private instances as that would be a privacy issue.
-  if (window.location.hostname === 'atomicdata.dev') {
     Bugsnag.notify(e);
   }
 }

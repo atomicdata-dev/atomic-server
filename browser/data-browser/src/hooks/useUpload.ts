@@ -6,6 +6,7 @@ import {
   useStore,
 } from '@tomic/react';
 import { useCallback, useState } from 'react';
+import { errorHandler } from '../handlers/errorHandler';
 
 export interface UseUploadResult {
   /** Uploads files to the upload endpoint and returns the created subjects. */
@@ -45,6 +46,7 @@ export function useUpload(parentResource: Resource): UseUploadResult {
       } catch (e) {
         setError(new AtomicError(e?.message));
         setIsUploading(false);
+        errorHandler(e);
 
         return [];
       }

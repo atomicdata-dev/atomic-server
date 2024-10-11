@@ -32,7 +32,10 @@ export function FileDropzoneInput({
   const onFileSelect = useCallback(
     async (files: File[]) => {
       const uploaded = await upload(files);
-      onFilesUploaded?.(uploaded);
+
+      if (uploaded.length > 0) {
+        onFilesUploaded?.(uploaded);
+      }
     },
     [upload],
   );
