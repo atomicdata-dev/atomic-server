@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { FaAsterisk, FaInfo, FaTrash } from 'react-icons/fa';
 import { styled } from 'styled-components';
 import { Collapse } from '../Collapse';
@@ -12,6 +12,34 @@ import {
 } from './InputStyles';
 import { complement } from 'polished';
 
+interface FieldProps {
+  /** Label */
+  label?: string;
+  /** Helper text / collapsible info */
+  helper?: React.ReactNode;
+  /** Here goes the input */
+  children: React.ReactNode;
+  /** If the field is requires. Shows an aterisk with hover text */
+  required?: boolean;
+  disabled?: boolean;
+  /** The error to be shown in the component */
+  error?: Error;
+
+  /** The id of the field. This is used to link the label with the input */
+  fieldId?: string;
+  labelId?: string;
+  /**
+   * If the field contains multiple inputs like an array.
+   * This will make the component render a fieldset + legend instead of a label.
+   */
+  multiInput?: boolean;
+  /**
+   * This function will be called when the delete icon is clicked. This should
+   * remove the item from any parent list
+   */
+  handleDelete?: (url: string) => unknown;
+}
+
 /** High level form field skeleton. Pass the actual input as a child component. */
 function Field({
   label,
@@ -23,19 +51,21 @@ function Field({
   disabled,
   fieldId,
   labelId,
-}: IFieldProps): JSX.Element {
+  multiInput,
+}: FieldProps): JSX.Element {
   const [collapsedHelper, setCollapsed] = useState(true);
 
   return (
-    <FieldStyled>
+    <FieldStyled as={multiInput ? 'fieldset' : undefined}>
       <LabelWrapper>
         <Row gap='0.4rem' center>
           <FieldLabel
             data-test={`field-label-${label}`}
             htmlFor={fieldId}
             id={labelId}
+            as={multiInput ? 'legend' : undefined}
           >
-            <span>{label}</span>
+            {label}
             {required && <Astrisk title='Required field' size='0.6em' />}
           </FieldLabel>
           {helper && (
@@ -88,29 +118,6 @@ export const FieldLabel = styled.label`
   align-items: center;
   font-weight: bold;
 `;
-
-interface IFieldProps {
-  /** Label */
-  label?: string;
-  /** Helper text / collapsible info */
-  helper?: React.ReactNode;
-  /** Here goes the input */
-  children: React.ReactNode;
-  /** If the field is requires. Shows an aterisk with hover text */
-  required?: boolean;
-  disabled?: boolean;
-  /** The error to be shown in the component */
-  error?: Error;
-
-  /** The id of the field. This is used to link the label with the input */
-  fieldId?: string;
-  labelId?: string;
-  /**
-   * This function will be called when the delete icon is clicked. This should
-   * remove the item from any parent list
-   */
-  handleDelete?: (url: string) => unknown;
-}
 
 export default Field;
 

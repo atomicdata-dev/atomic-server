@@ -1,4 +1,11 @@
-import { useString, core, server, commits, useCanWrite } from '@tomic/react';
+import {
+  useString,
+  core,
+  server,
+  commits,
+  useCanWrite,
+  dataBrowser,
+} from '@tomic/react';
 import AllProps from '../components/AllProps';
 import { ClassDetail } from '../components/ClassDetail';
 import { ContainerNarrow } from '../components/Containers';
@@ -37,6 +44,7 @@ export const defaultHiddenProps = [
   core.properties.read,
   // Shown in CommitDetail
   commits.properties.lastCommit,
+  dataBrowser.properties.subResources,
 ];
 
 /**

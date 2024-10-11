@@ -2,6 +2,7 @@ import {
   createContext,
   PropsWithChildren,
   useCallback,
+  useEffect,
   useMemo,
   useState,
 } from 'react';
@@ -31,15 +32,7 @@ export function FormValidationContextProvider({
 
   const setValidations = useCallback(
     (update: (newValidations: Validations) => Validations) => {
-      _setValidations(prev => {
-        const updatedValidations = update(prev);
-
-        onValidationChange(
-          Object.values(updatedValidations).every(v => v === undefined),
-        );
-
-        return updatedValidations;
-      });
+      _setValidations(prev => update(prev));
     },
     [onValidationChange],
   );
@@ -51,6 +44,10 @@ export function FormValidationContextProvider({
     }),
     [validations, setValidations],
   );
+
+  useEffect(() => {
+    onValidationChange(Object.values(validations).every(v => v === undefined));
+  }, [validations, onValidationChange]);
 
   return (
     <FormValidationContext.Provider value={context}>

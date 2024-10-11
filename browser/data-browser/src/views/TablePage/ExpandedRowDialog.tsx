@@ -1,4 +1,4 @@
-import { commits, core, useResource } from '@tomic/react';
+import { commits, core, useResource, dataBrowser } from '@tomic/react';
 import { useEffect } from 'react';
 import {
   Dialog,
@@ -20,6 +20,7 @@ const EXCLUDED_PROPS = [
   commits.properties.lastCommit,
   core.properties.parent,
   core.properties.isA,
+  dataBrowser.properties.subResources,
 ];
 
 export function ExpandedRowDialog({

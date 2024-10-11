@@ -16,6 +16,7 @@ export const LoaderInline = styled.span`
   border-radius: ${p => p.theme.radius};
   animation: ${loadingAnimation} 0.8s infinite ease-in-out alternate;
   width: 100%;
+  display: inline-block;
   height: 1rem;
 `;
 

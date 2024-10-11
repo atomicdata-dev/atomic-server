@@ -92,7 +92,7 @@ export function PropertyForm({
           <InputStyled
             id='name-form'
             type='text'
-            value={name}
+            value={name ?? ''}
             onChange={handleNameChange}
             placeholder='New Column'
             onBlur={setNameTouched}

@@ -32,6 +32,7 @@ interface SearchBoxProps {
   prefix?: React.ReactNode;
   hideClearButton?: boolean;
   visualError?: string;
+  id?: string;
   onChange: (value: string | undefined) => void;
   onCreateItem?: (name: string, isA?: string) => void;
   onClose?: () => void;
@@ -51,6 +52,7 @@ export function SearchBox({
   hideClearButton,
   allowsOnly,
   visualError,
+  id,
   onChange,
   onCreateItem,
   onClose,
@@ -164,6 +166,7 @@ export function SearchBox({
               setOpen(true);
               setJustFocussed(true);
             }}
+            id={id}
           >
             {value ? (
               <ResourceTitle>{title}</ResourceTitle>
