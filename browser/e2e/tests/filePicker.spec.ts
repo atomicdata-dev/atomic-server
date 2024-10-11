@@ -30,7 +30,7 @@ const uploadFile = async (page: Page, fileName: string) => {
 
   await fileChooser.setFiles(testFilePath(fileName));
 
-  await expect(page.getByText(fileName)).toHaveCount(2);
+  await expect(page.getByText(fileName)).toBeVisible();
 };
 
 // Creates an ontology with a class we can use to test the file picker.

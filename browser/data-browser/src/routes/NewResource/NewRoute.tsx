@@ -69,7 +69,7 @@ function NewResourceSelector() {
         navigate(constructOpenURL(calculatedParent));
       }
     },
-    [parentSubject, navigate],
+    [calculatedParent, navigate],
   );
 
   return (
@@ -86,7 +86,6 @@ function NewResourceSelector() {
         </h1>
         <SideBySide noTemplates={!showTemplates}>
           <Column gap='2rem'>
-            <h2>Classes</h2>
             <div>
               <ResourceSelector
                 hideCreateOption

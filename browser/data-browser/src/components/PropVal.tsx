@@ -6,6 +6,7 @@ import { ErrorLook } from './ErrorLook';
 import { ValueForm } from './forms/ValueForm';
 import ValueComp from './ValueComp';
 import { ALL_PROPS_CONTAINER } from '../helpers/containers';
+import { LoaderInline } from './Loader';
 
 type Props = {
   propertyURL: string;
@@ -33,9 +34,7 @@ function PropVal({
   if (property.loading) {
     return (
       <PropValRow columns={columns}>
-        <PropertyLabel title={propertyURL + ' is loading'}>
-          loading...
-        </PropertyLabel>
+        <StyledLoader title={`Loading ${truncated}`} />
       </PropValRow>
     );
   }
@@ -88,6 +87,13 @@ export const PropValRow = styled.div<PropValRowProps>`
 
 export const PropertyLabel = styled.span`
   font-weight: bold;
+`;
+
+const StyledLoader = styled(LoaderInline)`
+  grid-column: 1 / 3;
+  margin-inline: 1rem;
+  margin-block: 0.5rem;
+  width: calc(100% - 2rem);
 `;
 
 interface PropValRowProps {

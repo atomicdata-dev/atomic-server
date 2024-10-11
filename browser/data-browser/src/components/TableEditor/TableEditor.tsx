@@ -65,17 +65,16 @@ interface RowProps {
 
 type OnScroll = (props: ListOnScrollProps) => unknown;
 
-export function FancyTable<T>(props: FancyTableProps<T>): JSX.Element {
+export function FancyTable<T>({
+  rowHeight = 40,
+  ...props
+}: FancyTableProps<T>): JSX.Element {
   return (
     <TableEditorContextProvider>
-      <FancyTableInner {...props} />
+      <FancyTableInner rowHeight={rowHeight} {...props} />
     </TableEditorContextProvider>
   );
 }
-
-FancyTable.defaultProps = {
-  rowHeight: 40,
-};
 
 function FancyTableInner<T>({
   children,

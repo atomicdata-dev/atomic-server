@@ -1,4 +1,4 @@
-import { useProperty, Resource, Property } from '@tomic/react';
+import { useProperty, Resource, Property, Datatype } from '@tomic/react';
 import { styled } from 'styled-components';
 import Field from './Field';
 import Markdown from '../datatypes/Markdown';
@@ -63,7 +63,7 @@ function ResourceField({
         <InputSwitcher
           id={fieldId}
           key={propertyURL + ' input-switcher'}
-          data-testId={`input-${property.shortname}`}
+          data-testid={`input-${property.shortname}`}
           resource={resource}
           property={property}
           autoFocus={autoFocus}
@@ -88,6 +88,7 @@ function ResourceField({
       disabled={disabled}
       fieldId={fieldId}
       labelId={labelId}
+      multiInput={property?.datatype === Datatype.RESOURCEARRAY}
     >
       <InputSwitcher
         id={fieldId}

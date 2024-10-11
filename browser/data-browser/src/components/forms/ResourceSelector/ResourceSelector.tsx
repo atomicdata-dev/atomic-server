@@ -52,6 +52,7 @@ export interface ResourceSelectorProps {
 
   /** Callback function to be called when the input loses focus */
   onBlur?: () => void;
+  id?: string;
 }
 
 const INVALID_RESOURCE_ERROR = 'Invalid Resource';
@@ -74,6 +75,7 @@ export const ResourceSelector = memo(function ResourceSelector({
   last = true,
   prefix,
   allowsOnly,
+  id,
   onBlur,
 }: ResourceSelectorProps): JSX.Element {
   const store = useStore();
@@ -164,6 +166,7 @@ export const ResourceSelector = memo(function ResourceSelector({
         hideClearButton={hideClearButton}
         allowsOnly={allowsOnly}
         visualError={error || warning}
+        id={id}
         onChange={handleSubjectChange}
         onCreateItem={handleCreateItem}
         onClose={handleBlur}

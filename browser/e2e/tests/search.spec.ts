@@ -19,7 +19,9 @@ test.describe('search', async () => {
     await page.fill(addressBar, 'welcome');
     await expect(page.locator('text=Welcome to your')).toBeVisible();
     await page.keyboard.press('Enter');
-    await expect(page.locator('text=resources:')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Default Ontology' }),
+    ).toBeVisible();
   });
 
   test('scoped search', async ({ page }) => {

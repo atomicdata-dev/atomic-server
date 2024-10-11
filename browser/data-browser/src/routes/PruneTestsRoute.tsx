@@ -30,7 +30,7 @@ export function PruneTestsRoute(): JSX.Element {
             Prune
           </Button>
           {isWaiting && <p>Pruning, this might take a while...</p>}
-          <p data-testId='prune-result'>
+          <p data-testid='prune-result'>
             {result && `✅ ${result.props.responseMessage}`}
           </p>
         </Column>

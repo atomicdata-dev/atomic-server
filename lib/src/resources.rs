@@ -845,12 +845,17 @@ mod test {
         resource2.save_locally(&store).unwrap();
 
         let mut resource3 = Resource::new_generate_subject(&store);
+        let resource3_subject = resource3.get_subject().to_string();
+
         resource3
             .set(
                 urls::PARENT.into(),
                 Value::AtomicUrl(subject2.clone()),
                 &store,
             )
+            .unwrap();
+        resource3
+            .set(urls::NAME.into(), Value::String("resource3".into()), &store)
             .unwrap();
         let subject3 = resource3.get_subject().to_string();
         resource3.save_locally(&store).unwrap();
@@ -876,5 +881,24 @@ mod test {
         assert_panics!({ store.get_resource(&subject1).unwrap() });
         assert_panics!({ store.get_resource(&subject2).unwrap() });
         assert_panics!({ store.get_resource(&subject3).unwrap() });
+
+        // Create a new resource with the same subject as resource 3 to check if there's no old data left.
+        let mut resource4 = Resource::new(resource3_subject.to_string());
+
+        resource4
+            .set(
+                urls::DESCRIPTION.into(),
+                Value::Markdown("description thing".into()),
+                &store,
+            )
+            .unwrap();
+        resource4.save_locally(&store).unwrap();
+
+        assert_eq!(
+            resource4.get(urls::DESCRIPTION).unwrap().to_string(),
+            "description thing"
+        );
+
+        assert!(resource4.get(urls::NAME).is_err());
     }
 }

@@ -1,7 +1,10 @@
 import { styled, css } from 'styled-components';
 
 export const FieldStyled = styled.div`
-  margin-bottom: ${props => props.theme.margin}rem;
+  padding: 0;
+  margin-bottom: ${props => props.theme.size()};
+  border: none;
+  background-color: none;
 `;
 
 export const LabelWrapper = styled.div`
@@ -15,7 +18,7 @@ export const LabelStyled = styled.label`
   display: block;
 `;
 
-export const LabelHelper = styled.label`
+export const LabelHelper = styled.div`
   font-size: 0.9em;
   display: block;
 `;

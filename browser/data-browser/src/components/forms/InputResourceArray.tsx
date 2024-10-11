@@ -29,6 +29,7 @@ export default function InputResourceArray({
   property,
   commit,
   required,
+  id: _id,
   ...props
 }: InputResourceArrayProps): JSX.Element {
   const [draggingSubject, setDraggingSubject] = useState<string>();

@@ -65,6 +65,7 @@ export function AddPropertyButton({
 
     await addProperty(createdSubject);
 
+    // After create a new property, we move focus to the description input of the new property.
     focusOffsetElement(-4, triggerRef.current!);
   };
 

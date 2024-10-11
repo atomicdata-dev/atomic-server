@@ -484,7 +484,7 @@ test.describe('data-browser', async () => {
     // Set datatype of new property to boolean
     const selectDatatypeOption = await fillSearchBox(
       page,
-      'Search for a datatype or enter a URL',
+      'Datatype',
       'boolean',
     );
     await selectDatatypeOption('boolean - Either `true` or `false`');

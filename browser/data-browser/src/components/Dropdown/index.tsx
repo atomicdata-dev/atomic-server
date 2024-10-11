@@ -8,6 +8,7 @@ import {
   PropsWithChildren,
   forwardRef,
   ReactNode,
+  useEffect,
 } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { styled } from 'styled-components';
@@ -350,9 +351,11 @@ export function MenuItem({
 }: MenuItemPropsExtended): JSX.Element {
   const ref = useRef<HTMLButtonElement>(null);
 
-  if (selected && document.activeElement !== ref.current) {
-    ref.current?.focus();
-  }
+  useEffect(() => {
+    if (selected && document.activeElement !== ref.current) {
+      ref.current?.focus();
+    }
+  }, [selected]);
 
   return (
     <MenuItemStyled

@@ -115,7 +115,6 @@ export async function newDrive(page: Page) {
   await currentDialog(page).getByRole('button', { name: 'Create' }).click();
   await expect(currentDriveTitle(page)).not.toHaveText('localhost');
   await expect(currentDriveTitle(page)).toHaveText(driveTitle);
-  await expect(page.locator('text="Create new resource"')).toBeVisible();
   const driveURL = await getCurrentSubject(page);
   expect(driveURL).toContain('localhost');
 
@@ -292,7 +291,9 @@ export async function changeDrive(subject: string, page: Page) {
   await expect(page.locator('text=Drive Configuration')).toBeVisible();
   await page.fill('[data-test="server-url-input"]', subject);
   await page.click('[data-test="server-url-save"]');
-  await expect(page.locator('text=Create new resource')).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Default Ontology' }),
+  ).toBeVisible();
 }
 
 export async function editTitle(title: string, page: Page) {
