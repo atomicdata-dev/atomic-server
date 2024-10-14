@@ -223,6 +223,7 @@ fn main() -> AtomicResult<()> {
 
 fn exec_command(context: &mut Context) -> AtomicResult<()> {
     let command = context.matches.clone();
+    context.read_config();
 
     match command {
         Commands::Destroy { subject } => {

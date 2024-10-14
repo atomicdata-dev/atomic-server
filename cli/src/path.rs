@@ -4,29 +4,31 @@ use atomic_lib::{agents::ForAgent, errors::AtomicResult, serialize, storelike, A
 /// Resolves an Atomic Path query
 pub fn get_path(
     context: &mut Context,
-    path_vec: &Vec<String>,
+    path_vec: &[String],
     serialize: &SerializeOptions,
 ) -> AtomicResult<()> {
     // let subcommand_matches = context.matches.subcommand_matches("get").unwrap();
     let path_string: String = path_vec.join(" ");
 
+    let for_agent: ForAgent = context.store.get_default_agent()?.into();
     // Returns a URL or Value
-    let store = &mut context.store;
-    let path = store.get_path(
+    let path = context.store.get_path(
         &path_string,
         Some(&context.mapping.lock().unwrap()),
-        &ForAgent::Sudo,
+        &for_agent,
     )?;
     let out = match path {
         storelike::PathReturn::Subject(subject) => {
-            let resource = store.get_resource_extended(&subject, false, &ForAgent::Sudo)?;
+            let resource = context
+                .store
+                .get_resource_extended(&subject, false, &for_agent)?;
             print_resource(context, &resource, serialize)?;
             return Ok(());
         }
         storelike::PathReturn::Atom(atom) => match serialize {
             SerializeOptions::NTriples => {
                 let atoms: Vec<Atom> = vec![*atom];
-                serialize::atoms_to_ntriples(atoms, store)?
+                serialize::atoms_to_ntriples(atoms, &context.store)?
             }
             _other => atom.value.to_string(),
         },

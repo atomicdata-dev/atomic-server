@@ -44,6 +44,19 @@ impl<T: Into<String>> From<T> for ForAgent {
     }
 }
 
+// From Agent to ForAgent
+impl From<&Agent> for ForAgent {
+    fn from(agent: &Agent) -> Self {
+        ForAgent::AgentSubject(agent.subject.clone())
+    }
+}
+
+impl From<Agent> for ForAgent {
+    fn from(agent: Agent) -> Self {
+        ForAgent::AgentSubject(agent.subject)
+    }
+}
+
 /// An Agent can be thought of as a User. Agents are used for authentication and authorization.
 /// The private key of the Agent is used to sign [crate::Commit]s.
 #[derive(Clone, Debug)]
