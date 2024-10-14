@@ -175,5 +175,6 @@ const StyledUl = styled.ul`
   & > li {
     margin-left: 0px;
     list-style: none;
+    margin-bottom: 0;
   }
 `;
