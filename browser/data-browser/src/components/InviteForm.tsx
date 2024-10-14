@@ -47,9 +47,9 @@ export function InviteForm({ target }: InviteFormProps) {
 
       await invite.set(core.properties.parent, agent.subject);
       await invite.save();
-      await navigator.clipboard.writeText(invite.subject);
-      toast.success('Copied to clipboard');
       setSaved(true);
+      navigator.clipboard.writeText(invite.subject);
+      toast.success('Copied to clipboard');
     } catch (e) {
       setErr(e);
     }
