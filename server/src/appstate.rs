@@ -40,8 +40,12 @@ impl AppState {
             tracing::warn!("Development mode is enabled. This will use staging environments for services like LetsEncrypt.");
         }
 
-        let should_init = !&config.store_path.exists() || config.initialize;
         let mut store = atomic_lib::Db::init(&config.store_path, config.server_url.clone())?;
+        let no_server_resource = store.get_resource(&config.server_url).is_err();
+        if no_server_resource {
+            tracing::warn!("Server URL resource not found. This is likely because the server URL has changed. Initializing a new database...");
+        }
+        let should_init = !&config.store_path.exists() || config.initialize || no_server_resource;
         if should_init {
             tracing::info!("Initialize: creating and populating new Database...");
             atomic_lib::populate::populate_default_store(&store)
