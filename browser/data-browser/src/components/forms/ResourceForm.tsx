@@ -1,22 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   useArray,
   useResource,
   Resource,
-  useDebounce,
   useCanWrite,
   Client,
   useStore,
   core,
   commits,
+  dataBrowser,
 } from '@tomic/react';
 import { FaCaretDown, FaCaretRight } from 'react-icons/fa';
 
 import { constructOpenURL } from '../../helpers/navigation';
 import { Button } from '../Button';
 import ResourceField from './ResourceField';
-import { ErrMessage } from './InputStyles';
+import { ErrMessage, InlineErrMessage } from './InputStyles';
 import { ResourceSelector } from './ResourceSelector';
 import Field from './Field';
 import { Gutter } from '../Gutter';
@@ -26,6 +26,11 @@ import { Collapse } from '../Collapse';
 import styled from 'styled-components';
 import { FaFloppyDisk } from 'react-icons/fa6';
 import { FormValidationContextProvider } from './formValidation/FormValidationContextProvider';
+import { useOnline } from '../../hooks/useOnline';
+import {
+  RESOURCE_FORM_CONTEXT_VALUE,
+  ResourceFormContext,
+} from './ResourceFormContext';
 
 export enum ResourceFormVariant {
   Default,
@@ -53,6 +58,7 @@ const nonEssentialProps: string[] = [
   core.properties.write,
   core.properties.read,
   commits.properties.lastCommit,
+  dataBrowser.properties.subResources,
 ];
 
 /** Form for editing and creating a Resource */
@@ -64,6 +70,8 @@ export function ResourceForm({
   onCancel,
   onValidationChange,
 }: ResourceFormProps): JSX.Element {
+  const isOnline = useOnline();
+  const navigate = useNavigate();
   const [isAArray] = useArray(resource, core.properties.isA);
 
   if (classSubject === undefined && isAArray?.length > 0) {
@@ -78,23 +86,23 @@ export function ResourceForm({
   const [requires] = useArray(klass, core.properties.requires);
   const [recommends] = useArray(klass, core.properties.recommends);
   const [newPropErr, setNewPropErr] = useState<Error | undefined>(undefined);
-  const navigate = useNavigate();
   /** A list of custom properties, set by the User while editing this form */
   const [tempOtherProps, setTempOtherProps] = useState<string[]>([]);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const store = useStore();
   const wasNew: boolean = resource.new;
 
-  const [save, saving, err] = useSaveResource(resource, () => {
+  const onSaveSuccess = useCallback(() => {
     // We need to read the earlier .new state, because the resource is no
     // longer new after it was saved, during this callback
     wasNew && store.notifyResourceManuallyCreated(resource);
     onSave?.();
     navigate(constructOpenURL(resource.subject));
-  });
-  // I'm not entirely sure if debouncing is needed here.
-  const debouncedResource = useDebounce(resource, 5000);
-  const [_canWrite, canWriteErr] = useCanWrite(debouncedResource);
+  }, [resource, store, wasNew, onSave, navigate]);
+
+  const [save, saving, err] = useSaveResource(resource, onSaveSuccess);
+
+  const [canWrite, canWriteErr] = useCanWrite(resource);
 
   const otherProps = useMemo(() => {
     const allProps = Array.from(resource.getPropVals().keys());
@@ -118,10 +126,21 @@ export function ResourceForm({
     // array changes, but that leads to a weird loop, so that's what the length is for
   }, [resource, tempOtherProps, requires.length, recommends.length]);
 
-  const handleValidate = (valid: boolean) => {
-    setIsFormValid(valid);
-    onValidationChange?.(valid);
-  };
+  const handleValidate = useCallback(
+    (valid: boolean) => {
+      setIsFormValid(valid);
+      onValidationChange?.(valid);
+    },
+    [onValidationChange],
+  );
+
+  const handleDelete = useCallback(
+    (propertyURL: string) => {
+      resource.remove(propertyURL);
+      setTempOtherProps(tempOtherProps.filter(prop => prop !== propertyURL));
+    },
+    [resource, tempOtherProps],
+  );
 
   if (!resource.new && resource.loading) {
     return <>Loading resource...</>;
@@ -172,117 +191,120 @@ export function ResourceForm({
     }
   }
 
-  function handleDelete(propertyURL: string) {
-    resource.remove(propertyURL);
-    setTempOtherProps(tempOtherProps.filter(prop => prop !== propertyURL));
-  }
-
   return (
-    <FormValidationContextProvider onValidationChange={handleValidate}>
-      <form about={resource.subject} onSubmit={save}>
-        <Column>
-          {classSubject && klass.error && (
-            <ErrMessage>
-              Error in class, so this form could miss properties. You can still
-              edit the resource, though. Error message: `{klass.error.message}`
-            </ErrMessage>
-          )}
-          {canWriteErr && (
-            <ErrMessage>Cannot save edits: {canWriteErr}</ErrMessage>
-          )}
-          {requires.map(property => {
-            return (
-              <ResourceField
-                key={property + ' field'}
-                propertyURL={property}
-                resource={resource}
-                required
-              />
-            );
-          })}
-          {recommends.map(property => {
-            return (
-              <ResourceField
-                key={property + ' field'}
-                propertyURL={property}
-                resource={resource}
-              />
-            );
-          })}
-          {otherProps.map(property => {
-            return (
-              <ResourceField
-                key={property + ' field'}
-                propertyURL={property}
-                resource={resource}
-                handleDelete={() => handleDelete(property)}
-              />
-            );
-          })}
-        </Column>
-        <Gutter />
-        <Button
-          title={'show / hide advanced form fields'}
-          clean
-          style={{
-            display: 'flex',
-            marginBottom: '1rem',
-            alignItems: 'center',
-          }}
-          onClick={() => setShowAdvanced(!showAdvanced)}
-        >
-          <Row as='strong' gap='0.4rem' center>
-            {showAdvanced ? <FaCaretDown /> : <FaCaretRight />} Advanced
-          </Row>
-        </Button>
-        <StyledCollapse open={showAdvanced}>
+    <ResourceFormContext.Provider value={RESOURCE_FORM_CONTEXT_VALUE}>
+      <FormValidationContextProvider onValidationChange={handleValidate}>
+        <form about={resource.subject} onSubmit={save}>
           <Column>
-            <Field
-              label='add another property...'
-              helper='In Atomic Data, any Resource could have any single Property. Use this field to add new property-value combinations to your resource.'
-            >
-              <div>
-                <ResourceSelector
-                  value={undefined}
-                  setSubject={set => {
-                    handleAddProp(set);
-                  }}
-                  isA={core.classes.property}
+            {classSubject && klass.error && (
+              <ErrMessage>
+                Error in class, so this form could miss properties. You can
+                still edit the resource, though. Error message: `
+                {klass.error.message}`
+              </ErrMessage>
+            )}
+            {canWriteErr && (
+              <ErrMessage>Cannot save edits: {canWriteErr}</ErrMessage>
+            )}
+            {requires.map(property => {
+              return (
+                <ResourceField
+                  key={property + ' field'}
+                  propertyURL={property}
+                  resource={resource}
+                  required
                 />
-              </div>
-              {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
-            </Field>
-            {nonEssentialProps.map(prop => (
-              <ResourceField
-                key={prop}
-                propertyURL={prop}
-                resource={resource}
-              />
-            ))}
+              );
+            })}
+            {recommends.map(property => {
+              return (
+                <ResourceField
+                  key={property + ' field'}
+                  propertyURL={property}
+                  resource={resource}
+                />
+              );
+            })}
+            {otherProps.map(property => {
+              return (
+                <ResourceField
+                  key={property + ' field'}
+                  propertyURL={property}
+                  resource={resource}
+                  handleDelete={() => handleDelete(property)}
+                />
+              );
+            })}
           </Column>
-        </StyledCollapse>
-        {variant !== ResourceFormVariant.Dialog && (
-          <>
-            {err && <ErrMessage>{err.message}</ErrMessage>}
-            <Row justify='flex-end'>
-              {onCancel && (
-                <Button subtle onClick={onCancel}>
-                  Cancel
-                </Button>
-              )}
-              <Button
-                disabled={saving || !isFormValid}
-                data-test='save'
-                type='submit'
-              >
-                <FaFloppyDisk />
-                {saving ? 'wait...' : 'Save'}
-              </Button>
+          <Gutter />
+          <Button
+            title={'show / hide advanced form fields'}
+            clean
+            style={{
+              display: 'flex',
+              marginBottom: '1rem',
+              alignItems: 'center',
+            }}
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Row as='strong' gap='0.4rem' center>
+              {showAdvanced ? <FaCaretDown /> : <FaCaretRight />} Advanced
             </Row>
-          </>
-        )}
-      </form>
-    </FormValidationContextProvider>
+          </Button>
+          <StyledCollapse open={showAdvanced}>
+            <Column>
+              <Field
+                label='add another property...'
+                helper='In Atomic Data, any Resource could have any single Property. Use this field to add new property-value combinations to your resource.'
+              >
+                <div>
+                  <ResourceSelector
+                    value={undefined}
+                    setSubject={set => {
+                      handleAddProp(set);
+                    }}
+                    isA={core.classes.property}
+                  />
+                </div>
+                {newPropErr && <ErrMessage>{newPropErr.message}</ErrMessage>}
+              </Field>
+              {nonEssentialProps.map(prop => (
+                <ResourceField
+                  key={prop}
+                  propertyURL={prop}
+                  resource={resource}
+                />
+              ))}
+            </Column>
+          </StyledCollapse>
+          {variant !== ResourceFormVariant.Dialog && (
+            <>
+              <Row justify='flex-end' center wrapItems>
+                {err && <InlineErrMessage>{err.message}</InlineErrMessage>}
+                {!isOnline && (
+                  <InlineErrMessage>
+                    You are offline, changes can not be saved
+                  </InlineErrMessage>
+                )}
+                {onCancel && (
+                  <Button subtle onClick={onCancel}>
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  disabled={saving || !isFormValid || !isOnline || !canWrite}
+                  data-test='save'
+                  type='submit'
+                >
+                  <FaFloppyDisk />
+                  {saving ? 'wait...' : 'Save'}
+                </Button>
+              </Row>
+            </>
+          )}
+        </form>
+      </FormValidationContextProvider>
+    </ResourceFormContext.Provider>
   );
 }
 

@@ -51,6 +51,7 @@ export function PropertyLineWrite({
     <ListItem>
       <Row center wrapItems>
         <InputSwitcher
+          aria-label='Property shortname'
           commit
           required
           disabled={disabled}
@@ -58,6 +59,7 @@ export function PropertyLineWrite({
           property={shortnameProp}
         />
         <InputString
+          aria-label='Property description'
           commit
           required
           disabled={disabled}

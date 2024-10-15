@@ -16,6 +16,14 @@ import { ErrorChip } from '../ErrorChip';
 import { constructOpenURL } from '../../../helpers/navigation';
 import { useNavigateWithTransition } from '../../../hooks/useNavigateWithTransition';
 import { SearchBoxButton } from './SearchBoxButton';
+import {
+  SB_BACKGROUND,
+  SB_BOTTOM_RADIUS,
+  SB_HIGHLIGHT,
+  SB_TOP_RADIUS,
+} from './searchboxVars';
+import { useDialogTreeContext } from '../../Dialog/dialogContext';
+import { useResourceFormContext } from '../ResourceFormContext';
 
 export type OnResourceError = (hasError: boolean) => void;
 
@@ -67,6 +75,10 @@ export function SearchBox({
   const [open, setOpen] = useState(false);
   const containerRef = useContext(DropdownPortalContext);
   const [justFocussed, setJustFocussed] = useState(false);
+  const { inDialog } = useDialogTreeContext();
+  const { inResourceForm } = useResourceFormContext();
+
+  const disableGotoButton = inDialog && inResourceForm;
 
   const placeholderText =
     placeholder ??
@@ -135,7 +147,7 @@ export function SearchBox({
       : constructOpenURL(selectedResource.subject);
 
   const navigateToSelectedResource: MouseEventHandler<
-    HTMLAnchorElement
+    HTMLButtonElement
   > = e => {
     e.preventDefault();
     navigate(openLink);
@@ -189,9 +201,9 @@ export function SearchBox({
                   <FaTimes />
                 </SearchBoxButton>
               )}
+
               <SearchBoxButton
-                as='a'
-                href={openLink}
+                disabled={disableGotoButton}
                 title={`go to ${title}`}
                 onClick={navigateToSelectedResource}
                 type='button'
@@ -207,7 +219,7 @@ export function SearchBox({
         </TriggerButtonWrapper>
       </RadixPopover.Anchor>
       <RadixPopover.Portal container={containerRef.current}>
-        <RadixPopover.Content align='start'>
+        <RadixPopover.Content align='start' avoidCollisions>
           {open && (
             <SearchBoxWindow
               searchValue={inputValue}
@@ -248,14 +260,21 @@ const TriggerButtonWrapper = styled.div<{
   invalid: boolean;
   disabled: boolean;
 }>`
-  --search-box-hightlight: ${p =>
-    p.invalid ? p.theme.colors.alert : p.theme.colors.main};
+  ${SB_HIGHLIGHT.define(p =>
+    p.invalid ? p.theme.colors.alert : p.theme.colors.main,
+  )}
   display: flex;
   position: relative;
   border: 1px solid ${props => props.theme.colors.bg2};
-  border-radius: ${props => props.theme.radius};
-  background-color: var(--search-box-bg, ${props => props.theme.colors.bg});
-  &:has(:disabled) {
+
+  border-top-left-radius: ${p => SB_TOP_RADIUS.var(p.theme.radius)};
+  border-top-right-radius: ${p => SB_TOP_RADIUS.var(p.theme.radius)};
+  border-bottom-left-radius: ${p => SB_BOTTOM_RADIUS.var(p.theme.radius)};
+  border-bottom-right-radius: ${p => SB_BOTTOM_RADIUS.var(p.theme.radius)};
+
+  background-color: ${p => SB_BACKGROUND.var(p.theme.colors.bg)};
+
+  &:disabled {
     background-color: ${props => props.theme.colors.bg1};
   }
 
@@ -264,13 +283,13 @@ const TriggerButtonWrapper = styled.div<{
   &:hover,
   &:focus-visible {
     border-color: transparent;
-    box-shadow: 0 0 0 2px var(--search-box-hightlight);
+    box-shadow: 0 0 0 2px ${SB_HIGHLIGHT.var()};
     z-index: 1000;
   }
 `;
 
 const ResourceTitle = styled.span`
-  color: var(--search-box-hightlight);
+  color: ${SB_HIGHLIGHT.var()};
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

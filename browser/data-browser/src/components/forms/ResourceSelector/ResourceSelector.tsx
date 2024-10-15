@@ -1,19 +1,33 @@
-import { useState, useMemo, memo } from 'react';
+import { useState, useMemo, memo, useContext } from 'react';
 import { Dialog, useDialog } from '../../Dialog';
 import { useSettings } from '../../../helpers/AppSettings';
 import { css, styled } from 'styled-components';
 import { NewFormDialog } from '../NewForm/NewFormDialog';
-import { SearchBox } from '../SearchBox';
+import {
+  SB_BOTTOM_RADIUS,
+  SB_TOP_RADIUS,
+  SearchBox,
+  SearchBoxButton,
+} from '../SearchBox';
 import { FaTrash } from 'react-icons/fa';
-import { SearchBoxButton } from '../SearchBox/SearchBoxButton';
 import { getTitlePropOfClass } from './useTitlePropOfClass';
 import {
   checkForInitialRequiredValue,
   useValidation,
 } from '../formValidation/useValidation';
-import { ClassSelectorDialog } from './ClassSelectorDialog';
-import { core, useStore } from '@tomic/react';
+import { ClassSelectorDialog } from '../../ClassSelectorDialog';
+import {
+  core,
+  unknownSubject,
+  useCanWrite,
+  useResource,
+  useStore,
+} from '@tomic/react';
 import { stringToSlug } from '../../../helpers/stringToSlug';
+import { FaPencil } from 'react-icons/fa6';
+import { EditFormDialog } from '../EditFormDialog';
+import { ResourceFormContext } from '../ResourceFormContext';
+import { isURL } from '../../../helpers/isURL';
 
 export interface ResourceSelectorProps {
   /**
@@ -79,10 +93,12 @@ export const ResourceSelector = memo(function ResourceSelector({
   onBlur,
 }: ResourceSelectorProps): JSX.Element {
   const store = useStore();
+  const { inResourceForm } = useContext(ResourceFormContext);
   const [pickedSubject, setPickedSubject] = useState<string | undefined>();
   const [newResourceClass, setNewResourceClass] = useState<string | undefined>(
     isA,
   );
+  const [editing, setEditing] = useState(false);
   const [warning, setWarning] = useState<string | undefined>();
   const [classSelectorOpen, setClassSelectorOpen] = useState(false);
   const [titleProp, setTitleProp] = useState<string>();
@@ -100,6 +116,11 @@ export const ResourceSelector = memo(function ResourceSelector({
   const [initialNewTitle, setInitialNewTitle] = useState('');
 
   const { drive } = useSettings();
+
+  const resource = useResource(value ?? unknownSubject);
+  const [canWrite] = useCanWrite(resource);
+
+  const shouldShowEditForm = canWrite && isURL(value ?? '');
 
   const handleCreateItem = useMemo(() => {
     if (hideCreateOption) {
@@ -172,6 +193,15 @@ export const ResourceSelector = memo(function ResourceSelector({
         onClose={handleBlur}
         onResourceError={handleResourceError}
       >
+        {inResourceForm && shouldShowEditForm && (
+          <SearchBoxButton
+            onClick={() => setEditing(true)}
+            title='Edit resource'
+            type='button'
+          >
+            <FaPencil />
+          </SearchBoxButton>
+        )}
         {handleRemove && !disabled && (
           <SearchBoxButton onClick={handleRemove} title='Remove' type='button'>
             <FaTrash />
@@ -200,6 +230,9 @@ export const ResourceSelector = memo(function ResourceSelector({
           )}
         </Dialog>
       )}
+      {inResourceForm && shouldShowEditForm && (
+        <EditFormDialog subject={value!} show={editing} bindShow={setEditing} />
+      )}
       {!isA && (
         <ClassSelectorDialog
           show={classSelectorOpen}
@@ -217,22 +250,14 @@ export const ResourceSelector = memo(function ResourceSelector({
 const StyledSearchBox = styled(SearchBox)``;
 
 const Wrapper = styled.div<{ first?: boolean; last?: boolean }>`
-  --top-radius: ${p => (p.first ? p.theme.radius : 0)};
-  --bottom-radius: ${p => (p.last ? p.theme.radius : 0)};
+  ${SB_TOP_RADIUS.define(p => (p.first ? p.theme.radius : 0))}
+  ${SB_BOTTOM_RADIUS.define(p => (p.last ? p.theme.radius : 0))}
 
   flex: 1;
   max-width: 100%;
   position: relative;
-  ${StyledSearchBox} {
-    border-radius: 0;
-  }
 
   & ${StyledSearchBox} {
-    border-top-left-radius: var(--top-radius);
-    border-top-right-radius: var(--top-radius);
-    border-bottom-left-radius: var(--bottom-radius);
-    border-bottom-right-radius: var(--bottom-radius);
-
     ${p =>
       !p.last &&
       css`

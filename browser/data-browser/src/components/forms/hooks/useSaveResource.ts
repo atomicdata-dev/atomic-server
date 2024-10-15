@@ -43,7 +43,7 @@ export const useSaveResource = (
         toast.error('Could not save resource');
       }
     },
-    [resource, store],
+    [resource, store, onSaveSucces],
   );
 
   return [save, saving, error];

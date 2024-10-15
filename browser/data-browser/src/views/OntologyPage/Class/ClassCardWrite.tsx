@@ -54,6 +54,7 @@ export function ClassCardWrite({ subject }: ClassCardWriteProps): JSX.Element {
           <TitleWrapper>
             <FaCube />
             <InputSwitcher
+              aria-label='Class name'
               commit
               resource={resource}
               property={shortnameProp}

@@ -19,6 +19,7 @@ import { FaGripVertical, FaPlus, FaTrash } from 'react-icons/fa6';
 import { createPortal } from 'react-dom';
 import { transparentize } from 'polished';
 import { useValidation } from './formValidation/useValidation';
+import { SB_BACKGROUND } from './SearchBox/searchboxVars';
 
 interface InputResourceArrayProps extends InputProps {
   isA?: string;
@@ -285,7 +286,7 @@ const DummySelector = (props: ResourceSelectorProps) => {
 };
 
 const StyledDragOverlay = styled(DragOverlay)`
-  --search-box-bg: ${p => transparentize(0.5, p.theme.colors.bg)};
+  ${SB_BACKGROUND.define(p => transparentize(0.5, p.theme.colors.bg))}
   backdrop-filter: blur(3px);
 `;
 

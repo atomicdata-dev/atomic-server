@@ -14,8 +14,22 @@ test.describe('Ontology', async () => {
   test('Create and edit ontology', async ({ page }) => {
     test.slow();
 
-    const pickOption = async (query: Locator) => {
+    const pickOption = async (query: Locator, keyboardSteps?: number) => {
       await page.waitForTimeout(100);
+
+      // Sometimes when the page moves after the dropdown opens, part of the dropdownfalls outside the viewport.
+      // In this case we have to use the keyboard because scrolling doesn't seem to work.
+      if (keyboardSteps !== undefined) {
+        for (let i = 0; i < keyboardSteps; i++) {
+          await page.keyboard.press('ArrowDown');
+        }
+
+        await page.keyboard.press('Enter');
+
+        return;
+      }
+
+      // Use the mouse if we can.
       await query.hover();
       await query.click();
     };
@@ -57,7 +71,7 @@ test.describe('Ontology', async () => {
     await page.getByRole('button', { name: 'add required property' }).click();
     await page
       .getByPlaceholder('Search for a property or enter a URL')
-      .type('arrows');
+      .fill('arrows');
 
     await page.keyboard.press('ArrowDown');
     await page.keyboard.press('Enter');
@@ -153,17 +167,17 @@ test.describe('Ontology', async () => {
     // add name property to arrow-kind
     await arrowKindCard.getByTitle('add required property').click();
 
-    await page.getByPlaceholder('Search for a property').type('name');
+    await page.getByPlaceholder('Search for a property').fill('name');
 
     await expect(
       page.getByText('name - The name of a thing or person'),
     ).toBeVisible();
 
-    await pickOption(page.getByText('name - The name'));
+    await pickOption(page.getByText('name - The name'), 2);
 
     // add line-type property to arrow-kind
     await arrowKindCard.getByTitle('add recommended property').click();
-    await page.getByPlaceholder('Search for a property').type('line-type');
+    await page.getByPlaceholder('Search for a property').fill('line-type');
 
     await expect(page.getByText('Create line-type')).toBeVisible();
 
@@ -213,14 +227,17 @@ test.describe('Ontology', async () => {
 
     const createInstance = async (name: string) => {
       await page.getByRole('button', { name: 'New Instance' }).click();
-      await page.getByText('Search for a class').nth(1).click();
-      await page.getByPlaceholder('Search for a class').type('arrow-kind');
+      await expect(
+        currentDialog(page).getByRole('heading', { name: 'Select a class' }),
+      ).toBeVisible();
 
-      await expect(page.getByText('arrow-kind - Change me')).toBeVisible();
+      await currentDialog(page)
+        .getByRole('button', { name: 'arrow-kind' })
+        .click();
 
-      await pickOption(page.getByText('arrow-kind - Change me'));
-
-      await expect(page.getByText('new arrow-kind')).toBeVisible();
+      await expect(
+        currentDialog(page).getByRole('heading', { name: 'new arrow-kind' }),
+      ).toBeVisible();
 
       await expect(currentDialog(page).getByLabel('name')).toBeVisible();
       await currentDialog(page).getByLabel('name').fill(name);
@@ -241,7 +258,7 @@ test.describe('Ontology', async () => {
     await page.getByRole('button', { name: 'Search for a arrow-kind' }).click();
     await page
       .getByPlaceholder('Search for a arrow-kind ')
-      .type('red arrow with circle');
+      .fill('red arrow with circle');
     await pickOption(
       page.getByRole('dialog').getByText('Red arrow with circle').nth(1),
     );
@@ -253,7 +270,7 @@ test.describe('Ontology', async () => {
     await page.getByRole('button', { name: 'Search for a arrow-kind' }).click();
     await page
       .getByPlaceholder('Search for a arrow-kind ')
-      .type('green arrow with black border');
+      .fill('green arrow with black border');
     await pickOption(
       page
         .getByRole('dialog')

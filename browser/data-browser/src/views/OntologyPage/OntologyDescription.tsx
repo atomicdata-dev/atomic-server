@@ -27,5 +27,12 @@ export function OntologyDescription({
     return <Markdown text={description ?? ''} />;
   }
 
-  return <InputMarkdown commit resource={resource} property={property} />;
+  return (
+    <InputMarkdown
+      commit
+      resource={resource}
+      property={property}
+      aria-label='Description'
+    />
+  );
 }
