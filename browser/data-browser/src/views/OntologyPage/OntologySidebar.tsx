@@ -1,4 +1,4 @@
-import { Resource, urls, useArray, useResource } from '@tomic/react';
+import { core, Resource, useArray, useResource } from '@tomic/react';
 
 import { styled } from 'styled-components';
 import { Details } from '../../components/Details';
@@ -13,9 +13,9 @@ interface OntologySidebarProps {
 export function OntologySidebar({
   ontology,
 }: OntologySidebarProps): JSX.Element {
-  const [classes] = useArray(ontology, urls.properties.classes);
-  const [properties] = useArray(ontology, urls.properties.properties);
-  const [instances] = useArray(ontology, urls.properties.instances);
+  const [classes] = useArray(ontology, core.properties.classes);
+  const [properties] = useArray(ontology, core.properties.properties);
+  const [instances] = useArray(ontology, core.properties.instances);
 
   return (
     <Wrapper>
@@ -87,12 +87,15 @@ function Item({ subject }: ItemProps): JSX.Element {
 }
 
 const Wrapper = styled.div`
+  --ontology-sidebar-height: calc(
+    100vh - ${p => p.theme.heights.breadCrumbBar}
+  );
   position: sticky;
   top: 0px;
   display: flex;
   flex-direction: column;
   background-color: ${p => p.theme.colors.bg};
-  height: 100vh;
+  height: var(--ontology-sidebar-height);
   border-left: 1px solid ${p => p.theme.colors.bg2};
   min-width: 10rem;
 `;
@@ -128,7 +131,7 @@ const ItemLink = styled.a<{ error: boolean }>`
 
 const SideBarScrollArea = styled(ScrollArea)`
   overflow: hidden;
-  padding: ${p => p.theme.margin}rem;
+  padding: ${p => p.theme.size()};
   padding-left: 0.5rem;
-  max-height: 100vh;
+  max-height: var(--ontology-sidebar-height);
 `;

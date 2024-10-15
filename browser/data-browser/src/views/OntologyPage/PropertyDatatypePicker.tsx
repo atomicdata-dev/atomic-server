@@ -46,6 +46,7 @@ export function PropertyDatatypePicker({
 
   return (
     <StyledAtomicSelectInput
+      aria-label='Property datatype'
       commit
       disabled={disabled}
       resource={resource}

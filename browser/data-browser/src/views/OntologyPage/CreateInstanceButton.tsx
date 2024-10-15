@@ -2,22 +2,20 @@ import { useState } from 'react';
 import { Resource, core } from '@tomic/react';
 import { styled } from 'styled-components';
 import { FaPlus } from 'react-icons/fa';
-import { ResourceSelector } from '../../components/forms/ResourceSelector';
-import { Column } from '../../components/Row';
 import { NewFormDialog } from '../../components/forms/NewForm/NewFormDialog';
 import { Dialog, useDialog } from '../../components/Dialog';
+import { ClassSelectorDialog } from '../../components/ClassSelectorDialog';
 
 interface CreateInstanceButtonProps {
   ontology: Resource;
 }
 
 export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
-  const [active, setActive] = useState(false);
+  const [classSelectorActive, setClassSelectorActive] = useState(false);
   const [classSubject, setClassSubject] = useState<string | undefined>();
   const [dialogProps, show, close, isOpen] = useDialog({
     onSuccess: () => {
       setClassSubject(undefined);
-      setActive(false);
       ontology.save();
     },
   });
@@ -39,36 +37,26 @@ export function CreateInstanceButton({ ontology }: CreateInstanceButtonProps) {
 
   return (
     <>
-      {!active ? (
-        <InstanceButton onClick={() => setActive(true)}>
-          <FaPlus />
-          New Instance
-        </InstanceButton>
-      ) : (
-        <>
-          <ChooseClassFormWrapper>
-            <Column>
-              <strong>Select the class for this instance</strong>
-              <ResourceSelector
-                autoFocus
-                isA={core.classes.class}
-                setSubject={handleClassSelect}
-                value={classSubject}
-              />
-            </Column>
-          </ChooseClassFormWrapper>
-          <Dialog {...dialogProps}>
-            {isOpen && classSubject && (
-              <NewFormDialog
-                classSubject={classSubject}
-                onCancel={() => close(false)}
-                onSaveClick={handleSaveClick}
-                parent={ontology.subject}
-              />
-            )}
-          </Dialog>
-        </>
-      )}
+      <InstanceButton onClick={() => setClassSelectorActive(true)}>
+        <FaPlus />
+        New Instance
+      </InstanceButton>
+      <ClassSelectorDialog
+        show={classSelectorActive}
+        bindShow={setClassSelectorActive}
+        onClassSelect={handleClassSelect}
+        ontologies={[ontology.subject]}
+      />
+      <Dialog {...dialogProps} width='50rem'>
+        {isOpen && classSubject && (
+          <NewFormDialog
+            classSubject={classSubject}
+            onCancel={() => close(false)}
+            onSaveClick={handleSaveClick}
+            parent={ontology.subject}
+          />
+        )}
+      </Dialog>
     </>
   );
 }
@@ -92,12 +80,4 @@ const InstanceButton = styled.button`
     color: ${p => p.theme.colors.main};
     background-color: ${p => p.theme.colors.bg};
   }
-`;
-
-const ChooseClassFormWrapper = styled.div`
-  min-height: 10rem;
-  border: 2px dashed ${p => p.theme.colors.bg2};
-  background-color: ${p => p.theme.colors.bg};
-  border-radius: ${p => p.theme.radius};
-  padding: ${p => p.theme.margin}rem;
 `;

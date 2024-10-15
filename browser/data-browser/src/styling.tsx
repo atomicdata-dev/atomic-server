@@ -312,7 +312,7 @@ export const GlobalStyle = createGlobalStyle`
     li {
       list-style-type: disc;
       margin-left: ${props => props.theme.size(7)};
-      margin-bottom: ${props => props.theme.size(7)};
+      margin-bottom: ${props => props.theme.size(2)};
     }
   }
 

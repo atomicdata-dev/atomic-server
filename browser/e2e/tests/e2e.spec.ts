@@ -495,7 +495,9 @@ test.describe('data-browser', async () => {
 
     await currentDialog(page).getByRole('button', { name: 'Save' }).click();
 
-    await expect(page.getByRole('button', { name: 'test-prop' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'test-prop', exact: true }),
+    ).toBeVisible();
   });
 
   test('history page', async ({ page }) => {
