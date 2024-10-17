@@ -1,20 +1,21 @@
 export type TemplateKey = keyof typeof templates;
 
+export type ExecutionContext = {
+  serverUrl: string;
+};
+
 export type BaseTemplate = {
   name: string;
-  ontologyID: string;
-  generateEnv: (context: { serverUrl: string }) => string;
+  ontologyID: (context: ExecutionContext) => string;
+  generateEnv: (context: ExecutionContext) => string;
 };
 
 const baseTemplates = {
   website: {
     name: 'website',
-    ontologyID: 'website',
+    ontologyID: ({ serverUrl }) => `${serverUrl}/website`,
     generateEnv: ({ serverUrl }) => {
-      const siteSubject = new URL(
-        '01j5zrevq917dp0wm4p2vnd7nr',
-        serverUrl,
-      ).toString();
+      const siteSubject = `${serverUrl}/01j5zrevq917dp0wm4p2vnd7nr`;
 
       return `PUBLIC_ATOMIC_SERVER_URL=${serverUrl}\nPUBLIC_WEBSITE_RESOURCE=${siteSubject}`;
     },

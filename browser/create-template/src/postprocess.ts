@@ -1,7 +1,11 @@
 import path from 'node:path';
 import fs from 'node:fs';
 import { Store, type Resource } from '@tomic/lib';
-import { type TemplateKey, templates } from './templates.js';
+import {
+  type ExecutionContext,
+  type TemplateKey,
+  templates,
+} from './templates.js';
 import chalk from 'chalk';
 import { log } from './utils.js';
 import { getPackagemanager } from './packageManager.js';
@@ -15,10 +19,12 @@ export interface PostProcessContext {
 export async function postProcess(context: PostProcessContext) {
   const { folderPath, template, serverUrl } = context;
 
+  const executionContext: ExecutionContext = { serverUrl };
+
   const store = new Store({ serverUrl });
   const baseTemplate = templates[template];
   const ontologySubject = new URL(
-    baseTemplate.ontologyID,
+    baseTemplate.ontologyID(executionContext),
     serverUrl,
   ).toString();
 
@@ -26,14 +32,14 @@ export async function postProcess(context: PostProcessContext) {
 
   if (ontology.error) {
     console.error(
-      `The ${baseTemplate.name} does not exist on your drive. To get the template go to the Create Resource page and select the ${baseTemplate.name} template`,
+      `\nThe ${baseTemplate.name} template does not exist on your drive. To get the template go to the Create Resource page and select the ${baseTemplate.name} template`,
     );
     process.exit(1);
   }
 
   await modifyConfig(folderPath, ontology);
   await modifyReadme(folderPath);
-  await createEnvFile(folderPath, baseTemplate.generateEnv({ serverUrl }));
+  await createEnvFile(folderPath, baseTemplate.generateEnv(executionContext));
 }
 
 async function modifyConfig(folderPath: string, ontology: Resource) {

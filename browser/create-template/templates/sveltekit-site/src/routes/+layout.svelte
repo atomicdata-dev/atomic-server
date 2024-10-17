@@ -6,7 +6,7 @@
 </script>
 
 <SiteWrapper>
-	<VStack align="stretch" height="100vh">
+	<VStack align="stretch" minHeight="100vh">
 		<header>
 			<Navbar />
 		</header>

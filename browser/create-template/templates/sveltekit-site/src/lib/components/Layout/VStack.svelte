@@ -2,7 +2,8 @@
 	export let gap = '1rem';
 	export let align = 'start';
 	export let justify = 'start';
-	export let height = 'auto';
+	export let height = 'initial';
+	export let minHeight = 'initial';
 </script>
 
 <div
@@ -10,6 +11,7 @@
 	style:--vstack-align={align}
 	style:--vstack-justify={justify}
 	style:--vstack-height={height}
+	style:--vstack-min-height={minHeight}
 >
 	<slot />
 </div>
@@ -22,6 +24,7 @@
 		align-items: var(--vstack-align);
 		justify-content: var(--vstack-justify);
 		height: var(--vstack-height);
+		min-height: var(--vstack-min-height);
 		& > h1,
 		& > h2,
 		& > h3,
