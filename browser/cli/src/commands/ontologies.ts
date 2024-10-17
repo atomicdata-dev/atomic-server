@@ -20,7 +20,7 @@ export const ontologiesCommand = async (_args: string[]) => {
   const [valid, report] = await validateOntologies(atomicConfig.ontologies);
 
   if (!valid) {
-    console.log(chalk.red('Could not generate ontologies'));
+    console.log(chalk.red('ERROR: Could not generate ontologies'));
     console.log(report);
 
     return;
@@ -50,6 +50,13 @@ export const ontologiesCommand = async (_args: string[]) => {
   await write(generateIndex(atomicConfig.ontologies, missingProps.length > 0));
 
   console.log(chalk.green('Done!'));
+  console.log(
+    `\nDon't forget to call the ${chalk.blue(
+      'initOntologies()',
+    )} function somewhere in your app (exported from ${chalk.blue(
+      `${atomicConfig.outputFolder}/index.ts`,
+    )})`,
+  );
 };
 
 const write = async ({

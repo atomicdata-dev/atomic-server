@@ -24,10 +24,15 @@ export const initCommand = async (args: string[]) => {
     );
   }
 
-  console.log(chalk.cyan('Creating atomic.config.json'));
+  console.log(chalk.cyan(`Creating ${chalk.white('atomic.config.json')}`));
 
   const template = JSON.stringify(TEMPLATE_CONFIG_FILE, null, 2);
   fs.writeFileSync(filePath, template);
 
   console.log(chalk.green('Done!'));
+  console.log(
+    chalk.cyan(
+      'Next add your ontologies to your atomic.config.json file. You can find more info on how to do this here: https://docs.atomicdata.dev/js-cli',
+    ),
+  );
 };

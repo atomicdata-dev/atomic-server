@@ -26,8 +26,20 @@ export interface AtomicConfig {
   _ISLIB_: boolean;
 }
 
-export const atomicConfig: AtomicConfig = JSON.parse(
-  fs
-    .readFileSync(path.resolve(process.cwd(), './atomic.config.json'))
-    .toString(),
-);
+let atomicConfig: AtomicConfig;
+
+try {
+  atomicConfig = JSON.parse(
+    fs
+      .readFileSync(path.resolve(process.cwd(), './atomic.config.json'))
+      .toString(),
+  );
+} catch (e) {
+  console.error(
+    'ERROR: Could not find an atomic.config.json. Generate one with "ad-generate init"',
+  );
+
+  process.exit(1);
+}
+
+export { atomicConfig };
