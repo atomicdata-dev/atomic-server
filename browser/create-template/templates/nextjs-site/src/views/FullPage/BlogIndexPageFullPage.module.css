@@ -1,0 +1,23 @@
+.wrapper {
+  padding: 1rem;
+}
+
+.wrapper ul {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(calc(var(--theme-size-container-width) / 3 - 4rem), 1fr)
+  );
+  gap: 1rem;
+  list-style-type: none;
+  padding: 0;
+}
+
+.input {
+  height: 2rem;
+  appearance: none;
+  border: none;
+  outline: none;
+  background: none;
+  background-color: transparent;
+}

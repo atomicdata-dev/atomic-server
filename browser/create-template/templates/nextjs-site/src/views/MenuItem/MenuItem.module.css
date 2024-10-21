@@ -1,0 +1,40 @@
+.ul {
+  padding: 0.5rem;
+  list-style: none;
+}
+
+.button {
+  padding: 0.4rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--theme-border-radius);
+  height: 100%;
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background-color 100ms ease-in-out;
+  position: relative; /* For anchoring the submenu */
+}
+
+.button:hover,
+.button:focus-visible {
+  background-color: var(--theme-color-bg-2);
+}
+
+.submenu {
+  position: absolute; /* Anchoring relative to the button */
+  top: 100%; /* Anchors submenu to the bottom of the button */
+  left: 50%;
+  transform: translateX(-50%); /* Centers the submenu */
+  width: max(20ch, 100%);
+  border: 1px solid var(--theme-color-bg-1);
+  border-radius: var(--theme-border-radius);
+  box-shadow:
+    0px 2.8px 2.2px rgba(0, 0, 0, 0.02),
+    0px 6.7px 5.3px rgba(0, 0, 0, 0.028),
+    0px 12.5px 10px rgba(0, 0, 0, 0.035),
+    0px 22.3px 17.9px rgba(0, 0, 0, 0.042),
+    0px 41.8px 33.4px rgba(0, 0, 0, 0.05),
+    0px 100px 80px rgba(0, 0, 0, 0.07);
+}

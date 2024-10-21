@@ -1,0 +1,7 @@
+.wrapper {
+  max-width: 70ch;
+}
+
+.wrapper > p {
+  margin-top: 1em;
+}

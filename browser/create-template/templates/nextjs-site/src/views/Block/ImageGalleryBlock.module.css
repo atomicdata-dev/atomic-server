@@ -1,0 +1,15 @@
+.wrapper {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(calc(var(--theme-size-container-width) / 3 - 4rem), 1fr)
+  );
+  gap: 1rem;
+}
+
+.wrapper img {
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  height: auto;
+}

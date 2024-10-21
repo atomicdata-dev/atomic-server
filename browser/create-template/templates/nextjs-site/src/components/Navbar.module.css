@@ -1,0 +1,19 @@
+.nav {
+  gap: 1rem;
+  padding: 2rem 1rem;
+  border-bottom: 1px solid var(--theme-color-bg-1);
+}
+
+.ul {
+  display: flex;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 1rem;
+}
+
+.title {
+  font-size: 1.5rem;
+  text-decoration: none;
+  color: var(--theme-color-text);
+}

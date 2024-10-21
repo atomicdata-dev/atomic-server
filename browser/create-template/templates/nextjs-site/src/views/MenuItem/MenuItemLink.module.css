@@ -1,0 +1,17 @@
+.link {
+  width: 100%;
+  text-decoration: none;
+  color: var(--theme-color-text);
+  padding: 0.4rem;
+  display: inline-flex;
+  border-radius: var(--theme-border-radius);
+  transition: background-color 100ms ease-in-out;
+}
+
+.link:hover {
+  background-color: var(--theme-color-bg-2);
+}
+
+.linkActive {
+  color: var(--theme-color-accent);
+}

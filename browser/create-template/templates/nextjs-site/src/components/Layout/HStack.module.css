@@ -1,0 +1,24 @@
+/* HStack.module.css */
+.hstack {
+  display: flex;
+  gap: var(--hstack-gap);
+  align-items: var(--hstack-align);
+  justify-content: var(--hstack-justify);
+}
+
+.hstack > h1,
+.hstack > h2,
+.hstack > h3,
+.hstack > h4,
+.hstack > h5,
+.hstack > h6 {
+  margin: 0;
+}
+
+.fullWidth {
+  width: 100%;
+}
+
+.wrap {
+  flex-wrap: wrap;
+}

@@ -1,0 +1,8 @@
+.footer {
+  background-color: var(--theme-color-bg-2);
+  color: var(--theme-color-text-light);
+}
+
+.footer p {
+  padding: 1rem;
+}

@@ -1,0 +1,18 @@
+.searchBar {
+  border: 1px solid var(--theme-color-bg-1);
+  border-radius: 10rem;
+  padding-inline: 1rem;
+}
+
+.searchBar:focus-within {
+  box-shadow: 0px 0px 0px 2px var(--theme-color-accent);
+}
+
+.input {
+  height: 2rem;
+  appearance: none;
+  border: none;
+  outline: none;
+  background: none;
+  background-color: transparent;
+}

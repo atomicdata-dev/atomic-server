@@ -1,0 +1,18 @@
+/* VStack.module.css */
+.vstack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--vstack-gap);
+  align-items: var(--vstack-align);
+  justify-content: var(--vstack-justify);
+  height: var(--vstack-height);
+}
+
+.vstack > h1,
+.vstack > h2,
+.vstack > h3,
+.vstack > h4,
+.vstack > h5,
+.vstack > h6 {
+  margin: 0;
+}
