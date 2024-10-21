@@ -2,11 +2,12 @@ import type { MenuItem } from '@/ontologies/website';
 import { unknownSubject, useResource } from '@tomic/react';
 import MenuItemLink from './MenuItemLink';
 import styles from './MenuItem.module.css';
+import { useCurrentSubject } from '@/app/context/CurrentSubjectContext';
 
 const MenuItem = ({ subject }: { subject: string }) => {
   const menuItem = useResource<MenuItem>(subject ?? unknownSubject);
 
-  const currentSubject = '';
+  const { currentSubject } = useCurrentSubject();
 
   const id = (Math.random().toString(36) + '00000000000000000').slice(2, 10);
 
@@ -14,20 +15,20 @@ const MenuItem = ({ subject }: { subject: string }) => {
     <>
       <button
         className={styles.button}
-        popoverTarget={id}
-        popoverTargetAction='toggle'
+        popovertarget={id}
+        popovertargetaction='toggle'
       >
         {menuItem.title}
       </button>
 
       <div id={id} className={styles.submenu} popover='auto'>
-        {menuItem.props.subItems?.map((subItem: string, index: number) => (
-          <ul className={styles.ul}>
+        <ul className={styles.ul}>
+          {menuItem.props.subItems?.map((subItem: string, index: number) => (
             <li key={index}>
               <MenuItem subject={subItem} />
             </li>
-          </ul>
-        ))}
+          ))}
+        </ul>
       </div>
     </>
   ) : (

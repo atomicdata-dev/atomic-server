@@ -4,6 +4,7 @@ import { Store } from '@tomic/lib';
 import { StoreContext } from '@tomic/react';
 import { env } from '@/env';
 import { initOntologies } from '@/ontologies';
+import { CurrentSubjectProvider } from '@/app/context/CurrentSubjectContext';
 
 const ProviderWrapper = ({
   children,
@@ -17,7 +18,9 @@ const ProviderWrapper = ({
   initOntologies();
 
   return (
-    <StoreContext.Provider value={store}>{children}</StoreContext.Provider>
+    <StoreContext.Provider value={store}>
+      <CurrentSubjectProvider>{children}</CurrentSubjectProvider>
+    </StoreContext.Provider>
   );
 };
 
