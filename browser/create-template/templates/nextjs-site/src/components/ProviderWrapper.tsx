@@ -1,9 +1,9 @@
-"use client";
+'use client';
 
-import { Store } from "@tomic/lib";
-import { StoreContext } from "@tomic/react";
-import { env } from "@/env";
-import { initOntologies } from "@/ontologies";
+import { Store } from '@tomic/lib';
+import { StoreContext } from '@tomic/react';
+import { env } from '@/env';
+import { initOntologies } from '@/ontologies';
 
 const ProviderWrapper = ({
   children,

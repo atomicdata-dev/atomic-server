@@ -1,4 +1,4 @@
-@import "../../node_modules/modern-css-reset/dist/reset.min.css";
+@import '../../node_modules/modern-css-reset/dist/reset.min.css';
 
 :root {
   --theme-color-bg: #fff;
@@ -23,4 +23,8 @@ body {
 [popover] {
   margin: 0;
   padding: 0;
+}
+
+p {
+  margin-top: 1em;
 }
