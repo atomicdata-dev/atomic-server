@@ -14,7 +14,7 @@
   background: none;
   cursor: pointer;
   transition: background-color 100ms ease-in-out;
-  position: relative; /* For anchoring the submenu */
+  anchor-name: --menu-item-anchor;
 }
 
 .button:hover,
@@ -23,10 +23,8 @@
 }
 
 .submenu {
-  position: absolute; /* Anchoring relative to the button */
-  top: 100%; /* Anchors submenu to the bottom of the button */
-  left: 50%;
-  transform: translateX(-50%); /* Centers the submenu */
+  position-anchor: --menu-item-anchor;
+  position-area: bottom center;
   width: max(20ch, 100%);
   border: 1px solid var(--theme-color-bg-1);
   border-radius: var(--theme-border-radius);
