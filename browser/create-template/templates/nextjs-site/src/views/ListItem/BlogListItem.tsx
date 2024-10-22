@@ -14,7 +14,7 @@ const BlogListItem = ({ resource }: { resource: Resource<Blogpost> }) => {
   return (
     <a className={styles.card} href={resource.props.href}>
       <div className={styles.imageWrapper}>
-        <Image subject={resource.props.coverImage} alt='' />
+        {/* <Image subject={resource.props.coverImage} alt='' /> */}
       </div>
       <div className={styles.cardContent}>
         <div className={styles.publishDate}>{date}</div>

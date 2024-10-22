@@ -3,18 +3,25 @@ import { unknownSubject, Resource } from '@tomic/lib';
 import { useValue, useResource } from '@tomic/react';
 import styles from './MenuItemLink.module.css';
 import clsx from 'clsx';
+import { store } from '@/app/store';
 
-const MenuItemLink = ({
+const MenuItemLink = async ({
   resource,
   active = false,
 }: {
   resource: Resource;
   active?: boolean;
 }) => {
-  const page = useResource(resource.props.linksTo ?? unknownSubject);
-  const [pageHrefValue] = useValue(page, website.properties.href);
+  // const page = useResource(resource.props.linksTo ?? unknownSubject);
+  // const [pageHrefValue] = useValue(page, website.properties.href);
 
-  const href = pageHrefValue ?? resource.props.externalLink ?? '#';
+  // const href = pageHrefValue ?? resource.props.externalLink ?? '#';
+
+  const page = await store.getResource(resource.subject ?? unknownSubject);
+  const pageHrefValue = page.get(website.properties.href);
+
+  const href =
+    pageHrefValue ?? resource.get(website.properties.externalLink) ?? '#';
 
   return (
     <a

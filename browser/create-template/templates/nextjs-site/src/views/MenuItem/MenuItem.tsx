@@ -1,13 +1,11 @@
 import type { MenuItem } from '@/ontologies/website';
-import { unknownSubject, useResource } from '@tomic/react';
 import MenuItemLink from './MenuItemLink';
 import styles from './MenuItem.module.css';
-import { useCurrentSubject } from '@/app/context/CurrentSubjectContext';
+import { store } from '@/app/store';
+import { unknownSubject } from '@tomic/lib';
 
-const MenuItem = ({ subject }: { subject: string }) => {
-  const menuItem = useResource<MenuItem>(subject ?? unknownSubject);
-
-  const { currentSubject } = useCurrentSubject();
+const MenuItem = async ({ subject }: { subject: string }) => {
+  const menuItem = await store.getResource<MenuItem>(subject ?? unknownSubject);
 
   const id = (Math.random().toString(36) + '00000000000000000').slice(2, 10);
 
@@ -34,7 +32,8 @@ const MenuItem = ({ subject }: { subject: string }) => {
   ) : (
     <MenuItemLink
       resource={menuItem}
-      active={menuItem.props.linksTo === currentSubject}
+      // active={menuItem.props.linksTo === currentSubject}
+      active={false}
     />
   );
 };

@@ -2,7 +2,7 @@ import Container from '@/components/Layout/Container';
 import { Blogpost } from '@/ontologies/website';
 import { Resource } from '@tomic/lib';
 import styles from './BlogpostFullPage.module.css';
-import { Image } from '@tomic/react';
+import { Image } from '@/components/Image';
 import matter from 'gray-matter';
 import html from 'remark-html';
 import { remark } from 'remark';
@@ -14,7 +14,8 @@ const BlogpostFullPage = ({ resource }: { resource: Resource<Blogpost> }) => {
     day: 'numeric',
   });
 
-  const date = formatter.format(new Date(resource.props.publishedAt));
+  // const date = formatter.format(new Date(resource.props.publishedAt));
+  const date = '';
 
   const matterResult = matter(resource.props.description);
   const processed = remark().use(html).processSync(matterResult.content);

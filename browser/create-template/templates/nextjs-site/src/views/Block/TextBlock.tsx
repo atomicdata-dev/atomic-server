@@ -1,8 +1,8 @@
-import { Resource } from "@tomic/lib";
-import { remark } from "remark";
-import html from "remark-html";
-import matter from "gray-matter";
-import styles from "./TextBlock.module.css";
+import { Resource } from '@tomic/lib';
+import { remark } from 'remark';
+import html from 'remark-html';
+import matter from 'gray-matter';
+import styles from './TextBlock.module.css';
 
 const TextBlock = ({ resource }: { resource: Resource }) => {
   const matterResult = matter(resource.props.description);

@@ -1,3 +1,5 @@
+'use client';
+
 import { env } from '@/env';
 import { createContext, useContext, useState } from 'react';
 
