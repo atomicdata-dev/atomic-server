@@ -13,7 +13,6 @@ import {
   Resource,
   Datatype,
   datatypeFromUrl,
-  urls,
   truncateUrl,
   JSONValue,
   valToBoolean,
@@ -28,6 +27,8 @@ import {
   proxyResource,
   type Core,
   ResourceEvents,
+  core,
+  server,
 } from '@tomic/lib';
 import { useDebouncedCallback } from './index.js';
 
@@ -216,6 +217,7 @@ export function useValue(
     commitDebounce = 100,
     handleValidationError,
   } = opts;
+
   const [val, set] = useState<JSONValue>(resource.get(propertyURL));
   const [prevResourceReference, setPrevResourceReference] = useState(resource);
 
@@ -267,17 +269,6 @@ export function useValue(
     [resource, handleValidationError, store, validate, saveResource],
   );
 
-  // Update value when resource changes.
-  if (resource !== prevResourceReference) {
-    try {
-      set(resource.get(propertyURL));
-    } catch (e) {
-      store.notifyError(e);
-    }
-
-    setPrevResourceReference(resource);
-  }
-
   useEffect(() => {
     return resource.on(ResourceEvents.LocalChange, (prop, value) => {
       if (prop === propertyURL) {
@@ -285,6 +276,23 @@ export function useValue(
       }
     });
   }, [resource, propertyURL]);
+
+  // Update value when resource changes.
+  if (resource !== prevResourceReference) {
+    let localVal: JSONValue | undefined;
+
+    try {
+      localVal = resource.get(propertyURL);
+      set(localVal);
+    } catch (e) {
+      store.notifyError(e);
+    }
+
+    setPrevResourceReference(resource);
+
+    // We changed the value but we don't want to wait a whole react cycle to return the new value so we return the value here directly.
+    return [localVal, validateAndSet];
+  }
 
   return [val, validateAndSet];
 }
@@ -351,15 +359,15 @@ export function useTitle(
   truncateLength = 40,
   opts: useValueOptions = titleHookOpts,
 ): [string, SetValue<string>] {
-  const [name, setName] = useString(resource, urls.properties.name, opts);
+  const [name, setName] = useString(resource, core.properties.name, opts);
   const [shortname, setShortname] = useString(
     resource,
-    urls.properties.shortname,
+    core.properties.shortname,
     opts,
   );
   const [filename, setFileName] = useString(
     resource,
-    urls.properties.file.filename,
+    server.properties.filename,
     opts,
   );
 
@@ -379,7 +387,7 @@ export function useTitle(
     return [filename, setFileName];
   }
 
-  const subject = resource?.getSubject();
+  const subject = resource?.subject;
 
   if (typeof subject === 'string' && subject.length > 0) {
     return [truncateUrl(subject, truncateLength), setName];

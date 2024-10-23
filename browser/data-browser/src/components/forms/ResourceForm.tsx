@@ -240,11 +240,6 @@ export function ResourceForm({
           <Button
             title={'show / hide advanced form fields'}
             clean
-            style={{
-              display: 'flex',
-              marginBottom: '1rem',
-              alignItems: 'center',
-            }}
             onClick={() => setShowAdvanced(!showAdvanced)}
           >
             <Row as='strong' gap='0.4rem' center>
@@ -309,5 +304,5 @@ export function ResourceForm({
 }
 
 const StyledCollapse = styled(Collapse)`
-  max-width: 70ch;
+  margin-top: ${p => (p.open ? '1rem' : '0')};
 `;

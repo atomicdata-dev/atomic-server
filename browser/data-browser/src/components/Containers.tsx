@@ -1,24 +1,27 @@
-import { styled } from 'styled-components';
+import { css, styled } from 'styled-components';
+import { LAYOUT_CONTAINER } from '../helpers/containers';
 
-/** Centered column */
-export const ContainerNarrow = styled.div`
-  width: min(100%, ${props => props.theme.containerWidth}rem);
+const common = css`
   margin: auto;
-  padding: ${props => props.theme.margin}rem;
-  // Extra space for the navbar below
+  padding: ${p => p.theme.size()};
+  container: ${LAYOUT_CONTAINER} / inline-size;
   padding-bottom: 10rem;
 `;
 
+/** Centered column */
+export const ContainerNarrow = styled.div`
+  width: min(100%, ${p => p.theme.containerWidth}rem);
+  ${common}
+`;
+
 export const ContainerWide = styled.div`
-  width: min(100%, ${props => props.theme.containerWidthWide});
-  margin: auto;
-  padding: ${props => props.theme.margin}rem;
-  // Extra space for the navbar below
-  padding-bottom: 10rem;
+  width: min(100%, ${p => p.theme.containerWidthWide});
+  ${common}
 `;
 
 /** Full-page wrapper */
 export const ContainerFull = styled.div`
-  padding: ${props => props.theme.margin}rem;
+  container: ${LAYOUT_CONTAINER} / inline-size;
+  padding: ${p => p.theme.size()};
   padding-bottom: 10rem;
 `;

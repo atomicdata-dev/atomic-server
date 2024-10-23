@@ -52,7 +52,10 @@ const GridCollapser = styled.div<GridCollapserProps>`
   display: grid;
   grid-template-rows: ${({ open }) => (open ? '1fr' : '0fr')};
   grid-template-columns: 100%;
-  transition: grid-template-rows ${() => ANIMATION_DURATION()}ms ease-in-out;
+  transition:
+    grid-template-rows ${() => ANIMATION_DURATION()}ms ease-in-out,
+    // In some cases, a margin is added. This needs to animate as well.
+    margin-top ${() => ANIMATION_DURATION()}ms ease-in-out;
 
   @media (prefers-reduced-motion) {
     transition: unset;

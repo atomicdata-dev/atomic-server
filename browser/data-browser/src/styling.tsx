@@ -263,6 +263,9 @@ export const GlobalStyle = createGlobalStyle`
     line-height: 1.5em;
     word-wrap: break-word;
     overflow-wrap: anywhere;
+    // Prevents weird scrollbars appearing for a split second when opening a dialog
+    overflow: hidden;
+
     margin: 0;
     /** Pretty dark mode transition */
     transition: background-color .2s ease, border-color .2s ease, color .2s ease;

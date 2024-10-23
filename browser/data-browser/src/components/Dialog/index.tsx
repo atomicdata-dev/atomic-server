@@ -16,6 +16,7 @@ import {
 import { useDialog } from './useDialog';
 import { useControlLock } from '../../hooks/useControlLock';
 import { useDialogGlobalContext } from './DialogGlobalContextProvider';
+import { DIALOG_CONTENT_CONTAINER } from '../../helpers/containers';
 
 export interface InternalDialogProps {
   show: boolean;
@@ -216,16 +217,19 @@ const DialogContentSlot = styled(Slot)`
   overflow-y: visible;
   /* The main section should leave room for the footer */
   max-height: calc(80vh - 8rem);
-  padding-bottom: ${({ theme }) => theme.margin}rem;
+  padding-bottom: ${p => p.theme.size()};
   // Position the scrollbar against the side of the dialog without any spacing inbetween.
   // This also fixes ugly horizontal shadow cutoff.
-  margin-inline: -${p => p.theme.margin}rem;
-  padding-inline: ${p => p.theme.margin}rem;
+  margin-inline: -${p => p.theme.size()};
+  padding-inline: ${p => p.theme.size()};
+
+  container: ${DIALOG_CONTENT_CONTAINER} / inline-size;
+  scrollbar-gutter: stable;
 `;
 
 const DialogActionsSlot = styled(Slot)`
   display: flex;
-  gap: ${p => p.theme.margin}rem;
+  gap: ${p => p.theme.size()};
   align-items: center;
   justify-content: flex-end;
   border-top: 1px solid ${props => props.theme.colors.bg2};
@@ -238,7 +242,7 @@ const StyledInnerDialog = styled.div`
   grid-template-rows: 1fr auto auto;
   gap: 1rem;
   grid-template-areas: 'title close' 'content content' 'actions actions';
-  max-block-size: calc(100vh - ${p => p.theme.margin}rem * 2);
+  max-block-size: calc(100vh - ${p => p.theme.size()} * 2);
 `;
 
 const fadeInForground = keyframes`
@@ -264,18 +268,17 @@ const fadeInBackground = keyframes`
 `;
 
 const StyledDialog = styled.dialog<{ $width?: CSS.Property.Width }>`
-  --animation-speed: 500ms;
   --dialog-width: min(90vw, ${p => p.$width ?? '60ch'});
 
   ${VAR_DIALOG_INNER_WIDTH}: calc(
-    var(--dialog-width) - 2 * ${p => p.theme.margin}rem
+    var(--dialog-width) - 2 * ${p => p.theme.size()}
   );
 
   box-sizing: border-box;
   inset: 0px;
   position: relative;
   z-index: ${p => p.theme.zIndex.dialog};
-  padding: ${props => props.theme.margin}rem;
+  padding: ${p => p.theme.size()};
   color: ${props => props.theme.colors.text};
   background-color: ${props => props.theme.colors.bg};
   border-radius: ${props => props.theme.radius};
