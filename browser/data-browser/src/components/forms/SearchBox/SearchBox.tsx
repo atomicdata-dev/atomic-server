@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { styled } from 'styled-components';
+import { css, styled } from 'styled-components';
 import { removeCachedSearchResults, useResource, useStore } from '@tomic/react';
 import { DropdownPortalContext } from '../../Dropdown/dropdownContext';
 import * as RadixPopover from '@radix-ui/react-popover';
@@ -163,6 +163,7 @@ export function SearchBox({
         <TriggerButtonWrapper
           disabled={!!disabled}
           className={className}
+          open={open}
           invalid={!!visualError}
         >
           {prefix}
@@ -259,10 +260,14 @@ const TriggerButton = styled.button<{ $empty: boolean }>`
 const TriggerButtonWrapper = styled.div<{
   invalid: boolean;
   disabled: boolean;
+  open: boolean;
 }>`
   ${SB_HIGHLIGHT.define(p =>
     p.invalid ? p.theme.colors.alert : p.theme.colors.main,
   )}
+
+  max-width: 100cqw;
+
   display: flex;
   position: relative;
   border: 1px solid ${props => props.theme.colors.bg2};
@@ -284,7 +289,11 @@ const TriggerButtonWrapper = styled.div<{
   &:focus-visible {
     border-color: transparent;
     box-shadow: 0 0 0 2px ${SB_HIGHLIGHT.var()};
-    z-index: 1000;
+    ${p =>
+      !p.open &&
+      css`
+        z-index: 1000;
+      `}
   }
 `;
 

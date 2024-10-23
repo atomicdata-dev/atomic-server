@@ -20,7 +20,7 @@ export function SelectedFileLayout({
 }: PropsWithChildren<SelectedFileLayoutProps>): React.JSX.Element {
   return (
     <Wrapper>
-      <Row>
+      <Row center>
         <Title>{title}</Title>
         {!disabled && (
           <IconButton title='clear' onClick={onClear}>
@@ -35,7 +35,8 @@ export function SelectedFileLayout({
 }
 
 const Title = styled.span`
-  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
 const Wrapper = styled.div`

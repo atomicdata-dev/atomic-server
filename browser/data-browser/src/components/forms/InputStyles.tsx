@@ -5,6 +5,11 @@ export const FieldStyled = styled.div`
   margin-bottom: ${props => props.theme.size()};
   border: none;
   background-color: none;
+
+  // Removes default 1px margin on fieldset.
+  &:is(fieldset) {
+    margin-inline: 0;
+  }
 `;
 
 export const LabelWrapper = styled.div`
