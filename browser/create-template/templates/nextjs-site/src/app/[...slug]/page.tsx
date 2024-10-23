@@ -3,13 +3,14 @@ import { env } from '@/env';
 import FullPageView from '@/views/FullPage/FullPageView';
 import { notFound } from 'next/navigation';
 
-const Page = async ({
-  params,
-}: {
-  params: {
-    slug: string[];
-  };
-}) => {
+const Page = async (
+  props: {
+    params: Promise<{
+      slug: string[];
+    }>;
+  }
+) => {
+  const params = await props.params;
   const resourceUrl = new URL(
     `${env.NEXT_PUBLIC_ATOMIC_SERVER_URL}/${params.slug.join('/')}`,
   );

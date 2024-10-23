@@ -1,4 +1,4 @@
 {
-  "outputFolder": "./src/lib/ontologies",
+  "outputFolder": "./src/ontologies",
   "ontologies": ["<ONTOLOGY>"]
 }

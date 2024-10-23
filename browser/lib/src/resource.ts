@@ -67,7 +67,6 @@ export class Resource<C extends OptionalClass = any> {
    * applying the same commit twice
    */
   public appliedCommitSignatures: Set<string> = new Set();
-  public readonly __internalObject = this;
 
   private commitBuilder: CommitBuilder;
   private _subject: string;
@@ -93,6 +92,10 @@ export class Resource<C extends OptionalClass = any> {
     this.new = !!newResource;
     this._subject = subject;
     this.commitBuilder = new CommitBuilder(subject);
+  }
+
+  public get __internalObject(): Resource<C> {
+    return this;
   }
 
   /** The subject URL of the resource */

@@ -65,26 +65,27 @@ export type QuickAccesPropType<Class extends OptionalClass = UnknownClass> =
 
 export type OptionalClass = keyof Classes | UnknownClass;
 
-// A map of all known classes and properties to their camelcased shortname.
-const globalReverseNameMapping = new Map<string, string>();
-
 /** Let atomic lib know your custom ontologies exist */
 export function registerOntologies(...ontologies: BaseObject[]): void {
+  if (!globalThis.__ATOMIC_LIB_globalReverseNameMapping) {
+    globalThis.__ATOMIC_LIB_globalReverseNameMapping = new Map();
+  }
+
   for (const ontology of ontologies) {
     for (const [key, value] of Object.entries(ontology.classes)) {
-      globalReverseNameMapping.set(value, key);
+      globalThis.__ATOMIC_LIB_globalReverseNameMapping.set(value, key);
     }
 
     for (const [key, value] of Object.entries(ontology.properties)) {
-      globalReverseNameMapping.set(value, key);
+      globalThis.__ATOMIC_LIB_globalReverseNameMapping.set(value, key);
     }
   }
 }
 
 export function getKnownNameBySubject(subject: string): string | undefined {
-  return globalReverseNameMapping.get(subject);
+  return globalThis.__ATOMIC_LIB_globalReverseNameMapping.get(subject);
 }
 
 export function __INTERNAL_GET_KNOWN_SUBJECT_MAPPING(): Map<string, string> {
-  return globalReverseNameMapping;
+  return globalThis.__ATOMIC_LIB_globalReverseNameMapping;
 }
