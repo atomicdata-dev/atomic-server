@@ -1,8 +1,9 @@
 import { Blogpost } from '@/ontologies/website';
-import { type Resource, Image } from '@tomic/react';
+import type { Resource } from '@tomic/react';
 import styles from './BlogListItem.module.css';
+import { Image } from '@/components/Image';
 
-const BlogListItem = ({ resource }: { resource: Resource<Blogpost> }) => {
+const BlogListItem = async ({ resource }: { resource: Resource<Blogpost> }) => {
   const formatter = new Intl.DateTimeFormat('default', {
     year: 'numeric',
     month: 'long',
@@ -14,7 +15,7 @@ const BlogListItem = ({ resource }: { resource: Resource<Blogpost> }) => {
   return (
     <a className={styles.card} href={resource.props.href}>
       <div className={styles.imageWrapper}>
-        {/* <Image subject={resource.props.coverImage} alt='' /> */}
+        <Image subject={resource.props.coverImage} alt='' />
       </div>
       <div className={styles.cardContent}>
         <div className={styles.publishDate}>{date}</div>

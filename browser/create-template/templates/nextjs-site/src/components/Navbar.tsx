@@ -21,7 +21,7 @@ const Navbar = async () => {
             {site.title}
           </a>
           <ul className={styles.ul}>
-            {site.get(website.properties.menuItems)?.map((menuItem: string) => (
+            {site.props.menuItems?.map((menuItem: string) => (
               <li key={menuItem}>
                 <MenuItem subject={menuItem} />
               </li>

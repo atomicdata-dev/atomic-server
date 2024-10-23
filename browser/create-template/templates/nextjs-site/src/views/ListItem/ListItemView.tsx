@@ -5,8 +5,6 @@ import DefaultView from '@/views/DefaultView';
 import { store } from '@/app/store';
 
 const ListItemView = async ({ subject }: { subject: string }) => {
-  // const listItem = useResource(subject);
-
   const listItem = await store.getResource(subject);
 
   const Component = listItem.matchClass(
