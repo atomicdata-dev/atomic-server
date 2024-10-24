@@ -609,9 +609,11 @@ export class Store {
         return;
       }
 
-      // convert base64 content to JSON
-      const json = JSON.parse(atob(content));
-
+      // Decode base64 content safely as UTF-8
+      const jsonString = new TextDecoder().decode(
+        Uint8Array.from(atob(content), c => c.charCodeAt(0)),
+      );
+      const json = JSON.parse(jsonString);
       const [_, resources] = parser.parseObject(json);
       this.addResources(resources);
     });
