@@ -5,7 +5,13 @@ import BlogpostFullPage from './BlogpostFullPage';
 import DefaultFullPage from './DefaultFullPage';
 import { store } from '@/app/store';
 
-const FullPageView = async ({ subject }: { subject: string }) => {
+const FullPageView = async ({
+  subject,
+  searchParams,
+}: {
+  subject: string;
+  searchParams?: { search: string };
+}) => {
   const resource = await store.getResource(subject);
 
   const Component = resource.matchClass(
@@ -16,6 +22,10 @@ const FullPageView = async ({ subject }: { subject: string }) => {
     },
     DefaultFullPage,
   );
+
+  if (Component === BlogIndexPageFullPage) {
+    return <Component resource={resource} searchParams={searchParams} />;
+  }
 
   return <Component resource={resource} />;
 };
