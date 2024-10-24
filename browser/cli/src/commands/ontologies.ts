@@ -1,7 +1,10 @@
 /* eslint-disable no-console */
 import * as fs from 'fs';
 import chalk from 'chalk';
-import * as prettier from 'prettier';
+import {
+  resolveConfig as prettierResolveConfig,
+  format as prettierFormat,
+} from 'prettier';
 import * as path from 'path';
 import { generateOntology } from '../generateOntology.js';
 import { atomicConfig } from '../config.js';
@@ -75,10 +78,10 @@ const write = async ({
   );
 
   let formatted = content;
-  const prettierConfig = await prettier.resolveConfig(filePath);
+  const prettierConfig = await prettierResolveConfig(filePath);
 
   if (prettierConfig) {
-    formatted = await prettier.format(content, {
+    formatted = await prettierFormat(content, {
       ...prettierConfig,
       parser: 'typescript',
     });

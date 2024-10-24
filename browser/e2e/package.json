@@ -12,7 +12,7 @@
     "url": "https://github.com/atomicdata-dev/atomic-server/"
   },
   "devDependencies": {
-    "@playwright/test": "^1.43.1"
+    "@playwright/test": "^1.48.1"
   },
   "scripts": {
     "playwright-install": "playwright install chromium",

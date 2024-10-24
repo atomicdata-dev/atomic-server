@@ -17,10 +17,14 @@ interface FilePreviewProps {
 }
 
 export function FilePreview({ resource, hideTypes }: FilePreviewProps) {
-  const { downloadUrl, mimeType, bytes } = useFileInfo(resource);
+  const { downloadUrl, mimeType, bytes, loading } = useFileInfo(resource);
   const [ignoreSizeLimit, setIgnoreSizeLimit] = useState(false);
   const fileSizeLimit = useFilePreviewSizeLimit();
-  const shouldShowType = buildShouldShowType(mimeType, hideTypes);
+  const shouldShowType = buildShouldShowType(mimeType ?? '', hideTypes);
+
+  if (loading) {
+    return <NoPreview>Loading...</NoPreview>;
+  }
 
   if (bytes > fileSizeLimit && !ignoreSizeLimit) {
     return (
@@ -29,9 +33,7 @@ export function FilePreview({ resource, hideTypes }: FilePreviewProps) {
   }
 
   if (shouldShowType('image/')) {
-    return (
-      <StyledImageViewer src={downloadUrl} subject={resource.getSubject()} />
-    );
+    return <StyledImageViewer src={downloadUrl} subject={resource.subject} />;
   }
 
   if (shouldShowType('video/')) {

@@ -37,9 +37,13 @@ export function FilePreviewThumbnail(
 function FilePreviewThumbnailInner({
   resource,
 }: FilePreviewThumbnailProps): JSX.Element {
-  const { downloadUrl, mimeType, bytes } = useFileInfo(resource);
+  const { downloadUrl, mimeType, bytes, loading } = useFileInfo(resource);
   const previewSizeLimit = useFilePreviewSizeLimit();
   const transitionStyles = useFileImageTransitionStyles(resource.subject);
+
+  if (loading) {
+    return <TextWrapper>Loading...</TextWrapper>;
+  }
 
   if (bytes >= previewSizeLimit) {
     return <TextWrapper>To large for preview</TextWrapper>;

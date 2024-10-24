@@ -33,6 +33,7 @@ type PartialImageNodeProps = {
 
 export const ExtendedImage = Image.extend({
   addNodeView() {
+    // @ts-ignore. Weird type issue probably due to incorrect tiptap types.
     return ReactNodeViewRenderer(MarkdownEditorImage);
   },
 });
