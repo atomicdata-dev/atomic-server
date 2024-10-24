@@ -14,8 +14,7 @@ const BlogpostFullPage = ({ resource }: { resource: Resource<Blogpost> }) => {
     day: 'numeric',
   });
 
-  // const date = formatter.format(new Date(resource.props.publishedAt));
-  const date = '';
+  const date = formatter.format(new Date(resource.props.publishedAt));
 
   const matterResult = matter(resource.props.description);
   const processed = remark().use(html).processSync(matterResult.content);

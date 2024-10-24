@@ -1,6 +1,7 @@
 'use client';
 
 import Container from '@/components/Layout/Container';
+import Link from 'next/link';
 
 export default function Error({
   error,
@@ -11,7 +12,7 @@ export default function Error({
     <Container>
       <h1>{error.name}</h1>
       <p>
-        Go to <a href='/'>home</a>
+        Go to <Link href='/'>home</Link>
       </p>
     </Container>
   );

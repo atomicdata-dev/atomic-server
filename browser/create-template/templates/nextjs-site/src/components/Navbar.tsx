@@ -1,14 +1,13 @@
-import { useResource } from '@tomic/react';
 import Container from './Layout/Container';
 import HStack from './Layout/HStack';
 import { env } from '@/env';
-import { website, Website } from '@/ontologies/website';
+import { Website } from '@/ontologies/website';
 import MenuItem from '@/views/MenuItem/MenuItem';
 import styles from './Navbar.module.css';
 import { store } from '@/app/store';
+import Link from 'next/link';
 
 const Navbar = async () => {
-  // const site = useResource<Website>(env.NEXT_PUBLIC_WEBSITE_RESOURCE);
   const site = await store.getResource<Website>(
     env.NEXT_PUBLIC_WEBSITE_RESOURCE,
   );
@@ -17,9 +16,9 @@ const Navbar = async () => {
     <Container>
       <nav className={styles.nav}>
         <HStack align='center' justify='space-between' wrap>
-          <a href='/' className={styles.title}>
+          <Link href='/' className={styles.title}>
             {site.title}
-          </a>
+          </Link>
           <ul className={styles.ul}>
             {site.props.menuItems?.map((menuItem: string) => (
               <li key={menuItem}>

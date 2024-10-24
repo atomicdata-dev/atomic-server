@@ -1,4 +1,3 @@
-import { useResource } from '@tomic/react';
 import { website } from '@/ontologies/website';
 import BlogListItem from './BlogListItem';
 import DefaultView from '@/views/DefaultView';
