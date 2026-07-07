@@ -1,4 +1,6 @@
-# AGENTS.md
+# ATOMIC DATA
+
+> !Note: AGENTS.md and CLAUDE.md are the same file (symlinked), do not read both.
 
 Guidance for coding agents working in this repo.
 
