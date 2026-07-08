@@ -41,7 +41,10 @@ export function FieldRow({
     <RowWrapper $selected={selected}>
       <SelectButton
         type='button'
-        data-testid={`field-row-${type}`}
+        // While the resource is loading, `type` is just the fallback — don't
+        // claim a concrete testid yet, or every hydrating row briefly reads
+        // as `field-row-short-text` (breaks e2e strict-mode selectors).
+        data-testid={resource.loading ? 'field-row-loading' : `field-row-${type}`}
         onClick={onSelect}
       >
         <Row gap='0.5rem' center>

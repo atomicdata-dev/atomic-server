@@ -187,11 +187,12 @@ test.describe('forms', async () => {
     await waitForSync(page);
 
     // --- 6. Reload and confirm everything persisted ---
-    // NOTE: the radio-options and publish-state checks below can flake due
-    // to a confirmed, not-yet-fixed race in the outbox drain where a save
-    // reports success but the write never reaches the server — see
-    // planning/outbox-drain-data-loss-race.md. Kept strict deliberately:
-    // this is meant to keep failing until that bug is fixed.
+    // NOTE: the checks below are the end-to-end regression signal for the
+    // (fixed) outbox drain/sync races documented in
+    // planning/outbox-drain-data-loss-race.md — drain re-entrancy, the
+    // debounce window being invisible to sync status, and reload-stranded
+    // cold outbox entries. Kept strict deliberately: if this flakes again,
+    // suspect a regression there first.
     await page.reload();
     await expect(page.getByTestId('editable-title').first()).toBeVisible({
       timeout: 15000,
