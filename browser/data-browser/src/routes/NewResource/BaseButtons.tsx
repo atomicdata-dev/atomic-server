@@ -1,4 +1,4 @@
-import { ai, canvas, core, dataBrowser } from '@tomic/react';
+import { ai, canvas, core, dataBrowser, forms } from '@tomic/react';
 import { OutlinedSection } from '../../components/OutlinedSection';
 import { ClassButton } from './ClassButton';
 
@@ -19,6 +19,7 @@ const buttons = [
   dataBrowser.classes.bookmark,
   canvas.classes.canvas,
   core.classes.ontology,
+  forms.classes.form,
 ];
 
 export function BaseButtons({ parent }: BaseButtonsProps): JSX.Element {

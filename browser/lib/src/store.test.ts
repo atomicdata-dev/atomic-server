@@ -300,6 +300,137 @@ describe('Store', () => {
     expect(atomString).toBe('created-at');
   });
 
+  it('a 404 for a custom default property does not clobber an already-cached healthy resource with an error', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    // A user-defined default property (e.g. from lib/defaults/forms.json),
+    // populated locally via --repopulate-defaults but never published to the
+    // real atomicdata.dev — mirrors https://atomicdata.dev/properties/form-fields.
+    const propertySubject = 'https://atomicdata.dev/properties/form-fields';
+
+    // Simulate the property already being known-good in the store, e.g.
+    // hydrated once from OPFS/local defaults.
+    const goodProperty = new Resource(propertySubject);
+    await goodProperty.set(core.properties.shortname, 'form-fields', false);
+    await goodProperty.set(
+      core.properties.description,
+      'The fields of a FormPage.',
+      false,
+    );
+    await goodProperty.set(
+      core.properties.datatype,
+      Datatype.RESOURCEARRAY,
+      false,
+    );
+    await goodProperty.set(core.properties.isA, [core.classes.property], false);
+    store.addResource(goodProperty);
+
+    expect(store.resources.get(propertySubject)?.error).toBeUndefined();
+
+    // Simulate the live network fetch that `resource.set()`'s datatype
+    // validation (`getProperty` -> `getResource`) used to issue whenever this
+    // subject wasn't already resolved in-memory this session (common during
+    // form-builder field creation/edits). Because this subject only exists
+    // on the LOCAL dev server, the real atomicdata.dev 404s on it.
+    store.injectFetch(async () => new Response('Not found', { status: 404 }));
+
+    await store.fetchResourceFromServer(propertySubject, {
+      noWebSocket: true,
+    });
+
+    const after = store.resources.get(propertySubject);
+
+    // The propvals survive the failed fetch...
+    expect(after?.get(core.properties.shortname)).toBe('form-fields');
+    // ...and the resource must NOT be marked errored — it already had valid,
+    // complete local data, and a content-free 404 shouldn't override that
+    // (`Resource.merge`'s content-free-failure guard).
+    expect(after?.error).toBeUndefined();
+  });
+
+  it('editing a resource (resource.set validation) does NOT refetch a property that is already cached and healthy', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    const propertySubject = 'https://atomicdata.dev/properties/form-fields';
+
+    const goodProperty = new Resource(propertySubject);
+    await goodProperty.set(core.properties.shortname, 'form-fields', false);
+    await goodProperty.set(
+      core.properties.datatype,
+      Datatype.RESOURCEARRAY,
+      false,
+    );
+    await goodProperty.set(core.properties.isA, [core.classes.property], false);
+    store.addResource(goodProperty);
+
+    const fetchSpy = vi.fn(async () => new Response('Not found', { status: 404 }));
+    store.injectFetch(fetchSpy);
+
+    // Mirrors `useFormFieldPropertySync`'s `page.set(forms.properties.formFields, [...])`
+    const page = new Resource('https://example.com/some-form-page');
+    store.addResource(page);
+    await page.set(propertySubject, ['https://example.com/field-1']);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(store.resources.get(propertySubject)?.error).toBeUndefined();
+  });
+
+  it('getResource() checks the local WASM DB (OPFS) before hitting the network', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    // Not yet touched this session — nothing in `store.resources` yet.
+    const propertySubject = 'https://atomicdata.dev/properties/form-fields';
+    const jsonAd = JSON.stringify({
+      '@id': propertySubject,
+      [core.properties.shortname]: 'form-fields',
+      [core.properties.datatype]: Datatype.RESOURCEARRAY,
+      [core.properties.isA]: [core.classes.property],
+    });
+
+    // OPFS already has it (e.g. seeded from lib/defaults/forms.json via
+    // --repopulate-defaults), even though the in-memory store doesn't yet.
+    store.setClientDb({
+      isReady: true,
+      waitForReady: async () => true,
+      getResource: async (s: string) => (s === propertySubject ? jsonAd : null),
+    } as unknown as Parameters<Store['setClientDb']>[0]);
+
+    const fetchSpy = vi.fn(async () => new Response('Not found', { status: 404 }));
+    store.injectFetch(fetchSpy);
+
+    const resource = await store.getResource(propertySubject);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(resource.error).toBeUndefined();
+    expect(resource.get(core.properties.shortname)).toBe('form-fields');
+  });
+
+  it('getResourceLoading() on a subject that genuinely does not exist still settles into an error, not stuck loading forever', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    store.setServerConnected(true);
+    // No clientDb at all — nothing local, matching a subject that has never
+    // existed anywhere (not a case the content-free-failure merge guard
+    // should protect, since there's no "already had something better" here).
+    store.injectFetch(async () => new Response('Not found', { status: 404 }));
+
+    const subject = 'https://example.com/does-not-exist';
+    const resource = store.getResourceLoading(subject);
+
+    expect(resource.loading).toBe(true);
+
+    for (let i = 0; i < 50 && resource.loading; i++) {
+      await new Promise(res => setTimeout(res, 10));
+    }
+
+    expect(resource.loading).toBe(false);
+    expect(resource.error).toBeDefined();
+  });
+
   it('accepts a custom fetch implementation', async ({ expect }) => {
     const testResourceSubject = 'https://atomicdata.dev';
 

@@ -54,7 +54,7 @@ TL;DR Clone the repo and run `cargo run` from each folder (e.g. `cli` or `server
 
 - Run `cargo run` to start the server
 - Go to `browser`, run `pnpm install` (if you haven't already), and run `pnpm dev` to start the browser
-- Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:5173/app/show?subject=http%3A%2F%2Flocalhost`)
+- Visit your `localhost` in your locally running `atomic-data-browser` instance: (e.g. `http://localhost:6747/app/show?subject=http%3A%2F%2Flocalhost`)
 - use `cargo watch -- cargo run` to automatically recompile `atomic-server` when you update JS assets in `browser`
 
 ### IDE setup (VSCode)

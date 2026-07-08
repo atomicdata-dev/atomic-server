@@ -15,3 +15,13 @@ export function stringToSlug(str: string): string {
     .replace(/-+/g, '-')
     .replace(/^-+|-+$/g, '');
 }
+
+export function stringToSlugStrict(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s-]+/g, '')
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}

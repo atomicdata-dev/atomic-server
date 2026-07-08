@@ -3719,6 +3719,21 @@ export class Store {
       );
     }
 
+    // Before hitting the network, check the local WASM DB (OPFS). Default
+    // ontology resources — core vocab and user-defined defaults from
+    // `lib/defaults/*.json` — are seeded there so every client can resolve
+    // them without a round-trip. This matters most for custom (non-core)
+    // defaults: their subject is a `https://atomicdata.dev/...` URL for
+    // consistency, but they were never published to the real atomicdata.dev,
+    // so skipping this check would 404 against that host on every cache-miss
+    // (e.g. the first time `resource.set()`'s datatype validation touches
+    // one) even though the locally-connected server has them.
+    const fromDb = await this.fetchResourceFromClientDb(resolved);
+
+    if (fromDb && fromDb.isReady()) {
+      return fromDb;
+    }
+
     const result = await this.fetchResourceFromServer(resolved);
 
     // If the resource was not in the store yet, subscribe to changes so we don't return stale results when the resource is updated.

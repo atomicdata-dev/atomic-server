@@ -1585,6 +1585,14 @@ export class Resource<C extends OptionalClass = any> {
       throw new Error('Cannot merge resources with different subjects');
     }
 
+    // Captured before any mutation below: does `this` already carry real
+    // content? A failed fetch (e.g. a 404 for a subject only known to the
+    // locally-connected server, never published upstream) produces an empty
+    // placeholder Resource with nothing but `.error` set. Letting that
+    // clobber `.error` here would flip an otherwise fully-populated,
+    // healthy resource into a permanent "not found" state.
+    const hadContent = this.getEntries().length > 0;
+
     const incomingSnapshot = Resource.extractLoroSnapshot(resourceB);
 
     if (
@@ -1697,7 +1705,17 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     this.new = resourceB.new;
-    this.error = resourceB.error;
+
+    // Adopt the incoming error UNLESS it's a content-free failure trying to
+    // override a resource that already had something better. A successful
+    // incoming resource (no error) always wins — that's the recovery path.
+    const incomingIsEmptyFailure =
+      resourceB.error !== undefined && resourceB.getEntries().length === 0;
+
+    if (!incomingIsEmptyFailure || !hadContent) {
+      this.error = resourceB.error;
+    }
+
     this.commitError = resourceB.commitError;
 
     // Only update _lastCommit if the remote version has one and we don't have one,

@@ -87,7 +87,7 @@ Prefix all new subjects `https://atomicdata.dev/classes/form/...` and
 | `form-data-class`* | Resource\<Class>              | the generated submission class                 |
 | `form-target-table`* | Resource\<Table>            | where submissions land                         |
 | `form-pages`*      | ResourceArray\<FormPage>      |                                                |
-| `published-at`     | Timestamp                     | reuse existing `published-at`; absent = unpublished |
+| `form-published-at`     | Timestamp                     | |
 | `form-settings`    | JSON                          | progress bar on/off, confirmation message, etc. |
 | `form-styling`     | JSON                          | phase 6: colors, fonts, logo                   |
 
@@ -149,15 +149,45 @@ fields and pages under `form-conditions` (AND semantics).
 
 Deliverable: form classes exist on every server; TS constants available.
 
-- [ ] `lib/defaults/forms.json` with the classes/properties above (phase-1 subset:
+- [x] `lib/defaults/forms.json` with the classes/properties above (phase-1 subset:
       Form, FormPage, FormField, FormHeading, FormParagraph + properties).
-- [ ] Import in `lib/src/populate.rs` next to `table.json` (~line 273).
-- [ ] Add subject constants to `lib/src/urls.rs`.
-- [ ] Ask/wait for human to create the ontology on atomicdata.dev (agents can't do this currently) (Needed for TS generation).
-- [ ] Regenerate TS ontologies: `cd browser/lib && pnpm generate-ontologies`.
-- [ ] Doc page in `docs/` describing the Form data model (public spec surface).
-- [ ] Test: `cargo test -p atomic_lib` populate round-trip (classes resolvable
-      after `populate_default_store`).
+      Namespacing follows table.json's flat style (not the `form/`-path-segment
+      style originally sketched above) — see decision note below.
+- [x] Import in `lib/src/populate.rs` next to `table.json` (~line 271).
+- [x] Add subject constants to `lib/src/urls.rs` (new `// ... for Forms` section).
+- [x] Ask/wait for human to create the ontology on atomicdata.dev (agents can't do this currently) (Needed for TS generation).
+- [x] Regenerate TS ontologies: `cd browser/lib && pnpm generate-ontologies`.
+- [x] Doc page in `docs/` describing the Form data model (public spec surface):
+      `docs/src/schema/forms.md`, linked from `SUMMARY.md`.
+- [x] Test: `cargo test -p atomic_lib --features db-redb --lib populate_forms_ontology`
+      (`lib/src/store.rs`) — populate round-trip, classes resolvable after
+      `populate_default_store`. Full suite (224 tests) and `atomic-server` build
+      verified green.
+
+**Deviations found during implementation:**
+
+- **Namespacing is flat**, not path-namespaced as drafted in the Data model
+  section above — matches every existing ontology bundle (table.json etc.).
+  Classes: `classes/Form`, `classes/FormPage`, etc. Properties get a `form-`
+  prefix baked into the shortname only where form-specific
+  (`form-data-class`, `form-maps-to`, `form-field-type`, ...); generic ones
+  stay unprefixed (`required`, `cover-image`, `image-position`,
+  `published-at`).
+- **`published-at` didn't already exist** anywhere as a shared property (only
+  unrelated site-template ontologies used that name) — created fresh as a
+  generic, unprefixed `timestamp` property so it stays reusable outside Forms.
+- **`form-field-type` and `image-position` are plain `String` properties
+  without `allowsOnly`.** The JSON-AD parser requires `allowsOnly` array
+  members to be URL-parseable subjects (`lib/src/parse.rs` `try_to_subject`,
+  backed by `check_valid_url`), so it can't hold plain enum strings like
+  `"short-text"`. The enum values are documented in each property's
+  `description` and in `docs/src/schema/forms.md`; enforcement is deferred to
+  the application layer (form builder now, Phase 3's server-side validation
+  module later) rather than switching to a resource-based enum (which the
+  plan explicitly wanted to avoid for `form-field-type`).
+- Excluded from Phase 1 (per the plan's own phase-6 tags): `form-styling`
+  (Form), `form-conditions` (FormPage, FormField).
+- `forms.ts` needed to be manually created in the browser/lib/src/ontologies/ directory (`@tomic/cli` does not work at the moment due to version differences)
 
 ## Phase 2 — Form builder in the data-browser
 

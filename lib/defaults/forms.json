@@ -1,0 +1,237 @@
+[
+  {
+    "@id": "https://atomicdata.dev/properties/form-data-class",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Class",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The generated data Class holding one Property per question. Submission rows are instances of this class.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-data-class"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-target-table",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Table",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The Table that submissions to this form are written to.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-target-table"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-pages",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormPage",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The pages of a Form, in display order.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-pages"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-published-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a resource was published. Absence means it is not published / not publicly available.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-published-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-settings",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Miscellaneous Form settings, stored as a JSON object (e.g. whether to show a progress bar, the confirmation message shown after submitting).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-settings"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/Form",
+    "https://atomicdata.dev/properties/description": "A form or survey that can be published and shared with a link. Submissions are collected as rows in `form-target-table`, one Property per question on `form-data-class`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-published-at",
+      "https://atomicdata.dev/properties/form-settings"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/form-data-class",
+      "https://atomicdata.dev/properties/form-target-table",
+      "https://atomicdata.dev/properties/form-pages"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-fields",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "The fields of a FormPage, in display order. Mixes form fields (e.g. FormField) with layout blocks (e.g. FormHeading, FormParagraph); no classtype since multiple class-types aren't supported.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-fields"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/cover-image",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/File",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "A cover image shown alongside or behind a resource.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "cover-image"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/image-position",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Where a cover-image is positioned relative to its content. One of: top, left, right, cover.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "image-position"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormPage",
+    "https://atomicdata.dev/properties/description": "A single page of a Form, holding a list of fields and layout blocks.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/cover-image",
+      "https://atomicdata.dev/properties/image-position"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/form-fields"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-page"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-maps-to",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/Property",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The Property on the Form's data class that this field's answers are written to.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-maps-to"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/required",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/boolean",
+    "https://atomicdata.dev/properties/description": "Whether a value must be provided.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "required"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-field-type",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The kind of question a FormField renders and validates as. One of: short-text, long-text, email, number, date, datetime, checkbox, radio, multi-select.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-field-type"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-field-options",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Type-specific settings for a FormField (e.g. placeholder, min/max, choice options), stored as a JSON object whose shape depends on `form-field-type`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-field-options"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormField",
+    "https://atomicdata.dev/properties/description": "A single question in a Form. Its type is tagged by `form-field-type` and its type-specific settings live in `form-field-options`, so changing the question type only ever requires one property write.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/description",
+      "https://atomicdata.dev/properties/required",
+      "https://atomicdata.dev/properties/form-field-options"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/form-maps-to",
+      "https://atomicdata.dev/properties/form-field-type"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-field"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormHeading",
+    "https://atomicdata.dev/properties/description": "A heading layout block inside a FormPage's `form-fields` list.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/name"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-heading"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormParagraph",
+    "https://atomicdata.dev/properties/description": "A paragraph layout block inside a FormPage's `form-fields` list, rendered as markdown.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-paragraph"
+  },
+  {
+    "@id": "https://atomicdata.dev/ontology/forms",
+    "https://atomicdata.dev/properties/description": "Describes the classes and properties needed for Atomic Forms.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/class/ontology"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/",
+    "https://atomicdata.dev/properties/shortname": "forms",
+    "https://atomicdata.dev/properties/instances": [],
+    "https://atomicdata.dev/properties/classes": [
+      "https://atomicdata.dev/classes/Form",
+      "https://atomicdata.dev/classes/FormPage",
+      "https://atomicdata.dev/classes/FormField",
+      "https://atomicdata.dev/classes/FormHeading",
+      "https://atomicdata.dev/classes/FormParagraph"
+    ],
+    "https://atomicdata.dev/properties/properties": [
+      "https://atomicdata.dev/properties/form-data-class",
+      "https://atomicdata.dev/properties/form-target-table",
+      "https://atomicdata.dev/properties/form-pages",
+      "https://atomicdata.dev/properties/form-published-at",
+      "https://atomicdata.dev/properties/form-settings",
+      "https://atomicdata.dev/properties/form-fields",
+      "https://atomicdata.dev/properties/cover-image",
+      "https://atomicdata.dev/properties/image-position",
+      "https://atomicdata.dev/properties/form-maps-to",
+      "https://atomicdata.dev/properties/required",
+      "https://atomicdata.dev/properties/form-field-type",
+      "https://atomicdata.dev/properties/form-field-options"
+    ]
+  }
+]

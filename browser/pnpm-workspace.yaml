@@ -5,6 +5,14 @@ packages:
   - '!create-template/templates/**'
   - '!e2e/template-tests/**'
 
+allowBuilds:
+  '@parcel/watcher': false
+  '@swc/core': true
+  esbuild: true
+  netlify-cli: false
+  sharp: true
+  unix-dgram: true
+
 # Each range below is bounded to the package's current major line
 # (>=patched <nextMajor) — an open-ended ">=x" lets pnpm resolve to a much
 # newer, unrelated major release wherever nothing else in the graph pins one,

@@ -13,7 +13,7 @@ Designed for interacting with [atomic-server](https://github.com/atomicdata-dev/
 
 **demo on [atomicdata.dev](https://atomicdata.dev)**
 
-https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4
+<https://user-images.githubusercontent.com/2183313/139728539-d69b899f-6f9b-44cb-a1b7-bbab68beac0c.mp4>
 
 ```sh
 # To run, simply run the following commands:
