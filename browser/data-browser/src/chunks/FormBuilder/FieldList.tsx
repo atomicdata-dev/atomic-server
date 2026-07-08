@@ -27,9 +27,8 @@ export function FieldList({
     commit: true,
   });
 
-  const { createField, deleteField } = useFormFieldPropertySync(
-    dataClassSubject,
-  );
+  const { createField, deleteField } =
+    useFormFieldPropertySync(dataClassSubject);
 
   const handleAdd = async (type: AddableFieldType) => {
     const field = await createField(page, {
@@ -49,7 +48,7 @@ export function FieldList({
   };
 
   return (
-    <Column gap='0.75rem'>
+    <Column gap="0.75rem">
       <ReorderableList
         subjects={fields}
         onReorder={setFields}

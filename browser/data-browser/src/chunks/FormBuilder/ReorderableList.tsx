@@ -9,6 +9,7 @@ import {
 import { FaGripVertical } from 'react-icons/fa6';
 import { useDragSensors } from '../TableEditor/hooks/useDragSensors';
 import { transition } from '../../helpers/transition';
+import { Column } from '@components/Row';
 
 interface ReorderableListProps {
   subjects: string[];
@@ -63,7 +64,11 @@ export function ReorderableList({
         <DropEdge visible={!!draggingSubject} index={0} />
         {subjects.map((subject, index) => (
           <React.Fragment key={subject}>
-            <DraggableRow subject={subject} disabled={disabled} dragging={draggingSubject === subject}>
+            <DraggableRow
+              subject={subject}
+              disabled={disabled}
+              dragging={draggingSubject === subject}
+            >
               {renderItem(subject, index)}
             </DraggableRow>
             <DropEdge visible={!!draggingSubject} index={index + 1} />
@@ -95,7 +100,12 @@ function DraggableRow({
   return (
     <RowWrapper ref={setNodeRef} $dragging={dragging}>
       {!disabled && (
-        <DragHandle {...listeners} {...attributes} type='button' title='Move item'>
+        <DragHandle
+          {...listeners}
+          {...attributes}
+          type="button"
+          title="Move item"
+        >
           <FaGripVertical />
         </DragHandle>
       )}
@@ -115,10 +125,8 @@ function DropEdge({ index, visible }: DropEdgeProps): JSX.Element {
   return <DropEdgeElement ref={setNodeRef} active={isOver} visible={visible} />;
 }
 
-const RelativeContainer = styled.div`
+const RelativeContainer = styled(Column)`
   position: relative;
-  display: flex;
-  flex-direction: column;
 `;
 
 const RowWrapper = styled.div<{ $dragging: boolean }>`
