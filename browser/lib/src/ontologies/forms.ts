@@ -19,6 +19,7 @@ export const forms = {
     formPages: 'https://atomicdata.dev/properties/form-pages',
     formPublishedAt: 'https://atomicdata.dev/properties/form-published-at',
     formSettings: 'https://atomicdata.dev/properties/form-settings',
+    formPublishId: 'https://atomicdata.dev/properties/form-publish-id',
     formFields: 'https://atomicdata.dev/properties/form-fields',
     coverImage: 'https://atomicdata.dev/properties/cover-image',
     imagePosition: 'https://atomicdata.dev/properties/image-position',
@@ -35,6 +36,7 @@ export const forms = {
       'https://atomicdata.dev/properties/form-pages',
       'https://atomicdata.dev/properties/form-published-at',
       'https://atomicdata.dev/properties/form-settings',
+      'https://atomicdata.dev/properties/form-publish-id',
     ],
     ['https://atomicdata.dev/classes/FormPage']: [
       'https://atomicdata.dev/properties/form-fields',
@@ -79,7 +81,8 @@ declare module '../index.js' {
         | typeof forms.properties.formPages;
       recommends:
         | typeof forms.properties.formPublishedAt
-        | typeof forms.properties.formSettings;
+        | typeof forms.properties.formSettings
+        | typeof forms.properties.formPublishId;
     };
     [forms.classes.formPage]: {
       requires: BaseProps | typeof forms.properties.formFields;
@@ -115,6 +118,7 @@ declare module '../index.js' {
     [forms.properties.formPages]: string[];
     [forms.properties.formPublishedAt]: number;
     [forms.properties.formSettings]: JSONValue;
+    [forms.properties.formPublishId]: string;
     [forms.properties.formFields]: string[];
     [forms.properties.coverImage]: string;
     [forms.properties.imagePosition]: string;
@@ -130,6 +134,7 @@ declare module '../index.js' {
     [forms.properties.formPages]: 'formPages';
     [forms.properties.formPublishedAt]: 'formPublishedAt';
     [forms.properties.formSettings]: 'formSettings';
+    [forms.properties.formPublishId]: 'formPublishId';
     [forms.properties.formFields]: 'formFields';
     [forms.properties.coverImage]: 'coverImage';
     [forms.properties.imagePosition]: 'imagePosition';

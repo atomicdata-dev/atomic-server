@@ -255,6 +255,21 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .guard(guard::Method(Method::POST))
             .to(handlers::post_resource::handle_post_resource),
     )
+    .service(
+        web::resource("/form/{id}/definition")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::get_definition),
+    )
+    .service(
+        web::resource("/form/{id}/submit")
+            .guard(guard::Method(Method::POST))
+            .to(handlers::form::submit_form),
+    )
+    .service(
+        web::resource("/form/{id}")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::form_page),
+    )
     .service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
     .service(web::resource("/drive-usage").to(handlers::drive_usage::handle_drive_usage))
     .service(

@@ -10,23 +10,23 @@ import {
 import { useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { FaPlus, FaTrash } from 'react-icons/fa6';
-import { Column, Row } from '@components/Row';
+import { Row } from '@components/Row';
 import { Button } from '@components/Button';
 import { InputStyled } from '@components/forms/InputStyles';
 import { IconButton, IconButtonVariant } from '@components/IconButton/IconButton';
 import { ReorderableList } from './ReorderableList';
 
-interface PageSidebarProps {
+interface PageTabBarProps {
   formResource: Resource;
   activePage: string | undefined;
   onSelectPage: (subject: string) => void;
 }
 
-export function PageSidebar({
+export function PageTabBar({
   formResource,
   activePage,
   onSelectPage,
-}: PageSidebarProps): JSX.Element {
+}: PageTabBarProps): JSX.Element {
   const store = useStore();
   const [pages, setPages] = useArray(formResource, forms.properties.formPages, {
     commit: true,
@@ -62,26 +62,29 @@ export function PageSidebar({
   };
 
   return (
-    <Column gap='0.5rem'>
-      <ReorderableList
-        subjects={pages}
-        onReorder={setPages}
-        renderItem={subject => (
-          <PageTab
-            subject={subject}
-            active={subject === activePage}
-            canDelete={pages.length > 1}
-            onSelect={() => onSelectPage(subject)}
-            onDelete={() => deletePage(subject)}
-          />
-        )}
-      />
+    <TabBarRow gap='0.5rem' center>
+      <ScrollArea>
+        <ReorderableList
+          subjects={pages}
+          onReorder={setPages}
+          orientation='horizontal'
+          renderItem={subject => (
+            <PageTab
+              subject={subject}
+              active={subject === activePage}
+              canDelete={pages.length > 1}
+              onSelect={() => onSelectPage(subject)}
+              onDelete={() => deletePage(subject)}
+            />
+          )}
+        />
+      </ScrollArea>
       <AddButton type='button' subtle onClick={addPage}>
         <Row gap='.5rem' center>
           <FaPlus /> Add page
         </Row>
       </AddButton>
-    </Column>
+    </TabBarRow>
   );
 }
 
@@ -161,14 +164,26 @@ function PageTab({
   );
 }
 
+const TabBarRow = styled(Row)`
+  width: 100%;
+  min-width: 0;
+`;
+
+const ScrollArea = styled.div`
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+`;
+
 const TabRow = styled(Row)<{ $active: boolean }>`
   align-items: center;
   gap: 0.25rem;
-  width: 100%;
+  flex-shrink: 0;
+  white-space: nowrap;
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
-  flex: 1;
   text-align: left;
   padding: 0.35rem 0.6rem;
   border: none;
@@ -177,6 +192,7 @@ const TabButton = styled.button<{ $active: boolean }>`
   color: ${p => (p.$active ? p.theme.colors.text : p.theme.colors.textLight)};
   font-weight: ${p => (p.$active ? 'bold' : 'normal')};
   cursor: pointer;
+  white-space: nowrap;
 
   &:hover {
     background-color: ${p => p.theme.colors.bg1};
@@ -184,7 +200,7 @@ const TabButton = styled.button<{ $active: boolean }>`
 `;
 
 const AddButton = styled(Button)`
-  align-self: stretch;
+  flex-shrink: 0;
   box-shadow: none;
   border: 1px dashed ${p => p.theme.colors.bg2};
   background: none;

@@ -53,6 +53,16 @@
     "https://atomicdata.dev/properties/shortname": "form-settings"
   },
   {
+    "@id": "https://atomicdata.dev/properties/form-publish-id",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Short public slug used in share links (e.g. /form/<slug>), minted by the server on first publish.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-publish-id"
+  },
+  {
     "@id": "https://atomicdata.dev/classes/Form",
     "https://atomicdata.dev/properties/description": "A form or survey that can be published and shared with a link. Submissions are collected as rows in `form-target-table`, one Property per question on `form-data-class`.",
     "https://atomicdata.dev/properties/isA": [
@@ -61,7 +71,8 @@
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/form-published-at",
-      "https://atomicdata.dev/properties/form-settings"
+      "https://atomicdata.dev/properties/form-settings",
+      "https://atomicdata.dev/properties/form-publish-id"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name",
@@ -225,6 +236,7 @@
       "https://atomicdata.dev/properties/form-pages",
       "https://atomicdata.dev/properties/form-published-at",
       "https://atomicdata.dev/properties/form-settings",
+      "https://atomicdata.dev/properties/form-publish-id",
       "https://atomicdata.dev/properties/form-fields",
       "https://atomicdata.dev/properties/cover-image",
       "https://atomicdata.dev/properties/image-position",

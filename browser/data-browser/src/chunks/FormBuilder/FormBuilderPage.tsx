@@ -5,15 +5,19 @@ import { ContainerFull } from '@components/Containers';
 import { EditableTitle } from '@components/EditableTitle';
 import { Row } from '@components/Row';
 import type { ResourcePageProps } from '@views/ResourcePage';
-import { PageSidebar } from './PageSidebar';
+import { PageTabBar } from './PageTabBar';
 import { FieldList } from './FieldList';
 import { FieldSettingsPanel } from './FieldSettingsPanel';
 import { PublishToggle } from './PublishToggle';
+import { FormPreviewButton } from './FormPreviewDialog';
 
 export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   const titleId = useId();
   const [pages] = useArray(resource, forms.properties.formPages);
-  const [dataClassSubject] = useString(resource, forms.properties.formDataClass);
+  const [dataClassSubject] = useString(
+    resource,
+    forms.properties.formDataClass,
+  );
 
   const [activePage, setActivePage] = useState<string | undefined>(pages[0]);
   const [selectedField, setSelectedField] = useState<string | undefined>();
@@ -31,19 +35,12 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
         <TitleSlot>
           <Row justify='space-between' center>
             <EditableTitle resource={resource} id={titleId} />
-            <PublishToggle resource={resource} />
+            <Row gap='0.5rem' center>
+              <FormPreviewButton formSubject={resource.subject} />
+              <PublishToggle resource={resource} />
+            </Row>
           </Row>
         </TitleSlot>
-        <SidebarSlot>
-          <PageSidebar
-            formResource={resource}
-            activePage={activePage}
-            onSelectPage={subject => {
-              setActivePage(subject);
-              setSelectedField(undefined);
-            }}
-          />
-        </SidebarSlot>
         <MainSlot>
           {activePage && dataClassSubject && (
             <FieldList
@@ -62,6 +59,16 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
             />
           )}
         </SettingsSlot>
+        <PageBarSlot>
+          <PageTabBar
+            formResource={resource}
+            activePage={activePage}
+            onSelectPage={subject => {
+              setActivePage(subject);
+              setSelectedField(undefined);
+            }}
+          />
+        </PageBarSlot>
       </FormBuilderGrid>
     </ContainerFull>
   );
@@ -69,34 +76,22 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
 
 const FormBuilderGrid = styled.div`
   display: grid;
-  grid-template-areas: 'title title title' 'sidebar main settings';
-  grid-template-columns: 14rem 1fr 18rem;
-  grid-template-rows: 4rem auto;
+  grid-template-areas: 'title title' 'main settings' 'pages pages';
+  grid-template-columns: 1fr 18rem;
+  grid-template-rows: 4rem auto min-content;
   width: 100%;
   min-height: ${p => p.theme.heights.fullPage};
 
-  @container (max-width: 900px) {
-    grid-template-areas: 'title title' 'sidebar main' 'settings settings';
-    grid-template-columns: 14rem 1fr;
-    grid-template-rows: 4rem auto auto;
-  }
-
   @container (max-width: 600px) {
-    grid-template-areas: 'title' 'sidebar' 'main' 'settings';
+    grid-template-areas: 'title' 'main' 'settings' 'pages';
     grid-template-columns: 100cqw;
-    grid-template-rows: 4rem auto auto auto;
+    grid-template-rows: 4rem auto auto min-content;
   }
 `;
 
 const TitleSlot = styled.div`
   grid-area: title;
   padding: ${p => p.theme.size()};
-`;
-
-const SidebarSlot = styled.div`
-  grid-area: sidebar;
-  padding: ${p => p.theme.size()};
-  border-right: 1px solid ${p => p.theme.colors.bg2};
 `;
 
 const MainSlot = styled.div`
@@ -108,4 +103,11 @@ const SettingsSlot = styled.div`
   grid-area: settings;
   padding: ${p => p.theme.size()};
   border-left: 1px solid ${p => p.theme.colors.bg2};
+`;
+
+const PageBarSlot = styled.div`
+  grid-area: pages;
+  padding: ${p => p.theme.size()};
+  border-top: 1px solid ${p => p.theme.colors.bg2};
+  min-width: 0;
 `;

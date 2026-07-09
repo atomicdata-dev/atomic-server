@@ -1,0 +1,172 @@
+/* Minimal, dependency-free styling for @tomic/form-renderer. Import this
+   file once (`import '@tomic/form-renderer/style.css'`) alongside the
+   component. Everything is scoped under `.atomic-form-*` class names so it
+   can be safely loaded next to a host app's own styles. */
+
+:root {
+  --atomic-form-accent: #1e43a3;
+  --atomic-form-text: #1a1a1a;
+  --atomic-form-text-light: #6b7280;
+  --atomic-form-bg: #ffffff;
+  --atomic-form-border: #d9dce1;
+  --atomic-form-error: #c0392b;
+  --atomic-form-radius: 0.5rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --atomic-form-accent: #6d9bff;
+    --atomic-form-text: #f2f2f2;
+    --atomic-form-text-light: #a0a5ad;
+    --atomic-form-bg: #16181d;
+    --atomic-form-border: #33363d;
+    --atomic-form-error: #ff6b5e;
+  }
+}
+
+.atomic-form-progress {
+  height: 0.35rem;
+  background: var(--atomic-form-border);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.atomic-form-progress-bar {
+  height: 100%;
+  background: var(--atomic-form-accent);
+  transition: width 200ms ease;
+}
+
+.atomic-form-page-name {
+  color: var(--atomic-form-text);
+  margin: 0 0 1rem;
+}
+
+.atomic-form-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.atomic-form-heading {
+  color: var(--atomic-form-text);
+  margin: 0;
+}
+
+.atomic-form-paragraph {
+  color: var(--atomic-form-text-light);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.atomic-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.atomic-form-label {
+  font-weight: 600;
+  color: var(--atomic-form-text);
+}
+
+.atomic-form-required {
+  color: var(--atomic-form-error);
+  margin-left: 0.2rem;
+}
+
+.atomic-form-description {
+  margin: 0;
+  color: var(--atomic-form-text-light);
+  font-size: 0.9rem;
+}
+
+.atomic-form-input {
+  font: inherit;
+  color: var(--atomic-form-text);
+  background: var(--atomic-form-bg);
+  border: 1px solid var(--atomic-form-border);
+  border-radius: var(--atomic-form-radius);
+  padding: 0.6rem 0.75rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.atomic-form-input:focus {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 1px;
+}
+
+.atomic-form-textarea {
+  resize: vertical;
+}
+
+.atomic-form-checkbox-row,
+.atomic-form-choice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--atomic-form-text);
+}
+
+.atomic-form-choice-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.atomic-form-error {
+  color: var(--atomic-form-error);
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.atomic-form-submit-error {
+  margin-top: 1rem;
+}
+
+.atomic-form-honeypot {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.atomic-form-nav {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.atomic-form-button {
+  font: inherit;
+  font-weight: 600;
+  color: white;
+  background: var(--atomic-form-accent);
+  border: none;
+  border-radius: var(--atomic-form-radius);
+  padding: 0.65rem 1.5rem;
+  cursor: pointer;
+}
+
+.atomic-form-button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.atomic-form-button-secondary {
+  background: transparent;
+  color: var(--atomic-form-text);
+  border: 1px solid var(--atomic-form-border);
+}
+
+.atomic-form-success {
+  color: var(--atomic-form-text);
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 3rem 1rem;
+}

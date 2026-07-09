@@ -1,0 +1,66 @@
+{
+  "name": "@tomic/form-renderer",
+  "version": "0.41.0-beta.0",
+  "author": "Joep Meindertsma",
+  "description": "Pure React renderer for Atomic Forms definition JSON. No @tomic/lib or Loro dependency.",
+  "homepage": "https://docs.atomicdata.dev/js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atomicdata-dev/atomic-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/atomicdata-dev/atomic-server/issues"
+  },
+  "dependencies": {
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
+  },
+  "peerDependencies": {
+    "react": ">19.2.0",
+    "react-dom": ">19.2.0"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.d.ts.map"
+  ],
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/src/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/src/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./style.css": "./dist/style.css",
+    "./package.json": "./package.json"
+  },
+  "main-dev": "src/index.ts",
+  "types": "dist/src/index.d.ts",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "source": "src/index.ts",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup",
+    "format-check": "oxfmt -c ../.oxfmtrc.json --check ./src",
+    "format": "oxfmt -c ../.oxfmtrc.json ./src",
+    "lint": "oxlint -c ../.oxlintrc.json . && pnpm format-check",
+    "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
+    "start": "pnpm watch",
+    "watch": "tsup --watch",
+    "typecheck": "pnpm exec tsc --noEmit"
+  }
+}

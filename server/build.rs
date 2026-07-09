@@ -14,6 +14,10 @@ macro_rules! p {
 struct Dirs {
     js_dist_source: PathBuf,
     js_dist_tmp: PathBuf,
+    /// Published-form runtime (`browser/form-app`), embedded as a
+    /// `form-assets/` subtree of `js_dist_tmp` alongside the data-browser
+    /// dist — see `copy_form_assets`.
+    form_app_dist_source: PathBuf,
     /// All source directories to watch for changes
     src_dirs: Vec<PathBuf>,
     browser_root: PathBuf,
@@ -29,6 +33,7 @@ fn main() -> std::io::Result<()> {
         Dirs {
             js_dist_source: PathBuf::from("../browser/data-browser/dist"),
             js_dist_tmp: PathBuf::from("./assets_tmp"),
+            form_app_dist_source: PathBuf::from("../browser/form-app/dist"),
             src_dirs: vec![
                 PathBuf::from("../browser/data-browser/src"),
                 PathBuf::from("../browser/lib/src"),
@@ -44,6 +49,8 @@ fn main() -> std::io::Result<()> {
                 PathBuf::from("../browser/data-browser/vite.config.ts"),
                 PathBuf::from("../browser/data-browser/package.json"),
                 PathBuf::from("../browser/pnpm-lock.yaml"),
+                PathBuf::from("../browser/form-renderer/src"),
+                PathBuf::from("../browser/form-app/src"),
             ],
             browser_root: PathBuf::from(BROWSER_ROOT),
         }
@@ -68,6 +75,7 @@ fn main() -> std::io::Result<()> {
         let start_copy = Instant::now();
         let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
         dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        copy_form_assets(&dirs)?;
         p!(
             "Copying assets took: {:.3}s",
             start_copy.elapsed().as_secs_f32()
@@ -78,6 +86,14 @@ fn main() -> std::io::Result<()> {
             dirs.js_dist_tmp.display(),
             dirs.js_dist_source.display()
         );
+        // The main copy is skipped, but that doesn't mean form-assets is
+        // there too — `copy_form_assets` reads a different source, so
+        // `dist_is_newer_than_tmp` says nothing about it. Backfill it
+        // separately so `include_str!("../../assets_tmp/form-assets/index.html")`
+        // in handlers/form.rs doesn't fail to compile.
+        if !dirs.js_dist_tmp.join("form-assets").exists() {
+            copy_form_assets(&dirs)?;
+        }
     } else if dirs.js_dist_tmp.exists() {
         // `needs_build` is false and the embedded copy still has to be
         // refreshed: `should_build` answers "are the JS SOURCES newer than
@@ -96,6 +112,7 @@ fn main() -> std::io::Result<()> {
         let start_copy = Instant::now();
         let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
         dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        copy_form_assets(&dirs)?;
         p!(
             "Copying assets took: {:.3}s",
             start_copy.elapsed().as_secs_f32()
@@ -108,6 +125,7 @@ fn main() -> std::io::Result<()> {
         );
         let start_copy = Instant::now();
         dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        copy_form_assets(&dirs)?;
         p!(
             "Copying assets took: {:.3}s",
             start_copy.elapsed().as_secs_f32()
@@ -315,6 +333,26 @@ fn build_js(dirs: &Dirs) {
     run_streamed(&["run", "build"], "build");
 
     p!("js build successful");
+}
+
+/// Copies `browser/form-app/dist` into `<js_dist_tmp>/form-assets/`, so the
+/// published-form runtime rides along in the same `static_files::generate()`
+/// map as the data-browser dist (see `routes.rs`'s `ResourceFiles::new("/",
+/// generate())`) — `/form-assets/*` requests are then served automatically,
+/// no extra server route needed. Only the HTML shell at `/form/{id}` needs
+/// its own handler (`handlers::form::form_page`), which `include_str!`s
+/// `form-assets/index.html` from this same copy at compile time.
+fn copy_form_assets(dirs: &Dirs) -> std::io::Result<()> {
+    if !dirs.form_app_dist_source.exists() {
+        p!(
+            "Could not find {}, skipping form-app asset embed (form/:id route will 404)",
+            dirs.form_app_dist_source.display()
+        );
+        return Ok(());
+    }
+
+    let dest = dirs.js_dist_tmp.join("form-assets");
+    dircpy::copy_dir(&dirs.form_app_dist_source, &dest)
 }
 
 /// Pre-compress eligible files (`.wasm`, `.js`, `.css`, `.html`, `.svg`,

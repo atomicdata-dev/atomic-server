@@ -244,6 +244,7 @@ pub const FORM_TARGET_TABLE: &str = "https://atomicdata.dev/properties/form-targ
 pub const FORM_PAGES: &str = "https://atomicdata.dev/properties/form-pages";
 pub const FORM_PUBLISHED_AT: &str = "https://atomicdata.dev/properties/form-published-at";
 pub const FORM_SETTINGS: &str = "https://atomicdata.dev/properties/form-settings";
+pub const FORM_PUBLISH_ID: &str = "https://atomicdata.dev/properties/form-publish-id";
 pub const FORM_FIELDS: &str = "https://atomicdata.dev/properties/form-fields";
 pub const COVER_IMAGE: &str = "https://atomicdata.dev/properties/cover-image";
 pub const IMAGE_POSITION: &str = "https://atomicdata.dev/properties/image-position";

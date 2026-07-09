@@ -1,0 +1,40 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+}
+
+.atomic-form-app-shell {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: var(--atomic-form-bg, #fff);
+}
+
+.atomic-form-app-card {
+  width: 100%;
+  max-width: 40rem;
+}
+
+.atomic-form-app-title {
+  color: var(--atomic-form-text, #1a1a1a);
+  margin: 0 0 1.5rem;
+}
+
+.atomic-form-app-message {
+  color: var(--atomic-form-text-light, #6b7280);
+  text-align: center;
+  margin-top: 4rem;
+}

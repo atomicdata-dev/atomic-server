@@ -951,3 +951,259 @@ async fn version_endpoints() {
         "reading a version must not move the live resource: {body}"
     );
 }
+
+/// Phase 3 of `planning/atomic-forms.md`: builds a Form + FormPage + FormField
+/// graph pointing at a Table/Class pair (mirroring what the Phase 2
+/// data-browser builder produces), then drives the two new HTTP endpoints
+/// end to end: publish gating, slug minting + resolution, a valid
+/// submission landing as a table row, and the required-field / honeypot /
+/// unpublished rejection paths.
+#[actix_rt::test]
+async fn form_submission_flow() {
+    use atomic_lib::{Resource, Value};
+
+    let unique_string = atomic_lib::utils::random_string(10);
+    use clap::Parser;
+    let opts = Opts::parse_from([
+        "atomic-server",
+        "--initialize",
+        "--data-dir",
+        &format!("./.temp/{}/db", unique_string),
+        "--config-dir",
+        &format!("./.temp/{}/config", unique_string),
+    ]);
+
+    let mut config = config::build_config(opts).expect("failed init config");
+    config.search_index_path = format!("./.temp/{}/search_index", unique_string).into();
+    let appstate = crate::appstate::AppState::init(config.clone())
+        .await
+        .expect("failed init appstate");
+
+    let data = Data::new(appstate.clone());
+    let app = test::init_service(
+        App::new()
+            .app_data(data)
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+    let store = &appstate.store;
+
+    // Class + Property + Table (mirrors what NewFormDialog/useFormFieldPropertySync build client-side)
+    let mut class = Resource::new_instance(urls::CLASS, store).await.unwrap();
+    class
+        .set(urls::SHORTNAME.into(), Value::Slug("submission".into()), store)
+        .await
+        .unwrap();
+    class
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("A form submission row".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    class.save_locally(store).await.unwrap();
+
+    let mut email_prop = Resource::new_instance(urls::PROPERTY, store).await.unwrap();
+    email_prop
+        .set(urls::SHORTNAME.into(), Value::Slug("email".into()), store)
+        .await
+        .unwrap();
+    email_prop
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("Respondent email".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    email_prop
+        .set(
+            urls::DATATYPE_PROP.into(),
+            Value::AtomicUrl(urls::STRING.into()),
+            store,
+        )
+        .await
+        .unwrap();
+    email_prop.save_locally(store).await.unwrap();
+
+    let mut table = Resource::new_instance(urls::TABLE, store).await.unwrap();
+    table
+        .set(urls::NAME.into(), Value::String("Submissions".into()), store)
+        .await
+        .unwrap();
+    table
+        .set(
+            urls::CLASSTYPE_PROP.into(),
+            Value::AtomicUrl(class.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    table.save_locally(store).await.unwrap();
+
+    // FormField -> FormPage -> Form
+    let mut field = Resource::new_instance(urls::FORM_FIELD, store).await.unwrap();
+    field
+        .set(urls::NAME.into(), Value::String("Email".into()), store)
+        .await
+        .unwrap();
+    field
+        .set(
+            urls::FORM_MAPS_TO.into(),
+            Value::AtomicUrl(email_prop.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    field
+        .set(
+            urls::FORM_FIELD_TYPE.into(),
+            Value::String("email".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    field
+        .set(urls::REQUIRED.into(), Value::Boolean(true), store)
+        .await
+        .unwrap();
+    field.save_locally(store).await.unwrap();
+
+    let mut page = Resource::new_instance(urls::FORM_PAGE, store).await.unwrap();
+    page.set(
+        urls::FORM_FIELDS.into(),
+        Value::ResourceArray(vec![field.get_subject().to_string().into()]),
+        store,
+    )
+    .await
+    .unwrap();
+    page.save_locally(store).await.unwrap();
+
+    let mut form = Resource::new_instance(urls::FORM, store).await.unwrap();
+    form.set(urls::NAME.into(), Value::String("Feedback".into()), store)
+        .await
+        .unwrap();
+    form.set(
+        urls::FORM_DATA_CLASS.into(),
+        Value::AtomicUrl(class.get_subject().to_string().into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.set(
+        urls::FORM_TARGET_TABLE.into(),
+        Value::AtomicUrl(table.get_subject().to_string().into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.set(
+        urls::FORM_PAGES.into(),
+        Value::ResourceArray(vec![page.get_subject().to_string().into()]),
+        store,
+    )
+    .await
+    .unwrap();
+    // DID (genesis) subject — matches how forms are actually created by the
+    // data-browser client, and exercises the slug bootstrap fallback below.
+    form.save_as_genesis(store).await.unwrap();
+    let form_did_id = form.get_subject().pure_id();
+
+    // 1. Unpublished -> 410
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", form_did_id))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "unpublished form should 410");
+
+    // 2. Publish, GET by DID -> 200, slug gets minted
+    form.set(
+        urls::FORM_PUBLISHED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", form_did_id))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "definition fetch after publish failed: {:?}",
+        resp.status()
+    );
+    let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
+    let slug = body["id"].as_str().expect("slug should be minted").to_string();
+    assert!(!slug.is_empty());
+    assert_eq!(body["pages"][0]["blocks"][0]["mapsTo"], email_prop.get_subject().to_string());
+
+    // 3. GET by the minted slug -> same definition
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success(), "definition fetch by slug failed");
+
+    // 4. Valid submission -> 201, row lands under the table
+    let submit_body = serde_json::json!({
+        "values": { email_prop.get_subject().to_string(): "visitor@example.com" }
+    });
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "valid submission should succeed: {}",
+        get_body(resp)
+    );
+
+    let query = atomic_lib::storelike::Query::new_prop_val(
+        urls::PARENT,
+        table.get_subject().as_str(),
+    );
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(result.subjects.len(), 1, "submission row should exist under the table");
+
+    // 5. Missing required field -> 400 with a field error
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({ "values": {} }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400);
+    let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
+    assert!(body["errors"][0]["message"].as_str().is_some());
+
+    // 6. Honeypot filled -> 400
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "bot@example.com" },
+            "hp": "i-am-a-bot",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400, "honeypot-filled submission should be rejected");
+
+    // Only the one valid submission from step 4 should have landed.
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(result.subjects.len(), 1);
+
+    // 7. Unpublish -> submit now 410
+    form.remove_propval(urls::FORM_PUBLISHED_AT).unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "submit to unpublished form should 410");
+}

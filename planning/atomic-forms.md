@@ -145,7 +145,7 @@ fields and pages under `form-conditions` (AND semantics).
 
 ---
 
-## Phase 1 — Schema + ontology plumbing
+## Phase 1 — Schema + ontology plumbing - DONE
 
 Deliverable: form classes exist on every server; TS constants available.
 
@@ -189,41 +189,41 @@ Deliverable: form classes exist on every server; TS constants available.
   (Form), `form-conditions` (FormPage, FormField).
 - `forms.ts` needed to be manually created in the browser/lib/src/ontologies/ directory (`@tomic/cli` does not work at the moment due to version differences)
 
-## Phase 2 — Form builder in the data-browser
+## Phase 2 — Form builder in the data-browser - DONE
 
 Deliverable: create and edit a form with basic fields; submissions class/table
 wired up; no public runtime yet.
 
-- [ ] **New > Form**: `NewFormDialog` under
+- [x] **New > Form**: `NewFormDialog` under
       `components/forms/NewForm/CustomCreateActions/CustomForms/`, registered like
       `NewTableDialog`. On create: data Class (into default ontology, same logic as
       `NewTableDialog.tsx:54-75`) → Table (`classtype` = class, parent = form or
       folder) → Form resource (one starter page).
-- [ ] **FormBuilderPage** as a lazy chunk (`src/chunks/FormBuilder/`, route
+- [x] **FormBuilderPage** as a lazy chunk (`src/chunks/FormBuilder/`, route
       registered in `views/ResourcePage.tsx` switch on the new class) — follow the
       `TablePage` chunk pattern so the builder doesn't bloat the main bundle.
-- [ ] Builder UI: page list sidebar; field list per page; add/reorder/delete fields
+- [x] Builder UI: page list sidebar; field list per page; add/reorder/delete fields
       (reuse drag/drop + input components from `components/forms/`); field settings
       panel (label, helper, placeholder, required, min/max, default, options).
-- [ ] **Property sync**: creating a field creates the mapped Property on the data
+- [x] **Property sync**: creating a field creates the mapped Property on the data
       class (`form-maps-to`); renaming a field updates the Property's name;
       deleting a field keeps the Property (data preservation) but unlinks it.
       Encapsulate in a `useFormFieldPropertySync` hook — this is the trickiest
       invariant in the builder.
-- [ ] Field types (must-have set): short text, long text, email, number, date,
+- [x] Field types (must-have set): short text, long text, email, number, date,
       datetime, checkbox, radio group, multi-select checkboxes. Non-input: heading,
       paragraph.
-- [ ] Publish/unpublish toggle writing `published-at` (UI only enforces; server
+- [x] Publish/unpublish toggle writing `published-at` (UI only enforces; server
       enforcement lands in phase 3).
-- [ ] E2E spec: create form via New > Form, add fields of each type, reload,
+- [x] E2E spec: create form via New > Form, add fields of each type, reload,
       verify persistence. (Uses the standard `test-utils.ts` `before` hook.)
 
-## Phase 3 — Submission pipeline (server)
+## Phase 3 — Submission pipeline (server) - DONE
 
 Deliverable: `POST` a JSON submission against a published form; row appears in the
 table. Testable with `curl` before any runtime exists.
 
-- [ ] `server/src/handlers/form.rs` with two handlers, registered in
+- [x] `server/src/handlers/form.rs` with two handlers, registered in
       `routes.rs::config_routes` **before** the catch-all `ANY` routes:
   - `GET /form/{id}/definition` — resolve form subject from `{id}` (see below),
     check `published-at`, walk the graph with server-agent read, emit denormalized
@@ -232,57 +232,109 @@ table. Testable with `curl` before any runtime exists.
     Validate → create submission resource (parent = target table, `isA` = data
     class) via server-side `Resource` + `save()` (CommitBuilder → Loro at sign
     time, so Loro state + datatype tags are handled by existing infra).
-- [ ] **Form id ↔ subject resolution**: form subjects are `did:ad:{genesis}` —
+- [x] **Form id ↔ subject resolution**: form subjects are `did:ad:{genesis}` —
       too ugly for a share URL. On first publish, generate a short random slug
       (e.g. 10 chars base58), store it as `form-publish-id` on the Form, and index
       `publish-id → subject` in redb (small map in `Tree::PluginMeta`, like known
       peers). Route param is the slug.
-- [ ] **Server-side validation** (`lib` or `server` module, unit-tested in
+- [x] **Server-side validation** (`lib` or `server` module, unit-tested in
       isolation): required, min/max length + value, email/URL shape, option
       membership for radio/multi-select, datatype coercion. Declarative rule set
       derived from the same field definitions the definition JSON exposes, so the
       TS renderer (phase 4) implements the identical rules from the identical data.
-- [ ] Reject when: form unpublished, unknown property, extra properties, table or
+- [x] Reject when: form unpublished, unknown property, extra properties, table or
       data class missing.
-- [ ] Basic abuse control now (cheap): per-IP token bucket on the submit route +
+- [x] Basic abuse control now (cheap): per-IP token bucket on the submit route +
       an auto-added honeypot field rejected server-side when filled. Captcha is
       phase 6.
-- [ ] Integration test (`server/src/tests.rs` or a `--test forms` file): populate,
+- [x] Integration test (`server/src/tests.rs` or a `--test forms` file): populate,
       create form + table via server agent, publish, GET definition, POST valid +
       invalid submissions, assert row exists / errors are correct, unpublish →
       `410`.
 
-## Phase 4 — Published form runtime + `/form/:id` route
+**Implementation notes:**
+
+- `lib/src/forms.rs` (new, gated behind the `db` feature) holds the pure
+  definition-builder, validation, and slug mint/resolve logic;
+  `server/src/handlers/form.rs` is thin HTTP glue with its own plain-JSON
+  `FormApiError` (the runtime never parses JSON-AD, per decision #3).
+- Slug bootstrapping: rather than reopening phase 2's `PublishToggle` (which has
+  no server touchpoint), `{id}` resolves either to an existing slug in the redb
+  index or to the form's own `did:ad:{genesis}` pure_id as a fallback. The first
+  successful `GET .../definition` for a published, slug-less form mints and
+  persists one — see "Slug bootstrapping decision" above, which is now the
+  answer to the open question below on definition-JSON-vs-slug-on-publish.
+- Resolves two of the "Open questions" below: the submit handler is **always
+  on** (no `forms` cargo feature), and the `{id}` slug map is intentionally
+  server-global in redb (matches how `did:ad:` subjects already work).
+- Verified with `cargo test -p atomic_lib --features db-redb --lib forms::` (9
+  new tests), `cargo test -p atomic-server --lib` (41 tests incl.
+  `form_submission_flow`), and a manual pass against a live `cargo run` server +
+  browser-built/published form: `GET` by DID and by minted slug, valid submit
+  (`201`, row lands in the table), honeypot rejection (`400`), invalid-email
+  validation (`400`), and pre-publish/unpublished gating (`410`).
+
+## Phase 4 — Published form runtime + `/form/:id` route - DONE
 
 Deliverable: the full must-have loop — share a link, anyone submits without an
 account.
 
-- [ ] **`@tomic/form-renderer`** (`browser/form-renderer/`): React components
+- [x] **`@tomic/form-renderer`** (`browser/form-renderer/`): React components
       rendering a definition JSON — pages, all phase-2 field types, layout blocks,
       client-side validation mirroring phase-3 rules, multi-page navigation,
-      submit + success/error states. Props: `definition`, `onSubmit`, later
-      `theme`. No `@tomic/lib` dependency.
-- [ ] **`browser/form-app`**: Vite app mounting the renderer; reads a
+      submit + success/error states. Props: `definition`, `onSubmit`, `preview`.
+      No `@tomic/lib` dependency; ships its own `style.css`.
+- [x] **`browser/form-app`**: Vite app mounting the renderer; reads a
       `window.__FORM_DEFINITION__` global (injected by the server) with a fetch
       fallback to `/form/:id/definition`; POSTs to `/form/:id/submit`.
-- [ ] **`GET /form/{id}` route** (HTML): follow `single_page_app.rs` — HTML shell
-      template with CSP nonce, inject the definition JSON inline (kills the fetch
+- [x] **`GET /form/{id}` route** (HTML): follows `single_page_app.rs` — HTML shell
+      template with CSP nonce, definition JSON injected inline (kills the fetch
       waterfall), script tags pointing at embedded `form-assets/*` hashed bundles.
-      Unpublished/unknown → minimal "not available" page.
-- [ ] **`build.rs`**: build `form-app` in the existing browser build step; copy
+      Unpublished/unknown → minimal dependency-free "not available" page (410/404).
+- [x] **`build.rs`**: builds `form-app` as part of the existing `pnpm -r build`
+      step (topologically after `form-renderer`, its workspace dependency); copies
       `form-app/dist` into the embedded asset map under `form-assets/` (brotli
-      precompression comes free from the existing `precompress_assets`).
-- [ ] **Vite dev story**: in dev, `/form/:id` on :9883 serves the embedded build;
-      for HMR iteration run `form-app` dev server directly against
-      `localhost:9883` endpoints (CORS already permissive for GET; verify POST).
-      Document in `form-app/README.md`.
-- [ ] **Preview mode** in the builder: data-browser imports `@tomic/form-renderer`,
-      builds the definition JSON client-side from the resources (share the
-      serializer shape with the Rust one via a fixture test), renders in a dialog
-      or split pane with submissions disabled.
-- [ ] E2E spec: build + publish a form, open `/form/:slug` in a **fresh
-      unauthenticated context**, fill and submit, then as the owner verify the row
-      in the table view. This is the flagship e2e for the whole feature.
+      precompression comes free from the existing `precompress_assets`). Backfills
+      `form-assets/` even when the main JS build is skipped
+      (`ATOMICSERVER_SKIP_JS_BUILD=true`, set repo-wide by `.envrc`) so
+      `include_str!("../../assets_tmp/form-assets/index.html")` always has
+      something to compile against.
+- [x] **Vite dev story**: in dev, `/form/:id` on :9883 serves the embedded build;
+      for HMR iteration `form-app`'s own `pnpm dev` (`:6748`) fetches/posts
+      directly against `:9883` (CORS is `Cors::permissive()`). Documented in
+      `form-app/README.md`.
+- [x] **Preview mode** in the builder: `FormPreviewDialog.tsx` imports
+      `@tomic/form-renderer`; `buildFormDefinition.ts` is a hand-mirrored TS port
+      of `build_form_definition`/`build_block` (same shape, not a shared fixture —
+      see deviation below), rendered in a dialog with `preview` disabling submit.
+- [x] E2E spec (`browser/e2e/tests/forms-submission.spec.ts`): build + publish a
+      form, open `/form/:did` in a **fresh unauthenticated context** (`browser.
+      newContext()`), fill and submit, then as the owner verify the row in the
+      table view. Plus an unpublished-form → 410 case. Both green.
+
+**Deviations / notes found during implementation:**
+
+- **No shared TS/Rust fixture test** for the definition serializer (the plan's
+  "share the serializer shape... via a fixture test"). `buildFormDefinition.ts`
+  mirrors `lib/src/forms.rs` by hand instead — same field names/shapes, kept in
+  sync manually. Worth adding a fixture-based cross-check later if the two
+  drift.
+- **Found and fixed a real bug while writing the e2e spec**: `FormRenderer`'s
+  `<label>` and its `<input>` shared the exact same `id` (the label used it for
+  `aria-labelledby` on radio/multi-select groups; `FieldInput` used the same
+  value for the actual input's `id`). Duplicate IDs silently broke
+  `htmlFor`/label association. Fixed by giving the label its own `${inputId}-label`
+  id, threaded through `FieldInput` as a separate `labelId` prop.
+- **Local dev gotcha (not a code bug)**: a local server whose on-disk store
+  predates a newly-added default property (e.g. `form-publish-id`, added in
+  Phase 3) will 404 trying to resolve it, because `populate_default_store` only
+  re-runs on an already-initialized store when `ATOMIC_REPOPULATE_DEFAULTS=true`
+  is set. Hit this manually verifying the flow; restarting with that env var
+  fixed it. Worth remembering for anyone else's stale local dev DB.
+- The Phase 2 e2e (`forms.spec.ts`, "persist across reload") was independently
+  found failing/flaky on `develop`-equivalent code with none of this phase's
+  changes applied (verified by stashing `FormBuilderPage.tsx` and re-running) —
+  a pre-existing outbox/sync race, not a Phase 4 regression. Out of scope here.
 
 ## Phase 5 — Results & lifecycle polish
 
@@ -343,12 +395,13 @@ Rough priority order:
 - [ ] Multi-select storage: JSON string-array vs Tag resources + `resourceArray`.
       JSON is simpler and self-contained; Tags integrate with table cell rendering.
       Decide in phase 2 when wiring the table view.
-- [ ] Does the submit handler live behind a feature flag (`forms` cargo feature)
-      like `vector-search`, or always on? Leaning always-on (it's core product).
-- [ ] Definition JSON versioning: add `"version": 1` from day one so the runtime
-      can evolve.
-- [ ] Subdomain/multi-drive: `{id}` slug is server-global in the redb map; confirm
-      that's acceptable vs. scoping per drive.
+- [x] Does the submit handler live behind a feature flag (`forms` cargo feature)
+      like `vector-search`, or always on? **Resolved in phase 3: always on.**
+- [x] Definition JSON versioning: add `"version": 1` from day one so the runtime
+      can evolve. **Done in phase 3** (`FormDefinition.version`).
+- [x] Subdomain/multi-drive: `{id}` slug is server-global in the redb map; confirm
+      that's acceptable vs. scoping per drive. **Resolved in phase 3: server-global,
+      same as `did:ad:` subject resolution.**
 
 ## Testing summary
 
