@@ -10,6 +10,7 @@ import {
   ai,
   core,
   dataBrowser,
+  forms,
   useResource,
   useCanWrite,
   unknownSubject,
@@ -67,8 +68,9 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
     // sidebar tree for them. Tables show rows in the grid view, chatrooms
     // and meetings show messages in the timeline, AI chats show messages
     // in the AI panel, ontologies show classes/properties in their
-    // dedicated panel. Listing those children again in the sidebar would
-    // be noisy and confuses drop targeting.
+    // dedicated panel, forms show their results table via the builder's
+    // Results tab. Listing those children again in the sidebar would be
+    // noisy and confuses drop targeting.
     //
     // `allowIncomplete` means `classes` is `[]` until `isA` hydrates. Treat
     // that as hidden too: otherwise `useChildren` fetches every table row
@@ -81,7 +83,8 @@ export const ResourceSideBar: React.FC<ResourceSideBarProps> = memo(
       classes.includes(dataBrowser.classes.chatroom) ||
       classes.includes(dataBrowser.classes.meeting) ||
       classes.includes(ai.classes.aiChat) ||
-      classes.includes(core.classes.ontology);
+      classes.includes(core.classes.ontology) ||
+      classes.includes(forms.classes.form);
 
     const { subjects: subResources } = useChildren(
       hideChildren ? undefined : subject,

@@ -4,7 +4,6 @@ import { FormRenderer, type FormDefinition } from '@tomic/form-renderer';
 import '@tomic/form-renderer/style.css';
 import {
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   useDialog,
@@ -25,7 +24,7 @@ export function FormPreviewButton({
   formSubject,
 }: FormPreviewButtonProps): JSX.Element {
   const store = useStore();
-  const [dialogProps, show, close, isOpen] = useDialog();
+  const [dialogProps, show, _close, isOpen] = useDialog();
   const [definition, setDefinition] = useState<FormDefinition>();
 
   useEffect(() => {
@@ -47,24 +46,25 @@ export function FormPreviewButton({
       <Button subtle onClick={show}>
         Preview
       </Button>
-      <Dialog {...dialogProps} width='40rem'>
-        <DialogTitle>
-          <h1>Preview</h1>
-        </DialogTitle>
-        <DialogContent>
-          {definition ? (
-            <FormRenderer
-              definition={definition}
-              preview
-              onSubmit={async () => ({ ok: true })}
-            />
-          ) : (
-            <p>Loading preview…</p>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => close(false)}>Close</Button>
-        </DialogActions>
+      <Dialog {...dialogProps} width="40rem">
+        {isOpen && (
+          <>
+            <DialogTitle>
+              <h1>Preview</h1>
+            </DialogTitle>
+            <DialogContent>
+              {definition ? (
+                <FormRenderer
+                  definition={definition}
+                  preview
+                  onSubmit={async () => ({ ok: true })}
+                />
+              ) : (
+                <p>Loading preview…</p>
+              )}
+            </DialogContent>
+          </>
+        )}
       </Dialog>
     </>
   );

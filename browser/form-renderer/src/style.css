@@ -38,11 +38,6 @@
   transition: width 200ms ease;
 }
 
-.atomic-form-page-name {
-  color: var(--atomic-form-text);
-  margin: 0 0 1rem;
-}
-
 .atomic-form-blocks {
   display: flex;
   flex-direction: column;

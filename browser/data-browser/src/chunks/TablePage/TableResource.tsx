@@ -750,6 +750,46 @@ export const TableResource: React.FC<TableResourceProps> = ({
     setNewRowSubjects([mintSessionRow(Date.now())]);
   }, [queryKey, store, mintSessionRow]);
 
+  // Remote rows (another user, `/form/:id/submit` submissions) append to the
+  // collection while the baseline stays frozen — without this they stay
+  // invisible until a reload (form results tables were the repro). Growth is
+  // expected when it's covered by this session's own materialized rows (they
+  // keep rendering as `TableNewRow`s); anything beyond that came from outside
+  // the session, and the boundary index can't express the interleaving, so
+  // rebase the whole session onto the grown collection — same move as the
+  // queryKey rebase above: force-save rows with content, re-capture the
+  // baseline, reset to a single trailing placeholder.
+  useEffect(() => {
+    if (!ready) {
+      return;
+    }
+
+    const baseline = baselineMemberCountRef.current;
+
+    if (baseline === null) {
+      return;
+    }
+
+    const materialized = newRowSubjectsRef.current.filter(
+      s => !store.getResourceLoading(s).subject.startsWith('_new:'),
+    ).length;
+
+    if (collection.totalMembers <= baseline + materialized) {
+      return;
+    }
+
+    for (const subject of newRowSubjectsRef.current) {
+      const row = store.getResourceLoading(subject);
+
+      if (row.subject.startsWith('_new:') && row.getEntries().length > 2) {
+        void row.save().catch(() => undefined);
+      }
+    }
+
+    baselineMemberCountRef.current = collection.totalMembers;
+    setNewRowSubjects([mintSessionRow(Date.now())]);
+  }, [collection, ready, store, mintSessionRow]);
+
   const decrementMemberCount = useCallback(() => {
     if (baselineMemberCountRef.current && baselineMemberCountRef.current > 0) {
       baselineMemberCountRef.current -= 1;

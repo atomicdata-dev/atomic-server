@@ -76,7 +76,10 @@ fn not_found() -> FormApiError {
 }
 
 fn unpublished() -> FormApiError {
-    FormApiError::new(StatusCode::GONE, "This form is not published")
+    FormApiError::new(
+        StatusCode::GONE,
+        "This form isn't accepting responses right now.",
+    )
 }
 
 /// Resolves `{id}` to a Form resource, confirming it really is a Form and is
@@ -153,7 +156,10 @@ pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -
 }
 
 /// Minimal, dependency-free HTML page for unknown/unpublished/errored forms
-/// — no JS bundle needed since there's nothing to render.
+/// — no JS bundle needed since there's nothing to render. Colors mirror
+/// `@tomic/form-renderer`'s palette (`browser/form-renderer/src/style.css`)
+/// so a visitor doesn't see a jarring generic error page after a form-styled
+/// runtime would otherwise have loaded.
 fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
     let escaped = message
         .replace('&', "&amp;")
@@ -163,11 +169,18 @@ fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\
          <title>Form not available</title>\
-         <style>body{{font-family:system-ui,sans-serif;display:flex;justify-content:center;\
-         padding:4rem 1rem;color:#1a1a1a;background:#fff}}\
-         p{{max-width:28rem;text-align:center}}\
-         @media (prefers-color-scheme: dark){{body{{color:#f2f2f2;background:#16181d}}}}</style>\
-         </head><body><p>{escaped}</p></body></html>"
+         <style>\
+         :root{{--bg:#ffffff;--text:#1a1a1a;--text-light:#6b7280;--border:#d9dce1;--radius:0.5rem}}\
+         @media (prefers-color-scheme: dark){{:root{{--bg:#16181d;--text:#f2f2f2;--text-light:#a0a5ad;--border:#33363d}}}}\
+         body{{margin:0;font-family:system-ui,-apple-system,sans-serif;display:flex;\
+         min-height:100vh;align-items:center;justify-content:center;padding:1.5rem;\
+         color:var(--text);background:var(--bg)}}\
+         .card{{max-width:26rem;text-align:center;padding:2rem 1.75rem;\
+         border:1px solid var(--border);border-radius:var(--radius)}}\
+         h1{{font-size:1.1rem;margin:0 0 0.5rem}}\
+         p{{margin:0;color:var(--text-light);line-height:1.5}}\
+         </style>\
+         </head><body><div class=\"card\"><h1>Form not available</h1><p>{escaped}</p></div></body></html>"
     );
 
     HttpResponse::build(status)
@@ -250,7 +263,7 @@ pub async fn submit_form(
         .map_err(|_| internal_error("Form is missing its data class"))?
         .to_string();
 
-    store
+    let table = store
         .get_resource(&table_subject.clone().into())
         .await
         .map_err(|_| internal_error("Form's target table no longer exists"))?;
@@ -266,11 +279,32 @@ pub async fn submit_form(
     .await
     .map_err(internal_error)?;
 
+    // Stamp the owning drive. Client-created resources get this at genesis
+    // (and the commit handler's safety net covers rights-validated commits),
+    // but this server-agent `save()` path skips both — and without a `drive`
+    // the CommitMonitor's drive-scoped fan-out finds no owning drive, so
+    // connected clients never receive the new row over WS and the results
+    // table stays stale until a full reload. `set_unsafe` because `drive`
+    // has no resolvable Property resource (same as the commit handler's
+    // safety net).
+    if let Some(drive) = table.get_drive().or_else(|| form.get_drive()) {
+        row.set_unsafe(
+            urls::DRIVE_PROP.into(),
+            Value::AtomicUrl(drive.to_string().into()),
+        )
+        .map_err(internal_error)?;
+    }
+
     for (property, value) in coerced {
         row.set(property, value, store).await.map_err(internal_error)?;
     }
 
-    row.save(store).await.map_err(internal_error)?;
+    // Genesis (`did:ad:`) rather than plain `save()`: `new_instance` mints an
+    // `internal:/response/{id}` subject, which resolves to a different string
+    // per transport (`http://…` over WS push, `internal:/…` via drive sync) —
+    // the client then indexes the same row under two identities. Every other
+    // table row is a DID resource with one canonical id; match that.
+    row.save_as_genesis(store).await.map_err(internal_error)?;
 
     Ok(HttpResponse::Created().json(json!({ "ok": true })))
 }

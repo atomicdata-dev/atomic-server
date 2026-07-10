@@ -60,6 +60,13 @@ export const NewFormDialog: FC<CustomResourceDialogProps> = ({
     });
     await addToOntology(dataClass);
 
+    // `form-target-table` is a required property on the Form class, so it
+    // must be present in the Form's genesis commit — the server rejects a
+    // genesis commit missing a required property outright. That means the
+    // table's subject has to exist *before* the Form does, so the table is
+    // created first with a temporary parent (the same outer `parent` the
+    // Form gets) and re-parented to the Form once the Form's subject is
+    // known, right alongside the starter page.
     const table = await store.newResource({
       parent,
       isA: dataBrowser.classes.table,
@@ -82,6 +89,9 @@ export const NewFormDialog: FC<CustomResourceDialogProps> = ({
         parent,
         skipNavigation,
         onCreated: async formResource => {
+          await table.set(core.properties.parent, formResource.subject);
+          await table.save();
+
           const page = await store.newResource({
             parent: formResource.subject,
             isA: forms.classes.formPage,

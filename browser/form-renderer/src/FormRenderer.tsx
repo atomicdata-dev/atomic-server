@@ -130,8 +130,6 @@ export function FormRenderer({
         </div>
       )}
 
-      {page?.name && <h2 className='atomic-form-page-name'>{page.name}</h2>}
-
       <div className='atomic-form-blocks'>
         {page?.blocks.map((block, i) => {
           if (block.kind === 'heading') {

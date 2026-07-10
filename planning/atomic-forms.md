@@ -72,6 +72,39 @@ with `classtype` = that class, create the **Form** resource pointing at both.
 Submission rows are children of the table with `isA` = data class — exactly what
 `useTableData.ts` queries. Results-in-a-table then costs nothing.
 
+### 6. The results Table is a child of the Form, not a sibling
+
+Revised in Phase 5 (originally the Form and its target Table were both created
+with the same outer `parent` — siblings under whatever folder the user clicked
+"New" from). The Table's final `parent` is now the Form's own subject, and it
+is reached through a **"Results" tab** inside `FormBuilderPage` rather than
+its own sidebar entry.
+
+**Creation order constraint**: `form-target-table` is a required property on
+the Form class, so it must be present in the Form's *genesis* commit — the
+server rejects a genesis commit missing a required property outright (500,
+"Property ... missing. Is required in class Form"). That means the Table's
+subject has to exist before the Form's does, which conflicts with wanting the
+Table's `parent` to be the Form. `NewFormDialog.tsx` resolves this by
+creating the Table first with a temporary `parent` (the same outer `parent`
+the Form itself gets), including `form-target-table` in the Form's genesis
+`propVals`, then re-parenting the Table to the Form's subject in a follow-up
+commit inside `onCreated` (alongside creating the starter page). The Table is
+briefly parented outside the Form for one commit but this resolves before the
+dialog closes.
+
+Rationale: the table is an implementation detail of "this form's collected
+data", not an independent resource someone browses to on its own — nesting it
+under the Form keeps the sidebar tree honest about ownership and puts results
+one click away from the builder instead of a separate navigation. This mirrors
+how Tables already hide their own row children from the sidebar
+(`ResourceSideBar.tsx`'s `hideChildren`) — Forms get added to that same list so
+the Table doesn't *also* render as a nested sidebar item now that it's a
+child (would duplicate the Results tab and confuse drop targeting).
+
+No migration for forms created before this change — Forms is still a beta
+feature with only local/dev data in play.
+
 ---
 
 ## Data model
@@ -338,18 +371,79 @@ account.
 
 ## Phase 5 — Results & lifecycle polish
 
-Deliverable: pleasant creator experience around the collected data.
+Deliverable: pleasant creator experience around the collected data. The
+results *summary/aggregate view* (bar charts, histograms) is deferred to
+**Phase 5b** below — this phase only wires up the raw submissions grid.
 
-- [ ] Form page shows submission count + link to the table; empty states.
-- [ ] "Open form" / "Copy link" affordances; QR code (component exists for Iroh
-      pairing — reuse).
-- [ ] Unpublish keeps the definition endpoint returning `410` with a friendly
-      closed-message page.
+- [ ] Architecture change: results Table becomes a **child** of the Form
+      (decision #6 above), reached via a **"Results" tab** in
+      `FormBuilderPage` next to the existing field-builder view (which becomes
+      a "Fields" tab). `NewFormDialog.tsx` creates the Form first, then the
+      Table parented to it (mirrors how the starter page is already created
+      in `onCreated`). `ResourceSideBar.tsx`'s `hideChildren` gets
+      `forms.classes.form` added.
+- [x] Results tab renders the existing `TableResource` component
+      (`chunks/TablePage/TableResource.tsx`) against the target table — full
+      grid functionality for free, no new table UI.
+- [ ] ~~Submission count (badge on the "Results" tab) + custom empty state~~
+      **Dropped during implementation.** A standalone `useSubmissionCount`
+      hook (`useCollection` with the same `parent`+`isA` filter
+      `useTableData` uses) reliably returned a stale `0` for tables that
+      genuinely had rows — confirmed with fresh, never-before-queried
+      tables, so it wasn't a caching artifact from manual testing. The
+      *same* `TableResource`/`useTableData` pipeline, used directly (e.g.
+      navigating straight to the table's own page), correctly showed the
+      rows every time. ~~Root cause not fully isolated~~ **Root-caused and
+      fixed later — see "Submission rows invisible until reload" below.**
+      The tab still just renders `TableResource` directly (which has its
+      own, already-correct empty grid); a count/badge can now be revisited.
+- [x] **Bug: submission rows invisible until reload (fixed).** Reported as
+      "form results tables don't show their rows unless I refresh"; also
+      explains the stale `useSubmissionCount` above. Two independent causes:
+      1. **Server** (`server/src/handlers/form.rs::submit_form`): rows were
+         created via `Resource::new_instance` + `save()`, producing an
+         `internal:/response/{id}` subject with **no `drive` propval**. The
+         CommitMonitor's drive-scoped fan-out routes a commit only to
+         subscribers of the resource's `drive` — with none, the commit
+         reached no WS client, so connected browsers never heard about new
+         submissions (client-created rows always get `drive` stamped at
+         genesis; this server-agent path skipped both that and the
+         rights-path safety net in `commit.rs`). The `internal:` subject
+         also resolved to a different string per transport (`http://…` on
+         WS push vs `internal:/…` via drive sync), double-indexing the same
+         row in OPFS. Fix: stamp `drive` (from the target table, falling
+         back to the form) with `set_unsafe` and create the row via
+         `save_as_genesis()` so it's a canonical `did:ad:` resource like
+         every other table row.
+      2. **Client** (`TableResource.tsx`): the grid's frozen
+         `baselineMemberCountRef` (which exists so this-session typed rows
+         never remount mid-edit) never grew when members were added
+         *remotely* — the collection's live-membership bridge dutifully
+         appended the row (`totalMembers` grew) but the grid kept rendering
+         the frozen count. Fix: when the collection grows beyond
+         `baseline + this-session materialized rows`, rebase the session
+         onto the grown collection (same move as the existing queryKey
+         rebase). Applies to any table receiving rows from another
+         client/agent, not just form results.
+- [ ] "Open form" / "Copy link" affordances; QR code via a new `qrcode`
+      dependency (none existed in the repo). Publishing mints the share slug
+      immediately (one `GET /form/{did}/definition` call right after
+      `published-at` is set) instead of waiting for a visitor's first request
+      to mint it lazily.
+- [ ] Unpublish keeps the definition endpoint returning `410` with a friendlier,
+      form-specific closed-message page (copy + light styling pass on the
+      existing dependency-free `not_available_page`).
+- [ ] Delete-form flow: `Resource.destroy()` never cascades, so "keep table +
+      data class by default" already happens for free. Add an explicit
+      cascade option in a form-specific delete dialog: also destroy the
+      table + its submission rows (not the generated data Class/Properties).
+
+## Phase 5b — Results summary view (deferred)
+
 - [ ] Results summary view (per-question aggregates: bar chart for choice fields,
-      histogram for numbers, list for text) as a tab next to the table view.
-      Client-side aggregation over the collection is fine at expected volumes.
-- [ ] Delete-form flow: what happens to table + data class (keep by default,
-      offer cascade).
+      histogram for numbers, list for text) as an additional tab/mode next to
+      the raw results grid from Phase 5. Client-side aggregation over the
+      collection is fine at expected volumes.
 
 ## Phase 6 — Should-haves (each independently shippable)
 

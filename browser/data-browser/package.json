@@ -73,6 +73,7 @@
     "ollama-ai-provider-v2": "^3.5.1",
     "polished": "^4.3.1",
     "prismjs": "^1.30.0",
+    "qrcode": "^1.5.4",
     "quick-score": "^0.2.0",
     "react": "^19.2.6",
     "react-colorful": "^5.7.0",
@@ -107,6 +108,7 @@
   "devDependencies": {
     "@tanstack/router-devtools": "^1.167.0",
     "@types/prismjs": "^1.26.6",
+    "@types/qrcode": "^1.5.5",
     "@types/react": "^19.2.15",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",

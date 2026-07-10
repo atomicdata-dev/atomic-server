@@ -19,6 +19,8 @@ import { useCustomContextItemsContext } from './CustomContextItemsContext';
 import { CoverPickerDialog, EmojiPickerDialog } from '../ResourceDecorations';
 import { ResourceInline } from '../../views/ResourceInline';
 import { ResourceUsage } from '../ResourceUsage';
+import { getDeleteDialog } from './deleteDialogRegistry';
+import { useAfterResourceDelete } from '../../hooks/useAfterResourceDelete';
 
 export {
   CustomContextItemsProvider,
@@ -106,6 +108,7 @@ export function ResourceContextMenu({
   searchable,
 }: ResourceContextMenuProps) {
   const [confirmingAction, setConfirmingAction] = useState<ActionDefinition>();
+  const [showCustomDeleteDialog, setShowCustomDeleteDialog] = useState(false);
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [shiftHeld, setShiftHeld] = useState(false);
@@ -126,6 +129,8 @@ export function ResourceContextMenu({
     openCoverPicker,
   });
   const { items: customItems } = useCustomContextItemsContext();
+  const CustomDeleteDialog = getDeleteDialog(ctx.resource.getClasses()[0]);
+  const afterDelete = useAfterResourceDelete(subject, onAfterDelete);
   // Try to not have a useResource hook in here, as that will lead to many costly fetches when the user enters a new subject
 
   const handleBindActive = useCallback(
@@ -185,10 +190,16 @@ export function ResourceContextMenu({
 
     previousSection = action.section;
 
+    // Classes with their own delete dialog (e.g. Forms, which can also delete
+    // a results table) must always go through it — shift-to-skip and the
+    // generic confirmation are only safe for the non-cascading delete.
+    const usesCustomDeleteDialog =
+      action.id === ContextMenuOptions.Delete && CustomDeleteDialog;
+
     items.push({
       id: action.id,
       label:
-        shiftHeld && action.danger && action.dangerLabel
+        shiftHeld && action.danger && action.dangerLabel && !usesCustomDeleteDialog
           ? action.dangerLabel(ctx)
           : action.label(ctx),
       helper: action.helper(ctx),
@@ -202,7 +213,9 @@ export function ResourceContextMenu({
           : action.searchOnly,
       onClick: () => {
         // Shift skips the confirmation dialog for danger actions.
-        if (action.danger && action.confirmation && !shiftHeld) {
+        if (usesCustomDeleteDialog) {
+          setShowCustomDeleteDialog(true);
+        } else if (action.danger && action.confirmation && !shiftHeld) {
           setConfirmingAction(action);
         } else {
           runAction(action, ctx);
@@ -272,6 +285,14 @@ export function ResourceContextMenu({
           confirmation?.body(ctx)
         )}
       </ConfirmationDialog>
+      {CustomDeleteDialog && (
+        <CustomDeleteDialog
+          resource={ctx.resource}
+          show={showCustomDeleteDialog}
+          bindShow={setShowCustomDeleteDialog}
+          onDeleted={afterDelete}
+        />
+      )}
       {/* Use the menu's own subject, not the current page's — a right-click can
        * target a resource other than the one being viewed. */}
       <ResourceCodeUsageDialog
