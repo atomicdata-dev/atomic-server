@@ -105,6 +105,41 @@ test.describe('form publish and anonymous submit', () => {
       timeout: 15000,
     });
     await expect(page.getByText('ada@example.com')).toBeVisible();
+
+    // --- 5. Owner: the Summary tab aggregates the submission (Phase 5b).
+    // The summary is computed by the Form class extender on a forced server
+    // GET when the tab opens — not synced via OPFS/WS.
+    await openSubject(page, formSubject);
+    await page.getByRole('tab', { name: 'Summary' }).click();
+    await expect(page.getByText('1 response', { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText('Ada Lovelace')).toBeVisible();
+
+    // --- 6. Second anonymous submission only appears after Refresh
+    // (extenders are not realtime — the button is the update path).
+    const visitor2Context = await browser.newContext();
+    const visitor2Page = await visitor2Context.newPage();
+    await visitor2Page.goto(`${SERVER_URL}/form/${formSubject}`);
+    const name2 = visitor2Page.getByLabel('Full name', { exact: false });
+    await expect(name2).toBeVisible({ timeout: 15000 });
+    await name2.fill('Grace Hopper');
+    await visitor2Page
+      .getByLabel('Email', { exact: false })
+      .fill('grace@example.com');
+    await visitor2Page
+      .getByRole('button', { name: 'Submit', exact: true })
+      .click();
+    await expect(visitor2Page.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
+    await visitor2Context.close();
+
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await expect(page.getByText('2 responses', { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText('Grace Hopper')).toBeVisible();
   });
 
   test('unpublished form shows a friendly not-available page', async ({

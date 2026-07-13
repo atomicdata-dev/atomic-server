@@ -39,6 +39,7 @@ pub mod chatroom;
 pub mod did;
 pub mod export;
 pub mod files;
+pub mod form;
 pub mod importer;
 pub mod invite;
 pub mod path;

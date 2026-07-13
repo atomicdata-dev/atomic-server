@@ -10,6 +10,7 @@ pub mod config;
 mod content_types;
 pub mod context;
 mod errors;
+mod forms;
 mod handlers;
 mod helpers;
 pub mod host_mode;

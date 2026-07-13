@@ -27,6 +27,8 @@ export const forms = {
     required: 'https://atomicdata.dev/properties/required',
     formFieldType: 'https://atomicdata.dev/properties/form-field-type',
     formFieldOptions: 'https://atomicdata.dev/properties/form-field-options',
+    formSubmissionSummary:
+      'https://atomicdata.dev/properties/form-submission-summary',
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Form']: [
@@ -126,6 +128,7 @@ declare module '../index.js' {
     [forms.properties.required]: boolean;
     [forms.properties.formFieldType]: string;
     [forms.properties.formFieldOptions]: JSONValue;
+    [forms.properties.formSubmissionSummary]: JSONValue;
   }
 
   interface PropSubjectToNameMapping {
@@ -142,5 +145,6 @@ declare module '../index.js' {
     [forms.properties.required]: 'required';
     [forms.properties.formFieldType]: 'formFieldType';
     [forms.properties.formFieldOptions]: 'formFieldOptions';
+    [forms.properties.formSubmissionSummary]: 'formSubmissionSummary';
   }
 }

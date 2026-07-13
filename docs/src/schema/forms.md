@@ -26,6 +26,7 @@ Properties:
 - [`form-pages`](https://atomicdata.dev/properties/form-pages) - (required, ResourceArray, FormPage) the form's pages, in order.
 - [`form-published-at`](https://atomicdata.dev/properties/form-published-at) - (recommended, Timestamp) when the form was published. Absent means unpublished; submissions are only accepted while set.
 - [`form-settings`](https://atomicdata.dev/properties/form-settings) - (recommended, JSON) miscellaneous settings (e.g. progress bar, confirmation message).
+- [`form-submission-summary`](https://atomicdata.dev/properties/form-submission-summary) - (JSON, server-computed) aggregated submission statistics (response count, per-question option counts / number bins / answer samples), added to the resource by the server when a Form is fetched over HTTP. Ephemeral: it is never persisted and must never be written by clients.
 
 ## FormPage
 

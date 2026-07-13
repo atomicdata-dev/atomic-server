@@ -9,6 +9,7 @@ pub mod config;
 mod content_types;
 mod context;
 mod errors;
+mod forms;
 mod handlers;
 mod helpers;
 mod host_mode;

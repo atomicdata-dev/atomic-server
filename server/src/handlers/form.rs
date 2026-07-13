@@ -1,7 +1,7 @@
 //! `/form/:id` endpoints — Phase 3 of Atomic Forms
 //! (`planning/atomic-forms.md`). Submissions are written by the store's own
 //! default agent (there is no visitor identity); publish-state gating plus
-//! the field validation in `atomic_lib::forms` replace a rights check.
+//! the field validation in `crate::forms` replace a rights check.
 //! Responses are plain JSON, not JSON-AD — this runtime never parses Atomic
 //! Data, so it gets its own small error type instead of `AtomicServerError`.
 
@@ -12,10 +12,10 @@ use std::{
 };
 
 use actix_web::{http::StatusCode, web, HttpRequest, HttpResponse, ResponseError};
-use atomic_lib::{forms, urls, AtomicError, Resource, Storelike, Value};
+use atomic_lib::{urls, AtomicError, Resource, Storelike, Value};
 use serde_json::json;
 
-use crate::{appstate::AppState, handlers::single_page_app::generate_nonce};
+use crate::{appstate::AppState, forms, handlers::single_page_app::generate_nonce};
 
 pub struct FormApiError {
     status: StatusCode,
@@ -194,7 +194,7 @@ fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
 
 /// `GET /form/{id}/definition` — denormalized JSON for a published form.
 /// Mints and persists a publish slug on first successful fetch if the form
-/// doesn't have one yet (see `atomic_lib::forms` module docs).
+/// doesn't have one yet (see `crate::forms` module docs).
 pub async fn get_definition(
     path: web::Path<String>,
     appstate: web::Data<AppState>,

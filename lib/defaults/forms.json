@@ -63,6 +63,16 @@
     "https://atomicdata.dev/properties/shortname": "form-publish-id"
   },
   {
+    "@id": "https://atomicdata.dev/properties/form-submission-summary",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Aggregated submission statistics (response count, per-question counts/bins/answer samples), computed by the server when a Form is fetched. Ephemeral: never persisted, never written by clients.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-submission-summary"
+  },
+  {
     "@id": "https://atomicdata.dev/classes/Form",
     "https://atomicdata.dev/properties/description": "A form or survey that can be published and shared with a link. Submissions are collected as rows in `form-target-table`, one Property per question on `form-data-class`.",
     "https://atomicdata.dev/properties/isA": [
@@ -243,7 +253,8 @@
       "https://atomicdata.dev/properties/form-maps-to",
       "https://atomicdata.dev/properties/required",
       "https://atomicdata.dev/properties/form-field-type",
-      "https://atomicdata.dev/properties/form-field-options"
+      "https://atomicdata.dev/properties/form-field-options",
+      "https://atomicdata.dev/properties/form-submission-summary"
     ]
   }
 ]

@@ -17,8 +17,9 @@ import { PublishToggle } from './PublishToggle';
 import { FormPreviewButton } from './FormPreviewDialog';
 import { ResultsTab } from './ResultsTab';
 import { ShareLinkPanel } from './ShareLinkPanel';
+import { SummaryTab } from './Summary/SummaryTab';
 
-type BuilderTab = 'fields' | 'results';
+type BuilderTab = 'fields' | 'results' | 'summary';
 
 export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   const titleId = useId();
@@ -44,19 +45,19 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <Shell>
       <TitleSlot>
-        <Row justify="space-between" center>
+        <Row justify='space-between' center>
           <EditableTitle resource={resource} id={titleId} />
-          <Row gap="0.5rem" center>
+          <Row gap='0.5rem' center>
             <ShareLinkPanel resource={resource} />
             <FormPreviewButton formSubject={resource.subject} />
             <PublishToggle resource={resource} />
           </Row>
         </Row>
       </TitleSlot>
-      <TabsSlot role="tablist">
+      <TabsSlot role='tablist'>
         <TabButton
-          role="tab"
-          type="button"
+          role='tab'
+          type='button'
           $active={activeTab === 'fields'}
           aria-selected={activeTab === 'fields'}
           onClick={() => setActiveTab('fields')}
@@ -64,13 +65,22 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
           Fields
         </TabButton>
         <TabButton
-          role="tab"
-          type="button"
+          role='tab'
+          type='button'
           $active={activeTab === 'results'}
           aria-selected={activeTab === 'results'}
           onClick={() => setActiveTab('results')}
         >
           Results
+        </TabButton>
+        <TabButton
+          role='tab'
+          type='button'
+          $active={activeTab === 'summary'}
+          aria-selected={activeTab === 'summary'}
+          onClick={() => setActiveTab('summary')}
+        >
+          Summary
         </TabButton>
       </TabsSlot>
       {activeTab === 'fields' ? (
@@ -104,9 +114,13 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
             />
           </PageBarSlot>
         </FieldsGrid>
-      ) : (
+      ) : activeTab === 'results' ? (
         <ResultsSlot>
           <ResultsTab tableResource={tableResource} />
+        </ResultsSlot>
+      ) : (
+        <ResultsSlot>
+          <SummaryTab formSubject={resource.subject} />
         </ResultsSlot>
       )}
     </Shell>

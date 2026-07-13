@@ -12,9 +12,14 @@ use std::collections::{HashMap, HashSet};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value as JsonValue};
 
-use crate::{
-    datatype::DataType, db::trees::Tree, errors::AtomicResult, storelike::Storelike,
-    utils::random_string, Db, Resource, Subject, Value,
+use atomic_lib::{
+    agents::ForAgent,
+    datatype::DataType,
+    db::{drive_prefix_from_subject, trees::Tree},
+    errors::AtomicResult,
+    storelike::{FilterOperator, PropVal, Query, QueryResult, Storelike},
+    utils::random_string,
+    Db, Resource, Subject, Value,
 };
 
 /// The submit body's top-level key checked for a non-empty honeypot value.
@@ -72,14 +77,14 @@ pub async fn build_form_definition(
     store: &impl Storelike,
     form: &Resource,
 ) -> AtomicResult<FormDefinition> {
-    let name = form.get(crate::urls::NAME)?.to_string();
-    let settings = match form.get(crate::urls::FORM_SETTINGS) {
+    let name = form.get(atomic_lib::urls::NAME)?.to_string();
+    let settings = match form.get(atomic_lib::urls::FORM_SETTINGS) {
         Ok(Value::Json(v)) => v.clone(),
         _ => json!({}),
     };
 
     let page_subjects = form
-        .get(crate::urls::FORM_PAGES)
+        .get(atomic_lib::urls::FORM_PAGES)
         .and_then(|v| v.to_subjects(None))
         .unwrap_or_default();
 
@@ -103,18 +108,18 @@ async fn build_page_definition(
     store: &impl Storelike,
     page: &Resource,
 ) -> AtomicResult<FormPageDefinition> {
-    let name = page.get(crate::urls::NAME).ok().map(|v| v.to_string());
+    let name = page.get(atomic_lib::urls::NAME).ok().map(|v| v.to_string());
     let cover_image = page
-        .get(crate::urls::COVER_IMAGE)
+        .get(atomic_lib::urls::COVER_IMAGE)
         .ok()
         .map(|v| v.to_string());
     let image_position = page
-        .get(crate::urls::IMAGE_POSITION)
+        .get(atomic_lib::urls::IMAGE_POSITION)
         .ok()
         .map(|v| v.to_string());
 
     let field_subjects = page
-        .get(crate::urls::FORM_FIELDS)
+        .get(atomic_lib::urls::FORM_FIELDS)
         .and_then(|v| v.to_subjects(None))
         .unwrap_or_default();
 
@@ -134,31 +139,34 @@ async fn build_page_definition(
 
 fn build_block(field: &Resource) -> AtomicResult<FormBlock> {
     let classes = field
-        .get(crate::urls::IS_A)
+        .get(atomic_lib::urls::IS_A)
         .and_then(|v| v.to_subjects(None))
         .unwrap_or_default();
 
-    if classes.iter().any(|c| c == crate::urls::FORM_HEADING) {
-        let text = field.get(crate::urls::NAME)?.to_string();
+    if classes.iter().any(|c| c == atomic_lib::urls::FORM_HEADING) {
+        let text = field.get(atomic_lib::urls::NAME)?.to_string();
         return Ok(FormBlock::Heading { text });
     }
-    if classes.iter().any(|c| c == crate::urls::FORM_PARAGRAPH) {
-        let text = field.get(crate::urls::DESCRIPTION)?.to_string();
+    if classes
+        .iter()
+        .any(|c| c == atomic_lib::urls::FORM_PARAGRAPH)
+    {
+        let text = field.get(atomic_lib::urls::DESCRIPTION)?.to_string();
         return Ok(FormBlock::Paragraph { text });
     }
-    if classes.iter().any(|c| c == crate::urls::FORM_FIELD) {
-        let maps_to = field.get(crate::urls::FORM_MAPS_TO)?.to_string();
-        let label = field.get(crate::urls::NAME)?.to_string();
+    if classes.iter().any(|c| c == atomic_lib::urls::FORM_FIELD) {
+        let maps_to = field.get(atomic_lib::urls::FORM_MAPS_TO)?.to_string();
+        let label = field.get(atomic_lib::urls::NAME)?.to_string();
         let description = field
-            .get(crate::urls::DESCRIPTION)
+            .get(atomic_lib::urls::DESCRIPTION)
             .ok()
             .map(|v| v.to_string());
-        let field_type = field.get(crate::urls::FORM_FIELD_TYPE)?.to_string();
+        let field_type = field.get(atomic_lib::urls::FORM_FIELD_TYPE)?.to_string();
         let required = field
-            .get(crate::urls::REQUIRED)
+            .get(atomic_lib::urls::REQUIRED)
             .and_then(|v| v.to_bool())
             .unwrap_or(false);
-        let options = match field.get(crate::urls::FORM_FIELD_OPTIONS) {
+        let options = match field.get(atomic_lib::urls::FORM_FIELD_OPTIONS) {
             Ok(Value::Json(v)) => v.clone(),
             _ => json!({}),
         };
@@ -261,9 +269,9 @@ pub fn validate_submission(
 
 fn coerce_value(field_type: &str, options: &JsonValue, raw: &JsonValue) -> Result<Value, String> {
     match field_type {
-        "short-text" | "long-text" => {
-            Ok(Value::String(raw.as_str().ok_or("Expected a string")?.to_string()))
-        }
+        "short-text" | "long-text" => Ok(Value::String(
+            raw.as_str().ok_or("Expected a string")?.to_string(),
+        )),
         "email" => {
             let s = raw.as_str().ok_or("Expected a string")?.to_string();
             if !is_valid_email(&s) {
@@ -290,7 +298,9 @@ fn coerce_value(field_type: &str, options: &JsonValue, raw: &JsonValue) -> Resul
             Value::new(s, &DataType::Date).map_err(|e| e.to_string())
         }
         "datetime" => {
-            let ts = raw.as_i64().ok_or("Expected a timestamp in ms since epoch")?;
+            let ts = raw
+                .as_i64()
+                .ok_or("Expected a timestamp in ms since epoch")?;
             Ok(Value::Timestamp(ts))
         }
         "checkbox" => Ok(Value::Boolean(raw.as_bool().ok_or("Expected a boolean")?)),
@@ -334,6 +344,263 @@ fn is_valid_email(s: &str) -> bool {
     re.is_match(s)
 }
 
+// ── Submission summary (server-computed, ephemeral) ─────────────────────────
+
+/// Hard cap on rows aggregated per summary, so a huge table can't stall a GET.
+const SUMMARY_ROW_LIMIT: usize = 10_000;
+/// Max free-text answers included per field.
+const SUMMARY_ANSWER_SAMPLE_LIMIT: usize = 100;
+/// Histogram bin count the nice-width search aims for (actual count varies).
+const SUMMARY_HISTOGRAM_TARGET_BINS: usize = 9;
+
+/// Aggregates a Form's submission rows into the `form-submission-summary`
+/// JSON served by the Form class extender. Field order follows the form
+/// definition (pages, then fields). The row query runs as `for_agent`, so a
+/// caller inside the resource-GET path inherits its rights checks. Shape is
+/// mirrored by `FormSummary` in the data-browser's `SummaryTab` — keep in
+/// lockstep (no codegen), same convention as [FormDefinition].
+pub async fn build_form_summary(
+    store: &Db,
+    form: &Resource,
+    for_agent: &ForAgent,
+) -> AtomicResult<JsonValue> {
+    let definition = build_form_definition(store, form).await?;
+    let table_subject = form.get(atomic_lib::urls::FORM_TARGET_TABLE)?.to_string();
+    let data_class = form.get(atomic_lib::urls::FORM_DATA_CLASS)?.to_string();
+
+    let query = Query {
+        property: Some(atomic_lib::urls::PARENT.into()),
+        value: Some(Value::AtomicUrl(table_subject.into())),
+        filters: vec![PropVal {
+            property: Some(atomic_lib::urls::IS_A.into()),
+            value: Some(Value::AtomicUrl(data_class.into())),
+            operator: FilterOperator::Equal,
+        }],
+        limit: Some(SUMMARY_ROW_LIMIT),
+        for_agent: for_agent.clone(),
+        // Same fallback the collections `/query` path uses when no drive is
+        // given; the propval (stamped at genesis on client-created forms) is
+        // the real owning drive.
+        drive: Some(
+            form.get_drive()
+                .unwrap_or_else(|| drive_prefix_from_subject(form.get_subject())),
+        ),
+        ..Query::new()
+    };
+    let QueryResult {
+        resources: rows, ..
+    } = store.query(&query).await?;
+
+    let mut fields = Vec::new();
+    for page in &definition.pages {
+        for block in &page.blocks {
+            if let FormBlock::Field {
+                maps_to,
+                label,
+                field_type,
+                options,
+                ..
+            } = block
+            {
+                let values: Vec<&Value> = rows
+                    .iter()
+                    .filter_map(|row| row.get(maps_to).ok())
+                    .filter(|v| !is_empty_value(v))
+                    .collect();
+                fields.push(summarize_field(
+                    maps_to,
+                    label,
+                    field_type,
+                    options,
+                    &values,
+                    rows.len(),
+                ));
+            }
+        }
+    }
+
+    Ok(json!({ "responses": rows.len(), "fields": fields }))
+}
+
+/// Values the submit pipeline would never write, but that could sneak in via
+/// direct table edits — treated as "skipped" rather than as an answer.
+fn is_empty_value(value: &Value) -> bool {
+    match value {
+        Value::String(s) | Value::Markdown(s) | Value::Slug(s) => s.is_empty(),
+        Value::Json(JsonValue::Null) => true,
+        Value::Json(JsonValue::Array(a)) => a.is_empty(),
+        _ => false,
+    }
+}
+
+fn summarize_field(
+    maps_to: &str,
+    label: &str,
+    field_type: &str,
+    options: &JsonValue,
+    values: &[&Value],
+    total_rows: usize,
+) -> JsonValue {
+    let answered = values.len();
+    let mut summary = json!({
+        "mapsTo": maps_to,
+        "label": label,
+        "type": field_type,
+        "answered": answered,
+        "skipped": total_rows.saturating_sub(answered),
+    });
+    let obj = summary.as_object_mut().expect("built as an object above");
+
+    match field_type {
+        "radio" => {
+            let picks = values.iter().map(|v| v.to_string());
+            obj.insert("counts".into(), choice_counts(options, picks));
+        }
+        "multi-select" => {
+            // Each answer is a `Value::Json` array of picked option strings.
+            let picks = values.iter().flat_map(|v| match v {
+                Value::Json(JsonValue::Array(items)) => items
+                    .iter()
+                    .filter_map(|i| i.as_str().map(str::to_string))
+                    .collect::<Vec<_>>(),
+                _ => Vec::new(),
+            });
+            obj.insert("counts".into(), choice_counts(options, picks));
+        }
+        "checkbox" => {
+            let checked = values
+                .iter()
+                .filter(|v| matches!(v, Value::Boolean(true)))
+                .count();
+            obj.insert("checked".into(), json!(checked));
+            obj.insert("unchecked".into(), json!(answered - checked));
+        }
+        "number" => {
+            let numbers: Vec<f64> = values.iter().filter_map(|v| as_f64(v)).collect();
+            if let Some((bins, min, max, mean)) = histogram(&numbers) {
+                obj.insert("bins".into(), bins);
+                obj.insert("min".into(), json!(min));
+                obj.insert("max".into(), json!(max));
+                obj.insert("mean".into(), json!(mean));
+            }
+        }
+        // short-text, long-text, email, date, datetime: a sample of answers.
+        _ => {
+            let answers: Vec<JsonValue> = values
+                .iter()
+                .take(SUMMARY_ANSWER_SAMPLE_LIMIT)
+                .map(|v| match v {
+                    Value::Timestamp(t) => json!(t),
+                    other => json!(other.to_string()),
+                })
+                .collect();
+            obj.insert("answers".into(), json!(answers));
+        }
+    }
+
+    summary
+}
+
+/// Counts picks per configured option (field options JSON `{"options": [..]}`),
+/// preserving the configured order and zero-filling unpicked options. Picks
+/// not matching any configured option fold into a trailing `"Other"` bucket.
+fn choice_counts(options: &JsonValue, picks: impl Iterator<Item = String>) -> JsonValue {
+    let configured: Vec<String> = options
+        .get("options")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    let mut counts: Vec<(String, usize)> = configured.iter().map(|o| (o.clone(), 0)).collect();
+    let mut other = 0;
+    for pick in picks {
+        match counts.iter_mut().find(|(option, _)| option == &pick) {
+            Some((_, count)) => *count += 1,
+            None => other += 1,
+        }
+    }
+    if other > 0 {
+        counts.push(("Other".to_string(), other));
+    }
+
+    json!(counts
+        .into_iter()
+        .map(|(option, count)| json!([option, count]))
+        .collect::<Vec<_>>())
+}
+
+fn as_f64(value: &Value) -> Option<f64> {
+    match value {
+        Value::Float(f) => Some(*f),
+        Value::Integer(i) => Some(*i as f64),
+        Value::Timestamp(t) => Some(*t as f64),
+        _ => None,
+    }
+}
+
+/// Bins `values` into a histogram with a "nice" bin width (1·2·5×10ⁿ) and
+/// edges aligned to multiples of that width. Returns `(bins, min, max, mean)`
+/// as JSON-ready values, or `None` when there is nothing to bin.
+fn histogram(values: &[f64]) -> Option<(JsonValue, f64, f64, f64)> {
+    if values.is_empty() {
+        return None;
+    }
+    let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+
+    // All values identical: one bin holding everything.
+    if min == max {
+        let bins = json!([{ "min": min, "max": max, "count": values.len() }]);
+        return Some((bins, min, max, mean));
+    }
+
+    let width = nice_bin_width((max - min) / SUMMARY_HISTOGRAM_TARGET_BINS as f64);
+    let start = (min / width).floor() * width;
+    let bin_count = (((max - start) / width).ceil() as usize).max(1);
+
+    let mut counts = vec![0usize; bin_count];
+    for &v in values {
+        // The top edge is inclusive so `max` itself doesn't fall off the end.
+        let idx = (((v - start) / width).floor() as usize).min(bin_count - 1);
+        counts[idx] += 1;
+    }
+
+    let bins: Vec<JsonValue> = counts
+        .iter()
+        .enumerate()
+        .map(|(i, count)| {
+            json!({
+                "min": round_clean(start + i as f64 * width),
+                "max": round_clean(start + (i + 1) as f64 * width),
+                "count": count,
+            })
+        })
+        .collect();
+
+    Some((json!(bins), min, max, mean))
+}
+
+/// Smallest 1·2·5×10ⁿ value ≥ `raw`.
+fn nice_bin_width(raw: f64) -> f64 {
+    let magnitude = 10f64.powf(raw.log10().floor());
+    for multiplier in [1.0, 2.0, 5.0, 10.0] {
+        if magnitude * multiplier >= raw {
+            return magnitude * multiplier;
+        }
+    }
+    magnitude * 10.0
+}
+
+/// Rounds away float noise from repeated width additions (e.g. 0.30000000000000004).
+fn round_clean(x: f64) -> f64 {
+    (x * 1e9).round() / 1e9
+}
+
 // ── Publish slug index (redb-backed, mirrors sync::peer's known-peers map) ──
 
 fn get_slug_map(store: &Db) -> HashMap<String, String> {
@@ -373,7 +640,7 @@ pub async fn resolve_form(store: &Db, id: &str) -> AtomicResult<Resource> {
 /// `form-publish-id`, signed by the store's default agent) and indexes a new
 /// one. `form` must reflect the currently stored state.
 pub async fn mint_publish_slug(store: &Db, form: &mut Resource) -> AtomicResult<String> {
-    if let Ok(existing) = form.get(crate::urls::FORM_PUBLISH_ID) {
+    if let Ok(existing) = form.get(atomic_lib::urls::FORM_PUBLISH_ID) {
         let slug = existing.to_string();
         if !slug.is_empty() {
             return Ok(slug);
@@ -389,7 +656,7 @@ pub async fn mint_publish_slug(store: &Db, form: &mut Resource) -> AtomicResult<
     };
 
     form.set(
-        crate::urls::FORM_PUBLISH_ID.into(),
+        atomic_lib::urls::FORM_PUBLISH_ID.into(),
         Value::String(slug.clone()),
         store,
     )
@@ -405,7 +672,7 @@ pub async fn mint_publish_slug(store: &Db, form: &mut Resource) -> AtomicResult<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{test_utils::init_store, urls};
+    use atomic_lib::{test_utils::init_store, urls};
     use serde_json::json;
 
     async fn make_class_and_property(
@@ -485,7 +752,9 @@ mod tests {
             .unwrap();
         table.save_locally(store).await.unwrap();
 
-        let mut field = Resource::new_instance(urls::FORM_FIELD, store).await.unwrap();
+        let mut field = Resource::new_instance(urls::FORM_FIELD, store)
+            .await
+            .unwrap();
         field
             .set(urls::NAME.into(), Value::String("Email".into()), store)
             .await
@@ -512,7 +781,9 @@ mod tests {
             .unwrap();
         field.save_locally(store).await.unwrap();
 
-        let mut page = Resource::new_instance(urls::FORM_PAGE, store).await.unwrap();
+        let mut page = Resource::new_instance(urls::FORM_PAGE, store)
+            .await
+            .unwrap();
         page.set(
             urls::FORM_FIELDS.into(),
             Value::ResourceArray(vec![field.get_subject().to_string().into()]),
@@ -710,6 +981,171 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(resolved_by_did.get_subject(), form.get_subject());
+    }
+
+    fn field_summary(
+        field_type: &str,
+        options: JsonValue,
+        values: &[Value],
+        total: usize,
+    ) -> JsonValue {
+        let refs: Vec<&Value> = values.iter().collect();
+        summarize_field(
+            "https://example.com/p",
+            "Q",
+            field_type,
+            &options,
+            &refs,
+            total,
+        )
+    }
+
+    #[test]
+    fn radio_counts_preserve_option_order_and_fold_unknown() {
+        let values = vec![
+            Value::String("B".into()),
+            Value::String("A".into()),
+            Value::String("B".into()),
+            Value::String("stray".into()),
+        ];
+        let summary = field_summary("radio", json!({"options": ["A", "B", "C"]}), &values, 5);
+
+        assert_eq!(summary["answered"], 4);
+        assert_eq!(summary["skipped"], 1);
+        assert_eq!(
+            summary["counts"],
+            json!([["A", 1], ["B", 2], ["C", 0], ["Other", 1]])
+        );
+    }
+
+    #[test]
+    fn multi_select_counts_iterate_json_arrays() {
+        let values = vec![
+            Value::Json(json!(["Red", "Green"])),
+            Value::Json(json!(["Red"])),
+        ];
+        let summary = field_summary(
+            "multi-select",
+            json!({"options": ["Red", "Green", "Blue"]}),
+            &values,
+            2,
+        );
+
+        // Two responses, three total picks.
+        assert_eq!(summary["answered"], 2);
+        assert_eq!(
+            summary["counts"],
+            json!([["Red", 2], ["Green", 1], ["Blue", 0]])
+        );
+    }
+
+    #[test]
+    fn checkbox_counts_checked_and_unchecked() {
+        let values = vec![
+            Value::Boolean(true),
+            Value::Boolean(false),
+            Value::Boolean(true),
+        ];
+        let summary = field_summary("checkbox", json!({}), &values, 4);
+
+        assert_eq!(summary["checked"], 2);
+        assert_eq!(summary["unchecked"], 1);
+        assert_eq!(summary["skipped"], 1);
+    }
+
+    #[test]
+    fn number_histogram_uses_nice_bins() {
+        let values: Vec<Value> = [1.0, 3.0, 7.0, 12.0, 42.0]
+            .iter()
+            .map(|f| Value::Float(*f))
+            .collect();
+        let summary = field_summary("number", json!({}), &values, 5);
+
+        assert_eq!(summary["min"], 1.0);
+        assert_eq!(summary["max"], 42.0);
+        assert_eq!(summary["mean"], 13.0);
+
+        let bins = summary["bins"].as_array().unwrap();
+        // (42-1)/9 ≈ 4.6 → nice width 5, start 0 → bins 0..45.
+        assert_eq!(bins[0]["min"], 0.0);
+        assert_eq!(bins[0]["max"], 5.0);
+        assert_eq!(bins.len(), 9);
+        // Every value lands in exactly one bin.
+        let total: u64 = bins.iter().map(|b| b["count"].as_u64().unwrap()).sum();
+        assert_eq!(total, 5);
+        // 42 (the max) is inside the last bin, not dropped off the top edge.
+        assert_eq!(bins[8]["count"], 1);
+    }
+
+    #[test]
+    fn number_histogram_single_value_degenerates_to_one_bin() {
+        let values = vec![Value::Float(3.5), Value::Float(3.5)];
+        let summary = field_summary("number", json!({}), &values, 2);
+
+        assert_eq!(
+            summary["bins"],
+            json!([{"min": 3.5, "max": 3.5, "count": 2}])
+        );
+    }
+
+    #[test]
+    fn text_answers_are_sampled_and_capped() {
+        let values: Vec<Value> = (0..150)
+            .map(|i| Value::String(format!("answer {i}")))
+            .collect();
+        let summary = field_summary("short-text", json!({}), &values, 150);
+
+        assert_eq!(summary["answered"], 150);
+        assert_eq!(summary["answers"].as_array().unwrap().len(), 100);
+        assert_eq!(summary["answers"][0], "answer 0");
+    }
+
+    #[test]
+    fn datetime_answers_stay_numeric() {
+        let values = vec![Value::Timestamp(1700000000000)];
+        let summary = field_summary("datetime", json!({}), &values, 1);
+
+        assert_eq!(summary["answers"], json!([1700000000000i64]));
+    }
+
+    #[tokio::test]
+    async fn builds_summary_from_stored_rows() {
+        let store = init_store().await;
+        let (form, email_prop) = build_test_form(&store).await;
+
+        let table_subject = form.get(urls::FORM_TARGET_TABLE).unwrap().to_string();
+        let data_class = form.get(urls::FORM_DATA_CLASS).unwrap().to_string();
+
+        for i in 0..2 {
+            let mut row = Resource::new_instance(&data_class, &store).await.unwrap();
+            row.set(
+                urls::PARENT.into(),
+                Value::AtomicUrl(table_subject.clone().into()),
+                &store,
+            )
+            .await
+            .unwrap();
+            row.set(
+                email_prop.clone(),
+                Value::String(format!("visitor{i}@example.com")),
+                &store,
+            )
+            .await
+            .unwrap();
+            row.save_locally(&store).await.unwrap();
+        }
+
+        let summary = build_form_summary(&store, &form, &ForAgent::Sudo)
+            .await
+            .unwrap();
+
+        assert_eq!(summary["responses"], 2);
+        let fields = summary["fields"].as_array().unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0]["mapsTo"], email_prop);
+        assert_eq!(fields[0]["type"], "email");
+        assert_eq!(fields[0]["answered"], 2);
+        assert_eq!(fields[0]["answers"].as_array().unwrap().len(), 2);
     }
 
     #[tokio::test]

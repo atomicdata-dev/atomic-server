@@ -84,6 +84,7 @@ impl AppState {
         store.add_class_extender(plugins::files::build_file_extender(
             config.uploads_path.clone(),
         ))?;
+        store.add_class_extender(plugins::form::build_form_extender())?;
 
         // Owned here rather than in the AppState literal below, because the
         // `/server` endpoint closes over them to report this node's status.

@@ -287,7 +287,8 @@ table. Testable with `curl` before any runtime exists.
 
 **Implementation notes:**
 
-- `lib/src/forms.rs` (new, gated behind the `db` feature) holds the pure
+- `server/src/forms.rs` (moved out of `lib/src/forms.rs` — this logic is
+  server-only, not part of the reusable `atomic_lib` API) holds the pure
   definition-builder, validation, and slug mint/resolve logic;
   `server/src/handlers/form.rs` is thin HTTP glue with its own plain-JSON
   `FormApiError` (the runtime never parses JSON-AD, per decision #3).
@@ -349,7 +350,7 @@ account.
 
 - **No shared TS/Rust fixture test** for the definition serializer (the plan's
   "share the serializer shape... via a fixture test"). `buildFormDefinition.ts`
-  mirrors `lib/src/forms.rs` by hand instead — same field names/shapes, kept in
+  mirrors `server/src/forms.rs` by hand instead — same field names/shapes, kept in
   sync manually. Worth adding a fixture-based cross-check later if the two
   drift.
 - **Found and fixed a real bug while writing the e2e spec**: `FormRenderer`'s
@@ -425,7 +426,7 @@ results *summary/aggregate view* (bar charts, histograms) is deferred to
          onto the grown collection (same move as the existing queryKey
          rebase). Applies to any table receiving rows from another
          client/agent, not just form results.
-- [ ] "Open form" / "Copy link" affordances; QR code via a new `qrcode`
+- [x] "Open form" / "Copy link" affordances; QR code via a new `qrcode`
       dependency (none existed in the repo). Publishing mints the share slug
       immediately (one `GET /form/{did}/definition` call right after
       `published-at` is set) instead of waiting for a visitor's first request
@@ -433,17 +434,75 @@ results *summary/aggregate view* (bar charts, histograms) is deferred to
 - [ ] Unpublish keeps the definition endpoint returning `410` with a friendlier,
       form-specific closed-message page (copy + light styling pass on the
       existing dependency-free `not_available_page`).
-- [ ] Delete-form flow: `Resource.destroy()` never cascades, so "keep table +
+- [x] Delete-form flow: `Resource.destroy()` never cascades, so "keep table +
       data class by default" already happens for free. Add an explicit
       cascade option in a form-specific delete dialog: also destroy the
       table + its submission rows (not the generated data Class/Properties).
 
-## Phase 5b — Results summary view (deferred)
+## Phase 5b — Results summary view - DONE
 
-- [ ] Results summary view (per-question aggregates: bar chart for choice fields,
-      histogram for numbers, list for text) as an additional tab/mode next to
-      the raw results grid from Phase 5. Client-side aggregation over the
-      collection is fine at expected volumes.
+- [x] Results summary view (per-question aggregates: bar chart for choice fields,
+      histogram for numbers, list for text) as a third top-level **"Summary"
+      tab** in `FormBuilderPage`, next to Fields and Results.
+
+**Architecture (decided during implementation, revising the original
+"client-side aggregation over the collection" sketch):**
+
+- Client-side aggregation over all rows was rejected (fetching every row into
+  the browser just to count it is wasteful). A dedicated
+  `GET /form/:id/summary` endpoint was also considered but rejected: it would
+  need its own auth check, while a **ClassExtender on the Form class** runs
+  inside the rights-checked resource-GET path — authorization comes for free
+  (`for_agent` = requesting agent, checked by `check_read` before extenders
+  run; the row query re-runs as the same agent).
+- `forms::build_form_summary` (`server/src/forms.rs`) reuses the
+  Phase 3 definition walk for field order/metadata, queries rows once
+  (`parent` = target table AND `isA` = data class, capped at 10 000, drive =
+  form's `drive` propval falling back to `drive_prefix_from_subject`), and
+  aggregates per field type: option counts for radio/multi-select (configured
+  order, zero-filled, unknowns folded into "Other"; multi-select iterates the
+  `Value::Json` arrays natively), checked/unchecked for checkbox, nice-width
+  (1·2·5×10ⁿ) histogram bins + min/max/mean for number, and a capped
+  (100-answer) sample for text/email/date/datetime. Unit-tested alongside the
+  Phase 3 `forms::` tests.
+- `server/src/plugins/form.rs` (chatroom-extender pattern) sets the result as
+  an **ephemeral** `form-submission-summary` propval (new default property,
+  datatype JSON) on the served resource — never persisted, never part of the
+  Form's Loro doc. Aggregation errors are logged and the Form is served
+  without the prop.
+- **Caveats accepted:** the extender only runs on the plain-HTTP GET path.
+  The data-browser's OPFS-first store skips that path when it has local data
+  (`store.ts` "trust OPFS + live WS updates"), and the WS GET frame serves
+  raw Loro state. Extenders also don't run on live commits, so updates
+  arrive via an explicit **Refresh button**, not realtime.
+- **Found during verification: extender propvals must not pass through the
+  JS store at all.** Two real bugs surfaced when `SummaryTab` initially read
+  the summary via `fetchResourceFromServer` + `resource.get()`:
+  1. **Permanent staleness**: hydration "heals" JSON-AD-only props into the
+     resource's local LoroDoc (`resource.ts` `getLoroDoc`), and every later
+     hydration rebuilds propvals *from Loro* — so the summary stayed pinned
+     to its first-fetched value no matter how often it was re-fetched.
+  2. **Commit leak (the exact risk the plan flagged)**: the healed-in
+     summary op was exported and **signed into a later rename commit**
+     (verified by decoding the commit's `loroUpdate` — it contained
+     `form-submission-summary`), persisting a stale server-computed value
+     into the form's real CRDT state.
+  Fixes: `SummaryTab` now fetches the JSON-AD **directly** (same
+  `/did?subject=` + `signRequest` scheme as `Client.fetchResourceHTTP`) and
+  keeps the summary in component state — the store never sees it. And
+  `@tomic/lib`'s `Resource` got an `isCacheOnlyProp` guard (alongside
+  `lastCommit`/`createdAt`) so `form-submission-summary` can never be seeded
+  or healed into a local LoroDoc even when a Form is HTTP-fetched
+  incidentally. Leak regression-tested: post-fix rename commit delta is 273
+  bytes and free of the prop (contaminated one was 2.6 KB with it). Note:
+  the chatroom extender's `messages`/`nextPage` props have the same
+  theoretical exposure via the heal pass — untouched here, worth a look if
+  chatrooms ever misbehave after HTTP fetches.
+- UI: `chunks/FormBuilder/Summary/` — `SummaryTab` (fetch + refresh +
+  response count), `ChoiceBars` / `Histogram` / `AnswerList` (hand-rolled
+  single-hue styled-components charts; no chart dependency). Covered by an
+  extended `forms-submission.spec.ts` (summary after first submission,
+  Refresh picks up the second).
 
 ## Phase 6 — Should-haves (each independently shippable)
 
