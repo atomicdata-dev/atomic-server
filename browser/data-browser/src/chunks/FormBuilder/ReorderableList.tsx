@@ -1,14 +1,23 @@
-import React, { useState, type JSX, type ReactNode } from 'react';
+import React, { useState, type CSSProperties, type JSX, type ReactNode } from 'react';
 import { styled } from 'styled-components';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragEndEvent,
-  useDraggable,
-  useDroppable,
+  DragOverlay,
+  DragStartEvent,
+  closestCenter,
 } from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  horizontalListSortingStrategy,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { FaGripVertical } from 'react-icons/fa6';
 import { useDragSensors } from '../TableEditor/hooks/useDragSensors';
-import { transition } from '../../helpers/transition';
 
 interface ReorderableListProps {
   subjects: string[];
@@ -19,10 +28,11 @@ interface ReorderableListProps {
 }
 
 /**
- * Drag-handle + drop-edge reordering for a plain list of subjects, following
- * the same idiom as `InputResourceArray` (the only drag-and-drop pattern used
- * anywhere in this codebase) but content-agnostic so it can back both the
- * page tab bar and the field list.
+ * Drag-handle reordering for a plain list of subjects, built on
+ * `@dnd-kit/sortable` so the rest of the list smoothly slides out of the way
+ * to preview where the dragged item will land, and a floating `DragOverlay`
+ * previews the item being picked up. Backs both the page tab bar and the
+ * field list.
  */
 export function ReorderableList({
   subjects,
@@ -31,88 +41,126 @@ export function ReorderableList({
   disabled,
   orientation = 'vertical',
 }: ReorderableListProps): JSX.Element {
-  const [draggingSubject, setDraggingSubject] = useState<string>();
+  const [activeSubject, setActiveSubject] = useState<string>();
+  const [activeWidth, setActiveWidth] = useState<number>();
   const sensors = useDragSensors();
 
-  const handleDragEnd = ({ active, over }: DragEndEvent) => {
-    setDraggingSubject(undefined);
+  const handleDragStart = ({ active }: DragStartEvent) => {
+    setActiveSubject(active.id as string);
+    setActiveWidth(active.rect.current.initial?.width);
+  };
 
-    if (!over) {
+  const handleDragCancel = () => {
+    setActiveSubject(undefined);
+    setActiveWidth(undefined);
+  };
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    setActiveSubject(undefined);
+    setActiveWidth(undefined);
+
+    if (!over || active.id === over.id) {
       return;
     }
 
     const oldPos = subjects.indexOf(active.id as string);
-    const newPos = over.id as number;
+    const newPos = subjects.indexOf(over.id as string);
 
-    if (oldPos === -1 || oldPos === newPos) {
+    if (oldPos === -1 || newPos === -1) {
       return;
     }
 
-    const next = [...subjects];
-    const [removed] = next.splice(oldPos, 1);
-    next.splice(newPos > oldPos ? newPos - 1 : newPos, 0, removed);
-    onReorder(next);
+    onReorder(arrayMove(subjects, oldPos, newPos));
   };
 
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={event => setDraggingSubject(event.active.id as string)}
-      onDragCancel={() => setDraggingSubject(undefined)}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <RelativeContainer $orientation={orientation}>
-        <DropEdge
-          visible={!!draggingSubject}
-          index={0}
-          orientation={orientation}
-        />
-        {subjects.map((subject, index) => (
-          <React.Fragment key={subject}>
-            <DraggableRow
+      <SortableContext
+        items={subjects}
+        strategy={
+          orientation === 'horizontal'
+            ? horizontalListSortingStrategy
+            : verticalListSortingStrategy
+        }
+      >
+        <ListContainer $orientation={orientation}>
+          {subjects.map((subject, index) => (
+            <SortableRow
+              key={subject}
               subject={subject}
               disabled={disabled}
-              dragging={draggingSubject === subject}
               orientation={orientation}
             >
               {renderItem(subject, index)}
-            </DraggableRow>
-            <DropEdge
-              visible={!!draggingSubject}
-              index={index + 1}
-              orientation={orientation}
-            />
-          </React.Fragment>
-        ))}
-      </RelativeContainer>
+            </SortableRow>
+          ))}
+        </ListContainer>
+      </SortableContext>
+      {createPortal(
+        <DragOverlay dropAnimation={null}>
+          {activeSubject && (
+            <DragPreview
+              $orientation={orientation}
+              style={
+                orientation === 'vertical' && activeWidth
+                  ? { width: activeWidth }
+                  : undefined
+              }
+            >
+              <DragHandle type="button" tabIndex={-1}>
+                <FaGripVertical />
+              </DragHandle>
+              <RowContent $orientation={orientation}>
+                {renderItem(activeSubject, subjects.indexOf(activeSubject))}
+              </RowContent>
+            </DragPreview>
+          )}
+        </DragOverlay>,
+        document.body,
+      )}
     </DndContext>
   );
 }
 
-interface DraggableRowProps {
+interface SortableRowProps {
   subject: string;
   disabled?: boolean;
-  dragging: boolean;
   orientation: 'vertical' | 'horizontal';
   children: ReactNode;
 }
 
-function DraggableRow({
+function SortableRow({
   subject,
   disabled,
-  dragging,
   orientation,
   children,
-}: DraggableRowProps): JSX.Element {
-  const { attributes, listeners, setNodeRef } = useDraggable({
-    id: subject,
-    disabled,
-  });
+}: SortableRowProps): JSX.Element {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition: sortTransition,
+    isDragging,
+  } = useSortable({ id: subject, disabled });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition: sortTransition,
+    zIndex: isDragging ? 1 : undefined,
+  };
 
   return (
     <RowWrapper
       ref={setNodeRef}
-      $dragging={dragging}
+      style={style}
+      $dragging={isDragging}
       $orientation={orientation}
     >
       {!disabled && (
@@ -130,29 +178,9 @@ function DraggableRow({
   );
 }
 
-interface DropEdgeProps {
-  index: number;
-  visible: boolean;
-  orientation: 'vertical' | 'horizontal';
-}
-
-function DropEdge({ index, visible, orientation }: DropEdgeProps): JSX.Element {
-  const { setNodeRef, isOver } = useDroppable({ id: index });
-
-  return (
-    <DropEdgeElement
-      ref={setNodeRef}
-      active={isOver}
-      visible={visible}
-      $orientation={orientation}
-    />
-  );
-}
-
-const RelativeContainer = styled.div<{
+const ListContainer = styled.div<{
   $orientation: 'vertical' | 'horizontal';
 }>`
-  position: relative;
   display: flex;
   flex-direction: ${p => (p.$orientation === 'horizontal' ? 'row' : 'column')};
   ${p => p.$orientation === 'horizontal' && 'align-items: center;'}
@@ -197,30 +225,15 @@ const DragHandle = styled.button`
   }
 `;
 
-const DropEdgeElement = styled.div<{
-  visible: boolean;
-  active: boolean;
-  $orientation: 'vertical' | 'horizontal';
-}>`
-  display: ${p => (p.visible ? 'block' : 'none')};
-  flex-shrink: 0;
-  border-radius: 1.5px;
-  background: ${p => p.theme.colors.main};
-  opacity: ${p => (p.active ? 1 : 0)};
+const DragPreview = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  cursor: grabbing;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.15));
 
-  ${p =>
-    p.$orientation === 'horizontal'
-      ? `
-    width: 3px;
-    height: 1.8rem;
-    margin: 0 0.15rem;
-    transform: scaleY(${p.active ? 1.1 : 1});
-  `
-      : `
-    height: 3px;
-    width: 100%;
-    transform: scaleX(${p.active ? 1.1 : 1});
-  `}
-
-  ${transition('opacity', 'transform')}
+  ${DragHandle} svg {
+    color: ${p => p.theme.colors.textLight};
+  }
 `;
