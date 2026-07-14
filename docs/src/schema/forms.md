@@ -26,6 +26,9 @@ Properties:
 - [`form-pages`](https://atomicdata.dev/properties/form-pages) - (required, ResourceArray, FormPage) the form's pages, in order.
 - [`form-published-at`](https://atomicdata.dev/properties/form-published-at) - (recommended, Timestamp) when the form was published. Absent means unpublished; submissions are only accepted while set.
 - [`form-settings`](https://atomicdata.dev/properties/form-settings) - (recommended, JSON) miscellaneous settings (e.g. progress bar, confirmation message).
+- [`form-styling`](https://atomicdata.dev/properties/form-styling) - (recommended, JSON) visual theming for the published form. Keys (all optional): `textColor`, `mainColor`, `backgroundColor` (hex colors), `roundness` (one of: `sharp`, `rounded`, `round`).
+- [`cover-image`](https://atomicdata.dev/properties/cover-image) - (recommended, AtomicURL, File) an image shown alongside or behind the published form. Served to anonymous visitors via `GET /form/{id}/image` (publish-gated), so the File itself needs no public read rights.
+- [`image-position`](https://atomicdata.dev/properties/image-position) - (recommended, String) where the image is positioned. One of: `top`, `left`, `right`, `behind` (full-page image behind the form card), `full` (form rendered directly on the image, no card) — enforced by the application, not the store (see note below).
 - [`form-submission-summary`](https://atomicdata.dev/properties/form-submission-summary) - (JSON, server-computed) aggregated submission statistics (response count, per-question option counts / number bins / answer samples), added to the resource by the server when a Form is fetched over HTTP. Ephemeral: it is never persisted and must never be written by clients.
 
 ## FormPage
@@ -39,7 +42,7 @@ Properties:
 - [`form-fields`](https://atomicdata.dev/properties/form-fields) - (required, ResourceArray) the page's fields and layout blocks, in order. No `classtype`, since a page mixes input fields (`FormField`) with layout blocks (`FormHeading`, `FormParagraph`, ...) and Atomic Data doesn't support multiple class-types on one ResourceArray.
 - [`name`](https://atomicdata.dev/properties/name) - (recommended, String) the page's title.
 - [`cover-image`](https://atomicdata.dev/properties/cover-image) - (recommended, AtomicURL, File) an optional cover image.
-- [`image-position`](https://atomicdata.dev/properties/image-position) - (recommended, String) where the cover image is positioned. One of: `top`, `left`, `right`, `cover` — enforced by the application, not the store (see note below).
+- [`image-position`](https://atomicdata.dev/properties/image-position) - (recommended, String) where the cover image is positioned. Same values as on Form (see above); currently unused by the builder, which themes at the Form level.
 
 ## FormField
 

@@ -266,6 +266,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .to(handlers::form::submit_form),
     )
     .service(
+        web::resource("/form/{id}/image")
+            .guard(guard::Method(Method::GET))
+            .to(handlers::form::form_image),
+    )
+    .service(
         web::resource("/form/{id}")
             .guard(guard::Method(Method::GET))
             .to(handlers::form::form_page),

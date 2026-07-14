@@ -2,8 +2,11 @@ import { core, forms, useResource, useString, useTitle } from '@tomic/react';
 import type { JSX } from 'react';
 import { styled } from 'styled-components';
 import { FaTrash } from 'react-icons/fa6';
-import { Row } from '@components/Row';
-import { IconButton, IconButtonVariant } from '@components/IconButton/IconButton';
+import { Column, Row } from '@components/Row';
+import {
+  IconButton,
+  IconButtonVariant,
+} from '@components/IconButton/IconButton';
 import { FIELD_TYPE_META, type AddableFieldType } from './fieldTypes';
 
 interface FieldRowProps {
@@ -40,24 +43,29 @@ export function FieldRow({
   return (
     <RowWrapper $selected={selected}>
       <SelectButton
-        type='button'
+        type="button"
         // While the resource is loading, `type` is just the fallback — don't
         // claim a concrete testid yet, or every hydrating row briefly reads
         // as `field-row-short-text` (breaks e2e strict-mode selectors).
-        data-testid={resource.loading ? 'field-row-loading' : `field-row-${type}`}
+        data-testid={
+          resource.loading ? 'field-row-loading' : `field-row-${type}`
+        }
         onClick={onSelect}
       >
-        <Row gap='0.5rem' center>
-          <Icon />
-          <Label>{label || meta.label}</Label>
-        </Row>
+        <Column>
+          <Row gap="0.5rem" center>
+            <Icon />
+            <Label light>{meta.label}</Label>
+          </Row>
+          {label ? <Label>{label}</Label> : null}
+        </Column>
       </SelectButton>
       <IconButton
         variant={IconButtonVariant.Simple}
-        size='0.8rem'
-        color='textLight'
-        title='Delete field'
-        type='button'
+        size="0.8rem"
+        color="textLight"
+        title="Delete field"
+        type="button"
         onClick={onDelete}
       >
         <FaTrash />
@@ -95,8 +103,9 @@ const SelectButton = styled.button`
   min-width: 0;
 `;
 
-const Label = styled.span`
+const Label = styled.span<{ light?: boolean }>`
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  color: ${p => (p.light ? p.theme.colors.textLight : p.theme.colors.text)};
 `;

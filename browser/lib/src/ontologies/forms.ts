@@ -27,6 +27,7 @@ export const forms = {
     required: 'https://atomicdata.dev/properties/required',
     formFieldType: 'https://atomicdata.dev/properties/form-field-type',
     formFieldOptions: 'https://atomicdata.dev/properties/form-field-options',
+    formStyling: 'https://atomicdata.dev/properties/form-styling',
     formSubmissionSummary:
       'https://atomicdata.dev/properties/form-submission-summary',
   },
@@ -39,6 +40,9 @@ export const forms = {
       'https://atomicdata.dev/properties/form-published-at',
       'https://atomicdata.dev/properties/form-settings',
       'https://atomicdata.dev/properties/form-publish-id',
+      'https://atomicdata.dev/properties/form-styling',
+      'https://atomicdata.dev/properties/cover-image',
+      'https://atomicdata.dev/properties/image-position',
     ],
     ['https://atomicdata.dev/classes/FormPage']: [
       'https://atomicdata.dev/properties/form-fields',
@@ -84,7 +88,10 @@ declare module '../index.js' {
       recommends:
         | typeof forms.properties.formPublishedAt
         | typeof forms.properties.formSettings
-        | typeof forms.properties.formPublishId;
+        | typeof forms.properties.formPublishId
+        | typeof forms.properties.formStyling
+        | typeof forms.properties.coverImage
+        | typeof forms.properties.imagePosition;
     };
     [forms.classes.formPage]: {
       requires: BaseProps | typeof forms.properties.formFields;
@@ -128,6 +135,7 @@ declare module '../index.js' {
     [forms.properties.required]: boolean;
     [forms.properties.formFieldType]: string;
     [forms.properties.formFieldOptions]: JSONValue;
+    [forms.properties.formStyling]: JSONValue;
     [forms.properties.formSubmissionSummary]: JSONValue;
   }
 
@@ -145,6 +153,7 @@ declare module '../index.js' {
     [forms.properties.required]: 'required';
     [forms.properties.formFieldType]: 'formFieldType';
     [forms.properties.formFieldOptions]: 'formFieldOptions';
+    [forms.properties.formStyling]: 'formStyling';
     [forms.properties.formSubmissionSummary]: 'formSubmissionSummary';
   }
 }

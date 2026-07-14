@@ -301,6 +301,8 @@ table. Testable with `curl` before any runtime exists.
 - Resolves two of the "Open questions" below: the submit handler is **always
   on** (no `forms` cargo feature), and the `{id}` slug map is intentionally
   server-global in redb (matches how `did:ad:` subjects already work).
+  **Superseded**: the redb slug map is slated to be replaced by generic
+  ShortLink resources — see [`shortlinks.md`](./shortlinks.md).
 - Verified with `cargo test -p atomic_lib --features db-redb --lib forms::` (9
   new tests), `cargo test -p atomic-server --lib` (41 tests incl.
   `form_submission_flow`), and a manual pass against a live `cargo run` server +
@@ -508,26 +510,113 @@ results *summary/aggregate view* (bar charts, histograms) is deferred to
 
 Rough priority order:
 
-1. **Embedding**: `<iframe>` snippet; `/form/:id?embed=1` drops the page chrome;
+[] **Embedding**: `<iframe>` snippet; `/form/:id?embed=1` drops the page chrome;
    set `frame-ancestors` CSP appropriately on that route (currently forms route
    would inherit none); `postMessage` height auto-resize.
-2. **Captcha**: ALTCHA-style proof-of-work (self-hosted, no third party, fits the
+[] **Captcha**: ALTCHA-style proof-of-work (self-hosted, no third party, fits the
    privacy stance) — server issues challenge in the definition response, verifies
    on submit. Keep the verifier behind a trait so Turnstile/hCaptcha can slot in.
-3. **Private links**: one-time codes, generated in bulk by the owner, stored
-   hashed in redb keyed by form; `?code=` checked + atomically consumed on submit.
-4. **More field types** (each = enum value + options schema + renderer + validator +
+[] **Private links**: one-time invite codes modeled as **resources, children
+   of the Form** — not a redb side-table (consistent with how submission rows
+   already work, and reuses querying/commits/rights/sync instead of a second
+   storage system). Data design decided; UI deliberately not designed yet.
+  - **`FormInviteCode` class**: `form-code` (String, required, the code
+    value) + `used-at` (Timestamp, unset = unused). `parent` = the Form.
+    A `used-by` link to the submission row was considered and deferred
+    (anonymity implications). Revoke = `destroy()`.
+  - **Codes stored plaintext, not hashed.** Hierarchy rights already
+    restrict reads to form editors (children of the Form are private), and
+    an attacker who can read the DB has all form data anyway — hashing
+    protected nothing meaningful while blocking re-export. The definition
+    endpoint can't leak codes: it walks `form-pages`, not children.
+  - **Access mode is a Form property**: public ("anyone with the link",
+    current behavior) XOR invite-only. Mixed mode is deliberately not
+    supported — a still-working public link would void the feature's
+    guarantees (controlled audience, one response per person). When
+    invite-only, **the definition endpoint also requires a valid code**,
+    otherwise the questions leak to anyone with the URL.
+  - **Lookup**: query `form-code = X` via the **basic-path** `PropValSub`
+    index alone, then verify the hit's `parent` is the expected form. Do
+    NOT query `parent + isA + form-code` — the multi-filter complex path
+    lazily persists a watched query per distinct filter, i.e. one per code
+    value ever looked up (`Tree::WatchedQueries` bloat).
+  - **Validation vs consumption**: validate at definition-fetch time
+    *without* consuming (used/revoked/unknown → rejected before the visitor
+    fills anything in); consume atomically at submit. Commits are not
+    compare-and-swap, so the submit handler serializes check-and-consume
+    with an in-process per-form mutex (single server process; the rate
+    limiter already lives at that layer). Inside the mutex, mark `used-at`
+    first, then create the submission row — the reverse order allows double
+    submission if row creation races/fails.
+  - **Bulk generation** happens client-side via normal commits (reuses all
+    existing machinery; owner-signed, so provenance is honest). N codes = N
+    signed genesis commits through the outbox — cap a batch at a few hundred
+    and measure before considering a server-side bulk endpoint.
+  - The consumption commit fans out over WS like any other, so owner-facing
+    used/unused state updates in realtime with zero extra plumbing.
+  - Share-slug resolution is unrelated to codes and moves to ShortLinks —
+    see [`shortlinks.md`](./shortlinks.md).
+[] **More field types** (each = enum value + options schema + renderer + validator +
    datatype mapping): phone, URL, currency, dropdown multi-select, likert, rating,
    picture choice, file upload (needs upload path for anonymous users — scoped,
    size-limited `POST /form/:id/upload` writing into the commit as a blob), choice
    matrix, table input, location/address.
-5. **Branching**: FormCondition resources; evaluator implemented once in TS
+[] **Branching**: FormCondition resources; evaluator implemented once in TS
    (renderer + preview) and once in Rust (server must ignore validation errors on
    hidden fields); shared JSON fixtures keep the two in lockstep.
-6. **Styling/theming**: `form-styling` JSON (accent color, background, font, logo,
-   corner radius) → CSS variables in the renderer; theming UI in the builder;
-   embed inherits.
-7. **Progress bar** (trivial once settings exist).
+[x] **Styling/theming** — DONE (except fonts/logo, not requested). Shipped:
+   cover image (5 position modes), text/main/background colors, 3 corner
+   roundness levels, edited in a new **Settings tab** in `FormBuilderPage`.
+  - **Storage**: image reuses the generic `cover-image` + `image-position`
+    properties at Form level (added to Form's `recommends`; enum extended to
+    `top | left | right | behind | full`). Colors + roundness live in the new
+    `form-styling` JSON property (`textColor`/`mainColor`/`backgroundColor`
+    hex, `roundness`: `sharp | rounded | round`).
+  - **Anonymous image access**: `/download` is rights-checked, so the
+    definition's `styling.imageUrl` points at a new publish-gated
+    `GET /form/{id}/image` (`handlers/form.rs::form_image`) that resolves
+    `cover-image` server-side and delegates to the shared
+    `download_file_handler_partial` — stored mimetype (SVG works in `<img>`,
+    scripts never execute: `attachment` + `nosniff`), `?w=&q=&f=` processing
+    and a 1h public cache header. Consistent with decision #3: publishing
+    stays a property, the File stays private.
+  - **Renderer**: new `FormShell` component in `@tomic/form-renderer` owns the
+    page chrome (image layouts, card, title) + CSS-var overrides
+    (`stylingVars`), incl. derived `--atomic-form-text-light`/`border` via
+    `color-mix` and a luminance-picked `--atomic-form-on-accent` for button
+    text. Used by `form-app` **and** `FormPreviewDialog` — the preview is now
+    pixel-identical to the published page (and finally shows the title).
+    Custom colors apply as-is in both light/dark schemes.
+  - **Found & fixed along the way**:
+    1. JSON-datatype values written while the Property resource is
+       unresolvable (form-styling isn't on atomicdata.dev yet → no `json`
+       datatype tag) rehydrate as raw JSON *strings*; spreading that string
+       corrupted the next write into indexed characters. All readers now
+       parse defensively (`parseStylingValue` in `SettingsTab.tsx`, mirrored
+       in `buildFormDefinition.ts`; `Ok(Value::String)` arm in
+       `server/src/forms.rs::build_form_styling`). `SettingsTab` also sets
+       `validate: false` on the form-styling `useValue` — each validating
+       set otherwise blocks up to 10s on the failing property fetch.
+    2. `ColorSetting`'s debounced write is flushed on unmount, otherwise a
+       color picked right before switching builder tabs was dropped (ref
+       updated in an effect — mutating it during render gets dropped under
+       the React Compiler).
+    3. `server/build.rs`: in `ATOMICSERVER_SKIP_JS_BUILD` dev loops the
+       embedded `form-assets/` was backfilled only when *missing*, so a
+       rebuilt `form-app/dist` stayed stale forever. It now refreshes on
+       every build-script run (dest cleared first so hashed bundles don't
+       pile up).
+  - **Human follow-up needed**: add `form-styling` to the public
+    atomicdata.dev forms ontology (same Phase-1 step) — until then the
+    data-browser logs a 404 for the property and skips validation/tagging
+    (functionally fine, see fix 1). Local dev servers need one restart with
+    `ATOMIC_REPOPULATE_DEFAULTS=true`.
+  - Covered by `forms-submission.spec.ts` (theme in Settings tab → publish →
+    anonymous visitor sees custom accent + radius), `cargo test -p
+    atomic-server --lib forms::` (`definition_includes_styling`), and a
+    manual pass (all 5 image modes with an SVG, colors, roundness,
+    anonymous submit).
+[] **Progress bar** (trivial once settings exist).
 
 ## Phase 7 — Could-haves (sketch only)
 

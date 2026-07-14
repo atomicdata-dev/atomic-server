@@ -1,5 +1,9 @@
 import { useEffect, useState, type JSX } from 'react';
-import { FormRenderer, type FormDefinition } from '@tomic/form-renderer';
+import {
+  FormRenderer,
+  FormShell,
+  type FormDefinition,
+} from '@tomic/form-renderer';
 import { fetchDefinition, getFormIdFromLocation, submitForm } from './api.js';
 
 export function App(): JSX.Element {
@@ -36,32 +40,29 @@ export function App(): JSX.Element {
   }
 
   return (
-    <main className='atomic-form-app-shell'>
-      <div className='atomic-form-app-card'>
-        <h1 className='atomic-form-app-title'>{definition.name}</h1>
-        <FormRenderer
-          definition={definition}
-          onSubmit={async values => {
-            const outcome = await submitForm(
-              formId,
-              definition.honeypotField,
-              values,
-            );
+    <FormShell definition={definition}>
+      <FormRenderer
+        definition={definition}
+        onSubmit={async values => {
+          const outcome = await submitForm(
+            formId,
+            definition.honeypotField,
+            values,
+          );
 
-            if (outcome.ok) return { ok: true };
+          if (outcome.ok) return { ok: true };
 
-            return {
-              ok: false,
-              message:
-                outcome.message ??
-                (outcome.status === 429
-                  ? 'Too many submissions, please try again later.'
-                  : 'Something went wrong submitting this form. Please try again.'),
-              errors: outcome.errors,
-            };
-          }}
-        />
-      </div>
-    </main>
+          return {
+            ok: false,
+            message:
+              outcome.message ??
+              (outcome.status === 429
+                ? 'Too many submissions, please try again later.'
+                : 'Something went wrong submitting this form. Please try again.'),
+            errors: outcome.errors,
+          };
+        }}
+      />
+    </FormShell>
   );
 }

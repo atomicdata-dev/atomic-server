@@ -60,7 +60,18 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
-    "https://atomicdata.dev/properties/shortname": "form-publish-id"
+    "https://atomicdata.dev/properties/shortname": "form-publish-id",
+    "https://atomicdata.dev/properties/isDynamic": true
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-styling",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "Visual theming for a published Form, stored as a JSON object. Keys (all optional): textColor, mainColor, backgroundColor (hex colors), roundness (one of: sharp, rounded, round).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-styling"
   },
   {
     "@id": "https://atomicdata.dev/properties/form-submission-summary",
@@ -70,6 +81,7 @@
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/isDynamic": true,
     "https://atomicdata.dev/properties/shortname": "form-submission-summary"
   },
   {
@@ -82,7 +94,10 @@
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/form-published-at",
       "https://atomicdata.dev/properties/form-settings",
-      "https://atomicdata.dev/properties/form-publish-id"
+      "https://atomicdata.dev/properties/form-publish-id",
+      "https://atomicdata.dev/properties/form-styling",
+      "https://atomicdata.dev/properties/cover-image",
+      "https://atomicdata.dev/properties/image-position"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name",
@@ -116,7 +131,7 @@
   {
     "@id": "https://atomicdata.dev/properties/image-position",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
-    "https://atomicdata.dev/properties/description": "Where a cover-image is positioned relative to its content. One of: top, left, right, cover.",
+    "https://atomicdata.dev/properties/description": "Where a cover-image is positioned relative to its content. One of: top, left, right, behind (full-page image behind the content card), full (content rendered directly on the image, no card).",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
@@ -254,6 +269,7 @@
       "https://atomicdata.dev/properties/required",
       "https://atomicdata.dev/properties/form-field-type",
       "https://atomicdata.dev/properties/form-field-options",
+      "https://atomicdata.dev/properties/form-styling",
       "https://atomicdata.dev/properties/form-submission-summary"
     ]
   }

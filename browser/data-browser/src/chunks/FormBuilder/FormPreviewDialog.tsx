@@ -1,6 +1,10 @@
 import { useEffect, useState, type JSX } from 'react';
 import { useStore } from '@tomic/react';
-import { FormRenderer, type FormDefinition } from '@tomic/form-renderer';
+import {
+  FormRenderer,
+  FormShell,
+  type FormDefinition,
+} from '@tomic/form-renderer';
 import '@tomic/form-renderer/style.css';
 import {
   Dialog,
@@ -54,11 +58,13 @@ export function FormPreviewButton({
             </DialogTitle>
             <DialogContent>
               {definition ? (
-                <FormRenderer
-                  definition={definition}
-                  preview
-                  onSubmit={async () => ({ ok: true })}
-                />
+                <FormShell definition={definition}>
+                  <FormRenderer
+                    definition={definition}
+                    preview
+                    onSubmit={async () => ({ ok: true })}
+                  />
+                </FormShell>
               ) : (
                 <p>Loading preview…</p>
               )}

@@ -53,11 +53,29 @@ export interface FormPageDefinition {
   blocks: FormBlock[];
 }
 
+export type ImagePosition = 'top' | 'left' | 'right' | 'behind' | 'full';
+
+export type Roundness = 'sharp' | 'rounded' | 'round';
+
+/** Visual theming for the published form. All keys optional; unset keys keep
+ * the light/dark-adaptive defaults from `style.css`. `imageUrl` is filled by
+ * the server (`/form/{id}/image`) or, in the builder preview, with the File's
+ * own `downloadURL`. */
+export interface FormStyling {
+  imageUrl?: string;
+  imagePosition?: ImagePosition | string;
+  textColor?: string;
+  mainColor?: string;
+  backgroundColor?: string;
+  roundness?: Roundness | string;
+}
+
 export interface FormDefinition {
   version: number;
   id: string;
   name: string;
   settings: Record<string, unknown>;
+  styling: FormStyling;
   honeypotField: string;
   pages: FormPageDefinition[];
 }

@@ -3,6 +3,7 @@ import { before, newResource, openSubject, SERVER_URL } from './test-utils';
 
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
+const FORM_STYLING = 'https://atomicdata.dev/properties/form-styling';
 
 /**
  * Flagship e2e for Atomic Forms (Phase 4, `planning/atomic-forms.md`): build
@@ -50,6 +51,35 @@ test.describe('form publish and anonymous submit', () => {
     await page.getByRole('menuitem', { name: 'Email', exact: true }).click();
     await expect(page.getByTestId('field-row-email')).toBeVisible();
 
+    // --- 1b. Theme it via the Settings tab (Phase 6 styling): custom main
+    // color + round corners. These must reach the anonymous runtime through
+    // the definition's `styling` object.
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await page.getByTitle('Pick main color').click();
+    await page.getByPlaceholder('#1e43a3').fill('#e91e63');
+    await page.keyboard.press('Escape');
+    // The swatch label reflects the picked color once state has settled.
+    await expect(page.getByTitle('Pick main color')).toContainText('#e91e63');
+    await page.getByRole('button', { name: 'Round', exact: true }).click();
+    await page.getByRole('tab', { name: 'Fields' }).click();
+
+    // The color write is debounced (and flushed on tab-switch unmount);
+    // wait for both keys to be in the resource before publishing. The value
+    // may round-trip as a raw JSON string while the form-styling Property
+    // isn't resolvable (not yet on atomicdata.dev) — accept both shapes.
+    await page.waitForFunction(
+      ({ subject, prop }) => {
+        const raw = window.store.resources.get(subject)?.get(prop);
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+        return (
+          parsed?.mainColor === '#e91e63' && parsed?.roundness === 'round'
+        );
+      },
+      { subject: formSubject, prop: FORM_STYLING },
+      { timeout: 15000 },
+    );
+
     await page.waitForFunction(
       () => window.store.getSyncStatus().pendingDirtyCount === 0,
       undefined,
@@ -86,6 +116,19 @@ test.describe('form publish and anonymous submit', () => {
 
     const nameInput = visitorPage.getByLabel('Full name', { exact: false });
     await expect(nameInput).toBeVisible({ timeout: 15000 });
+
+    // The Phase 6 styling applies: FormShell sets the CSS vars, so the
+    // submit button renders in the custom main color with round corners.
+    const submitButton = visitorPage.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    await expect(submitButton).toHaveCSS(
+      'background-color',
+      'rgb(233, 30, 99)',
+    );
+    await expect(submitButton).toHaveCSS('border-radius', '16px');
+
     await nameInput.fill('Ada Lovelace');
 
     const emailInput = visitorPage.getByLabel('Email', { exact: false });

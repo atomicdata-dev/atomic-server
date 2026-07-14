@@ -15,7 +15,12 @@ use actix_web::{http::StatusCode, web, HttpRequest, HttpResponse, ResponseError}
 use atomic_lib::{urls, AtomicError, Resource, Storelike, Value};
 use serde_json::json;
 
-use crate::{appstate::AppState, forms, handlers::single_page_app::generate_nonce};
+use crate::{
+    appstate::AppState,
+    forms,
+    handlers::download::{download_file_handler_partial, DownloadParams},
+    handlers::single_page_app::generate_nonce,
+};
 
 pub struct FormApiError {
     status: StatusCode,
@@ -125,6 +130,7 @@ pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -
         Ok(slug) => slug,
         Err(e) => return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     };
+    fill_image_url(&mut definition);
 
     let nonce = match generate_nonce() {
         Ok(n) => n,
@@ -208,8 +214,51 @@ pub async fn get_definition(
     definition.id = forms::mint_publish_slug(store, &mut form)
         .await
         .map_err(internal_error)?;
+    fill_image_url(&mut definition);
 
     Ok(HttpResponse::Ok().json(definition))
+}
+
+/// Points the definition's styling at the publish-gated image route (see
+/// [form_image]) — the visitor has no agent, so the File's own rights-checked
+/// `/download` URL would be unreachable. Requires `definition.id` to be set.
+fn fill_image_url(definition: &mut forms::FormDefinition) {
+    if definition.styling.has_image {
+        definition.styling.image_url = Some(format!("/form/{}/image", definition.id));
+    }
+}
+
+/// `GET /form/{id}/image` — serves the published form's `cover-image` File.
+/// Publish-gating replaces the rights check `/download` would do (decision #3
+/// in `planning/atomic-forms.md`: publishing is a property, not a rights
+/// change, so the File stays private). Delegates to the shared download
+/// handler: stored mimetype (SVG renders in `<img>`; `Content-Disposition:
+/// attachment` + `nosniff` keep it from ever executing as a document) and
+/// `?w=&q=&f=` image processing come with it.
+pub async fn form_image(
+    path: web::Path<String>,
+    params: web::Query<DownloadParams>,
+    req: HttpRequest,
+    appstate: web::Data<AppState>,
+) -> Result<HttpResponse, FormApiError> {
+    let store = &appstate.store;
+    let form = resolve_published_form(store, &path.into_inner()).await?;
+
+    let image_subject = form.get(urls::COVER_IMAGE).map_err(|_| not_found())?.to_string();
+    let file = store
+        .get_resource(&image_subject.into())
+        .await
+        .map_err(|_| not_found())?;
+
+    let mut response = download_file_handler_partial(&file, &req, &params, &appstate)
+        .map_err(|e| internal_error(e.to_string()))?;
+    // Same-URL responses are stable while published; let browsers cache them
+    // for a bit instead of re-fetching per page view.
+    response.headers_mut().insert(
+        actix_web::http::header::CACHE_CONTROL,
+        actix_web::http::header::HeaderValue::from_static("public, max-age=3600"),
+    );
+    Ok(response)
 }
 
 /// `POST /form/{id}/submit` — body `{ "values": { "<propertySubject>": <json>, ... } }`.

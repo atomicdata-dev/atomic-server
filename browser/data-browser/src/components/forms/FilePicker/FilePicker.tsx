@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { FilePickerDialog } from './FilePickerDialog';
 import { InputProps } from '../ResourceField';
 import { StoreEvents, useStore, useSubject } from '@tomic/react';
@@ -22,7 +22,8 @@ export function FilePicker({
   disabled,
   required,
   commit,
-}: InputProps): React.JSX.Element {
+  allowedMimes,
+}: InputProps & { allowedMimes?: Set<string> }): React.JSX.Element {
   const store = useStore();
   const { upload } = useUpload(resource);
   const [value, setValue] = useSubject(resource, property.subject, {
@@ -42,7 +43,25 @@ export function FilePicker({
   const [unsubScheduledUpload, setUnsubScheduledUpload] =
     useState<() => void | undefined>();
 
+  // `selectedSubject` starts out mirroring the resource's current value; this
+  // effect exists only to push USER-driven picks/clears back into the
+  // resource. Skip when nothing has actually changed from that starting
+  // snapshot — otherwise this fires on mount and dirties the resource with a
+  // no-op write. A "have we run before" ref doesn't work here: React
+  // StrictMode double-invokes mount effects (mount → cleanup → mount) and,
+  // since this effect has no cleanup to reset such a ref, the second
+  // invocation would see it already flipped and run the real body anyway.
+  // Comparing against a static snapshot is immune to that replay.
+  const initial = useRef({ subject: value, file: undefined as File | undefined });
+
   useEffect(() => {
+    if (
+      selectedSubject === initial.current.subject &&
+      selectedFile === initial.current.file
+    ) {
+      return;
+    }
+
     if (selectedSubject) {
       setValue(selectedSubject);
     } else if (selectedFile) {
@@ -132,6 +151,7 @@ export function FilePicker({
         onShowChange={setShow}
         onResourcePicked={setSelectedSubject}
         onNewFilePicked={setSelectedFile}
+        allowedMimes={allowedMimes}
       />
       {error && <ErrMessage>{error}</ErrMessage>}
     </Wrapper>

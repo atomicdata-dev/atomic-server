@@ -86,14 +86,14 @@ fn main() -> std::io::Result<()> {
             dirs.js_dist_tmp.display(),
             dirs.js_dist_source.display()
         );
-        // The main copy is skipped, but that doesn't mean form-assets is
-        // there too — `copy_form_assets` reads a different source, so
-        // `dist_is_newer_than_tmp` says nothing about it. Backfill it
-        // separately so `include_str!("../../assets_tmp/form-assets/index.html")`
-        // in handlers/form.rs doesn't fail to compile.
-        if !dirs.js_dist_tmp.join("form-assets").exists() {
-            copy_form_assets(&dirs)?;
-        }
+        // The main copy is skipped, but form-assets still needs to exist
+        // (`include_str!("../../assets_tmp/form-assets/index.html")` in
+        // handlers/form.rs) *and* to reflect the current form-app build —
+        // in ATOMICSERVER_SKIP_JS_BUILD dev loops (this repo's `.envrc`
+        // sets it) a freshly `pnpm build`-ed form-app/dist would otherwise
+        // stay embedded stale forever. The copy is tiny, so always refresh
+        // (no-op when form-app/dist doesn't exist).
+        copy_form_assets(&dirs)?;
     } else if dirs.js_dist_tmp.exists() {
         // `needs_build` is false and the embedded copy still has to be
         // refreshed: `should_build` answers "are the JS SOURCES newer than
@@ -352,6 +352,8 @@ fn copy_form_assets(dirs: &Dirs) -> std::io::Result<()> {
     }
 
     let dest = dirs.js_dist_tmp.join("form-assets");
+    // Clear first so hashed bundle files from previous builds don't pile up.
+    let _ = fs::remove_dir_all(&dest);
     dircpy::copy_dir(&dirs.form_app_dist_source, &dest)
 }
 

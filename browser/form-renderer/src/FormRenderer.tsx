@@ -2,6 +2,7 @@ import { useId, useState, type FormEvent, type JSX } from 'react';
 import type { FormDefinition, FormErrors, FormValues } from './types.js';
 import { validatePage, validateAll } from './validation.js';
 import { FieldInput } from './FieldInput.js';
+import { FormMarkdown } from './FormMarkdown.js';
 
 export type SubmitResult =
   | { ok: true }
@@ -142,9 +143,11 @@ export function FormRenderer({
 
           if (block.kind === 'paragraph') {
             return (
-              <p key={i} className='atomic-form-paragraph'>
-                {block.text}
-              </p>
+              <FormMarkdown
+                key={i}
+                className='atomic-form-paragraph'
+                text={block.text}
+              />
             );
           }
 
@@ -174,7 +177,10 @@ export function FormRenderer({
                 </label>
               )}
               {block.description && (
-                <p className='atomic-form-description'>{block.description}</p>
+                <FormMarkdown
+                  className='atomic-form-description'
+                  text={block.description}
+                />
               )}
               <FieldInput
                 field={block}

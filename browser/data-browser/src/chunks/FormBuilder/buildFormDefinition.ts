@@ -1,11 +1,13 @@
-import { core, forms, Store, type JSONValue } from '@tomic/react';
+import { core, forms, server, Store, type JSONValue } from '@tomic/react';
 import type {
   FieldOptions,
   FieldType,
   FormBlock,
   FormDefinition,
   FormPageDefinition,
+  FormStyling,
 } from '@tomic/form-renderer';
+import { parseStylingValue } from './SettingsTab';
 
 /**
  * Client-side mirror of `atomic_lib::forms::build_form_definition`
@@ -41,9 +43,47 @@ export async function buildFormDefinitionClientSide(
     id: '',
     name,
     settings,
+    styling: await buildStyling(store, form),
     honeypotField: 'hp',
     pages,
   };
+}
+
+/** Mirrors `build_form_styling` (server/src/forms.rs), except `imageUrl`:
+ * the server points it at the publish-gated `/form/{id}/image` route for
+ * anonymous visitors, while this preview uses the File's own `downloadURL`
+ * (the owner is authenticated, so the rights-checked route works). */
+async function buildStyling(
+  store: Store,
+  form: Awaited<ReturnType<Store['getResource']>>,
+): Promise<FormStyling> {
+  // Tolerates the raw-JSON-string form (see parseStylingValue's docs).
+  const stylingJson = parseStylingValue(
+    form.get(forms.properties.formStyling) as JSONValue | undefined,
+  );
+
+  const styling: FormStyling = {
+    textColor: stylingJson.textColor as string | undefined,
+    mainColor: stylingJson.mainColor as string | undefined,
+    backgroundColor: stylingJson.backgroundColor as string | undefined,
+    roundness: stylingJson.roundness as string | undefined,
+  };
+
+  const coverImage = form.get(forms.properties.coverImage) as
+    | string
+    | undefined;
+
+  if (coverImage) {
+    const file = await store.getResource(coverImage);
+    styling.imageUrl = file.get(server.properties.downloadUrl) as
+      | string
+      | undefined;
+    styling.imagePosition = form.get(forms.properties.imagePosition) as
+      | string
+      | undefined;
+  }
+
+  return styling;
 }
 
 async function buildPageDefinition(

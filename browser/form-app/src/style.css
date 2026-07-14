@@ -6,6 +6,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
   font-family:
@@ -15,22 +20,20 @@ body {
     sans-serif;
 }
 
+/* The FormShell (flex: 1) stretches to fill the viewport. */
+#root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Loading / error fallback, before a definition is available. */
 .atomic-form-app-shell {
   min-height: 100vh;
   display: flex;
   justify-content: center;
   padding: 2rem 1rem;
   background: var(--atomic-form-bg, #fff);
-}
-
-.atomic-form-app-card {
-  width: 100%;
-  max-width: 40rem;
-}
-
-.atomic-form-app-title {
-  color: var(--atomic-form-text, #1a1a1a);
-  margin: 0 0 1.5rem;
 }
 
 .atomic-form-app-message {

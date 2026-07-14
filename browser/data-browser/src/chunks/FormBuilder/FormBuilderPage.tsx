@@ -18,8 +18,9 @@ import { FormPreviewButton } from './FormPreviewDialog';
 import { ResultsTab } from './ResultsTab';
 import { ShareLinkPanel } from './ShareLinkPanel';
 import { SummaryTab } from './Summary/SummaryTab';
+import { SettingsTab } from './SettingsTab';
 
-type BuilderTab = 'fields' | 'results' | 'summary';
+type BuilderTab = 'fields' | 'results' | 'summary' | 'settings';
 
 export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   const titleId = useId();
@@ -63,6 +64,15 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
           onClick={() => setActiveTab('fields')}
         >
           Fields
+        </TabButton>
+        <TabButton
+          role='tab'
+          type='button'
+          $active={activeTab === 'settings'}
+          aria-selected={activeTab === 'settings'}
+          onClick={() => setActiveTab('settings')}
+        >
+          Settings
         </TabButton>
         <TabButton
           role='tab'
@@ -114,6 +124,10 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
             />
           </PageBarSlot>
         </FieldsGrid>
+      ) : activeTab === 'settings' ? (
+        <ResultsSlot>
+          <SettingsTab resource={resource} />
+        </ResultsSlot>
       ) : activeTab === 'results' ? (
         <ResultsSlot>
           <ResultsTab tableResource={tableResource} />

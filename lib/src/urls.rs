@@ -252,6 +252,7 @@ pub const FORM_MAPS_TO: &str = "https://atomicdata.dev/properties/form-maps-to";
 pub const REQUIRED: &str = "https://atomicdata.dev/properties/required";
 pub const FORM_FIELD_TYPE: &str = "https://atomicdata.dev/properties/form-field-type";
 pub const FORM_FIELD_OPTIONS: &str = "https://atomicdata.dev/properties/form-field-options";
+pub const FORM_STYLING: &str = "https://atomicdata.dev/properties/form-styling";
 pub const FORM_SUBMISSION_SUMMARY: &str =
     "https://atomicdata.dev/properties/form-submission-summary";
 // AI

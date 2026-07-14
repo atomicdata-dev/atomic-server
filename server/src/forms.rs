@@ -34,9 +34,38 @@ pub struct FormDefinition {
     pub id: String,
     pub name: String,
     pub settings: JsonValue,
+    pub styling: FormStyling,
     #[serde(rename = "honeypotField")]
     pub honeypot_field: String,
     pub pages: Vec<FormPageDefinition>,
+}
+
+/// Visual theming for the published runtime, mirrored by `FormStyling` in
+/// `@tomic/form-renderer` (same keep-in-lockstep convention as
+/// [FormDefinition]). Colors/roundness come from the Form's `form-styling`
+/// JSON; `image_url` is left empty by [build_form_definition] — the caller
+/// owns URL construction (the HTTP handlers point it at `/form/{id}/image`,
+/// the data-browser preview at the File's own `downloadURL`). `has_image` +
+/// `image_position` come from the Form's `cover-image` / `image-position`
+/// props.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct FormStyling {
+    /// Internal signal for the handlers (a cover-image exists, fill in
+    /// `image_url`); not part of the wire format.
+    #[serde(skip)]
+    pub has_image: bool,
+    #[serde(rename = "imageUrl", skip_serializing_if = "Option::is_none")]
+    pub image_url: Option<String>,
+    #[serde(rename = "imagePosition", skip_serializing_if = "Option::is_none")]
+    pub image_position: Option<String>,
+    #[serde(rename = "textColor", skip_serializing_if = "Option::is_none")]
+    pub text_color: Option<String>,
+    #[serde(rename = "mainColor", skip_serializing_if = "Option::is_none")]
+    pub main_color: Option<String>,
+    #[serde(rename = "backgroundColor", skip_serializing_if = "Option::is_none")]
+    pub background_color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub roundness: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,6 +111,7 @@ pub async fn build_form_definition(
         Ok(Value::Json(v)) => v.clone(),
         _ => json!({}),
     };
+    let styling = build_form_styling(form);
 
     let page_subjects = form
         .get(atomic_lib::urls::FORM_PAGES)
@@ -99,9 +129,41 @@ pub async fn build_form_definition(
         id: String::new(),
         name,
         settings,
+        styling,
         honeypot_field: HONEYPOT_FIELD.to_string(),
         pages,
     })
+}
+
+fn build_form_styling(form: &Resource) -> FormStyling {
+    // The String arm covers docs written before the client could resolve the
+    // form-styling Property (no `json` datatype tag → the value materializes
+    // as its raw serialized string).
+    let styling_json = match form.get(atomic_lib::urls::FORM_STYLING) {
+        Ok(Value::Json(v)) => v.clone(),
+        Ok(Value::String(s)) => serde_json::from_str(s).unwrap_or_else(|_| json!({})),
+        _ => json!({}),
+    };
+    let get_str = |key: &str| {
+        styling_json
+            .get(key)
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .map(str::to_string)
+    };
+
+    FormStyling {
+        has_image: form.get(atomic_lib::urls::COVER_IMAGE).is_ok(),
+        image_url: None,
+        image_position: form
+            .get(atomic_lib::urls::IMAGE_POSITION)
+            .ok()
+            .map(|v| v.to_string()),
+        text_color: get_str("textColor"),
+        main_color: get_str("mainColor"),
+        background_color: get_str("backgroundColor"),
+        roundness: get_str("roundness"),
+    }
 }
 
 async fn build_page_definition(
@@ -851,6 +913,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn definition_includes_styling() {
+        let store = init_store().await;
+        let (mut form, _email_prop) = build_test_form(&store).await;
+
+        // Defaults: no styling props set.
+        let definition = build_form_definition(&store, &form).await.unwrap();
+        assert!(!definition.styling.has_image);
+        assert!(definition.styling.main_color.is_none());
+        // Wire format hides the empty fields entirely.
+        let wire = serde_json::to_value(&definition).unwrap();
+        assert_eq!(wire["styling"], json!({}));
+
+        form.set(
+            urls::FORM_STYLING.into(),
+            Value::Json(json!({
+                "textColor": "#112233",
+                "mainColor": "#445566",
+                "backgroundColor": "#778899",
+                "roundness": "round",
+            })),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.set(
+            urls::IMAGE_POSITION.into(),
+            Value::String("behind".into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        // Any subject works; has_image only checks presence.
+        form.set(
+            urls::COVER_IMAGE.into(),
+            Value::AtomicUrl("https://example.com/image".to_string().into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        assert!(styling.has_image);
+        assert_eq!(styling.image_position.as_deref(), Some("behind"));
+        assert_eq!(styling.text_color.as_deref(), Some("#112233"));
+        assert_eq!(styling.main_color.as_deref(), Some("#445566"));
+        assert_eq!(styling.background_color.as_deref(), Some("#778899"));
+        assert_eq!(styling.roundness.as_deref(), Some("round"));
+        // `has_image` never leaks into the wire format.
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert!(wire.get("hasImage").is_none());
+    }
+
+    #[tokio::test]
     async fn validate_submission_rejects_missing_required_field() {
         let store = init_store().await;
         let (form, _email_prop) = build_test_form(&store).await;
@@ -910,6 +1026,7 @@ mod tests {
             id: String::new(),
             name: "n".into(),
             settings: json!({}),
+            styling: FormStyling::default(),
             honeypot_field: HONEYPOT_FIELD.into(),
             pages: vec![FormPageDefinition {
                 name: None,
@@ -939,6 +1056,7 @@ mod tests {
             id: String::new(),
             name: "n".into(),
             settings: json!({}),
+            styling: FormStyling::default(),
             honeypot_field: HONEYPOT_FIELD.into(),
             pages: vec![FormPageDefinition {
                 name: None,
