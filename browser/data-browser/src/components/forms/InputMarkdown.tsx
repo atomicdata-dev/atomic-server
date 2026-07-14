@@ -45,6 +45,7 @@ export default function InputMarkdown({
   return (
     <>
       <MarkdownInput
+        key={`${resource.subject}-${property.subject}`}
         initialContent={value}
         id={id}
         labelId={labelId}
