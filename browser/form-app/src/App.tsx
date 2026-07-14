@@ -4,7 +4,13 @@ import {
   FormShell,
   type FormDefinition,
 } from '@tomic/form-renderer';
-import { fetchDefinition, getFormIdFromLocation, submitForm } from './api.js';
+import {
+  fetchDefinition,
+  getFormIdFromLocation,
+  isEmbedMode,
+  submitForm,
+} from './api.js';
+import { startEmbedResizeReporting } from './embedResize.js';
 
 export function App(): JSX.Element {
   const [definition, setDefinition] = useState<FormDefinition | undefined>(
@@ -12,6 +18,7 @@ export function App(): JSX.Element {
   );
   const [error, setError] = useState<string | undefined>();
   const [formId] = useState(getFormIdFromLocation);
+  const [embed] = useState(isEmbedMode);
 
   useEffect(() => {
     if (definition) return;
@@ -22,6 +29,14 @@ export function App(): JSX.Element {
         setError(e instanceof Error ? e.message : 'Could not load this form.'),
       );
   }, [definition, formId]);
+
+  useEffect(() => {
+    if (!embed) return;
+
+    document.documentElement.classList.add('atomic-form-embed');
+
+    return startEmbedResizeReporting();
+  }, [embed]);
 
   if (error) {
     return (
@@ -40,7 +55,7 @@ export function App(): JSX.Element {
   }
 
   return (
-    <FormShell definition={definition}>
+    <FormShell definition={definition} embed={embed}>
       <FormRenderer
         definition={definition}
         onSubmit={async values => {

@@ -155,7 +155,7 @@ pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -
         .insert_header((
             "Content-Security-Policy",
             format!(
-                "script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+                "script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors *"
             ),
         ))
         .body(body)
@@ -166,6 +166,11 @@ pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -
 /// `@tomic/form-renderer`'s palette (`browser/form-renderer/src/style.css`)
 /// so a visitor doesn't see a jarring generic error page after a form-styled
 /// runtime would otherwise have loaded.
+///
+/// Shares `form_page`'s `frame-ancestors *` policy (Phase 6 "Embedding" —
+/// forms are embeddable by any site once published, no auth boundary is
+/// involved) so a stale/unpublished embed shows this friendly card instead
+/// of a browser-blocked blank frame.
 fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
     let escaped = message
         .replace('&', "&amp;")
@@ -195,6 +200,7 @@ fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
             "Cache-Control",
             "no-store, no-cache, must-revalidate, private",
         ))
+        .insert_header(("Content-Security-Policy", "frame-ancestors *"))
         .body(body)
 }
 

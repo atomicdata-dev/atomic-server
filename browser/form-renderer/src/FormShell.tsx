@@ -6,6 +6,12 @@ export interface FormShellProps {
   /** Usually a `<FormRenderer>` for the same definition. */
   children: ReactNode;
   className?: string;
+  /** Set by the published runtime when rendering inside an `<iframe>`
+   * (`?embed=1`, Phase 6 "Embedding") — trims the shell to its natural
+   * content height instead of stretching to fill the viewport, so the
+   * `ResizeObserver`-driven `postMessage` height report reflects the real
+   * form height rather than a forced full-viewport minimum. */
+  embed?: boolean;
 }
 
 const ROUNDNESS: Record<string, string> = {
@@ -81,6 +87,7 @@ export function FormShell({
   definition,
   children,
   className,
+  embed,
 }: FormShellProps): JSX.Element {
   const { styling } = definition;
   const imageUrl = styling.imageUrl;
@@ -88,7 +95,7 @@ export function FormShell({
 
   return (
     <div
-      className={`atomic-form-shell atomic-form-shell-${position} ${className ?? ''}`}
+      className={`atomic-form-shell atomic-form-shell-${position} ${embed ? 'atomic-form-shell-embed' : ''} ${className ?? ''}`}
       style={stylingVars(styling)}
     >
       {imageUrl && (position === 'behind' || position === 'full') && (

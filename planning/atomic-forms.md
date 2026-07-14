@@ -510,9 +510,50 @@ results *summary/aggregate view* (bar charts, histograms) is deferred to
 
 Rough priority order:
 
-[] **Embedding**: `<iframe>` snippet; `/form/:id?embed=1` drops the page chrome;
-   set `frame-ancestors` CSP appropriately on that route (currently forms route
-   would inherit none); `postMessage` height auto-resize.
+[x] **Embedding** — DONE. `<iframe>` snippet with a copy button in a new
+   "Embed" tab inside `ShareLinkPanel`'s popover (alongside the existing
+   Link tab); `?embed=1` drops the full-viewport shell styling client-side;
+   `frame-ancestors` opened up; `postMessage` height auto-resize.
+  - **`frame-ancestors *`, not an allow-list.** Published forms already have
+    no auth/rights gate — anyone with the share link can view and submit —
+    so allowing any site to iframe that same public content adds no new
+    trust boundary. Applied unconditionally to `form_page` (not gated on
+    `?embed=1`, which the server never parses — see below), and also added
+    to `not_available_page` (previously had **no** CSP header at all), so a
+    stale/unpublished embed shows the friendly closed-form card instead of a
+    browser-blocked blank frame.
+  - **`?embed=1` is read client-side only**, via
+    `new URLSearchParams(window.location.search)` in `form-app/src/api.ts`'s
+    `isEmbedMode()` — no `web::Query` extractor needed server-side, keeping
+    decision #2's "runtime stays tiny" property. `App.tsx` tags `<html>`
+    with an `atomic-form-embed` class and passes `embed` into `FormShell`
+    (`atomic-form-shell-embed`), and `form-renderer`/`form-app` CSS drop the
+    `min-height: 100%`/`100vh` chain under those classes — otherwise the
+    `ResizeObserver` height report reflects the forced-full-viewport height
+    instead of the form's real content height.
+  - **Resize protocol**: `form-app/src/embedResize.ts` posts
+    `{ type: 'atomic-form-resize', height }` to `window.parent` via `'*'`
+    (arbitrary embedding origin, no sensitive payload — same choice the
+    existing `pluginRPC.tsx` postMessage calls make). The copied snippet's
+    own inline listener matches on `event.source === iframe.contentWindow`
+    (not the iframe's `id`, which only exists to make `getElementById` easy)
+    so multiple embedded forms on one page don't cross-resize each other.
+  - **Found while writing the e2e test, not a product bug**: `frame-ancestors
+    *` does not cover `about:blank` embedders per spec (Chrome: "'*' matches
+    only URLs with network schemes ... The scheme 'http:' must be added
+    explicitly"), and Chrome's Local Network Access checks separately block
+    a synthetic/routed origin from framing a genuine `localhost` target. A
+    real embedding site (served over http/https) hits neither restriction —
+    only `page.setContent()`/`page.route()`-based test harnesses do. Fixed
+    by having the e2e spec spin up a real local `http` server to host the
+    wrapper page (`forms-submission.spec.ts`).
+  - Covered by `forms-submission.spec.ts` ("embed snippet renders
+    chrome-less and auto-resizes in an iframe": publish, read the exact
+    snippet out of the Embed tab's `CodeBlock`, host it on a real local HTTP
+    server, verify chrome-less rendering + resize + anonymous submit from
+    inside the iframe) and `cargo test -p atomic-server --lib` (CSP header
+    assertions in `form_submission_flow` for both the published and
+    unpublished HTML page).
 [] **Captcha**: ALTCHA-style proof-of-work (self-hosted, no third party, fits the
    privacy stance) — server issues challenge in the definition response, verifies
    on submit. Keep the verifier behind a trait so Turnstile/hCaptcha can slot in.

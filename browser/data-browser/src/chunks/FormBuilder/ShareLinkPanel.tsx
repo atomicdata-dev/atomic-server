@@ -1,16 +1,30 @@
-import { forms, Resource, useNumber, useStore, useString } from '@tomic/react';
+import {
+  core,
+  forms,
+  Resource,
+  useNumber,
+  useStore,
+  useString,
+} from '@tomic/react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
-import * as RadixPopover from '@radix-ui/react-popover';
 import toast from 'react-hot-toast';
 import QRCode from 'qrcode';
 import {
   FaArrowUpRightFromSquare,
+  FaCode,
   FaCopy,
+  FaLink,
   FaShareNodes,
 } from 'react-icons/fa6';
-import { Popover } from '@components/Popover';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  useDialog,
+} from '@components/Dialog';
 import { Column, Row } from '@components/Row';
+import { CodeBlock } from '@components/CodeBlock';
 
 interface ShareLinkPanelProps {
   resource: Resource;
@@ -28,7 +42,7 @@ export function ShareLinkPanel({
   resource,
 }: ShareLinkPanelProps): JSX.Element | null {
   const store = useStore();
-  const [open, setOpen] = useState(false);
+  const [dialogProps, show, , isOpen] = useDialog();
   const [publishedAt] = useNumber(resource, forms.properties.formPublishedAt);
   const [persistedSlug] = useString(resource, forms.properties.formPublishId);
   const [mintedSlug, setMintedSlug] = useState<string | undefined>();
@@ -98,29 +112,43 @@ export function ShareLinkPanel({
   }
 
   if (!slug) {
-    return <DisabledTrigger title='Preparing share link…' />;
+    return <DisabledTrigger title="Preparing share link…" />;
   }
 
   const shareUrl = `${store.getServerUrl()}/form/${slug}`;
 
   return (
-    <Popover
-      open={open}
-      onOpenChange={setOpen}
-      Trigger={
-        <Trigger title='Share form'>
-          <FaShareNodes />
-          Share
-        </Trigger>
-      }
-    >
-      <PanelContent shareUrl={shareUrl} />
-    </Popover>
+    <>
+      <Trigger type="button" title="Share form" onClick={show}>
+        <FaShareNodes />
+        Share
+      </Trigger>
+      <Dialog {...dialogProps} width="44rem">
+        {isOpen && (
+          <>
+            <DialogTitle>
+              <h1>Share form</h1>
+            </DialogTitle>
+            <DialogContent>
+              <PanelContent shareUrl={shareUrl} resource={resource} />
+            </DialogContent>
+          </>
+        )}
+      </Dialog>
+    </>
   );
 }
 
-function PanelContent({ shareUrl }: { shareUrl: string }): JSX.Element {
+function PanelContent({
+  shareUrl,
+  resource,
+}: {
+  shareUrl: string;
+  resource: Resource;
+}): JSX.Element {
+  const [view, setView] = useState<'link' | 'embed'>('link');
   const [qrDataUrl, setQrDataUrl] = useState<string | undefined>();
+  const [formName] = useString(resource, core.properties.name);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,22 +168,93 @@ function PanelContent({ shareUrl }: { shareUrl: string }): JSX.Element {
   };
 
   return (
-    <Inner gap='0.75rem'>
-      {qrDataUrl && <QrImage src={qrDataUrl} alt='QR code for the form link' />}
-      <LinkText title={shareUrl}>{shareUrl}</LinkText>
-      <Row gap='0.5rem'>
-        <PanelButton type='button' onClick={copyLink}>
-          <FaCopy /> Copy link
-        </PanelButton>
-        <PanelLink href={shareUrl} target='_blank' rel='noreferrer'>
-          <FaArrowUpRightFromSquare /> Open
-        </PanelLink>
-      </Row>
+    <Inner gap="0.75rem">
+      <ViewToggle role="tablist">
+        <ViewButton
+          type="button"
+          role="tab"
+          $active={view === 'link'}
+          aria-selected={view === 'link'}
+          onClick={() => setView('link')}
+        >
+          <FaLink /> Link
+        </ViewButton>
+        <ViewButton
+          type="button"
+          role="tab"
+          $active={view === 'embed'}
+          aria-selected={view === 'embed'}
+          onClick={() => setView('embed')}
+        >
+          <FaCode /> Embed
+        </ViewButton>
+      </ViewToggle>
+      {view === 'link' ? (
+        <>
+          {qrDataUrl && (
+            <QrImage src={qrDataUrl} alt="QR code for the form link" />
+          )}
+          <LinkText title={shareUrl}>{shareUrl}</LinkText>
+          <Row gap="0.5rem">
+            <PanelButton type="button" onClick={copyLink}>
+              <FaCopy /> Copy link
+            </PanelButton>
+            <PanelLink href={shareUrl} target="_blank" rel="noreferrer">
+              <FaArrowUpRightFromSquare /> Open
+            </PanelLink>
+          </Row>
+        </>
+      ) : (
+        <EmbedView shareUrl={shareUrl} formName={formName} />
+      )}
     </Inner>
   );
 }
 
-const Trigger = styled(RadixPopover.Trigger)`
+function EmbedView({
+  shareUrl,
+  formName,
+}: {
+  shareUrl: string;
+  formName: string | undefined;
+}): JSX.Element {
+  const snippet = buildEmbedSnippet(shareUrl, formName ?? 'Form');
+
+  return (
+    <EmbedInner>
+      <EmbedHint>Paste this where you want the form to appear.</EmbedHint>
+      <CodeBlock content={snippet} wordWrap />
+    </EmbedInner>
+  );
+}
+
+/** Iframe height starts at a reasonable default and is then driven by the
+ * `atomic-form-resize` `postMessage` the published runtime posts
+ * (`form-app/src/embedResize.ts`) — `event.source` (not the iframe's id) is
+ * what actually disambiguates the message if a page embeds more than one
+ * form; the id just makes the element easy to select. */
+function buildEmbedSnippet(shareUrl: string, formName: string): string {
+  const id = `atomic-form-${Math.random().toString(36).slice(2, 8)}`;
+  const escapedName = formName.replace(/"/g, '&quot;');
+
+  return `<iframe id="${id}" src="${shareUrl}?embed=1" width="100%" height="600" style="border:none;" title="${escapedName}"></iframe>
+<script>
+(function () {
+  var iframe = document.getElementById('${id}');
+  window.addEventListener('message', function (event) {
+    if (
+      event.data &&
+      event.data.type === 'atomic-form-resize' &&
+      event.source === iframe.contentWindow
+    ) {
+      iframe.style.height = event.data.height + 'px';
+    }
+  });
+})();
+</script>`;
+}
+
+const Trigger = styled.button`
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -188,6 +287,43 @@ const Inner = styled(Column)`
   padding: ${p => p.theme.size()};
   align-items: center;
   min-width: 14rem;
+`;
+
+const ViewToggle = styled.div`
+  display: flex;
+  gap: 0.25rem;
+  width: 100%;
+  border-bottom: 1px solid ${p => p.theme.colors.bg2};
+`;
+
+const ViewButton = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 1.85rem;
+  padding: 0 0.6rem;
+  border: none;
+  border-bottom: 2px solid
+    ${p => (p.$active ? p.theme.colors.main : 'transparent')};
+  background: none;
+  color: ${p => (p.$active ? p.theme.colors.text : p.theme.colors.textLight)};
+  font-weight: ${p => (p.$active ? 'bold' : 'normal')};
+  cursor: pointer;
+
+  &:hover {
+    color: ${p => p.theme.colors.text};
+  }
+`;
+
+const EmbedInner = styled(Column)`
+  gap: 0.5rem;
+  width: 22rem;
+  max-width: 100%;
+`;
+
+const EmbedHint = styled.span`
+  font-size: 0.8rem;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const QrImage = styled.img`

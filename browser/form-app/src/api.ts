@@ -11,6 +11,13 @@ export function getFormIdFromLocation(): string {
   return idx >= 0 && segments[idx + 1] ? segments[idx + 1] : '';
 }
 
+/** `?embed=1` (Phase 6 "Embedding") — read directly from the URL rather than
+ * threaded in by the server, so the runtime behaves the same whether the
+ * HTML shell is server-rendered or opened straight against a dev server. */
+export function isEmbedMode(): boolean {
+  return new URLSearchParams(window.location.search).get('embed') === '1';
+}
+
 export async function fetchDefinition(id: string): Promise<FormDefinition> {
   const res = await fetch(`/form/${id}/definition`);
 

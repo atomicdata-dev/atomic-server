@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import http from 'node:http';
 import { before, newResource, openSubject, SERVER_URL } from './test-utils';
 
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
@@ -183,6 +184,154 @@ test.describe('form publish and anonymous submit', () => {
       timeout: 15000,
     });
     await expect(page.getByText('Grace Hopper')).toBeVisible();
+  });
+
+  test('embed snippet renders chrome-less and auto-resizes in an iframe', async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    // --- 1. Owner: build and publish a minimal one-field form ---
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Embed test');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('editable-title').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Short text', exact: true }).click();
+    await expect(page.getByTestId('field-row-short-text')).toBeVisible();
+    await page.getByTestId('field-row-short-text').click();
+    await page.getByTestId('field-label-input').fill('Full name');
+
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await page.waitForFunction(
+      ({ subject, prop }) =>
+        typeof window.store.resources.get(subject)?.get(prop) === 'number',
+      { subject: formSubject, prop: FORM_PUBLISHED_AT },
+      { timeout: 10000 },
+    );
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    // --- 2. Owner: open the Share popover's Embed tab and read the exact
+    // snippet a real user would copy-paste — this is what gets exercised
+    // below, not a hand-reconstructed equivalent.
+    //
+    // The share slug mint (`ShareLinkPanel.tsx`) fires right after publish
+    // and only retries for ~15s before giving up — shorter than how long
+    // the publish commit can actually take to reach the server under
+    // suite-wide load. Poll the definition endpoint directly first (a
+    // generous budget, no give-up) so that by the time we open the popover
+    // the form is already published server-side and the panel's own first
+    // attempt succeeds immediately.
+    await expect(async () => {
+      const res = await page.request.get(
+        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition`,
+      );
+      expect(res.ok()).toBe(true);
+    }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
+
+    await page.getByTitle('Share form').click({ timeout: 20000 });
+    const popover = page.getByRole('dialog');
+    await expect(popover).toBeVisible({ timeout: 15000 });
+    await popover.getByRole('tab', { name: 'Embed' }).click();
+
+    const snippetLocator = popover.locator('[data-code-content]');
+    await expect(snippetLocator).toBeVisible({ timeout: 15000 });
+    const snippet = await snippetLocator.getAttribute('data-code-content');
+    expect(snippet).toBeTruthy();
+    // The snippet embeds the minted share slug (same URL as the Link tab),
+    // not the raw `did:ad:` subject.
+    expect(snippet).toMatch(
+      new RegExp(`${SERVER_URL}/form/[a-z0-9]+\\?embed=1`),
+    );
+
+    // --- 3. Fresh, unauthenticated context: load a throwaway host page
+    // containing exactly that snippet, mirroring what a real embedder's
+    // site would run. Served from a real local HTTP server (not
+    // `page.setContent`/`about:blank`) — Chrome's `frame-ancestors *`
+    // explicitly excludes non-network-scheme embedders, and its Local
+    // Network Access checks block a synthetic/routed origin from framing a
+    // genuine `localhost` target, so an `about:blank` host 404s in ways a
+    // real embedding site never would. ---
+    const hostServer = http.createServer((_req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`<!doctype html><html><body>${snippet}</body></html>`);
+    });
+    await new Promise<void>(resolve =>
+      hostServer.listen(0, '127.0.0.1', resolve),
+    );
+    const hostPort = (hostServer.address() as { port: number }).port;
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+
+    try {
+      await visitorPage.goto(`http://localhost:${hostPort}/`);
+
+      const iframeLocator = visitorPage.locator('iframe');
+      await expect(iframeLocator).toHaveAttribute('height', '600');
+
+      const embedFrame = visitorPage.frameLocator('iframe');
+      const nameInput = embedFrame.getByLabel('Full name', { exact: false });
+      await expect(nameInput).toBeVisible({ timeout: 15000 });
+
+      // Chrome-less: the runtime marks <html> so the full-viewport shell
+      // styling is dropped (form-app/src/style.css).
+      const frameHandle = await iframeLocator.elementHandle();
+      const frame = await frameHandle?.contentFrame();
+      await expect
+        .poll(
+          async () =>
+            frame?.evaluate(() =>
+              document.documentElement.classList.contains('atomic-form-embed'),
+            ),
+          { timeout: 15000 },
+        )
+        .toBe(true);
+
+      // Auto-resize: the runtime's ResizeObserver reports content height via
+      // postMessage, and the snippet's own listener script applies it.
+      await expect
+        .poll(async () => iframeLocator.evaluate(el => el.style.height), {
+          timeout: 15000,
+        })
+        .not.toBe('');
+
+      await nameInput.fill('Ada Lovelace');
+      await embedFrame
+        .getByRole('button', { name: 'Submit', exact: true })
+        .click();
+      await expect(embedFrame.getByRole('status')).toContainText('Thank you', {
+        timeout: 15000,
+      });
+    } finally {
+      await visitorContext.close();
+      hostServer.close();
+    }
   });
 
   test('unpublished form shows a friendly not-available page', async ({

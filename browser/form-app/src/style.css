@@ -41,3 +41,22 @@ body {
   text-align: center;
   margin-top: 4rem;
 }
+
+/* Phase 6 "Embedding" (`?embed=1`): shrink-to-content instead of forcing a
+   full-viewport minimum, so the ResizeObserver height report the runtime
+   posts to the embedding page (embedResize.ts) reflects the form's real
+   height, not an inflated one. Class is set on <html> (not <body>) so this
+   selector can reach both ancestors. */
+html.atomic-form-embed,
+html.atomic-form-embed body {
+  height: auto;
+}
+
+html.atomic-form-embed #root {
+  min-height: 0;
+}
+
+html.atomic-form-embed .atomic-form-app-shell {
+  min-height: 0;
+  padding: 1rem;
+}

@@ -1117,6 +1117,20 @@ async fn form_submission_flow() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 410, "unpublished form should 410");
 
+    // 1b. The unpublished HTML page (`not_available_page`) still allows
+    // embedding — Phase 6 "Embedding": a stale snippet should show the
+    // friendly closed-form card inside the iframe, not a browser-blocked
+    // blank frame.
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", form_did_id))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.headers().get("Content-Security-Policy").unwrap(),
+        "frame-ancestors *",
+        "unpublished form page should allow embedding"
+    );
+
     // 2. Publish, GET by DID -> 200, slug gets minted
     form.set(
         urls::FORM_PUBLISHED_AT.into(),
@@ -1147,6 +1161,25 @@ async fn form_submission_flow() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success(), "definition fetch by slug failed");
+
+    // 3b. Phase 6 "Embedding": the published HTML page allows framing from
+    // any origin (forms have no auth boundary once published — same trust
+    // level as the direct share link).
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success());
+    let csp = resp
+        .headers()
+        .get("Content-Security-Policy")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(
+        csp.contains("frame-ancestors *"),
+        "published form page should allow embedding: {csp}"
+    );
 
     // 4. Valid submission -> 201, row lands under the table
     let submit_body = serde_json::json!({

@@ -312,3 +312,31 @@
 /* full: no card chrome — the form sits directly on the image. Inputs keep
    their own background so they stay usable on busy images. */
 
+/* ── embed (Phase 6): shrink-to-content instead of filling the viewport ──
+   The published runtime reports its content height to the embedding page
+   via `postMessage` and expects the iframe to be resized to match — a
+   `min-height: 100%` chain would report the iframe's *current* (often
+   stale) height back to itself instead of the form's real height. Image
+   panes drop their viewport-sticky layout for the same reason, reusing the
+   narrow-viewport treatment below. */
+.atomic-form-shell-embed {
+  min-height: 0;
+  flex: initial;
+}
+
+.atomic-form-shell-embed .atomic-form-content-pane {
+  padding: 1rem;
+}
+
+.atomic-form-shell-embed.atomic-form-shell-left,
+.atomic-form-shell-embed.atomic-form-shell-right {
+  display: flex;
+  flex-direction: column;
+}
+
+.atomic-form-shell-embed .atomic-form-image-pane {
+  position: static;
+  height: 12rem;
+  order: 0;
+}
+
