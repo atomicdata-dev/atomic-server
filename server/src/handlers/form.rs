@@ -131,6 +131,7 @@ pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -
         Err(e) => return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
     };
     fill_image_url(&mut definition);
+    definition.captcha = Some(appstate.captcha.client_config(&definition.id));
 
     let nonce = match generate_nonce() {
         Ok(n) => n,
@@ -154,8 +155,10 @@ pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -
         ))
         .insert_header((
             "Content-Security-Policy",
+            // `worker-src blob:` — the ALTCHA widget's single-file bundle
+            // spawns its proof-of-work Web Workers from blob: URLs.
             format!(
-                "script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; frame-ancestors *"
+                "script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; worker-src 'self' blob:; frame-ancestors *"
             ),
         ))
         .body(body)
@@ -221,8 +224,27 @@ pub async fn get_definition(
         .await
         .map_err(internal_error)?;
     fill_image_url(&mut definition);
+    definition.captcha = Some(appstate.captcha.client_config(&definition.id));
 
     Ok(HttpResponse::Ok().json(definition))
+}
+
+/// `GET /form/{id}/challenge` — a fresh proof-of-work challenge for the
+/// published form's captcha widget. Stateless to issue (HMAC-signed), so no
+/// bookkeeping happens here; one-time use is enforced at verification.
+pub async fn get_challenge(
+    path: web::Path<String>,
+    appstate: web::Data<AppState>,
+) -> Result<HttpResponse, FormApiError> {
+    resolve_published_form(&appstate.store, &path.into_inner()).await?;
+
+    let challenge = appstate.captcha.issue().map_err(internal_error)?;
+    Ok(HttpResponse::Ok()
+        .insert_header((
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate, private",
+        ))
+        .json(challenge))
 }
 
 /// Points the definition's styling at the publish-gated image route (see
@@ -291,6 +313,15 @@ pub async fn submit_form(
             "Invalid submission",
         ));
     }
+
+    // Proof-of-work captcha (Phase 6): the widget rides its solved payload
+    // along in the body's top-level `altcha` field. Verified + consumed
+    // (one-time use) before any validation work happens.
+    appstate
+        .captcha
+        .verify(body.get("altcha").and_then(|v| v.as_str()))
+        .await
+        .map_err(|message| FormApiError::new(StatusCode::BAD_REQUEST, message))?;
 
     let definition = forms::build_form_definition(store, &form)
         .await

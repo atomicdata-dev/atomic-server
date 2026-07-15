@@ -117,6 +117,7 @@ ort = { version = "2.0.0-rc.11", optional = true, default-features = false, feat
   "tls-rustls",
   "tracing",
 ] }
+altcha = "0.1.0"
 
 [dependencies.instant-acme]
 optional = true

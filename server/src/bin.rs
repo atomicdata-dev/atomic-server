@@ -4,6 +4,7 @@ use std::{fs::File, io::Write};
 
 mod actor_messages;
 mod appstate;
+mod captcha;
 mod commit_monitor;
 pub mod config;
 mod content_types;

@@ -1,4 +1,8 @@
-import type { FormDefinition, FormValues } from '@tomic/form-renderer';
+import {
+  CAPTCHA_VALUE_KEY,
+  type FormDefinition,
+  type FormValues,
+} from '@tomic/form-renderer';
 
 /** The form id is the last path segment of `/form/:id`. Reading it from the
  * URL (rather than threading it through props from the server) keeps this
@@ -44,10 +48,15 @@ export async function submitForm(
   honeypotField: string,
   values: FormValues,
 ): Promise<SubmitOutcome> {
-  // FormRenderer rides the honeypot's value along under its own field key
-  // (see FormRenderer.tsx's handleSubmit) — lift it back out to the
-  // top-level `hp` the server expects, rather than nesting it under `values`.
-  const { [honeypotField]: honeypotValue, ...fieldValues } = values;
+  // FormRenderer rides the honeypot's and captcha's values along under
+  // their own field keys (see FormRenderer.tsx's handleSubmit) — lift them
+  // back out to the top-level `hp` / `altcha` fields the server expects,
+  // rather than nesting them under `values`.
+  const {
+    [honeypotField]: honeypotValue,
+    [CAPTCHA_VALUE_KEY]: captchaValue,
+    ...fieldValues
+  } = values;
 
   const res = await fetch(`/form/${id}/submit`, {
     method: 'POST',
@@ -55,6 +64,7 @@ export async function submitForm(
     body: JSON.stringify({
       values: fieldValues,
       [honeypotField]: honeypotValue ?? '',
+      altcha: typeof captchaValue === 'string' ? captchaValue : '',
     }),
   });
 

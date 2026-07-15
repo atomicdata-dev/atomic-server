@@ -25,6 +25,8 @@ pub struct AppState {
     /// The Actix Address of the CommitMonitor, which should receive updates when a commit is applied
     /// (and also hosts Loro ephemera / drive presence fan-out).
     pub commit_monitor: actix::Addr<CommitMonitor>,
+    /// Verifies published-form submission captchas (`crate::captcha`).
+    pub captcha: Arc<dyn crate::captcha::CaptchaVerifier>,
     pub vector_search_state: crate::vector_search::VectorSearchState,
     pub index_status_broadcast: Arc<IndexStatusBroadcast>,
     /// Whether this node is managed (reports to a control plane). Set at runtime
@@ -212,10 +214,13 @@ impl AppState {
                 tracing::error!("Failed to add all resources to vector search index: {}", e);
             }
         }
+        let captcha = Arc::new(crate::captcha::AltchaVerifier::from_store(&store));
+
         Ok(AppState {
             store,
             config,
             commit_monitor,
+            captcha,
             vector_search_state,
             index_status_broadcast,
             managed: server_info.managed,

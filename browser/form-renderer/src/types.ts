@@ -70,6 +70,19 @@ export interface FormStyling {
   roundness?: Roundness | string;
 }
 
+/** Captcha client config, filled in by the server for published forms
+ * (`server/src/captcha.rs::client_config`). Absent in builder previews, so
+ * the preview never renders a live widget. */
+export interface FormCaptcha {
+  provider: 'altcha' | string;
+  challengeUrl: string;
+}
+
+/** The ride-along key under which FormRenderer passes the solved captcha
+ * payload to `onSubmit` — same pattern as the honeypot value. The host app
+ * lifts it out into the submit body's top-level `altcha` field. */
+export const CAPTCHA_VALUE_KEY = '__altcha';
+
 export interface FormDefinition {
   version: number;
   id: string;
@@ -77,6 +90,7 @@ export interface FormDefinition {
   settings: Record<string, unknown>;
   styling: FormStyling;
   honeypotField: string;
+  captcha?: FormCaptcha;
   pages: FormPageDefinition[];
 }
 

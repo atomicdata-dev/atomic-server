@@ -46,9 +46,7 @@ function readableTextOn(hexColor: string): string | undefined {
  * keys override the light/dark-adaptive defaults in `style.css`; derived
  * colors (helper text, borders, on-accent text) keep contrast sensible
  * against the custom values. */
-export function stylingVars(
-  styling: FormDefinition['styling'],
-): CSSProperties {
+export function stylingVars(styling: FormDefinition['styling']): CSSProperties {
   const vars: Record<string, string> = {};
 
   if (styling.textColor) {

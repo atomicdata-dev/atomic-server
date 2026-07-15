@@ -1154,6 +1154,11 @@ async fn form_submission_flow() {
     let slug = body["id"].as_str().expect("slug should be minted").to_string();
     assert!(!slug.is_empty());
     assert_eq!(body["pages"][0]["blocks"][0]["mapsTo"], email_prop.get_subject().to_string());
+    assert_eq!(
+        body["captcha"]["challengeUrl"],
+        format!("/form/{slug}/challenge"),
+        "definition should carry the captcha client config"
+    );
 
     // 3. GET by the minted slug -> same definition
     let req = test::TestRequest::get()
@@ -1181,9 +1186,38 @@ async fn form_submission_flow() {
         "published form page should allow embedding: {csp}"
     );
 
-    // 4. Valid submission -> 201, row lands under the table
+    // 3c. Captcha: fetch a challenge and solve it natively (difficulty is
+    // lowered under cfg(test) — see `crate::captcha`), mirroring what the
+    // ALTCHA widget does in the visitor's browser.
+    macro_rules! solve_captcha {
+        () => {{
+            let req = test::TestRequest::get()
+                .uri(&format!("/form/{}/challenge", slug))
+                .to_request();
+            let resp = test::call_service(&app, req).await;
+            assert!(resp.status().is_success(), "challenge fetch failed");
+            let challenge: altcha::Challenge =
+                serde_json::from_str(&get_body(resp)).expect("challenge should parse");
+            let solution =
+                altcha::solve_challenge(altcha::SolveChallengeOptions::new(&challenge))
+                    .unwrap()
+                    .expect("challenge should be solvable");
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD.encode(
+                serde_json::to_vec(&serde_json::json!({
+                    "challenge": challenge,
+                    "solution": solution,
+                }))
+                .unwrap(),
+            )
+        }};
+    }
+
+    // 4. Valid submission (with solved captcha) -> 201, row lands under the table
+    let captcha_payload = solve_captcha!();
     let submit_body = serde_json::json!({
-        "values": { email_prop.get_subject().to_string(): "visitor@example.com" }
+        "values": { email_prop.get_subject().to_string(): "visitor@example.com" },
+        "altcha": captcha_payload,
     });
     let req = test::TestRequest::post()
         .uri(&format!("/form/{}/submit", slug))
@@ -1204,17 +1238,39 @@ async fn form_submission_flow() {
     let result = store.query(&query).await.unwrap();
     assert_eq!(result.subjects.len(), 1, "submission row should exist under the table");
 
-    // 5. Missing required field -> 400 with a field error
+    // 4b. Missing captcha payload -> 400
     let req = test::TestRequest::post()
         .uri(&format!("/form/{}/submit", slug))
-        .set_json(&serde_json::json!({ "values": {} }))
+        .set_json(&serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor2@example.com" }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400, "captcha-less submission should be rejected");
+
+    // 4c. Replayed captcha payload (already consumed by step 4) -> 400
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor2@example.com" },
+            "altcha": captcha_payload,
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 400, "replayed captcha should be rejected");
+
+    // 5. Missing required field -> 400 with a field error (fresh captcha —
+    // field validation runs after captcha verification)
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({ "values": {}, "altcha": solve_captcha!() }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 400);
     let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
     assert!(body["errors"][0]["message"].as_str().is_some());
 
-    // 6. Honeypot filled -> 400
+    // 6. Honeypot filled -> 400 (checked before the captcha, so no payload needed)
     let req = test::TestRequest::post()
         .uri(&format!("/form/{}/submit", slug))
         .set_json(&serde_json::json!({

@@ -554,9 +554,54 @@ Rough priority order:
     inside the iframe) and `cargo test -p atomic-server --lib` (CSP header
     assertions in `form_submission_flow` for both the published and
     unpublished HTML page).
-[] **Captcha**: ALTCHA-style proof-of-work (self-hosted, no third party, fits the
-   privacy stance) — server issues challenge in the definition response, verifies
-   on submit. Keep the verifier behind a trait so Turnstile/hCaptcha can slot in.
+[x] **Captcha** — DONE. ALTCHA proof-of-work (self-hosted, no third party),
+   always-on for every published form (no per-form toggle: solving is
+   invisible background CPU work, so there's little reason to opt out).
+   Verifier lives behind the `CaptchaVerifier` trait
+   (`server/src/captcha.rs`, on `AppState`) so Turnstile/hCaptcha can slot
+   in later (async `verify` for their HTTP round-trips).
+  - **Official libraries, not hand-rolled**: the `altcha` crate
+    (altcha-org's own Rust implementation of PoW v2: `create_challenge` /
+    `verify_solution` / `solve_challenge` — the latter also powers the
+    tests) and the `altcha` npm widget v3 (~34 kB gzipped web component;
+    form-app bundle now 144 kB gzipped). What the libraries *don't*
+    ship, `AltchaVerifier` adds: an HMAC secret (random, persisted in redb
+    `Tree::PluginMeta` like the publish-slug map, so restarts don't
+    invalidate in-flight solutions) and one-time-use replay protection (an
+    in-process consumed-nonce map with lazy TTL pruning, same layer as the
+    submit rate limiter).
+  - **Deviation from the sketch above** ("server issues challenge in the
+    definition response"): the widget's native flow is a challenge URL it
+    fetches itself, so there's a publish-gated `GET /form/{id}/challenge`
+    endpoint instead (stateless to issue — challenges are HMAC-signed, no
+    bookkeeping until verify). The definition response carries
+    `captcha: { provider, challengeUrl }` so the runtime knows what to
+    render; builder previews get no `captcha` field and render no widget.
+  - **Difficulty**: PBKDF2/SHA-256, cost 5000, deterministic counter
+    1000–4000 (below the docs' 5000–10000 so mid-range phones solve in a
+    couple of seconds — deterrence comes from combining with the rate
+    limiter + honeypot). Challenges expire after 1 h. Under `cfg(test)`
+    difficulty drops to near-zero so debug-build tests solve natively.
+  - **Client**: `FormRenderer` renders `<altcha-widget auto="onload">`
+    (visible checkbox card above Submit, mounted-but-hidden on earlier
+    pages so solving starts at page load), disables Submit until the
+    widget's `statechange` reports `verified`, and rides the solved payload
+    to `onSubmit` under `CAPTCHA_VALUE_KEY` (honeypot pattern); form-app
+    lifts it into the body's top-level `altcha` field. The `altcha` package
+    is a dependency of **form-app only** (side-effect import registers the
+    element); form-renderer ships a hand-written JSX declaration
+    (`altcha-widget.d.ts`) so the data-browser preview never pulls in the
+    solver. Widget card themed via `--altcha-*` → `--atomic-form-*` CSS-var
+    mapping in form-renderer's `style.css`.
+  - **CSP**: `form_page`'s header gained `worker-src 'self' blob:` — the
+    widget's single-file bundle spawns its solver Web Workers from blob:
+    URLs.
+  - Covered by: `cargo test -p atomic-server --lib captcha::` (6 tests:
+    roundtrip, replay, tamper, foreign-secret, expiry, malformed),
+    `form_submission_flow` (definition carries config; solve → 201;
+    missing payload → 400; replay → 400), and `forms-submission.spec.ts`
+    (widget visible, Submit gated on background solve, anonymous + embed
+    submits flow through it).
 [] **Private links**: one-time invite codes modeled as **resources, children
    of the Form** — not a redb side-table (consistent with how submission rows
    already work, and reuses querying/commits/rights/sync instead of a second

@@ -37,6 +37,12 @@ pub struct FormDefinition {
     pub styling: FormStyling,
     #[serde(rename = "honeypotField")]
     pub honeypot_field: String,
+    /// Captcha client config (`crate::captcha::CaptchaVerifier::client_config`).
+    /// Left `None` by [build_form_definition] — the HTTP handlers fill it in
+    /// (it references the publish slug), keeping this builder pure and the
+    /// data-browser's preview mirror (`buildFormDefinition.ts`) unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub captcha: Option<JsonValue>,
     pub pages: Vec<FormPageDefinition>,
 }
 
@@ -131,6 +137,7 @@ pub async fn build_form_definition(
         settings,
         styling,
         honeypot_field: HONEYPOT_FIELD.to_string(),
+        captcha: None,
         pages,
     })
 }
@@ -1028,6 +1035,7 @@ mod tests {
             settings: json!({}),
             styling: FormStyling::default(),
             honeypot_field: HONEYPOT_FIELD.into(),
+            captcha: None,
             pages: vec![FormPageDefinition {
                 name: None,
                 cover_image: None,
@@ -1058,6 +1066,7 @@ mod tests {
             settings: json!({}),
             styling: FormStyling::default(),
             honeypot_field: HONEYPOT_FIELD.into(),
+            captcha: None,
             pages: vec![FormPageDefinition {
                 name: None,
                 cover_image: None,

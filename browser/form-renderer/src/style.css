@@ -340,3 +340,22 @@
   order: 0;
 }
 
+/* ── ALTCHA captcha card (published runtime only) ──
+   Maps the widget's theming variables onto the form theme so custom colors
+   and roundness from the Settings tab apply to it in both color schemes. */
+.atomic-form-captcha {
+  margin-top: 1.25rem;
+}
+
+.atomic-form-captcha altcha-widget {
+  display: block;
+  --altcha-color-base: var(--atomic-form-bg);
+  --altcha-color-base-content: var(--atomic-form-text);
+  --altcha-border-color: var(--atomic-form-border);
+  --altcha-border-radius: var(--atomic-form-radius);
+  --altcha-checkbox-border-color: var(--atomic-form-border);
+  --altcha-color-primary: var(--atomic-form-accent);
+  --altcha-color-error: var(--atomic-form-error);
+  --altcha-spinner-color: var(--atomic-form-accent);
+  --altcha-max-width: 100%;
+}

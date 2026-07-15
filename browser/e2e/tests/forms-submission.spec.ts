@@ -130,11 +130,18 @@ test.describe('form publish and anonymous submit', () => {
     );
     await expect(submitButton).toHaveCSS('border-radius', '16px');
 
+    // Phase 6 captcha: the ALTCHA widget renders above Submit and solves its
+    // proof-of-work in the background (auto=onload). Submit stays disabled
+    // until the widget reports `verified` (no toBeDisabled assertion — on a
+    // fast machine the solve can finish before we'd check).
+    await expect(visitorPage.locator('altcha-widget')).toBeVisible();
+
     await nameInput.fill('Ada Lovelace');
 
     const emailInput = visitorPage.getByLabel('Email', { exact: false });
     await emailInput.fill('ada@example.com');
 
+    await expect(submitButton).toBeEnabled({ timeout: 30000 });
     await visitorPage.getByRole('button', { name: 'Submit', exact: true }).click();
     await expect(visitorPage.getByRole('status')).toContainText(
       'Thank you',
@@ -171,9 +178,12 @@ test.describe('form publish and anonymous submit', () => {
     await visitor2Page
       .getByLabel('Email', { exact: false })
       .fill('grace@example.com');
-    await visitor2Page
-      .getByRole('button', { name: 'Submit', exact: true })
-      .click();
+    const submit2 = visitor2Page.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    await expect(submit2).toBeEnabled({ timeout: 30000 });
+    await submit2.click();
     await expect(visitor2Page.getByRole('status')).toContainText('Thank you', {
       timeout: 15000,
     });
@@ -322,9 +332,13 @@ test.describe('form publish and anonymous submit', () => {
         .not.toBe('');
 
       await nameInput.fill('Ada Lovelace');
-      await embedFrame
-        .getByRole('button', { name: 'Submit', exact: true })
-        .click();
+      const embedSubmit = embedFrame.getByRole('button', {
+        name: 'Submit',
+        exact: true,
+      });
+      // Wait out the captcha's background proof-of-work solve.
+      await expect(embedSubmit).toBeEnabled({ timeout: 30000 });
+      await embedSubmit.click();
       await expect(embedFrame.getByRole('status')).toContainText('Thank you', {
         timeout: 15000,
       });

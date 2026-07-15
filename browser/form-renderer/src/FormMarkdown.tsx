@@ -11,7 +11,10 @@ export interface FormMarkdownProps {
  * text) as safe, minimally-styled HTML. A `div` wrapper — not `p` — since
  * ReactMarkdown may itself emit block-level elements (lists, multiple
  * paragraphs), which can't nest inside a `<p>`. */
-export function FormMarkdown({ text, className }: FormMarkdownProps): JSX.Element {
+export function FormMarkdown({
+  text,
+  className,
+}: FormMarkdownProps): JSX.Element {
   return (
     <div className={className}>
       <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>

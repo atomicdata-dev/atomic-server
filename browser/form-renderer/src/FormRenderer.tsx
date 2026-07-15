@@ -1,5 +1,10 @@
-import { useId, useState, type FormEvent, type JSX } from 'react';
-import type { FormDefinition, FormErrors, FormValues } from './types.js';
+import { useEffect, useId, useState, type FormEvent, type JSX } from 'react';
+import {
+  CAPTCHA_VALUE_KEY,
+  type FormDefinition,
+  type FormErrors,
+  type FormValues,
+} from './types.js';
 import { validatePage, validateAll } from './validation.js';
 import { FieldInput } from './FieldInput.js';
 import { FormMarkdown } from './FormMarkdown.js';
@@ -33,6 +38,29 @@ export function FormRenderer({
   const [serverMessage, setServerMessage] = useState<string | undefined>();
   const [honeypot, setHoneypot] = useState('');
   const groupId = useId();
+
+  // ALTCHA proof-of-work captcha (server-provided config; previews get no
+  // config and render no widget). The <altcha-widget> element itself is
+  // registered by the host app (form-app's `import 'altcha'`).
+  const captcha =
+    !preview && definition.captcha?.provider === 'altcha'
+      ? definition.captcha
+      : undefined;
+  const [captchaVerified, setCaptchaVerified] = useState(false);
+  const [captchaEl, setCaptchaEl] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!captchaEl) return;
+
+    const onStateChange = (event: Event) => {
+      const state = (event as CustomEvent<{ state?: string }>).detail?.state;
+      setCaptchaVerified(state === 'verified');
+    };
+
+    captchaEl.addEventListener('statechange', onStateChange);
+
+    return () => captchaEl.removeEventListener('statechange', onStateChange);
+  }, [captchaEl]);
 
   const page = definition.pages[pageIndex];
   const isLastPage = pageIndex === definition.pages.length - 1;
@@ -88,12 +116,24 @@ export function FormRenderer({
     }
 
     setStatus('submitting');
-    // The honeypot's value rides along under its own field key so the host
-    // app (form-app) can lift it out to the submit body's top-level `hp`
-    // field without FormRenderer needing to know the wire format.
+    // The widget stores its solved payload in a hidden input named 'altcha'
+    // inside this <form>. Read it before the await — the event's
+    // currentTarget is only valid synchronously.
+    const captchaPayload = captcha
+      ? ((new FormData(e.currentTarget as HTMLFormElement).get('altcha') as
+          | string
+          | null) ?? '')
+      : undefined;
+    // The honeypot's (and captcha's) value rides along under its own field
+    // key so the host app (form-app) can lift it out to the submit body's
+    // top-level `hp` / `altcha` fields without FormRenderer needing to know
+    // the wire format.
     const outcome = await onSubmit({
       ...result.values,
       [definition.honeypotField]: honeypot,
+      ...(captchaPayload === undefined
+        ? {}
+        : { [CAPTCHA_VALUE_KEY]: captchaPayload }),
     });
 
     if (outcome.ok) {
@@ -199,6 +239,21 @@ export function FormRenderer({
         })}
       </div>
 
+      {captcha && (
+        // Mounted on every page (hidden until the last) so the background
+        // solve starts at load, not when the visitor reaches Submit.
+        <div
+          className='atomic-form-captcha'
+          style={isLastPage ? undefined : { display: 'none' }}
+        >
+          <altcha-widget
+            ref={setCaptchaEl}
+            challenge={captcha.challengeUrl}
+            auto='onload'
+          />
+        </div>
+      )}
+
       {!preview && (
         <input
           type='text'
@@ -238,7 +293,9 @@ export function FormRenderer({
           <button
             type='submit'
             className='atomic-form-button'
-            disabled={status === 'submitting'}
+            disabled={
+              status === 'submitting' || (!!captcha && !captchaVerified)
+            }
           >
             {status === 'submitting' ? 'Submitting…' : 'Submit'}
           </button>
