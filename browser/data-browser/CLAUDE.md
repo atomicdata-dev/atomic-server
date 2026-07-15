@@ -12,7 +12,7 @@ Change a sync screen here → change its twin there, and update that doc.
 
 ## Editing UI
 
-When working on the data-browser, determine if you need to change or add UI, if so, read `./UI_COMPONENTS.md` for a list of existing reusable components.
+IMPORTANT!: When working on the data-browser, determine if you need to change or add UI, if so, read `./UI_COMPONENTS.md` for a list of existing reusable components.
 Prefer the existing reusable layout, resource view, overlay, button, loading, and accessibility components listed there before building new components from scratch.
 
 ## Tech Stack

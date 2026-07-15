@@ -1,4 +1,4 @@
-import { FC, PropsWithChildren } from 'react';
+import { FC, PropsWithChildren, ReactNode } from 'react';
 import * as RadixTabs from '@radix-ui/react-tabs';
 import { styled } from 'styled-components';
 import { transition } from '../helpers/transition';
@@ -7,6 +7,7 @@ type TabItem = {
   label: string;
   value: string;
   disabled?: boolean;
+  icon?: ReactNode;
 };
 
 interface TabsProps {
@@ -40,6 +41,7 @@ export function Tabs({
             className={rounded ? 'rounded-tab' : ''}
             disabled={tab.disabled}
           >
+            {tab.icon}
             {tab.label}
           </TabButton>
         ))}
@@ -76,6 +78,10 @@ const TabList = styled(RadixTabs.List)`
 
 const TabButton = styled(RadixTabs.Trigger)`
   --tab-active-color: ${p => p.theme.colors.main};
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   background: none;
   border: none;
   color: ${p => p.theme.colors.text};

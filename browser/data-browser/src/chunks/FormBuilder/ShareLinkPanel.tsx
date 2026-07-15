@@ -25,6 +25,8 @@ import {
 } from '@components/Dialog';
 import { Column, Row } from '@components/Row';
 import { CodeBlock } from '@components/CodeBlock';
+import { Tabs } from '@components/Tabs';
+import { Button } from '@components/Button';
 
 interface ShareLinkPanelProps {
   resource: Resource;
@@ -112,17 +114,17 @@ export function ShareLinkPanel({
   }
 
   if (!slug) {
-    return <DisabledTrigger title="Preparing share link…" />;
+    return <Button subtle disabled title="Preparing share link…" />;
   }
 
   const shareUrl = `${store.getServerUrl()}/form/${slug}`;
 
   return (
     <>
-      <Trigger type="button" title="Share form" onClick={show}>
+      <Button subtle title="Share form" onClick={show}>
         <FaShareNodes />
         Share
-      </Trigger>
+      </Button>
       <Dialog {...dialogProps} width="44rem">
         {isOpen && (
           <>
@@ -146,7 +148,6 @@ function PanelContent({
   shareUrl: string;
   resource: Resource;
 }): JSX.Element {
-  const [view, setView] = useState<'link' | 'embed'>('link');
   const [qrDataUrl, setQrDataUrl] = useState<string | undefined>();
   const [formName] = useString(resource, core.properties.name);
 
@@ -169,44 +170,33 @@ function PanelContent({
 
   return (
     <Inner gap="0.75rem">
-      <ViewToggle role="tablist">
-        <ViewButton
-          type="button"
-          role="tab"
-          $active={view === 'link'}
-          aria-selected={view === 'link'}
-          onClick={() => setView('link')}
-        >
-          <FaLink /> Link
-        </ViewButton>
-        <ViewButton
-          type="button"
-          role="tab"
-          $active={view === 'embed'}
-          aria-selected={view === 'embed'}
-          onClick={() => setView('embed')}
-        >
-          <FaCode /> Embed
-        </ViewButton>
-      </ViewToggle>
-      {view === 'link' ? (
-        <>
-          {qrDataUrl && (
-            <QrImage src={qrDataUrl} alt="QR code for the form link" />
-          )}
-          <LinkText title={shareUrl}>{shareUrl}</LinkText>
-          <Row gap="0.5rem">
-            <PanelButton type="button" onClick={copyLink}>
-              <FaCopy /> Copy link
-            </PanelButton>
-            <PanelLink href={shareUrl} target="_blank" rel="noreferrer">
-              <FaArrowUpRightFromSquare /> Open
-            </PanelLink>
-          </Row>
-        </>
-      ) : (
-        <EmbedView shareUrl={shareUrl} formName={formName} />
-      )}
+      <StyledTabs
+        label="Share form view"
+        tabs={[
+          { label: 'Link', value: 'link', icon: <FaLink /> },
+          { label: 'Embed', value: 'embed', icon: <FaCode /> },
+        ]}
+      >
+        <Tabs.Panel value="link">
+          <Column gap="0.75rem" align="center">
+            {qrDataUrl && (
+              <QrImage src={qrDataUrl} alt="QR code for the form link" />
+            )}
+            <LinkText title={shareUrl}>{shareUrl}</LinkText>
+            <Row gap="0.5rem">
+              <PanelButton type="button" onClick={copyLink}>
+                <FaCopy /> Copy link
+              </PanelButton>
+              <PanelLink href={shareUrl} target="_blank" rel="noreferrer">
+                <FaArrowUpRightFromSquare /> Open
+              </PanelLink>
+            </Row>
+          </Column>
+        </Tabs.Panel>
+        <Tabs.Panel value="embed">
+          <EmbedView shareUrl={shareUrl} formName={formName} />
+        </Tabs.Panel>
+      </StyledTabs>
     </Inner>
   );
 }
@@ -221,10 +211,10 @@ function EmbedView({
   const snippet = buildEmbedSnippet(shareUrl, formName ?? 'Form');
 
   return (
-    <EmbedInner>
+    <Column gap="0.5rem">
       <EmbedHint>Paste this where you want the form to appear.</EmbedHint>
       <CodeBlock content={snippet} wordWrap />
-    </EmbedInner>
+    </Column>
   );
 }
 
@@ -254,74 +244,17 @@ function buildEmbedSnippet(shareUrl: string, formName: string): string {
 </script>`;
 }
 
-const Trigger = styled.button`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  height: 2rem;
-  padding: 0 0.75rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  background-color: ${p => p.theme.colors.bg};
-  color: ${p => p.theme.colors.text};
-  cursor: pointer;
-
-  &:hover {
-    background-color: ${p => p.theme.colors.bg1};
-  }
-`;
-
-const DisabledTrigger = styled.button.attrs({ type: 'button', disabled: true })`
-  display: inline-flex;
-  align-items: center;
-  height: 2rem;
-  padding: 0 0.75rem;
-  border: 1px solid ${p => p.theme.colors.bg2};
-  border-radius: ${p => p.theme.radius};
-  background-color: ${p => p.theme.colors.bg};
-  color: ${p => p.theme.colors.textLight};
-  opacity: 0.6;
-`;
-
 const Inner = styled(Column)`
   padding: ${p => p.theme.size()};
   align-items: center;
   min-width: 14rem;
 `;
 
-const ViewToggle = styled.div`
-  display: flex;
-  gap: 0.25rem;
+const StyledTabs = styled(Tabs)`
   width: 100%;
-  border-bottom: 1px solid ${p => p.theme.colors.bg2};
 `;
 
-const ViewButton = styled.button<{ $active: boolean }>`
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  height: 1.85rem;
-  padding: 0 0.6rem;
-  border: none;
-  border-bottom: 2px solid
-    ${p => (p.$active ? p.theme.colors.main : 'transparent')};
-  background: none;
-  color: ${p => (p.$active ? p.theme.colors.text : p.theme.colors.textLight)};
-  font-weight: ${p => (p.$active ? 'bold' : 'normal')};
-  cursor: pointer;
-
-  &:hover {
-    color: ${p => p.theme.colors.text};
-  }
-`;
-
-const EmbedInner = styled(Column)`
-  gap: 0.5rem;
-  width: 22rem;
-  max-width: 100%;
-`;
-
-const EmbedHint = styled.span`
+const EmbedHint = styled.p`
   font-size: 0.8rem;
   color: ${p => p.theme.colors.textLight};
 `;

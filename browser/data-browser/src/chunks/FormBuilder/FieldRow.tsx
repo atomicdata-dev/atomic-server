@@ -52,11 +52,11 @@ export function FieldRow({
         }
         onClick={onSelect}
       >
-        <Column>
-          <Row gap="0.5rem" center>
+        <Column fullWidth>
+          <FieldTypeRow gap="0.5rem" center>
             <Icon />
             <Label light>{meta.label}</Label>
-          </Row>
+          </FieldTypeRow>
           {label ? <Label>{label}</Label> : null}
         </Column>
       </SelectButton>
@@ -74,6 +74,9 @@ export function FieldRow({
   );
 }
 
+const FieldTypeRow = styled(Row)`
+  color: ${p => p.theme.colors.textLight};
+`;
 const RowWrapper = styled.div<{ $selected: boolean }>`
   display: flex;
   align-items: center;
@@ -106,6 +109,7 @@ const SelectButton = styled.button`
 const Label = styled.span<{ light?: boolean }>`
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
   white-space: nowrap;
   color: ${p => (p.light ? p.theme.colors.textLight : p.theme.colors.text)};
 `;

@@ -6,12 +6,7 @@ import {
   type FormDefinition,
 } from '@tomic/form-renderer';
 import '@tomic/form-renderer/style.css';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  useDialog,
-} from '@components/Dialog';
+import { Dialog, useDialog } from '@components/Dialog';
 import { Button } from '@components/Button';
 import { buildFormDefinitionClientSide } from './buildFormDefinition';
 
@@ -53,10 +48,10 @@ export function FormPreviewButton({
       <Dialog {...dialogProps} width="40rem">
         {isOpen && (
           <>
-            <DialogTitle>
+            <Dialog.Title>
               <h1>Preview</h1>
-            </DialogTitle>
-            <DialogContent>
+            </Dialog.Title>
+            <Dialog.Content>
               {definition ? (
                 <FormShell definition={definition}>
                   <FormRenderer
@@ -68,7 +63,7 @@ export function FormPreviewButton({
               ) : (
                 <p>Loading preview…</p>
               )}
-            </DialogContent>
+            </Dialog.Content>
           </>
         )}
       </Dialog>

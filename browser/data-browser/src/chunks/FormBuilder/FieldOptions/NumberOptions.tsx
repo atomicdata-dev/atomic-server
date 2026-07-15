@@ -34,27 +34,27 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
 
   return (
     <>
-      <Row gap='0.5rem'>
-        <Field label='Min'>
+      <Row gap="0.5rem" wrapItems>
+        <Field label="Min">
           <InputWrapper>
             <InputStyled
-              type='number'
+              type="number"
               value={min ?? ''}
               onChange={e => setBound('min', e.target.value)}
             />
           </InputWrapper>
         </Field>
-        <Field label='Max'>
+        <Field label="Max">
           <InputWrapper>
             <InputStyled
-              type='number'
+              type="number"
               value={max ?? ''}
               onChange={e => setBound('max', e.target.value)}
             />
           </InputWrapper>
         </Field>
       </Row>
-      <Field label='Placeholder'>
+      <Field label="Placeholder">
         <InputWrapper>
           <InputStyled
             value={placeholder}
