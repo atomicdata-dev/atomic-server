@@ -72,6 +72,11 @@ pub struct FormStyling {
     pub background_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roundness: Option<String>,
+    /// Multi-page progress bar visibility. `None` means unset (shown by
+    /// default); the runtime and preview both treat only `Some(false)` as
+    /// hiding it.
+    #[serde(rename = "showProgressBar", skip_serializing_if = "Option::is_none")]
+    pub show_progress_bar: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,6 +163,7 @@ fn build_form_styling(form: &Resource) -> FormStyling {
             .filter(|s| !s.is_empty())
             .map(str::to_string)
     };
+    let get_bool = |key: &str| styling_json.get(key).and_then(|v| v.as_bool());
 
     FormStyling {
         has_image: form.get(atomic_lib::urls::COVER_IMAGE).is_ok(),
@@ -170,6 +176,7 @@ fn build_form_styling(form: &Resource) -> FormStyling {
         main_color: get_str("mainColor"),
         background_color: get_str("backgroundColor"),
         roundness: get_str("roundness"),
+        show_progress_bar: get_bool("showProgressBar"),
     }
 }
 
@@ -670,6 +677,90 @@ fn round_clean(x: f64) -> f64 {
     (x * 1e9).round() / 1e9
 }
 
+// ── Invite codes (Phase 6 "Private links") ──────────────────────────────────
+
+/// `form-access` value that switches a Form from "anyone with the link" to
+/// invite-code gating. Any other value (or absence) means public.
+pub const ACCESS_INVITE_ONLY: &str = "invite-only";
+/// The submit body's top-level key carrying the visitor's invite code.
+pub const INVITE_CODE_FIELD: &str = "code";
+
+pub fn is_invite_only(form: &Resource) -> bool {
+    form.get(atomic_lib::urls::FORM_ACCESS)
+        .map(|v| v.to_string() == ACCESS_INVITE_ONLY)
+        .unwrap_or(false)
+}
+
+/// Outcome of a non-consuming invite-code check ([check_invite_code]).
+#[derive(Debug)]
+pub enum InviteCodeCheck {
+    /// The code exists, belongs to this form, and hasn't been consumed.
+    /// Carries the code resource so the submit path can consume it without a
+    /// second lookup.
+    Valid(Box<Resource>),
+    Used,
+    /// Unknown code, a code belonging to another form, or an empty string.
+    Invalid,
+}
+
+/// Looks up an invite code presented for `form`, without consuming it.
+///
+/// Deliberately queries the **basic-path** `PropValSub` index alone
+/// (`form-code = X`, no extra filters) and verifies the hit's `parent` in
+/// code: adding a `parent`/`isA` filter would route through the complex query
+/// path, which lazily persists one watched query per distinct filter — i.e.
+/// one per code value ever looked up (`Tree::WatchedQueries` bloat).
+pub async fn check_invite_code(store: &Db, form: &Resource, code: &str) -> InviteCodeCheck {
+    if code.is_empty() {
+        return InviteCodeCheck::Invalid;
+    }
+
+    let query = Query::new_prop_val(atomic_lib::urls::FORM_CODE, code);
+    let Ok(QueryResult { resources, .. }) = store.query(&query).await else {
+        return InviteCodeCheck::Invalid;
+    };
+
+    let form_id = form.get_subject().pure_id();
+    for candidate in resources {
+        let belongs_to_form = matches!(
+            candidate.get(atomic_lib::urls::PARENT),
+            Ok(Value::AtomicUrl(parent)) if parent.pure_id() == form_id
+        );
+        let is_invite_code = candidate
+            .get(atomic_lib::urls::IS_A)
+            .and_then(|v| v.to_subjects(None))
+            .unwrap_or_default()
+            .iter()
+            .any(|c| c == atomic_lib::urls::FORM_INVITE_CODE);
+        if !belongs_to_form || !is_invite_code {
+            continue;
+        }
+
+        if candidate.get(atomic_lib::urls::USED_AT).is_ok() {
+            return InviteCodeCheck::Used;
+        }
+
+        return InviteCodeCheck::Valid(Box::new(candidate));
+    }
+
+    InviteCodeCheck::Invalid
+}
+
+/// Marks an invite code as consumed (`used-at` = now), signed by the store's
+/// default agent. The caller must serialize check-and-consume (the submit
+/// handler holds a per-form mutex) — commits are not compare-and-swap, so
+/// this alone can't prevent a double spend.
+pub async fn consume_invite_code(store: &Db, code: &mut Resource) -> AtomicResult<()> {
+    code.set(
+        atomic_lib::urls::USED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await?;
+    code.save(store).await?;
+    Ok(())
+}
+
 // ── Publish slug index (redb-backed, mirrors sync::peer's known-peers map) ──
 
 fn get_slug_map(store: &Db) -> HashMap<String, String> {
@@ -968,9 +1059,31 @@ mod tests {
         assert_eq!(styling.main_color.as_deref(), Some("#445566"));
         assert_eq!(styling.background_color.as_deref(), Some("#778899"));
         assert_eq!(styling.roundness.as_deref(), Some("round"));
+        // Unset: the renderer treats this as "show" (only `Some(false)` hides it).
+        assert_eq!(styling.show_progress_bar, None);
         // `has_image` never leaks into the wire format.
         let wire = serde_json::to_value(&styling).unwrap();
         assert!(wire.get("hasImage").is_none());
+    }
+
+    #[tokio::test]
+    async fn definition_can_disable_progress_bar() {
+        let store = init_store().await;
+        let (mut form, _email_prop) = build_test_form(&store).await;
+
+        form.set(
+            urls::FORM_STYLING.into(),
+            Value::Json(json!({ "showProgressBar": false })),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        assert_eq!(styling.show_progress_bar, Some(false));
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert_eq!(wire["showProgressBar"], json!(false));
     }
 
     #[tokio::test]
@@ -1273,6 +1386,106 @@ mod tests {
         assert_eq!(fields[0]["type"], "email");
         assert_eq!(fields[0]["answered"], 2);
         assert_eq!(fields[0]["answers"].as_array().unwrap().len(), 2);
+    }
+
+    async fn make_invite_code(store: &Db, form: &Resource, code: &str) -> Resource {
+        let mut invite = Resource::new_instance(urls::FORM_INVITE_CODE, store)
+            .await
+            .unwrap();
+        invite
+            .set(
+                urls::PARENT.into(),
+                Value::AtomicUrl(form.get_subject().to_string().into()),
+                store,
+            )
+            .await
+            .unwrap();
+        invite
+            .set(urls::FORM_CODE.into(), Value::String(code.into()), store)
+            .await
+            .unwrap();
+        invite.save_locally(store).await.unwrap();
+        invite
+    }
+
+    #[tokio::test]
+    async fn access_mode_defaults_to_public() {
+        let store = init_store().await;
+        let (mut form, _) = build_test_form(&store).await;
+
+        assert!(!is_invite_only(&form));
+
+        form.set(
+            urls::FORM_ACCESS.into(),
+            Value::String(ACCESS_INVITE_ONLY.into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        assert!(is_invite_only(&form));
+
+        form.set(
+            urls::FORM_ACCESS.into(),
+            Value::String("public".into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        assert!(!is_invite_only(&form));
+    }
+
+    #[tokio::test]
+    async fn invite_code_check_and_consume() {
+        let store = init_store().await;
+        let (form, _) = build_test_form(&store).await;
+        let (other_form, _) = build_test_form(&store).await;
+
+        make_invite_code(&store, &form, "right-code").await;
+        make_invite_code(&store, &other_form, "other-form-code").await;
+
+        // Unknown / empty codes are invalid.
+        assert!(matches!(
+            check_invite_code(&store, &form, "nope").await,
+            InviteCodeCheck::Invalid
+        ));
+        assert!(matches!(
+            check_invite_code(&store, &form, "").await,
+            InviteCodeCheck::Invalid
+        ));
+        // A code belonging to a different form is invalid for this one.
+        assert!(matches!(
+            check_invite_code(&store, &form, "other-form-code").await,
+            InviteCodeCheck::Invalid
+        ));
+
+        // Valid, and checking does NOT consume.
+        let InviteCodeCheck::Valid(mut code) =
+            check_invite_code(&store, &form, "right-code").await
+        else {
+            panic!("expected a valid code");
+        };
+        assert!(matches!(
+            check_invite_code(&store, &form, "right-code").await,
+            InviteCodeCheck::Valid(_)
+        ));
+
+        consume_invite_code(&store, &mut code).await.unwrap();
+        assert!(matches!(
+            check_invite_code(&store, &form, "right-code").await,
+            InviteCodeCheck::Used
+        ));
+
+        // Revoking (destroying) an unused code makes it invalid.
+        let InviteCodeCheck::Valid(mut other) =
+            check_invite_code(&store, &other_form, "other-form-code").await
+        else {
+            panic!("expected a valid code");
+        };
+        other.destroy(&store).await.unwrap();
+        assert!(matches!(
+            check_invite_code(&store, &other_form, "other-form-code").await,
+            InviteCodeCheck::Invalid
+        ));
     }
 
     #[tokio::test]

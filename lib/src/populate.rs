@@ -329,6 +329,12 @@ pub fn defaults_fingerprint() -> String {
 /// [`SaveOpts::Merge`]. Consequently a *changed* value of an existing default
 /// never propagates to an existing store — only new resources and new
 /// properties do.
+///
+/// NOTE: every `defaults/*.json` imported here must ALSO be added to
+/// `browser/data-browser/src/bootstrap.ts`. These subjects live under
+/// `https://atomicdata.dev/...` but are not published there; without the
+/// client-side bootstrap, `resource.set()` datatype validation tries to fetch
+/// them from the real atomicdata.dev and stalls writes for up to 10s.
 pub async fn populate_default_store(store: &impl Storelike) -> AtomicResult<()> {
     let opts = ParseOpts {
         save: SaveOpts::Merge,

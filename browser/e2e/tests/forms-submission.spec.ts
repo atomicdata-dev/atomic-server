@@ -348,6 +348,136 @@ test.describe('form publish and anonymous submit', () => {
     }
   });
 
+  test('invite-only form gates visitors on single-use invite links', async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    // --- 1. Owner: build and publish a minimal one-field form ---
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Private form');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('editable-title').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Short text', exact: true }).click();
+    await expect(page.getByTestId('field-row-short-text')).toBeVisible();
+    await page.getByTestId('field-row-short-text').click();
+    await page.getByTestId('field-label-input').fill('Full name');
+
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await page.waitForFunction(
+      ({ subject, prop }) =>
+        typeof window.store.resources.get(subject)?.get(prop) === 'number',
+      { subject: formSubject, prop: FORM_PUBLISHED_AT },
+      { timeout: 10000 },
+    );
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    // --- 2. Owner: switch to invite only and generate 2 invite links
+    // (Settings tab → Form access section) ---
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Invite only', exact: true }).click();
+
+    await page.getByLabel('Number of invite links').fill('2');
+    await page
+      .getByRole('button', { name: 'Generate invite links', exact: true })
+      .click();
+    await expect(page.getByTestId('invite-code')).toHaveCount(2, {
+      timeout: 15000,
+    });
+    const code = await page.getByTestId('invite-code').first().textContent();
+    expect(code).toBeTruthy();
+
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    // Wait until the server actually enforces invite-only (the form-access
+    // commit and the code resources may still be in flight): the plain
+    // definition must 403 while the code opens it.
+    await expect(async () => {
+      const bare = await page.request.get(
+        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition`,
+      );
+      expect(bare.status()).toBe(403);
+      const withCode = await page.request.get(
+        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition?code=${code}`,
+      );
+      expect(withCode.ok()).toBe(true);
+    }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
+
+    // --- 3. Anonymous visitor without a code: friendly 403 page ---
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    const bareResponse = await visitorPage.goto(
+      `${SERVER_URL}/form/${formSubject}`,
+    );
+    expect(bareResponse?.status()).toBe(403);
+    await expect(visitorPage.getByText('invite-only')).toBeVisible();
+
+    // --- 4. With the invite link: form renders and submits ---
+    await visitorPage.goto(`${SERVER_URL}/form/${formSubject}?code=${code}`);
+    const nameInput = visitorPage.getByLabel('Full name', { exact: false });
+    await expect(nameInput).toBeVisible({ timeout: 15000 });
+    await nameInput.fill('Ada Lovelace');
+    const submitButton = visitorPage.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    // Wait out the captcha's background proof-of-work solve.
+    await expect(submitButton).toBeEnabled({ timeout: 30000 });
+    await submitButton.click();
+    await expect(visitorPage.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
+    await visitorContext.close();
+
+    // --- 5. The code is single-use: a second visitor with the same link
+    // gets the friendly used-code page ---
+    const visitor2Context = await browser.newContext();
+    const visitor2Page = await visitor2Context.newPage();
+    const reusedResponse = await visitor2Page.goto(
+      `${SERVER_URL}/form/${formSubject}?code=${code}`,
+    );
+    expect(reusedResponse?.status()).toBe(403);
+    await expect(visitor2Page.getByText('already been used')).toBeVisible();
+    await visitor2Context.close();
+
+    // --- 6. Owner: the consumed code shows as Used (the consumption commit
+    // fans out over WS like any other, so no reload should be needed) ---
+    await expect(
+      page.getByTestId('invite-code').and(page.locator('[data-used="true"]')),
+    ).toHaveCount(1, { timeout: 20000 });
+    await expect(page.getByText('Used', { exact: true })).toBeVisible();
+  });
+
   test('unpublished form shows a friendly not-available page', async ({
     page,
     browser,

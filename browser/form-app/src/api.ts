@@ -22,14 +22,33 @@ export function isEmbedMode(): boolean {
   return new URLSearchParams(window.location.search).get('embed') === '1';
 }
 
-export async function fetchDefinition(id: string): Promise<FormDefinition> {
-  const res = await fetch(`/form/${id}/definition`);
+/** `?code=` (Phase 6 "Private links") — the invite code for an invite-only
+ * form. Server-validated on the definition fetch and consumed at submit; the
+ * runtime just rides it along. */
+export function getInviteCodeFromLocation(): string | undefined {
+  return (
+    new URLSearchParams(window.location.search).get('code') ?? undefined
+  );
+}
+
+export async function fetchDefinition(
+  id: string,
+  code?: string,
+): Promise<FormDefinition> {
+  const query = code ? `?code=${encodeURIComponent(code)}` : '';
+  const res = await fetch(`/form/${id}/definition${query}`);
 
   if (!res.ok) {
+    // Invite-only rejections (403) come with a human-readable reason.
+    const body = (await res.json().catch(() => undefined)) as
+      | { error?: string }
+      | undefined;
+
     throw new Error(
-      res.status === 410 || res.status === 404
-        ? 'This form is not available.'
-        : 'Could not load this form.',
+      body?.error ??
+        (res.status === 410 || res.status === 404
+          ? 'This form is not available.'
+          : 'Could not load this form.'),
     );
   }
 
@@ -47,6 +66,7 @@ export async function submitForm(
   id: string,
   honeypotField: string,
   values: FormValues,
+  code?: string,
 ): Promise<SubmitOutcome> {
   // FormRenderer rides the honeypot's and captcha's values along under
   // their own field keys (see FormRenderer.tsx's handleSubmit) — lift them
@@ -65,6 +85,7 @@ export async function submitForm(
       values: fieldValues,
       [honeypotField]: honeypotValue ?? '',
       altcha: typeof captchaValue === 'string' ? captchaValue : '',
+      ...(code ? { code } : {}),
     }),
   });
 

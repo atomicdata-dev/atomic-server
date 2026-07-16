@@ -8,6 +8,8 @@ import ontologiesDefaults from '@repo-lib-defaults/ontologies.json';
 import aiDefaults from '@repo-lib-defaults/ai.json';
 import meetingDefaults from '@repo-lib-defaults/meeting.json';
 import forksDefaults from '@repo-lib-defaults/forks.json';
+import formsDefaults from '@repo-lib-defaults/forms.json';
+import pluginsDefaults from '@repo-lib-defaults/plugins.json';
 
 /**
  * A bundled entry that holds no content of its own — no class, and no
@@ -30,6 +32,12 @@ function isAnchorStub(resource: Resource): boolean {
  * This ensures that critical property definitions (like 'subdomain') are
  * available even if the server has no Drive binding yet or the definitions haven't
  * been uploaded to the live atomicdata.dev server yet.
+ *
+ * Every default set the server imports in `lib/src/populate.rs`
+ * (`populate_default_store`) must also be added here. A missing set makes
+ * `resource.set()` datatype validation fetch the property from the real
+ * atomicdata.dev — which doesn't host it — stalling every write to it for up
+ * to 10s (the `getResource` not-ready timeout).
  */
 export function bootstrap(store: Store): void {
   const parser = new JSONADParser();
@@ -79,6 +87,8 @@ export function bootstrap(store: Store): void {
     addBootstrapped(aiDefaults);
     addBootstrapped(meetingDefaults);
     addBootstrapped(forksDefaults);
+    addBootstrapped(formsDefaults);
+    addBootstrapped(pluginsDefaults);
   } catch (e) {
     console.error('Failed to bootstrap store:', e);
   }

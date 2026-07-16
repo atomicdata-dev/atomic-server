@@ -1295,4 +1295,151 @@ async fn form_submission_flow() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 410, "submit to unpublished form should 410");
+
+    // 8. Private links (Phase 6): republish and switch to invite-only.
+    form.set(
+        urls::FORM_PUBLISHED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.set(
+        urls::FORM_ACCESS.into(),
+        Value::String("invite-only".into()),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    // Definition without / with an unknown code -> 403 (the questions must
+    // not leak to someone holding only the share URL).
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "invite-only definition without code should 403");
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition?code=wrong", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "invite-only definition with unknown code should 403");
+
+    // The HTML page is gated the same way (the definition is injected inline).
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "invite-only form page without code should 403");
+
+    // Mint an invite code, child of the form (as the builder UI does).
+    let mut invite = Resource::new_instance(urls::FORM_INVITE_CODE, store)
+        .await
+        .unwrap();
+    invite
+        .set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(form.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    invite
+        .set(
+            urls::FORM_CODE.into(),
+            Value::String("secret-code".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    invite.save_locally(store).await.unwrap();
+
+    // Definition with the code -> 200, and fetching does NOT consume it.
+    for _ in 0..2 {
+        let req = test::TestRequest::get()
+            .uri(&format!("/form/{}/definition?code=secret-code", slug))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(
+            resp.status().is_success(),
+            "invite-only definition with valid code should succeed: {:?}",
+            resp.status()
+        );
+    }
+
+    // Submit without a code -> 403 (pre-check runs before captcha
+    // verification, so no solved payload is needed).
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "visitor3@example.com" }
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "invite-only submit without code should 403");
+
+    // Submit with the code -> 201, and the code is now consumed.
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "invited@example.com" },
+            "altcha": solve_captcha!(),
+            "code": "secret-code",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        201,
+        "invite-only submit with valid code should succeed: {}",
+        get_body(resp)
+    );
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(result.subjects.len(), 2, "invited submission should land in the table");
+    let invite = store
+        .get_resource(&invite.get_subject().clone())
+        .await
+        .unwrap();
+    assert!(
+        invite.get(urls::USED_AT).is_ok(),
+        "the invite code should be marked used after the submission"
+    );
+
+    // Replaying the consumed code -> 403 on both submit and definition.
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&serde_json::json!({
+            "values": { email_prop.get_subject().to_string(): "sneaky@example.com" },
+            "code": "secret-code",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "used code should be rejected at submit");
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition?code=secret-code", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 403, "used code should be rejected at definition");
+
+    // No row landed for the rejected replay.
+    let result = store.query(&query).await.unwrap();
+    assert_eq!(result.subjects.len(), 2);
+
+    // Switching back to public opens the plain link again.
+    form.set(urls::FORM_ACCESS.into(), Value::String("public".into()), store)
+        .await
+        .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "public definition should work again after switching back"
+    );
 }

@@ -99,7 +99,14 @@ const createIndexOffset =
     const findNextAvailable = (
       scopedStartingPoint: number,
       scopedOffset: number,
+      remainingAttempts: number,
     ) => {
+      // Every item is a divider or disabled — there is no valid index to
+      // land on, so stop recursing instead of looping forever.
+      if (remainingAttempts <= 0) {
+        return 0;
+      }
+
       const newIndex = loopingIndex(
         scopedStartingPoint + scopedOffset,
         items.length,
@@ -108,13 +115,17 @@ const createIndexOffset =
       const additionalIncrement = getAdditionalOffest(offset);
 
       if (shouldSkip(items[newIndex])) {
-        return findNextAvailable(newIndex, additionalIncrement);
+        return findNextAvailable(
+          newIndex,
+          additionalIncrement,
+          remainingAttempts - 1,
+        );
       }
 
       return newIndex;
     };
 
-    return findNextAvailable(startingPoint, offset);
+    return findNextAvailable(startingPoint, offset, items.length);
   };
 
 function normalizeItems(items: DropdownItem[]) {

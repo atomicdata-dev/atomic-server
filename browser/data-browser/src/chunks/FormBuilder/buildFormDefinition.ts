@@ -67,6 +67,7 @@ async function buildStyling(
     mainColor: stylingJson.mainColor as string | undefined,
     backgroundColor: stylingJson.backgroundColor as string | undefined,
     roundness: stylingJson.roundness as string | undefined,
+    showProgressBar: stylingJson.showProgressBar as boolean | undefined,
   };
 
   const coverImage = form.get(forms.properties.coverImage) as

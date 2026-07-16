@@ -77,6 +77,11 @@ export const Flex = styled.div<FlexProps>`
     margin-bottom: 0;
   }
 
+  &:is(li) {
+    margin: 0;
+    display: flex;
+  }
+
   & ${ButtonDefault} {
     align-self: flex-start;
   }

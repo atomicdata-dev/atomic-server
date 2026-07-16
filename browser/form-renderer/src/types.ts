@@ -68,6 +68,8 @@ export interface FormStyling {
   mainColor?: string;
   backgroundColor?: string;
   roundness?: Roundness | string;
+  /** Multi-page progress bar visibility. Defaults to shown when unset. */
+  showProgressBar?: boolean;
 }
 
 /** Captcha client config, filled in by the server for published forms

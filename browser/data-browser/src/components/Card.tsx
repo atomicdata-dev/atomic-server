@@ -35,10 +35,29 @@ const CardBase = styled.div.attrs<CardProps>(p => ({
   }
 `;
 
+export const CardList = styled.ul<{ maxHeight?: string; gap?: string }>`
+  --card-list-gap: ${p => p.gap ?? p.theme.size(2)};
+  display: flex;
+  flex-direction: column;
+  gap: 0px;
+  /* row-rule: 1px solid ${p => p.theme.colors.bg2}; */
+  max-height: ${p => p.maxHeight ?? 'initial'};
+  overflow: ${p => (p.maxHeight ? 'scroll' : 'visible')};
+
+  & > * {
+    padding-block-start: calc(var(--card-list-gap) / 2);
+    padding-block-end: calc(var(--card-list-gap) / 2);
+
+    &:not(:last-child) {
+      border-bottom: 1px solid ${p => p.theme.colors.bg2};
+    }
+  }
+`;
+
 /** A Card with a border.
  * By default the Card has padding but if you use `Card.Content` inside the card, only the content will have padding.
  */
-export const Card = Object.assign(CardBase, { Content });
+export const Card = Object.assign(CardBase, { Content, List: CardList });
 
 export interface CardRowProps {
   noBorder?: boolean;

@@ -65,7 +65,7 @@ export function FormRenderer({
   const page = definition.pages[pageIndex];
   const isLastPage = pageIndex === definition.pages.length - 1;
   const progress =
-    definition.pages.length > 1
+    definition.pages.length > 1 && definition.styling.showProgressBar !== false
       ? Math.round(((pageIndex + 1) / definition.pages.length) * 100)
       : undefined;
 

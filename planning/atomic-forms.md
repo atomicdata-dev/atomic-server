@@ -514,7 +514,8 @@ Rough priority order:
    "Embed" tab inside `ShareLinkPanel`'s popover (alongside the existing
    Link tab); `?embed=1` drops the full-viewport shell styling client-side;
    `frame-ancestors` opened up; `postMessage` height auto-resize.
-  - **`frame-ancestors *`, not an allow-list.** Published forms already have
+
+- **`frame-ancestors *`, not an allow-list.** Published forms already have
     no auth/rights gate — anyone with the share link can view and submit —
     so allowing any site to iframe that same public content adds no new
     trust boundary. Applied unconditionally to `form_page` (not gated on
@@ -522,7 +523,7 @@ Rough priority order:
     to `not_available_page` (previously had **no** CSP header at all), so a
     stale/unpublished embed shows the friendly closed-form card instead of a
     browser-blocked blank frame.
-  - **`?embed=1` is read client-side only**, via
+- **`?embed=1` is read client-side only**, via
     `new URLSearchParams(window.location.search)` in `form-app/src/api.ts`'s
     `isEmbedMode()` — no `web::Query` extractor needed server-side, keeping
     decision #2's "runtime stays tiny" property. `App.tsx` tags `<html>`
@@ -531,14 +532,14 @@ Rough priority order:
     `min-height: 100%`/`100vh` chain under those classes — otherwise the
     `ResizeObserver` height report reflects the forced-full-viewport height
     instead of the form's real content height.
-  - **Resize protocol**: `form-app/src/embedResize.ts` posts
+- **Resize protocol**: `form-app/src/embedResize.ts` posts
     `{ type: 'atomic-form-resize', height }` to `window.parent` via `'*'`
     (arbitrary embedding origin, no sensitive payload — same choice the
     existing `pluginRPC.tsx` postMessage calls make). The copied snippet's
     own inline listener matches on `event.source === iframe.contentWindow`
     (not the iframe's `id`, which only exists to make `getElementById` easy)
     so multiple embedded forms on one page don't cross-resize each other.
-  - **Found while writing the e2e test, not a product bug**: `frame-ancestors
+- **Found while writing the e2e test, not a product bug**: `frame-ancestors
     *` does not cover `about:blank` embedders per spec (Chrome: "'*' matches
     only URLs with network schemes ... The scheme 'http:' must be added
     explicitly"), and Chrome's Local Network Access checks separately block
@@ -547,7 +548,7 @@ Rough priority order:
     only `page.setContent()`/`page.route()`-based test harnesses do. Fixed
     by having the e2e spec spin up a real local `http` server to host the
     wrapper page (`forms-submission.spec.ts`).
-  - Covered by `forms-submission.spec.ts` ("embed snippet renders
+- Covered by `forms-submission.spec.ts` ("embed snippet renders
     chrome-less and auto-resizes in an iframe": publish, read the exact
     snippet out of the Embed tab's `CodeBlock`, host it on a real local HTTP
     server, verify chrome-less rendering + resize + anonymous submit from
@@ -560,7 +561,7 @@ Rough priority order:
    Verifier lives behind the `CaptchaVerifier` trait
    (`server/src/captcha.rs`, on `AppState`) so Turnstile/hCaptcha can slot
    in later (async `verify` for their HTTP round-trips).
-  - **Official libraries, not hand-rolled**: the `altcha` crate
+- **Official libraries, not hand-rolled**: the `altcha` crate
     (altcha-org's own Rust implementation of PoW v2: `create_challenge` /
     `verify_solution` / `solve_challenge` — the latter also powers the
     tests) and the `altcha` npm widget v3 (~34 kB gzipped web component;
@@ -570,19 +571,19 @@ Rough priority order:
     invalidate in-flight solutions) and one-time-use replay protection (an
     in-process consumed-nonce map with lazy TTL pruning, same layer as the
     submit rate limiter).
-  - **Deviation from the sketch above** ("server issues challenge in the
+- **Deviation from the sketch above** ("server issues challenge in the
     definition response"): the widget's native flow is a challenge URL it
     fetches itself, so there's a publish-gated `GET /form/{id}/challenge`
     endpoint instead (stateless to issue — challenges are HMAC-signed, no
     bookkeeping until verify). The definition response carries
     `captcha: { provider, challengeUrl }` so the runtime knows what to
     render; builder previews get no `captcha` field and render no widget.
-  - **Difficulty**: PBKDF2/SHA-256, cost 5000, deterministic counter
+- **Difficulty**: PBKDF2/SHA-256, cost 5000, deterministic counter
     1000–4000 (below the docs' 5000–10000 so mid-range phones solve in a
     couple of seconds — deterrence comes from combining with the rate
     limiter + honeypot). Challenges expire after 1 h. Under `cfg(test)`
     difficulty drops to near-zero so debug-build tests solve natively.
-  - **Client**: `FormRenderer` renders `<altcha-widget auto="onload">`
+- **Client**: `FormRenderer` renders `<altcha-widget auto="onload">`
     (visible checkbox card above Submit, mounted-but-hidden on earlier
     pages so solving starts at page load), disables Submit until the
     widget's `statechange` reports `verified`, and rides the solved payload
@@ -593,55 +594,127 @@ Rough priority order:
     (`altcha-widget.d.ts`) so the data-browser preview never pulls in the
     solver. Widget card themed via `--altcha-*` → `--atomic-form-*` CSS-var
     mapping in form-renderer's `style.css`.
-  - **CSP**: `form_page`'s header gained `worker-src 'self' blob:` — the
+- **CSP**: `form_page`'s header gained `worker-src 'self' blob:` — the
     widget's single-file bundle spawns its solver Web Workers from blob:
     URLs.
-  - Covered by: `cargo test -p atomic-server --lib captcha::` (6 tests:
+- Covered by: `cargo test -p atomic-server --lib captcha::` (6 tests:
     roundtrip, replay, tamper, foreign-secret, expiry, malformed),
     `form_submission_flow` (definition carries config; solve → 201;
     missing payload → 400; replay → 400), and `forms-submission.spec.ts`
     (widget visible, Submit gated on background solve, anonymous + embed
     submits flow through it).
-[] **Private links**: one-time invite codes modeled as **resources, children
-   of the Form** — not a redb side-table (consistent with how submission rows
-   already work, and reuses querying/commits/rights/sync instead of a second
-   storage system). Data design decided; UI deliberately not designed yet.
+[x] **Private links** — DONE. One-time invite codes modeled as **resources,
+   children of the Form** — not a redb side-table (consistent with how
+   submission rows already work, and reuses querying/commits/rights/sync
+   instead of a second storage system).
   - **`FormInviteCode` class**: `form-code` (String, required, the code
-    value) + `used-at` (Timestamp, unset = unused). `parent` = the Form.
-    A `used-by` link to the submission row was considered and deferred
-    (anonymity implications). Revoke = `destroy()`.
+      value) + `used-at` (Timestamp, unset = unused). `parent` = the Form.
+      A `used-by` link to the submission row was considered and deferred
+      (anonymity implications). Revoke = `destroy()`.
   - **Codes stored plaintext, not hashed.** Hierarchy rights already
-    restrict reads to form editors (children of the Form are private), and
-    an attacker who can read the DB has all form data anyway — hashing
-    protected nothing meaningful while blocking re-export. The definition
-    endpoint can't leak codes: it walks `form-pages`, not children.
+      restrict reads to form editors (children of the Form are private), and
+      an attacker who can read the DB has all form data anyway — hashing
+      protected nothing meaningful while blocking re-export. The definition
+      endpoint can't leak codes: it walks `form-pages`, not children.
   - **Access mode is a Form property**: public ("anyone with the link",
-    current behavior) XOR invite-only. Mixed mode is deliberately not
-    supported — a still-working public link would void the feature's
-    guarantees (controlled audience, one response per person). When
-    invite-only, **the definition endpoint also requires a valid code**,
-    otherwise the questions leak to anyone with the URL.
+      current behavior) XOR invite-only. Mixed mode is deliberately not
+      supported — a still-working public link would void the feature's
+      guarantees (controlled audience, one response per person). When
+      invite-only, **the definition endpoint also requires a valid code**,
+      otherwise the questions leak to anyone with the URL.
   - **Lookup**: query `form-code = X` via the **basic-path** `PropValSub`
-    index alone, then verify the hit's `parent` is the expected form. Do
-    NOT query `parent + isA + form-code` — the multi-filter complex path
-    lazily persists a watched query per distinct filter, i.e. one per code
-    value ever looked up (`Tree::WatchedQueries` bloat).
+      index alone, then verify the hit's `parent` is the expected form. Do
+      NOT query `parent + isA + form-code` — the multi-filter complex path
+      lazily persists a watched query per distinct filter, i.e. one per code
+      value ever looked up (`Tree::WatchedQueries` bloat).
   - **Validation vs consumption**: validate at definition-fetch time
-    *without* consuming (used/revoked/unknown → rejected before the visitor
-    fills anything in); consume atomically at submit. Commits are not
-    compare-and-swap, so the submit handler serializes check-and-consume
-    with an in-process per-form mutex (single server process; the rate
-    limiter already lives at that layer). Inside the mutex, mark `used-at`
-    first, then create the submission row — the reverse order allows double
-    submission if row creation races/fails.
+      *without* consuming (used/revoked/unknown → rejected before the visitor
+      fills anything in); consume atomically at submit. Commits are not
+      compare-and-swap, so the submit handler serializes check-and-consume
+      with an in-process per-form mutex (single server process; the rate
+      limiter already lives at that layer). Inside the mutex, mark `used-at`
+      first, then create the submission row — the reverse order allows double
+      submission if row creation races/fails.
   - **Bulk generation** happens client-side via normal commits (reuses all
-    existing machinery; owner-signed, so provenance is honest). N codes = N
-    signed genesis commits through the outbox — cap a batch at a few hundred
-    and measure before considering a server-side bulk endpoint.
+      existing machinery; owner-signed, so provenance is honest). N codes = N
+      signed genesis commits through the outbox — cap a batch at a few hundred
+      and measure before considering a server-side bulk endpoint.
   - The consumption commit fans out over WS like any other, so owner-facing
-    used/unused state updates in realtime with zero extra plumbing.
+      used/unused state updates in realtime with zero extra plumbing.
   - Share-slug resolution is unrelated to codes and moves to ShortLinks —
-    see [`shortlinks.md`](./shortlinks.md).
+      see [`shortlinks.md`](./shortlinks.md).
+  - **UI**: lives in the Settings tab, now divided into collapsibles like the
+      app settings page (`SettingsGroup`/`SettingsSection`): the existing
+      appearance settings under **Appearance**, private links under
+      **Form access** (`FormAccessSection.tsx`).
+
+  **Implementation notes (all of the above shipped as designed; deviations
+  and specifics below):**
+
+  - Schema: `FormInviteCode` class (`form-code` required String, `used-at`
+    recommended Timestamp) + `form-access` String property on Form
+    (`public` default when absent XOR `invite-only`), in
+    `lib/defaults/forms.json`, `urls.rs`, the hand-mirrored
+    `browser/lib/src/ontologies/forms.ts`, and `docs/src/schema/forms.md`.
+    `used-at` is a generic, unprefixed property (like `required`) so it
+    stays reusable outside Forms.
+  - Server (`server/src/forms.rs`): `is_invite_only`, `check_invite_code`
+    (basic-path `form-code = X` query exactly as planned — the
+    watched-query-bloat warning is baked into a comment — verifying
+    `parent` by `pure_id()` and `isA` in code, returning
+    `Valid(resource) | Used | Invalid`), `consume_invite_code`
+    (`used-at` = now, server-agent `save()` — fans out over WS, so the
+    owner's code list flips to "Used" in realtime; verified in the e2e).
+  - Gating (`handlers/form.rs::check_form_access`): `GET /form/{id}` (HTML,
+    definition is injected inline so the page itself must be gated) and
+    `GET .../definition` take `?code=`; `POST .../submit` takes a top-level
+    `code` body field. Missing/invalid → 403, used → 403 with an
+    "already been used" message (rendered by the friendly
+    `not_available_page` for the HTML route). **Deliberately not gated**:
+    `/challenge` (stateless PoW, leaks nothing) and `/image` (branding, and
+    per-code URLs would break its public cache header) — both stay
+    publish-gated only.
+  - Submit consumes atomically: non-consuming pre-check *before* captcha
+    verification (an invalid code shouldn't burn the visitor's one-time
+    PoW payload), then re-check + consume under an in-process **per-form
+    `tokio::Mutex`** (`form_submit_lock`, same layer as the rate limiter),
+    `used-at` written *before* the row is created, per the plan's ordering
+    rationale.
+  - Runtime (`form-app`): reads `?code=` client-side
+    (`getInviteCodeFromLocation`), appends it to the definition fetch
+    fallback and the submit body; `fetchDefinition` now surfaces the
+    server's 403 reason instead of a generic message. No renderer changes.
+  - Bulk generation is client-side as planned (`createInviteCodes` loops
+    `store.newResource` + `save()`), batch capped at 200, 10-char codes
+    from an unambiguous alphabet via `crypto.getRandomValues`. The code
+    list uses `useCollection` (`parent` = form AND `isA` = FormInviteCode —
+    bounded at one watched query per form, unlike per-code lookups).
+    Revoke = `destroy()`. `ShareLinkPanel` shows an invite-only notice so
+    the plain share link isn't copied in confusion.
+  - Covered by: `cargo test -p atomic-server --lib forms::` (access-mode
+    default + check/consume/revoke unit tests), `form_submission_flow`
+    (invite-only 403s on definition/page/submit, non-consuming definition
+    fetch, consume on submit → `used-at` set, replay 403 on both paths,
+    switch back to public), and a new `forms-submission.spec.ts` e2e
+    (Settings → Form access → invite only → generate 2 links → visitor
+    without code gets friendly 403, with code submits, second visitor with
+    same link gets used-code page, owner sees "Used" in realtime).
+  - **Wuchale**: new UI strings required `pnpm exec wuchale` (data-browser)
+    — until extraction runs, dev shows `[i18n-404:*]` placeholders. The
+    extraction also refreshed some unrelated stale catalog entries
+    (obsolete `#~` markers) — pre-existing drift, not from this change.
+    Non-English translations for the new strings are left for the
+    AI-translation flow (no `OPENROUTER_API_KEY` locally).
+  - **Human follow-up needed**: add `FormInviteCode`, `form-access`,
+    `form-code`, `used-at` to the public atomicdata.dev forms ontology
+    (same step as `form-styling` above). Local dev servers need one
+    restart with `ATOMIC_REPOPULATE_DEFAULTS=true`.
+  - The Phase 2 e2e (`forms.spec.ts` "persist across reload") remains
+    environment-flaky (fails on this machine on a clean tree too —
+    verified via stash A/B; publish/options commits report
+    `pendingDirtyCount === 0` yet never reach the server). Same
+    pre-existing outbox/sync race already documented under Phase 4; not a
+    Private Links regression.
 [] **More field types** (each = enum value + options schema + renderer + validator +
    datatype mapping): phone, URL, currency, dropdown multi-select, likert, rating,
    picture choice, file upload (needs upload path for anonymous users — scoped,
@@ -653,12 +726,12 @@ Rough priority order:
 [x] **Styling/theming** — DONE (except fonts/logo, not requested). Shipped:
    cover image (5 position modes), text/main/background colors, 3 corner
    roundness levels, edited in a new **Settings tab** in `FormBuilderPage`.
-  - **Storage**: image reuses the generic `cover-image` + `image-position`
+- **Storage**: image reuses the generic `cover-image` + `image-position`
     properties at Form level (added to Form's `recommends`; enum extended to
     `top | left | right | behind | full`). Colors + roundness live in the new
     `form-styling` JSON property (`textColor`/`mainColor`/`backgroundColor`
     hex, `roundness`: `sharp | rounded | round`).
-  - **Anonymous image access**: `/download` is rights-checked, so the
+- **Anonymous image access**: `/download` is rights-checked, so the
     definition's `styling.imageUrl` points at a new publish-gated
     `GET /form/{id}/image` (`handlers/form.rs::form_image`) that resolves
     `cover-image` server-side and delegates to the shared
@@ -666,14 +739,14 @@ Rough priority order:
     scripts never execute: `attachment` + `nosniff`), `?w=&q=&f=` processing
     and a 1h public cache header. Consistent with decision #3: publishing
     stays a property, the File stays private.
-  - **Renderer**: new `FormShell` component in `@tomic/form-renderer` owns the
+- **Renderer**: new `FormShell` component in `@tomic/form-renderer` owns the
     page chrome (image layouts, card, title) + CSS-var overrides
     (`stylingVars`), incl. derived `--atomic-form-text-light`/`border` via
     `color-mix` and a luminance-picked `--atomic-form-on-accent` for button
     text. Used by `form-app` **and** `FormPreviewDialog` — the preview is now
     pixel-identical to the published page (and finally shows the title).
     Custom colors apply as-is in both light/dark schemes.
-  - **Found & fixed along the way**:
+- **Found & fixed along the way**:
     1. JSON-datatype values written while the Property resource is
        unresolvable (form-styling isn't on atomicdata.dev yet → no `json`
        datatype tag) rehydrate as raw JSON *strings*; spreading that string
@@ -692,12 +765,12 @@ Rough priority order:
        rebuilt `form-app/dist` stayed stale forever. It now refreshes on
        every build-script run (dest cleared first so hashed bundles don't
        pile up).
-  - **Human follow-up needed**: add `form-styling` to the public
+- **Human follow-up needed**: add `form-styling` to the public
     atomicdata.dev forms ontology (same Phase-1 step) — until then the
     data-browser logs a 404 for the property and skips validation/tagging
     (functionally fine, see fix 1). Local dev servers need one restart with
     `ATOMIC_REPOPULATE_DEFAULTS=true`.
-  - Covered by `forms-submission.spec.ts` (theme in Settings tab → publish →
+- Covered by `forms-submission.spec.ts` (theme in Settings tab → publish →
     anonymous visitor sees custom accent + radius), `cargo test -p
     atomic-server --lib forms::` (`definition_includes_styling`), and a
     manual pass (all 5 image modes with an SVG, colors, roundness,

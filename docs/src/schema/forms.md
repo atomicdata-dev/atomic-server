@@ -26,10 +26,11 @@ Properties:
 - [`form-pages`](https://atomicdata.dev/properties/form-pages) - (required, ResourceArray, FormPage) the form's pages, in order.
 - [`form-published-at`](https://atomicdata.dev/properties/form-published-at) - (recommended, Timestamp) when the form was published. Absent means unpublished; submissions are only accepted while set.
 - [`form-settings`](https://atomicdata.dev/properties/form-settings) - (recommended, JSON) miscellaneous settings (e.g. progress bar, confirmation message).
-- [`form-styling`](https://atomicdata.dev/properties/form-styling) - (recommended, JSON) visual theming for the published form. Keys (all optional): `textColor`, `mainColor`, `backgroundColor` (hex colors), `roundness` (one of: `sharp`, `rounded`, `round`).
+- [`form-styling`](https://atomicdata.dev/properties/form-styling) - (recommended, JSON) visual theming for the published form. Keys (all optional): `textColor`, `mainColor`, `backgroundColor` (hex colors), `roundness` (one of: `sharp`, `rounded`, `round`), `showProgressBar` (boolean, defaults to `true`) toggles the multi-page progress bar.
 - [`cover-image`](https://atomicdata.dev/properties/cover-image) - (recommended, AtomicURL, File) an image shown alongside or behind the published form. Served to anonymous visitors via `GET /form/{id}/image` (publish-gated), so the File itself needs no public read rights.
 - [`image-position`](https://atomicdata.dev/properties/image-position) - (recommended, String) where the image is positioned. One of: `top`, `left`, `right`, `behind` (full-page image behind the form card), `full` (form rendered directly on the image, no card) — enforced by the application, not the store (see note below).
 - [`form-submission-summary`](https://atomicdata.dev/properties/form-submission-summary) - (JSON, server-computed) aggregated submission statistics (response count, per-question option counts / number bins / answer samples), added to the resource by the server when a Form is fetched over HTTP. Ephemeral: it is never persisted and must never be written by clients.
+- [`form-access`](https://atomicdata.dev/properties/form-access) - (recommended, String) who can open the published form. One of: `public` (anyone with the link; the default when absent), `invite-only` (a valid, unused `FormInviteCode` is required to view and submit) — enforced by the application, not the store (see note below).
 
 ## FormPage
 
@@ -77,6 +78,20 @@ _URL: [`https://atomicdata.dev/classes/FormParagraph`](https://atomicdata.dev/cl
 A paragraph layout block inside a FormPage's `form-fields` list, rendered as markdown.
 
 - [`description`](https://atomicdata.dev/properties/description) - (required, Markdown) the paragraph body.
+
+## FormInviteCode
+
+_URL: [`https://atomicdata.dev/classes/FormInviteCode`](https://atomicdata.dev/classes/FormInviteCode)_
+
+A single-use invite code for an invite-only Form (`form-access` =
+`invite-only`). Codes are stored as children of the Form (their `parent`), so
+the hierarchy's rights keep them readable by form editors only — they never
+appear in the public form definition. A code is consumed (its `used-at` set)
+when a submission is accepted with it; revoking a code is simply destroying
+the resource.
+
+- [`form-code`](https://atomicdata.dev/properties/form-code) - (required, String) the code value a visitor presents (as the `code` query parameter / submit body field).
+- [`used-at`](https://atomicdata.dev/properties/used-at) - (recommended, Timestamp) when the code was consumed by a submission. Absent means still usable.
 
 ## Example
 

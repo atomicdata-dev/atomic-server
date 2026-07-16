@@ -150,6 +150,8 @@ function PanelContent({
 }): JSX.Element {
   const [qrDataUrl, setQrDataUrl] = useState<string | undefined>();
   const [formName] = useString(resource, core.properties.name);
+  const [access] = useString(resource, forms.properties.formAccess);
+  const inviteOnly = access === 'invite-only';
 
   useEffect(() => {
     let cancelled = false;
@@ -170,6 +172,13 @@ function PanelContent({
 
   return (
     <Inner gap="0.75rem">
+      {inviteOnly && (
+        <InviteOnlyNote>
+          This form is invite only — the plain link and embed won&apos;t open
+          without a valid invite code. Create and copy invite links in
+          Settings → Form access.
+        </InviteOnlyNote>
+      )}
       <StyledTabs
         label="Share form view"
         tabs={[
@@ -257,6 +266,15 @@ const StyledTabs = styled(Tabs)`
 const EmbedHint = styled.p`
   font-size: 0.8rem;
   color: ${p => p.theme.colors.textLight};
+`;
+
+const InviteOnlyNote = styled.p`
+  margin: 0;
+  font-size: 0.8rem;
+  color: ${p => p.theme.colors.textLight};
+  background-color: ${p => p.theme.colors.bg1};
+  border-radius: ${p => p.theme.radius};
+  padding: 0.5rem 0.75rem;
 `;
 
 const QrImage = styled.img`

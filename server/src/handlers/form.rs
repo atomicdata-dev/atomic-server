@@ -7,12 +7,13 @@
 
 use std::{
     collections::{HashMap, VecDeque},
-    sync::{Mutex, OnceLock},
+    sync::{Arc, Mutex, OnceLock},
     time::{Duration, Instant},
 };
 
 use actix_web::{http::StatusCode, web, HttpRequest, HttpResponse, ResponseError};
 use atomic_lib::{urls, AtomicError, Resource, Storelike, Value};
+use serde::Deserialize;
 use serde_json::json;
 
 use crate::{
@@ -87,6 +88,46 @@ fn unpublished() -> FormApiError {
     )
 }
 
+/// `?code=` on the viewer-facing routes (Phase 6 "Private links"): the invite
+/// code a visitor presents for an invite-only form.
+#[derive(Deserialize)]
+pub struct AccessQuery {
+    code: Option<String>,
+}
+
+/// Enforces a Form's `form-access` mode. Public forms always pass. For
+/// invite-only forms the presented code must exist, belong to this form, and
+/// be unused — checked *without* consuming, so a visitor can load the form
+/// (definition) and still submit with the same code. Consumption happens
+/// atomically in [submit_form].
+async fn check_form_access(
+    store: &atomic_lib::Db,
+    form: &Resource,
+    code: Option<&str>,
+) -> Result<(), FormApiError> {
+    if !forms::is_invite_only(form) {
+        return Ok(());
+    }
+
+    let forbidden = |message: &str| FormApiError::new(StatusCode::FORBIDDEN, message);
+
+    let Some(code) = code.filter(|c| !c.is_empty()) else {
+        return Err(forbidden(
+            "This form is invite-only. Ask the form owner for an invite link.",
+        ));
+    };
+
+    match forms::check_invite_code(store, form, code).await {
+        forms::InviteCodeCheck::Valid(_) => Ok(()),
+        forms::InviteCodeCheck::Used => Err(forbidden(
+            "This invite link has already been used. Ask the form owner for a new one.",
+        )),
+        forms::InviteCodeCheck::Invalid => Err(forbidden(
+            "This invite link isn't valid. Ask the form owner for a new one.",
+        )),
+    }
+}
+
 /// Resolves `{id}` to a Form resource, confirming it really is a Form and is
 /// currently published. Shared by both handlers.
 async fn resolve_published_form(store: &atomic_lib::Db, id: &str) -> Result<Resource, FormApiError> {
@@ -114,13 +155,24 @@ async fn resolve_published_form(store: &atomic_lib::Db, id: &str) -> Result<Reso
 /// `single_page_app.rs`'s meta-tag injection for the same reason. Falls back
 /// to a minimal standalone page (no JS bundle needed) when the form is
 /// unknown or unpublished.
-pub async fn form_page(path: web::Path<String>, appstate: web::Data<AppState>) -> HttpResponse {
+pub async fn form_page(
+    path: web::Path<String>,
+    access: web::Query<AccessQuery>,
+    appstate: web::Data<AppState>,
+) -> HttpResponse {
     let store = &appstate.store;
 
     let mut form = match resolve_published_form(store, &path.into_inner()).await {
         Ok(form) => form,
         Err(err) => return not_available_page(err.status, &err.message),
     };
+
+    // Invite-only gating happens here on the server (unlike `?embed=1`, which
+    // stays client-side) — the definition is injected into the HTML below, so
+    // serving the page without a valid code would leak the questions.
+    if let Err(err) = check_form_access(store, &form, access.code.as_deref()).await {
+        return not_available_page(err.status, &err.message);
+    }
 
     let mut definition = match forms::build_form_definition(store, &form).await {
         Ok(d) => d,
@@ -212,10 +264,12 @@ fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
 /// doesn't have one yet (see `crate::forms` module docs).
 pub async fn get_definition(
     path: web::Path<String>,
+    access: web::Query<AccessQuery>,
     appstate: web::Data<AppState>,
 ) -> Result<HttpResponse, FormApiError> {
     let store = &appstate.store;
     let mut form = resolve_published_form(store, &path.into_inner()).await?;
+    check_form_access(store, &form, access.code.as_deref()).await?;
 
     let mut definition = forms::build_form_definition(store, &form)
         .await
@@ -232,6 +286,9 @@ pub async fn get_definition(
 /// `GET /form/{id}/challenge` — a fresh proof-of-work challenge for the
 /// published form's captcha widget. Stateless to issue (HMAC-signed), so no
 /// bookkeeping happens here; one-time use is enforced at verification.
+/// Deliberately not invite-code-gated: a challenge leaks nothing about the
+/// form, and gating it would mean threading the code through the widget's
+/// challenge URL for zero security gain.
 pub async fn get_challenge(
     path: web::Path<String>,
     appstate: web::Data<AppState>,
@@ -263,6 +320,9 @@ fn fill_image_url(definition: &mut forms::FormDefinition) {
 /// handler: stored mimetype (SVG renders in `<img>`; `Content-Disposition:
 /// attachment` + `nosniff` keep it from ever executing as a document) and
 /// `?w=&q=&f=` image processing come with it.
+/// Deliberately not invite-code-gated: the cover image is branding, not
+/// answers/questions, and gating it would break the browser cache header
+/// below (per-code URLs) for zero meaningful confidentiality gain.
 pub async fn form_image(
     path: web::Path<String>,
     params: web::Query<DownloadParams>,
@@ -313,6 +373,16 @@ pub async fn submit_form(
             "Invalid submission",
         ));
     }
+
+    // Invite-only pre-check (non-consuming): fail fast on a missing/invalid/
+    // already-used code before the visitor's one-time captcha payload gets
+    // burned by the verification below. The authoritative check-and-consume
+    // runs again under the per-form lock right before the row is written.
+    let invite_code = body
+        .get(forms::INVITE_CODE_FIELD)
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    check_form_access(store, &form, invite_code.as_deref()).await?;
 
     // Proof-of-work captcha (Phase 6): the widget rides its solved payload
     // along in the body's top-level `altcha` field. Verified + consumed
@@ -390,9 +460,54 @@ pub async fn submit_form(
     // per transport (`http://…` over WS push, `internal:/…` via drive sync) —
     // the client then indexes the same row under two identities. Every other
     // table row is a DID resource with one canonical id; match that.
-    row.save_as_genesis(store).await.map_err(internal_error)?;
+    if forms::is_invite_only(&form) {
+        // Commits are not compare-and-swap, so check-and-consume is
+        // serialized with an in-process per-form mutex (single server
+        // process — same layer as the rate limiter above). Inside the lock,
+        // `used-at` is written *before* the row: the reverse order would
+        // allow a double submission when row creation races or fails.
+        let lock = form_submit_lock(&form);
+        let _guard = lock.lock().await;
+
+        match forms::check_invite_code(store, &form, invite_code.as_deref().unwrap_or_default())
+            .await
+        {
+            forms::InviteCodeCheck::Valid(mut code) => {
+                forms::consume_invite_code(store, &mut code)
+                    .await
+                    .map_err(internal_error)?;
+            }
+            // The pre-check passed, so a concurrent submit consumed the code
+            // in the meantime (or the owner revoked it mid-flight).
+            _ => {
+                return Err(FormApiError::new(
+                    StatusCode::FORBIDDEN,
+                    "This invite link has already been used. Ask the form owner for a new one.",
+                ));
+            }
+        }
+
+        row.save_as_genesis(store).await.map_err(internal_error)?;
+    } else {
+        row.save_as_genesis(store).await.map_err(internal_error)?;
+    }
 
     Ok(HttpResponse::Created().json(json!({ "ok": true })))
+}
+
+/// Per-form lock serializing invite-code check-and-consume in [submit_form].
+/// Entries are never pruned — one `Arc<Mutex>` per invite-only form ever
+/// submitted to since the last restart is negligible.
+fn form_submit_lock(form: &Resource) -> Arc<tokio::sync::Mutex<()>> {
+    static LOCKS: OnceLock<Mutex<HashMap<String, Arc<tokio::sync::Mutex<()>>>>> = OnceLock::new();
+    let locks = LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+
+    locks
+        .lock()
+        .unwrap()
+        .entry(form.get_subject().pure_id())
+        .or_default()
+        .clone()
 }
 
 // ── Per-IP rate limiting (fixed window, in-process) ──────────────────────

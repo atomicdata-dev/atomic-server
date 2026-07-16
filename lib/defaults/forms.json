@@ -66,12 +66,57 @@
   {
     "@id": "https://atomicdata.dev/properties/form-styling",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
-    "https://atomicdata.dev/properties/description": "Visual theming for a published Form, stored as a JSON object. Keys (all optional): textColor, mainColor, backgroundColor (hex colors), roundness (one of: sharp, rounded, round).",
+    "https://atomicdata.dev/properties/description": "Visual theming for a published Form, stored as a JSON object. Keys (all optional): textColor, mainColor, backgroundColor (hex colors), roundness (one of: sharp, rounded, round), showProgressBar (boolean, defaults to true) toggles the multi-page progress bar.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
     "https://atomicdata.dev/properties/shortname": "form-styling"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-access",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "Who can open a published Form. One of: public (anyone with the link; the default when absent), invite-only (a valid, unused FormInviteCode is required to view and submit).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-access"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-code",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "The code value of a FormInviteCode, matched against the `code` a visitor presents when opening or submitting an invite-only Form.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-code"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/used-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a resource was used or consumed. Absence means it is still unused.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "used-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormInviteCode",
+    "https://atomicdata.dev/properties/description": "A single-use invite code for an invite-only Form. Stored as a child of the Form (its `parent`), so hierarchy rights keep codes readable by form editors only. `used-at` set means the code has been consumed by a submission; revoking a code is simply destroying it.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/used-at"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/form-code"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-invite-code"
   },
   {
     "@id": "https://atomicdata.dev/properties/form-submission-summary",
@@ -96,6 +141,7 @@
       "https://atomicdata.dev/properties/form-settings",
       "https://atomicdata.dev/properties/form-publish-id",
       "https://atomicdata.dev/properties/form-styling",
+      "https://atomicdata.dev/properties/form-access",
       "https://atomicdata.dev/properties/cover-image",
       "https://atomicdata.dev/properties/image-position"
     ],
@@ -253,7 +299,8 @@
       "https://atomicdata.dev/classes/FormPage",
       "https://atomicdata.dev/classes/FormField",
       "https://atomicdata.dev/classes/FormHeading",
-      "https://atomicdata.dev/classes/FormParagraph"
+      "https://atomicdata.dev/classes/FormParagraph",
+      "https://atomicdata.dev/classes/FormInviteCode"
     ],
     "https://atomicdata.dev/properties/properties": [
       "https://atomicdata.dev/properties/form-data-class",
@@ -270,7 +317,10 @@
       "https://atomicdata.dev/properties/form-field-type",
       "https://atomicdata.dev/properties/form-field-options",
       "https://atomicdata.dev/properties/form-styling",
-      "https://atomicdata.dev/properties/form-submission-summary"
+      "https://atomicdata.dev/properties/form-submission-summary",
+      "https://atomicdata.dev/properties/form-access",
+      "https://atomicdata.dev/properties/form-code",
+      "https://atomicdata.dev/properties/used-at"
     ]
   }
 ]

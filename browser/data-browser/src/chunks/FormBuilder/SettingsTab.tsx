@@ -12,13 +12,16 @@ import * as RadixPopover from '@radix-ui/react-popover';
 import { HexColorPicker } from 'react-colorful';
 import { FaXmark } from 'react-icons/fa6';
 import Field from '@components/forms/Field';
+import { Checkbox, CheckboxLabel } from '@components/forms/Checkbox';
 import { FilePicker } from '@components/forms/FilePicker/FilePicker';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Button } from '@components/Button';
 import { IconButton } from '@components/IconButton/IconButton';
 import { Column, Row } from '@components/Row';
 import { Popover } from '@components/Popover';
+import { SettingsGroup, SettingsSection } from '@components/Settings';
 import { useDebounce } from '@helpers/useDebounce';
+import { FormAccessSection } from './FormAccessSection';
 
 const IMAGE_MIMES = new Set([
   'image/png',
@@ -55,10 +58,26 @@ interface SettingsTabProps {
   resource: Resource;
 }
 
-/** Styling/theming settings for a Form: cover image (+ position), custom
- * colors and corner roundness. Everything is previewed 1:1 by the Preview
- * dialog and the published runtime via the definition's `styling` object. */
+/** Form settings, grouped into collapsible sections like the app settings
+ * page: Appearance (cover image, colors, roundness — previewed 1:1 by the
+ * Preview dialog and the published runtime via the definition's `styling`
+ * object) and Form access (public vs invite-only + invite link management). */
 export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
+  return (
+    <Wrapper>
+      <SettingsGroup>
+        <SettingsSection label="Form access" initialState>
+          <FormAccessSection resource={resource} />
+        </SettingsSection>
+        <SettingsSection label="Appearance" initialState>
+          <AppearanceSettings resource={resource} />
+        </SettingsSection>
+      </SettingsGroup>
+    </Wrapper>
+  );
+}
+
+function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
   const coverImageProp = useProperty(forms.properties.coverImage);
   const [coverImage] = useString(resource, forms.properties.coverImage);
   const [position, setPosition] = useString(
@@ -66,19 +85,15 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
     forms.properties.imagePosition,
     { commit: true },
   );
-  // validate: false skips the Property-resource fetch on every set — the
-  // form-styling Property isn't resolvable from atomicdata.dev yet, and
-  // each validation attempt would block the write for up to 10s on a fresh
-  // profile. The value shape is owned by this component anyway.
   const [styling, setStyling] = useValue(
     resource,
     forms.properties.formStyling,
-    { commit: true, validate: false },
+    { commit: true },
   );
 
   const stylingObj = parseStylingValue(styling);
 
-  const setStylingKey = (key: string, value: string | undefined) => {
+  const setStylingKey = (key: string, value: JSONValue | undefined) => {
     const next = { ...stylingObj };
 
     if (value === undefined) {
@@ -90,10 +105,12 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
     setStyling(next);
   };
 
+  const showProgressBar = stylingObj.showProgressBar !== false;
+
   return (
-    <Wrapper>
+    <Sections>
       <Section>
-        <Field label='Form image'>
+        <Field label="Form image">
           <FilePicker
             commit
             resource={resource}
@@ -102,8 +119,8 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
           />
         </Field>
         {coverImage && (
-          <Field label='Image position'>
-            <Row gap='0.5rem' wrapItems>
+          <Field label="Image position">
+            <Row gap="0.5rem" wrapItems>
               {POSITIONS.map(({ value, label, title }) => (
                 <Button
                   key={value}
@@ -120,31 +137,33 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
       </Section>
       <Section>
         <ColorSetting
-          label='Text color'
-          placeholderColor='#1a1a1a'
+          label="Text color"
+          placeholderColor="#1a1a1a"
           value={stylingObj.textColor as string | undefined}
           onChange={value => setStylingKey('textColor', value)}
         />
         <ColorSetting
-          label='Main color'
-          placeholderColor='#1e43a3'
+          label="Main color"
+          placeholderColor="#1e43a3"
           value={stylingObj.mainColor as string | undefined}
           onChange={value => setStylingKey('mainColor', value)}
         />
         <ColorSetting
-          label='Background color'
-          placeholderColor='#ffffff'
+          label="Background color"
+          placeholderColor="#ffffff"
           value={stylingObj.backgroundColor as string | undefined}
           onChange={value => setStylingKey('backgroundColor', value)}
         />
       </Section>
       <Section>
-        <Field label='Roundness'>
-          <Row gap='0.5rem'>
+        <Field label="Roundness">
+          <Row gap="0.5rem">
             {ROUNDNESS_LEVELS.map(({ value, label }) => (
               <Button
                 key={value}
-                subtle={((stylingObj.roundness as string) ?? 'rounded') !== value}
+                subtle={
+                  ((stylingObj.roundness as string) ?? 'rounded') !== value
+                }
                 onClick={() => setStylingKey('roundness', value)}
               >
                 {label}
@@ -153,7 +172,18 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
           </Row>
         </Field>
       </Section>
-    </Wrapper>
+      <Section>
+        <CheckboxLabel>
+          <Checkbox
+            checked={showProgressBar}
+            onChange={checked =>
+              setStylingKey('showProgressBar', checked ? undefined : false)
+            }
+          />
+          Show progress bar on multi-page forms
+        </CheckboxLabel>
+      </Section>
+    </Sections>
   );
 }
 
@@ -234,7 +264,7 @@ function ColorSetting({
 
   return (
     <Field label={label}>
-      <Row gap='0.5rem' center>
+      <Row gap="0.5rem" center>
         <Popover
           open={open}
           onOpenChange={setOpen}
@@ -245,7 +275,7 @@ function ColorSetting({
             </SwatchTrigger>
           }
         >
-          <PickerPanel gap='0.75rem'>
+          <PickerPanel gap="0.75rem">
             <HexColorPicker
               color={draft ?? placeholderColor}
               onChange={setDraft}
@@ -260,7 +290,7 @@ function ColorSetting({
           </PickerPanel>
         </Popover>
         {draft && (
-          <IconButton title='Reset' onClick={() => setDraft(undefined)}>
+          <IconButton title="Reset" onClick={() => setDraft(undefined)}>
             <FaXmark />
           </IconButton>
         )}
@@ -269,8 +299,11 @@ function ColorSetting({
   );
 }
 
-const Wrapper = styled(Column)`
+const Wrapper = styled.div`
   max-width: 32rem;
+`;
+
+const Sections = styled(Column)`
   gap: 1.5rem;
 `;
 

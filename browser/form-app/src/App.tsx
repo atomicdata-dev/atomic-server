@@ -7,6 +7,7 @@ import {
 import {
   fetchDefinition,
   getFormIdFromLocation,
+  getInviteCodeFromLocation,
   isEmbedMode,
   submitForm,
 } from './api.js';
@@ -19,16 +20,17 @@ export function App(): JSX.Element {
   const [error, setError] = useState<string | undefined>();
   const [formId] = useState(getFormIdFromLocation);
   const [embed] = useState(isEmbedMode);
+  const [inviteCode] = useState(getInviteCodeFromLocation);
 
   useEffect(() => {
     if (definition) return;
 
-    fetchDefinition(formId)
+    fetchDefinition(formId, inviteCode)
       .then(setDefinition)
       .catch(e =>
         setError(e instanceof Error ? e.message : 'Could not load this form.'),
       );
-  }, [definition, formId]);
+  }, [definition, formId, inviteCode]);
 
   useEffect(() => {
     if (!embed) return;
@@ -63,6 +65,7 @@ export function App(): JSX.Element {
             formId,
             definition.honeypotField,
             values,
+            inviteCode,
           );
 
           if (outcome.ok) return { ok: true };
