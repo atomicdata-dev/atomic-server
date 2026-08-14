@@ -6,6 +6,7 @@ import {
   type FormValues,
 } from './types.js';
 import { validatePage, validateAll } from './validation.js';
+import { computeVisibility } from './conditions.js';
 import { FieldInput } from './FieldInput.js';
 import { FormMarkdown } from './FormMarkdown.js';
 
@@ -63,11 +64,38 @@ export function FormRenderer({
   }, [captchaEl]);
 
   const page = definition.pages[pageIndex];
-  const isLastPage = pageIndex === definition.pages.length - 1;
+  const visibility = computeVisibility(definition, values);
+  const visiblePageIndices = visibility.pageIndices;
+  const visiblePos = visiblePageIndices.indexOf(pageIndex);
+  const isLastPage =
+    visiblePageIndices.length === 0 ||
+    visiblePos === visiblePageIndices.length - 1 ||
+    (visiblePos < 0 && pageIndex >= (visiblePageIndices.at(-1) ?? 0));
   const progress =
-    definition.pages.length > 1 && definition.styling.showProgressBar !== false
-      ? Math.round(((pageIndex + 1) / definition.pages.length) * 100)
+    visiblePageIndices.length > 1 &&
+    definition.styling.showProgressBar !== false
+      ? Math.round(
+          ((Math.max(visiblePos, 0) + 1) / visiblePageIndices.length) * 100,
+        )
       : undefined;
+
+  const visiblePagesKey = visiblePageIndices.join(',');
+
+  // If the current page was hidden by a later answer change (unusual —
+  // page conditions typically reference earlier pages), snap to the
+  // nearest still-visible page so the visitor isn't stuck on a blank one.
+  useEffect(() => {
+    const indices = visiblePagesKey
+      ? visiblePagesKey.split(',').map(Number)
+      : [];
+
+    if (indices.length === 0) return;
+
+    if (indices.includes(pageIndex)) return;
+
+    const next = indices.find(i => i > pageIndex);
+    setPageIndex(next ?? indices[indices.length - 1]);
+  }, [pageIndex, visiblePagesKey]);
 
   const setValue = (mapsTo: string, value: unknown) => {
     setValues(prev => ({ ...prev, [mapsTo]: value }));
@@ -90,10 +118,21 @@ export function FormRenderer({
       return;
     }
 
-    setPageIndex(i => Math.min(i + 1, definition.pages.length - 1));
+    setPageIndex(i => {
+      const pos = visiblePageIndices.indexOf(i);
+      const nextPos = pos < 0 ? 0 : pos + 1;
+
+      return visiblePageIndices[nextPos] ?? i;
+    });
   };
 
-  const goBack = () => setPageIndex(i => Math.max(i - 1, 0));
+  const goBack = () =>
+    setPageIndex(i => {
+      const pos = visiblePageIndices.indexOf(i);
+      const prevPos = pos <= 0 ? 0 : pos - 1;
+
+      return visiblePageIndices[prevPos] ?? i;
+    });
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -105,12 +144,17 @@ export function FormRenderer({
     if (Object.keys(result.errors).length > 0) {
       setErrors(result.errors);
 
-      // Jump to the first page that has an error so the visitor sees it.
-      const firstErrorPage = definition.pages.findIndex(p =>
-        p.blocks.some(b => b.kind === 'field' && b.mapsTo in result.errors),
+      // Jump to the first *visible* page that has an error so the visitor sees it.
+      const firstErrorPage = visibility.pageIndices.find(i =>
+        definition.pages[i].blocks.some(
+          (b, bi) =>
+            b.kind === 'field' &&
+            visibility.blocks[i]?.has(bi) &&
+            b.mapsTo in result.errors,
+        ),
       );
 
-      if (firstErrorPage >= 0) setPageIndex(firstErrorPage);
+      if (firstErrorPage !== undefined) setPageIndex(firstErrorPage);
 
       return;
     }
@@ -173,6 +217,8 @@ export function FormRenderer({
 
       <div className='atomic-form-blocks'>
         {page?.blocks.map((block, i) => {
+          if (!visibility.blocks[pageIndex]?.has(i)) return null;
+
           if (block.kind === 'heading') {
             return (
               <h3 key={i} className='atomic-form-heading'>
@@ -275,7 +321,7 @@ export function FormRenderer({
       )}
 
       <div className='atomic-form-nav'>
-        {pageIndex > 0 && (
+        {pageIndex > 0 && visiblePos > 0 && (
           <button
             type='button'
             className='atomic-form-button atomic-form-button-secondary'

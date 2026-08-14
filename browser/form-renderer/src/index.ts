@@ -12,3 +12,10 @@ export {
   fieldBlocks,
 } from './validation.js';
 export type { ValidationResult } from './validation.js';
+export {
+  computeVisibility,
+  evaluateCondition,
+  visibleFieldMaps,
+  isEmptyValue,
+} from './conditions.js';
+export type { FormVisibility } from './conditions.js';

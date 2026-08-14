@@ -18,15 +18,18 @@ import { NumberOptions } from './FieldOptions/NumberOptions';
 import { ChoiceOptions } from './FieldOptions/ChoiceOptions';
 import type { FormFieldType } from './fieldTypes';
 import { useFormFieldPropertySync } from './useFormFieldPropertySync';
+import { ConditionsEditor } from './ConditionsEditor';
 
 interface FieldSettingsPanelProps {
   fieldSubject: string;
   dataClassSubject: string;
+  form: Resource;
 }
 
 export function FieldSettingsPanel({
   fieldSubject,
   dataClassSubject,
+  form,
 }: FieldSettingsPanelProps): JSX.Element {
   const field = useResource(fieldSubject);
   const descriptionProp = useProperty(core.properties.description);
@@ -43,6 +46,11 @@ export function FieldSettingsPanel({
         <Field label='Heading text' required>
           <FieldLabelInput field={field} renameField={renameField} />
         </Field>
+        <ConditionsEditor
+          resource={field}
+          form={form}
+          beforeField={fieldSubject}
+        />
       </Panel>
     );
   }
@@ -58,6 +66,11 @@ export function FieldSettingsPanel({
             required
           />
         </Field>
+        <ConditionsEditor
+          resource={field}
+          form={form}
+          beforeField={fieldSubject}
+        />
       </Panel>
     );
   }
@@ -73,7 +86,15 @@ export function FieldSettingsPanel({
       <Field label='Required'>
         <InputSwitcher commit resource={field} property={requiredProp} />
       </Field>
-      <TypeOptions field={field} type={fieldType as FormFieldType | undefined} />
+      <TypeOptions
+        field={field}
+        type={fieldType as FormFieldType | undefined}
+      />
+      <ConditionsEditor
+        resource={field}
+        form={form}
+        beforeField={fieldSubject}
+      />
     </Panel>
   );
 }

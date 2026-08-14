@@ -12,6 +12,7 @@ import type {
   FormErrors,
   FormValues,
 } from './types.js';
+import { computeVisibility, isEmptyValue } from './conditions.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -30,19 +31,7 @@ export function fieldBlocks(definition: FormDefinition): FieldBlock[] {
 }
 
 function isEmpty(value: unknown): boolean {
-  if (value === undefined || value === null) {
-    return true;
-  }
-
-  if (typeof value === 'string') {
-    return value.length === 0;
-  }
-
-  if (Array.isArray(value)) {
-    return value.length === 0;
-  }
-
-  return false;
+  return isEmptyValue(value);
 }
 
 function checkMembership(
@@ -137,8 +126,10 @@ export interface ValidationResult {
   values: FormValues;
 }
 
-/** Validates every field on the given page (or every field in the whole
- * definition when `pageIndex` is omitted), including requiredness. */
+/** Validates every *visible* field on the given page (or every visible
+ * field in the whole definition when `pageIndex` is omitted), including
+ * requiredness. Hidden fields are skipped — required-on-hidden is not an
+ * error, and their values are not copied into the coerced result. */
 export function validatePage(
   definition: FormDefinition,
   pageIndex: number,
@@ -146,11 +137,19 @@ export function validatePage(
 ): ValidationResult {
   const errors: FormErrors = {};
   const coerced: FormValues = {};
+  const visibility = computeVisibility(definition, values);
+
+  if (!visibility.pageIndices.includes(pageIndex)) {
+    return { errors, values: coerced };
+  }
 
   const blocks: FormBlock[] = definition.pages[pageIndex]?.blocks ?? [];
+  const visibleBlocks = visibility.blocks[pageIndex] ?? new Set<number>();
 
-  for (const block of blocks) {
-    if (block.kind !== 'field') continue;
+  for (let i = 0; i < blocks.length; i++) {
+    const block = blocks[i];
+
+    if (block.kind !== 'field' || !visibleBlocks.has(i)) continue;
 
     const raw = values[block.mapsTo];
 

@@ -8195,3 +8195,39 @@ msgstr "Jede Antwort ist ein"
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewFormDialog.tsx
 msgid "Names the class of a single submission — e.g. every response of a Job Application form is an Application."
 msgstr "Benennt die Klasse einer einzelnen Übermittlung – z. B. ist jede Antwort eines Bewerbungsformulars eine Bewerbung."
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Add a question before this one first"
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "and"
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "<0/> Add condition"
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Show when"
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "All of these must match. Leave empty to always show."
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Remove condition"
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "checked"
+msgstr ""
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "unchecked"
+msgstr ""
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Conditional"
+msgstr ""

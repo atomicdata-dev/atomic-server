@@ -36,6 +36,7 @@ pub const FORM_FIELD: &str = "https://atomicdata.dev/classes/FormField";
 pub const FORM_HEADING: &str = "https://atomicdata.dev/classes/FormHeading";
 pub const FORM_PARAGRAPH: &str = "https://atomicdata.dev/classes/FormParagraph";
 pub const FORM_INVITE_CODE: &str = "https://atomicdata.dev/classes/FormInviteCode";
+pub const FORM_CONDITION: &str = "https://atomicdata.dev/classes/FormCondition";
 
 // Properties
 pub const ORIGINAL_SUBJECT: &str = "https://atomicdata.dev/properties/originalSubject";
@@ -259,6 +260,11 @@ pub const FORM_SUBMISSION_SUMMARY: &str =
 pub const FORM_ACCESS: &str = "https://atomicdata.dev/properties/form-access";
 pub const FORM_CODE: &str = "https://atomicdata.dev/properties/form-code";
 pub const USED_AT: &str = "https://atomicdata.dev/properties/used-at";
+pub const FORM_CONDITIONS: &str = "https://atomicdata.dev/properties/form-conditions";
+pub const FORM_CONDITION_FIELD: &str = "https://atomicdata.dev/properties/form-condition-field";
+pub const FORM_CONDITION_OPERATOR: &str =
+    "https://atomicdata.dev/properties/form-condition-operator";
+pub const FORM_CONDITION_VALUE: &str = "https://atomicdata.dev/properties/form-condition-value";
 // AI
 pub const TEXT_PART: &str = "https://atomicdata.dev/01jtjxtsa9syxmfca2zx5gcnmj/class/text-part";
 pub const REASONING_PART: &str =

@@ -340,6 +340,27 @@ mod test {
     }
 
     #[tokio::test]
+    async fn populate_forms_ontology() {
+        let store = init_store().await;
+        for url in [
+            urls::FORM,
+            urls::FORM_PAGE,
+            urls::FORM_FIELD,
+            urls::FORM_HEADING,
+            urls::FORM_PARAGRAPH,
+            urls::FORM_CONDITION,
+            urls::FORM_CONDITIONS,
+            urls::FORM_CONDITION_FIELD,
+            urls::FORM_CONDITION_OPERATOR,
+            urls::FORM_CONDITION_VALUE,
+        ] {
+            store.get_resource(&url.into()).await.unwrap();
+        }
+        let class = store.get_class(urls::FORM_CONDITION).await.unwrap();
+        assert_eq!(class.shortname, "form-condition");
+    }
+
+    #[tokio::test]
     async fn single_get_empty_server_to_class() {
         let store = Store::init().await.unwrap();
         crate::populate::populate_base_models(&store).await.unwrap();

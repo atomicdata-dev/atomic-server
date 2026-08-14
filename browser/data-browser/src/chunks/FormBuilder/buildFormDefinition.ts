@@ -3,6 +3,7 @@ import type {
   FieldOptions,
   FieldType,
   FormBlock,
+  FormCondition,
   FormDefinition,
   FormPageDefinition,
   FormStyling,
@@ -108,19 +109,82 @@ async function buildPageDefinition(
 
   for (const fieldSubject of fieldSubjects) {
     const field = await store.getResource(fieldSubject);
-    blocks.push(buildBlock(field));
+    blocks.push(await buildBlock(store, field));
   }
 
-  return { name, coverImage, imagePosition, blocks };
+  const conditions = await buildConditions(store, page);
+
+  return {
+    name,
+    coverImage,
+    imagePosition,
+    ...(conditions.length > 0 ? { conditions } : {}),
+    blocks,
+  };
 }
 
-function buildBlock(
+async function buildConditions(
+  store: Store,
+  resource: Awaited<ReturnType<Store['getResource']>>,
+): Promise<FormCondition[]> {
+  const subjects =
+    (resource.get(forms.properties.formConditions) as string[] | undefined) ??
+    [];
+  const out: FormCondition[] = [];
+
+  for (const subject of subjects) {
+    const cond = await store.getResource(subject);
+    const fieldSubject = cond.get(forms.properties.formConditionField) as
+      | string
+      | undefined;
+    let mapsTo = '';
+
+    if (fieldSubject) {
+      const field = await store.getResource(fieldSubject);
+      mapsTo =
+        (field.get(forms.properties.formMapsTo) as string | undefined) ?? '';
+    }
+
+    out.push({
+      field: mapsTo,
+      operator:
+        (cond.get(forms.properties.formConditionOperator) as
+          | string
+          | undefined) ?? 'equals',
+      value: parseConditionValue(
+        cond.get(forms.properties.formConditionValue) as JSONValue | undefined,
+      ),
+    });
+  }
+
+  return out;
+}
+
+function parseConditionValue(raw: JSONValue | undefined): unknown {
+  if (raw === undefined || raw === null) return null;
+
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return raw;
+    }
+  }
+
+  return raw;
+}
+
+async function buildBlock(
+  store: Store,
   field: Awaited<ReturnType<Store['getResource']>>,
-): FormBlock {
+): Promise<FormBlock> {
+  const conditions = await buildConditions(store, field);
+
   if (field.hasClasses(forms.classes.formHeading)) {
     return {
       kind: 'heading',
       text: (field.get(core.properties.name) as string) ?? '',
+      ...(conditions.length > 0 ? { conditions } : {}),
     };
   }
 
@@ -128,6 +192,7 @@ function buildBlock(
     return {
       kind: 'paragraph',
       text: (field.get(core.properties.description) as string) ?? '',
+      ...(conditions.length > 0 ? { conditions } : {}),
     };
   }
 
@@ -146,5 +211,6 @@ function buildBlock(
       'short-text',
     required: Boolean(field.get(forms.properties.required)),
     options,
+    ...(conditions.length > 0 ? { conditions } : {}),
   };
 }

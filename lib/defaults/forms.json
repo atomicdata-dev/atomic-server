@@ -194,7 +194,8 @@
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/name",
       "https://atomicdata.dev/properties/cover-image",
-      "https://atomicdata.dev/properties/image-position"
+      "https://atomicdata.dev/properties/image-position",
+      "https://atomicdata.dev/properties/form-conditions"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/form-fields"
@@ -252,7 +253,8 @@
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/description",
       "https://atomicdata.dev/properties/required",
-      "https://atomicdata.dev/properties/form-field-options"
+      "https://atomicdata.dev/properties/form-field-options",
+      "https://atomicdata.dev/properties/form-conditions"
     ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name",
@@ -268,6 +270,9 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/name"
     ],
@@ -280,10 +285,71 @@
       "https://atomicdata.dev/classes/Class"
     ],
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
     "https://atomicdata.dev/properties/requires": [
       "https://atomicdata.dev/properties/description"
     ],
     "https://atomicdata.dev/properties/shortname": "form-paragraph"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-conditions",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormCondition",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
+    "https://atomicdata.dev/properties/description": "Visibility conditions on a FormPage, FormField, or layout block. All conditions must match (AND) for the item to be shown; an empty list means always visible. Each entry is a FormCondition.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-conditions"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-condition-field",
+    "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormField",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/atomicURL",
+    "https://atomicdata.dev/properties/description": "The FormField whose answer this FormCondition inspects.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-condition-field"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-condition-operator",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "How a FormCondition compares the referenced field's answer to `form-condition-value`. One of: equals, not-equals, contains, greater-than, less-than. Unenforced at the store (plain String, same limitation as form-field-type); the form builder and submission validator check the enum.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-condition-operator"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-condition-value",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
+    "https://atomicdata.dev/properties/description": "The comparison value for a FormCondition. Shape depends on the referenced field (string, number, boolean, ...).",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-condition-value"
+  },
+  {
+    "@id": "https://atomicdata.dev/classes/FormCondition",
+    "https://atomicdata.dev/properties/description": "A single visibility predicate: show the parent page/field/block when `form-condition-field`'s answer matches `form-condition-value` under `form-condition-operator`. Stored as a child of the thing it hides, listed in that resource's `form-conditions` array. Multiple conditions on one parent are ANDed.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/form-condition-value"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/form-condition-field",
+      "https://atomicdata.dev/properties/form-condition-operator"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-condition"
   },
   {
     "@id": "https://atomicdata.dev/ontology/forms",
@@ -300,7 +366,8 @@
       "https://atomicdata.dev/classes/FormField",
       "https://atomicdata.dev/classes/FormHeading",
       "https://atomicdata.dev/classes/FormParagraph",
-      "https://atomicdata.dev/classes/FormInviteCode"
+      "https://atomicdata.dev/classes/FormInviteCode",
+      "https://atomicdata.dev/classes/FormCondition"
     ],
     "https://atomicdata.dev/properties/properties": [
       "https://atomicdata.dev/properties/form-data-class",
@@ -320,7 +387,11 @@
       "https://atomicdata.dev/properties/form-submission-summary",
       "https://atomicdata.dev/properties/form-access",
       "https://atomicdata.dev/properties/form-code",
-      "https://atomicdata.dev/properties/used-at"
+      "https://atomicdata.dev/properties/used-at",
+      "https://atomicdata.dev/properties/form-conditions",
+      "https://atomicdata.dev/properties/form-condition-field",
+      "https://atomicdata.dev/properties/form-condition-operator",
+      "https://atomicdata.dev/properties/form-condition-value"
     ]
   }
 ]

@@ -13,6 +13,7 @@ import type { ResourcePageProps } from '@views/ResourcePage';
 import { PageTabBar } from './PageTabBar';
 import { FieldList } from './FieldList';
 import { FieldSettingsPanel } from './FieldSettingsPanel';
+import { PageSettingsPanel } from './PageSettingsPanel';
 import { PublishToggle } from './PublishToggle';
 import { FormPreviewButton } from './FormPreviewDialog';
 import { ResultsTab } from './ResultsTab';
@@ -106,11 +107,16 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
             )}
           </MainSlot>
           <SettingsSlot>
-            {selectedField && dataClassSubject && (
+            {selectedField && dataClassSubject ? (
               <FieldSettingsPanel
                 fieldSubject={selectedField}
                 dataClassSubject={dataClassSubject}
+                form={resource}
               />
+            ) : (
+              activePage && (
+                <PageSettingsPanel pageSubject={activePage} form={resource} />
+              )
             )}
           </SettingsSlot>
           <PageBarSlot>

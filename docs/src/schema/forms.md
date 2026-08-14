@@ -44,6 +44,7 @@ Properties:
 - [`name`](https://atomicdata.dev/properties/name) - (recommended, String) the page's title.
 - [`cover-image`](https://atomicdata.dev/properties/cover-image) - (recommended, AtomicURL, File) an optional cover image.
 - [`image-position`](https://atomicdata.dev/properties/image-position) - (recommended, String) where the cover image is positioned. Same values as on Form (see above); currently unused by the builder, which themes at the Form level.
+- [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates. All must match (AND) for the page to be shown; an empty list means always visible. Evaluated against answers from earlier pages.
 
 ## FormField
 
@@ -62,6 +63,7 @@ Properties:
 - [`description`](https://atomicdata.dev/properties/description) - (recommended, Markdown) helper text shown below the label.
 - [`required`](https://atomicdata.dev/properties/required) - (recommended, Boolean) whether an answer is mandatory.
 - [`form-field-options`](https://atomicdata.dev/properties/form-field-options) - (recommended, JSON) type-specific settings (placeholder, min/max, choice options, ...); shape depends on `form-field-type`.
+- [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates. All must match (AND) for the field to be shown. Hidden fields are not validated and their submitted values are dropped.
 
 ## FormHeading
 
@@ -70,6 +72,7 @@ _URL: [`https://atomicdata.dev/classes/FormHeading`](https://atomicdata.dev/clas
 A heading layout block inside a FormPage's `form-fields` list.
 
 - [`name`](https://atomicdata.dev/properties/name) - (required, String) the heading text.
+- [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates, same AND semantics as on FormField.
 
 ## FormParagraph
 
@@ -78,6 +81,27 @@ _URL: [`https://atomicdata.dev/classes/FormParagraph`](https://atomicdata.dev/cl
 A paragraph layout block inside a FormPage's `form-fields` list, rendered as markdown.
 
 - [`description`](https://atomicdata.dev/properties/description) - (required, Markdown) the paragraph body.
+- [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates, same AND semantics as on FormField.
+
+## FormCondition
+
+_URL: [`https://atomicdata.dev/classes/FormCondition`](https://atomicdata.dev/classes/FormCondition)_
+
+A single visibility predicate on a page, field, or layout block. The parent
+lists its predicates in `form-conditions`; they are ANDed. Stored as a child
+of the thing it hides, so hierarchy rights keep them private to form editors
+— they appear in the public definition JSON only as denormalized
+`{ field, operator, value }` objects (`field` is the referenced question's
+`form-maps-to` property URL, not the FormField subject).
+
+- [`form-condition-field`](https://atomicdata.dev/properties/form-condition-field) - (required, AtomicURL, FormField) the question whose answer is inspected.
+- [`form-condition-operator`](https://atomicdata.dev/properties/form-condition-operator) - (required, String) one of: `equals`, `not-equals`, `contains`, `greater-than`, `less-than` — enforced by the application, not the store (see note below).
+- [`form-condition-value`](https://atomicdata.dev/properties/form-condition-value) - (recommended, JSON) the comparison value. Shape depends on the referenced field.
+
+An unanswered or hidden referenced field fails the condition (the dependent
+stays hidden). `contains` is a case-insensitive substring on strings and
+membership on multi-select arrays. `greater-than` / `less-than` compare
+numerically, falling back to lexicographic string order (ISO dates work).
 
 ## FormInviteCode
 
@@ -107,12 +131,8 @@ the resource.
 }
 ```
 
-Not yet in scope for this phase: conditional field/page visibility
-(`form-conditions`), and `form-styling` (colors, fonts, logo) — both are
-should-have follow-ups.
-
-Note on `form-field-type` / `image-position`: [`allowsOnly`](https://atomicdata.dev/properties/allowsOnly)
+Note on `form-field-type` / `image-position` / `form-condition-operator`: [`allowsOnly`](https://atomicdata.dev/properties/allowsOnly)
 can only restrict a property to a list of URL-parseable subjects, so it can't
-hold plain enum strings like `short-text`. These two properties are therefore
-unenforced `String`s at the store level for now; the enum is validated by the
-form builder and (in a later phase) by the submission endpoint.
+hold plain enum strings like `short-text`. These properties are therefore
+unenforced `String`s at the store level; the enum is validated by the
+form builder and the submission endpoint.

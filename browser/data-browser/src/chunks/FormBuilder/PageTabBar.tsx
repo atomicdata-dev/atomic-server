@@ -13,7 +13,10 @@ import { FaPlus, FaTrash } from 'react-icons/fa6';
 import { Row } from '@components/Row';
 import { Button } from '@components/Button';
 import { InputStyled } from '@components/forms/InputStyles';
-import { IconButton, IconButtonVariant } from '@components/IconButton/IconButton';
+import {
+  IconButton,
+  IconButtonVariant,
+} from '@components/IconButton/IconButton';
 import { ReorderableList } from './ReorderableList';
 
 interface PageTabBarProps {
@@ -52,6 +55,14 @@ export function PageTabBar({
     }
 
     const page = await store.getResource(subject);
+    const conditions =
+      (page.get(forms.properties.formConditions) as string[] | undefined) ?? [];
+
+    for (const condSubject of conditions) {
+      const cond = await store.getResource(condSubject);
+      await cond.destroy();
+    }
+
     setPages(pages.filter(p => p !== subject));
     await page.destroy();
 

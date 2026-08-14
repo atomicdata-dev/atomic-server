@@ -1,0 +1,596 @@
+{
+  "_comment": [
+    "Shared fixtures for the form-condition evaluator. Both sides of the",
+    "lockstep load this file: Rust `server/src/forms.rs` (via include_str!)",
+    "and TS `browser/form-renderer/src/conditions.test.ts`.",
+    "`pages` is the denormalized definition shape (same as GET /form/:id/definition).",
+    "`visibleFields` / `visiblePages` are the evaluator's output.",
+    "`storedFields` is which mapsTo keys validate_submission keeps (hidden",
+    "values are dropped; missing required hidden fields are not errors).",
+    "`valid` is whether validation succeeds for the given `values`."
+  ],
+  "cases": [
+    {
+      "name": "no conditions: everything visible",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Name",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "Ada" },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "equals match shows the follow-up",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Pet?",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Pet name",
+              "type": "short-text",
+              "required": true,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "Yes" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "Yes", "p2": "Spot" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "equals miss hides the follow-up; required on hidden is ignored",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Pet?",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Pet name",
+              "type": "short-text",
+              "required": true,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "Yes" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "No" },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "visible required follow-up still errors when empty",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Pet?",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Pet name",
+              "type": "short-text",
+              "required": true,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "Yes" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "Yes" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": false
+    },
+    {
+      "name": "submitted value for a hidden field is dropped, not stored",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Pet?",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Pet name",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "Yes" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "No", "p2": "secret" },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "page condition hides the whole page and its required fields",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Continue?",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            }
+          ]
+        },
+        {
+          "conditions": [
+            { "field": "p1", "operator": "equals", "value": "Yes" }
+          ],
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Details",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "No" },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "page condition match shows the later page",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Continue?",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            }
+          ]
+        },
+        {
+          "conditions": [
+            { "field": "p1", "operator": "equals", "value": "Yes" }
+          ],
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Details",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "Yes", "p2": "ok" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0, 1],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "AND semantics: both conditions must match",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "A",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "B",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p3",
+              "label": "C",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "x" },
+                { "field": "p2", "operator": "equals", "value": "y" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "x", "p2": "nope", "p3": "hidden" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "contains is a case-insensitive substring",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Bio",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Follow-up",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "contains", "value": "CAT" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "I have a cat", "p2": "ok" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "contains on multi-select is membership",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Colors",
+              "type": "multi-select",
+              "required": true,
+              "options": { "options": ["Red", "Green", "Blue"] }
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Red follow-up",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "contains", "value": "Red" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": ["Green", "Red"], "p2": "ok" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "not-equals hides when the value matches",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Country",
+              "type": "short-text",
+              "required": true,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Other",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "not-equals", "value": "US" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "US", "p2": "dropped" },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "greater-than on numbers",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Age",
+              "type": "number",
+              "required": true,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Adult Q",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "greater-than", "value": 18 }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": 21, "p2": "ok" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "less-than miss keeps the follow-up hidden",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Age",
+              "type": "number",
+              "required": true,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Child Q",
+              "type": "short-text",
+              "required": true,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "less-than", "value": 18 }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": 21 },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "unanswered referenced field fails the condition",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "A",
+              "type": "short-text",
+              "required": false,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "B",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "x" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": {},
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": [],
+      "valid": true
+    },
+    {
+      "name": "hidden field value is ignored when evaluating later conditions",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Gate",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Mid",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "Yes" }
+              ]
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p3",
+              "label": "Late",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p2", "operator": "equals", "value": "cat" }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "No", "p2": "cat", "p3": "sneaky" },
+      "visibleFields": ["p1"],
+      "visiblePages": [0],
+      "storedFields": ["p1"],
+      "valid": true
+    },
+    {
+      "name": "checkbox equals true",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Agree",
+              "type": "checkbox",
+              "required": false,
+              "options": {}
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "More",
+              "type": "short-text",
+              "required": false,
+              "options": {},
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": true }
+              ]
+            }
+          ]
+        }
+      ],
+      "values": { "p1": true, "p2": "ok" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    },
+    {
+      "name": "heading/paragraph conditions hide layout without affecting fields",
+      "pages": [
+        {
+          "blocks": [
+            {
+              "kind": "field",
+              "mapsTo": "p1",
+              "label": "Gate",
+              "type": "radio",
+              "required": true,
+              "options": { "options": ["Yes", "No"] }
+            },
+            {
+              "kind": "heading",
+              "text": "Only if yes",
+              "conditions": [
+                { "field": "p1", "operator": "equals", "value": "Yes" }
+              ]
+            },
+            {
+              "kind": "field",
+              "mapsTo": "p2",
+              "label": "Always",
+              "type": "short-text",
+              "required": false,
+              "options": {}
+            }
+          ]
+        }
+      ],
+      "values": { "p1": "No", "p2": "still here" },
+      "visibleFields": ["p1", "p2"],
+      "visiblePages": [0],
+      "storedFields": ["p1", "p2"],
+      "valid": true
+    }
+  ]
+}

@@ -478,6 +478,194 @@ test.describe('form publish and anonymous submit', () => {
     await expect(page.getByText('Used', { exact: true })).toBeVisible();
   });
 
+  test('branching hides a follow-up unless its condition matches', async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    const FORM_CONDITIONS =
+      'https://atomicdata.dev/properties/form-conditions';
+
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Pet survey');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('editable-title').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Radio group', exact: true }).click();
+    await expect(page.getByTestId('field-row-radio')).toBeVisible();
+    await page.getByTestId('field-row-radio').click();
+    await page.getByTestId('field-label-input').fill('Do you have a pet?');
+    const optionInputs = page.getByTestId('choice-option-input');
+    await optionInputs.nth(0).fill('Yes');
+    await optionInputs.nth(1).fill('No');
+    await page.waitForFunction(
+      ({ typeProp, optionsProp }) => {
+        for (const r of window.store.resources.values()) {
+          if (r.get(typeProp) === 'radio') {
+            const raw = r.get(optionsProp);
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+            return parsed?.options?.[0] === 'Yes';
+          }
+        }
+
+        return false;
+      },
+      {
+        typeProp: 'https://atomicdata.dev/properties/form-field-type',
+        optionsProp: 'https://atomicdata.dev/properties/form-field-options',
+      },
+      { timeout: 10000 },
+    );
+
+    await page.getByTitle('Add field').click();
+    await page
+      .getByRole('menuitem', { name: 'Short text', exact: true })
+      .click();
+    await expect(page.getByTestId('field-row-short-text')).toBeVisible();
+    await page.getByTestId('field-row-short-text').click();
+    await page.getByTestId('field-label-input').fill("Pet's name");
+
+    // Required only applies while the field is visible — the interesting
+    // branching invariant the server also enforces.
+    const requiredCheckbox = page.getByRole('checkbox');
+    await requiredCheckbox.check();
+
+    await page.getByTestId('add-condition').click();
+    await expect(page.getByTestId('condition-field')).toBeVisible();
+    await expect(
+      page.getByTestId('condition-value').locator('option[value="Yes"]'),
+    ).toHaveCount(1, { timeout: 10000 });
+    await page.getByTestId('condition-value').selectOption('Yes');
+
+    const petNameSubject = await page.evaluate(
+      ({ fieldType, typeProp }) => {
+        for (const r of window.store.resources.values()) {
+          if (r.get(typeProp) === fieldType) {
+            return r.subject;
+          }
+        }
+
+        return undefined;
+      },
+      {
+        fieldType: 'short-text',
+        typeProp: 'https://atomicdata.dev/properties/form-field-type',
+      },
+    );
+    expect(petNameSubject).toBeTruthy();
+
+    await page.waitForFunction(
+      ({ subject, prop }) => {
+        const conds = window.store.resources.get(subject)?.get(prop);
+
+        return Array.isArray(conds) && conds.length > 0;
+      },
+      { subject: petNameSubject as string, prop: FORM_CONDITIONS },
+      { timeout: 15000 },
+    );
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await page.waitForFunction(
+      ({ subject, prop }) =>
+        typeof window.store.resources.get(subject)?.get(prop) === 'number',
+      { subject: formSubject, prop: FORM_PUBLISHED_AT },
+      { timeout: 10000 },
+    );
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await expect(async () => {
+      const res = await page.request.get(
+        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition`,
+      );
+      expect(res.ok()).toBe(true);
+      const body = await res.json();
+      const followUp = body.pages[0].blocks.find(
+        (b: { kind: string; label?: string }) =>
+          b.kind === 'field' && b.label === "Pet's name",
+      );
+      expect(followUp?.conditions?.[0]?.operator).toBe('equals');
+      expect(followUp?.conditions?.[0]?.value).toBe('Yes');
+    }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
+
+    const tableSubject = await page.evaluate(
+      ({ subject, prop }) =>
+        window.store.resources.get(subject)?.get(prop) as string | undefined,
+      { subject: formSubject, prop: FORM_TARGET_TABLE },
+    );
+    expect(tableSubject).toBeTruthy();
+
+    // Visitor 1: answers No — the required follow-up stays hidden and
+    // submit succeeds without it.
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    await visitorPage.goto(`${SERVER_URL}/form/${formSubject}`);
+    await expect(
+      visitorPage.getByText('Do you have a pet?', { exact: false }),
+    ).toBeVisible({ timeout: 15000 });
+    await visitorPage.getByText('No', { exact: true }).click();
+    await expect(visitorPage.getByLabel("Pet's name")).toHaveCount(0);
+    const submit1 = visitorPage.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    await expect(submit1).toBeEnabled({ timeout: 30000 });
+    await submit1.click();
+    await expect(visitorPage.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
+    await visitorContext.close();
+
+    // Visitor 2: answers Yes — follow-up appears, is required, then submits.
+    const visitor2Context = await browser.newContext();
+    const visitor2Page = await visitor2Context.newPage();
+    await visitor2Page.goto(`${SERVER_URL}/form/${formSubject}`);
+    await expect(
+      visitor2Page.getByText('Do you have a pet?', { exact: false }),
+    ).toBeVisible({ timeout: 15000 });
+    await visitor2Page.getByText('Yes', { exact: true }).click();
+    const petName = visitor2Page.getByLabel("Pet's name", { exact: false });
+    await expect(petName).toBeVisible();
+    await petName.fill('Spot');
+    const submit2 = visitor2Page.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    await expect(submit2).toBeEnabled({ timeout: 30000 });
+    await submit2.click();
+    await expect(visitor2Page.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
+    await visitor2Context.close();
+
+    await openSubject(page, tableSubject as string);
+    await expect(page.getByText('Spot')).toBeVisible({ timeout: 15000 });
+  });
+
   test('unpublished form shows a friendly not-available page', async ({
     page,
     browser,

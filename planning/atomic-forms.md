@@ -720,9 +720,38 @@ Rough priority order:
    picture choice, file upload (needs upload path for anonymous users — scoped,
    size-limited `POST /form/:id/upload` writing into the commit as a blob), choice
    matrix, table input, location/address.
-[] **Branching**: FormCondition resources; evaluator implemented once in TS
-   (renderer + preview) and once in Rust (server must ignore validation errors on
-   hidden fields); shared JSON fixtures keep the two in lockstep.
+[x] **Branching** — DONE. FormCondition resources on pages, fields, and layout
+   blocks; evaluator implemented once in TS (`form-renderer/src/conditions.ts`)
+   and once in Rust (`server/src/forms.rs`); shared fixtures
+   (`testdata/form-conditions.json`) keep the two in lockstep. Server
+   `validate_submission` skips hidden fields (required-on-hidden is not an
+   error; submitted values for them are dropped). Builder: "Show when" editor
+   in the field settings pane and the page pane (when no field is selected).
+- **Schema**: `FormCondition` class (`form-condition-field` required AtomicURL
+    to FormField, `form-condition-operator` required String enum, 
+    `form-condition-value` recommended JSON) + `form-conditions` ResourceArray
+    on FormPage / FormField / FormHeading / FormParagraph. Operator is a
+    plain String without `allowsOnly` (same limitation as `form-field-type`).
+    AND semantics; empty list = always visible.
+- **Definition JSON**: conditions inlined as `{ field, operator, value }`
+    where `field` is the referenced question's `form-maps-to` (the runtime
+    never sees FormField subjects). Omitted when empty.
+- **Evaluation** walks the form in document order. A referenced field that is
+    itself hidden (or unanswered) fails the condition, so later questions
+    cannot be unlocked by submitting a value for a hidden predecessor.
+    `contains` is a case-insensitive substring on strings and membership on
+    multi-select arrays. `greater-than` / `less-than` compare numerically,
+    falling back to lexicographic string order (ISO dates work).
+- **Renderer**: hidden blocks are not rendered; Next/Back/progress/Submit
+    skip hidden pages; the last *visible* page is the submit page.
+- **Human follow-up needed**: add `FormCondition` + `form-conditions` /
+    `form-condition-field` / `form-condition-operator` / `form-condition-value`
+    to the public atomicdata.dev forms ontology (same step as `form-styling`).
+    Local dev servers need one restart with `ATOMIC_REPOPULATE_DEFAULTS=true`.
+- Covered by: `testdata/form-conditions.json` (TS + Rust),
+    `definition_inlines_field_conditions`, `populate_forms_ontology`,
+    and `forms-submission.spec.ts` (radio → required follow-up hidden when
+    No, shown+filled when Yes).
 [x] **Styling/theming** — DONE (except fonts/logo, not requested). Shipped:
    cover image (5 position modes), text/main/background colors, 3 corner
    roundness levels, edited in a new **Settings tab** in `FormBuilderPage`.

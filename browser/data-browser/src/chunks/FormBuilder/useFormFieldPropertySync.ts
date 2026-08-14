@@ -42,14 +42,10 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
         });
         await field.save();
       } else {
-        const propertySubject = await createPropertyOnClass(
-          store,
-          dataClass,
-          {
-            name: opts.label,
-            datatype: FIELD_TYPE_TO_DATATYPE[opts.type],
-          },
-        );
+        const propertySubject = await createPropertyOnClass(store, dataClass, {
+          name: opts.label,
+          datatype: FIELD_TYPE_TO_DATATYPE[opts.type],
+        });
 
         field = await store.newResource({
           parent: page.subject,
@@ -110,12 +106,21 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
       );
       await page.save();
 
+      const conditions =
+        (field.get(forms.properties.formConditions) as string[] | undefined) ??
+        [];
+
+      for (const subject of conditions) {
+        const cond = await store.getResource(subject);
+        await cond.destroy();
+      }
+
       // The mapped Property (and any submissions already written to it) is
       // deliberately left in place — only the FormField / form-maps-to link
       // is removed.
       await field.destroy();
     },
-    [],
+    [store],
   );
 
   return { createField, renameField, deleteField };

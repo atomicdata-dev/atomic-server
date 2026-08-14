@@ -1,7 +1,14 @@
-import { core, forms, useResource, useString, useTitle } from '@tomic/react';
+import {
+  core,
+  forms,
+  useArray,
+  useResource,
+  useString,
+  useTitle,
+} from '@tomic/react';
 import type { JSX } from 'react';
 import { styled } from 'styled-components';
-import { FaTrash } from 'react-icons/fa6';
+import { FaCodeBranch, FaTrash } from 'react-icons/fa6';
 import { Column, Row } from '@components/Row';
 import {
   IconButton,
@@ -26,6 +33,7 @@ export function FieldRow({
   const [name] = useTitle(resource);
   const [fieldType] = useString(resource, forms.properties.formFieldType);
   const [description] = useString(resource, core.properties.description);
+  const [conditions] = useArray(resource, forms.properties.formConditions);
   const isHeading = resource.hasClasses(forms.classes.formHeading);
   const isParagraph = resource.hasClasses(forms.classes.formParagraph);
 
@@ -43,7 +51,7 @@ export function FieldRow({
   return (
     <RowWrapper $selected={selected}>
       <SelectButton
-        type="button"
+        type='button'
         // While the resource is loading, `type` is just the fallback — don't
         // claim a concrete testid yet, or every hydrating row briefly reads
         // as `field-row-short-text` (breaks e2e strict-mode selectors).
@@ -53,19 +61,25 @@ export function FieldRow({
         onClick={onSelect}
       >
         <Column fullWidth>
-          <FieldTypeRow gap="0.5rem" center>
+          <FieldTypeRow gap='0.5rem' center>
             <Icon />
             <Label light>{meta.label}</Label>
           </FieldTypeRow>
           {label ? <Label>{label}</Label> : null}
+          {conditions.length > 0 && (
+            <FieldTypeRow gap='0.35rem' center>
+              <FaCodeBranch />
+              <Label light>Conditional</Label>
+            </FieldTypeRow>
+          )}
         </Column>
       </SelectButton>
       <IconButton
         variant={IconButtonVariant.Simple}
-        size="0.8rem"
-        color="textLight"
-        title="Delete field"
-        type="button"
+        size='0.8rem'
+        color='textLight'
+        title='Delete field'
+        type='button'
         onClick={onDelete}
       >
         <FaTrash />

@@ -13,6 +13,7 @@ export const forms = {
     formHeading: 'https://atomicdata.dev/classes/FormHeading',
     formParagraph: 'https://atomicdata.dev/classes/FormParagraph',
     formInviteCode: 'https://atomicdata.dev/classes/FormInviteCode',
+    formCondition: 'https://atomicdata.dev/classes/FormCondition',
   },
   properties: {
     formDataClass: 'https://atomicdata.dev/properties/form-data-class',
@@ -34,6 +35,11 @@ export const forms = {
     formAccess: 'https://atomicdata.dev/properties/form-access',
     formCode: 'https://atomicdata.dev/properties/form-code',
     usedAt: 'https://atomicdata.dev/properties/used-at',
+    formConditions: 'https://atomicdata.dev/properties/form-conditions',
+    formConditionField: 'https://atomicdata.dev/properties/form-condition-field',
+    formConditionOperator:
+      'https://atomicdata.dev/properties/form-condition-operator',
+    formConditionValue: 'https://atomicdata.dev/properties/form-condition-value',
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Form']: [
@@ -54,6 +60,7 @@ export const forms = {
       'https://atomicdata.dev/properties/name',
       'https://atomicdata.dev/properties/cover-image',
       'https://atomicdata.dev/properties/image-position',
+      'https://atomicdata.dev/properties/form-conditions',
     ],
     ['https://atomicdata.dev/classes/FormField']: [
       'https://atomicdata.dev/properties/name',
@@ -62,16 +69,24 @@ export const forms = {
       'https://atomicdata.dev/properties/description',
       'https://atomicdata.dev/properties/required',
       'https://atomicdata.dev/properties/form-field-options',
+      'https://atomicdata.dev/properties/form-conditions',
     ],
     ['https://atomicdata.dev/classes/FormHeading']: [
       'https://atomicdata.dev/properties/name',
+      'https://atomicdata.dev/properties/form-conditions',
     ],
     ['https://atomicdata.dev/classes/FormParagraph']: [
       'https://atomicdata.dev/properties/description',
+      'https://atomicdata.dev/properties/form-conditions',
     ],
     ['https://atomicdata.dev/classes/FormInviteCode']: [
       'https://atomicdata.dev/properties/form-code',
       'https://atomicdata.dev/properties/used-at',
+    ],
+    ['https://atomicdata.dev/classes/FormCondition']: [
+      'https://atomicdata.dev/properties/form-condition-field',
+      'https://atomicdata.dev/properties/form-condition-operator',
+      'https://atomicdata.dev/properties/form-condition-value',
     ],
   },
 } as const satisfies OntologyBaseObject;
@@ -84,6 +99,7 @@ export namespace Forms {
   export type FormHeading = typeof forms.classes.formHeading;
   export type FormParagraph = typeof forms.classes.formParagraph;
   export type FormInviteCode = typeof forms.classes.formInviteCode;
+  export type FormCondition = typeof forms.classes.formCondition;
 }
 
 declare module '../index.js' {
@@ -109,7 +125,8 @@ declare module '../index.js' {
       recommends:
         | 'https://atomicdata.dev/properties/name'
         | typeof forms.properties.coverImage
-        | typeof forms.properties.imagePosition;
+        | typeof forms.properties.imagePosition
+        | typeof forms.properties.formConditions;
     };
     [forms.classes.formField]: {
       requires:
@@ -120,19 +137,27 @@ declare module '../index.js' {
       recommends:
         | 'https://atomicdata.dev/properties/description'
         | typeof forms.properties.required
-        | typeof forms.properties.formFieldOptions;
+        | typeof forms.properties.formFieldOptions
+        | typeof forms.properties.formConditions;
     };
     [forms.classes.formHeading]: {
       requires: BaseProps | 'https://atomicdata.dev/properties/name';
-      recommends: never;
+      recommends: typeof forms.properties.formConditions;
     };
     [forms.classes.formParagraph]: {
       requires: BaseProps | 'https://atomicdata.dev/properties/description';
-      recommends: never;
+      recommends: typeof forms.properties.formConditions;
     };
     [forms.classes.formInviteCode]: {
       requires: BaseProps | typeof forms.properties.formCode;
       recommends: typeof forms.properties.usedAt;
+    };
+    [forms.classes.formCondition]: {
+      requires:
+        | BaseProps
+        | typeof forms.properties.formConditionField
+        | typeof forms.properties.formConditionOperator;
+      recommends: typeof forms.properties.formConditionValue;
     };
   }
 
@@ -155,6 +180,10 @@ declare module '../index.js' {
     [forms.properties.formAccess]: string;
     [forms.properties.formCode]: string;
     [forms.properties.usedAt]: number;
+    [forms.properties.formConditions]: string[];
+    [forms.properties.formConditionField]: string;
+    [forms.properties.formConditionOperator]: string;
+    [forms.properties.formConditionValue]: JSONValue;
   }
 
   interface PropSubjectToNameMapping {
@@ -176,5 +205,9 @@ declare module '../index.js' {
     [forms.properties.formAccess]: 'formAccess';
     [forms.properties.formCode]: 'formCode';
     [forms.properties.usedAt]: 'usedAt';
+    [forms.properties.formConditions]: 'formConditions';
+    [forms.properties.formConditionField]: 'formConditionField';
+    [forms.properties.formConditionOperator]: 'formConditionOperator';
+    [forms.properties.formConditionValue]: 'formConditionValue';
   }
 }

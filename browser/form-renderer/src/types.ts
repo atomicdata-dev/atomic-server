@@ -27,11 +27,13 @@ export interface FieldOptions {
 export interface HeadingBlock {
   kind: 'heading';
   text: string;
+  conditions?: FormCondition[];
 }
 
 export interface ParagraphBlock {
   kind: 'paragraph';
   text: string;
+  conditions?: FormCondition[];
 }
 
 export interface FieldBlock {
@@ -42,14 +44,32 @@ export interface FieldBlock {
   type: FieldType;
   required: boolean;
   options: FieldOptions;
+  conditions?: FormCondition[];
 }
 
 export type FormBlock = HeadingBlock | ParagraphBlock | FieldBlock;
+
+export type ConditionOperator =
+  | 'equals'
+  | 'not-equals'
+  | 'contains'
+  | 'greater-than'
+  | 'less-than';
+
+/** Denormalized visibility predicate. `field` is the referenced question's
+ * `mapsTo` (property subject), not the FormField resource URL. Empty list on
+ * a page/block means always visible; multiple entries are ANDed. */
+export interface FormCondition {
+  field: string;
+  operator: ConditionOperator | string;
+  value: unknown;
+}
 
 export interface FormPageDefinition {
   name?: string | null;
   coverImage?: string | null;
   imagePosition?: string | null;
+  conditions?: FormCondition[];
   blocks: FormBlock[];
 }
 

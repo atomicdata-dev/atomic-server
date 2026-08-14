@@ -557,3 +557,16 @@ This does not yet prove restoration of the user's private staging workspace.
 Not covered: wall-clock on a large real store (the 21.7KB-parent form from
 `planning/slow-collection-queries.md`); per-GET rights walks on the invite-code
 panel (memo is per-query, not per-request).
+
+---
+
+## Forms
+
+| Flow | Where |
+|---|---|
+| FormCondition evaluator (visibility + hidden-field validation skip) | Shared fixtures `testdata/form-conditions.json` loaded by `server/src/forms.rs::condition_fixtures_match_ts` **and** `browser/form-renderer/src/conditions.test.ts`. A fix to one is a fix to the other. |
+| Definition serializer inlines FormCondition resources as `{field, operator, value}` | `server/src/forms.rs::definition_inlines_field_conditions` |
+| Form ontology populate (incl. FormCondition) | `lib/src/store.rs::populate_forms_ontology` |
+| Publish → anonymous submit of a branching follow-up | `browser/e2e/tests/forms-submission.spec.ts` ("branching hides a follow-up unless its condition matches") |
+
+Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it).

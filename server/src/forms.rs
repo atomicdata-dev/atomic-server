@@ -86,7 +86,20 @@ pub struct FormPageDefinition {
     pub cover_image: Option<String>,
     #[serde(rename = "imagePosition")]
     pub image_position: Option<String>,
+    /// AND-ed visibility predicates. Empty (or omitted) means always shown.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub conditions: Vec<FormConditionDef>,
     pub blocks: Vec<FormBlock>,
+}
+
+/// Denormalized visibility predicate. `field` is the referenced question's
+/// `mapsTo` (property subject), not the FormField resource URL. Mirrors
+/// `FormCondition` in `@tomic/form-renderer`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FormConditionDef {
+    pub field: String,
+    pub operator: String,
+    pub value: JsonValue,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,9 +107,13 @@ pub struct FormPageDefinition {
 pub enum FormBlock {
     Heading {
         text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        conditions: Vec<FormConditionDef>,
     },
     Paragraph {
         text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        conditions: Vec<FormConditionDef>,
     },
     Field {
         #[serde(rename = "mapsTo")]
@@ -107,7 +124,166 @@ pub enum FormBlock {
         field_type: String,
         required: bool,
         options: JsonValue,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        conditions: Vec<FormConditionDef>,
     },
+}
+
+impl FormBlock {
+    pub fn conditions(&self) -> &[FormConditionDef] {
+        match self {
+            Self::Heading { conditions, .. }
+            | Self::Paragraph { conditions, .. }
+            | Self::Field { conditions, .. } => conditions,
+        }
+    }
+}
+
+/// Walk the definition in document order and decide what's shown.
+/// A referenced field that is itself hidden (or unanswered) fails the
+/// condition, so later questions cannot be unlocked by submitting a
+/// value for a hidden predecessor. AND semantics; empty list = visible.
+#[derive(Debug, Clone)]
+pub struct FormVisibility {
+    /// `mapsTo` of every visible input field, in document order.
+    pub fields: Vec<String>,
+    /// Indices of pages whose own conditions match.
+    pub page_indices: Vec<usize>,
+    /// Per page, which block indices are visible (page-hidden → empty).
+    /// Used by the TS renderer; kept here so the two visibility structs match.
+    #[allow(dead_code)]
+    pub blocks: Vec<HashSet<usize>>,
+}
+
+fn json_is_empty(value: Option<&JsonValue>) -> bool {
+    match value {
+        None | Some(JsonValue::Null) => true,
+        Some(JsonValue::String(s)) => s.is_empty(),
+        Some(JsonValue::Array(a)) => a.is_empty(),
+        _ => false,
+    }
+}
+
+fn json_as_number(value: &JsonValue) -> Option<f64> {
+    match value {
+        JsonValue::Number(n) => n.as_f64(),
+        JsonValue::String(s) if !s.is_empty() => s.parse().ok(),
+        _ => None,
+    }
+}
+
+fn json_as_str(value: &JsonValue) -> String {
+    match value {
+        JsonValue::String(s) => s.clone(),
+        JsonValue::Number(n) => n.to_string(),
+        JsonValue::Bool(b) => b.to_string(),
+        other => other.to_string(),
+    }
+}
+
+/// Numeric equality when both sides look like numbers; otherwise JSON Eq.
+pub fn json_equal(a: &JsonValue, b: &JsonValue) -> bool {
+    if let (Some(na), Some(nb)) = (json_as_number(a), json_as_number(b)) {
+        return na == nb;
+    }
+    a == b
+}
+
+fn json_contains(answer: &JsonValue, expected: &JsonValue) -> bool {
+    match answer {
+        JsonValue::String(s) => s
+            .to_lowercase()
+            .contains(&json_as_str(expected).to_lowercase()),
+        JsonValue::Array(arr) => arr.iter().any(|item| json_equal(item, expected)),
+        _ => false,
+    }
+}
+
+fn json_compare(answer: &JsonValue, expected: &JsonValue) -> Option<std::cmp::Ordering> {
+    if let (Some(na), Some(nb)) = (json_as_number(answer), json_as_number(expected)) {
+        return na.partial_cmp(&nb);
+    }
+    if let (JsonValue::String(a), JsonValue::String(b)) = (answer, expected) {
+        return Some(a.cmp(b));
+    }
+    None
+}
+
+/// A single predicate. Unanswered / hidden referenced fields fail
+/// (the dependent stays hidden). Unknown operators fail closed.
+pub fn evaluate_condition(condition: &FormConditionDef, answer: Option<&JsonValue>) -> bool {
+    if json_is_empty(answer) {
+        return false;
+    }
+    let answer = answer.expect("checked non-empty above");
+    match condition.operator.as_str() {
+        "equals" => json_equal(answer, &condition.value),
+        "not-equals" => !json_equal(answer, &condition.value),
+        "contains" => json_contains(answer, &condition.value),
+        "greater-than" => matches!(
+            json_compare(answer, &condition.value),
+            Some(std::cmp::Ordering::Greater)
+        ),
+        "less-than" => matches!(
+            json_compare(answer, &condition.value),
+            Some(std::cmp::Ordering::Less)
+        ),
+        _ => false,
+    }
+}
+
+fn conditions_match(
+    conditions: &[FormConditionDef],
+    values: &Map<String, JsonValue>,
+    visible_fields: &[String],
+) -> bool {
+    if conditions.is_empty() {
+        return true;
+    }
+    conditions.iter().all(|condition| {
+        let answer = if !condition.field.is_empty()
+            && visible_fields.iter().any(|f| f == &condition.field)
+        {
+            values.get(&condition.field)
+        } else {
+            None
+        };
+        evaluate_condition(condition, answer)
+    })
+}
+
+pub fn compute_visibility(
+    definition: &FormDefinition,
+    values: &Map<String, JsonValue>,
+) -> FormVisibility {
+    let mut fields = Vec::new();
+    let mut page_indices = Vec::new();
+    let mut blocks = Vec::new();
+
+    for (p, page) in definition.pages.iter().enumerate() {
+        let mut visible_blocks = HashSet::new();
+        if !conditions_match(&page.conditions, values, &fields) {
+            blocks.push(visible_blocks);
+            continue;
+        }
+        page_indices.push(p);
+        for (b, block) in page.blocks.iter().enumerate() {
+            if !conditions_match(block.conditions(), values, &fields) {
+                continue;
+            }
+            visible_blocks.insert(b);
+            if let FormBlock::Field { maps_to, .. } = block {
+                fields.push(maps_to.clone());
+            }
+        }
+        blocks.push(visible_blocks);
+    }
+
+    FormVisibility {
+        fields,
+        page_indices,
+        blocks,
+    }
 }
 
 /// Walks Form -> form-pages -> FormPage -> form-fields, resolving each child
@@ -202,18 +378,75 @@ async fn build_page_definition(
     let mut blocks = Vec::with_capacity(field_subjects.len());
     for field_subject in field_subjects {
         let field = store.get_resource(&field_subject.into()).await?;
-        blocks.push(build_block(&field)?);
+        blocks.push(build_block(store, &field).await?);
     }
 
     Ok(FormPageDefinition {
         name,
         cover_image,
         image_position,
+        conditions: build_conditions(store, page).await,
         blocks,
     })
 }
 
-fn build_block(field: &Resource) -> AtomicResult<FormBlock> {
+async fn build_conditions(
+    store: &impl Storelike,
+    resource: &Resource,
+) -> Vec<FormConditionDef> {
+    let subjects = resource
+        .get(atomic_lib::urls::FORM_CONDITIONS)
+        .and_then(|v| v.to_subjects(None))
+        .unwrap_or_default();
+    let mut out = Vec::with_capacity(subjects.len());
+    for subject in subjects {
+        let Ok(cond) = store.get_resource(&subject.into()).await else {
+            continue;
+        };
+        let field_subject = cond
+            .get(atomic_lib::urls::FORM_CONDITION_FIELD)
+            .ok()
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let maps_to = if field_subject.is_empty() {
+            String::new()
+        } else {
+            match store.get_resource(&field_subject.into()).await {
+                Ok(field) => field
+                    .get(atomic_lib::urls::FORM_MAPS_TO)
+                    .ok()
+                    .map(|v| v.to_string())
+                    .unwrap_or_default(),
+                Err(_) => String::new(),
+            }
+        };
+        let operator = cond
+            .get(atomic_lib::urls::FORM_CONDITION_OPERATOR)
+            .ok()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "equals".into());
+        let value = match cond.get(atomic_lib::urls::FORM_CONDITION_VALUE) {
+            Ok(Value::Json(v)) => v.clone(),
+            Ok(Value::String(s)) => {
+                serde_json::from_str(s).unwrap_or_else(|_| json!(s))
+            }
+            Ok(other) => json!(other.to_string()),
+            Err(_) => JsonValue::Null,
+        };
+        out.push(FormConditionDef {
+            field: maps_to,
+            operator,
+            value,
+        });
+    }
+    out
+}
+
+async fn build_block(
+    store: &impl Storelike,
+    field: &Resource,
+) -> AtomicResult<FormBlock> {
+    let conditions = build_conditions(store, field).await;
     let classes = field
         .get(atomic_lib::urls::IS_A)
         .and_then(|v| v.to_subjects(None))
@@ -221,14 +454,14 @@ fn build_block(field: &Resource) -> AtomicResult<FormBlock> {
 
     if classes.iter().any(|c| c == atomic_lib::urls::FORM_HEADING) {
         let text = field.get(atomic_lib::urls::NAME)?.to_string();
-        return Ok(FormBlock::Heading { text });
+        return Ok(FormBlock::Heading { text, conditions });
     }
     if classes
         .iter()
         .any(|c| c == atomic_lib::urls::FORM_PARAGRAPH)
     {
         let text = field.get(atomic_lib::urls::DESCRIPTION)?.to_string();
-        return Ok(FormBlock::Paragraph { text });
+        return Ok(FormBlock::Paragraph { text, conditions });
     }
     if classes.iter().any(|c| c == atomic_lib::urls::FORM_FIELD) {
         let maps_to = field.get(atomic_lib::urls::FORM_MAPS_TO)?.to_string();
@@ -253,6 +486,7 @@ fn build_block(field: &Resource) -> AtomicResult<FormBlock> {
             field_type,
             required,
             options,
+            conditions,
         });
     }
 
@@ -269,12 +503,14 @@ pub struct ValidationError {
     pub message: String,
 }
 
-/// Validates a submitted `values` map against a form's field blocks
-/// (required-ness, datatype shape, numeric bounds, option membership) and
-/// coerces accepted values into `atomic_lib::Value`s ready for
-/// `resource.set()`. Collects every error rather than failing fast, so a
-/// client can show all problems at once. Unknown keys in `values` (not
-/// matching any field's `mapsTo`) are also reported as errors.
+/// Validates a submitted `values` map against a form's *visible* field
+/// blocks (required-ness, datatype shape, numeric bounds, option
+/// membership) and coerces accepted values into `atomic_lib::Value`s ready
+/// for `resource.set()`. Hidden fields (conditions not matching) are
+/// skipped: required-on-hidden is not an error, and submitted values for
+/// them are dropped rather than stored. Collects every error rather than
+/// failing fast. Unknown keys in `values` (not matching any field's
+/// `mapsTo`) are also reported as errors.
 pub fn validate_submission(
     definition: &FormDefinition,
     values: &Map<String, JsonValue>,
@@ -295,6 +531,8 @@ pub fn validate_submission(
         })
         .collect();
 
+    let visibility = compute_visibility(definition, values);
+
     let mut errors = Vec::new();
     let mut coerced = Vec::new();
 
@@ -309,6 +547,10 @@ pub fn validate_submission(
     }
 
     for (maps_to, field_type, required, options) in fields {
+        if !visibility.fields.iter().any(|f| f == maps_to) {
+            continue;
+        }
+
         let raw = values.get(maps_to);
         let is_empty = match raw {
             None | Some(JsonValue::Null) => true,
@@ -833,6 +1075,7 @@ pub async fn mint_publish_slug(store: &Db, form: &mut Resource) -> AtomicResult<
 mod tests {
     use super::*;
     use atomic_lib::{test_utils::init_store, urls};
+    use serde::Deserialize;
     use serde_json::json;
 
     async fn make_class_and_property(
@@ -1153,6 +1396,7 @@ mod tests {
                 name: None,
                 cover_image: None,
                 image_position: None,
+                conditions: vec![],
                 blocks: vec![FormBlock::Field {
                     maps_to: "https://example.com/n".into(),
                     label: "Number".into(),
@@ -1160,6 +1404,7 @@ mod tests {
                     field_type: "number".into(),
                     required: true,
                     options: json!({"min": 1, "max": 10}),
+                    conditions: vec![],
                 }],
             }],
         };
@@ -1184,6 +1429,7 @@ mod tests {
                 name: None,
                 cover_image: None,
                 image_position: None,
+                conditions: vec![],
                 blocks: vec![FormBlock::Field {
                     maps_to: "https://example.com/r".into(),
                     label: "Radio".into(),
@@ -1191,6 +1437,7 @@ mod tests {
                     field_type: "radio".into(),
                     required: true,
                     options: json!({"options": ["A", "B"]}),
+                    conditions: vec![],
                 }],
             }],
         };
@@ -1497,5 +1744,206 @@ mod tests {
         let slug_a = mint_publish_slug(&store, &mut form_a).await.unwrap();
         let slug_b = mint_publish_slug(&store, &mut form_b).await.unwrap();
         assert_ne!(slug_a, slug_b);
+    }
+
+    #[derive(Deserialize)]
+    struct ConditionFixtureFile {
+        cases: Vec<ConditionFixtureCase>,
+    }
+
+    #[derive(Deserialize)]
+    struct ConditionFixtureCase {
+        name: String,
+        pages: Vec<FormPageDefinition>,
+        values: Map<String, JsonValue>,
+        #[serde(rename = "visibleFields")]
+        visible_fields: Vec<String>,
+        #[serde(rename = "visiblePages")]
+        visible_pages: Vec<usize>,
+        #[serde(rename = "storedFields")]
+        stored_fields: Vec<String>,
+        valid: bool,
+    }
+
+    #[test]
+    fn condition_fixtures_match_ts() {
+        let file: ConditionFixtureFile =
+            serde_json::from_str(include_str!("../../testdata/form-conditions.json"))
+                .expect("form-conditions.json should parse");
+
+        for case in file.cases {
+            let definition = FormDefinition {
+                version: 1,
+                id: String::new(),
+                name: "fixture".into(),
+                settings: json!({}),
+                styling: FormStyling::default(),
+                honeypot_field: HONEYPOT_FIELD.into(),
+                captcha: None,
+                pages: case.pages,
+            };
+            let vis = compute_visibility(&definition, &case.values);
+            assert_eq!(
+                vis.fields, case.visible_fields,
+                "{}: visible fields",
+                case.name
+            );
+            assert_eq!(
+                vis.page_indices, case.visible_pages,
+                "{}: visible pages",
+                case.name
+            );
+
+            match validate_submission(&definition, &case.values) {
+                Ok(coerced) => {
+                    assert!(
+                        case.valid,
+                        "{}: expected invalid, got stored {:?}",
+                        case.name, coerced
+                    );
+                    let mut stored: Vec<String> = coerced.into_iter().map(|(k, _)| k).collect();
+                    stored.sort();
+                    let mut expected = case.stored_fields.clone();
+                    expected.sort();
+                    assert_eq!(stored, expected, "{}: stored fields", case.name);
+                }
+                Err(errors) => {
+                    assert!(
+                        !case.valid,
+                        "{}: expected valid, got errors {:?}",
+                        case.name, errors
+                    );
+                    // Invalid cases still record which visible fields coerced.
+                    // Re-run isn't needed: the fixture's storedFields lists
+                    // what would have been kept had validation passed for
+                    // those keys; we only check `valid` here.
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn definition_inlines_field_conditions() {
+        let store = init_store().await;
+        let (form, email_prop) = build_test_form(&store).await;
+
+        // A second optional follow-up field on the same page, shown when the
+        // email equals a sentinel. Mirrors how the builder stores conditions
+        // as FormCondition children listed in `form-conditions`.
+        let mut follow_up = Resource::new_instance(urls::FORM_FIELD, &store)
+            .await
+            .unwrap();
+        follow_up
+            .set(
+                urls::NAME.into(),
+                Value::String("Follow-up".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        follow_up
+            .set(
+                urls::FORM_MAPS_TO.into(),
+                Value::AtomicUrl("https://example.com/follow-up".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        follow_up
+            .set(
+                urls::FORM_FIELD_TYPE.into(),
+                Value::String("short-text".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        follow_up.save_locally(&store).await.unwrap();
+
+        let mut cond = Resource::new_instance(urls::FORM_CONDITION, &store)
+            .await
+            .unwrap();
+        cond.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(follow_up.get_subject().to_string().into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        // The existing email FormField is the first (only) field on the page.
+        let page_subject = form
+            .get(urls::FORM_PAGES)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()[0]
+            .clone();
+        let page = store.get_resource(&page_subject.clone().into()).await.unwrap();
+        let email_field = page
+            .get(urls::FORM_FIELDS)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()[0]
+            .clone();
+        cond.set(
+            urls::FORM_CONDITION_FIELD.into(),
+            Value::AtomicUrl(email_field.to_string().into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        cond.set(
+            urls::FORM_CONDITION_OPERATOR.into(),
+            Value::String("equals".into()),
+            &store,
+        )
+        .await
+        .unwrap();
+        cond.set(
+            urls::FORM_CONDITION_VALUE.into(),
+            Value::Json(json!("trigger@example.com")),
+            &store,
+        )
+        .await
+        .unwrap();
+        cond.save_locally(&store).await.unwrap();
+
+        follow_up
+            .set(
+                urls::FORM_CONDITIONS.into(),
+                Value::ResourceArray(vec![cond.get_subject().to_string().into()]),
+                &store,
+            )
+            .await
+            .unwrap();
+        follow_up.save_locally(&store).await.unwrap();
+
+        let mut page = page;
+        let existing = page
+            .get(urls::FORM_FIELDS)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap();
+        let mut fields: Vec<_> = existing.into_iter().map(|s| s.into()).collect();
+        fields.push(follow_up.get_subject().to_string().into());
+        page.set(urls::FORM_FIELDS.into(), Value::ResourceArray(fields), &store)
+            .await
+            .unwrap();
+        page.save_locally(&store).await.unwrap();
+
+        let definition = build_form_definition(&store, &form).await.unwrap();
+        assert_eq!(definition.pages[0].blocks.len(), 2);
+        match &definition.pages[0].blocks[1] {
+            FormBlock::Field {
+                maps_to,
+                conditions,
+                ..
+            } => {
+                assert_eq!(maps_to, "https://example.com/follow-up");
+                assert_eq!(conditions.len(), 1);
+                assert_eq!(conditions[0].field, email_prop);
+                assert_eq!(conditions[0].operator, "equals");
+                assert_eq!(conditions[0].value, json!("trigger@example.com"));
+            }
+            other => panic!("expected a Field block, got {other:?}"),
+        }
     }
 }
