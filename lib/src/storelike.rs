@@ -441,6 +441,16 @@ pub trait Storelike: Sized + Send + Sync {
     /// If you're not sure what to use, use `get_resource_extended`.
     async fn get_resource(&self, subject: &Subject) -> AtomicResult<Resource>;
 
+    /// Resource built from materialized propvals only — no Loro snapshot decode.
+    ///
+    /// [`check_rights`](crate::hierarchy::check_rights) reads only propvals
+    /// (`parent`, `drive`, ACL arrays), so the rights walk uses this instead of
+    /// [`get_resource`]. Stores with a row cache (`Db`) override; the default
+    /// is [`get_resource`] itself.
+    async fn get_resource_shallow(&self, subject: &Subject) -> AtomicResult<Resource> {
+        self.get_resource(subject).await
+    }
+
     /// Returns true when the resource is present in the local backing store.
     ///
     /// This must not fetch, synthesize dynamic resources, call endpoints, or

@@ -262,6 +262,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
   `ingest_commit_json` serializes; `sync::ws_apply::apply_commit_json` now
   returns the `CommitResponse` instead of `()`. See
   `planning/runtime-boundary-decision.md`.
+- Collection `/query`: the rights walk no longer full-decodes ancestors (memoize by subject + `get_resource_shallow`), and auth-denied members stop being fetched after 16 consecutive denials. Pins the remaining 0.7s invite-code listing from `planning/slow-collection-queries.md`.
 
 ## [v0.41.0-beta.2] - 2026-08-01
 

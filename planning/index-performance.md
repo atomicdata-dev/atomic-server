@@ -74,8 +74,8 @@ a derived, rebuildable projection:
 | Cursor pagination / `hasMore` instead of exact counts | not built (wire + client change) |
 | Batched KV reads (one read txn per query) | not built (`KvStore` trait change; per-`get` redb txns remain) |
 | Zones index (walk-free auth) | see [`zones.md`](./zones.md) |
-| Memoized ancestor *fetch* in the rights walk (the memo caches verdicts, but `get_parent` still full-decodes the parent per member) | not built — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
-| Cap on the auth-denied member cascade (denied members don't fill the page, so the loop resolves every match) | not built — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
+| Memoized ancestor *fetch* in the rights walk (consult the memo by subject before `get_parent`; ancestors loaded via `get_resource_shallow`) | **built** — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
+| Cap on the auth-denied member cascade (stop `resolve_query_member` after `AUTH_DENY_STREAK_CAP` consecutive denials while filling a page) | **built** — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
 
 ## Benchmark context
 

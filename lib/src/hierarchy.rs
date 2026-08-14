@@ -118,9 +118,20 @@ pub fn check_read<'a>(
 ///
 /// Must not outlive a request (rights can change between requests) and must
 /// not be shared across agents — it does not key on the agent.
+///
+/// Lookups are by subject (not `&Resource`) so a cached verdict can skip
+/// fetching the ancestor entirely — see [`cached_outcome`].
 #[derive(Default)]
 pub struct RightsCache {
     outcomes: std::collections::HashMap<(u8, String), bool>,
+}
+
+impl RightsCache {
+    fn get(&self, right: Right, subject: &crate::Subject) -> Option<bool> {
+        self.outcomes
+            .get(&(right_discriminant(right), subject.pure_id()))
+            .copied()
+    }
 }
 
 fn right_discriminant(right: Right) -> u8 {
@@ -129,6 +140,40 @@ fn right_discriminant(right: Right) -> u8 {
         Right::Write => 1,
         Right::Append => 2,
     }
+}
+
+/// Cached `(right, subject)` verdict, if any. `None` when there is no cache
+/// or that pair has not been resolved yet.
+fn cached_outcome(
+    cache: Option<&std::sync::Mutex<RightsCache>>,
+    right: Right,
+    subject: &crate::Subject,
+) -> Option<bool> {
+    cache.and_then(|c| c.lock().ok().and_then(|g| g.get(right, subject)))
+}
+
+/// Load a resource for the rights walk: propvals-only when the store
+/// supports it, falling back to a full [`Storelike::get_resource`] so an
+/// un-materialized external parent can still be fetched.
+async fn fetch_for_rights<S: Storelike>(
+    store: &S,
+    subject: &crate::Subject,
+) -> AtomicResult<Resource> {
+    match store.get_resource_shallow(subject).await {
+        Ok(resource) => Ok(resource),
+        Err(_) => store.get_resource(subject).await,
+    }
+}
+
+fn cached_allow_msg() -> String {
+    "Allowed (cached for this request)".into()
+}
+
+fn cached_deny_err(right: Right, for_agent_enum: &ForAgent) -> crate::errors::AtomicError {
+    crate::errors::AtomicError::unauthorized(format!(
+        "No {} right found for {} (cached for this request)",
+        right, for_agent_enum
+    ))
 }
 
 /// [`check_rights`] with an optional per-request [`RightsCache`]. The cache is
@@ -143,29 +188,20 @@ pub fn check_rights_cached<'a, S: Storelike>(
     cache: Option<&'a std::sync::Mutex<RightsCache>>,
 ) -> AsyncResult<'a, AtomicResult<String>> {
     Box::pin(async move {
-        let key = (right_discriminant(right), resource.get_subject().pure_id());
-        if let Some(cache) = cache {
-            let hit = cache
-                .lock()
-                .ok()
-                .and_then(|guard| guard.outcomes.get(&key).copied());
-            match hit {
-                Some(true) => return Ok("Allowed (cached for this request)".into()),
-                Some(false) => {
-                    return Err(crate::errors::AtomicError::unauthorized(format!(
-                        "No {} right found for {} (cached for this request)",
-                        right, for_agent_enum
-                    )))
-                }
-                None => {}
-            }
+        match cached_outcome(cache, right, resource.get_subject()) {
+            Some(true) => return Ok(cached_allow_msg()),
+            Some(false) => return Err(cached_deny_err(right, for_agent_enum)),
+            None => {}
         }
 
         let result = check_rights_impl(store, resource, for_agent_enum, right, cache).await;
 
         if let Some(cache) = cache {
             if let Ok(mut guard) = cache.lock() {
-                guard.outcomes.insert(key, result.is_ok());
+                guard.outcomes.insert(
+                    (right_discriminant(right), resource.get_subject().pure_id()),
+                    result.is_ok(),
+                );
             }
         }
         result
@@ -372,9 +408,9 @@ fn check_rights_impl<'a, S: Storelike>(
             return match right {
                 Right::Read => {
                     // Commits can be read when their subject / target is readable.
-                    let target = store
-                        .get_resource(&commit_subject.to_string().as_str().into())
-                        .await?;
+                    let target =
+                        fetch_for_rights(store, &commit_subject.to_string().as_str().into())
+                            .await?;
                     check_rights_cached(store, &target, for_agent_enum, right, cache).await
                 }
                 Right::Write => Err("Commits cannot be edited.".into()),
@@ -434,37 +470,77 @@ fn check_rights_impl<'a, S: Storelike>(
         if let Ok(drive_val) = resource.get(urls::DRIVE_PROP) {
             let drive_subject = crate::Subject::from(drive_val.to_string());
             if &drive_subject != resource.get_subject() {
-                // A cached deny short-circuits the drive fetch entirely.
-                let cached_deny = cache.and_then(|c| {
-                    let key = (right_discriminant(right), drive_subject.pure_id());
-                    c.lock().ok().and_then(|g| g.outcomes.get(&key).copied())
-                }) == Some(false);
-                if !cached_deny {
-                    if let Ok(drive_res) = store.get_resource(&drive_subject).await {
-                        if let Ok(reason) =
-                            check_rights_cached(store, &drive_res, for_agent_enum, right, cache)
-                                .await
-                        {
-                            return Ok(reason);
+                // Consult the memo by subject *before* fetching: a cached allow
+                // is a hit, a cached deny skips the drive fetch and falls
+                // through to the parent walk (intermediate parents can still
+                // grant). Same idea as the parent path below.
+                match cached_outcome(cache, right, &drive_subject) {
+                    Some(true) => return Ok(cached_allow_msg()),
+                    Some(false) => {}
+                    None => {
+                        if let Ok(drive_res) = fetch_for_rights(store, &drive_subject).await {
+                            if let Ok(reason) =
+                                check_rights_cached(store, &drive_res, for_agent_enum, right, cache)
+                                    .await
+                            {
+                                return Ok(reason);
+                            }
                         }
                     }
                 }
             }
         }
 
-        // Try the parents recursively
+        // Try the parents recursively. The parent *subject* is known from
+        // propvals, so a cached verdict skips the fetch entirely — without
+        // this, every member of a listing pays a full `get_resource` of the
+        // same parent even though the memo already has the answer.
         tracing::debug!(
             subject = %resource.get_subject(),
             "rights walk: no explicit grant here, ascending to parent"
         );
-        match resource.get_parent(store).await {
-            Ok(parent) => {
-                tracing::debug!(
-                    subject = %resource.get_subject(),
-                    parent = %parent.get_subject(),
-                    "rights walk: ascending"
-                );
-                return check_rights_cached(store, &parent, for_agent_enum, right, cache).await;
+        match resource.get(urls::PARENT) {
+            Ok(parent_val) => {
+                let parent_subject = crate::Subject::from(parent_val.to_string());
+                if resource.get_subject() == &parent_subject {
+                    tracing::warn!(
+                        subject = %resource.get_subject(),
+                        "rights walk TERMINATED: circular parent (parent = same resource)"
+                    );
+                } else {
+                    match cached_outcome(cache, right, &parent_subject) {
+                        Some(true) => return Ok(cached_allow_msg()),
+                        Some(false) => {
+                            return Err(cached_deny_err(right, for_agent_enum));
+                        }
+                        None => match fetch_for_rights(store, &parent_subject).await {
+                            Ok(parent) => {
+                                tracing::debug!(
+                                    subject = %resource.get_subject(),
+                                    parent = %parent.get_subject(),
+                                    "rights walk: ascending"
+                                );
+                                return check_rights_cached(
+                                    store,
+                                    &parent,
+                                    for_agent_enum,
+                                    right,
+                                    cache,
+                                )
+                                .await;
+                            }
+                            Err(parent_err) => {
+                                tracing::warn!(
+                                    subject = %resource.get_subject(),
+                                    agent = %for_agent,
+                                    ?right,
+                                    parent_err = %parent_err,
+                                    "rights walk TERMINATED: parent fetch failed (this is where the 401 originates)"
+                                );
+                            }
+                        },
+                    }
+                }
             }
             Err(parent_err) => {
                 tracing::warn!(
@@ -472,7 +548,7 @@ fn check_rights_impl<'a, S: Storelike>(
                     agent = %for_agent,
                     ?right,
                     parent_err = %parent_err,
-                    "rights walk TERMINATED: get_parent failed (this is where the 401 originates)"
+                    "rights walk TERMINATED: no parent (this is where the 401 originates)"
                 );
             }
         }

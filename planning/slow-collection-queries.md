@@ -1,9 +1,11 @@
 # Slow collection queries (`/query`)
 
-**Status:** two of three causes fixed by the index/query rework
-(`3578d080`, see [`index-performance.md`](./index-performance.md)); **two
-items still open**, re-measured 2026-08-10 against the same real store.
-Original diagnosis 2026-07-16.
+**Status:** all three causes addressed. Index/query rework (`3578d080`,
+see [`index-performance.md`](./index-performance.md)) fixed the per-member
+Loro decode and added a per-query rights *verdict* memo; the two remaining
+items below landed 2026-08-14 (ancestor *fetch* memo + denial-streak cap).
+Original diagnosis 2026-07-16; last re-measure of the production store
+2026-08-10.
 
 ## Where it stands
 
@@ -19,57 +21,54 @@ build, anonymous agent) on a binary built after the rebase:
 | same, `page_size=100` | 3.4s | **0.69s** |
 | same, `page_size=1&offset=1000` (skips all per-member work) | — | **11ms** |
 
-~90% faster, but a 105-member auth-denied query still costs 0.7s, and page
-size still makes no difference.
+~90% faster after the index rework, but a 105-member auth-denied query still
+cost 0.7s, and page size still made no difference — that was the two open
+items. They were not re-measured on the production store; the regression
+test pins them to `get_resource` / `get_resource_shallow` call counts
+instead (`unauthorized_collection_query_bounds_fetch_counts`).
 
-### Cause 1 — no memoization in the rights walk → **fixed (partially)**
+### Cause 1 — no memoization in the rights walk → **fixed**
 
 `hierarchy::RightsCache` + `check_rights_cached` memoize
 `(right, subject) → verdict` for one query; `query_basic` and
 `query_sorted_indexed` each build one and thread it through
-`resolve_query_member`. The drive fast path also got an explicit
-`cached_deny` short-circuit that skips the drive fetch entirely.
+`resolve_query_member`.
 
-**But the parent walk did not get the same treatment** — see open item 1.
+The walk now consults that memo by *subject* **before** fetching an
+ancestor (drive or parent). A cached allow returns immediately; a cached
+deny on the drive still falls through to the parent walk (intermediate
+parents can grant); a cached deny on the parent is final. Ancestors are
+loaded with `Storelike::get_resource_shallow` (propvals only — `check_rights`
+never needs the CRDT), falling back to `get_resource` only if the row is
+missing (external / not yet materialized).
 
 ### Cause 2 — `get_resource` parses the full Loro snapshot on every read → **fixed for the query path**
 
 `Db::get_resource_shallow` (row-only, no CRDT decode) is now what queries
 read; nested bodies get the raw snapshot bytes attached verbatim as
 `loroUpdate` instead of a decode+re-export. `Storelike::get_resource`
-(`lib/src/db.rs:3034`) still decodes — deliberately; it's the
-CRDT-authoritative path. That's fine except where the rights walk calls it
-(open item 1).
+(`lib/src/db.rs`) still decodes — deliberately; it's the
+CRDT-authoritative path. The rights walk no longer calls it for local
+ancestors (cause 1).
 
-### Cause 3 — auth-failed members don't fill the page → **still open**
+### Cause 3 — auth-failed members don't fill the page → **fixed (capped)**
 
-Unchanged in `query_sorted_indexed` (`lib/src/db/query_index.rs:273`) and
-`query_basic` (`lib/src/db.rs:2110`): `in_selection = subjects.len() < limit
-&& i >= q.offset`. A denied member never grows `subjects`, so every
-subsequent entry is still fetched and rights-walked. Measured cost of exactly
-this: the same query at `offset=1000` (where `i >= q.offset` is false, so the
-loop only counts) is **11ms vs 700ms** — a 64× gap that is entirely
-per-member work the client never sees.
+Unchanged contract for mixed ACLs: denied members do not consume
+`page_size`, so a public child after a short private streak still fills
+the page (`unauthorized_query_skips_denials_to_fill_the_page`).
+
+What changed: `QueryAuthFill` in `query_basic` and `query_sorted_indexed`
+stops calling `resolve_query_member` after
+`query_index::AUTH_DENY_STREAK_CAP` (16) consecutive denials *while filling
+a page*, and only counts the remaining index hits (same cheap-pagination
+behavior as entries past `limit`, issue #286). Unbounded queries
+(`limit = None`) keep resolving so aggregations / complete listings stay
+correct.
 
 ## Open items
 
-- [ ] **Memoize the parent *fetch*, not just the verdict.**
-      `check_rights_impl` (`lib/src/hierarchy.rs:339`) calls
-      `resource.get_parent(store)`, which does a full
-      `store.get_resource(parent)` — Loro snapshot decode and all — *before*
-      `check_rights_cached` can consult the memo, because the memo takes a
-      `&Resource`. So each member pays one full decode of the form's 21.7KB
-      snapshot even though the verdict for that parent is already cached.
-      Confirmed by the cost scaling with parent snapshot size: ~6.7ms/member
-      when the parent is the 21.7KB form, ~2.3ms/member when it's the 2.9KB
-      drive.
-      Fix: consult the memo by *subject* before fetching (the drive fast path
-      at `hierarchy.rs:321` already does exactly this with `cached_deny` —
-      generalize it), and/or fetch ancestors with `get_resource_shallow`, since
-      `check_rights` only reads propvals.
-- [ ] **Cap the auth-failed fetch cascade** (original cause 3, unchanged):
-      once the page is full — or after N consecutive denials — stop calling
-      `resolve_query_member` and only count the remaining entries.
+- [x] **Memoize the parent *fetch*, not just the verdict.**
+- [x] **Cap the auth-failed fetch cascade.**
 
 Either fix alone should take the repro well under 100ms; both should land it
 near the 12ms fixed overhead.
@@ -85,10 +84,11 @@ curl -s -o /dev/null -w "%{time_total}s\n" -H "Accept: application/ad+json" \
 # add &offset=1000 to see the same query with the per-member loop skipped
 ```
 
-Synthetic repro for a regression test: drive → folder → form → ~100
-`FormInviteCode` children, query `parent=form` as a *non-authorized* agent,
-assert `get_resource` call counts (not wall clock — a fresh store's snapshots
-are too small to show it).
+Synthetic repro (now a regression test): drive → folder → form → ~100
+children, query `parent=form` as a *non-authorized* agent, assert
+`get_resource` / `get_resource_shallow` call counts — not wall clock.
+See `unauthorized_collection_query_bounds_fetch_counts` in
+`lib/src/db/test.rs`.
 
 Profiling: `atomic-server --trace chrome` writes `./trace-<ts>.json`;
 `check_rights` spans carry `subject` in args.
@@ -105,12 +105,14 @@ Profiling: `atomic-server --trace chrome` writes `./trace-<ts>.json`;
   are unreachable garbage rather than bad reads) — but they never get dropped,
   and the next key-format change has no working version gate on redb.
 - Watched queries are still emptied on every server startup by design
-  (`Db::clear_watched_queries`, `lib/src/db.rs:1729`), so the first sorted /
+  (`Db::clear_watched_queries`), so the first sorted /
   multi-filter query after a restart still pays an index rebuild.
 - `createInviteCodes` (`browser/data-browser/src/chunks/FormBuilder/FormAccessSection.tsx:54`)
   still saves codes in a sequential `for` loop (~9.3s for 100).
 - The invite-code panel still renders all rows via `mapAll`
   (`FormAccessSection.tsx:275`), each row's `useMemberFromCollection` fetching
   its own resource. Those per-row GETs go through `get_resource_extended` →
-  `check_rights` with **no** memo (the memo is per-query, not per-request), so
-  open item 1 hits them too.
+  `check_rights` with **no** memo (the memo is per-query, not per-request).
+  Cause 1 still helps each GET (ancestors are shallow-fetched), but there is
+  still one rights walk per row rather than one per listing.
+

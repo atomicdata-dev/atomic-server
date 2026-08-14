@@ -10,6 +10,48 @@ use std::sync::Arc;
 
 use super::trees::{self, Operation, Transaction, Tree};
 
+/// After this many consecutive auth-denied (or unresolvable) members while
+/// filling a page, stop calling [`Db::resolve_query_member`] and only count
+/// remaining index hits. Denied members never grow `subjects`, so without
+/// this cap a fully-private collection of size N costs N fetches even for
+/// `page_size=1`. Unbounded queries (`limit = None`) keep resolving — they
+/// have to, to return a complete set. See
+/// `planning/slow-collection-queries.md`.
+pub(crate) const AUTH_DENY_STREAK_CAP: usize = 16;
+
+/// Tracks whether the query loop is still trying to fill the page, or has
+/// given up on further `resolve_query_member` calls (page full, or a long
+/// denial streak).
+pub(crate) struct QueryAuthFill {
+    consecutive_denials: usize,
+}
+
+impl QueryAuthFill {
+    pub(crate) fn new() -> Self {
+        Self {
+            consecutive_denials: 0,
+        }
+    }
+
+    /// Whether the next in-window index hit should be fetched and
+    /// permission-checked.
+    pub(crate) fn should_resolve(&self, subjects_len: usize, limit: Option<usize>) -> bool {
+        match limit {
+            Some(l) if subjects_len >= l => false,
+            Some(_) => self.consecutive_denials < AUTH_DENY_STREAK_CAP,
+            None => true,
+        }
+    }
+
+    pub(crate) fn on_included(&mut self) {
+        self.consecutive_denials = 0;
+    }
+
+    pub(crate) fn on_denied(&mut self) {
+        self.consecutive_denials += 1;
+    }
+}
+
 /// Returned by functions that iterate over [IndexAtom]s
 pub type IndexIterator = Box<dyn Iterator<Item = AtomicResult<IndexAtom>> + Send>;
 
@@ -264,15 +306,14 @@ pub async fn query_sorted_indexed(
 
     let base_domain = store.get_base_domain();
     let rights_cache = std::sync::Mutex::new(crate::hierarchy::RightsCache::default());
-
-    let limit = q.limit.unwrap_or(usize::MAX);
+    let mut fill = QueryAuthFill::new();
 
     for (i, kv) in iter.enumerate() {
         let kv = kv?;
         // The user's maximum amount of results has not yet been reached
         // and
         // The users minimum starting distance (offset) has been reached
-        let in_selection = subjects.len() < limit && i >= q.offset;
+        let in_selection = i >= q.offset && fill.should_resolve(subjects.len(), q.limit);
         // Tracks whether this iter step should bump the visible count.
         // Defaults to true so entries past the page limit still count
         // (preserving the cheap-pagination behavior). Flipped to false
@@ -296,15 +337,18 @@ pub async fn query_sorted_indexed(
                         if let Some(resource) = body {
                             resources.push(resource);
                         }
+                        fill.on_included();
                     }
                     None => {
                         // Index hit that doesn't resolve for this agent
                         // (auth-filtered or destroyed-with-stale-index).
                         should_count = false;
+                        fill.on_denied();
                     }
                 }
             } else {
                 subjects.push(subject);
+                fill.on_included();
             }
         }
 
@@ -654,6 +698,30 @@ pub fn drive_prefix_from_subject(subject: &Subject) -> Subject {
 pub mod test {
     use super::*;
     use crate::{urls, values::SubResource};
+
+    #[test]
+    fn auth_fill_stops_resolving_after_a_denial_streak_when_paged() {
+        let mut fill = QueryAuthFill::new();
+        assert!(fill.should_resolve(0, Some(10)));
+        for _ in 0..AUTH_DENY_STREAK_CAP {
+            fill.on_denied();
+        }
+        assert!(
+            !fill.should_resolve(0, Some(10)),
+            "a full denial streak must stop filling a paged query"
+        );
+        assert!(
+            fill.should_resolve(0, None),
+            "unbounded queries keep resolving so they can return a complete set"
+        );
+        fill.on_included();
+        assert!(
+            fill.should_resolve(0, Some(10)),
+            "an included member resets the streak"
+        );
+        // Page already full.
+        assert!(!fill.should_resolve(10, Some(10)));
+    }
 
     /// Regression: real-world folder-table filters (where value is a DID
     /// Subject and property+sort_by are atomicdata.dev URLs) must round-trip
