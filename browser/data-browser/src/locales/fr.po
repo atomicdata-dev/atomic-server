@@ -2417,7 +2417,7 @@ msgid "Add tag"
 msgstr "Ajouter une étiquette"
 
 msgid "Could not update your list: no personal drive is set up for this account yet."
-msgstr ""
+msgstr "Impossible de mettre à jour votre liste : aucun disque personnel n'est encore configuré pour ce compte."
 
 #. 0: getTitle(resource)
 #. 0: getTitle(resource)
@@ -3990,7 +3990,7 @@ msgstr ""
 #. 0: text
 #: src/chunks/TablePage/TableHeading.tsx
 msgid "Sort by {0}"
-msgstr ""
+msgstr "Trier par {0}"
 
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 msgid "Edit unavailable"
@@ -4005,7 +4005,7 @@ msgstr ""
 
 #: src/chunks/TablePage/Kanban/KanbanView.tsx
 msgid "Setting up the board…"
-msgstr ""
+msgstr "Configuration du tableau…"
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Start from"
@@ -4029,19 +4029,19 @@ msgstr "Supprimer la vue"
 
 #: src/chunks/TablePage/Calendar/CalendarView.tsx
 msgid "Setting up the calendar…"
-msgstr ""
+msgstr "Configuration du calendrier…"
 
 #: src/chunks/TablePage/Calendar/CalendarView.tsx
 msgid "Previous month"
-msgstr ""
+msgstr "Mois précédent"
 
 #: src/chunks/TablePage/Calendar/CalendarView.tsx
 msgid "Today"
-msgstr ""
+msgstr "Aujourd'hui"
 
 #: src/chunks/TablePage/Calendar/CalendarView.tsx
 msgid "Next month"
-msgstr ""
+msgstr "Mois suivant"
 
 #: src/chunks/TablePage/Calendar/CalendarDay.tsx
 #: src/chunks/TablePage/quickAdd.test.ts
@@ -4171,14 +4171,14 @@ msgstr ""
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Undo (Ctrl+Z) — drag horizontally to scrub history, hold to see discarded versions"
-msgstr ""
+msgstr "Annuler (Ctrl+Z) — faites glisser horizontalement pour parcourir l'historique, maintenez pour voir les versions abandonnées"
 
 #. 0: username
 #. 0: name.trim()
 #: src/components/NewIdentitySection.tsx
 #: src/views/InvitePage.tsx
 msgid "{0}'s Drive"
-msgstr ""
+msgstr "Disque de {0}"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Create a new Agent on this server. We will set your username and create a private drive as your home."
@@ -4223,7 +4223,7 @@ msgstr "La ressource à <0/> n'a pas été chargée après 15 secondes. Elle pou
 
 #: src/views/InvitePage.tsx
 msgid "Accept as"
-msgstr ""
+msgstr "Accepter en tant que"
 
 #: src/views/InvitePage.tsx
 msgid "IMPORTANT! Below is your agent secret, you use this to login. Save it somewhere safe, the secret will not be show again and if you lose it you will not be able to access this user again."
@@ -4248,11 +4248,11 @@ msgstr "<0/> RAG, Fournit automatiquement le contexte de votre base de connaissa
 
 #: src/views/ErrorPage.tsx
 msgid "If you have not set up an identity on this server yet,"
-msgstr ""
+msgstr "Si vous n'avez pas encore configuré d'identité sur ce serveur,"
 
 #: src/views/ErrorPage.tsx
 msgid "create one here"
-msgstr ""
+msgstr "créez-en une ici"
 
 #: src/chunks/AI/MCPConfigTab.tsx
 msgid "custom header"
@@ -4395,17 +4395,17 @@ msgstr "Créer une invitation"
 #. 0: status.blockedCount
 #: src/components/SideBar/SyncMenuItem.tsx
 msgid "{0} changes could not sync (no access)"
-msgstr ""
+msgstr "Les {0} modifications n'ont pas pu être synchronisées (accès refusé)"
 
 #. 0: status.pendingDirtyCount
 #: src/components/SideBar/SyncMenuItem.tsx
 msgid "{0} changes pending"
-msgstr ""
+msgstr "Les {0} modifications en attente"
 
 #. 0: dragResource.title; 1: dropResource.title
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "{0} was moved to {1}"
-msgstr ""
+msgstr "{0} a été déplacé vers {1}"
 
 #. 0: classSubject
 #: src/components/forms/ResourceForm.tsx
@@ -4446,7 +4446,7 @@ msgstr "Appuyez sur <0>Annuler</0> / <1>Rétablir</1> pour parcourir les modific
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
-msgstr ""
+msgstr "Maintenez le bouton Annuler pour voir les versions que vous avez abandonnées en dessinant après une annulation ; faites glisser sur l'une d'elles et relâchez pour la restaurer"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Tap the zoom button to fit all strokes; drag left/right to zoom continuously"
@@ -4482,7 +4482,7 @@ msgstr ""
 
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "/1K web search results"
-msgstr ""
+msgstr "/1K résultats de recherche web"
 
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "The selected model does not support tool use."
@@ -4496,12 +4496,12 @@ msgstr "{0}/M jetons d'entrée"
 #. 0: INDEX_CELL_WIDTH; 1: effectiveSizes.join( ' ', )
 #: src/chunks/TableEditor/hooks/useCellSizes.ts
 msgid "{0} {1} minmax(50px, 1fr)"
-msgstr ""
+msgstr "{0} {1} minmax(50px, 1fr)"
 
 #. 0: subject
 #: src/components/SideBar/ResourceSideBar/ResourceSideBar.tsx
 msgid "{0} is loading..."
-msgstr ""
+msgstr "{0} est en cours de chargement..."
 
 #: src/components/forms/FilePicker/FilePickerButton.tsx
 msgid "Select File"
@@ -4568,10 +4568,10 @@ msgstr "Le titre est utilisé pour construire le sujet, gardez à l'esprit que l
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Creating table <0/>"
-msgstr ""
+msgstr "Création de la table <0/>"
 
 msgid "Creating <0>{0} resources</0>"
-msgstr ""
+msgstr "Création de <0>{0} ressources</0>"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 msgid "Due date"
@@ -4629,23 +4629,23 @@ msgstr ""
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "End meeting"
-msgstr ""
+msgstr "Terminer la réunion"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "Start meeting"
-msgstr ""
+msgstr "Démarrer la réunion"
 
 #: src/components/DemoExitButton.tsx
 msgid "Leaving…"
-msgstr ""
+msgstr "Déconnexion…"
 
 #: src/components/DemoExitButton.tsx
 msgid "Exit demo"
-msgstr ""
+msgstr "Quitter la démo"
 
 #: src/components/DemoExitButton.tsx
 msgid "Leave the demo workspace"
-msgstr ""
+msgstr "Quitter l'espace de travail de la démo"
 
 #: src/routes/DemoRoute.tsx
 msgid "Could not start the demo"
@@ -4761,15 +4761,15 @@ msgid "Private drive"
 msgstr "Lecteur privé"
 
 msgid "Your personal space — visible only to you."
-msgstr ""
+msgstr "Votre espace personnel — visible uniquement par vous."
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Manage drives"
-msgstr ""
+msgstr "Gérer les disques"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View and organize all your drives."
-msgstr ""
+msgstr "Voir et organiser tous vos disques."
 
 msgid "Your personal space — only visible to you."
 msgstr "Votre espace personnel — visible uniquement par vous."
@@ -4929,7 +4929,7 @@ msgstr ""
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Pairing device"
-msgstr ""
+msgstr "Appairage de l'appareil"
 
 #: src/chunks/AI/RealAIChat.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
@@ -4938,48 +4938,48 @@ msgstr "Réessayer"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Open workspace"
-msgstr ""
+msgstr "Ouvrir l'espace de travail"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Close"
-msgstr ""
+msgstr "Fermer"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Connecting to the device…"
-msgstr ""
+msgstr "Connexion à l'appareil…"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Could not connect"
-msgstr ""
+msgstr "Connexion impossible"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Connect to the device"
-msgstr ""
+msgstr "Se connecter à l'appareil"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Bringing your workspace over…"
-msgstr ""
+msgstr "Transfert de votre espace de travail…"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Your workspace is here"
-msgstr ""
+msgstr "Votre espace de travail est ici"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Bring your workspace over"
-msgstr ""
+msgstr "Transférez votre espace de travail"
 
 #. 0: device
 #. 0: serverLabel(status.serverUrl ?? '')
 #: src/components/pairing/PairingFlowProvider.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Paired with {0}"
-msgstr ""
+msgstr "Appairé avec {0}"
 
 #. 0: count; 1: count === 1 ? 'resource' \\: 'resources'; 2: device
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Synced {0} {1} with {2}"
-msgstr ""
+msgstr "Synchronisation de {0} {1} avec {2}"
 
 #: src/routes/SyncRoute.tsx
 msgid "Show this code"
@@ -4987,15 +4987,15 @@ msgstr "Afficher ce code"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "This device can’t tell which workspace to open. Open the app on your other device, then pair again."
-msgstr ""
+msgstr "Cet appareil ne peut pas déterminer quel espace de travail ouvrir. Ouvrez l'application sur votre autre appareil, puis appairez de nouveau."
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Your workspace didn’t arrive"
-msgstr ""
+msgstr "Votre espace de travail n'est pas arrivé"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Your workspace hasn’t opened here yet. It may still be settling — reopen this page in a moment. If it stays empty, check that the other device holds your data."
-msgstr ""
+msgstr "Votre espace de travail ne s'est pas encore ouvert ici. Il peut encore être en cours de synchronisation — rouvrez cette page dans un instant. S'il reste vide, vérifiez que l'autre appareil contient vos données."
 
 #. 0: PRODUCT_NAME
 #. 0: PRODUCT_NAME
@@ -5037,27 +5037,27 @@ msgstr ""
 
 #: src/components/ForkBar.tsx
 msgid "Discard"
-msgstr ""
+msgstr "Abandonner"
 
 msgid "<0/> Merge"
-msgstr ""
+msgstr "<0/> Fusionner"
 
 #: src/components/ForkBar.tsx
 msgid "No changes yet."
-msgstr ""
+msgstr "Aucune modification pour l'instant."
 
 #. 0: changes.length; 1: changes.length === 1 ? 'y' \\: 'ies'
 #: src/components/ForkBar.tsx
 msgid "{0} changed propert{1}."
-msgstr ""
+msgstr "{0} propriété{1} modifiée(s)."
 
 #: src/components/ForkBar.tsx
 msgid "conflict"
-msgstr ""
+msgstr "conflit"
 
 #: src/components/ForkBar.tsx
 msgid "Edit the body, then merge."
-msgstr ""
+msgstr "Modifiez le corps, puis fusionnez."
 
 #: src/chunks/RTE/readDocumentV2TiptapJson.ts
 msgid "Resource has no editable document content"
@@ -5077,11 +5077,11 @@ msgstr "Réunion"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "Open chat"
-msgstr ""
+msgstr "Ouvrir le chat"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "Loading meeting notes…"
-msgstr ""
+msgstr "Chargement des notes de réunion…"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Notes"
@@ -5110,7 +5110,7 @@ msgstr ""
 #: src/actions/resourceActions.tsx
 #: src/components/ForkBar.tsx
 msgid "Fork merged"
-msgstr ""
+msgstr "Fork fusionné"
 
 #: src/actions/resourceActions.tsx
 msgid "Open the resource this fork was forked from."
@@ -5119,20 +5119,20 @@ msgstr ""
 #. 0: conflicts.length; 1: conflicts.length === 1 ? 'y was' \\: 'ies were'; 2: conflicts .map(c => c.property.split('/').pop()) .join(', '); 3: conflicts.length === 1 ? 'it' \\: 'them'
 #: src/components/ForkBar.tsx
 msgid "{0} propert{1} also changed on the original since this fork was made ({2}). Merging will overwrite {3} with this fork's version. Continue?"
-msgstr ""
+msgstr "{0} propriété{1} également modifiée(s) sur l'original depuis la création de ce fork ({2}). La fusion écrasera {3} par la version de ce fork. Continuer ?"
 
 #: src/components/ForkBar.tsx
 msgid "Fork discarded"
-msgstr ""
+msgstr "Fork abandonné"
 
 #: src/components/ForkBar.tsx
 msgid "Fork of"
-msgstr ""
+msgstr "Fork de"
 
 #. 0: forkSubjects.length
 #: src/components/PendingForks.tsx
 msgid "{0} forks propose changes to this:"
-msgstr ""
+msgstr "{0} forks proposent des modifications pour ceci :"
 
 #: src/helpers/forksFolder.ts
 msgid "Forks"
@@ -5305,7 +5305,7 @@ msgstr "Ajouter une langue"
 
 #: src/chunks/TablePage/NewColumnButton.tsx
 msgid "Localized Text"
-msgstr ""
+msgstr "Texte localisé"
 
 #. 0: contentLanguage; 1: title
 #: src/components/LocalizedTextValue.tsx
@@ -5860,28 +5860,28 @@ msgstr "Quand verrouiller cet appareil"
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 msgid "Untitled entry"
-msgstr ""
+msgstr "Entrée sans titre"
 
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 msgid "What are you working on?"
-msgstr ""
+msgstr "Sur quoi travaillez-vous ?"
 
 msgid "<0/> Start"
-msgstr ""
+msgstr "<0/> Démarrer"
 
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 msgid "Stop"
-msgstr ""
+msgstr "Arrêter"
 
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 #: src/chunks/TablePage/Timer/useTimerProps.ts
 msgid "Start"
-msgstr ""
+msgstr "Démarrer"
 
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 msgid "Start again"
-msgstr ""
+msgstr "Relancer"
 
 #: src/chunks/TablePage/Timer/useTimerProps.ts
 msgid "When tracking of this entry started."
@@ -5893,18 +5893,18 @@ msgstr ""
 
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 msgid "One at a time"
-msgstr ""
+msgstr "Un à la fois"
 
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 msgid "Stop the running entry when another starts"
-msgstr ""
+msgstr "Arrêter l'entrée en cours quand une autre démarre"
 
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 #: src/chunks/TablePage/derivedColumns.test.ts
 #: src/chunks/TablePage/derivedColumns.test.ts
 #: src/chunks/TablePage/tableAggregates.test.ts
 msgid "Duration"
-msgstr ""
+msgstr "Durée"
 
 #: src/chunks/TablePage/TableViewTabs.tsx
 #: src/chunks/TablePage/TableViewTabs.tsx
@@ -5926,22 +5926,22 @@ msgstr "Toujours utilisé par la vue {0}"
 
 #: src/chunks/TablePage/Timer/useTimerColumns.tsx
 msgid "Timer"
-msgstr ""
+msgstr "Chronomètre"
 
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 msgid "Could not start the entry"
-msgstr ""
+msgstr "Impossible de démarrer l'entrée"
 
 #. 0: days
 #. 0: Math.floor(hours / 24)
 #: src/chunks/TablePage/derivedColumns.ts
 #: src/components/Vault/VaultPanel.tsx
 msgid "{0}d ago"
-msgstr ""
+msgstr "il y a {0} j"
 
 #: src/chunks/TablePage/NewColumnButton.tsx
 msgid "Computed"
-msgstr ""
+msgstr "Calculé"
 
 #. 0: spec.label
 #: src/chunks/TablePage/DerivedColumnHeading.tsx
@@ -5987,12 +5987,12 @@ msgstr ""
 
 #: src/chunks/TablePage/TableSummaryBar.tsx
 msgid "Only the largest groups are shown."
-msgstr ""
+msgstr "Seuls les plus grands groupes sont affichés."
 
 #. 0: titles.get(groupByColumn!) ?? groupProperty?.shortname ?? ''
 #: src/chunks/TablePage/TableSummaryBar.tsx
 msgid "Per {0}"
-msgstr ""
+msgstr "Par {0}"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Break down by"
@@ -6015,29 +6015,29 @@ msgstr ""
 #. 0: column.virtual?.label
 #: src/chunks/TablePage/TableHeading.tsx
 msgid "{0} — part of this view"
-msgstr ""
+msgstr "{0} — fait partie de cette vue"
 
 #. 0: rowCount
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "{0} rows"
-msgstr ""
+msgstr "{0} lignes"
 
 #. 0: AGGREGATE_FUNCTION_LABELS[configured.function]; 1: label
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "{0} of {1} — click to change"
-msgstr ""
+msgstr "{0} sur {1} — cliquer pour modifier"
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Change breakdown…"
-msgstr ""
+msgstr "Modifier la répartition…"
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Break down by…"
-msgstr ""
+msgstr "Répartir par…"
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Clear breakdown"
-msgstr ""
+msgstr "Effacer la répartition"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Break down the totals"
@@ -6053,20 +6053,20 @@ msgstr ""
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Add a totals row"
-msgstr ""
+msgstr "Ajouter une ligne de totaux"
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Remove this totals row"
-msgstr ""
+msgstr "Supprimer cette ligne de totaux"
 
 #. 0: rowCount
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "{0} rows — the totals menu"
-msgstr ""
+msgstr "{0} lignes — le menu des totaux"
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Total this column"
-msgstr ""
+msgstr "Totaliser cette colonne"
 
 #: src/chunks/AI/RealAIChat.tsx
 msgid "Unknown error"
@@ -6084,19 +6084,19 @@ msgstr "Ollama{0}"
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "This column holds an action, not a value, so there is nothing to total."
-msgstr ""
+msgstr "Cette colonne contient une action, pas une valeur, donc il n'y a rien à totaliser."
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "now"
-msgstr ""
+msgstr "maintenant"
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "a date"
-msgstr ""
+msgstr "une date"
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "Compare against"
-msgstr ""
+msgstr "Comparer à"
 
 #: src/chunks/TablePage/TableViewTabs.tsx
 msgid "Filter rows by a column"
@@ -6148,7 +6148,7 @@ msgstr ""
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Pick a column…"
-msgstr ""
+msgstr "Choisir une colonne…"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Of"
@@ -6197,7 +6197,7 @@ msgstr ""
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/rowActions.ts
 msgid "Value"
-msgstr ""
+msgstr "Valeur"
 
 #. 0: spec.label
 #: src/chunks/TablePage/RowActionHeading.tsx
@@ -6235,16 +6235,16 @@ msgstr ""
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Button says"
-msgstr ""
+msgstr "Le bouton indique"
 
 #: src/actions/runAction.ts
 #: src/chunks/TablePage/NewColumnButton.tsx
 msgid "Action"
-msgstr ""
+msgstr "Action"
 
 #: src/chunks/TablePage/NewColumnButton.tsx
 msgid "A button on every row: \"Watered\", \"Mark done\", \"+1\"."
-msgstr ""
+msgstr "Un bouton sur chaque ligne : « Arrosé », « Marquer comme fait », « +1 »."
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Creating table…"
@@ -6271,14 +6271,14 @@ msgstr "Un bouton au-dessus des lignes qui en crée un — \"Enregistrer un flux
 #. 0: tableClass.title.toLowerCase()
 #: src/chunks/TablePage/QuickAddBar.tsx
 msgid "Could not add the {0}"
-msgstr ""
+msgstr "Impossible d'ajouter le {0}"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
 msgid "Log a feed"
-msgstr ""
+msgstr "Enregistrer un flux"
 
 #: src/chunks/TablePage/QuickAddDialog.tsx
 msgid "It sits above the rows and creates one. Everything else about the row is edited in the table."
@@ -6286,19 +6286,19 @@ msgstr ""
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Ask for a value first"
-msgstr ""
+msgstr "Demander d'abord une valeur"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "On for a list you name things in; off for a button you just press."
-msgstr ""
+msgstr "Activé pour une liste où vous nommez des éléments ; désactivé pour un bouton que vous pressez simplement."
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Type into"
-msgstr ""
+msgstr "Saisir dans"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "What are you adding?"
-msgstr ""
+msgstr "Qu'ajoutez-vous ?"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Placeholder"
@@ -6306,11 +6306,11 @@ msgstr "Espace réservé"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Nothing"
-msgstr ""
+msgstr "Rien"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Also set"
-msgstr ""
+msgstr "Définir également"
 
 #: src/chunks/DashboardPage/blocks/CreateBlock.tsx
 msgid "Pick a table to add to"

@@ -74,6 +74,8 @@ a derived, rebuildable projection:
 | Cursor pagination / `hasMore` instead of exact counts | not built (wire + client change) |
 | Batched KV reads (one read txn per query) | not built (`KvStore` trait change; per-`get` redb txns remain) |
 | Zones index (walk-free auth) | see [`zones.md`](./zones.md) |
+| Memoized ancestor *fetch* in the rights walk (the memo caches verdicts, but `get_parent` still full-decodes the parent per member) | not built — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
+| Cap on the auth-denied member cascade (denied members don't fill the page, so the loop resolves every match) | not built — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
 
 ## Benchmark context
 
@@ -135,7 +137,16 @@ attached undecoded (see Target architecture §1). If a row is missing
 of the drive resource per checked member, with a recursive parent walk on
 denial. Mitigated this pass by the per-query `RightsCache`: each distinct
 subject in the ancestry is resolved once per query, and per-member work is a
-hashmap hit + explicit-ACL scan on the row. [`zones.md`](./zones.md) remains
+hashmap hit + explicit-ACL scan on the row.
+
+**Follow-up 2026-08-10 — the mitigation is incomplete on the *parent* leg.**
+The memo keys on a `&Resource`, so `check_rights_impl` must call
+`resource.get_parent(store)` — a full `get_resource` decode — *before* it can
+find the cached verdict for that parent. The drive fast path avoids this with
+an explicit by-subject `cached_deny` probe; the parent walk has no equivalent.
+On the real store this is still ~6.7ms/member (parent = 21.7KB form snapshot),
+i.e. 0.7s for a 105-member auth-denied query. Details and repro in
+[`slow-collection-queries.md`](./slow-collection-queries.md). [`zones.md`](./zones.md) remains
 the structural fix (walk-free, index-lookup auth), and its open question —
 whether the zone index also makes member-row *reads* skippable for
 subjects-only queries — still stands.

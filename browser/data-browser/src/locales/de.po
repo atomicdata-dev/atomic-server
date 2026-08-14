@@ -9,15 +9,15 @@ msgstr ""
 
 #: src/chunks/AI/AISidebar.tsx
 msgid "Failed to save AI chat message"
-msgstr ""
+msgstr "Fehler beim Speichern der KI-Chat-Nachricht"
 
 #: src/chunks/AI/AISidebar.tsx
 msgid "Failed to remove AI chat message"
-msgstr ""
+msgstr "Fehler beim Entfernen der KI-Chat-Nachricht"
 
 #: src/chunks/AI/AISidebar.tsx
 msgid "Failed to regenerate AI chat message"
-msgstr ""
+msgstr "Fehler beim Neugenerieren der KI-Chat-Nachricht"
 
 #: src/chunks/AI/AISidebar.tsx
 #: src/components/SideBar/AIPanel.tsx
@@ -26,11 +26,11 @@ msgstr "Neuer Chat"
 
 #: src/chunks/AI/AISidebar.tsx
 msgid "Atomic Assistant"
-msgstr ""
+msgstr "Atomarer Assistent"
 
 #: src/chunks/AI/AISidebar.tsx
 msgid "Close AI Sidebar"
-msgstr ""
+msgstr "KI-Seitenleiste schließen"
 
 #: src/chunks/AI/AISetupPanel.tsx
 #: src/chunks/AI/RealAIChat.tsx
@@ -662,56 +662,56 @@ msgstr "Dokumentinhalt konnte nicht gelesen werden"
 
 #: src/chunks/AI/AIChatMessageParts/FileContent.tsx
 msgid "Attached File"
-msgstr ""
+msgstr "Angehängte Datei"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Searching online"
-msgstr ""
+msgstr "Suche online"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Reading <0/> schema"
-msgstr ""
+msgstr "Lese <0/> Schema"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Reading schema"
-msgstr ""
+msgstr "Lese Schema"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Listing user classes"
-msgstr ""
+msgstr "Liste Benutzerklassen"
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Loading skill: <0/>"
-msgstr ""
+msgstr "Lade Fertigkeit: <0/>"
 
 #. 0: ' · '
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Loading skill: <0/> {0} <1/>"
-msgstr ""
+msgstr "Lade Fertigkeit: <0/> {0} <1/>"
 
 msgid "Reading{0} <0/>"
-msgstr ""
+msgstr "Lese{0} <0/>"
 
 msgid "Creating <0/>"
-msgstr ""
+msgstr "Erstelle <0/>"
 
 msgid "Editing {0} on <0/>"
-msgstr ""
+msgstr "Bearbeite {0} auf <0/>"
 
 msgid "Editing <0/>"
-msgstr ""
+msgstr "Bearbeite <0/>"
 
 #: src/chunks/AI/AIChatMessageParts/ReasoningMessage.tsx
 msgid "Thinking..."
-msgstr ""
+msgstr "Denke nach..."
 
 #: src/chunks/AI/AIChatMessageParts/ReasoningMessage.tsx
 msgid "Thinking"
-msgstr ""
+msgstr "Denke nach"
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 msgid "Unable to connect to Ollama server. Check if the server is running and you configured the correct url in the settings"
-msgstr ""
+msgstr "Verbindung zum Ollama-Server nicht möglich. Überprüfe, ob der Server läuft und du die korrekte URL in den Einstellungen konfiguriert hast."
 
 #: src/chunks/AI/AIChatPage.tsx
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
@@ -729,44 +729,44 @@ msgstr "Laden..."
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 msgid "Check your Ollama URL and that the server is running"
-msgstr ""
+msgstr "Überprüfe deine Ollama-URL und ob der Server läuft."
 
 #. 0: models.length
 #. 0: modelList.length
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "{0} Models"
-msgstr ""
+msgstr "{0} Modelle"
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 msgid "Format:"
-msgstr ""
+msgstr "Format:"
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 msgid "Parent Model:"
-msgstr ""
+msgstr "Übergeordnetes Modell:"
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 msgid "Family:"
-msgstr ""
+msgstr "Familie:"
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 msgid "Parameter Size:"
-msgstr ""
+msgstr "Parametergröße:"
 
 #: src/chunks/AI/ModelSelect/OllamaModelSelector.tsx
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "Select a model"
-msgstr ""
+msgstr "Modell auswählen"
 
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "Add an OpenRouter API key in settings"
-msgstr ""
+msgstr "Füge einen OpenRouter-API-Schlüssel in den Einstellungen hinzu."
 
 #. 0: formatter.format(selectedModel?.pricing.completion * 1000000)
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "{0} /M output tokens"
-msgstr ""
+msgstr "{0} /M Ausgabetoken"
 
 #: src/components/SideBar/index.tsx
 msgid "AI Chats"
@@ -782,11 +782,11 @@ msgstr "App"
 
 #: src/components/Dropdown/DefaultTrigger.tsx
 msgid "DefaultTrigger"
-msgstr ""
+msgstr "DefaultTrigger"
 
 #: src/components/AtomicLink.tsx
 msgid "No `subject`, `path` or `href` passed to this AtomicLink."
-msgstr ""
+msgstr "Diesem AtomicLink wurde kein `subject`, `path` oder `href` übergeben."
 
 #: src/views/ResourcePage.tsx
 msgid "Still loading…"
@@ -951,7 +951,7 @@ msgstr "Unbenannter Chat"
 
 #: src/components/ErrorLook.tsx
 msgid "Stack trace:"
-msgstr ""
+msgstr "Stacktrace:"
 
 #: src/routes/Router.tsx
 msgid "Not found!"
@@ -965,166 +965,166 @@ msgstr "Zur Startseite"
 #. 0: title
 #: src/views/EndpointPage.tsx
 msgid "{0} endpoint"
-msgstr ""
+msgstr "{0}-Endpunkt"
 
 #: src/views/CollectionPage.tsx
 msgid "CollectionDisplayStyle"
-msgstr ""
+msgstr "CollectionDisplayStyle"
 
 #. 0: classTitle
 #: src/views/CollectionPage.tsx
 msgid "Hide {0} info"
-msgstr ""
+msgstr "{0}-Info ausblenden"
 
 #. 0: classTitle
 #: src/views/CollectionPage.tsx
 msgid "Show {0} info"
-msgstr ""
+msgstr "{0}-Info anzeigen"
 
 #: src/views/CollectionPage.tsx
 msgid "empty"
-msgstr ""
+msgstr "leer"
 
 #: src/components/Table.tsx
 #: src/views/CollectionPage.tsx
 msgid "This collection is empty"
-msgstr ""
+msgstr "Diese Sammlung ist leer"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Personal"
-msgstr ""
+msgstr "Persönlich"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Your private space on this server. Only you can read and write here."
-msgstr ""
+msgstr "Ihr privater Bereich auf diesem Server. Nur Sie können hier lesen und schreiben."
 
 #: src/views/InvitePage.tsx
 msgid "Failed to persist agent after accepting invite"
-msgstr ""
+msgstr "Fehler beim Speichern des Agenten nach dem Akzeptieren der Einladung"
 
 #: src/views/InvitePage.tsx
 msgid "Invite accepted, but no destination was returned."
-msgstr ""
+msgstr "Einladung akzeptiert, aber es wurde kein Ziel zurückgegeben."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "AtomicServer"
-msgstr ""
+msgstr "AtomicServer"
 
 #. 0: write ? 'edit' \\: 'view'; 1: resourceName ? ` "${resourceName}"` \\: ''
 #: src/views/InvitePage.tsx
 msgid "You've been invited to {0} {1}"
-msgstr ""
+msgstr "Sie wurden eingeladen, {1} zu {0}en"
 
 #: src/views/InvitePage.tsx
 msgid "Sorry, this invite has no usages left. Ask for a new one."
-msgstr ""
+msgstr "Diese Einladung hat leider keine Verwendungen mehr. Bitte fordern Sie eine neue an."
 
 #: src/views/InvitePage.tsx
 msgid "Create account and accept"
-msgstr ""
+msgstr "Konto erstellen und akzeptieren"
 
 #: src/views/InvitePage.tsx
 msgid "I already have an account"
-msgstr ""
+msgstr "Ich habe bereits ein Konto"
 
 #: src/views/InvitePage.tsx
 msgid "Agent created!"
-msgstr ""
+msgstr "Agent erstellt!"
 
 msgid "Enter a name"
-msgstr ""
+msgstr "Geben Sie einen Namen ein"
 
 msgid "Agent Name"
-msgstr ""
+msgstr "Agentenname"
 
 #: src/views/InvitePage.tsx
 msgid "Agent Secret"
-msgstr ""
+msgstr "Agent-Geheimnis"
 
 #: src/views/InvitePage.tsx
 msgid "Copy secret to continue"
-msgstr ""
+msgstr "Geheimnis kopieren, um fortzufahren"
 
 msgid "Update Document"
-msgstr ""
+msgstr "Dokument aktualisieren"
 
 msgid "Could not update document"
-msgstr ""
+msgstr "Dokument konnte nicht aktualisiert werden"
 
 #: src/views/ErrorPage.tsx
 #: src/views/ErrorPage.tsx
 msgid "Retry"
-msgstr ""
+msgstr "Erneut versuchen"
 
 #: src/views/ErrorPage.tsx
 msgid "You don't have access to this, try signing in:"
-msgstr ""
+msgstr "Sie haben keinen Zugriff darauf, versuchen Sie sich anzumelden:"
 
 #. 0: resource.subject
 #: src/views/ErrorPage.tsx
 msgid "Could not open {0}"
-msgstr ""
+msgstr "Konnte {0} nicht öffnen"
 
 #: src/views/ErrorPage.tsx
 msgid "Use proxy"
-msgstr ""
+msgstr "Proxy verwenden"
 
 #. 0: store.getServerUrl()
 #: src/views/ErrorPage.tsx
 msgid "Fetches the URL from your current Atomic-Server ({0}), instead of from the actual URL itself. Can be useful if the URL is down, but the resource is cached in your server."
-msgstr ""
+msgstr "Ruft die URL von Ihrem aktuellen Atomic-Server ({0}) ab, anstatt von der eigentlichen URL selbst. Dies kann nützlich sein, wenn die URL nicht erreichbar ist, die Ressource jedoch auf Ihrem Server zwischengespeichert ist."
 
 #: src/views/BookmarkPage/BookmarkPage.tsx
 msgid "Bookmark URL"
-msgstr ""
+msgstr "Lesezeichen-URL"
 
 #: src/views/BookmarkPage/BookmarkPage.tsx
 msgid "No url"
-msgstr ""
+msgstr "Keine URL"
 
 #: src/views/Card/MessageCard.tsx
 #: src/views/MessagePage.tsx
 msgid "Message in <0/>"
-msgstr ""
+msgstr "Nachricht in <0/>"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Set as current drive"
-msgstr ""
+msgstr "Als aktuellen Drive festlegen"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Add description"
-msgstr ""
+msgstr "Beschreibung hinzufügen"
 
 #: src/components/OverlayContainer.tsx
 #: src/views/Drive/DrivePage.tsx
 msgid "Resources"
-msgstr ""
+msgstr "Ressourcen"
 
 #: src/components/NavBar.tsx
 #: src/components/NavBar.tsx
 #: src/views/Drive/DrivePage.tsx
 msgid "Tags"
-msgstr ""
+msgstr "Tags"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Add LLM instructions"
-msgstr ""
+msgstr "LLM-Anweisungen hinzufügen"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "LLM Instructions"
-msgstr ""
+msgstr "LLM-Anweisungen"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Default Ontology"
-msgstr ""
+msgstr "Standard-Ontologie"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Plugins"
-msgstr ""
+msgstr "Plugins"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Remove tag"
-msgstr ""
+msgstr "Tag entfernen"
 
 #: src/views/ChatRoom/ChatRoomView.tsx
 msgid "Loading messages..."
@@ -1187,20 +1187,20 @@ msgstr ""
 
 #: src/views/ImporterPage.tsx
 msgid "Imported!"
-msgstr ""
+msgstr "Importiert!"
 
 #: src/views/ImporterPage.tsx
 msgid "Import to"
-msgstr ""
+msgstr "Importieren in"
 
 #. 0: ' '
 #: src/views/ImporterPage.tsx
 msgid "Read more about how importing Atomic Data works{0} <0>in the docs</0> ."
-msgstr ""
+msgstr "Erfahren Sie mehr darüber, wie das Importieren von Atomic Data funktioniert{0} <0>in der Dokumentation</0>."
 
 #: src/views/ImporterPage.tsx
 msgid "Paste your JSON-AD..."
-msgstr ""
+msgstr "Füge dein JSON-AD ein..."
 
 #: src/views/ImporterPage.tsx
 msgid "Options"
@@ -1208,45 +1208,45 @@ msgstr "Optionen"
 
 #: src/views/ImporterPage.tsx
 msgid "Overwrite resources that are outside the scope of the parent. Do this only if you trust the imported data."
-msgstr ""
+msgstr "Ressourcen überschreiben, die außerhalb des Bereichs des übergeordneten Elements liegen. Tun Sie dies nur, wenn Sie den importierten Daten vertrauen."
 
 #: src/views/ImporterPage.tsx
 msgid "Enter subject"
-msgstr ""
+msgstr "Betreff eingeben"
 
 #: src/views/ImporterPage.tsx
 msgid "Target parent"
-msgstr ""
+msgstr "Ziel-Elternelement"
 
 #: src/views/ImporterPage.tsx
 msgid "This URL will be used as the default Parent for imported resources."
-msgstr ""
+msgstr "Diese URL wird als Standard-Elternelement für importierte Ressourcen verwendet."
 
 #: src/views/ImporterPage.tsx
 msgid "Importing..."
-msgstr ""
+msgstr "Importieren..."
 
 #: src/actions/resourceActions.tsx
 #: src/views/ImporterPage.tsx
 msgid "Import"
-msgstr ""
+msgstr "Importieren"
 
 #: src/components/Main.tsx
 msgid "Start of main content"
-msgstr ""
+msgstr "Beginn des Hauptinhalts"
 
 #: src/views/TagPage/TagPage.tsx
 msgid "Edit tag"
-msgstr ""
+msgstr "Tag bearbeiten"
 
 #: src/views/Document/DocumentV2FullPage.tsx
 msgid "Couldn't open the document editor"
-msgstr ""
+msgstr "Konnte den Dokumenteneditor nicht öffnen"
 
 #: src/views/Canvas/CanvasPage.tsx
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Space"
-msgstr ""
+msgstr "Arbeitsfläche"
 
 #: src/components/forms/NewForm/CustomCreateActions/BasicInstanceHandlers.ts
 msgid "Canvas"
@@ -1255,73 +1255,73 @@ msgstr "Canvas"
 #. 0: saveError
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Save failed: {0}"
-msgstr ""
+msgstr "Speichern fehlgeschlagen: {0}"
 
 #: src/components/TeamProfileStep.tsx
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Saving…"
-msgstr ""
+msgstr "Speichern…"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Canvas help"
-msgstr ""
+msgstr "Hilfe zur Arbeitsfläche"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Show canvas help"
-msgstr ""
+msgstr "Hilfe zur Arbeitsfläche anzeigen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Switch to draw"
-msgstr ""
+msgstr "Zum Zeichnen wechseln"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Eraser"
-msgstr ""
+msgstr "Radiergummi"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Pen color (tap to swap with previous, drag to pick from fan)"
-msgstr ""
+msgstr "Stiftfarbe (tippen, um mit vorheriger zu tauschen, ziehen, um aus Fächer auszuwählen)"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Pen color"
-msgstr ""
+msgstr "Stiftfarbe"
 
 #. 0: penWidth
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Stroke width: {0} (tap to swap with previous, drag to pick from fan)"
-msgstr ""
+msgstr "Strichstärke: {0} (tippen, um mit vorheriger zu tauschen, ziehen, um aus Fächer auszuwählen)"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Stroke width"
-msgstr ""
+msgstr "Strichstärke"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Redo (Ctrl+Shift+Z)"
-msgstr ""
+msgstr "Wiederholen (Strg+Umschalt+Z)"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Zoom to fit (tap) — drag horizontally to zoom-scrub"
-msgstr ""
+msgstr "Anpassen zoomen (tippen) — horizontal ziehen, um zu zoomen und zu durchsuchen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Canvas controls"
-msgstr ""
+msgstr "Leinwand-Steuerung"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "<0>Left click</0> & drag — draw a stroke"
-msgstr ""
+msgstr "<0>Linksklick</0> & ziehen — einen Strich zeichnen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Tap the eraser button, then drag across strokes to remove them"
-msgstr ""
+msgstr "Tippen Sie auf die Radiergummi-Taste, dann ziehen Sie über Striche, um sie zu entfernen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "<0>Ctrl</0>+<1/> undo · <2>Ctrl</2>+ <3>Shift</3>+<4/> redo"
-msgstr ""
+msgstr "<0>Strg</0>+<1/> Rückgängig · <2>Strg</2>+ <3>Umschalt</3>+<4/> Wiederholen"
 
 #: src/views/Card/ResourceCard.tsx
 msgid "Resource is loading..."
-msgstr ""
+msgstr "Ressource wird geladen…"
 
 #: src/components/OverlayContainer.tsx
 #: src/routes/Search/SearchOverlay.tsx
@@ -1460,7 +1460,7 @@ msgstr "Offline"
 
 #: src/components/SideBar/SyncMenuItem.tsx
 msgid "Changes could not sync"
-msgstr ""
+msgstr "Änderungen konnten nicht synchronisiert werden"
 
 #: src/components/SideBar/SyncMenuItem.tsx
 #: src/routes/SyncRoute.tsx
@@ -1469,7 +1469,7 @@ msgstr "Ausstehende Änderungen"
 
 #: src/components/SideBar/SyncMenuItem.tsx
 msgid "Syncing..."
-msgstr ""
+msgstr "Wird synchronisiert..."
 
 #: src/chunks/RTE/ImagePicker.tsx
 msgid "Left"
@@ -1525,7 +1525,7 @@ msgstr ""
 #: src/views/OntologyPage/NewPropertyButton.tsx
 #: src/views/Plugin/PluginPage.tsx
 msgid "Save"
-msgstr ""
+msgstr "Speichern"
 
 #. 0: files.length
 #: src/routes/NewResource/NewRoute.tsx
@@ -1904,7 +1904,7 @@ msgid "Download file ({0})"
 msgstr ""
 
 msgid "<0/> Download"
-msgstr ""
+msgstr "<0/> Herunterladen"
 
 #: src/views/File/FilePreview.tsx
 msgid "Sorry, your browser doesn't support embedded videos."
@@ -2058,7 +2058,7 @@ msgstr ""
 #: src/components/Toaster.tsx
 #: src/components/forms/InputResourceArray.tsx
 msgid "Clear"
-msgstr ""
+msgstr "Löschen"
 
 #: src/actions/resourceActions.tsx
 msgid "Resource deleted!"
@@ -2261,7 +2261,7 @@ msgstr ""
 #: src/views/BookmarkPage/BookmarkPage.tsx
 #: src/views/Card/BookmarkCard.tsx
 msgid "Open site"
-msgstr ""
+msgstr "Seite öffnen"
 
 #: src/components/AI/ChatLoadingIndicator.tsx
 msgid "Loading AI"
@@ -2405,7 +2405,7 @@ msgid "Indexing vector data for this drive. AI search may be briefly out of date
 msgstr "Indiziere Vektordaten für dieses Laufwerk. Die KI-Suche ist möglicherweise kurzzeitig nicht aktuell."
 
 msgid "<0/> Resource with error"
-msgstr ""
+msgstr "<0/> Ressource mit Fehler"
 
 #: src/components/Tag/CreateTagRow.tsx
 msgid "New tag"
@@ -2417,59 +2417,59 @@ msgid "Add tag"
 msgstr "Tag hinzufügen"
 
 msgid "Could not update your list: no personal drive is set up for this account yet."
-msgstr ""
+msgstr "Ihre Liste konnte nicht aktualisiert werden: Für dieses Konto ist noch kein persönliches Laufwerk eingerichtet."
 
 #. 0: getTitle(resource)
 #. 0: getTitle(resource)
 #: src/components/SideBar/DriveSwitcher.tsx
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Switch to {0}"
-msgstr ""
+msgstr "Zu {0} wechseln"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Create a new drive"
-msgstr ""
+msgstr "Neuen Drive erstellen"
 
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "To rearange items, press space or enter to start dragging. While dragging, use the arrow keys to move the item in any given direction. Press space or enter again to drop the item in its new position, or press escape to cancel."
-msgstr ""
+msgstr "Um Elemente neu anzuordnen, drücke die Leertaste oder die Eingabetaste, um das Ziehen zu starten. Während des Ziehens kannst du mit den Pfeiltasten das Element in jede Richtung bewegen. Drücke erneut die Leertaste oder die Eingabetaste, um das Element an der neuen Position abzulegen, oder drücke Escape, um abzubrechen."
 
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Keyboard support for drag and drop is disabled. Enable it in the settings."
-msgstr ""
+msgstr "Die Tastaturunterstützung für Drag & Drop ist deaktiviert. Aktiviere sie in den Einstellungen."
 
 #. 0: resource.title
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Picked up {0}"
-msgstr ""
+msgstr "{0} aufgegriffen"
 
 #. 0: dragResource.title; 1: dropResource.title
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Draggable item {0} was moved over droppable area in {1}"
-msgstr ""
+msgstr "Das verschiebbare Element {0} wurde über den Ablegebereich in {1} bewegt."
 
 #: src/components/SideBar/useSidebarDnd.ts
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "Dragging canceled"
-msgstr ""
+msgstr "Ziehen abgebrochen"
 
 #: src/components/SideBar/ResourceSideBar/SidebarItemTitle.tsx
 msgid "Collapse folder"
-msgstr ""
+msgstr "Ordner einklappen"
 
 #: src/components/SideBar/ResourceSideBar/SidebarItemTitle.tsx
 msgid "Expand folder"
-msgstr ""
+msgstr "Ordner ausklappen"
 
 #. 0: title
 #: src/components/SideBar/ResourceSideBar/SidebarItemTitle.tsx
 msgid "Rearrange {0}"
-msgstr ""
+msgstr "{0} neu anordnen"
 
 #. 0: title
 #: src/components/SideBar/ResourceSideBar/SidebarItemTitle.tsx
 msgid "Rearange {0}"
-msgstr ""
+msgstr "{0} neu anordnen"
 
 #: src/chunks/RTE/NoteExtention/NoteComponent.tsx
 msgid "<0/> Note"
@@ -3463,15 +3463,15 @@ msgstr "Geben Sie '/' für Optionen oder '@' für Ressourcen ein"
 #: src/chunks/RTE/AsyncMarkdownEditor.tsx
 #: src/chunks/RTE/AsyncMarkdownEditor.tsx
 msgid "Start typing..."
-msgstr ""
+msgstr "Tippen beginnen..."
 
 #: src/chunks/RTE/AsyncMarkdownEditor.tsx
 msgid "Type '/' for options"
-msgstr ""
+msgstr "'/' für Optionen"
 
 #: src/chunks/RTE/AsyncMarkdownEditor.tsx
 msgid "Edit raw markdown"
-msgstr ""
+msgstr "Roh-Markdown bearbeiten"
 
 #: src/chunks/RTE/ColorMenu.tsx
 msgid "Edit text color"
@@ -3594,10 +3594,10 @@ msgstr "Externe Eigenschaft"
 
 #: src/chunks/TablePage/TableExportDialog.tsx
 msgid "Export table as CSV"
-msgstr ""
+msgstr "Tabelle als CSV exportieren"
 
 msgid "<0/>{0} Reference resources by subject instead of name."
-msgstr ""
+msgstr "<0/>{0} Ressourcen nach Thema statt nach Namen referenzieren."
 
 #: src/chunks/TablePage/TableFilterBar.tsx
 msgid "Table filters"
@@ -3648,7 +3648,7 @@ msgstr ""
 
 #: src/chunks/TablePage/TablePage.tsx
 msgid "Export to CSV"
-msgstr ""
+msgstr "Als CSV exportieren"
 
 #: src/chunks/TablePage/TableViewTabs.tsx
 msgid "Untitled view"
@@ -3672,11 +3672,11 @@ msgstr ""
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "Remove filter"
-msgstr ""
+msgstr "Filter entfernen"
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "Filter operator"
-msgstr ""
+msgstr "Filter-Operator"
 
 #: src/chunks/TablePage/useTableView.ts
 #: src/chunks/TablePage/useTableView.ts
@@ -3808,7 +3808,7 @@ msgstr "<0/> Zeit einbeziehen"
 
 #: src/chunks/TablePage/PropertyForm/EditPropertyDialog.tsx
 msgid "Edit Column"
-msgstr ""
+msgstr "Spalte bearbeiten"
 
 #: src/chunks/TablePage/PropertyForm/ExternalPropertyDialog.tsx
 msgid "Add external property"
@@ -3837,11 +3837,11 @@ msgstr ""
 
 #: src/chunks/TablePage/PropertyForm/PropertyForm.tsx
 msgid "Invalid Name"
-msgstr ""
+msgstr "Ungültiger Name"
 
 #: src/chunks/TablePage/PropertyForm/PropertyForm.tsx
 msgid "New Column"
-msgstr ""
+msgstr "Neue Spalte"
 
 #: src/chunks/TablePage/PropertyForm/RelationPropertyForm.tsx
 msgid "Resource type:"
@@ -3890,7 +3890,7 @@ msgstr "Kein Typ ausgewählt"
 #: src/chunks/TablePage/EditorCells/JSONCell.tsx
 #: src/chunks/TablePage/EditorCells/MarkdownCell.tsx
 msgid "Open edit dialog"
-msgstr ""
+msgstr "Bearbeitungsdialog öffnen"
 
 #: src/chunks/TablePage/EditorCells/MultiRelationCell.tsx
 msgid "Add resource"
@@ -4171,14 +4171,14 @@ msgstr ""
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Undo (Ctrl+Z) — drag horizontally to scrub history, hold to see discarded versions"
-msgstr ""
+msgstr "Rückgängig (Strg+Z) — horizontal ziehen, um den Verlauf zu durchsuchen, halten, um verworfene Versionen anzuzeigen"
 
 #. 0: username
 #. 0: name.trim()
 #: src/components/NewIdentitySection.tsx
 #: src/views/InvitePage.tsx
 msgid "{0}'s Drive"
-msgstr ""
+msgstr "Drive von {0}"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Create a new Agent on this server. We will set your username and create a private drive as your home."
@@ -4215,7 +4215,7 @@ msgid "This removes drives created for automated tests or local dev: names conta
 msgstr ""
 
 msgid "<0/> This document needs to be updated to the new format in order to be edited."
-msgstr ""
+msgstr "<0/> Dieses Dokument muss in das neue Format aktualisiert werden, um bearbeitet werden zu können."
 
 #: src/views/ResourcePage.tsx
 msgid "The resource at <0/> hasn't loaded after 15 seconds. It may not exist, or the server may be unreachable."
@@ -4223,11 +4223,11 @@ msgstr "Die Ressource unter <0/> wurde nach 15 Sekunden nicht geladen. Mögliche
 
 #: src/views/InvitePage.tsx
 msgid "Accept as"
-msgstr ""
+msgstr "Akzeptieren als"
 
 #: src/views/InvitePage.tsx
 msgid "IMPORTANT! Below is your agent secret, you use this to login. Save it somewhere safe, the secret will not be show again and if you lose it you will not be able to access this user again."
-msgstr ""
+msgstr "WICHTIG! Unten finden Sie Ihr Agent-Geheimnis, mit dem Sie sich anmelden. Bewahren Sie es an einem sicheren Ort auf. Das Geheimnis wird nicht erneut angezeigt, und wenn Sie es verlieren, können Sie nicht mehr auf diesen Benutzer zugreifen."
 
 #: src/chunks/AI/AISetupPanel.tsx
 msgid "This pre-selects a model for built-in agents and new custom agents. You can change each agent's model individually later."
@@ -4248,11 +4248,11 @@ msgstr "<0/> RAG, automatisch Kontext aus Ihrer Wissensdatenbank basierend auf I
 
 #: src/views/ErrorPage.tsx
 msgid "If you have not set up an identity on this server yet,"
-msgstr ""
+msgstr "Falls Sie auf diesem Server noch keine Identität eingerichtet haben,"
 
 #: src/views/ErrorPage.tsx
 msgid "create one here"
-msgstr ""
+msgstr "Erstelle eines hier"
 
 #: src/chunks/AI/MCPConfigTab.tsx
 msgid "custom header"
@@ -4398,17 +4398,17 @@ msgstr ""
 #. 0: status.blockedCount
 #: src/components/SideBar/SyncMenuItem.tsx
 msgid "{0} changes could not sync (no access)"
-msgstr ""
+msgstr "{0} Änderungen konnten nicht synchronisiert werden (kein Zugriff)"
 
 #. 0: status.pendingDirtyCount
 #: src/components/SideBar/SyncMenuItem.tsx
 msgid "{0} changes pending"
-msgstr ""
+msgstr "{0} Änderungen ausstehend"
 
 #. 0: dragResource.title; 1: dropResource.title
 #: src/components/SideBar/useSidebarDnd.ts
 msgid "{0} was moved to {1}"
-msgstr ""
+msgstr "{0} wurde nach {1} verschoben."
 
 #. 0: classSubject
 #: src/components/forms/ResourceForm.tsx
@@ -4433,39 +4433,39 @@ msgstr ""
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "<0>Scroll</0> · <1>Space</1>+drag · middle-mouse drag — pan the canvas"
-msgstr ""
+msgstr "<0>Scrollen</0> · <1>Leertaste</1>+ziehen · mittlere Maustaste ziehen — die Leinwand verschieben"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "<0>Ctrl</0>+<1>scroll</1> · trackpad pinch — zoom toward the cursor"
-msgstr ""
+msgstr "<0>Strg</0>+<1>scrollen</1> · Trackpad-Pinzette — zum Cursor zoomen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Tap the colour or width button to swap with the previous choice; press & drag to open the picker fan"
-msgstr ""
+msgstr "Tippen Sie auf die Farb- oder Breiten-Taste, um mit der vorherigen Auswahl zu tauschen; drücken und ziehen, um den Auswahl-Fächer zu öffnen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Tap <0>Undo</0> / <1>Redo</1> to step through edits; drag the undo button left/right to scrub the full history"
-msgstr ""
+msgstr "Tippen Sie <0>Rückgängig</0> / <1>Wiederholen</1>, um Bearbeitungen schrittweise durchzugehen; ziehen Sie die Rückgängig-Taste nach links/rechts, um den gesamten Verlauf zu durchsuchen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Hold the undo button to see versions you abandoned by drawing after an undo; drag over one and release to restore it"
-msgstr ""
+msgstr "Halten Sie die Rückgängig-Taste, um Versionen zu sehen, die Sie durch Zeichnen nach einem Rückgängig aufgegeben haben; über eine ziehen und loslassen, um sie wiederherzustellen"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Tap the zoom button to fit all strokes; drag left/right to zoom continuously"
-msgstr ""
+msgstr "Tippen Sie auf die Zoom-Taste, um alle Striche anzupassen; nach links/rechts ziehen, um kontinuierlich zu zoomen"
 
 #: src/views/Drive/DrivePage.tsx
 msgid "A short description given to the AI Agent, use this to tell it what this drive is about, link important resources etc."
-msgstr ""
+msgstr "Eine kurze Beschreibung, die dem KI-Agenten gegeben wird. Verwenden Sie diese, um ihm mitzuteilen, worum es bei diesem Drive geht, um wichtige Ressourcen usw. zu verlinken."
 
 #: src/views/Document/DocumentV2FullPage.tsx
 msgid "The collaborative editing engine (Loro / WebAssembly) failed to initialize in this tab, so the document body can't be shown."
-msgstr ""
+msgstr "Die kollaborative Bearbeitungs-Engine (Loro / WebAssembly) konnte in diesem Tab nicht initialisiert werden, daher kann der Dokumentinhalt nicht angezeigt werden."
 
 #: src/views/Document/DocumentV2FullPage.tsx
 msgid "Try reloading the page. If it keeps happening, another tab of this app or a browser extension may be blocking WebAssembly, or the tab ran out of memory."
-msgstr ""
+msgstr "Versuchen Sie, die Seite neu zu laden. Wenn das Problem weiterhin besteht, blockiert möglicherweise ein anderer Tab dieser App oder eine Browsererweiterung WebAssembly, oder der Tab hat nicht genügend Arbeitsspeicher."
 
 #: src/views/PluginView/useRequestPermissionDialog.tsx
 msgid "wants to read a resource that is not contained in the current scope."
@@ -4485,16 +4485,16 @@ msgstr ""
 
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "/1K web search results"
-msgstr ""
+msgstr "/1K Websuchergebnisse"
 
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "The selected model does not support tool use."
-msgstr ""
+msgstr "Das ausgewählte Modell unterstützt die Verwendung von Tools nicht."
 
 #. 0: formatter.format(selectedModel?.pricing.prompt * 1000000)
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "{0}/M input tokens"
-msgstr ""
+msgstr "{0}/M Eingabetoken"
 
 #. 0: INDEX_CELL_WIDTH; 1: effectiveSizes.join( ' ', )
 #: src/chunks/TableEditor/hooks/useCellSizes.ts
@@ -4504,7 +4504,7 @@ msgstr "{0} {1} minmax(50px, 1fr)"
 #. 0: subject
 #: src/components/SideBar/ResourceSideBar/ResourceSideBar.tsx
 msgid "{0} is loading..."
-msgstr ""
+msgstr "{0} wird geladen..."
 
 #: src/components/forms/FilePicker/FilePickerButton.tsx
 msgid "Select File"
@@ -4571,10 +4571,10 @@ msgstr "Der Titel wird verwendet, um den Betreff zu konstruieren. Beachten Sie, 
 
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 msgid "Creating table <0/>"
-msgstr ""
+msgstr "Erstelle Tabelle <0/>"
 
 msgid "Creating <0>{0} resources</0>"
-msgstr ""
+msgstr "Erstelle <0>{0} Ressourcen</0>"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 msgid "Due date"
@@ -4632,23 +4632,23 @@ msgstr ""
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "End meeting"
-msgstr ""
+msgstr "Meeting beenden"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "Start meeting"
-msgstr ""
+msgstr "Meeting starten"
 
 #: src/components/DemoExitButton.tsx
 msgid "Leaving…"
-msgstr ""
+msgstr "Verlassen…"
 
 #: src/components/DemoExitButton.tsx
 msgid "Exit demo"
-msgstr ""
+msgstr "Demo beenden"
 
 #: src/components/DemoExitButton.tsx
 msgid "Leave the demo workspace"
-msgstr ""
+msgstr "Demo-Arbeitsbereich verlassen"
 
 #: src/routes/DemoRoute.tsx
 msgid "Could not start the demo"
@@ -4764,15 +4764,15 @@ msgid "Private drive"
 msgstr "Privates Laufwerk"
 
 msgid "Your personal space — visible only to you."
-msgstr ""
+msgstr "Dein persönlicher Bereich – nur für dich sichtbar."
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Manage drives"
-msgstr ""
+msgstr "Drives verwalten"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "View and organize all your drives."
-msgstr ""
+msgstr "Alle deine Drives anzeigen und organisieren."
 
 msgid "Your personal space — only visible to you."
 msgstr "Ihr persönlicher Bereich – nur für Sie sichtbar."
@@ -4932,7 +4932,7 @@ msgstr ""
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Pairing device"
-msgstr ""
+msgstr "Gerät koppeln"
 
 #: src/chunks/AI/RealAIChat.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
@@ -4941,48 +4941,48 @@ msgstr "Erneut versuchen"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Open workspace"
-msgstr ""
+msgstr "Arbeitsbereich öffnen"
 
 #: src/components/SideBar/FeedbackMenuItem.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Close"
-msgstr ""
+msgstr "Schließen"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Connecting to the device…"
-msgstr ""
+msgstr "Verbinde mit dem Gerät…"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Could not connect"
-msgstr ""
+msgstr "Konnte keine Verbindung herstellen"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Connect to the device"
-msgstr ""
+msgstr "Mit dem Gerät verbinden"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Bringing your workspace over…"
-msgstr ""
+msgstr "Übertrage Ihren Arbeitsbereich…"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Your workspace is here"
-msgstr ""
+msgstr "Ihr Arbeitsbereich ist da"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Bring your workspace over"
-msgstr ""
+msgstr "Arbeitsbereich übertragen"
 
 #. 0: device
 #. 0: serverLabel(status.serverUrl ?? '')
 #: src/components/pairing/PairingFlowProvider.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Paired with {0}"
-msgstr ""
+msgstr "Gekoppelt mit {0}"
 
 #. 0: count; 1: count === 1 ? 'resource' \\: 'resources'; 2: device
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Synced {0} {1} with {2}"
-msgstr ""
+msgstr "Synchronisiert {0} {1} mit {2}"
 
 #: src/routes/SyncRoute.tsx
 msgid "Show this code"
@@ -4990,15 +4990,15 @@ msgstr "Diesen Code anzeigen"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "This device can’t tell which workspace to open. Open the app on your other device, then pair again."
-msgstr ""
+msgstr "Dieses Gerät kann nicht erkennen, welcher Arbeitsbereich geöffnet werden soll. Öffnen Sie die App auf Ihrem anderen Gerät und koppeln Sie erneut."
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Your workspace didn’t arrive"
-msgstr ""
+msgstr "Ihr Arbeitsbereich ist nicht angekommen"
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Your workspace hasn’t opened here yet. It may still be settling — reopen this page in a moment. If it stays empty, check that the other device holds your data."
-msgstr ""
+msgstr "Ihr Arbeitsbereich wurde hier noch nicht geöffnet. Möglicherweise wird er noch eingerichtet — öffnen Sie diese Seite in einem Moment erneut. Wenn sie leer bleibt, überprüfen Sie, ob das andere Gerät Ihre Daten enthält."
 
 #. 0: PRODUCT_NAME
 #. 0: PRODUCT_NAME
@@ -5040,27 +5040,27 @@ msgstr ""
 
 #: src/components/ForkBar.tsx
 msgid "Discard"
-msgstr ""
+msgstr "Verwerfen"
 
 msgid "<0/> Merge"
-msgstr ""
+msgstr "<0/> Zusammenführen"
 
 #: src/components/ForkBar.tsx
 msgid "No changes yet."
-msgstr ""
+msgstr "Noch keine Änderungen."
 
 #. 0: changes.length; 1: changes.length === 1 ? 'y' \\: 'ies'
 #: src/components/ForkBar.tsx
 msgid "{0} changed propert{1}."
-msgstr ""
+msgstr "{0} geänderte Eigenschaft{1}."
 
 #: src/components/ForkBar.tsx
 msgid "conflict"
-msgstr ""
+msgstr "Konflikt"
 
 #: src/components/ForkBar.tsx
 msgid "Edit the body, then merge."
-msgstr ""
+msgstr "Bearbeiten Sie den Text und führen Sie dann zusammen."
 
 #: src/chunks/RTE/readDocumentV2TiptapJson.ts
 msgid "Resource has no editable document content"
@@ -5080,11 +5080,11 @@ msgstr "Besprechung"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "Open chat"
-msgstr ""
+msgstr "Chat öffnen"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "Loading meeting notes…"
-msgstr ""
+msgstr "Lade Meeting-Notizen…"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Notes"
@@ -5113,7 +5113,7 @@ msgstr ""
 #: src/actions/resourceActions.tsx
 #: src/components/ForkBar.tsx
 msgid "Fork merged"
-msgstr ""
+msgstr "Fork zusammengeführt"
 
 #: src/actions/resourceActions.tsx
 msgid "Open the resource this fork was forked from."
@@ -5122,20 +5122,20 @@ msgstr ""
 #. 0: conflicts.length; 1: conflicts.length === 1 ? 'y was' \\: 'ies were'; 2: conflicts .map(c => c.property.split('/').pop()) .join(', '); 3: conflicts.length === 1 ? 'it' \\: 'them'
 #: src/components/ForkBar.tsx
 msgid "{0} propert{1} also changed on the original since this fork was made ({2}). Merging will overwrite {3} with this fork's version. Continue?"
-msgstr ""
+msgstr "{0} Eigenschaft{1} wurde auch im Original geändert, seit dieser Fork erstellt wurde ({2}). Durch das Zusammenführen wird {3} mit der Version dieses Forks überschrieben. Fortfahren?"
 
 #: src/components/ForkBar.tsx
 msgid "Fork discarded"
-msgstr ""
+msgstr "Fork verworfen"
 
 #: src/components/ForkBar.tsx
 msgid "Fork of"
-msgstr ""
+msgstr "Fork von"
 
 #. 0: forkSubjects.length
 #: src/components/PendingForks.tsx
 msgid "{0} forks propose changes to this:"
-msgstr ""
+msgstr "{0} Forks schlagen Änderungen vor:"
 
 #: src/helpers/forksFolder.ts
 msgid "Forks"
@@ -5940,7 +5940,7 @@ msgstr "Eintrag konnte nicht gestartet werden"
 #: src/chunks/TablePage/derivedColumns.ts
 #: src/components/Vault/VaultPanel.tsx
 msgid "{0}d ago"
-msgstr ""
+msgstr "vor {0} Tagen"
 
 #: src/chunks/TablePage/NewColumnButton.tsx
 msgid "Computed"
@@ -6091,15 +6091,15 @@ msgstr "Diese Spalte enthält eine Aktion, keinen Wert, daher gibt es nichts zu 
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "now"
-msgstr ""
+msgstr "jetzt"
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "a date"
-msgstr ""
+msgstr "ein Datum"
 
 #: src/chunks/TablePage/TableFilterChip.tsx
 msgid "Compare against"
-msgstr ""
+msgstr "Vergleichen mit"
 
 #: src/chunks/TablePage/TableViewTabs.tsx
 msgid "Filter rows by a column"
@@ -6151,7 +6151,7 @@ msgstr ""
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Pick a column…"
-msgstr ""
+msgstr "Spalte auswählen…"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Of"
@@ -6238,7 +6238,7 @@ msgstr ""
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Button says"
-msgstr ""
+msgstr "Schaltfläche sagt"
 
 #: src/actions/runAction.ts
 #: src/chunks/TablePage/NewColumnButton.tsx
@@ -6281,7 +6281,7 @@ msgstr "{0} konnte nicht hinzugefügt werden"
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
 msgid "Log a feed"
-msgstr ""
+msgstr "Feed protokollieren"
 
 #: src/chunks/TablePage/QuickAddDialog.tsx
 msgid "It sits above the rows and creates one. Everything else about the row is edited in the table."
@@ -6289,19 +6289,19 @@ msgstr ""
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Ask for a value first"
-msgstr ""
+msgstr "Zuerst einen Wert anfordern"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "On for a list you name things in; off for a button you just press."
-msgstr ""
+msgstr "Ein für eine Liste, in der du Dinge benennst; aus für eine Schaltfläche, die du einfach drückst."
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Type into"
-msgstr ""
+msgstr "Eingeben in"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "What are you adding?"
-msgstr ""
+msgstr "Was fügst du hinzu?"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Placeholder"
@@ -6309,11 +6309,11 @@ msgstr "Platzhalter"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Nothing"
-msgstr ""
+msgstr "Nichts"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Also set"
-msgstr ""
+msgstr "Auch festlegen"
 
 #: src/chunks/DashboardPage/blocks/CreateBlock.tsx
 msgid "Pick a table to add to"
