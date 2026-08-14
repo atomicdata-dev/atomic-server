@@ -1,11 +1,9 @@
 # Slow collection queries (`/query`)
 
-**Status:** all three causes addressed. Index/query rework (`3578d080`,
-see [`index-performance.md`](./index-performance.md)) fixed the per-member
-Loro decode and added a per-query rights *verdict* memo; the two remaining
-items below landed 2026-08-14 (ancestor *fetch* memo + denial-streak cap).
-Original diagnosis 2026-07-16; last re-measure of the production store
-2026-08-10.
+**Status:** ancestor-fetch memo landed 2026-08-14. A consecutive-denial
+cap was tried and **reverted**: each member can carry its own grant, so a
+private streak must not stop the scan. Original diagnosis 2026-07-16;
+last re-measure of the production store 2026-08-10.
 
 ## Where it stands
 
@@ -22,10 +20,10 @@ build, anonymous agent) on a binary built after the rebase:
 | same, `page_size=1&offset=1000` (skips all per-member work) | — | **11ms** |
 
 ~90% faster after the index rework, but a 105-member auth-denied query still
-cost 0.7s, and page size still made no difference — that was the two open
-items. They were not re-measured on the production store; the regression
-test pins them to `get_resource` / `get_resource_shallow` call counts
-instead (`unauthorized_collection_query_bounds_fetch_counts`).
+cost 0.7s because each member full-decoded the parent. The ancestor-fetch
+memo (not re-measured on the production store) pins that to call counts in
+`unauthorized_collection_query_bounds_fetch_counts`. A denial-streak cap
+was not taken: it would hide later readable rows.
 
 ### Cause 1 — no memoization in the rights walk → **fixed**
 
@@ -51,27 +49,28 @@ read; nested bodies get the raw snapshot bytes attached verbatim as
 CRDT-authoritative path. The rights walk no longer calls it for local
 ancestors (cause 1).
 
-### Cause 3 — auth-failed members don't fill the page → **fixed (capped)**
+### Cause 3 — auth-failed members don't fill the page → **left as-is**
 
-Unchanged contract for mixed ACLs: denied members do not consume
-`page_size`, so a public child after a short private streak still fills
-the page (`unauthorized_query_skips_denials_to_fill_the_page`).
+Denied members do not consume `page_size`, so the loop keeps
+`resolve_query_member` until it has `limit` *authorized* hits (or the
+index is exhausted). That is required: a resource can have its own
+`read` grant even when every previous sibling was private
+(`unauthorized_query_skips_denials_to_fill_the_page` — 20 private, then
+one public, `page_size=1`).
 
-What changed: `QueryAuthFill` in `query_basic` and `query_sorted_indexed`
-stops calling `resolve_query_member` after
-`query_index::AUTH_DENY_STREAK_CAP` (16) consecutive denials *while filling
-a page*, and only counts the remaining index hits (same cheap-pagination
-behavior as entries past `limit`, issue #286). Unbounded queries
-(`limit = None`) keep resolving so aggregations / complete listings stay
-correct.
+A consecutive-denial cap would make the all-denied invite-code listing
+cheaper, but would hide later readable rows after a private streak. The
+ancestor-fetch memo (cause 1) is the speedup that stays correct: each
+member is still a cheap shallow row read + a cache hit on the parent,
+not a Loro decode of the form.
 
 ## Open items
 
 - [x] **Memoize the parent *fetch*, not just the verdict.**
-- [x] **Cap the auth-failed fetch cascade.**
-
-Either fix alone should take the repro well under 100ms; both should land it
-near the 12ms fixed overhead.
+- [x] **Cap the auth-failed fetch cascade** — *declined.* Stopping after N
+      consecutive denials would skip later members the agent *can* read.
+      Keep scanning until the page is full of authorized hits; the parent
+      memo makes that cheap.
 
 ## Repro
 

@@ -551,9 +551,8 @@ This does not yet prove restoration of the user's private staging workspace.
 |---|---|
 | Destroyed children don't inflate `parent=` `totalMembers` | `lib/src/db/test.rs` `destroy_clears_parent_index_count` |
 | In-page auth-denied members: `count` equals `subjects.len()` | `unauthorized_query_count_matches_subjects` |
-| Public child after a short private streak still fills the page | `unauthorized_query_skips_denials_to_fill_the_page` |
-| Auth-denied listing does not full-decode ancestors, and stops resolving after `AUTH_DENY_STREAK_CAP` consecutive denials | `unauthorized_collection_query_bounds_fetch_counts` (call counts, not wall clock) |
-| Denial-streak / page-full / unbounded-query contract for the fill loop | `lib/src/db/query_index.rs` `auth_fill_stops_resolving_after_a_denial_streak_when_paged` |
+| Public child after a private streak still fills the page | `unauthorized_query_skips_denials_to_fill_the_page` (20 private, then one public) |
+| Auth-denied listing does not full-decode ancestors; each member is still shallow-fetched | `unauthorized_collection_query_bounds_fetch_counts` (call counts, not wall clock) |
 
 Not covered: wall-clock on a large real store (the 21.7KB-parent form from
 `planning/slow-collection-queries.md`); per-GET rights walks on the invite-code

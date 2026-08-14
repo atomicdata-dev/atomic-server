@@ -2373,7 +2373,6 @@ impl Db {
         let mut resources: Vec<Resource> = vec![];
         let mut total_count = 0;
         let rights_cache = std::sync::Mutex::new(RightsCache::default());
-        let mut fill = query_index::QueryAuthFill::new();
 
         let atoms = self.get_index_iterator_for_query(q);
 
@@ -2389,11 +2388,13 @@ impl Db {
                 continue;
             }
 
-            if fill.should_resolve(subjects.len(), q.limit) {
+            // Denied members do not grow `subjects`, so we keep resolving
+            // until the page is full of *authorized* hits — a private streak
+            // must not hide a later readable row.
+            if q.limit.is_none() || subjects.len() < q.limit.unwrap() {
                 // Sudo without nested bodies needs no per-member work at all.
                 if q.for_agent == ForAgent::Sudo && !q.include_nested {
                     subjects.push(atom.subject.clone());
-                    fill.on_included();
                     continue;
                 }
 
@@ -2406,7 +2407,6 @@ impl Db {
                         if let Some(resource) = body {
                             resources.push(resource);
                         }
-                        fill.on_included();
                     }
                     None => {
                         // The index has an entry for this subject but the
@@ -2415,11 +2415,9 @@ impl Db {
                         // Roll back the count bump so it doesn't outrun the
                         // returned subjects and produce a
                         // `totalMembers: N, members: []` drift. We only do
-                        // this for in-page hits; entries past the limit (or
-                        // past the denial-streak cap) stay counted blindly
-                        // (issue #286).
+                        // this for in-page hits; entries past the limit stay
+                        // counted blindly (issue #286).
                         total_count -= 1;
-                        fill.on_denied();
                     }
                 }
             }

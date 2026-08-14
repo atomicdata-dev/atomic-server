@@ -75,7 +75,7 @@ a derived, rebuildable projection:
 | Batched KV reads (one read txn per query) | not built (`KvStore` trait change; per-`get` redb txns remain) |
 | Zones index (walk-free auth) | see [`zones.md`](./zones.md) |
 | Memoized ancestor *fetch* in the rights walk (consult the memo by subject before `get_parent`; ancestors loaded via `get_resource_shallow`) | **built** — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
-| Cap on the auth-denied member cascade (stop `resolve_query_member` after `AUTH_DENY_STREAK_CAP` consecutive denials while filling a page) | **built** — see [`slow-collection-queries.md`](./slow-collection-queries.md) |
+| Cap on the auth-denied member cascade (stop resolving after N consecutive denials) | **declined** — would hide later readable members after a private streak; the ancestor-fetch memo is the speedup that stays correct |
 
 ## Benchmark context
 

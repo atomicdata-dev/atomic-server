@@ -373,14 +373,13 @@ fn parent_query(parent: &Subject, limit: Option<usize>, for_agent: ForAgent) -> 
 
 /// Synthetic repro from `planning/slow-collection-queries.md`: drive → folder
 /// → form → many private children, queried `parent=form` as a non-authorized
-/// agent. Pins the two remaining costs to *call counts* (a fresh store's
-/// snapshots are too small to show wall-clock):
+/// agent. Pins remaining cost to *call counts* (a fresh store's snapshots are
+/// too small to show wall-clock):
 ///
-/// 1. The rights walk must not full-decode ancestors (`get_resource` stays 0)
-///    and must not re-fetch a parent whose verdict is already cached.
-/// 2. After [`query_index::AUTH_DENY_STREAK_CAP`] consecutive denials, the
-///    loop must stop calling `resolve_query_member` — otherwise page_size
-///    makes no difference and every match is fetched.
+/// The rights walk must not full-decode ancestors (`get_resource` stays 0)
+/// and must not re-fetch a parent whose verdict is already cached. Each
+/// member is still shallow-fetched — a later readable sibling after a
+/// private streak must not be skipped.
 #[tokio::test]
 async fn unauthorized_collection_query_bounds_fetch_counts() {
     let store = Db::init_temp("unauthorized_collection_query_bounds_fetch_counts")
@@ -420,21 +419,24 @@ async fn unauthorized_collection_query_bounds_fetch_counts() {
 
     let full_decodes = store.get_resource_call_count();
     let shallow = store.get_resource_shallow_call_count();
-    let cap = super::query_index::AUTH_DENY_STREAK_CAP;
     assert_eq!(
         full_decodes, 0,
         "rights walk must not Loro-decode ancestors; get_resource was called {full_decodes} times"
     );
     assert!(
-        shallow <= cap + 8,
-        "expected at most {cap} member fetches plus a handful of ancestors, got {shallow} shallow fetches — \
-         either the parent memo is not skipping refetches or the denial-streak cap is not stopping the loop"
+        shallow >= CHILDREN,
+        "every member must still be shallow-fetched (a readable row after a private streak would otherwise be skipped); got {shallow}"
+    );
+    assert!(
+        shallow <= CHILDREN + 8,
+        "expected one shallow fetch per member plus a handful of ancestors, got {shallow} — \
+         the parent memo is not skipping refetches"
     );
 }
 
-/// Denied members must not consume the page: a public child after a short
-/// private streak is still returned. (A streak at the cap is a different
-/// contract — see AUTH_DENY_STREAK_CAP.)
+/// Denied members must not consume the page: a public child after a long
+/// private streak is still returned. Each member can carry its own grant,
+/// so a run of private siblings must not stop the scan.
 #[tokio::test]
 async fn unauthorized_query_skips_denials_to_fill_the_page() {
     let store = Db::init_temp("unauthorized_query_skips_denials_to_fill_the_page")
@@ -445,7 +447,7 @@ async fn unauthorized_query_skips_denials_to_fill_the_page() {
     let drive = crate::test_utils::create_test_drive(&store).await.unwrap();
     let form = genesis_child(&store, &drive).await;
 
-    for _ in 0..5 {
+    for _ in 0..20 {
         genesis_child(&store, &form).await;
     }
 
@@ -478,7 +480,7 @@ async fn unauthorized_query_skips_denials_to_fill_the_page() {
     assert_eq!(
         res.subjects,
         vec![public_subject],
-        "a public child after a few private siblings must still fill page_size=1"
+        "a public child after many private siblings must still fill page_size=1"
     );
 }
 
