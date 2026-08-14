@@ -351,10 +351,38 @@ fn copy_form_assets(dirs: &Dirs) -> std::io::Result<()> {
         return Ok(());
     }
 
+    warn_if_form_app_stale(dirs);
+
     let dest = dirs.js_dist_tmp.join("form-assets");
     // Clear first so hashed bundle files from previous builds don't pile up.
     let _ = fs::remove_dir_all(&dest);
     dircpy::copy_dir(&dirs.form_app_dist_source, &dest)
+}
+
+/// ATOMICSERVER_SKIP_JS_BUILD reuses form-app/dist as-is. If form-renderer
+/// (or form-app src) is newer than that dist, published `/form/:id` pages
+/// silently run a stale renderer — which is how conditional questions
+/// shipped in the builder preview (Vite HMR) but not on the public route.
+fn warn_if_form_app_stale(dirs: &Dirs) {
+    let Some(dist_time) = find_newest_file_time(&dirs.form_app_dist_source) else {
+        return;
+    };
+    let form_app_inputs = [
+        PathBuf::from("../browser/form-renderer/src"),
+        PathBuf::from("../browser/form-app/src"),
+        PathBuf::from("../browser/form-app/vite.config.ts"),
+    ];
+    let newer_src = form_app_inputs.iter().any(|src_dir| {
+        find_newest_file_time(src_dir).is_some_and(|src_time| src_time > dist_time)
+    });
+    if newer_src {
+        p!(
+            "form-app/dist is older than form-renderer/form-app source — \
+             published /form/:id will not include the latest renderer \
+             (e.g. conditional questions). Run `pnpm --filter @tomic/form-app build` \
+             in browser/, then rebuild the server."
+        );
+    }
 }
 
 /// Pre-compress eligible files (`.wasm`, `.js`, `.css`, `.html`, `.svg`,

@@ -643,6 +643,70 @@ describe('Store', () => {
     expect(store.getSyncStatus().pendingDirtyCount).toBe(0);
   });
 
+  it('recovers from a server pending-deps rejection by re-sending a full snapshot', async ({
+    expect,
+  }) => {
+    // Incident class: the save cursor sits PAST ops the server never
+    // received (an earlier commit was lost in transit after the cursor
+    // advanced), so every exported delta depends on ops the server doesn't
+    // have. The server now rejects those ("parked as pending"); the drain
+    // must react by dropping the cursor so the next attempt exports a
+    // self-contained snapshot that re-delivers the lost range.
+    const { store, posted, postCommitSpy } = await testStore();
+    const name = core.properties.name;
+    const description = core.properties.description;
+
+    const resource = await store.newResource({
+      isA: 'https://atomicdata.dev/classes/Folder',
+      propVals: { [name]: 'Before' },
+      parent: 'https://example.com/drive',
+    });
+    await resource.save();
+    const subject = resource.subject;
+
+    // The "lost" edit: committed locally, then the cursor is (wrongly)
+    // advanced past it without the server ever seeing a commit — the state
+    // the incident left the client in.
+    await resource.set(description, 'the lost edit', false);
+    resource.getLoroDoc()!.commit();
+    resource.markLoroSavedAt(resource.getLoroDoc()!.oplogVersion());
+
+    // Next edit exports a delta starting past the lost ops; the server
+    // rejects it the way lib/src/commit.rs now does.
+    postCommitSpy.mockImplementationOnce(async () => {
+      throw new Error(
+        "Commit's Loro update depends on ops the server does not have — the " +
+          'update was parked as pending and none of its changes could be applied.',
+      );
+    });
+    await resource.set(name, 'After', false);
+    const postedBefore = posted.length;
+    await resource.save();
+
+    // The rejected attempt must keep the entry queued (not drop it) …
+    expect(store.outbox.hasPending(subject)).toBe(true);
+
+    // … and the retry (once due) must send a FULL snapshot. Clear the
+    // backoff window so the next drain attempts immediately.
+    const entry = store.outbox.getEntry(subject)!;
+    entry.failures = 0;
+    entry.lastAttemptAt = undefined;
+    await store.syncDirtyResources();
+
+    expect(posted.length).toBe(postedBefore + 1);
+    const resent = posted[posted.length - 1];
+
+    // Self-contained proof: the resent bytes import COMPLETE into a fresh
+    // doc (a delta would leave pending ops) and carry BOTH edits — the
+    // lost one and the new one.
+    const probe = new Resource(subject);
+    const { complete } = probe.importLoroUpdate(resent.loroUpdate!);
+    expect(complete).toBe(true);
+    expect(probe.get(name)).toBe('After');
+    expect(probe.get(description)).toBe('the lost edit');
+    expect(store.outbox.hasPending(subject)).toBe(false);
+  });
+
   it('counts scheduled (debounce-pending) saves in sync status', ({
     expect,
   }) => {

@@ -25,7 +25,10 @@ Two ways to iterate:
 - **Through the embedded build** — `cd server && cargo run` (rebuilds the
   whole browser workspace, including this package, when sources change; set
   `ATOMICSERVER_SKIP_JS_BUILD=true` to skip and reuse the last build). Visit
-  `http://localhost:9883/form/:id`.
+  `http://localhost:9883/form/:id`. With the skip flag set, rebuild this
+  package yourself after `@tomic/form-renderer` changes (`pnpm --filter
+  @tomic/form-app build`) — otherwise the public route keeps a stale
+  renderer while the builder preview (Vite HMR) shows the new one.
 - **HMR against a running server** — `pnpm dev` here starts a Vite dev
   server on `:6748`. It fetches `/form/:id/definition` and POSTs to
   `/form/:id/submit` directly against `http://localhost:9883` (atomic-server

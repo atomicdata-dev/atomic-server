@@ -8202,3 +8202,32 @@ msgstr "unchecked"
 #: src/chunks/FormBuilder/FieldRow.tsx
 msgid "Conditional"
 msgstr "Conditional"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Add condition"
+msgstr "Add condition"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Done"
+msgstr "Done"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Always shown"
+msgstr "Always shown"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "1 condition"
+msgstr "1 condition"
+
+#. 0: count
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "{0} conditions"
+msgstr "{0} conditions"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Show Page When"
+msgstr "Show Page When"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Show Field When"
+msgstr "Show Field When"

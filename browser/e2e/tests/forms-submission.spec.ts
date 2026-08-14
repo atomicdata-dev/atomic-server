@@ -545,6 +545,7 @@ test.describe('form publish and anonymous submit', () => {
     const requiredCheckbox = page.getByRole('checkbox');
     await requiredCheckbox.check();
 
+    await page.getByTestId('edit-conditions').click();
     await page.getByTestId('add-condition').click();
     await expect(page.getByTestId('condition-field')).toBeVisible();
     await expect(

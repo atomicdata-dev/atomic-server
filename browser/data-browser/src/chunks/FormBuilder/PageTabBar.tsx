@@ -9,7 +9,7 @@ import {
 } from '@tomic/react';
 import { useState, type JSX } from 'react';
 import { styled } from 'styled-components';
-import { FaPlus, FaTrash } from 'react-icons/fa6';
+import { FaCodeBranch, FaPlus, FaTrash } from 'react-icons/fa6';
 import { Row } from '@components/Row';
 import { Button } from '@components/Button';
 import { InputStyled } from '@components/forms/InputStyles';
@@ -45,7 +45,15 @@ export function PageTabBar({
       },
     });
     await page.save();
-    setPages([...pages, page.subject]);
+    // Write the form's page list explicitly and await durability — the
+    // debounced `setPages` commit is fire-and-forget, and if it never lands
+    // the page just saved above is orphaned (exists, but no form points at
+    // it).
+    await formResource.set(forms.properties.formPages, [
+      ...pages,
+      page.subject,
+    ]);
+    await formResource.save();
     onSelectPage(page.subject);
   };
 
@@ -53,6 +61,14 @@ export function PageTabBar({
     if (pages.length <= 1) {
       return;
     }
+
+    const remaining = pages.filter(p => p !== subject);
+
+    // Point the form away from the page BEFORE destroying anything, and
+    // await durability — the reverse order leaves the form referencing a
+    // destroyed page if the debounced commit never lands.
+    await formResource.set(forms.properties.formPages, remaining);
+    await formResource.save();
 
     const page = await store.getResource(subject);
     const conditions =
@@ -63,22 +79,20 @@ export function PageTabBar({
       await cond.destroy();
     }
 
-    setPages(pages.filter(p => p !== subject));
     await page.destroy();
 
     if (activePage === subject) {
-      const remaining = pages.filter(p => p !== subject);
       onSelectPage(remaining[0]);
     }
   };
 
   return (
-    <TabBarRow gap='0.5rem' center>
+    <TabBarRow gap="0.5rem" center>
       <ScrollArea>
         <ReorderableList
           subjects={pages}
           onReorder={setPages}
-          orientation='horizontal'
+          orientation="horizontal"
           renderItem={subject => (
             <PageTab
               subject={subject}
@@ -90,8 +104,8 @@ export function PageTabBar({
           )}
         />
       </ScrollArea>
-      <AddButton type='button' subtle onClick={addPage}>
-        <Row gap='.5rem' center>
+      <AddButton type="button" subtle onClick={addPage}>
+        <Row gap=".5rem" center>
           <FaPlus /> Add page
         </Row>
       </AddButton>
@@ -116,6 +130,7 @@ function PageTab({
 }: PageTabProps): JSX.Element {
   const resource = useResource(subject);
   const [name, setName] = useTitle(resource, Infinity, { commit: true });
+  const [conditions] = useArray(resource, forms.properties.formConditions);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
 
@@ -149,23 +164,25 @@ function PageTab({
   return (
     <TabRow $active={active}>
       <TabButton
-        type='button'
+        type="button"
         $active={active}
+        title={conditions.length > 0 ? 'Conditional' : undefined}
         onClick={onSelect}
         onDoubleClick={() => {
           setDraft(name);
           setEditing(true);
         }}
       >
+        {conditions.length > 0 && <BranchIcon aria-hidden />}
         {name || 'Untitled page'}
       </TabButton>
       {canDelete && (
         <IconButton
           variant={IconButtonVariant.Simple}
-          size='0.8rem'
-          color='textLight'
-          title='Delete page'
-          type='button'
+          size="0.8rem"
+          color="textLight"
+          title="Delete page"
+          type="button"
           onClick={onDelete}
         >
           <FaTrash />
@@ -195,6 +212,9 @@ const TabRow = styled(Row)<{ $active: boolean }>`
 `;
 
 const TabButton = styled.button<{ $active: boolean }>`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   text-align: left;
   padding: 0.35rem 0.6rem;
   border: none;
@@ -208,6 +228,12 @@ const TabButton = styled.button<{ $active: boolean }>`
   &:hover {
     background-color: ${p => p.theme.colors.bg1};
   }
+`;
+
+const BranchIcon = styled(FaCodeBranch)`
+  flex-shrink: 0;
+  font-size: 0.75em;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const AddButton = styled(Button)`

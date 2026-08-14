@@ -402,7 +402,7 @@ export function passkeyRpId(): string | undefined {
 export class PrfUnsupportedError extends Error {
   constructor(message = 'This device cannot protect a backup with a passkey.') {
     super(message);
-    this.name = 'PrfUnsupportedError';
+    this.name = /* @wc-ignore */ 'PrfUnsupportedError';
   }
 }
 

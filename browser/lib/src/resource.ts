@@ -1198,6 +1198,21 @@ export class Resource<C extends OptionalClass = any> {
     this._loroVersionAtLastSave = new VersionVectorClass(merged);
   }
 
+  /**
+   * Drop the save cursor entirely so the next drain export falls back to a
+   * FULL snapshot instead of a delta. Recovery path for the server's
+   * pending-deps rejection ("your update depends on ops I don't have"): the
+   * cursor sits past ops the server never received — usually because an
+   * earlier commit was lost in transit after the cursor advanced — so every
+   * delta exported from it is un-importable. A snapshot is self-contained:
+   * the server merges it and recovers the missing range along the way.
+   *
+   * @internal store-level drain only — not part of the public API.
+   */
+  public clearLoroSaveCursor(): void {
+    this._loroVersionAtLastSave = undefined;
+  }
+
   /** Base64-encode the current save cursor (last-synced Loro version) for
    *  durable storage. Returns undefined when nothing has synced yet (the
    *  cursor is the resource's whole history → handled as a first commit).
@@ -1446,8 +1461,18 @@ export class Resource<C extends OptionalClass = any> {
     this._loroDoc.import(snapshot);
     this._loroMap = this._loroDoc.getMap('properties');
 
+    // Carry over the source's cursor VALUE, not the doc's current version.
+    // Stamping `oplogVersion()` here would mark any not-yet-drained local
+    // ops as "already saved" — the next export would start past them and
+    // silently drop the edit on the wire (the incident class described in
+    // `initLoroSaveCursorIfFresh`). Copy via encode/decode: the clone's doc
+    // was seeded from the source's full snapshot, so the vector is valid
+    // for it, and sharing the WASM object would tie its lifetime to the
+    // source doc.
     this._loroVersionAtLastSave = resource._loroVersionAtLastSave
-      ? this._loroDoc.oplogVersion()
+      ? LoroLoader.Loro.VersionVector.decode(
+          resource._loroVersionAtLastSave.encode(),
+        )
       : undefined;
   }
 

@@ -2092,7 +2092,7 @@ msgstr "Agregar a favoritos"
 
 #: src/actions/resourceActions.tsx
 msgid "Toggle whether this resource appears in your Favorites."
-msgstr ""
+msgstr "Alterna si este recurso aparece en tus Favoritos."
 
 #: src/actions/resourceActions.tsx
 #: src/chunks/DashboardPage/blocks/ViewBlock.tsx
@@ -3918,39 +3918,39 @@ msgstr "Decimales"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Setting up your account…"
-msgstr ""
+msgstr "Configurando tu cuenta…"
 
 #: src/components/NewIdentitySection.tsx
 #: src/components/NewIdentitySection.tsx
 msgid "Could not back up your secret. You can still save it yourself."
-msgstr ""
+msgstr "No se pudo respaldar tu secreto. Todavía puedes guardarlo tú mismo."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Back up your secret?"
-msgstr ""
+msgstr "¿Respaldar tu secreto?"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Recovery password"
-msgstr ""
+msgstr "Contraseña de recuperación"
 
 #: src/components/NewIdentitySection.tsx
 #: src/components/NewIdentitySection.tsx
 msgid "Skip, I'll save it myself"
-msgstr ""
+msgstr "Usar un código de recuperación en su lugar"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Could not restore your account."
-msgstr ""
+msgstr "No se pudo restaurar tu cuenta."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Restore account"
-msgstr ""
+msgstr "Restaurar cuenta"
 
 #. 0: restore.email
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Enter the recovery password you set for {0}."
-msgstr ""
+msgstr "Ingresa la contraseña de recuperación que configuraste para {0}."
 
 #: src/components/Vault/VaultPanel.tsx
 #: src/components/Vault/VaultRestoreAction.tsx
@@ -3958,34 +3958,34 @@ msgstr ""
 #: src/views/getting-started/ConnectDeviceStep.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Restoring…"
-msgstr ""
+msgstr "Restaurando…"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Restore & sign in"
-msgstr ""
+msgstr "Restaurar e iniciar sesión"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Sign in to access this drive"
-msgstr ""
+msgstr "Inicia sesión para acceder a esta unidad"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Enter your agent secret to unlock this drive on this device."
-msgstr ""
+msgstr "Ingresa tu secreto de agente para desbloquear esta unidad en este dispositivo."
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Checking your {0} account…"
-msgstr ""
+msgstr "Verificando tu cuenta de {0}…"
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "To restore your account, sign in to your {0} account first, then come back here."
-msgstr ""
+msgstr "Para restaurar tu cuenta, inicia sesión en tu cuenta de {0} primero, luego vuelve aquí."
 
 #. 0: PRODUCT_NAME
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Sign in to your {0} account"
-msgstr ""
+msgstr "Inicia sesión en tu cuenta de {0}"
 
 #. 0: text
 #: src/chunks/TablePage/TableHeading.tsx
@@ -3994,14 +3994,14 @@ msgstr "Ordenar por {0}"
 
 #: src/chunks/TablePage/TableHeadingMenu.tsx
 msgid "Edit unavailable"
-msgstr ""
+msgstr "Editar no disponible"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 #: src/chunks/AI/jsonAdCompact.test.ts
 #: src/chunks/AI/jsonAdCompact.test.ts
 #: src/chunks/TablePage/Kanban/useKanbanGroupBy.ts
 msgid "Status"
-msgstr ""
+msgstr "Estado"
 
 #: src/chunks/TablePage/Kanban/KanbanView.tsx
 msgid "Setting up the board…"
@@ -4009,11 +4009,11 @@ msgstr "Configurando el tablero…"
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Start from"
-msgstr ""
+msgstr "Empezar desde"
 
 #: src/components/forms/ValueForm/ValueForm.tsx
 msgid "Click to add a value"
-msgstr ""
+msgstr "Haz clic para agregar un valor"
 
 #: src/chunks/TablePage/TableViewTabs.tsx
 msgid "Rename"
@@ -4047,11 +4047,11 @@ msgstr "Mes siguiente"
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
 msgid "Add item"
-msgstr ""
+msgstr "Agregar elemento"
 
 #: src/chunks/TablePage/Calendar/CalendarDay.tsx
 msgid "New item…"
-msgstr ""
+msgstr "Nuevo elemento…"
 
 #: src/chunks/TablePage/Kanban/KanbanView.tsx
 #: src/chunks/TablePage/createTableFromSpec.ts
@@ -4062,11 +4062,11 @@ msgstr "Fila"
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Each row is a"
-msgstr ""
+msgstr "Cada fila es una"
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Names the class of the rows — e.g. every row of an Employees table is an Employee."
-msgstr ""
+msgstr "Nombra la clase de las filas — p. ej., cada fila de una tabla de Empleados es un Empleado."
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewDriveDialog.tsx
 #: src/routes/NewDriveRoute.tsx
@@ -4079,11 +4079,11 @@ msgstr "No se pudo crear la unidad"
 
 #: src/components/CommentsPanel/CommentsPanelContainer.tsx
 msgid "Open a resource to see its comments."
-msgstr ""
+msgstr "Abre un recurso para ver sus comentarios."
 
 #: src/components/CommentsPanel/CommentsPanelContainer.tsx
 msgid "Comments"
-msgstr ""
+msgstr "Comentarios"
 
 #: src/chunks/TablePage/TableResource.tsx
 msgid "Failed to insert row"
@@ -4091,83 +4091,83 @@ msgstr "Error al insertar la fila"
 
 #: src/components/Presence/ResourcePresenceRow.tsx
 msgid "Also viewing this resource"
-msgstr ""
+msgstr "También viendo este recurso"
 
 #: src/components/Presence/SidebarPresence.tsx
 msgid "Currently here"
-msgstr ""
+msgstr "Actualmente aquí"
 
 #: src/components/Presence/FollowStatus.tsx
 #: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Show profile"
-msgstr ""
+msgstr "Mostrar perfil"
 
 #: src/components/Presence/FollowStatus.tsx
 #: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Stop following"
-msgstr ""
+msgstr "Dejar de seguir"
 
 #: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "Follow"
-msgstr ""
+msgstr "Seguir"
 
 #: src/components/Presence/PresenceAvatarMenu.tsx
 msgid "PresenceAvatarTrigger"
-msgstr ""
+msgstr "PresenceAvatarTrigger"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Don’t allow following me"
-msgstr ""
+msgstr "No permitir seguirme"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Following you"
-msgstr ""
+msgstr "Te sigue"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Following"
-msgstr ""
+msgstr "Siguiendo"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Disconnects current followers."
-msgstr ""
+msgstr "Desconecta seguidores actuales."
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Following — press for actions"
-msgstr ""
+msgstr "Siguiendo — presiona para acciones"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "These users follow you — press for actions"
-msgstr ""
+msgstr "Estos usuarios te siguen — presiona para acciones"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Enable following"
-msgstr ""
+msgstr "Activar seguimiento"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "BadgedFollowTrigger"
-msgstr ""
+msgstr "BadgedFollowTrigger"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Jump to their location"
-msgstr ""
+msgstr "Saltar a su ubicación"
 
 #: src/components/Presence/FollowStatus.tsx
 msgid "Go to the resource they are viewing right now."
-msgstr ""
+msgstr "Ir al recurso que están viendo ahora."
 
 #. 0: step + 1; 1: totalSteps
 #: src/views/Canvas/HistoryScrubOverlay.tsx
 msgid "Version {0} / {1}"
-msgstr ""
+msgstr "Versión {0} / {1}"
 
 #: src/views/Canvas/HistoryScrubOverlay.tsx
 msgid "Discarded versions"
-msgstr ""
+msgstr "Versiones descartadas"
 
 #. 0: i + 1
 #: src/views/Canvas/HistoryScrubOverlay.tsx
 msgid "Restore discarded version {0}"
-msgstr ""
+msgstr "Restaurar versión descartada {0}"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "Undo (Ctrl+Z) — drag horizontally to scrub history, hold to see discarded versions"
@@ -4303,13 +4303,13 @@ msgstr ""
 #: src/chunks/AI/useGenerativeData.test.ts
 #: src/chunks/AI/useGenerativeData.test.ts
 msgid "AI chat title generation failed"
-msgstr ""
+msgstr "Falló la generación del título del chat de IA"
 
 #: src/chunks/AI/useGenerativeData.test.ts
 #: src/chunks/AI/useGenerativeData.test.ts
 #: src/chunks/AI/useGenerativeData.test.ts
 msgid "Project planning"
-msgstr ""
+msgstr "Planificación de proyectos"
 
 #. 0: ' '
 #: src/chunks/RTE/CollaborativeEditor.tsx
@@ -4318,16 +4318,16 @@ msgstr "Ha habido un error en el editor. Por favor, refresque la página para co
 
 #: src/chunks/RTE/ImagePicker.tsx
 msgid "Caption"
-msgstr ""
+msgstr "Leyenda"
 
 #: src/chunks/RTE/ImagePicker.tsx
 msgid "Text Flow"
-msgstr ""
+msgstr "Flujo de texto"
 
 #. 0: propertyLabel; 1: rowIndex + 1
 #: src/chunks/TablePage/TableCell.tsx
 msgid "{0}, row {1}"
-msgstr ""
+msgstr "{0}, fila {1}"
 
 #: src/chunks/TablePage/TableViewTabs.tsx
 msgid "Are you sure you want to delete the <0/> view? This only removes the view, not the rows."
@@ -4336,7 +4336,7 @@ msgstr "¿Estás seguro de que quieres eliminar la vista <0/>? Esto solo elimina
 #. 0: srcName
 #: src/chunks/TablePage/useTableView.ts
 msgid "{0} copy"
-msgstr ""
+msgstr "Copia de {0}"
 
 #. 0: p; 1: theme.animation.duration
 #: src/helpers/transition.ts
@@ -4414,7 +4414,7 @@ msgstr "{0} no es una Clase. Solo los recursos con clases válidas pueden ser cr
 
 #: src/components/forms/ResourceForm.tsx
 msgid "Error in class, so this form could miss properties. You can still edit the resource, though. Error message: `"
-msgstr ""
+msgstr "Error en la clase, por lo que este formulario podría carecer de propiedades. Aun así, puedes editar el recurso. Mensaje de error: `"
 
 #: src/routes/Search/SearchRoute.tsx
 msgid "Searching for"
@@ -4426,7 +4426,7 @@ msgstr "para"
 
 #: src/routes/Share/AgentRights.tsx
 msgid "Public (anyone)"
-msgstr ""
+msgstr "Público (cualquiera)"
 
 #: src/views/Canvas/CanvasPage.tsx
 msgid "<0>Scroll</0> · <1>Space</1>+drag · middle-mouse drag — pan the canvas"
@@ -4474,11 +4474,11 @@ msgstr "quiere modificar un recurso que no está contenido en el ámbito actual.
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "No recovery backup was found for"
-msgstr ""
+msgstr "No se encontró ninguna copia de seguridad de recuperación para"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid ". Account recovery only works if you enabled it earlier."
-msgstr ""
+msgstr ". La recuperación de la cuenta solo funciona si la habilitaste antes."
 
 #: src/chunks/AI/ModelSelect/OpenRouterModelSelector.tsx
 msgid "/1K web search results"
@@ -4512,7 +4512,7 @@ msgstr "Seleccionar Archivo"
 #: src/components/forms/FilePicker/SelectedFile.tsx
 #: src/components/forms/FilePicker/SelectedFile.tsx
 msgid "{0} preview"
-msgstr ""
+msgstr "Vista previa de {0}"
 
 msgid ""
 "{0}{1}\n"
@@ -4575,16 +4575,16 @@ msgstr "Creando <0>{0} recursos</0>"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 msgid "Due date"
-msgstr ""
+msgstr "Fecha de vencimiento"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 #: src/chunks/AI/jsonAdCompact.test.ts
 msgid "Lead"
-msgstr ""
+msgstr "Cliente potencial"
 
 #: src/chunks/AI/jsonAdCompact.test.ts
 msgid "Wat"
-msgstr ""
+msgstr "Qué"
 
 #: src/components/Dropdown/index.tsx
 msgid "Filter actions…"
@@ -4601,16 +4601,16 @@ msgstr "No hay acciones coincidentes"
 #: src/actions/resourceActions.tsx
 #: src/actions/resourceActions.tsx
 msgid "Go to parent"
-msgstr ""
+msgstr "Ir al padre"
 
 #: src/actions/resourceActions.tsx
 msgid "Open the parent of this resource."
-msgstr ""
+msgstr "Abrir el padre de este recurso."
 
 #. 0: ' '
 #: src/components/OverlayContainer.tsx
 msgid "Are you sure you want to delete{0} <0/>"
-msgstr ""
+msgstr "¿Estás seguro de que quieres eliminar{0} <0/>"
 
 msgid "<0/> Go to parent resource"
 msgstr "<0/> Ir al recurso principal"
@@ -4621,11 +4621,11 @@ msgstr "Mostrar u ocultar la barra lateral"
 
 #: src/components/OverlayContainer.tsx
 msgid "Filter shortcuts…"
-msgstr ""
+msgstr "Filtrar atajos…"
 
 #: src/components/OverlayContainer.tsx
 msgid "No matching shortcuts"
-msgstr ""
+msgstr "No hay atajos coincidentes"
 
 #: src/views/Meeting/MeetingPage.tsx
 msgid "End meeting"
@@ -4649,75 +4649,75 @@ msgstr "Abandonar el espacio de trabajo de demo"
 
 #: src/routes/DemoRoute.tsx
 msgid "Could not start the demo"
-msgstr ""
+msgstr "No se pudo iniciar la demostración"
 
 #: src/routes/DemoRoute.tsx
 msgid "The demo could not start"
-msgstr ""
+msgstr "La demostración no pudo iniciar"
 
 #: src/chunks/Demo/SimulatedTypist.ts
 msgid "Map"
-msgstr ""
+msgstr "Mapa"
 
 #: src/chunks/Demo/SimulatedTypist.ts
 msgid "List"
-msgstr ""
+msgstr "Lista"
 
 #. 0: new Date().toLocaleString(undefined, { month\\: 'short', day\\: 'numeric', hour\\: '2-digit', minute\\: '2-digit', })
 #: src/components/Presence/FollowContext.tsx
 msgid "Meeting · {0}"
-msgstr ""
+msgstr "Reunión · {0}"
 
 #: src/components/Presence/FollowStatus.tsx
 #: src/components/Presence/FollowStatus.tsx
 msgid "Open meeting chat"
-msgstr ""
+msgstr "Abrir chat de la reunión"
 
 #: src/components/Presence/FollowStatus.tsx
 #: src/components/Presence/FollowStatus.tsx
 msgid "Chat and the log of resources visited during the meeting."
-msgstr ""
+msgstr "Chat y el registro de recursos visitados durante la reunión."
 
 #: src/chunks/TablePage/Timer/useTimerProps.ts
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "End"
-msgstr ""
+msgstr "Fin"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave"
-msgstr ""
+msgstr "Salir"
 
 #. 0: participants.length
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "{0} here"
-msgstr ""
+msgstr "{0} aquí"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 #: src/components/Presence/MeetingBanner.tsx
 msgid "Ending…"
-msgstr ""
+msgstr "Finalizando…"
 
 #: src/components/Presence/MeetingBanner.tsx
 #: src/components/Presence/MeetingMessageToaster.tsx
 msgid "Open the meeting chat"
-msgstr ""
+msgstr "Abrir el chat de la reunión"
 
 #. 0: title; 1: leaderName
 #: src/components/Presence/MeetingBanner.tsx
 msgid "Join {0} — led by {1}"
-msgstr ""
+msgstr "Unirse a {0} — dirigido por {1}"
 
 #: src/components/Presence/MeetingBanner.tsx
 msgid "Join"
-msgstr ""
+msgstr "Unirse"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Try the live demo"
-msgstr ""
+msgstr "Probar la demo en vivo"
 
 #: src/routes/DemoRoute.tsx
 msgid "The demo needs the local database, which is disabled in this browser. Enable it on the Sync page and try again."
-msgstr ""
+msgstr "La demostración necesita la base de datos local, que está deshabilitada en este navegador. Habilítala en la página de Sincronización e inténtalo de nuevo."
 
 #. 0: name
 #: src/components/Presence/AgentAvatar.tsx
@@ -4726,35 +4726,35 @@ msgstr "{0} está en línea"
 
 #: src/components/Presence/MeetingBanner.tsx
 msgid "Close the meeting chat"
-msgstr ""
+msgstr "Cerrar el chat de la reunión"
 
 #: src/components/PairingCode.tsx
 msgid "Pairing code copied."
-msgstr ""
+msgstr "Código de emparejamiento copiado."
 
 #: src/components/PairingCode.tsx
 msgid "Could not copy — select and copy the code manually."
-msgstr ""
+msgstr "No se pudo copiar: selecciona y copia el código manualmente."
 
 #: src/components/ConnectServerDialog.tsx
 #: src/components/ConnectToDeviceForm.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Connect"
-msgstr ""
+msgstr "Conectar"
 
 #: src/components/Presence/TypingIndicator.tsx
 msgid "<0/> is typing"
-msgstr ""
+msgstr "<0/> está escribiendo"
 
 #. 0: typers.length - 1
 #: src/components/Presence/TypingIndicator.tsx
 msgid "<0/> and {0} others are typing"
-msgstr ""
+msgstr "<0/> y {0} otros están escribiendo"
 
 #. 0: ' '
 #: src/components/Presence/TypingIndicator.tsx
 msgid "<0/> and{0} <1/> are typing"
-msgstr ""
+msgstr "<0/> y{0} <1/> están escribiendo"
 
 #: src/components/SideBar/DriveSwitcher.tsx
 msgid "Private drive"
@@ -4791,7 +4791,7 @@ msgstr "Visitadas recientemente"
 
 #: src/routes/DemoRoute.tsx
 msgid "Setting up your demo…"
-msgstr ""
+msgstr "Configurando tu demostración…"
 
 #: src/routes/SyncRoute.tsx
 msgid "Your data lives on this device — it isn’t syncing anywhere yet."
@@ -4836,7 +4836,7 @@ msgstr "Sincronizar ahora"
 
 #: src/components/ConnectServerDialog.tsx
 msgid "Embedded (this device)"
-msgstr ""
+msgstr "Integrado (este dispositivo)"
 
 #: src/routes/SyncRoute.tsx
 msgid "Node ID"
@@ -4880,15 +4880,15 @@ msgstr "Este espacio de trabajo no se ha sincronizado. Está a salvo aquí, pero
 
 #: src/components/ConnectToDeviceForm.tsx
 msgid "Camera access is needed to scan a code."
-msgstr ""
+msgstr "Se necesita acceso a la cámara para escanear un código."
 
 #: src/components/ConnectToDeviceForm.tsx
 msgid "Could not open the scanner."
-msgstr ""
+msgstr "No se pudo abrir el escáner."
 
 #: src/components/ConnectToDeviceForm.tsx
 msgid "<0/> Scan a QR code"
-msgstr ""
+msgstr "<0/> Escanear un código QR"
 
 #: src/routes/SyncRoute.tsx
 #: src/views/getting-started/ConnectDeviceStep.tsx
@@ -4897,35 +4897,35 @@ msgstr "Tus datos están en otro dispositivo"
 
 #: src/components/ConnectServerDialog.tsx
 msgid "A server keeps your workspaces online and backed up, and lets you share them with other people."
-msgstr ""
+msgstr "Un servidor mantiene tus espacios de trabajo en línea y respaldados, y te permite compartirlos con otras personas."
 
 #: src/components/ConnectServerDialog.tsx
 msgid "Switch to"
-msgstr ""
+msgstr "Cambiar a"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Connect to that device"
-msgstr ""
+msgstr "Conectar con ese dispositivo"
 
 msgid "You’re signed in, but this device doesn’t have your workspace yet. Signing in restores who you are — your data stays where you made it."
-msgstr ""
+msgstr "Has iniciado sesión, pero este dispositivo aún no tiene tu espacio de trabajo. Iniciar sesión restaura quién eres; tus datos se quedan donde los creaste."
 
 msgid "…or let it scan this device"
-msgstr ""
+msgstr "…o déjalo escanear este dispositivo"
 
 msgid "Scan this code from your other device instead. It only says where to reach this one — the other side still proves it holds your key."
-msgstr ""
+msgstr "Escanea este código desde tu otro dispositivo. Solo indica dónde encontrar este; el otro lado aún demuestra que tiene tu clave."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Skip for now"
-msgstr ""
+msgstr "Omitir por ahora"
 
 #: src/components/ConnectToDeviceForm.tsx
 msgid "Paste a pairing code or did:ad:node:…"
-msgstr ""
+msgstr "Pega un código de emparejamiento o did:ad:node:…"
 
 msgid "Open <0>Sync</0> there to show its code, then scan or paste it here."
-msgstr ""
+msgstr "Abre <0>Sincronización</0> allí para mostrar su código, luego escanéalo o pégalo aquí."
 
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Pairing device"
@@ -5021,19 +5021,19 @@ msgstr "No se pudo activar la copia de seguridad de {0}."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Skip anyway"
-msgstr ""
+msgstr "Omitir de todos modos"
 
 #: src/actions/resourceActions.tsx
 msgid "Open original"
-msgstr ""
+msgstr "Abrir original"
 
 #: src/helpers/draftsFolder.ts
 msgid "Drafts"
-msgstr ""
+msgstr "Borradores"
 
 #: src/helpers/forksFolder.ts
 msgid "Work in progress. Resources here are visible to people who can write to this drive, and are published by moving them somewhere publicly readable."
-msgstr ""
+msgstr "Trabajo en curso. Los recursos aquí son visibles para las personas que pueden escribir en esta unidad, y se publican moviéndolos a algún lugar legible públicamente."
 
 #: src/components/ForkBar.tsx
 msgid "Discard"
@@ -5065,11 +5065,11 @@ msgstr "El recurso no tiene contenido de documento editable"
 
 #: src/components/NewInstanceButton/QuickCreateRow.tsx
 msgid "New Meeting"
-msgstr ""
+msgstr "Nueva reunión"
 
 #: src/components/Presence/MeetingBanner.tsx
 msgid "Ending meeting"
-msgstr ""
+msgstr "Finalizar reunión"
 
 #: src/components/forms/NewForm/CustomCreateActions/BasicInstanceHandlers.ts
 msgid "Meeting"
@@ -5085,27 +5085,27 @@ msgstr "Cargando notas de la reunión…"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Notes"
-msgstr ""
+msgstr "Notas"
 
 #: src/actions/resourceActions.tsx
 msgid "Edit as fork"
-msgstr ""
+msgstr "Editar como fork"
 
 #: src/actions/resourceActions.tsx
 msgid "Fork this resource. The original is untouched until you merge the fork back."
-msgstr ""
+msgstr "Haz un fork de este recurso. El original no se modifica hasta que fusiones el fork de vuelta."
 
 #: src/actions/resourceActions.tsx
 msgid "Fork created"
-msgstr ""
+msgstr "Fork creado"
 
 #: src/actions/resourceActions.tsx
 msgid "Merge fork"
-msgstr ""
+msgstr "Fusionar fork"
 
 #: src/actions/resourceActions.tsx
 msgid "Write this fork onto the resource it was forked from, as a single commit."
-msgstr ""
+msgstr "Escribe este fork en el recurso del que se bifurcó, como un solo commit."
 
 #: src/actions/resourceActions.tsx
 #: src/components/ForkBar.tsx
@@ -5114,7 +5114,7 @@ msgstr "Bifurcación fusionada"
 
 #: src/actions/resourceActions.tsx
 msgid "Open the resource this fork was forked from."
-msgstr ""
+msgstr "Abrir el recurso del que se bifurcó este fork."
 
 #. 0: conflicts.length; 1: conflicts.length === 1 ? 'y was' \\: 'ies were'; 2: conflicts .map(c => c.property.split('/').pop()) .join(', '); 3: conflicts.length === 1 ? 'it' \\: 'them'
 #: src/components/ForkBar.tsx
@@ -5136,11 +5136,11 @@ msgstr "{0} bifurcaciones proponen cambios a esto:"
 
 #: src/helpers/forksFolder.ts
 msgid "Forks"
-msgstr ""
+msgstr "Bifurcaciones"
 
 #: src/helpers/draftsFolder.ts
 msgid "Unpublished new content. Resources here are visible to people who can write to this drive; publish one by moving it somewhere publicly readable."
-msgstr ""
+msgstr "Contenido nuevo no publicado. Los recursos aquí son visibles para las personas que pueden escribir en esta unidad; publique uno moviéndolo a algún lugar legible públicamente."
 
 #: src/routes/AppSettings.tsx
 msgid "Virtual drive"
@@ -5251,23 +5251,23 @@ msgstr "O pega el suyo"
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Scan this from that device"
-msgstr ""
+msgstr "Escanea esto desde ese dispositivo"
 
 msgid "Syncs your workspace with {0}, which this browser reads from. Safe to show: a code only routes."
-msgstr ""
+msgstr "Sincroniza tu espacio de trabajo con {0}, que este navegador lee. Seguro de mostrar: un código solo enruta."
 
 msgid "Connect a device that has it"
-msgstr ""
+msgstr "Conecta un dispositivo que lo tenga"
 
 msgid "An always-on device has an address — add it and your workspace appears."
-msgstr ""
+msgstr "Un dispositivo siempre encendido tiene una dirección: agrégala y tu espacio de trabajo aparecerá."
 
 #: src/routes/SyncRoute.tsx
 msgid "Error: could not disconnect that device"
 msgstr "Error: no se pudo desconectar ese dispositivo"
 
 msgid "Go to {0}"
-msgstr ""
+msgstr "Ir a {0}"
 
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/forms/InputLocalizedText.tsx
@@ -5282,12 +5282,12 @@ msgstr "Idioma ya agregado"
 #. 0: tag
 #: src/components/forms/InputLocalizedText.tsx
 msgid "Translation for {0}"
-msgstr ""
+msgstr "Traducción para {0}"
 
 #. 0: tag
 #: src/components/forms/InputLocalizedText.tsx
 msgid "Remove {0} translation"
-msgstr ""
+msgstr "Eliminar traducción de {0}"
 
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/forms/InputLocalizedText.tsx
@@ -5296,7 +5296,7 @@ msgstr "Nueva etiqueta de idioma"
 
 #: src/components/forms/InputLocalizedText.tsx
 msgid "<0/> Add language"
-msgstr ""
+msgstr "<0/> Añadir idioma"
 
 #: src/components/EditLanguagesDialog.tsx
 #: src/components/forms/InputLocalizedText.tsx
@@ -5310,30 +5310,30 @@ msgstr "Texto localizado"
 #. 0: contentLanguage; 1: title
 #: src/components/LocalizedTextValue.tsx
 msgid "No {0} translation. {1}"
-msgstr ""
+msgstr "No hay traducción para {0}. {1}"
 
 #: src/chunks/TablePage/ColumnLanguageChip.tsx
 #: src/components/ContentLanguageSelect.tsx
 #: src/components/ContentLanguageSelect.tsx
 msgid "Content language"
-msgstr ""
+msgstr "Idioma del contenido"
 
 #: src/chunks/TablePage/ColumnLanguageChip.tsx
 msgid "Unsplit language columns"
-msgstr ""
+msgstr "Unir columnas de idioma"
 
 #: src/chunks/TablePage/ColumnLanguageChip.tsx
 msgid "Split by language"
-msgstr ""
+msgstr "Dividir por idioma"
 
 #. 0: tag
 #: src/chunks/TablePage/ColumnLanguageChip.tsx
 msgid "Language: {0}"
-msgstr ""
+msgstr "Idioma: {0}"
 
 #: src/chunks/TablePage/ColumnLanguageChip.tsx
 msgid "Edit languages…"
-msgstr ""
+msgstr "Editar idiomas…"
 
 #: src/components/EditLanguagesDialog.tsx
 msgid "Languages"
@@ -5358,7 +5358,7 @@ msgstr ""
 
 #: src/components/forms/ResourceForm.tsx
 msgid "This property is server-managed and cannot be edited."
-msgstr ""
+msgstr "Esta propiedad está gestionada por el servidor y no se puede editar."
 
 #: src/routes/SyncRoute.tsx
 msgid "Local storage is off, so this server is the only data source. Enable local storage below to work disconnected."
@@ -5385,7 +5385,7 @@ msgstr "Nueva unidad"
 #: src/helpers/knownPeers.test.ts
 #: src/helpers/knownPeers.test.ts
 msgid "Joep's phone"
-msgstr ""
+msgstr "Teléfono de Joep"
 
 #: src/helpers/knownPeers.test.ts
 #: src/helpers/knownPeers.test.ts
@@ -5394,30 +5394,30 @@ msgstr ""
 #: src/helpers/pairing.test.ts
 #: src/helpers/pairing.test.ts
 msgid "Tablet"
-msgstr ""
+msgstr "Tableta"
 
 #: src/helpers/knownPeers.test.ts
 #: src/helpers/knownPeers.test.ts
 msgid "Phone"
-msgstr ""
+msgstr "Teléfono"
 
 #: src/helpers/knownPeers.test.ts
 msgid "Real"
-msgstr ""
+msgstr "Real"
 
 #: src/helpers/managedServer.test.ts
 #: src/helpers/pairing.test.ts
 msgid "Failed to fetch"
-msgstr ""
+msgstr "Error al obtener"
 
 #: src/helpers/pairing.test.ts
 #: src/helpers/pairing.test.ts
 msgid "Joep’s phone"
-msgstr ""
+msgstr "Teléfono de Joep"
 
 #: src/helpers/managed/reconcile.test.ts
 msgid "Active"
-msgstr ""
+msgstr "Activo"
 
 #: src/routes/AppSettings.tsx
 msgid "Customize"
@@ -5426,103 +5426,103 @@ msgstr "Personalizar"
 #. 0: rowName
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 msgid "Add {0}"
-msgstr ""
+msgstr "Agregar {0}"
 
 #. 0: rowName
 #: src/chunks/TablePage/Kanban/KanbanColumn.tsx
 msgid "{0} title…"
-msgstr ""
+msgstr "{0} título…"
 
 msgid "<0/>{0} Colorful mode"
 msgstr "<0/>{0} Modo colorido"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Leave video call"
-msgstr ""
+msgstr "Salir de la videollamada"
 
 #: src/components/Presence/FollowSessionPanelContainer.tsx
 msgid "Start video call"
-msgstr ""
+msgstr "Iniciar videollamada"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "Microphone access was denied — allow it in your browser to join the call."
-msgstr ""
+msgstr "Se denegó el acceso al micrófono — permítelo en tu navegador para unirte a la llamada."
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "No microphone or camera found."
-msgstr ""
+msgstr "No se encontró micrófono ni cámara."
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "Mute microphone"
-msgstr ""
+msgstr "Silenciar micrófono"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "Unmute microphone"
-msgstr ""
+msgstr "Reactivar micrófono"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "Turn camera off"
-msgstr ""
+msgstr "Apagar cámara"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "Turn camera on"
-msgstr ""
+msgstr "Encender cámara"
 
 #: src/chunks/Conference/ConferenceRoom.tsx
 msgid "Leave call"
-msgstr ""
+msgstr "Salir de la llamada"
 
 #: src/actions/resourceActions.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "Change cover"
-msgstr ""
+msgstr "Omitir, lo guardaré yo mismo"
 
 #: src/components/ResourceDecorations.tsx
 msgid "Remove cover"
-msgstr ""
+msgstr "Reposicionar"
 
 #: src/actions/resourceActions.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "Change icon"
-msgstr ""
+msgstr "Arrastra para reposicionar · suelta para guardar"
 
 #: src/actions/resourceActions.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "Add icon"
-msgstr ""
+msgstr "Cambiar icono"
 
 #: src/actions/resourceActions.tsx
 #: src/components/ResourceDecorations.tsx
 msgid "Add cover"
-msgstr ""
+msgstr "Añadir icono"
 
 #: src/actions/resourceActions.tsx
 msgid "Pick an image shown as a banner at the top of this resource."
-msgstr ""
+msgstr "Elige una imagen que se muestre como banner en la parte superior de este recurso."
 
 #: src/components/ResourceDecorations.tsx
 msgid "Icon"
-msgstr ""
+msgstr "Añadir portada"
 
 #: src/components/AvatarCropper.tsx
 msgid "Adjust image"
-msgstr ""
+msgstr "Ajustar imagen"
 
 #: src/components/AvatarCropper.tsx
 msgid "Zoom"
-msgstr ""
+msgstr "Zoom"
 
 #: src/components/ResourceDecorations.tsx
 msgid "Remove icon"
-msgstr ""
+msgstr "Icono"
 
 #: src/actions/resourceActions.tsx
 msgid "Pick an emoji or image shown next to this resource wherever it appears."
-msgstr ""
+msgstr "Elige un emoji o imagen que se muestre junto a este recurso dondequiera que aparezca."
 
 #: src/components/ResourceDecorations.tsx
 msgid "<0/> Upload image"
-msgstr ""
+msgstr "<0/> Subir imagen"
 
 #: src/chunks/EmojiInput/EmojiInput.tsx
 msgid "Upload image"
@@ -5531,7 +5531,7 @@ msgstr "Subir imagen"
 #. 0: file.name
 #: src/components/AvatarCropper.tsx
 msgid "Could not display \"{0}\" — it may not be a supported image format"
-msgstr ""
+msgstr "No se pudo mostrar \"{0}\" — puede que no sea un formato de imagen compatible"
 
 #: src/chunks/EmojiInput/EmojiInput.tsx
 msgid "Pick existing"
@@ -5539,20 +5539,20 @@ msgstr "Seleccionar existente"
 
 #: src/components/ResourceDecorations.tsx
 msgid "<0/> Pick existing"
-msgstr ""
+msgstr "<0/> Subir imagen"
 
 #: src/components/ResourceDecorations.tsx
 msgid "Reposition"
-msgstr ""
+msgstr "Cambiar portada"
 
 #: src/components/ResourceDecorations.tsx
 msgid "Drag to reposition · release to save"
-msgstr ""
+msgstr "Eliminar portada"
 
 #. 0: restore.email
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Enter the recovery code you saved for {0}."
-msgstr ""
+msgstr "Ingresa el código de recuperación que guardaste para {0}."
 
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
@@ -5564,24 +5564,24 @@ msgstr "Código de recuperación"
 #: src/components/NewIdentitySection.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Copy the code to continue"
-msgstr ""
+msgstr "Copia el código para continuar"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Save your new recovery code"
-msgstr ""
+msgstr "Guarda tu nuevo código de recuperación"
 
 #. 0: new Date().toISOString().slice(0, 10)
 #: src/helpers/managed/recovery.ts
 msgid "Recovery code saved {0}"
-msgstr ""
+msgstr "Código de recuperación guardado {0}"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Save your recovery code"
-msgstr ""
+msgstr "Guarda tu código de recuperación"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Are you sure you've stored this code somewhere safe? You cannot recover your account without it."
-msgstr ""
+msgstr "¿Estás seguro de que has guardado este código en un lugar seguro? No puedes recuperar tu cuenta sin él."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Generating…"
@@ -5589,7 +5589,7 @@ msgstr "Generando…"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Generate my recovery code"
-msgstr ""
+msgstr "Generar mi código de recuperación"
 
 #: src/helpers/managed/recovery.ts
 msgid "PrfUnsupportedError"
@@ -5598,69 +5598,69 @@ msgstr ""
 #. 0: new Date().toISOString().slice(0, 10)
 #: src/helpers/managed/recovery.ts
 msgid "Passkey added {0}"
-msgstr ""
+msgstr "Clave de acceso añadida {0}"
 
 #: src/helpers/managed/recovery.ts
 msgid "That passkey could not unlock this backup."
-msgstr ""
+msgstr "Esa clave de acceso no pudo desbloquear esta copia de seguridad."
 
 #: src/helpers/managed/recovery.ts
 msgid "Wrong recovery code"
-msgstr ""
+msgstr "Código de recuperación incorrecto"
 
 #. 0: e.message
 #: src/components/NewIdentitySection.tsx
 msgid "{0} You can save a recovery code instead."
-msgstr ""
+msgstr "{0} Puedes guardar un código de recuperación en su lugar."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Checking what this device supports…"
-msgstr ""
+msgstr "Comprobando qué admite este dispositivo…"
 
 #: src/components/NewIdentitySection.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Waiting for your passkey…"
-msgstr ""
+msgstr "Usa tu huella dactilar, rostro o bloqueo de pantalla: el mismo que desbloquea este dispositivo. Nada que escribir, y también funciona en tus otros dispositivos."
 
 #: src/components/NewIdentitySection.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Use a recovery code instead"
-msgstr ""
+msgstr "Usar una clave de acceso"
 
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Atomic account"
-msgstr ""
+msgstr "Cuenta atómica"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Could not unlock with your passkey."
-msgstr ""
+msgstr "No se pudo desbloquear con tu clave de acceso."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Unlock with your passkey"
-msgstr ""
+msgstr "Desbloquear con tu passkey"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Use your passkey instead"
-msgstr ""
+msgstr "Usar tu passkey en su lugar"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not add a recovery code."
 msgstr "No se pudo añadir un código de recuperación."
 
 msgid "This passkey only works on this device"
-msgstr ""
+msgstr "Esta clave de acceso solo funciona en este dispositivo"
 
 msgid "Give me a recovery code"
-msgstr ""
+msgstr "Dame un código de recuperación"
 
 msgid "Continue without one"
-msgstr ""
+msgstr "Continuar sin uno"
 
 #: src/routes/SettingsAgent.tsx
 msgid "How you get back in on a new device — and where to find your agent secret."
@@ -5684,63 +5684,63 @@ msgstr "Mostrar mi secreto de agente"
 
 #: src/components/NewIdentitySection.tsx
 msgid "This is your account"
-msgstr ""
+msgstr "Esta es tu cuenta"
 
 #. 0: PRODUCT_NAME
 #: src/components/NewIdentitySection.tsx
 msgid "Anyone who has this <0>is</0> you — on any device, forever. It can't be changed or revoked. It's also the only thing that still works if {0} disappears."
-msgstr ""
+msgstr "Cualquiera que tenga esto <0>es</0> tú, en cualquier dispositivo, para siempre. No se puede cambiar ni revocar. También es lo único que aún funciona si {0} desaparece."
 
 #. 0: ' '
 #: src/components/NewIdentitySection.tsx
 msgid "Store it like a passport, not a password: a password manager, or{0} <0>Save backup file</0> below and move it somewhere private. Never email or chat it."
-msgstr ""
+msgstr "Guárdalo como un pasaporte, no como una contraseña: un gestor de contraseñas, o{0} <0>Guardar archivo de respaldo</0> abajo y muévelo a un lugar privado. Nunca lo envíes por correo o chat."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Protect your account"
-msgstr ""
+msgstr "Omitir, lo guardaré yo mismo"
 
 msgid "Use your fingerprint, face, or screen lock — the same one that unlocks this device. Nothing to write down, and it works on your other devices too."
-msgstr ""
+msgstr "Proteger tu cuenta"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Use a passkey"
-msgstr ""
+msgstr "Esperando tu clave de acceso…"
 
 #: src/components/NewIdentitySection.tsx
 msgid "This device can’t use passkeys, so we’ll give you a recovery code instead — a spare key for your account."
-msgstr ""
+msgstr "Este dispositivo no puede usar claves de acceso, así que te daremos un código de recuperación en su lugar: una llave de repuesto para tu cuenta."
 
 #: src/components/NewIdentitySection.tsx
 msgid "A spare key for your account."
-msgstr ""
+msgstr "Una llave de repuesto para tu cuenta."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Save a recovery code"
-msgstr ""
+msgstr "Guardar un código de recuperación"
 
 #. 0: passkeySupported === false ? 'This device can’t use passkeys, so we’ll give you a recovery code instead — a spare key for your account.' \\: 'A spare key for your account.'; 1: ' '
 #: src/components/NewIdentitySection.tsx
 msgid "{0}{1} You'll also need to sign in to your email to use it, so it's safe to keep in a password manager or on paper."
-msgstr ""
+msgstr "{0}{1} También necesitarás iniciar sesión en tu correo electrónico para usarlo, así que es seguro guardarlo en un gestor de contraseñas o en papel."
 
 msgid "It isn't synced to your other devices, so losing this one would lock you out. A recovery code is a spare key — you'll need your email to use it, so it's safe to keep on paper."
-msgstr ""
+msgstr "No está sincronizada con tus otros dispositivos, por lo que perder este te bloquearía. Un código de recuperación es una llave de repuesto; necesitarás tu correo electrónico para usarlo, así que es seguro guardarlo en papel."
 
 msgid "Keep this somewhere safe. You'll need it — plus your email — to get back in. We can't show it again, but you can generate a new one from Settings whenever you like."
-msgstr ""
+msgstr "Mantén esto en un lugar seguro. Lo necesitarás, junto con tu correo electrónico, para volver a entrar. No podemos mostrarlo de nuevo, pero puedes generar uno nuevo desde Ajustes cuando quieras."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Protect my account"
-msgstr ""
+msgstr "Proteger mi cuenta"
 
 #: src/components/NewIdentitySection.tsx
 msgid "Skip this?"
-msgstr ""
+msgstr "¿Omitir esto?"
 
 #: src/components/NewIdentitySection.tsx
 msgid "<0>Then it's all on you.</0> We'll show you your secret next — it's the only copy that will ever exist, nobody can reset it for you, and losing it means losing your account and everything in it. Fine if you'll genuinely keep it safe."
-msgstr ""
+msgstr "<0>Entonces todo depende de ti.</0> A continuación te mostraremos tu secreto: es la única copia que existirá jamás, nadie puede restablecerlo por ti, y perderlo significa perder tu cuenta y todo lo que contiene. Bien si realmente lo mantendrás seguro."
 
 #. 0: PRODUCT_NAME; 1: ' '
 #: src/components/AccountRecoveryCard.tsx
@@ -5750,15 +5750,15 @@ msgstr "Esta <0>es</0> tu cuenta — cualquiera que la tenga eres tú, en cualqu
 #. 0: restore.email
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Unlock {0} with your fingerprint, face, or screen lock."
-msgstr ""
+msgstr "Desbloquea {0} con tu huella digital, rostro o bloqueo de pantalla."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "We've replaced your old recovery password with a stronger generated code. Keep it somewhere safe — you'll need it, plus your email, to get back in. We can't show it again, but you can generate a new one from Settings any time."
-msgstr ""
+msgstr "Hemos reemplazado tu antigua contraseña de recuperación con un código generado más seguro. Guárdalo en un lugar seguro; lo necesitarás, junto con tu correo electrónico, para volver a acceder. No podemos mostrarlo de nuevo, pero puedes generar uno nuevo desde Configuración en cualquier momento."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Signed out of your account here — that secret belongs to a different one."
-msgstr ""
+msgstr "Se cerró sesión de tu cuenta aquí — ese secreto pertenece a una diferente."
 
 #: src/routes/SettingsAgent.tsx
 msgid "More profile fields"
@@ -5790,12 +5790,12 @@ msgstr "Añadir una foto"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Use your fingerprint, face, or screen lock."
-msgstr ""
+msgstr "Usa tu huella digital, rostro o bloqueo de pantalla."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "or sign in another way"
-msgstr ""
+msgstr "o iniciar sesión de otra manera"
 
 #: src/routes/SettingsAgent.tsx
 msgid "Sign out. You can get back in on this device with your passkey."
@@ -5819,7 +5819,7 @@ msgstr "Abrir por URL"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Continue as"
-msgstr ""
+msgstr "Continuar como"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not reach your backup. Try again."
@@ -5827,14 +5827,14 @@ msgstr "No se pudo acceder a tu copia de seguridad. Inténtalo de nuevo."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Paste your agent secret"
-msgstr ""
+msgstr "Pega tu secreto de agente"
 
 msgid "Use my account instead"
-msgstr ""
+msgstr "Usar mi cuenta en su lugar"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "That doesn’t look like a valid agent secret."
-msgstr ""
+msgstr "Eso no parece un secreto de agente válido."
 
 #: src/routes/SettingsAgent.tsx
 msgid "Whether this browser stays signed in as you when anyone opens it."
@@ -5885,11 +5885,11 @@ msgstr "Iniciar de nuevo"
 
 #: src/chunks/TablePage/Timer/useTimerProps.ts
 msgid "When tracking of this entry started."
-msgstr ""
+msgstr "Cuando comenzó el seguimiento de esta entrada."
 
 #: src/chunks/TablePage/Timer/useTimerProps.ts
 msgid "When tracking of this entry stopped."
-msgstr ""
+msgstr "Cuando terminó el seguimiento de esta entrada."
 
 #: src/chunks/TablePage/Timer/TimerToolbar.tsx
 msgid "One at a time"
@@ -5946,44 +5946,44 @@ msgstr "Calculado"
 #. 0: spec.label
 #: src/chunks/TablePage/DerivedColumnHeading.tsx
 msgid "Remove the {0} column from this view. It is computed, so no data is deleted — add it back any time."
-msgstr ""
+msgstr "Elimina la columna {0} de esta vista. Es calculada, por lo que no se eliminan datos; puedes volver a agregarla en cualquier momento."
 
 #: src/chunks/TablePage/DerivedColumnHeading.tsx
 msgid "Remove computed column"
-msgstr ""
+msgstr "Eliminar columna calculada"
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Edit computed column"
-msgstr ""
+msgstr "Editar columna calculada"
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "New computed column"
-msgstr ""
+msgstr "Nueva columna calculada"
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Computes"
-msgstr ""
+msgstr "Calcula"
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Choose a column…"
-msgstr ""
+msgstr "Elige una columna…"
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "A fixed number…"
-msgstr ""
+msgstr "Un número fijo…"
 
 #. 0: arg.accepts === 'instant' ? 'date' \\: 'number'
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "This table has no {0} column to use here yet."
-msgstr ""
+msgstr "Esta tabla aún no tiene una columna {0} para usar aquí."
 
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 msgid "Add column"
-msgstr ""
+msgstr "Agregar columna"
 
 #: src/chunks/TablePage/derivedColumns.test.ts
 msgid "No kind"
-msgstr ""
+msgstr "Ningún tipo"
 
 #: src/chunks/TablePage/TableSummaryBar.tsx
 msgid "Only the largest groups are shown."
@@ -5996,21 +5996,21 @@ msgstr "Por {0}"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Break down by"
-msgstr ""
+msgstr "Desglosar por"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Per day"
-msgstr ""
+msgstr "Por día"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Per month"
-msgstr ""
+msgstr "Por mes"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Per exact value"
-msgstr ""
+msgstr "Por valor exacto"
 
 #. 0: column.virtual?.label
 #: src/chunks/TablePage/TableHeading.tsx
@@ -6041,15 +6041,15 @@ msgstr "Limpiar desglose"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Break down the totals"
-msgstr ""
+msgstr "Desglosar los totales"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Nothing — one total per column"
-msgstr ""
+msgstr "Nada — un total por columna"
 
 #: src/chunks/TablePage/BreakdownDialog.tsx
 msgid "Splits each total per distinct value of a column — per project, per month, per status — under the table. Computed by the server over every matching row, like the totals themselves."
-msgstr ""
+msgstr "Divide cada total por valor distinto de una columna — por proyecto, por mes, por estado — debajo de la tabla. Calculado por el servidor sobre cada fila coincidente, como los totales mismos."
 
 #: src/chunks/TablePage/TableTotalsFooter.tsx
 msgid "Add a totals row"
@@ -6104,44 +6104,44 @@ msgstr "Filtrar filas por una columna"
 
 #: src/chunks/DashboardPage/DashboardPage.tsx
 msgid "This dashboard has no blocks yet."
-msgstr ""
+msgstr "Este panel no tiene bloques todavía."
 
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 msgid "Configure"
-msgstr ""
+msgstr "Configurar"
 
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 msgid "Width"
-msgstr ""
+msgstr "Ancho"
 
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 msgid "Move earlier"
-msgstr ""
+msgstr "Mover antes"
 
 #: src/chunks/DashboardPage/DashboardBlock.tsx
 msgid "Move later"
-msgstr ""
+msgstr "Mover después"
 
 #. 0: kind
 #: src/chunks/DashboardPage/BlockRenderer.tsx
 msgid "This block is a “{0}”, which this version can’t show."
-msgstr ""
+msgstr "Este bloque es un “{0}”, que esta versión no puede mostrar."
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "What this shows"
-msgstr ""
+msgstr "Qué muestra esto"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Every row"
-msgstr ""
+msgstr "Cada fila"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Rows"
-msgstr ""
+msgstr "Filas"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Measure"
-msgstr ""
+msgstr "Medida"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
@@ -6152,47 +6152,47 @@ msgstr "Elige una columna…"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Of"
-msgstr ""
+msgstr "De"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "One bar per"
-msgstr ""
+msgstr "Una barra por"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Each value"
-msgstr ""
+msgstr "Cada valor"
 
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Bucket"
-msgstr ""
+msgstr "Cubo"
 
 #: src/chunks/DashboardPage/blocks/ViewBlock.tsx
 msgid "Pick a table to show"
-msgstr ""
+msgstr "Elige una tabla para mostrar"
 
 #: src/chunks/DashboardPage/blocks/TextBlock.tsx
 msgid "Nothing written here yet"
-msgstr ""
+msgstr "Nada escrito aquí aún"
 
 #: src/chunks/DashboardPage/blocks/StatBlock.tsx
 msgid "Pick something to measure"
-msgstr ""
+msgstr "Elige algo para medir"
 
 #: src/chunks/DashboardPage/blocks/ChartBlock.tsx
 msgid "Pick a number and something to group it by"
-msgstr ""
+msgstr "Elige un número y algo para agruparlo"
 
 #: src/chunks/DashboardPage/blocks/ChartBlock.tsx
 msgid "No data yet"
-msgstr ""
+msgstr "Sin datos aún"
 
 #: src/chunks/DashboardPage/blocks/ChartBlock.tsx
 msgid "Showing the largest"
-msgstr ""
+msgstr "Mostrando el más grande"
 
 #: src/chunks/DashboardPage/blocks/ChartBlock.tsx
 msgid "groups"
-msgstr ""
+msgstr "grupos"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/rowActions.ts
@@ -6202,35 +6202,35 @@ msgstr "Valor"
 #. 0: spec.label
 #: src/chunks/TablePage/RowActionHeading.tsx
 msgid "Remove the {0} button from this view. Nothing already recorded by pressing it is affected — add it back any time."
-msgstr ""
+msgstr "Elimina el botón {0} de esta vista. Nada de lo ya registrado al presionarlo se ve afectado; puedes volver a agregarlo en cualquier momento."
 
 #: src/chunks/TablePage/RowActionHeading.tsx
 msgid "Remove action"
-msgstr ""
+msgstr "Eliminar acción"
 
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Edit action"
-msgstr ""
+msgstr "Editar acción"
 
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Add an action"
-msgstr ""
+msgstr "Agregar una acción"
 
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Does what"
-msgstr ""
+msgstr "Qué hace"
 
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "This table has no column of the right kind for that yet."
-msgstr ""
+msgstr "Esta tabla aún no tiene una columna del tipo adecuado para eso."
 
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "To column"
-msgstr ""
+msgstr "Columna de destino"
 
 #: src/chunks/TablePage/RowActionDialog.tsx
 msgid "Pick an option…"
-msgstr ""
+msgstr "Elige una opción…"
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 #: src/chunks/TablePage/RowActionDialog.tsx
@@ -6248,7 +6248,7 @@ msgstr "Un botón en cada fila: \"Regado\", \"Marcar como hecho\", \"+1\"."
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewTableDialog.tsx
 msgid "Creating table…"
-msgstr ""
+msgstr "Creando tabla…"
 
 #: src/components/Template/ApplyTemplateDialog.tsx
 msgid "Applying template…"
@@ -6282,7 +6282,7 @@ msgstr "Registrar un feed"
 
 #: src/chunks/TablePage/QuickAddDialog.tsx
 msgid "It sits above the rows and creates one. Everything else about the row is edited in the table."
-msgstr ""
+msgstr "Se encuentra encima de las filas y crea una. Todo lo demás sobre la fila se edita en la tabla."
 
 #: src/chunks/TablePage/QuickAddFields.tsx
 msgid "Ask for a value first"
@@ -6314,15 +6314,15 @@ msgstr "También establecer"
 
 #: src/chunks/DashboardPage/blocks/CreateBlock.tsx
 msgid "Pick a table to add to"
-msgstr ""
+msgstr "Elige una tabla para agregar"
 
 #: src/chunks/DashboardPage/blocks/CreateBlock.tsx
 msgid "Say what the button does"
-msgstr ""
+msgstr "Di qué hace el botón"
 
 #: src/chunks/DashboardPage/blocks/CreateBlock.tsx
 msgid "That table has no row class yet"
-msgstr ""
+msgstr "Esa tabla aún no tiene clase de fila"
 
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewDashboardDialog.tsx
 msgid "Dashboard"
@@ -6342,51 +6342,51 @@ msgstr "Nuevo panel de control"
 
 #: src/chunks/DashboardPage/DashboardPage.tsx
 msgid "Nothing here yet. Add a number, a chart, a button or a table."
-msgstr ""
+msgstr "Aún no hay nada aquí. Añade un número, un gráfico, un botón o una tabla."
 
 #. 0: fn
 #: src/chunks/DashboardPage/BlockConfigDialog.tsx
 msgid "Pick a column for the {0} to measure"
-msgstr ""
+msgstr "Elige una columna para que {0} mida"
 
 #: src/helpers/stringToSlug.test.ts
 msgid "Last watered"
-msgstr ""
+msgstr "Último riego"
 
 #: src/helpers/stringToSlug.test.ts
 msgid "Meat & fish"
-msgstr ""
+msgstr "Carne y pescado"
 
 #: src/helpers/stringToSlug.test.ts
 msgid "Quantity / unit"
-msgstr ""
+msgstr "Cantidad / unidad"
 
 #: src/helpers/stringToSlug.test.ts
 msgid "Plan B2 - final"
-msgstr ""
+msgstr "Plan B2 - final"
 
 #: src/chunks/TablePage/quickAdd.test.ts
 #: src/chunks/TablePage/quickAdd.test.ts
 msgid "What do you need?"
-msgstr ""
+msgstr "¿Qué necesitas?"
 
 #: src/chunks/TablePage/tableAggregates.test.ts
 msgid "Total"
-msgstr ""
+msgstr "Total"
 
 #: src/chunks/TablePage/rowActions.test.ts
 msgid "Do it"
-msgstr ""
+msgstr "Hacerlo"
 
 #. 0: kind; 1: count
 #: src/chunks/TablePage/derivedColumns.test.ts
 msgid "{0} takes {1} arguments; raise MAX_DERIVED_ARGS and add a subscription in DerivedCell"
-msgstr ""
+msgstr "{0} toma {1} argumentos; aumenta MAX_DERIVED_ARGS y añade una suscripción en DerivedCell"
 
 #. 0: aggregate.computedColumn
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} is not a computed column of this view"
-msgstr ""
+msgstr "{0} no es una columna calculada de esta vista"
 
 #. 0: aggregate.column
 #. 0: value
@@ -6395,62 +6395,62 @@ msgstr ""
 #: src/chunks/TablePage/tableTemplates.test.ts
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} is not a column"
-msgstr ""
+msgstr "{0} no es una columna"
 
 #. 0: derived.name; 1: name
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} is missing {1}"
-msgstr ""
+msgstr "A {0} le falta {1}"
 
 #. 0: derived.name; 1: name; 2: value
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0}.{1} reads {2}"
-msgstr ""
+msgstr "{0}.{1} lee {2}"
 
 #. 0: action.label; 1: action.column
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} writes \"{1}\", which is not a column"
-msgstr ""
+msgstr "{0} escribe \"{1}\", que no es una columna"
 
 #. 0: action.label; 1: type
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} stamps now into a {1} column"
-msgstr ""
+msgstr "{0} sella la hora actual en una columna de tipo {1}"
 
 #. 0: action.label; 1: type
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} toggles a {1} column"
-msgstr ""
+msgstr "{0} alterna una columna de tipo {1}"
 
 #. 0: action.label; 1: type
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} increments a {1} column"
-msgstr ""
+msgstr "{0} incrementa una columna de tipo {1}"
 
 #. 0: action.label
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} needs a step"
-msgstr ""
+msgstr "{0} necesita un paso"
 
 #. 0: action.label
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} needs a value to write"
-msgstr ""
+msgstr "{0} necesita un valor para escribir"
 
 #. 0: action.label; 1: action.value; 2: action.column
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} sets \"{1}\", not an option of {2}"
-msgstr ""
+msgstr "{0} establece \"{1}\", que no es una opción de {2}"
 
 #. 0: quickAdd.label; 1: quickAdd.field
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} types into \"{1}\", which is not a column"
-msgstr ""
+msgstr "{0} escribe en \"{1}\", que no es una columna"
 
 #. 0: quickAdd.label; 1: preset.column
 #: src/chunks/TablePage/tableTemplates.test.ts
 msgid "{0} presets \"{1}\", which is not a column"
-msgstr ""
+msgstr "{0} preestablece \"{1}\", que no es una columna"
 
 #: src/routes/AboutRoute.tsx
 msgid "The one workspace for everything, owned by you."
@@ -8176,11 +8176,11 @@ msgstr "Nombra la clase de un único envío — p. ej., cada respuesta de un for
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "Add a question before this one first"
-msgstr ""
+msgstr "Agregue una pregunta antes de esta primero"
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "and"
-msgstr ""
+msgstr "y"
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "<0/> Add condition"
@@ -8192,20 +8192,49 @@ msgstr ""
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "All of these must match. Leave empty to always show."
-msgstr ""
+msgstr "Todos deben coincidir. Déjelo vacío para mostrar siempre."
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "Remove condition"
-msgstr ""
+msgstr "Eliminar condición"
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "checked"
-msgstr ""
+msgstr "marcado"
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "unchecked"
-msgstr ""
+msgstr "sin marcar"
 
 #: src/chunks/FormBuilder/FieldRow.tsx
 msgid "Conditional"
-msgstr ""
+msgstr "Condicional"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Add condition"
+msgstr "Agregar condición"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Done"
+msgstr "Hecho"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Always shown"
+msgstr "Siempre visible"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "1 condition"
+msgstr "1 condición"
+
+#. 0: count
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "{0} conditions"
+msgstr "{0} condiciones"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Show Page When"
+msgstr "Mostrar página cuando"
+
+#: src/chunks/FormBuilder/ConditionsEditor.tsx
+msgid "Show Field When"
+msgstr "Mostrar campo cuando"

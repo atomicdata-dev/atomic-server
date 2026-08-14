@@ -11,7 +11,7 @@ import {
 } from '@tomic/react';
 import type { JSX } from 'react';
 import { styled } from 'styled-components';
-import { FaPlus, FaTrash } from 'react-icons/fa6';
+import { FaCodeBranch, FaPlus, FaTrash } from 'react-icons/fa6';
 import Field from '@components/forms/Field';
 import { BasicSelect } from '@components/forms/BasicSelect';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
@@ -21,6 +21,7 @@ import {
   IconButton,
   IconButtonVariant,
 } from '@components/IconButton/IconButton';
+import { Dialog, useDialog } from '@components/Dialog';
 import {
   previousQuestions,
   useFormQuestions,
@@ -46,6 +47,70 @@ interface ConditionsEditorProps {
 }
 
 export function ConditionsEditor({
+  resource,
+  form,
+  beforeField,
+  beforePage,
+}: ConditionsEditorProps): JSX.Element {
+  const [dialogProps, show, close, isOpen] = useDialog();
+  const [conditionSubjects] = useArray(
+    resource,
+    forms.properties.formConditions,
+  );
+  const title = beforePage ? 'Show Page When' : 'Show Field When';
+
+  return (
+    <>
+      <Field label={title}>
+        <OpenButton
+          type="button"
+          subtle
+          data-testid="edit-conditions"
+          onClick={show}
+        >
+          <Row gap=".5rem" center>
+            <FaCodeBranch />
+            <ConditionsSummary count={conditionSubjects.length} />
+          </Row>
+        </OpenButton>
+      </Field>
+      <Dialog {...dialogProps} width="40rem">
+        {isOpen && (
+          <>
+            <Dialog.Title>
+              <h1>{title}</h1>
+            </Dialog.Title>
+            <Dialog.Content>
+              <ConditionsList
+                resource={resource}
+                form={form}
+                beforeField={beforeField}
+                beforePage={beforePage}
+              />
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onClick={() => close(true)}>Done</Button>
+            </Dialog.Actions>
+          </>
+        )}
+      </Dialog>
+    </>
+  );
+}
+
+function ConditionsSummary({ count }: { count: number }): JSX.Element {
+  if (count === 0) {
+    return <span>Always shown</span>;
+  }
+
+  if (count === 1) {
+    return <span>1 condition</span>;
+  }
+
+  return <span>{count} conditions</span>;
+}
+
+function ConditionsList({
   resource,
   form,
   beforeField,
@@ -89,11 +154,9 @@ export function ConditionsEditor({
   };
 
   return (
-    <Field
-      label='Show when'
-      helper='All of these must match. Leave empty to always show.'
-    >
-      <Column gap='0.4rem'>
+    <Column gap="0.75rem">
+      <Helper>All of these must match. Leave empty to always show.</Helper>
+      <Column gap="0.4rem">
         {conditionSubjects.map((subject, index) => (
           <div key={subject}>
             {index > 0 && <AndLabel>and</AndLabel>}
@@ -105,9 +168,9 @@ export function ConditionsEditor({
           </div>
         ))}
         <AddButton
-          type='button'
+          type="button"
           subtle
-          data-testid='add-condition'
+          data-testid="add-condition"
           disabled={available.length === 0}
           title={
             available.length === 0
@@ -116,13 +179,13 @@ export function ConditionsEditor({
           }
           onClick={addCondition}
         >
-          <Row gap='.5rem' center>
+          <Row gap=".5rem" center>
             <FaPlus />
             <span>Add condition</span>
           </Row>
         </AddButton>
       </Column>
-    </Field>
+    </Column>
   );
 }
 
@@ -167,9 +230,9 @@ function ConditionRow({
   };
 
   return (
-    <Row gap='0.4rem' center>
-      <BasicSelect
-        data-testid='condition-field'
+    <ConditionGrid>
+      <ShrinkSelect
+        data-testid="condition-field"
         value={fieldSubject ?? ''}
         onChange={e => onFieldChange(e.target.value)}
       >
@@ -178,9 +241,9 @@ function ConditionRow({
             {q.label}
           </option>
         ))}
-      </BasicSelect>
-      <BasicSelect
-        data-testid='condition-operator'
+      </ShrinkSelect>
+      <ShrinkSelect
+        data-testid="condition-operator"
         value={operator ?? 'equals'}
         onChange={e => setOperator(e.target.value)}
       >
@@ -189,7 +252,7 @@ function ConditionRow({
             {op.label}
           </option>
         ))}
-      </BasicSelect>
+      </ShrinkSelect>
       <ValueInput
         question={selected}
         value={parseConditionValue(value)}
@@ -197,16 +260,16 @@ function ConditionRow({
       />
       <IconButton
         variant={IconButtonVariant.Simple}
-        size='0.8rem'
-        color='textLight'
-        title='Remove condition'
-        type='button'
-        data-testid='remove-condition'
+        size="0.8rem"
+        color="textLight"
+        title="Remove condition"
+        type="button"
+        data-testid="remove-condition"
         onClick={onRemove}
       >
         <FaTrash />
       </IconButton>
-    </Row>
+    </ConditionGrid>
   );
 }
 
@@ -222,7 +285,7 @@ function ValueInput({
   if (!question) {
     return (
       <InputWrapper>
-        <InputStyled data-testid='condition-value' disabled />
+        <InputStyled data-testid="condition-value" disabled />
       </InputWrapper>
     );
   }
@@ -231,14 +294,14 @@ function ValueInput({
     const boolVal = value === true;
 
     return (
-      <BasicSelect
-        data-testid='condition-value'
+      <ShrinkSelect
+        data-testid="condition-value"
         value={boolVal ? 'true' : 'false'}
         onChange={e => onChange(e.target.value === 'true')}
       >
-        <option value='true'>checked</option>
-        <option value='false'>unchecked</option>
-      </BasicSelect>
+        <option value="true">checked</option>
+        <option value="false">unchecked</option>
+      </ShrinkSelect>
     );
   }
 
@@ -250,8 +313,8 @@ function ValueInput({
     const current = typeof value === 'string' ? value : '';
 
     return (
-      <BasicSelect
-        data-testid='condition-value'
+      <ShrinkSelect
+        data-testid="condition-value"
         value={current}
         onChange={e => onChange(e.target.value)}
       >
@@ -260,7 +323,7 @@ function ValueInput({
             {opt}
           </option>
         ))}
-      </BasicSelect>
+      </ShrinkSelect>
     );
   }
 
@@ -268,8 +331,8 @@ function ValueInput({
     return (
       <InputWrapper>
         <InputStyled
-          data-testid='condition-value'
-          type='number'
+          data-testid="condition-value"
+          type="number"
           value={typeof value === 'number' ? value : ''}
           onChange={e =>
             onChange(e.target.value === '' ? '' : Number(e.target.value))
@@ -283,8 +346,8 @@ function ValueInput({
     return (
       <InputWrapper>
         <InputStyled
-          data-testid='condition-value'
-          type='date'
+          data-testid="condition-value"
+          type="date"
           value={typeof value === 'string' ? value : ''}
           onChange={e => onChange(e.target.value)}
         />
@@ -295,7 +358,7 @@ function ValueInput({
   return (
     <InputWrapper>
       <InputStyled
-        data-testid='condition-value'
+        data-testid="condition-value"
         value={
           typeof value === 'string' || typeof value === 'number' ? value : ''
         }
@@ -332,6 +395,17 @@ function parseConditionValue(raw: JSONValue | undefined): JSONValue {
   return raw;
 }
 
+const OpenButton = styled(Button)`
+  width: 100%;
+  justify-content: flex-start;
+`;
+
+const Helper = styled.p`
+  margin: 0;
+  font-size: 0.9rem;
+  color: ${p => p.theme.colors.textLight};
+`;
+
 const AndLabel = styled.p`
   margin: 0.15rem 0;
   font-size: 0.8rem;
@@ -343,4 +417,19 @@ const AddButton = styled(Button)`
   box-shadow: none;
   border: 1px dashed ${p => p.theme.colors.bg2};
   background: none;
+`;
+
+const ConditionGrid = styled.div`
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 0.4rem;
+  align-items: center;
+
+  & > * {
+    min-width: 0;
+  }
+`;
+
+const ShrinkSelect = styled(BasicSelect)`
+  min-width: 0;
 `;

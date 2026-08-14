@@ -571,6 +571,48 @@ describe('resource.ts', () => {
     const delta = doc.export({ mode: 'update', from: lvasAfterEcho });
     expect(delta.length).toBeGreaterThan(40);
   });
+
+  /**
+   * Regression: `cloneLoroStateFrom` used to stamp the CLONE's current
+   * oplog version as its save cursor whenever the source had any cursor.
+   * A clone (or `merge(…, { replaceLoroDocs: true })`) of a resource
+   * holding not-yet-drained local ops thereby marked those ops "already
+   * saved" — the next export started past them and the edit silently
+   * never reached the server. The clone must carry the source's cursor
+   * VALUE.
+   */
+  it('clone preserves the save cursor value, keeping un-drained ops exportable', async ({
+    expect,
+  }) => {
+    const name = 'https://atomicdata.dev/properties/name';
+    const r = new Resource('https://example.com/clone-cursor');
+    await r.set(name, 'a', false);
+    const doc = r.getLoroDoc()!;
+    doc.commit();
+
+    // Cursor state after a successful sign of "a".
+    const lvasAtSign = doc.oplogVersion();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (r as any)._loroVersionAtLastSave = lvasAtSign;
+
+    // A local edit that has NOT been drained yet.
+    await r.set(name, 'ab', false);
+    doc.commit();
+    expect(r.hasOpsPastSaveCursor()).toBe(true);
+
+    const cloned = r.clone();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const clonedCursor = (cloned as any)._loroVersionAtLastSave;
+    expect(clonedCursor.encode()).toEqual(lvasAtSign.encode());
+    expect(cloned.hasOpsPastSaveCursor()).toBe(true);
+
+    // The next export from the clone still carries the un-drained op.
+    const delta = cloned
+      .getLoroDoc()!
+      .export({ mode: 'update', from: clonedCursor });
+    expect(delta.length).toBeGreaterThan(40);
+  });
 });
 
 describe('Resource.merge Loro options', () => {

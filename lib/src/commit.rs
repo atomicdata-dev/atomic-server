@@ -85,6 +85,12 @@ pub struct CommitApplied {
     /// the caller can export everything the apply added — including what
     /// the server writes afterwards — as one delta for live subscribers.
     pub vv_before: Option<loro::VersionVector>,
+    /// True when the commit's `loroUpdate` carried ops whose causal
+    /// dependencies are missing from the stored doc. Loro parks those ops
+    /// as *pending*: they don't advance the version vector and contribute
+    /// nothing to state, so without an explicit check they masquerade as
+    /// an idempotent replay while the client's writes silently vanish.
+    pub imported_pending_ops: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -684,6 +690,33 @@ impl Commit {
         // job of the genesis certificate (`planning/genesis-self-verifying.md`),
         // where identity metadata is signed into the DID, not a settable propval.
 
+        // Pending-import guard: the commit's loroUpdate contained ops whose
+        // causal dependencies are missing from the stored doc (e.g. the
+        // client's earlier commit never arrived, or the server's state was
+        // rolled back). Loro parks those ops as "pending": the version
+        // vector doesn't advance and the diff is empty, which makes the
+        // commit look exactly like an idempotent replay below — silently
+        // ACKing the client while its writes go nowhere, and every later
+        // delta from that client inherits the same fate. Reject instead so
+        // the client keeps its save cursor, refetches, and re-sends the
+        // full range.
+        if opts.validate_loro_causality && applied.imported_pending_ops {
+            tracing::warn!(
+                subject = %commit.subject,
+                loro_bytes = commit.loro_update.as_ref().map(|b| b.len()).unwrap_or(0),
+                "[causality-guard] rejecting commit whose Loro update depends on ops missing from the stored doc (import left ops pending)"
+            );
+
+            return Err(format!(
+                "Commit's Loro update depends on ops the server does not have — the update \
+                 was parked as pending and none of its changes could be applied. An earlier \
+                 commit from this client likely never arrived. Refetch the resource and \
+                 re-send the missing changes. subject={}",
+                commit.subject,
+            )
+            .into());
+        }
+
         // Causality guard: a commit with a non-trivial loroUpdate that
         // produces ZERO net state change.
         //
@@ -1090,6 +1123,7 @@ impl Commit {
         let mut changed_props: HashSet<String> = HashSet::new();
         let mut imported_new_ops = false;
         let mut vv_before: Option<loro::VersionVector> = None;
+        let mut imported_pending_ops = false;
 
         if let Some(loro_update_bytes) = &self.loro_update {
             // Seed from the current resource state when no snapshot exists yet so
@@ -1106,6 +1140,7 @@ impl Commit {
             let diff = loro_doc
                 .import_update_with_diff(loro_update_bytes, &resource.get_subject().to_string())?;
             imported_new_ops = loro_doc.oplog_vv_map() != vv_map_before;
+            imported_pending_ops = diff.imported_pending_ops;
 
             // Track which properties changed
             for atom in &diff.add_atoms {
@@ -1140,6 +1175,7 @@ impl Commit {
             changed_props,
             imported_new_ops,
             vv_before,
+            imported_pending_ops,
         })
     }
 
@@ -2996,6 +3032,116 @@ mod test {
             after.get(crate::urls::NAME).unwrap().to_string(),
             "Renamed",
             "state must be unchanged by the idempotent replay",
+        );
+    }
+
+    /// A commit whose Loro delta depends on ops the server never received
+    /// must be REJECTED — not silently accepted as an "idempotent replay".
+    /// Loro parks such ops as pending (VV doesn't advance, diff is empty),
+    /// which without an explicit guard is indistinguishable from a replay:
+    /// the server ACKs, the client advances its save cursor, and the missing
+    /// edit is permanently lost on both sides. Regression test for a real
+    /// incident where a form's `form-pages` update vanished this way.
+    #[tokio::test]
+    async fn commit_with_pending_loro_deps_is_rejected() {
+        let (store, agent) = store_with_known_agent().await;
+        let subject = "https://localhost/pending_deps_target";
+
+        let opts = CommitOpts {
+            validate_schema: true,
+            validate_signature: true,
+            validate_timestamp: false,
+            validate_previous_commit: false,
+            validate_loro_causality: true,
+            validate_rights: false,
+            validate_for_agent: None,
+            update_index: true,
+            source_id: None,
+        };
+
+        // Commit 1: create the resource from a full snapshot.
+        let client_doc = crate::loro::AtomicLoroDoc::new();
+        client_doc
+            .set_property(crate::urls::NAME, &Value::String("Original".into()))
+            .unwrap();
+        client_doc
+            .set_property(
+                crate::urls::IS_A,
+                &Value::ResourceArray(vec![crate::urls::CLASS.to_string().into()]),
+            )
+            .unwrap();
+        client_doc
+            .set_property(crate::urls::SHORTNAME, &Value::String("orig".into()))
+            .unwrap();
+        client_doc
+            .set_property(crate::urls::DESCRIPTION, &Value::String("desc".into()))
+            .unwrap();
+        let empty = Resource::new(subject.into());
+        let mut builder = CommitBuilder::new(subject.into());
+        builder.set_loro_update(client_doc.export_snapshot());
+        let commit1 = builder.sign(&agent, &store, &empty).await.unwrap();
+        store.apply_commit(commit1, &opts).await.unwrap();
+        let after_first = store.get_resource(&subject.into()).await.unwrap();
+        let vv_synced = client_doc.oplog_vv();
+
+        // Edit A: never reaches the server (its commit was lost in transit).
+        client_doc
+            .set_property(
+                crate::urls::DESCRIPTION,
+                &Value::String("the lost edit".into()),
+            )
+            .unwrap();
+        client_doc.commit_with_message("edit A");
+        let vv_after_lost_edit = client_doc.oplog_vv();
+
+        // Edit B: exported as a delta that starts AFTER edit A, so its ops
+        // causally depend on ops the server never got.
+        client_doc
+            .set_property(crate::urls::NAME, &Value::String("Renamed".into()))
+            .unwrap();
+        client_doc.commit_with_message("edit B");
+        let orphan_delta = client_doc.export_updates_since(&vv_after_lost_edit);
+
+        let mut builder2 = CommitBuilder::new(subject.into());
+        builder2.set_loro_update(orphan_delta);
+        let commit2 = builder2.sign(&agent, &store, &after_first).await.unwrap();
+        let err = store
+            .apply_commit(commit2, &opts)
+            .await
+            .expect_err("a delta depending on ops the server never received must be rejected");
+        assert!(
+            err.to_string().contains("pending"),
+            "rejection should name the pending import, got: {err}"
+        );
+
+        let after = store.get_resource(&subject.into()).await.unwrap();
+        assert_eq!(
+            after.get(crate::urls::NAME).unwrap().to_string(),
+            "Original",
+            "the orphaned delta must not have changed stored state"
+        );
+
+        // Recovery: re-sending the FULL missing range (everything since the
+        // last acked version) is accepted and lands both edits.
+        let full_delta = client_doc.export_updates_since(&vv_synced);
+        let mut builder3 = CommitBuilder::new(subject.into());
+        builder3.set_loro_update(full_delta);
+        let commit3 = builder3.sign(&agent, &store, &after_first).await.unwrap();
+        store
+            .apply_commit(commit3, &opts)
+            .await
+            .expect("re-sending the full range must be accepted");
+        let recovered = store.get_resource(&subject.into()).await.unwrap();
+        assert_eq!(
+            recovered.get(crate::urls::NAME).unwrap().to_string(),
+            "Renamed"
+        );
+        assert_eq!(
+            recovered
+                .get(crate::urls::DESCRIPTION)
+                .unwrap()
+                .to_string(),
+            "the lost edit"
         );
     }
 

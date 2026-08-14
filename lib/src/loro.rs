@@ -108,6 +108,12 @@ impl std::fmt::Debug for AtomicLoroDoc {
 pub struct LoroDiff {
     pub add_atoms: Vec<Atom>,
     pub remove_atoms: Vec<Atom>,
+    /// True when the imported update contained ops whose causal
+    /// dependencies are missing from this doc. Loro parks such ops as
+    /// "pending": they don't advance the version vector and contribute
+    /// nothing to state, so accepting a commit in that condition silently
+    /// discards the client's writes.
+    pub imported_pending_ops: bool,
 }
 
 impl AtomicLoroDoc {
@@ -144,10 +150,25 @@ impl AtomicLoroDoc {
 
     /// Import a binary update (from a commit's loroUpdate field).
     pub fn import_update(&self, update: &[u8]) -> AtomicResult<()> {
-        self.doc
+        self.import_update_status(update).map(|_| ())
+    }
+
+    /// Import a binary update and report whether any of its ops were parked
+    /// as *pending* — ops whose causal dependencies are missing from this
+    /// doc. Pending ops don't advance the version vector and contribute
+    /// nothing to state; callers that must not lose data (the `/commit`
+    /// apply path) should treat `true` as a hard error rather than a
+    /// successful no-op.
+    pub fn import_update_status(&self, update: &[u8]) -> AtomicResult<bool> {
+        let status = self
+            .doc
             .import(update)
             .map_err(|e| format!("Failed to import Loro update: {e}"))?;
-        Ok(())
+        let has_pending = status
+            .pending
+            .as_ref()
+            .is_some_and(|range| range.iter().next().is_some());
+        Ok(has_pending)
     }
 
     /// Export a snapshot of the full document state.
@@ -804,7 +825,7 @@ impl AtomicLoroDoc {
     /// Compares the properties map before and after the import.
     pub fn import_update_with_diff(&self, update: &[u8], subject: &str) -> AtomicResult<LoroDiff> {
         let before = self.get_all_properties();
-        self.import_update(update)?;
+        let imported_pending_ops = self.import_update_status(update)?;
         let after = self.get_all_properties();
         // Tags are per-property and stable; one read after the import covers
         // both the before and after value of every property.
@@ -848,6 +869,7 @@ impl AtomicLoroDoc {
         Ok(LoroDiff {
             add_atoms,
             remove_atoms,
+            imported_pending_ops,
         })
     }
 }

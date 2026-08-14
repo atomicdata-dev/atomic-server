@@ -195,6 +195,21 @@ export function isTerminalCommitErrorMessage(message: string): boolean {
  * Retrying spins the server (see the 401-flood); the only resolutions are a
  * rights change or the user abandoning the edit — neither helped by hammering.
  */
+/**
+ * Pattern-match the server's pending-deps rejection: "your Loro delta
+ * depends on ops I never received". Retrying the same delta can never
+ * succeed (the missing base ops won't materialize server-side), but the
+ * write is fully recoverable — the drain reacts by clearing the resource's
+ * save cursor so the next attempt exports a self-contained snapshot, which
+ * the server can always merge. So: not terminal (don't drop), not blocking
+ * (don't park); the caller resets the cursor and lets backoff retry.
+ */
+export function isPendingDepsCommitErrorMessage(message: string): boolean {
+  // Server emits: "Commit's Loro update depends on ops the server does not
+  // have — the update was parked as pending ..." (lib/src/commit.rs).
+  return message.includes('parked as pending');
+}
+
 export function isUnrecoverableCommitErrorMessage(message: string): boolean {
   // Server emits: "No https://atomicdata.dev/properties/write right has been found..."
   if (message.includes('/properties/write right has been found')) {

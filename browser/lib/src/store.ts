@@ -59,6 +59,7 @@ import { DrivePresenceManager } from './presence.js';
 import { perfMark, perfSpan } from './perf-trace.js';
 import {
   LocalOutbox,
+  isPendingDepsCommitErrorMessage,
   isTerminalCommitError,
   isUnrecoverableCommitError,
   type OutboxEntry,
@@ -1395,7 +1396,25 @@ export class Store {
       resource.appliedCommitSignatures.add(commit.signature);
     }
 
-    const created = await this.postCommit(commit, endpoint);
+    let created: Commit;
+
+    try {
+      created = await this.postCommit(commit, endpoint);
+    } catch (e) {
+      // Pending-deps rejection: the delta we just sent starts past ops the
+      // server never received (an earlier commit was lost after the save
+      // cursor advanced). Retrying the same delta can never succeed — the
+      // missing base won't appear server-side. Drop the cursor so the next
+      // drain attempt (scheduled by the outbox backoff) exports a
+      // self-contained snapshot, which the server can always merge; that
+      // re-delivers the lost range too.
+      if (e instanceof Error && isPendingDepsCommitErrorMessage(e.message)) {
+        resource.clearLoroSaveCursor();
+      }
+
+      throw e;
+    }
+
     const commitId = commitIdOf(created);
 
     if (commitId) {

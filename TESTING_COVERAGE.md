@@ -560,6 +560,30 @@ panel (memo is per-query, not per-request).
 
 ---
 
+## Commit delivery and the Loro save cursor
+
+The client exports each commit as a delta starting at its save cursor
+(`_loroVersionAtLastSave`). If the cursor ever sits past ops the server never
+received, every later delta is un-importable server-side — and Loro parks such
+ops as *pending* (VV unchanged, empty diff), which without a guard is
+indistinguishable from an idempotent replay. This lost a real user's
+`form-pages` write in 2026-08.
+
+| Flow | Where |
+|---|---|
+| Server rejects a delta whose deps it never received (pending import), and accepts the full-range re-send | `lib/src/commit.rs::commit_with_pending_loro_deps_is_rejected` |
+| Idempotent replay of an already-applied commit is still accepted | `lib/src/commit.rs::idempotent_commit_replay_is_accepted` |
+| Drain reacts to the pending-deps rejection by clearing the cursor and re-sending a self-contained snapshot | `browser/lib/src/store.test.ts` ("recovers from a server pending-deps rejection…") |
+| `clone()` / `merge(replaceLoroDocs)` carries the cursor VALUE, not the current doc version | `browser/lib/src/resource.test.ts` ("clone preserves the save cursor value…") |
+| Imports/echoes don't advance the cursor past unsigned local edits | `browser/lib/src/resource.test.ts` ("importLoroUpdate does not advance…") |
+
+Not covered: the OPFS-suppression window (edits live only in memory between
+`markDirty` and a successful drain — an app kill in that window still loses
+them, `store.ts` `addResource`'s `!hasPendingCommits` gate); WS `COMMIT_OK`
+acks carrying no server-side apply confirmation beyond the echoed commit.
+
+---
+
 ## Forms
 
 | Flow | Where |
@@ -569,4 +593,4 @@ panel (memo is per-query, not per-request).
 | Form ontology populate (incl. FormCondition) | `lib/src/store.rs::populate_forms_ontology` |
 | Publish → anonymous submit of a branching follow-up | `browser/e2e/tests/forms-submission.spec.ts` ("branching hides a follow-up unless its condition matches") |
 
-Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it).
+Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it); add/delete-page write ordering in `PageTabBar` (both now `await` the form's `form-pages` save — add before selecting, delete before destroying — but no test pins that ordering).
