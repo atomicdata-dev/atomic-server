@@ -1,3 +1,5 @@
+'use no memo';
+
 import {
   forms,
   useArray,
