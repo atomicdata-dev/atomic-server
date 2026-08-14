@@ -1,5 +1,3 @@
-'use no memo';
-
 import {
   forms,
   useArray,
@@ -119,7 +117,8 @@ export function ConditionsEditor({
           onClick={addCondition}
         >
           <Row gap='.5rem' center>
-            <FaPlus /> Add condition
+            <FaPlus />
+            <span>Add condition</span>
           </Row>
         </AddButton>
       </Column>
