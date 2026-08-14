@@ -263,6 +263,7 @@ See [STATUS.md](server/STATUS.md) to learn more about which features will remain
   returns the `CommitResponse` instead of `()`. See
   `planning/runtime-boundary-decision.md`.
 - Collection `/query`: the rights walk no longer full-decodes ancestors (memoize by subject + `get_resource_shallow`). Denied members still do not consume `page_size`, so a readable row after a private streak is returned.
+- Forms: branching — hide/show pages and questions from earlier answers (`FormCondition` resources). Submit validation skips hidden fields (required-on-hidden is not an error; submitted values for them are dropped). [#875](https://github.com/ontola/atomic-server/issues/875)
 
 ## [v0.41.0-beta.2] - 2026-08-01
 
