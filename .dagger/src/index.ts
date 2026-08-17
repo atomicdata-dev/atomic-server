@@ -35,6 +35,19 @@ const TOUCH_WORKSPACE_SOURCES = [
 const NODE_IMAGE = 'node:22';
 const RUST_IMAGE = 'rust:bookworm';
 
+// Must match `packageManager` in `browser/package.json`, exactly.
+//
+// Installing any *other* version means the first pnpm invocation inside a
+// workspace tries to self-switch to the declared one, and pnpm 10 cannot
+// switch to pnpm 11: it downloads `@pnpm/<platform>` and then looks for the
+// CLI at `.tools/@pnpm+<platform>/<version>/bin`, which pnpm 11 no longer
+// ships that way. The switch dies with
+//   ERROR  Failed to switch pnpm to v11.10.0. Looks like pnpm CLI is missing
+// and takes every JS container with it. Upstream: pnpm/pnpm#12528.
+//
+// So: install the exact version, and never let the self-switch run.
+const PNPM_VERSION = '11.10.0';
+
 // Must match `@playwright/test` in `browser/e2e/package.json`.
 //
 // The image bakes in the browser builds its own Playwright wants, and each
@@ -708,9 +721,10 @@ export class AtomicServer {
     const pnpmContainer = dag
       .container()
       .from(NODE_IMAGE)
-      .withExec(['npm', 'install', '--global', 'corepack@latest'])
-      .withExec(['corepack', 'enable'])
-      .withExec(['corepack', 'prepare', 'pnpm@latest-10', '--activate'])
+      // Straight to the declared version — see PNPM_VERSION. Going through
+      // corepack with a 10.x line meant pnpm had to self-switch to 11 on
+      // first use, which is broken.
+      .withExec(['npm', 'install', '--global', `pnpm@${PNPM_VERSION}`])
       // Hoisting must be a *persistent* setting, not a CLI flag. pnpm 11
       // (see browser/package.json `packageManager`) runs a deps-status check
       // before every `pnpm run`, and re-invokes `pnpm install` itself when
@@ -960,9 +974,8 @@ export class AtomicServer {
     const pnpmContainer = dag
       .container()
       .from(NODE_IMAGE)
-      .withExec(['npm', 'install', '--global', 'corepack@latest'])
-      .withExec(['corepack', 'enable'])
-      .withExec(['corepack', 'prepare', 'pnpm@latest-10', '--activate'])
+      // Exact declared version, no corepack, no self-switch — see PNPM_VERSION.
+      .withExec(['npm', 'install', '--global', `pnpm@${PNPM_VERSION}`])
       // See jsTestIntegration() for why hoisting is an env var and not a
       // `--shamefully-hoist` flag: pnpm 11's pre-run deps check re-invokes
       // `pnpm install` without the flag, reads that as a hoisting-config
@@ -1604,7 +1617,10 @@ export class AtomicServer {
       .withExec([
         '/bin/sh',
         '-c',
-        'curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.15.1 ENV="$HOME/.shrc" SHELL="$(which sh)" sh - && ' +
+        // PNPM_VERSION is the version browser/package.json declares. Pinning
+        // anything older here made the first `pnpm install` below self-switch
+        // to it, which is the failure documented at PNPM_VERSION.
+        `curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=${PNPM_VERSION} ENV="$HOME/.shrc" SHELL="$(which sh)" sh - && ` +
           'export PATH=/root/.local/share/pnpm:/opt/npm-global/bin:$PATH && ' +
           '/bin/apt update && /bin/apt install -y zip && ' +
           'if [ ! -x /opt/npm-global/bin/netlify ]; then npm install -g netlify-cli --quiet; fi && netlify --version',
