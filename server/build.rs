@@ -345,10 +345,19 @@ fn build_js(dirs: &Dirs) {
 fn copy_form_assets(dirs: &Dirs) -> std::io::Result<()> {
     if !dirs.form_app_dist_source.exists() {
         p!(
-            "Could not find {}, skipping form-app asset embed (form/:id route will 404)",
+            "Could not find {}, skipping form-app asset embed (form/:id route serves a placeholder)",
             dirs.form_app_dist_source.display()
         );
-        return Ok(());
+        // `handlers/form.rs` does an unconditional
+        // `include_str!("../../assets_tmp/form-assets/index.html")`, so a
+        // missing form-app build is a *compile* error, not a degraded route.
+        // That bites every build that legitimately has no form-app/dist:
+        // CI's fmt/clippy/nextest and integration containers (which stub
+        // assets_tmp rather than running the JS build), and any fresh clone
+        // running `cargo check` before `pnpm build`. Emit a placeholder so
+        // the macro always resolves; real deployments overwrite it with the
+        // actual bundle two lines below.
+        return write_form_assets_placeholder(dirs);
     }
 
     warn_if_form_app_stale(dirs);
@@ -357,6 +366,24 @@ fn copy_form_assets(dirs: &Dirs) -> std::io::Result<()> {
     // Clear first so hashed bundle files from previous builds don't pile up.
     let _ = fs::remove_dir_all(&dest);
     dircpy::copy_dir(&dirs.form_app_dist_source, &dest)
+}
+
+/// Writes the minimal `form-assets/index.html` that `handlers/form.rs`'s
+/// `include_str!` needs in order to compile when there is no form-app build to
+/// embed. Carries no `<script>`, so a server built this way serves an inert
+/// explanatory page at `/form/{id}` instead of the real runtime.
+fn write_form_assets_placeholder(dirs: &Dirs) -> std::io::Result<()> {
+    let dest = dirs.js_dist_tmp.join("form-assets");
+    fs::create_dir_all(&dest)?;
+    fs::write(
+        dest.join("index.html"),
+        "<!doctype html><html><head><meta charset=\"utf-8\">\
+         <title>Form runtime not built</title></head><body>\
+         This atomic-server was built without the form-app bundle, so \
+         published forms cannot be rendered. Run `pnpm build` in `browser/` \
+         and rebuild the server.\
+         </body></html>",
+    )
 }
 
 /// ATOMICSERVER_SKIP_JS_BUILD reuses form-app/dist as-is. If form-renderer
@@ -372,9 +399,9 @@ fn warn_if_form_app_stale(dirs: &Dirs) {
         PathBuf::from("../browser/form-app/src"),
         PathBuf::from("../browser/form-app/vite.config.ts"),
     ];
-    let newer_src = form_app_inputs.iter().any(|src_dir| {
-        find_newest_file_time(src_dir).is_some_and(|src_time| src_time > dist_time)
-    });
+    let newer_src = form_app_inputs
+        .iter()
+        .any(|src_dir| find_newest_file_time(src_dir).is_some_and(|src_time| src_time > dist_time));
     if newer_src {
         p!(
             "form-app/dist is older than form-renderer/form-app source — \

@@ -711,6 +711,21 @@ export class AtomicServer {
       .withExec(['npm', 'install', '--global', 'corepack@latest'])
       .withExec(['corepack', 'enable'])
       .withExec(['corepack', 'prepare', 'pnpm@latest-10', '--activate'])
+      // Hoisting must be a *persistent* setting, not a CLI flag. pnpm 11
+      // (see browser/package.json `packageManager`) runs a deps-status check
+      // before every `pnpm run`, and re-invokes `pnpm install` itself when
+      // node_modules looks stale. That implicit install doesn't inherit
+      // `--shamefully-hoist`, so it sees a changed hoisting config, decides
+      // node_modules must be purged, and — with no TTY to confirm — aborts
+      // with ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY. `PNPM_CONFIG_*` is
+      // read by every pnpm invocation in the container, implicit ones
+      // included, so the two agree and no purge is ever proposed.
+      //
+      // Deliberately an env var rather than `shamefullyHoist: true` in
+      // pnpm-workspace.yaml: that file is shared with developers, and
+      // flattening node_modules locally would hide undeclared dependencies
+      // that currently fail fast.
+      .withEnvVariable('PNPM_CONFIG_SHAMEFULLY_HOIST', 'true')
       .withWorkdir('/repo/browser');
 
     // Mount workspace package manifests for caching and `pnpm install`.
@@ -770,11 +785,10 @@ export class AtomicServer {
         'store-dir',
         '/repo/browser/.pnpm-store',
       ])
-      .withExec([
-        'sh',
-        '-c',
-        'yes | pnpm install --frozen-lockfile --shamefully-hoist',
-      ]);
+      // Hoisting comes from PNPM_CONFIG_SHAMEFULLY_HOIST above, and the
+      // `yes |` that used to answer the purge prompt is no longer needed —
+      // nothing prompts once the setting is persistent.
+      .withExec(['pnpm', 'install', '--frozen-lockfile']);
 
     // Drop in @tomic/lib source. Other packages are unused by the
     // integration tests, so we don't bother mounting them.
@@ -949,6 +963,11 @@ export class AtomicServer {
       .withExec(['npm', 'install', '--global', 'corepack@latest'])
       .withExec(['corepack', 'enable'])
       .withExec(['corepack', 'prepare', 'pnpm@latest-10', '--activate'])
+      // See jsTestIntegration() for why hoisting is an env var and not a
+      // `--shamefully-hoist` flag: pnpm 11's pre-run deps check re-invokes
+      // `pnpm install` without the flag, reads that as a hoisting-config
+      // change, and aborts trying to purge node_modules without a TTY.
+      .withEnvVariable('PNPM_CONFIG_SHAMEFULLY_HOIST', 'true')
       .withWorkdir('/app');
 
     // Copy workspace files first for caching node_modules.
@@ -980,11 +999,7 @@ export class AtomicServer {
       // `/app/.pnpm-store` without the config command.
       .withMountedCache('/app/.pnpm-store', dag.cacheVolume('pnpm-store'))
       .withExec(['pnpm', 'config', 'set', 'store-dir', '/app/.pnpm-store'])
-      .withExec([
-        'sh',
-        '-c',
-        'yes | pnpm install --frozen-lockfile --shamefully-hoist',
-      ]);
+      .withExec(['pnpm', 'install', '--frozen-lockfile']);
 
     // data-browser bootstrap JSON lives in repo-root lib/defaults. Vite resolves ../../../lib
     // from data-browser/src to filesystem /lib if /app is only browser — do not mount there
@@ -1017,6 +1032,13 @@ export class AtomicServer {
       .withFile(
         '/testdata/pairing-request.json',
         this.source.file('testdata/pairing-request.json'),
+      )
+      // Likewise form-renderer/src/conditions.test.ts reads the shared
+      // form-condition golden cases at
+      // `../../../testdata/form-conditions.json` from /app/form-renderer/src.
+      .withFile(
+        '/testdata/form-conditions.json',
+        this.source.file('testdata/form-conditions.json'),
       );
 
     // Build all packages since they may depend on each other's built artifacts
@@ -1240,6 +1262,16 @@ export class AtomicServer {
         .withFile(
           '/code/testdata/pairing-request.json',
           source.file('testdata/pairing-request.json'),
+        )
+        // Same deal for the form-condition golden cases, except this one is
+        // an `include_str!` in `server/src/forms.rs`'s test module rather
+        // than a runtime read — so a missing file is a *compile* error that
+        // takes out every `--all-targets` build (clippy and nextest both),
+        // not just one failing test. `form-renderer/src/conditions.test.ts`
+        // checks the same fixture from the TS side; see jsBuild()'s mount.
+        .withFile(
+          '/code/testdata/form-conditions.json',
+          source.file('testdata/form-conditions.json'),
         )
         .withDirectory('/code/server', source.directory('server'))
         .withDirectory('/code/lib', source.directory('lib'))
