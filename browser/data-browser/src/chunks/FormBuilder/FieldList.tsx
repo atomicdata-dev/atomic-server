@@ -48,7 +48,7 @@ export function FieldList({
   };
 
   return (
-    <Column gap="0.75rem">
+    <Column gap='0.75rem'>
       <ReorderableList
         subjects={fields}
         onReorder={setFields}

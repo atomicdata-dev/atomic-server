@@ -52,7 +52,10 @@ export function FilePicker({
   // since this effect has no cleanup to reset such a ref, the second
   // invocation would see it already flipped and run the real body anyway.
   // Comparing against a static snapshot is immune to that replay.
-  const initial = useRef({ subject: value, file: undefined as File | undefined });
+  const initial = useRef({
+    subject: value,
+    file: undefined as File | undefined,
+  });
 
   useEffect(() => {
     if (

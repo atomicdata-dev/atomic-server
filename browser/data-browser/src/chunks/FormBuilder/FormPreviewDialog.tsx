@@ -45,7 +45,7 @@ export function FormPreviewButton({
       <Button subtle onClick={show}>
         Preview
       </Button>
-      <Dialog {...dialogProps} width="40rem">
+      <Dialog {...dialogProps} width='40rem'>
         {isOpen && (
           <>
             <Dialog.Title>

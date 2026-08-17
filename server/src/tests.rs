@@ -991,7 +991,11 @@ async fn form_submission_flow() {
     // Class + Property + Table (mirrors what NewFormDialog/useFormFieldPropertySync build client-side)
     let mut class = Resource::new_instance(urls::CLASS, store).await.unwrap();
     class
-        .set(urls::SHORTNAME.into(), Value::Slug("submission".into()), store)
+        .set(
+            urls::SHORTNAME.into(),
+            Value::Slug("submission".into()),
+            store,
+        )
         .await
         .unwrap();
     class
@@ -1029,7 +1033,11 @@ async fn form_submission_flow() {
 
     let mut table = Resource::new_instance(urls::TABLE, store).await.unwrap();
     table
-        .set(urls::NAME.into(), Value::String("Submissions".into()), store)
+        .set(
+            urls::NAME.into(),
+            Value::String("Submissions".into()),
+            store,
+        )
         .await
         .unwrap();
     table
@@ -1043,7 +1051,9 @@ async fn form_submission_flow() {
     table.save_locally(store).await.unwrap();
 
     // FormField -> FormPage -> Form
-    let mut field = Resource::new_instance(urls::FORM_FIELD, store).await.unwrap();
+    let mut field = Resource::new_instance(urls::FORM_FIELD, store)
+        .await
+        .unwrap();
     field
         .set(urls::NAME.into(), Value::String("Email".into()), store)
         .await
@@ -1070,7 +1080,9 @@ async fn form_submission_flow() {
         .unwrap();
     field.save_locally(store).await.unwrap();
 
-    let mut page = Resource::new_instance(urls::FORM_PAGE, store).await.unwrap();
+    let mut page = Resource::new_instance(urls::FORM_PAGE, store)
+        .await
+        .unwrap();
     page.set(
         urls::FORM_FIELDS.into(),
         Value::ResourceArray(vec![field.get_subject().to_string().into()]),
@@ -1151,9 +1163,15 @@ async fn form_submission_flow() {
         resp.status()
     );
     let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
-    let slug = body["id"].as_str().expect("slug should be minted").to_string();
+    let slug = body["id"]
+        .as_str()
+        .expect("slug should be minted")
+        .to_string();
     assert!(!slug.is_empty());
-    assert_eq!(body["pages"][0]["blocks"][0]["mapsTo"], email_prop.get_subject().to_string());
+    assert_eq!(
+        body["pages"][0]["blocks"][0]["mapsTo"],
+        email_prop.get_subject().to_string()
+    );
     assert_eq!(
         body["captcha"]["challengeUrl"],
         format!("/form/{slug}/challenge"),
@@ -1165,7 +1183,10 @@ async fn form_submission_flow() {
         .uri(&format!("/form/{}/definition", slug))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert!(resp.status().is_success(), "definition fetch by slug failed");
+    assert!(
+        resp.status().is_success(),
+        "definition fetch by slug failed"
+    );
 
     // 3b. Phase 6 "Embedding": the published HTML page allows framing from
     // any origin (forms have no auth boundary once published — same trust
@@ -1231,12 +1252,14 @@ async fn form_submission_flow() {
         get_body(resp)
     );
 
-    let query = atomic_lib::storelike::Query::new_prop_val(
-        urls::PARENT,
-        table.get_subject().as_str(),
-    );
+    let query =
+        atomic_lib::storelike::Query::new_prop_val(urls::PARENT, table.get_subject().as_str());
     let result = store.query(&query).await.unwrap();
-    assert_eq!(result.subjects.len(), 1, "submission row should exist under the table");
+    assert_eq!(
+        result.subjects.len(),
+        1,
+        "submission row should exist under the table"
+    );
 
     // 4b. Missing captcha payload -> 400
     let req = test::TestRequest::post()
@@ -1246,7 +1269,11 @@ async fn form_submission_flow() {
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 400, "captcha-less submission should be rejected");
+    assert_eq!(
+        resp.status(),
+        400,
+        "captcha-less submission should be rejected"
+    );
 
     // 4c. Replayed captcha payload (already consumed by step 4) -> 400
     let req = test::TestRequest::post()
@@ -1279,7 +1306,11 @@ async fn form_submission_flow() {
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 400, "honeypot-filled submission should be rejected");
+    assert_eq!(
+        resp.status(),
+        400,
+        "honeypot-filled submission should be rejected"
+    );
 
     // Only the one valid submission from step 4 should have landed.
     let result = store.query(&query).await.unwrap();
@@ -1319,20 +1350,32 @@ async fn form_submission_flow() {
         .uri(&format!("/form/{}/definition", slug))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 403, "invite-only definition without code should 403");
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only definition without code should 403"
+    );
 
     let req = test::TestRequest::get()
         .uri(&format!("/form/{}/definition?code=wrong", slug))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 403, "invite-only definition with unknown code should 403");
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only definition with unknown code should 403"
+    );
 
     // The HTML page is gated the same way (the definition is injected inline).
     let req = test::TestRequest::get()
         .uri(&format!("/form/{}", slug))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 403, "invite-only form page without code should 403");
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only form page without code should 403"
+    );
 
     // Mint an invite code, child of the form (as the builder UI does).
     let mut invite = Resource::new_instance(urls::FORM_INVITE_CODE, store)
@@ -1378,7 +1421,11 @@ async fn form_submission_flow() {
         }))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 403, "invite-only submit without code should 403");
+    assert_eq!(
+        resp.status(),
+        403,
+        "invite-only submit without code should 403"
+    );
 
     // Submit with the code -> 201, and the code is now consumed.
     let req = test::TestRequest::post()
@@ -1397,7 +1444,11 @@ async fn form_submission_flow() {
         get_body(resp)
     );
     let result = store.query(&query).await.unwrap();
-    assert_eq!(result.subjects.len(), 2, "invited submission should land in the table");
+    assert_eq!(
+        result.subjects.len(),
+        2,
+        "invited submission should land in the table"
+    );
     let invite = store
         .get_resource(&invite.get_subject().clone())
         .await
@@ -1422,16 +1473,24 @@ async fn form_submission_flow() {
         .uri(&format!("/form/{}/definition?code=secret-code", slug))
         .to_request();
     let resp = test::call_service(&app, req).await;
-    assert_eq!(resp.status(), 403, "used code should be rejected at definition");
+    assert_eq!(
+        resp.status(),
+        403,
+        "used code should be rejected at definition"
+    );
 
     // No row landed for the rejected replay.
     let result = store.query(&query).await.unwrap();
     assert_eq!(result.subjects.len(), 2);
 
     // Switching back to public opens the plain link again.
-    form.set(urls::FORM_ACCESS.into(), Value::String("public".into()), store)
-        .await
-        .unwrap();
+    form.set(
+        urls::FORM_ACCESS.into(),
+        Value::String("public".into()),
+        store,
+    )
+    .await
+    .unwrap();
     form.save_locally(store).await.unwrap();
 
     let req = test::TestRequest::get()

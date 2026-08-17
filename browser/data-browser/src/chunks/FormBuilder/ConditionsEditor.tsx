@@ -63,18 +63,18 @@ export function ConditionsEditor({
     <>
       <Field label={title}>
         <OpenButton
-          type="button"
+          type='button'
           subtle
-          data-testid="edit-conditions"
+          data-testid='edit-conditions'
           onClick={show}
         >
-          <Row gap=".5rem" center>
+          <Row gap='.5rem' center>
             <FaCodeBranch />
             <ConditionsSummary count={conditionSubjects.length} />
           </Row>
         </OpenButton>
       </Field>
-      <Dialog {...dialogProps} width="40rem">
+      <Dialog {...dialogProps} width='40rem'>
         {isOpen && (
           <>
             <Dialog.Title>
@@ -154,9 +154,9 @@ function ConditionsList({
   };
 
   return (
-    <Column gap="0.75rem">
+    <Column gap='0.75rem'>
       <Helper>All of these must match. Leave empty to always show.</Helper>
-      <Column gap="0.4rem">
+      <Column gap='0.4rem'>
         {conditionSubjects.map((subject, index) => (
           <div key={subject}>
             {index > 0 && <AndLabel>and</AndLabel>}
@@ -168,9 +168,9 @@ function ConditionsList({
           </div>
         ))}
         <AddButton
-          type="button"
+          type='button'
           subtle
-          data-testid="add-condition"
+          data-testid='add-condition'
           disabled={available.length === 0}
           title={
             available.length === 0
@@ -179,7 +179,7 @@ function ConditionsList({
           }
           onClick={addCondition}
         >
-          <Row gap=".5rem" center>
+          <Row gap='.5rem' center>
             <FaPlus />
             <span>Add condition</span>
           </Row>
@@ -232,7 +232,7 @@ function ConditionRow({
   return (
     <ConditionGrid>
       <ShrinkSelect
-        data-testid="condition-field"
+        data-testid='condition-field'
         value={fieldSubject ?? ''}
         onChange={e => onFieldChange(e.target.value)}
       >
@@ -243,7 +243,7 @@ function ConditionRow({
         ))}
       </ShrinkSelect>
       <ShrinkSelect
-        data-testid="condition-operator"
+        data-testid='condition-operator'
         value={operator ?? 'equals'}
         onChange={e => setOperator(e.target.value)}
       >
@@ -260,11 +260,11 @@ function ConditionRow({
       />
       <IconButton
         variant={IconButtonVariant.Simple}
-        size="0.8rem"
-        color="textLight"
-        title="Remove condition"
-        type="button"
-        data-testid="remove-condition"
+        size='0.8rem'
+        color='textLight'
+        title='Remove condition'
+        type='button'
+        data-testid='remove-condition'
         onClick={onRemove}
       >
         <FaTrash />
@@ -285,7 +285,7 @@ function ValueInput({
   if (!question) {
     return (
       <InputWrapper>
-        <InputStyled data-testid="condition-value" disabled />
+        <InputStyled data-testid='condition-value' disabled />
       </InputWrapper>
     );
   }
@@ -295,12 +295,12 @@ function ValueInput({
 
     return (
       <ShrinkSelect
-        data-testid="condition-value"
+        data-testid='condition-value'
         value={boolVal ? 'true' : 'false'}
         onChange={e => onChange(e.target.value === 'true')}
       >
-        <option value="true">checked</option>
-        <option value="false">unchecked</option>
+        <option value='true'>checked</option>
+        <option value='false'>unchecked</option>
       </ShrinkSelect>
     );
   }
@@ -314,7 +314,7 @@ function ValueInput({
 
     return (
       <ShrinkSelect
-        data-testid="condition-value"
+        data-testid='condition-value'
         value={current}
         onChange={e => onChange(e.target.value)}
       >
@@ -331,8 +331,8 @@ function ValueInput({
     return (
       <InputWrapper>
         <InputStyled
-          data-testid="condition-value"
-          type="number"
+          data-testid='condition-value'
+          type='number'
           value={typeof value === 'number' ? value : ''}
           onChange={e =>
             onChange(e.target.value === '' ? '' : Number(e.target.value))
@@ -346,8 +346,8 @@ function ValueInput({
     return (
       <InputWrapper>
         <InputStyled
-          data-testid="condition-value"
-          type="date"
+          data-testid='condition-value'
+          type='date'
           value={typeof value === 'string' ? value : ''}
           onChange={e => onChange(e.target.value)}
         />
@@ -358,7 +358,7 @@ function ValueInput({
   return (
     <InputWrapper>
       <InputStyled
-        data-testid="condition-value"
+        data-testid='condition-value'
         value={
           typeof value === 'string' || typeof value === 'number' ? value : ''
         }

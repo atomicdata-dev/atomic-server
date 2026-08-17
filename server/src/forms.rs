@@ -390,10 +390,7 @@ async fn build_page_definition(
     })
 }
 
-async fn build_conditions(
-    store: &impl Storelike,
-    resource: &Resource,
-) -> Vec<FormConditionDef> {
+async fn build_conditions(store: &impl Storelike, resource: &Resource) -> Vec<FormConditionDef> {
     let subjects = resource
         .get(atomic_lib::urls::FORM_CONDITIONS)
         .and_then(|v| v.to_subjects(None))
@@ -427,9 +424,7 @@ async fn build_conditions(
             .unwrap_or_else(|| "equals".into());
         let value = match cond.get(atomic_lib::urls::FORM_CONDITION_VALUE) {
             Ok(Value::Json(v)) => v.clone(),
-            Ok(Value::String(s)) => {
-                serde_json::from_str(s).unwrap_or_else(|_| json!(s))
-            }
+            Ok(Value::String(s)) => serde_json::from_str(s).unwrap_or_else(|_| json!(s)),
             Ok(other) => json!(other.to_string()),
             Err(_) => JsonValue::Null,
         };
@@ -442,10 +437,7 @@ async fn build_conditions(
     out
 }
 
-async fn build_block(
-    store: &impl Storelike,
-    field: &Resource,
-) -> AtomicResult<FormBlock> {
+async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<FormBlock> {
     let conditions = build_conditions(store, field).await;
     let classes = field
         .get(atomic_lib::urls::IS_A)
@@ -1706,8 +1698,7 @@ mod tests {
         ));
 
         // Valid, and checking does NOT consume.
-        let InviteCodeCheck::Valid(mut code) =
-            check_invite_code(&store, &form, "right-code").await
+        let InviteCodeCheck::Valid(mut code) = check_invite_code(&store, &form, "right-code").await
         else {
             panic!("expected a valid code");
         };
@@ -1834,11 +1825,7 @@ mod tests {
             .await
             .unwrap();
         follow_up
-            .set(
-                urls::NAME.into(),
-                Value::String("Follow-up".into()),
-                &store,
-            )
+            .set(urls::NAME.into(), Value::String("Follow-up".into()), &store)
             .await
             .unwrap();
         follow_up
@@ -1876,7 +1863,10 @@ mod tests {
             .to_subjects(None)
             .unwrap()[0]
             .clone();
-        let page = store.get_resource(&page_subject.clone().into()).await.unwrap();
+        let page = store
+            .get_resource(&page_subject.clone().into())
+            .await
+            .unwrap();
         let email_field = page
             .get(urls::FORM_FIELDS)
             .unwrap()
@@ -1924,9 +1914,13 @@ mod tests {
             .unwrap();
         let mut fields: Vec<_> = existing.into_iter().map(|s| s.into()).collect();
         fields.push(follow_up.get_subject().to_string().into());
-        page.set(urls::FORM_FIELDS.into(), Value::ResourceArray(fields), &store)
-            .await
-            .unwrap();
+        page.set(
+            urls::FORM_FIELDS.into(),
+            Value::ResourceArray(fields),
+            &store,
+        )
+        .await
+        .unwrap();
         page.save_locally(&store).await.unwrap();
 
         let definition = build_form_definition(&store, &form).await.unwrap();

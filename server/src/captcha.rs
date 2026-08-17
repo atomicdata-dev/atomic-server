@@ -100,9 +100,10 @@ impl AltchaVerifier {
             Ok(Some(bytes)) => String::from_utf8_lossy(&bytes).into_owned(),
             _ => {
                 let secret = random_string(64);
-                if let Err(e) = store
-                    .kv
-                    .insert(Tree::PluginMeta, HMAC_SECRET_KEY, secret.as_bytes())
+                if let Err(e) =
+                    store
+                        .kv
+                        .insert(Tree::PluginMeta, HMAC_SECRET_KEY, secret.as_bytes())
                 {
                     tracing::warn!(
                         "Could not persist captcha HMAC secret, challenges won't survive a restart: {e}"
@@ -253,8 +254,9 @@ mod tests {
             .unwrap()
             .unwrap();
         solution.derived_key = "00".repeat(32);
-        let payload =
-            BASE64.encode(serde_json::to_vec(&json!({ "challenge": challenge, "solution": solution })).unwrap());
+        let payload = BASE64.encode(
+            serde_json::to_vec(&json!({ "challenge": challenge, "solution": solution })).unwrap(),
+        );
 
         let err = verifier.verify(Some(&payload)).await.unwrap_err();
         assert!(err.contains("failed"), "{err}");

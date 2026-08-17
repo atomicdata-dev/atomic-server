@@ -114,18 +114,18 @@ export function ShareLinkPanel({
   }
 
   if (!slug) {
-    return <Button subtle disabled title="Preparing share link…" />;
+    return <Button subtle disabled title='Preparing share link…' />;
   }
 
   const shareUrl = `${store.getServerUrl()}/form/${slug}`;
 
   return (
     <>
-      <Button subtle title="Share form" onClick={show}>
+      <Button subtle title='Share form' onClick={show}>
         <FaShareNodes />
         Share
       </Button>
-      <Dialog {...dialogProps} width="44rem">
+      <Dialog {...dialogProps} width='44rem'>
         {isOpen && (
           <>
             <DialogTitle>
@@ -171,38 +171,38 @@ function PanelContent({
   };
 
   return (
-    <Inner gap="0.75rem">
+    <Inner gap='0.75rem'>
       {inviteOnly && (
         <InviteOnlyNote>
           This form is invite only — the plain link and embed won&apos;t open
-          without a valid invite code. Create and copy invite links in
-          Settings → Form access.
+          without a valid invite code. Create and copy invite links in Settings
+          → Form access.
         </InviteOnlyNote>
       )}
       <StyledTabs
-        label="Share form view"
+        label='Share form view'
         tabs={[
           { label: 'Link', value: 'link', icon: <FaLink /> },
           { label: 'Embed', value: 'embed', icon: <FaCode /> },
         ]}
       >
-        <Tabs.Panel value="link">
-          <Column gap="0.75rem" align="center">
+        <Tabs.Panel value='link'>
+          <Column gap='0.75rem' align='center'>
             {qrDataUrl && (
-              <QrImage src={qrDataUrl} alt="QR code for the form link" />
+              <QrImage src={qrDataUrl} alt='QR code for the form link' />
             )}
             <LinkText title={shareUrl}>{shareUrl}</LinkText>
-            <Row gap="0.5rem">
-              <PanelButton type="button" onClick={copyLink}>
+            <Row gap='0.5rem'>
+              <PanelButton type='button' onClick={copyLink}>
                 <FaCopy /> Copy link
               </PanelButton>
-              <PanelLink href={shareUrl} target="_blank" rel="noreferrer">
+              <PanelLink href={shareUrl} target='_blank' rel='noreferrer'>
                 <FaArrowUpRightFromSquare /> Open
               </PanelLink>
             </Row>
           </Column>
         </Tabs.Panel>
-        <Tabs.Panel value="embed">
+        <Tabs.Panel value='embed'>
           <EmbedView shareUrl={shareUrl} formName={formName} />
         </Tabs.Panel>
       </StyledTabs>
@@ -220,7 +220,7 @@ function EmbedView({
   const snippet = buildEmbedSnippet(shareUrl, formName ?? 'Form');
 
   return (
-    <Column gap="0.5rem">
+    <Column gap='0.5rem'>
       <EmbedHint>Paste this where you want the form to appear.</EmbedHint>
       <CodeBlock content={snippet} wordWrap />
     </Column>

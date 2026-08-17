@@ -1,4 +1,9 @@
-import React, { useState, type CSSProperties, type JSX, type ReactNode } from 'react';
+import React, {
+  useState,
+  type CSSProperties,
+  type JSX,
+  type ReactNode,
+} from 'react';
 import { styled } from 'styled-components';
 import { createPortal } from 'react-dom';
 import {
@@ -113,7 +118,7 @@ export function ReorderableList({
                   : undefined
               }
             >
-              <DragHandle type="button" tabIndex={-1}>
+              <DragHandle type='button' tabIndex={-1}>
                 <FaGripVertical />
               </DragHandle>
               <RowContent $orientation={orientation}>
@@ -167,8 +172,8 @@ function SortableRow({
         <DragHandle
           {...listeners}
           {...attributes}
-          type="button"
-          title="Move item"
+          type='button'
+          title='Move item'
         >
           <FaGripVertical />
         </DragHandle>

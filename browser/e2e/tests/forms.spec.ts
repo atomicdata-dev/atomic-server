@@ -3,7 +3,8 @@ import { newResource, before, openSubject } from './test-utils';
 
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
 const FORM_FIELD_TYPE = 'https://atomicdata.dev/properties/form-field-type';
-const FORM_FIELD_OPTIONS = 'https://atomicdata.dev/properties/form-field-options';
+const FORM_FIELD_OPTIONS =
+  'https://atomicdata.dev/properties/form-field-options';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 
 /** Menu label -> field-row testid key, in AddFieldMenu order. */
@@ -147,9 +148,8 @@ test.describe('forms', async () => {
     await waitForSync(page);
 
     const tableSubject = await page.evaluate(
-      ({ subject, prop }) => window.store.resources.get(subject)?.get(prop) as
-        | string
-        | undefined,
+      ({ subject, prop }) =>
+        window.store.resources.get(subject)?.get(prop) as string | undefined,
       { subject: formSubject, prop: FORM_TARGET_TABLE },
     );
     expect(tableSubject).toBeTruthy();
@@ -171,9 +171,14 @@ test.describe('forms', async () => {
     await page.getByRole('button', { name: 'Add option' }).click();
     await expect(choiceInputs).toHaveCount(3);
     await choiceInputs.nth(2).fill('C');
-    await waitForPropertyValue(page, radioSubject as string, FORM_FIELD_OPTIONS, {
-      options: ['A', 'B', 'C'],
-    });
+    await waitForPropertyValue(
+      page,
+      radioSubject as string,
+      FORM_FIELD_OPTIONS,
+      {
+        options: ['A', 'B', 'C'],
+      },
+    );
 
     // --- 5. Publish ---
     await page.getByRole('button', { name: 'Publish', exact: true }).click();

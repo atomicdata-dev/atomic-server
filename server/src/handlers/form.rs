@@ -130,8 +130,13 @@ async fn check_form_access(
 
 /// Resolves `{id}` to a Form resource, confirming it really is a Form and is
 /// currently published. Shared by both handlers.
-async fn resolve_published_form(store: &atomic_lib::Db, id: &str) -> Result<Resource, FormApiError> {
-    let form = forms::resolve_form(store, id).await.map_err(|_| not_found())?;
+async fn resolve_published_form(
+    store: &atomic_lib::Db,
+    id: &str,
+) -> Result<Resource, FormApiError> {
+    let form = forms::resolve_form(store, id)
+        .await
+        .map_err(|_| not_found())?;
 
     let classes = form
         .get(urls::IS_A)
@@ -332,7 +337,10 @@ pub async fn form_image(
     let store = &appstate.store;
     let form = resolve_published_form(store, &path.into_inner()).await?;
 
-    let image_subject = form.get(urls::COVER_IMAGE).map_err(|_| not_found())?.to_string();
+    let image_subject = form
+        .get(urls::COVER_IMAGE)
+        .map_err(|_| not_found())?
+        .to_string();
     let file = store
         .get_resource(&image_subject.into())
         .await
@@ -452,7 +460,9 @@ pub async fn submit_form(
     }
 
     for (property, value) in coerced {
-        row.set(property, value, store).await.map_err(internal_error)?;
+        row.set(property, value, store)
+            .await
+            .map_err(internal_error)?;
     }
 
     // Genesis (`did:ad:`) rather than plain `save()`: `new_instance` mints an

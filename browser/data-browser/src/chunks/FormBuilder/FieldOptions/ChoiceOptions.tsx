@@ -6,7 +6,10 @@ import Field from '@components/forms/Field';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
-import { IconButton, IconButtonVariant } from '@components/IconButton/IconButton';
+import {
+  IconButton,
+  IconButtonVariant,
+} from '@components/IconButton/IconButton';
 import { useDebounce } from '@helpers/useDebounce';
 
 interface ChoiceOptionsProps {

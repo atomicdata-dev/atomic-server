@@ -87,12 +87,12 @@ export function PageTabBar({
   };
 
   return (
-    <TabBarRow gap="0.5rem" center>
+    <TabBarRow gap='0.5rem' center>
       <ScrollArea>
         <ReorderableList
           subjects={pages}
           onReorder={setPages}
-          orientation="horizontal"
+          orientation='horizontal'
           renderItem={subject => (
             <PageTab
               subject={subject}
@@ -104,8 +104,8 @@ export function PageTabBar({
           )}
         />
       </ScrollArea>
-      <AddButton type="button" subtle onClick={addPage}>
-        <Row gap=".5rem" center>
+      <AddButton type='button' subtle onClick={addPage}>
+        <Row gap='.5rem' center>
           <FaPlus /> Add page
         </Row>
       </AddButton>
@@ -164,7 +164,7 @@ function PageTab({
   return (
     <TabRow $active={active}>
       <TabButton
-        type="button"
+        type='button'
         $active={active}
         title={conditions.length > 0 ? 'Conditional' : undefined}
         onClick={onSelect}
@@ -179,10 +179,10 @@ function PageTab({
       {canDelete && (
         <IconButton
           variant={IconButtonVariant.Simple}
-          size="0.8rem"
-          color="textLight"
-          title="Delete page"
-          type="button"
+          size='0.8rem'
+          color='textLight'
+          title='Delete page'
+          type='button'
           onClick={onDelete}
         >
           <FaTrash />

@@ -42,7 +42,9 @@ test.describe('form publish and anonymous submit', () => {
     expect(formSubject).toBeTruthy();
 
     await page.getByTitle('Add field').click();
-    await page.getByRole('menuitem', { name: 'Short text', exact: true }).click();
+    await page
+      .getByRole('menuitem', { name: 'Short text', exact: true })
+      .click();
     await expect(page.getByTestId('field-row-short-text')).toBeVisible();
 
     await page.getByTestId('field-row-short-text').click();
@@ -73,9 +75,7 @@ test.describe('form publish and anonymous submit', () => {
         const raw = window.store.resources.get(subject)?.get(prop);
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
-        return (
-          parsed?.mainColor === '#e91e63' && parsed?.roundness === 'round'
-        );
+        return parsed?.mainColor === '#e91e63' && parsed?.roundness === 'round';
       },
       { subject: formSubject, prop: FORM_STYLING },
       { timeout: 15000 },
@@ -142,11 +142,12 @@ test.describe('form publish and anonymous submit', () => {
     await emailInput.fill('ada@example.com');
 
     await expect(submitButton).toBeEnabled({ timeout: 30000 });
-    await visitorPage.getByRole('button', { name: 'Submit', exact: true }).click();
-    await expect(visitorPage.getByRole('status')).toContainText(
-      'Thank you',
-      { timeout: 15000 },
-    );
+    await visitorPage
+      .getByRole('button', { name: 'Submit', exact: true })
+      .click();
+    await expect(visitorPage.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
 
     await visitorContext.close();
 
@@ -221,7 +222,9 @@ test.describe('form publish and anonymous submit', () => {
     expect(formSubject).toBeTruthy();
 
     await page.getByTitle('Add field').click();
-    await page.getByRole('menuitem', { name: 'Short text', exact: true }).click();
+    await page
+      .getByRole('menuitem', { name: 'Short text', exact: true })
+      .click();
     await expect(page.getByTestId('field-row-short-text')).toBeVisible();
     await page.getByTestId('field-row-short-text').click();
     await page.getByTestId('field-label-input').fill('Full name');
@@ -373,7 +376,9 @@ test.describe('form publish and anonymous submit', () => {
     expect(formSubject).toBeTruthy();
 
     await page.getByTitle('Add field').click();
-    await page.getByRole('menuitem', { name: 'Short text', exact: true }).click();
+    await page
+      .getByRole('menuitem', { name: 'Short text', exact: true })
+      .click();
     await expect(page.getByTestId('field-row-short-text')).toBeVisible();
     await page.getByTestId('field-row-short-text').click();
     await page.getByTestId('field-label-input').fill('Full name');
@@ -401,7 +406,9 @@ test.describe('form publish and anonymous submit', () => {
     // --- 2. Owner: switch to invite only and generate 2 invite links
     // (Settings tab → Form access section) ---
     await page.getByRole('tab', { name: 'Settings' }).click();
-    await page.getByRole('button', { name: 'Invite only', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Invite only', exact: true })
+      .click();
 
     await page.getByLabel('Number of invite links').fill('2');
     await page
@@ -484,8 +491,7 @@ test.describe('form publish and anonymous submit', () => {
   }) => {
     test.slow();
 
-    const FORM_CONDITIONS =
-      'https://atomicdata.dev/properties/form-conditions';
+    const FORM_CONDITIONS = 'https://atomicdata.dev/properties/form-conditions';
 
     await newResource('form', page);
     await page.getByPlaceholder('New Form').fill('Pet survey');
@@ -505,7 +511,9 @@ test.describe('form publish and anonymous submit', () => {
     expect(formSubject).toBeTruthy();
 
     await page.getByTitle('Add field').click();
-    await page.getByRole('menuitem', { name: 'Radio group', exact: true }).click();
+    await page
+      .getByRole('menuitem', { name: 'Radio group', exact: true })
+      .click();
     await expect(page.getByTestId('field-row-radio')).toBeVisible();
     await page.getByTestId('field-row-radio').click();
     await page.getByTestId('field-label-input').fill('Do you have a pet?');
@@ -686,7 +694,9 @@ test.describe('form publish and anonymous submit', () => {
 
     const visitorContext = await browser.newContext();
     const visitorPage = await visitorContext.newPage();
-    const response = await visitorPage.goto(`${SERVER_URL}/form/${formSubject}`);
+    const response = await visitorPage.goto(
+      `${SERVER_URL}/form/${formSubject}`,
+    );
     expect(response?.status()).toBe(410);
     await visitorContext.close();
   });

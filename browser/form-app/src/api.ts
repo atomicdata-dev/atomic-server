@@ -26,9 +26,7 @@ export function isEmbedMode(): boolean {
  * form. Server-validated on the definition fetch and consumed at submit; the
  * runtime just rides it along. */
 export function getInviteCodeFromLocation(): string | undefined {
-  return (
-    new URLSearchParams(window.location.search).get('code') ?? undefined
-  );
+  return new URLSearchParams(window.location.search).get('code') ?? undefined;
 }
 
 export async function fetchDefinition(

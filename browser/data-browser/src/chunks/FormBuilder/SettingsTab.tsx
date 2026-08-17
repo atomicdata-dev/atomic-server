@@ -66,10 +66,10 @@ export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
   return (
     <Wrapper>
       <SettingsGroup>
-        <SettingsSection label="Form access" initialState>
+        <SettingsSection label='Form access' initialState>
           <FormAccessSection resource={resource} />
         </SettingsSection>
-        <SettingsSection label="Appearance" initialState>
+        <SettingsSection label='Appearance' initialState>
           <AppearanceSettings resource={resource} />
         </SettingsSection>
       </SettingsGroup>
@@ -110,7 +110,7 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
   return (
     <Sections>
       <Section>
-        <Field label="Form image">
+        <Field label='Form image'>
           <FilePicker
             commit
             resource={resource}
@@ -119,8 +119,8 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
           />
         </Field>
         {coverImage && (
-          <Field label="Image position">
-            <Row gap="0.5rem" wrapItems>
+          <Field label='Image position'>
+            <Row gap='0.5rem' wrapItems>
               {POSITIONS.map(({ value, label, title }) => (
                 <Button
                   key={value}
@@ -137,27 +137,27 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
       </Section>
       <Section>
         <ColorSetting
-          label="Text color"
-          placeholderColor="#1a1a1a"
+          label='Text color'
+          placeholderColor='#1a1a1a'
           value={stylingObj.textColor as string | undefined}
           onChange={value => setStylingKey('textColor', value)}
         />
         <ColorSetting
-          label="Main color"
-          placeholderColor="#1e43a3"
+          label='Main color'
+          placeholderColor='#1e43a3'
           value={stylingObj.mainColor as string | undefined}
           onChange={value => setStylingKey('mainColor', value)}
         />
         <ColorSetting
-          label="Background color"
-          placeholderColor="#ffffff"
+          label='Background color'
+          placeholderColor='#ffffff'
           value={stylingObj.backgroundColor as string | undefined}
           onChange={value => setStylingKey('backgroundColor', value)}
         />
       </Section>
       <Section>
-        <Field label="Roundness">
-          <Row gap="0.5rem">
+        <Field label='Roundness'>
+          <Row gap='0.5rem'>
             {ROUNDNESS_LEVELS.map(({ value, label }) => (
               <Button
                 key={value}
@@ -264,7 +264,7 @@ function ColorSetting({
 
   return (
     <Field label={label}>
-      <Row gap="0.5rem" center>
+      <Row gap='0.5rem' center>
         <Popover
           open={open}
           onOpenChange={setOpen}
@@ -275,7 +275,7 @@ function ColorSetting({
             </SwatchTrigger>
           }
         >
-          <PickerPanel gap="0.75rem">
+          <PickerPanel gap='0.75rem'>
             <HexColorPicker
               color={draft ?? placeholderColor}
               onChange={setDraft}
@@ -290,7 +290,7 @@ function ColorSetting({
           </PickerPanel>
         </Popover>
         {draft && (
-          <IconButton title="Reset" onClick={() => setDraft(undefined)}>
+          <IconButton title='Reset' onClick={() => setDraft(undefined)}>
             <FaXmark />
           </IconButton>
         )}

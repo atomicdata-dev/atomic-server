@@ -123,19 +123,19 @@ export function FormAccessSection({
   const inviteOnly = access === ACCESS_INVITE_ONLY;
 
   return (
-    <Column gap="1rem">
-      <Field label="Who can open this form">
-        <Row gap="0.5rem" wrapItems>
+    <Column gap='1rem'>
+      <Field label='Who can open this form'>
+        <Row gap='0.5rem' wrapItems>
           <Button
             subtle={inviteOnly}
-            title="Anyone with the share link can view and submit"
+            title='Anyone with the share link can view and submit'
             onClick={() => setAccess(ACCESS_PUBLIC)}
           >
             Anyone with the link
           </Button>
           <Button
             subtle={!inviteOnly}
-            title="Only visitors with a valid, unused invite link can view and submit"
+            title='Only visitors with a valid, unused invite link can view and submit'
             onClick={() => setAccess(ACCESS_INVITE_ONLY)}
           >
             Invite only
@@ -154,7 +154,10 @@ export function FormAccessSection({
   );
 }
 
-const ExportTrigger = buildDefaultTrigger(<FaDownload />, 'Export invite links');
+const ExportTrigger = buildDefaultTrigger(
+  <FaDownload />,
+  'Export invite links',
+);
 
 function InviteCodeManager({ resource }: FormAccessSectionProps): JSX.Element {
   const store = useStore();
@@ -239,22 +242,22 @@ function InviteCodeManager({ resource }: FormAccessSectionProps): JSX.Element {
   ];
 
   return (
-    <Column gap="0.75rem">
+    <Column gap='0.75rem'>
       <Hint>
         Each invite link can be used for exactly one submission. Deleting a link
         revokes it.
       </Hint>
       <Card>
         <Column>
-          <Row gap="0.5rem" center>
+          <Row gap='0.5rem' center>
             <AmountInputWrapper>
               <InputStyled
-                type="number"
+                type='number'
                 min={1}
                 max={MAX_BATCH}
                 value={amount}
-                aria-label="Number of invite links"
-                placeholder="Amount"
+                aria-label='Number of invite links'
+                placeholder='Amount'
                 onChange={e => setAmount(e.target.value)}
               />
               <Button
@@ -271,7 +274,7 @@ function InviteCodeManager({ resource }: FormAccessSectionProps): JSX.Element {
           {collection.totalMembers === 0 ? (
             <Hint>No invite links yet.</Hint>
           ) : (
-            <Card.List maxHeight="20rem">
+            <Card.List maxHeight='20rem'>
               {mapAll(({ index }) => (
                 <InviteCodeRow
                   key={index}
@@ -319,9 +322,9 @@ function InviteCodeRow({
   };
 
   return (
-    <Row gap="0.5rem" center as="li">
+    <Row gap='0.5rem' center as='li'>
       <CodeText
-        data-testid="invite-code"
+        data-testid='invite-code'
         data-used={usedAt !== undefined}
         $used={usedAt !== undefined}
       >
@@ -330,7 +333,7 @@ function InviteCodeRow({
       {usedAt !== undefined ? (
         <UsedBadge title={new Date(usedAt).toLocaleString()}>Used</UsedBadge>
       ) : (
-        <IconButton title="Copy invite link" onClick={copyLink}>
+        <IconButton title='Copy invite link' onClick={copyLink}>
           <FaLink />
         </IconButton>
       )}

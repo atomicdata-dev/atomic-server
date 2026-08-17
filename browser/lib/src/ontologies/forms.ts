@@ -36,10 +36,12 @@ export const forms = {
     formCode: 'https://atomicdata.dev/properties/form-code',
     usedAt: 'https://atomicdata.dev/properties/used-at',
     formConditions: 'https://atomicdata.dev/properties/form-conditions',
-    formConditionField: 'https://atomicdata.dev/properties/form-condition-field',
+    formConditionField:
+      'https://atomicdata.dev/properties/form-condition-field',
     formConditionOperator:
       'https://atomicdata.dev/properties/form-condition-operator',
-    formConditionValue: 'https://atomicdata.dev/properties/form-condition-value',
+    formConditionValue:
+      'https://atomicdata.dev/properties/form-condition-value',
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Form']: [

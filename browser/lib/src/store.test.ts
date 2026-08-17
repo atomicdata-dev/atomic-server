@@ -365,7 +365,9 @@ describe('Store', () => {
     await goodProperty.set(core.properties.isA, [core.classes.property], false);
     store.addResource(goodProperty);
 
-    const fetchSpy = vi.fn(async () => new Response('Not found', { status: 404 }));
+    const fetchSpy = vi.fn(
+      async () => new Response('Not found', { status: 404 }),
+    );
     store.injectFetch(fetchSpy);
 
     // Mirrors `useFormFieldPropertySync`'s `page.set(forms.properties.formFields, [...])`
@@ -398,7 +400,9 @@ describe('Store', () => {
       getResource: async (s: string) => (s === propertySubject ? jsonAd : null),
     } as unknown as Parameters<Store['setClientDb']>[0]);
 
-    const fetchSpy = vi.fn(async () => new Response('Not found', { status: 404 }));
+    const fetchSpy = vi.fn(
+      async () => new Response('Not found', { status: 404 }),
+    );
     store.injectFetch(fetchSpy);
 
     const resource = await store.getResource(propertySubject);
