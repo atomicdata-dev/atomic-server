@@ -1,3 +1,5 @@
+// @wc-ignore-file
+
 import { type Server, type Store } from '@tomic/react';
 
 export const DRIVE_INSTRUCTIONS_MAX_CHARS = 12_000;

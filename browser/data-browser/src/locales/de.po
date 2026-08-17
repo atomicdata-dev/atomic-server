@@ -8263,3 +8263,13 @@ msgstr "Seite anzeigen wenn"
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "Show Field When"
 msgstr "Feld anzeigen wenn"
+
+#. 0: managedAccount.email
+#: src/routes/SyncRoute.tsx
+msgid "{0} — we hold your key sealed, so this email gets you back in on a new device."
+msgstr "{0} — wir bewahren Ihren Schlüssel versiegelt auf, sodass Sie sich mit dieser E-Mail auf einem neuen Gerät wieder anmelden können."
+
+#. 0: managedAccount.email
+#: src/routes/SyncRoute.tsx
+msgid "{0} — no recovery backup stored. Lose every device and this workspace is gone."
+msgstr "{0} — keine Wiederherstellungssicherung gespeichert. Wenn Sie alle Geräte verlieren, ist dieser Arbeitsbereich verloren."

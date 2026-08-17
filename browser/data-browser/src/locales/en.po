@@ -8231,3 +8231,13 @@ msgstr "Show Page When"
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
 msgid "Show Field When"
 msgstr "Show Field When"
+
+#. 0: managedAccount.email
+#: src/routes/SyncRoute.tsx
+msgid "{0} — we hold your key sealed, so this email gets you back in on a new device."
+msgstr "{0} — we hold your key sealed, so this email gets you back in on a new device."
+
+#. 0: managedAccount.email
+#: src/routes/SyncRoute.tsx
+msgid "{0} — no recovery backup stored. Lose every device and this workspace is gone."
+msgstr "{0} — no recovery backup stored. Lose every device and this workspace is gone."

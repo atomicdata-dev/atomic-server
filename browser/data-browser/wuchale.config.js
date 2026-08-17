@@ -64,6 +64,8 @@ const IGNORE_MESSAGES = [
 // Any strings defined in these functions will not be translated.
 const IGNORED_FUNCTIONS = ['effectFetch', 'JSON.stringify', 'JSON.parse'];
 
+const IGNORED_FILE_PARTS = ['.test', '.spec'];
+
 export default defineConfig({
   // sourceLocale is en by default
   locales: ['en', 'es', 'fr', 'de'],
@@ -78,6 +80,10 @@ export default defineConfig({
       loader: 'react',
       heuristic: ({ msgStr, details }) => {
         const [msg] = msgStr;
+
+        if (IGNORED_FILE_PARTS.some(part => details.file.includes(part))) {
+          return false;
+        }
 
         if (details.scope === 'script') {
           // Ignore certain functions
