@@ -48,6 +48,17 @@ const RUST_IMAGE = 'rust:bookworm';
 // So: install the exact version, and never let the self-switch run.
 const PNPM_VERSION = '11.10.0';
 
+// Where `get.pnpm.io/install.sh` puts the CLI, for the containers that install
+// pnpm that way instead of via `npm --global` (the playwright image).
+//
+// pnpm 10 dropped the binary straight into `$PNPM_HOME`; pnpm 11 installs
+// `@pnpm/exe` and leaves shims in `$PNPM_HOME/bin` instead. Pointing PATH at
+// `$PNPM_HOME` — correct until the version bump above — now yields
+//   exec: "pnpm": executable file not found in $PATH
+// on the container's first `pnpm install`. The install script's own PATH
+// advice (`export PATH="$PNPM_HOME/bin:$PATH"`) is the authority here.
+const PNPM_BIN_DIR = '/root/.local/share/pnpm/bin';
+
 // Must match `@playwright/test` in `browser/e2e/package.json`.
 //
 // The image bakes in the browser builds its own Playwright wants, and each
@@ -1612,7 +1623,7 @@ export class AtomicServer {
       .withEnvVariable('NPM_CONFIG_PREFIX', '/opt/npm-global')
       .withEnvVariable(
         'PATH',
-        '/root/.local/share/pnpm:/opt/npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+        `${PNPM_BIN_DIR}:/opt/npm-global/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`,
       )
       .withExec([
         '/bin/sh',
@@ -1621,7 +1632,7 @@ export class AtomicServer {
         // anything older here made the first `pnpm install` below self-switch
         // to it, which is the failure documented at PNPM_VERSION.
         `curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=${PNPM_VERSION} ENV="$HOME/.shrc" SHELL="$(which sh)" sh - && ` +
-          'export PATH=/root/.local/share/pnpm:/opt/npm-global/bin:$PATH && ' +
+          `export PATH=${PNPM_BIN_DIR}:/opt/npm-global/bin:$PATH && ` +
           '/bin/apt update && /bin/apt install -y zip && ' +
           'if [ ! -x /opt/npm-global/bin/netlify ]; then npm install -g netlify-cli --quiet; fi && netlify --version',
       ]);
