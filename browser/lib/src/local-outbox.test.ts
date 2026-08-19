@@ -57,6 +57,14 @@ describe('isTerminalCommitErrorMessage', () => {
     ).toBe(true);
   });
 
+  it('flags a write aimed at an immutable Commit', ({ expect }) => {
+    // A `<server>/commits/<sig>` subject (imported from another server) once
+    // reached the outbox and retried this rejection on backoff forever.
+    expect(isTerminalCommitErrorMessage('Commits cannot be edited.')).toBe(
+      true,
+    );
+  });
+
   it("doesn't flag normal errors", ({ expect }) => {
     expect(isTerminalCommitErrorMessage('Invalid signature')).toBe(false);
     expect(isTerminalCommitErrorMessage('Network timeout')).toBe(false);

@@ -180,6 +180,18 @@ export function isTerminalCommitErrorMessage(message: string): boolean {
     return true;
   }
 
+  // A Commit was queued as if it were an editable resource. Commits are
+  // immutable by definition, so the server refuses the write on every attempt
+  // (`hierarchy.rs`: "Commits cannot be edited.") and the entry retries on
+  // backoff forever. Nothing is lost by dropping it: a Commit's content is
+  // whatever was signed, and no local edit to it could ever have applied.
+  // Seen in the field on resources imported from another server, whose
+  // `<server>/commits/<sig>` subjects slip past the `did:ad:commit:` guard
+  // that keeps client-minted commits out of the outbox.
+  if (message.includes('Commits cannot be edited')) {
+    return true;
+  }
+
   return false;
 }
 
