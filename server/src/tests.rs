@@ -626,6 +626,19 @@ async fn upload_download_test() {
     let resp = test::call_service(&app, req).await;
     assert!(resp.status().is_success());
 
+    // The content-addressed route only gets a hash, but it must still answer
+    // with the File's real mimetype: the response carries `nosniff`, so an
+    // `application/octet-stream` answer makes the browser refuse to render the
+    // bytes in an `<img>` — and `downloadURL` for every client-uploaded file
+    // points here.
+    assert_eq!(
+        resp.headers()
+            .get(actix_web::http::header::CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok()),
+        Some("text/plain"),
+        "content-addressed download must serve the uploaded mimetype"
+    );
+
     let downloaded_bytes = test::read_body(resp).await;
     assert_eq!(downloaded_bytes, test_content.as_slice());
 }

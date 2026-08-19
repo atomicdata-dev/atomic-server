@@ -94,6 +94,61 @@ const createModel = async (page: Page) => {
 test.describe('File Picker', () => {
   test.beforeEach(before);
 
+  // Uploaded SVGs used to show as broken images everywhere the app previews a
+  // local file: `useFileObjectUrl` built the `blob:` URL from an untyped Blob,
+  // so the object URL had no Content-Type. An `<img>` sniffs raster formats
+  // regardless, but never SVG — browsers render SVG only when the type is
+  // exactly `image/svg+xml`.
+  test('uploaded SVG renders in the preview', async ({ page }) => {
+    await signIn(page);
+    await newDrive(page);
+
+    await uploadFile(page, 'testImage.svg');
+
+    const image = page.locator('img[data-test="image-viewer"]');
+    await expect(image).toBeVisible();
+
+    // The `<img>` element is in the DOM either way — only a non-zero
+    // naturalWidth proves the bytes actually decoded.
+    await expect
+      .poll(() => image.evaluate((img: HTMLImageElement) => img.naturalWidth))
+      .toBeGreaterThan(0);
+
+    // The other half of the same bug: once the local bytes are gone the app
+    // falls back to `downloadURL`, which points at the content-addressed
+    // `/download/files/{hash}` route. That route only gets a hash, and used to
+    // answer `application/octet-stream` — which, together with the `nosniff`
+    // it also sets, makes the browser refuse to render the bytes in an
+    // `<img>`, for every image type rather than just SVG.
+    const subject = new URL(page.url()).searchParams.get('subject');
+    expect(subject).toBeTruthy();
+
+    const downloadUrl = await page.evaluate(
+      async (s: string) =>
+        (await window.store.getResource(s)).get(
+          'https://atomicdata.dev/properties/downloadURL',
+        ) as string,
+      subject!,
+    );
+    expect(downloadUrl).toContain('/download/files/');
+
+    // Poll: the blob is pushed to the server after the commit, so the route
+    // 404s for a moment right after upload.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(async (url: string) => {
+            const res = await fetch(url);
+
+            return res.ok
+              ? res.headers.get('content-type')
+              : `HTTP ${res.status}`;
+          }, downloadUrl),
+        { timeout: 20000 },
+      )
+      .toBe('image/svg+xml');
+  });
+
   test(
     'select file and upload using the filepicker',
     smoke,

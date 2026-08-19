@@ -594,3 +594,28 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Publish → anonymous submit of a branching follow-up | `browser/e2e/tests/forms-submission.spec.ts` ("branching hides a follow-up unless its condition matches") |
 
 Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it); add/delete-page write ordering in `PageTabBar` (both now `await` the form's `form-pages` save — add before selecting, delete before destroying — but no test pins that ordering).
+
+---
+
+## Files and image previews
+
+| Flow | Where |
+|---|---|
+| Upload → blob stored → content-addressed download round-trip | `server/src/tests.rs::upload_download_test` |
+| `/download/files/{hash}` answers with the File's real mimetype, not `application/octet-stream` | `server/src/tests.rs::upload_download_test` |
+| An uploaded SVG actually decodes in the preview (local `blob:` URL **and** the server `downloadURL`) | `browser/e2e/tests/filePicker.spec.ts` ("uploaded SVG renders in the preview") |
+| File picker lists files, filters by name, previews text | `browser/e2e/tests/filePicker.spec.ts` |
+| Upload while offline, then reconnect | `browser/e2e/tests/file-upload-offline.spec.ts`, `browser/lib/tests/upload-offline-reconnect.integration.test.ts` |
+
+Both halves of the SVG row guard the same class of bug and neither implies the
+other: a `blob:` URL takes its Content-Type from the `Blob`'s `type`, the
+network URL from the response header, and an `<img>` renders SVG only when that
+type is exactly `image/svg+xml` (raster formats it will sniff; SVG it never
+will). `user_blob_response` also sets `nosniff`, so an `application/octet-stream`
+answer breaks *every* image type on the network path, not just SVG.
+
+Not covered: that the network `downloadURL` path is what actually renders once
+the local bytes are evicted — the e2e asserts the header directly rather than
+clearing the ClientDb and re-rendering. No test pins the `?w=`/`?f=` rendition
+route's refusal to process SVG (`is_image_bytes` rejects it); the app avoids
+that route for SVG, but nothing enforces that it keeps doing so.
