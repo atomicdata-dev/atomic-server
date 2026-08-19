@@ -8248,3 +8248,7 @@ msgstr "{0} — mantenemos tu clave sellada, por lo que este correo electrónico
 #: src/routes/SyncRoute.tsx
 msgid "{0} — no recovery backup stored. Lose every device and this workspace is gone."
 msgstr "{0} — no hay copia de seguridad de recuperación almacenada. Si pierdes todos los dispositivos, este espacio de trabajo desaparecerá."
+
+#: src/chunks/FormBuilder/DeleteFormDialog.tsx
+msgid "Are you sure you want to delete this form?"
+msgstr "¿Estás seguro de que quieres eliminar este formulario?"

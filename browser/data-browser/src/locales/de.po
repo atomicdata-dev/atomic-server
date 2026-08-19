@@ -8273,3 +8273,7 @@ msgstr "{0} — wir bewahren Ihren Schlüssel versiegelt auf, sodass Sie sich mi
 #: src/routes/SyncRoute.tsx
 msgid "{0} — no recovery backup stored. Lose every device and this workspace is gone."
 msgstr "{0} — keine Wiederherstellungssicherung gespeichert. Wenn Sie alle Geräte verlieren, ist dieser Arbeitsbereich verloren."
+
+#: src/chunks/FormBuilder/DeleteFormDialog.tsx
+msgid "Are you sure you want to delete this form?"
+msgstr "Sind Sie sicher, dass Sie dieses Formular löschen möchten?"
