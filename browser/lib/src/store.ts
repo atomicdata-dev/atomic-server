@@ -22,7 +22,12 @@ import {
   signRequest,
 } from './authentication.js';
 import { Client, type FileOrFileLike } from './client.js';
-import { CommitBuilder, commitIdOf, type Commit } from './commit.js';
+import {
+  CommitBuilder,
+  commitIdOf,
+  isCommitSubject,
+  type Commit,
+} from './commit.js';
 import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import {
   AtomicError,
@@ -1062,10 +1067,14 @@ export class Store {
           const isRedundantGenesis = msg.includes(
             'is_genesis: true, but the resource already exists',
           );
+          // Same reasoning for a Commit that was queued as an editable
+          // resource: no user write is lost (a Commit is immutable), so the
+          // drop is bookkeeping, not a recovery the user needs to know about.
+          const isCommitWrite = msg.includes('Commits cannot be edited');
 
-          if (isRedundantGenesis) {
+          if (isRedundantGenesis || isCommitWrite) {
             console.debug(
-              `Dropped redundant genesis commit for ${entry.subject} (already on server)`,
+              `Dropped unsyncable commit for ${entry.subject}: ${msg}`,
             );
           } else {
             this.notifyError(
@@ -1082,10 +1091,15 @@ export class Store {
           // response would reset `Resource.new`, re-arming the local-change
           // subscriber's dirty-tracking for the next edit and looping this
           // exact drop (see the `_new:` guard in `resource.ts`'s Loro
-          // subscription).
+          // subscription). Commit subjects are skipped for the same reason in
+          // reverse: the Commit on the server is already what it will always
+          // be, so there is nothing to align, and the legacy `/commits/<sig>`
+          // form carries unescaped signature characters that only produce a
+          // failed fetch.
           if (
             !entry.subject.startsWith('_new:') &&
-            !entry.subject.startsWith('_local:')
+            !entry.subject.startsWith('_local:') &&
+            !isCommitSubject(entry.subject)
           ) {
             this.fetchResourceFromServer(entry.subject).catch(() => undefined);
           }
