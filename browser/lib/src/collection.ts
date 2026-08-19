@@ -852,15 +852,20 @@ export class Collection {
       return;
     }
 
-    if (!hasClientDb) {
-      // Offline AND no OPFS: brief window for the WS to come up.
-      // Without this, the constructor's `_waitForReady` resolves to
-      // an empty page and the UI freezes in a "no rows" state.
-      await this.store.waitForServerConnected(3000);
+    // The local DB couldn't answer and the socket isn't up yet — the cold-load
+    // window. This wait used to be reserved for stores with no OPFS at all,
+    // which left the far more common case (OPFS present, index not populated
+    // for this parent) falling off the end of this method: no fetch, no retry,
+    // and `_waitForReady` resolving anyway, so the UI rendered "no members"
+    // with neither a loader nor an error and nothing ever asked again. A
+    // signed-in session loses this race by design — `serverConnected` only
+    // flips after AUTH_OK — which is why the sidebar came up empty when signed
+    // in and full when signed out. Being offline for real costs one bounded
+    // wait, and the page still ends up empty, which is the truth then.
+    await this.store.waitForServerConnected(3000);
 
-      if (this.store.serverConnected) {
-        await this.fetchPageFromServer(page).catch(() => undefined);
-      }
+    if (this.store.serverConnected) {
+      await this.fetchPageFromServer(page).catch(() => undefined);
     }
   }
 
