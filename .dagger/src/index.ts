@@ -1140,11 +1140,40 @@ export class AtomicServer {
       .withWorkdir('/code')
       .withExec(['cargo', 'fetch']);
 
-    const browserDir = this.jsBuild(e2e).directory('/app/data-browser/dist');
-    const containerWithAssets = sourceContainer.withDirectory(
-      '/code/server/assets_tmp',
-      browserDir,
-    );
+    const jsContainer = this.jsBuild(e2e);
+    const formAppDist = jsContainer.directory('/app/form-app/dist');
+    // The published-form runtime (`browser/form-app`) is a SECOND bundle,
+    // separate from the data-browser one. `server/build.rs::copy_form_assets`
+    // copies it from `../browser/form-app/dist` into
+    // `assets_tmp/form-assets/`, which `handlers/form.rs` `include_str!`s and
+    // `static_files::generate()` serves at `/form-assets/*`. Mounting only
+    // `data-browser/dist` left that path absent, so every dagger-built server
+    // — the e2e one AND the release binary this same function produces —
+    // embedded build.rs's placeholder shell: `/form/{id}` answered with an
+    // inert "form runtime not built" page carrying no <script>. Silent,
+    // because a missing form-app build is only a `cargo:warning` (it has to
+    // be: the fmt/clippy/nextest containers stub `assets_tmp` and run no JS
+    // build at all).
+    //
+    // Both halves are needed. The mount under `/code/browser` is what
+    // `copy_form_assets` reads — without it, a build.rs that DOES run
+    // overwrites any bundle we place with the placeholder. Pre-placing the
+    // same bundle inside `assets_tmp` covers the opposite case: `/code/target`
+    // is a cache volume shared across runs, and cargo will happily treat the
+    // build script as fresh (replaying its stored output) while still
+    // recompiling the lib — leaving `include_str!` to read whatever the
+    // mounted `assets_tmp` holds.
+    //
+    // Only `dist` goes under `/code/browser`, deliberately: mounting
+    // `form-app/src` too would make `should_build()` see source newer than a
+    // (missing) `data-browser/dist` and try to run `pnpm build` inside the
+    // rust container.
+    const assetsDir = jsContainer
+      .directory('/app/data-browser/dist')
+      .withDirectory('form-assets', formAppDist);
+    const containerWithAssets = sourceContainer
+      .withDirectory('/code/server/assets_tmp', assetsDir)
+      .withDirectory('/code/browser/form-app/dist', formAppDist);
 
     // Scope the build to `atomic-server` so cargo doesn't try to build
     // workspace siblings like the wasm cdylib plugin examples — which

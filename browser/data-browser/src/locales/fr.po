@@ -6454,26 +6454,26 @@ msgstr "{0} prédéfinit \"{1}\", qui n'est pas une colonne"
 
 #: src/routes/AboutRoute.tsx
 msgid "The one workspace for everything, owned by you."
-msgstr ""
+msgstr "L'unique espace de travail pour tout, qui vous appartient."
 
 #: src/routes/AboutRoute.tsx
 msgid "Documents, tables, files, chat and custom apps in one place. AtomicServer starts on your device, and can run with no server at all. It adds backup, sharing and always-on availability when you want them. Everything you make is Atomic Data: typed, linked and portable, so it stays readable by other apps and by you."
-msgstr ""
+msgstr "Documents, tableaux, fichiers, chat et applications personnalisées en un seul endroit. AtomicServer démarre sur votre appareil et peut fonctionner sans aucun serveur. Il ajoute la sauvegarde, le partage et la disponibilité permanente quand vous le souhaitez. Tout ce que vous créez est Atomic Data : typé, lié et portable, pour rester lisible par d'autres applications et par vous."
 
 #. 0: token
 #: src/helpers/managed/api.ts
 msgid "Bearer {0}"
-msgstr ""
+msgstr "Bearer {0}"
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Set up Cloud Server"
-msgstr ""
+msgstr "Configurer le serveur Cloud"
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Cloud Server"
-msgstr ""
+msgstr "Serveur Cloud"
 
 msgid "Timed out connecting to the Cloud Server node."
 msgstr ""
@@ -6637,7 +6637,7 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Manage account →"
-msgstr ""
+msgstr "Gérer le compte →"
 
 #: src/components/Vault/VaultPanel.tsx
 #: src/components/Vault/VaultPanel.tsx
@@ -6656,7 +6656,7 @@ msgstr ""
 #. 0: PRODUCT_NAME
 #: src/routes/SyncRoute.tsx
 msgid "A hosted workspace on {0}: shareable links, search across everything, API access, and no waiting on another device to be awake. Unlike Cloud Vault, our servers process what you put here."
-msgstr ""
+msgstr "Un espace de travail hébergé sur {0} : liens partageables, recherche dans tout, accès API, et pas d'attente qu'un autre appareil soit allumé. Contrairement à Cloud Vault, nos serveurs traitent ce que vous mettez ici."
 
 #. 0: missing.join(', ')
 #: src/helpers/managed/useVaultBackup.ts
@@ -6665,48 +6665,48 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Disconnect"
-msgstr ""
+msgstr "Déconnecter"
 
 #: src/routes/SyncRoute.tsx
 msgid "Reconnect"
-msgstr ""
+msgstr "Reconnecter"
 
 #: src/routes/SyncRoute.tsx
 msgid "Not connected"
-msgstr ""
+msgstr "Non connecté"
 
 #: src/routes/SyncRoute.tsx
 msgid "Switch"
-msgstr ""
+msgstr "Basculer"
 
 #: src/routes/SyncRoute.tsx
 msgid "Your cloud services"
-msgstr ""
+msgstr "Vos services cloud"
 
 #: src/routes/SyncRoute.tsx
 msgid "Cloud services for this workspace"
-msgstr ""
+msgstr "Services cloud pour cet espace de travail"
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "Signed in as {0}."
-msgstr ""
+msgstr "Connecté en tant que {0}."
 
 #: src/routes/SyncRoute.tsx
 msgid "Email recovery"
-msgstr ""
+msgstr "Récupération par email"
 
 #. 0: count
 #. 0: nodeUsage.resourceCount.toLocaleString()
 #: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
 #: src/routes/SyncRoute.tsx
 msgid "{0} resources"
-msgstr ""
+msgstr "{0} ressources"
 
 #. 0: formatBytes(usedBytes); 1: formatBytes(quotaBytes)
 #: src/routes/SyncRoute.tsx
 msgid "{0} of {1}"
-msgstr ""
+msgstr "{0} de {1}"
 
 #. 0: syncedAgo
 #. 0: formatTimeAgo(new Date(lastSynced)) ?? 'just now'
@@ -6715,38 +6715,38 @@ msgstr ""
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Synced {0}"
-msgstr ""
+msgstr "Synchronisé {0}"
 
 #: src/routes/SyncRoute.tsx
 msgid "Synced just now"
-msgstr ""
+msgstr "Synchronisé à l'instant"
 
 #: src/routes/SyncRoute.tsx
 msgid "Open a workspace to see whether it can be hosted."
-msgstr ""
+msgstr "Ouvrez un espace de travail pour voir s'il peut être hébergé."
 
 #: src/routes/SyncRoute.tsx
 msgid "This device doesn’t have this workspace yet. Pair the device that does, and you can host it from here."
-msgstr ""
+msgstr "Cet appareil n'a pas encore cet espace de travail. Associez l'appareil qui l'a et vous pourrez l'héberger depuis ici."
 
 msgid "Already set up for this workspace. This app is reading from {0} instead."
-msgstr ""
+msgstr "Déjà configuré pour cet espace de travail. Cette application lit depuis {0} à la place."
 
 #: src/routes/SyncRoute.tsx
 msgid "This server"
-msgstr ""
+msgstr "Ce serveur"
 
 #. 0: serverHostname ?? 'This server'
 #: src/routes/SyncRoute.tsx
 msgid "{0} doesn’t offer hosting, so it can’t be switched on from here."
-msgstr ""
+msgstr "{0} ne propose pas d'hébergement, donc il ne peut pas être activé depuis ici."
 
 #: src/routes/SyncRoute.tsx
 msgid "Checking whether this workspace is hosted…"
-msgstr ""
+msgstr "Vérification si cet espace de travail est hébergé…"
 
 msgid "This workspace already lives on {0}. Moving it here is a migration, not a backup."
-msgstr ""
+msgstr "Cet espace de travail vit déjà sur {0}. Le déplacer ici est une migration, pas une sauvegarde."
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Checking this workspace’s backup…"
@@ -6755,16 +6755,16 @@ msgstr ""
 #. 0: withWhom
 #: src/routes/SyncRoute.tsx
 msgid "Already up to date{0}"
-msgstr ""
+msgstr "Déjà à jour{0}"
 
 #. 0: withWhom; 1: sent; 2: received
 #: src/routes/SyncRoute.tsx
 msgid "Synced{0} — sent {1}, received {2}"
-msgstr ""
+msgstr "Synchronisé{0} — envoyé {1}, reçu {2}"
 
 #: src/routes/SyncRoute.tsx
 msgid "Paired"
-msgstr ""
+msgstr "Appairé"
 
 #: src/routes/SyncRoute.tsx
 msgid "Paired device"
@@ -6782,118 +6782,118 @@ msgstr ""
 
 #: src/routes/SyncRoute.tsx
 msgid "Sign in →"
-msgstr ""
+msgstr "Se connecter →"
 
 #. 0: PRODUCT_NAME
 #: src/routes/SyncRoute.tsx
 msgid "Not set up. With an account on {0} we hold your key sealed, so an email gets you back in on a new device. Without one, losing every device loses this workspace."
-msgstr ""
+msgstr "Non configuré. Avec un compte sur {0} nous conservons votre clé scellée, afin qu'un email vous permette de revenir sur un nouvel appareil. Sans cela, perdre tous les appareils fait perdre cet espace de travail."
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. We hold your key sealed, so this email gets you back in on a new device."
-msgstr ""
+msgstr "{0}. Nous conservons votre clé scellée, afin que cet email vous permette de revenir sur un nouvel appareil."
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. No recovery backup stored, so losing every device loses this workspace."
-msgstr ""
+msgstr "{0}. Aucune sauvegarde de récupération stockée, donc perdre tous les appareils fait perdre cet espace de travail."
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Set up email recovery"
-msgstr ""
+msgstr "Configurer la récupération par email"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "That does not look like an agent secret."
-msgstr ""
+msgstr "Cela ne ressemble pas à un secret d'agent."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "That secret belongs to a different account than the one signed in here."
-msgstr ""
+msgstr "Ce secret appartient à un compte différent de celui connecté ici."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "That secret carries no account to back up."
-msgstr ""
+msgstr "Ce secret ne porte aucun compte à sauvegarder."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not set up account recovery."
-msgstr ""
+msgstr "Impossible de configurer la récupération du compte."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Nothing protects this account but the secret you saved during setup. Lose every device you are signed in on and that copy is all there is."
-msgstr ""
+msgstr "Rien ne protège ce compte à part le secret que vous avez enregistré lors de la configuration. Perdez tous les appareils sur lesquels vous êtes connecté et cette copie est tout ce qu'il reste."
 
 #. 0: PRODUCT_NAME
 #: src/components/AccountRecoveryCard.tsx
 msgid "You can store an encrypted backup now. Paste the secret and this device seals it before sending, so {0} holds a blob it cannot read and your email plus a passkey or recovery code gets you back in on a new device."
-msgstr ""
+msgstr "Vous pouvez stocker une sauvegarde chiffrée maintenant. Collez le secret et cet appareil le scelle avant de l'envoyer, de sorte que {0} conserve un blob qu'il ne peut pas lire et votre e-mail plus une clé d'accès ou un code de récupération vous permet de vous reconnecter sur un nouvel appareil."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "We have to ask you for it. This browser keeps your key where scripts cannot read it, which protects you and also means we cannot fetch the secret ourselves."
-msgstr ""
+msgstr "Nous devons vous le demander. Ce navigateur conserve votre clé là où les scripts ne peuvent pas la lire, ce qui vous protège et signifie également que nous ne pouvons pas récupérer le secret nous-mêmes."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Sign in to set up recovery"
-msgstr ""
+msgstr "Connectez-vous pour configurer la récupération"
 
 #: src/components/AccountRecoveryCard.tsx
 #: src/components/AccountRecoveryCard.tsx
 msgid "Your agent secret"
-msgstr ""
+msgstr "Votre secret d'agent"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Set up account recovery"
-msgstr ""
+msgstr "Configurer la récupération du compte"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Storing a backup is a write to"
-msgstr ""
+msgstr "Stocker une sauvegarde est une écriture sur"
 
 #: src/components/AccountRecoveryCard.tsx
 msgid ", so it needs you signed in there first."
-msgstr ""
+msgstr ", donc cela nécessite que vous soyez connecté là-bas d'abord."
 
 #: src/routes/SyncRoute.tsx
 msgid "Store it with "
-msgstr ""
+msgstr "Stocker avec "
 
 #. 0: PRODUCT_NAME
 #: src/components/AccountRecoveryCard.tsx
 msgid "Could not store your backup with {0}."
-msgstr ""
+msgstr "Impossible de stocker votre sauvegarde avec {0}."
 
 #: src/components/AccountRecoveryCard.tsx
 msgid "Storing…"
-msgstr ""
+msgstr "Stockage en cours…"
 
 #. 0: PRODUCT_NAME
 #: src/components/AccountRecoveryCard.tsx
 msgid "Store it with {0}"
-msgstr ""
+msgstr "Stockez-le avec {0}"
 
 #. 0: PRODUCT_NAME
 #: src/components/AccountRecoveryCard.tsx
 msgid "This backup is sealed in this browser only. {0} is not holding a copy, so a new device could not get you back in."
-msgstr ""
+msgstr "Cette sauvegarde est scellée uniquement dans ce navigateur. {0} ne conserve pas de copie, donc un nouvel appareil ne pourrait pas vous reconnecter."
 
 #. 0: managedAccount.email
 #: src/routes/SyncRoute.tsx
 msgid "{0}. Your backup is sealed in this browser and nowhere else, so it unlocks here but a new device could not get you back in."
-msgstr ""
+msgstr "{0}. Votre sauvegarde est scellée dans ce navigateur et nulle part ailleurs, donc elle se déverrouille ici mais un nouvel appareil ne pourrait pas vous faire revenir."
 
 #. 0: ' '; 1: `${ [hasPasskey && 'your passkey', hasCode && 'your recovery code'] .filter(Boolean) .join(' or ') || 'your recovery password' }${deviceOnly ? ', on this device' \\: ''}.`
 #: src/components/AccountRecoveryCard.tsx
 msgid "You can get back in with:{0} {1}"
-msgstr ""
+msgstr "Vous pouvez vous reconnecter avec :{0} {1}"
 
 #: src/routes/SyncRoute.tsx
 msgid "An always-on device has an address. One you carry has a code instead, shown below."
-msgstr ""
+msgstr "Un appareil toujours allumé a une adresse. Celui que vous portez a un code à la place, affiché ci-dessous."
 
 #: src/routes/SyncRoute.tsx
 msgid "An always-on device has an address. Type it here."
-msgstr ""
+msgstr "Un appareil toujours allumé a une adresse. Tapez-la ici."
 
 #. 0: detail
 #: src/actions/resourceActions.tsx

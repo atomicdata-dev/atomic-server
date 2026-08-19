@@ -1,10 +1,58 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import http from 'node:http';
 import { before, newResource, openSubject, SERVER_URL } from './test-utils';
 
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 const FORM_STYLING = 'https://atomicdata.dev/properties/form-styling';
+
+/**
+ * GET the published definition of `subject` from inside the browser.
+ *
+ * Deliberately an in-page `fetch` and NOT `page.request.get`: Playwright's
+ * APIRequestContext resolves hostnames in the node process, which does not
+ * honour the chromium `--host-resolver-rules` flag the dagger e2e uses to
+ * point `atomic.localhost` at the atomic-server service container. There the
+ * node-side lookup falls back to 127.0.0.1, where nothing listens, and every
+ * such request dies with `ECONNREFUSED 127.0.0.1:9883` — a CI-only failure
+ * that cannot reproduce locally, where `localhost` really is the server.
+ *
+ * `credentials: 'omit'` keeps the probe anonymous even when the page happens
+ * to share an origin with the server (it does in CI, it does not locally),
+ * so it measures what an actual visitor gets.
+ *
+ * The subject goes into the path raw, exactly as the `goto`s below build it.
+ * `encodeURIComponent` would be wrong here: a browser sends the `%3A`
+ * literally, and the route then resolves to something other than the form
+ * (observed: a 410 "not accepting responses" for a form that is published).
+ * The node-side client normalised the escapes away, which is why the same
+ * URL worked before this became a real browser request.
+ */
+async function fetchDefinition(
+  page: Page,
+  subject: string,
+  query = '',
+): Promise<{ status: number; ok: boolean; body: string }> {
+  return page.evaluate(async url => {
+    const res = await fetch(url, { credentials: 'omit' });
+
+    return { status: res.status, ok: res.ok, body: await res.text() };
+  }, `${SERVER_URL}/form/${subject}/definition${query}`);
+}
+
+/**
+ * Wait until the server itself serves the form — the client-side
+ * `pendingDirtyCount === 0` only proves the publish commit left this tab.
+ * Under suite-wide load the server can still be a beat behind, and opening
+ * the visitor page too early renders the not-available view instead of the
+ * form.
+ */
+async function waitForPublished(page: Page, subject: string): Promise<void> {
+  await expect(async () => {
+    const res = await fetchDefinition(page, subject);
+    expect(res.ok).toBe(true);
+  }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
+}
 
 /**
  * Flagship e2e for Atomic Forms (Phase 4, `planning/atomic-forms.md`): build
@@ -108,6 +156,8 @@ test.describe('form publish and anonymous submit', () => {
       { subject: formSubject, prop: FORM_TARGET_TABLE },
     );
     expect(tableSubject).toBeTruthy();
+
+    await waitForPublished(page, formSubject);
 
     // --- 3. Fresh, unauthenticated context: open the published form and submit ---
     const visitorContext = await browser.newContext();
@@ -260,12 +310,7 @@ test.describe('form publish and anonymous submit', () => {
     // generous budget, no give-up) so that by the time we open the popover
     // the form is already published server-side and the panel's own first
     // attempt succeeds immediately.
-    await expect(async () => {
-      const res = await page.request.get(
-        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition`,
-      );
-      expect(res.ok()).toBe(true);
-    }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
+    await waitForPublished(page, formSubject);
 
     await page.getByTitle('Share form').click({ timeout: 20000 });
     const popover = page.getByRole('dialog');
@@ -430,14 +475,14 @@ test.describe('form publish and anonymous submit', () => {
     // commit and the code resources may still be in flight): the plain
     // definition must 403 while the code opens it.
     await expect(async () => {
-      const bare = await page.request.get(
-        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition`,
+      const bare = await fetchDefinition(page, formSubject);
+      expect(bare.status).toBe(403);
+      const withCode = await fetchDefinition(
+        page,
+        formSubject,
+        `?code=${code}`,
       );
-      expect(bare.status()).toBe(403);
-      const withCode = await page.request.get(
-        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition?code=${code}`,
-      );
-      expect(withCode.ok()).toBe(true);
+      expect(withCode.ok).toBe(true);
     }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
 
     // --- 3. Anonymous visitor without a code: friendly 403 page ---
@@ -617,11 +662,9 @@ test.describe('form publish and anonymous submit', () => {
     );
 
     await expect(async () => {
-      const res = await page.request.get(
-        `${SERVER_URL}/form/${encodeURIComponent(formSubject)}/definition`,
-      );
-      expect(res.ok()).toBe(true);
-      const body = await res.json();
+      const res = await fetchDefinition(page, formSubject);
+      expect(res.ok).toBe(true);
+      const body = JSON.parse(res.body);
       const followUp = body.pages[0].blocks.find(
         (b: { kind: string; label?: string }) =>
           b.kind === 'field' && b.label === "Pet's name",
