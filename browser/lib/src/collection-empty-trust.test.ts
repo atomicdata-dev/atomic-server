@@ -97,3 +97,57 @@ describe('an empty matching set still carries its statistics', () => {
     ]);
   });
 });
+
+/**
+ * Cold load: the local DB has an OPFS file but nothing indexed for this
+ * parent yet, and the WebSocket hasn't finished its handshake. Signing in
+ * makes that window wider — `serverConnected` only flips after AUTH_OK — so
+ * the sidebar's first (and, for a server-root drive, only) query landed in it
+ * every time. The page must not resolve empty and stay that way: nothing
+ * re-queries a collection on reconnect, so an empty here is permanent for the
+ * session, rendered without a loader or an error.
+ */
+describe('a query that outruns the WebSocket handshake', () => {
+  const unpopulatedClientDb = () =>
+    ({
+      isReady: true,
+      waitForReady: async () => true,
+      query: async (): Promise<ClientDbQueryResult> => ({
+        subjects: [],
+        resources: [],
+        count: 0,
+        aggregates: [],
+      }),
+    }) as unknown as ClientDbWorker;
+
+  it('waits for the connection instead of resolving an empty page', async ({
+    expect,
+  }) => {
+    const store = new Store({ serverUrl: 'https://example.com' });
+    // Every server fetch fails; we only care that one is attempted at all.
+    store.injectFetch(async () => {
+      throw new Error('offline');
+    });
+    store.setClientDb(unpopulatedClientDb());
+
+    const collection = new Collection(store, 'https://example.com', {
+      page_size: '30',
+      include_nested: false,
+      property: core.properties.parent,
+      value: 'https://example.com',
+    });
+
+    let resolved = false;
+    const ready = collection.waitForReady().then(() => {
+      resolved = true;
+    });
+
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(resolved).toBe(false);
+
+    store.setServerConnected(true);
+    await ready;
+
+    expect(resolved).toBe(true);
+  });
+});
