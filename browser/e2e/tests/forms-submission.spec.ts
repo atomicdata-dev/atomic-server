@@ -412,7 +412,7 @@ test.describe('form publish and anonymous submit', () => {
 
     await page.getByLabel('Number of invite links').fill('2');
     await page
-      .getByRole('button', { name: 'Generate invite links', exact: true })
+      .getByRole('button', { name: 'Generate codes', exact: true })
       .click();
     await expect(page.getByTestId('invite-code')).toHaveCount(2, {
       timeout: 15000,
@@ -560,6 +560,15 @@ test.describe('form publish and anonymous submit', () => {
       page.getByTestId('condition-value').locator('option[value="Yes"]'),
     ).toHaveCount(1, { timeout: 10000 });
     await page.getByTestId('condition-value').selectOption('Yes');
+
+    // The conditions editor is a modal <dialog>; while it is open its
+    // backdrop swallows every click on the page behind it (including
+    // Publish, further down). Close it the way a user would.
+    const conditionsDialog = page.locator('dialog[open]');
+    await conditionsDialog
+      .getByRole('button', { name: 'Done', exact: true })
+      .click();
+    await expect(conditionsDialog).toBeHidden();
 
     const petNameSubject = await page.evaluate(
       ({ fieldType, typeProp }) => {
