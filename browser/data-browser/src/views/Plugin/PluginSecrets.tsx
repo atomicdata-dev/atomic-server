@@ -42,6 +42,7 @@ export function PluginSecrets({
   const [view, setView] = useState<SecretsView>();
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
+  const [origin, setOrigin] = useState('');
   const [busy, setBusy] = useState(false);
 
   const { subject } = plugin;
@@ -77,7 +78,7 @@ export function PluginSecrets({
         plugin: subject,
         name,
         value,
-        origins: declaredOrigins ?? [],
+        origins: declaredOrigins?.length ? declaredOrigins : [origin],
       }),
     });
 
@@ -93,9 +94,10 @@ export function PluginSecrets({
     // it back from, so leaving it in an input only risks it being seen.
     setName('');
     setValue('');
+    setOrigin('');
     setView(result.body as SecretsView);
     toast.success(`Stored ${name}`);
-  }, [store, endpoint, drive, subject, name, value, declaredOrigins]);
+  }, [store, endpoint, drive, subject, name, value, origin, declaredOrigins]);
 
   const remove = useCallback(
     async (secretName: string) => {
@@ -117,8 +119,15 @@ export function PluginSecrets({
   );
 
   const originCount = declaredOrigins?.length ?? 0;
+  // A manifest supplies origins for a WASM plugin. A script plugin has no
+  // manifest, so it is asked for one — and gets exactly the origin it names,
+  // rather than a wildcard.
+  const needsOrigin = originCount === 0;
   const canAdd =
-    name.length > 0 && value.length > 0 && originCount > 0 && !busy;
+    name.length > 0 &&
+    value.length > 0 &&
+    (originCount > 0 || origin.length > 0) &&
+    !busy;
 
   return (
     <Column>
@@ -129,10 +138,11 @@ export function PluginSecrets({
         </Row>
       </h3>
 
-      {originCount === 0 ? (
+      {needsOrigin ? (
         <Muted>
-          This plugin declares no origins, so it cannot send a credential
-          anywhere. Add <code>network.origins</code> to its manifest first.
+          A secret is sent only to the origin you name here, and moves this
+          plugin to the server so it can reach it. The plugin uses it as{' '}
+          <code>secret:&lt;name&gt;</code> and never sees the value.
         </Muted>
       ) : (
         <Muted>
@@ -179,6 +189,15 @@ export function PluginSecrets({
             onChange={e => setValue(e.target.value)}
           />
         </InputWrapper>
+        {needsOrigin && (
+          <InputWrapper>
+            <InputStyled
+              placeholder='https://api.example.com'
+              value={origin}
+              onChange={e => setOrigin(e.target.value)}
+            />
+          </InputWrapper>
+        )}
         <Button disabled={!canAdd} onClick={add}>
           {busy ? 'Storing…' : 'Store'}
         </Button>

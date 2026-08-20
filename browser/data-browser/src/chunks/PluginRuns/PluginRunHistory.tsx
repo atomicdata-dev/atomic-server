@@ -6,6 +6,7 @@ import { Details } from '@components/Details';
 import { Column, Row } from '@components/Row';
 import { AtomicLink } from '@components/AtomicLink';
 import { onRunsChanged, pluginClassesFor, usePluginClass } from './runScript';
+import { PluginSecrets } from '@views/Plugin/PluginSecrets';
 
 /**
  * What a plugin has actually done, every time it ran.
@@ -102,6 +103,9 @@ export function PluginRunHistory({
 
   return (
     <Column gap='0.5rem'>
+      {/* A plugin only reaches the network once it has a credential, so this is
+          also what moves it from the browser to the server. */}
+      <PluginSecrets plugin={resource} drive={drive ?? ''} />
       <Heading>Runs</Heading>
       {runs === undefined && <Muted>Loading…</Muted>}
       {runs?.length === 0 && <Muted>This plugin has not run yet.</Muted>}
