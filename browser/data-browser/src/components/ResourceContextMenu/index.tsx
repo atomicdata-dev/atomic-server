@@ -15,6 +15,7 @@ import { resourceActions } from '../../actions/resourceActions';
 import { useActionContext } from '../../actions/useActionContext';
 import { runAction } from '../../actions/runAction';
 import type { ActionDefinition } from '../../actions/types';
+import { RunPluginDialog } from '@chunks/PluginRuns/RunPluginDialog';
 import { useCustomContextItemsContext } from './CustomContextItemsContext';
 import { CoverPickerDialog, EmojiPickerDialog } from '../ResourceDecorations';
 import { ResourceInline } from '../../views/ResourceInline';
@@ -116,6 +117,8 @@ export function ResourceContextMenu({
   // undefined = never opened (dialog not mounted), boolean = mounted.
   const [emojiPickerOpen, setEmojiPickerOpen] = useState<boolean>();
   const [coverPickerOpen, setCoverPickerOpen] = useState<boolean>();
+  const [pluginRunOpen, setPluginRunOpen] = useState<boolean>();
+  const openPluginRun = useCallback(() => setPluginRunOpen(true), []);
   const openEmojiPicker = useCallback(() => setEmojiPickerOpen(true), []);
   const openCoverPicker = useCallback(() => setCoverPickerOpen(true), []);
   const ctx = useActionContext(subject, {
@@ -124,6 +127,7 @@ export function ResourceContextMenu({
     showCodeUsageDialog: openCodeUsageDialog,
     openEmojiPicker,
     openCoverPicker,
+    openPluginRun,
   });
   const { items: customItems } = useCustomContextItemsContext();
   // Try to not have a useResource hook in here, as that will lead to many costly fetches when the user enters a new subject
@@ -292,6 +296,14 @@ export function ResourceContextMenu({
           resource={ctx.resource}
           show={coverPickerOpen}
           onShowChange={setCoverPickerOpen}
+        />
+      )}
+      {pluginRunOpen !== undefined && ctx.drive !== undefined && (
+        <RunPluginDialog
+          resource={ctx.resource}
+          drive={ctx.drive}
+          show={pluginRunOpen}
+          onShowChange={setPluginRunOpen}
         />
       )}
     </>

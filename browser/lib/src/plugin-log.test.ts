@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pluginRunSchema, recordRun, runStatus } from './plugin-log.js';
+import { pluginSchema, recordRun, runStatus } from './plugin-log.js';
 import { ensureSchema } from './plugin-schema.js';
 import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
@@ -89,11 +89,12 @@ describe('ensureSchema', () => {
   it('creates the classes and properties a spec asks for', async () => {
     const store = makeStore();
 
-    const schema = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const schema = await ensureSchema(store, DRIVE, pluginSchema());
 
     expect(Object.keys(schema.properties)).toHaveLength(
-      pluginRunSchema().properties.length,
+      pluginSchema().properties.length,
     );
+    expect(schema.classes['plugin-script']).toBeDefined();
     expect(schema.classes['plugin-run']).toBeDefined();
 
     const created = store.world[schema.classes['plugin-run']];
@@ -108,23 +109,24 @@ describe('ensureSchema', () => {
   it('registers what it created on the ontology', async () => {
     const store = makeStore();
 
-    const schema = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const schema = await ensureSchema(store, DRIVE, pluginSchema());
 
     expect(store.world[ONTOLOGY].props[core.properties.classes]).toEqual([
+      schema.classes['plugin-script'],
       schema.classes['plugin-run'],
     ]);
     expect(
       store.world[ONTOLOGY].props[core.properties.properties],
-    ).toHaveLength(pluginRunSchema().properties.length);
+    ).toHaveLength(pluginSchema().properties.length);
   });
 
   it('reuses what is already there instead of making a parallel set', async () => {
     const store = makeStore();
 
-    const first = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const first = await ensureSchema(store, DRIVE, pluginSchema());
     const createdAfterFirst = store.newResource.mock.calls.length;
 
-    const second = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const second = await ensureSchema(store, DRIVE, pluginSchema());
 
     expect(second).toEqual(first);
     expect(store.newResource.mock.calls.length).toBe(createdAfterFirst);
@@ -134,7 +136,7 @@ describe('ensureSchema', () => {
     const store = makeStore();
     store.world[DRIVE].props = {};
 
-    await expect(ensureSchema(store, DRIVE, pluginRunSchema())).rejects.toThrow(
+    await expect(ensureSchema(store, DRIVE, pluginSchema())).rejects.toThrow(
       /no default ontology/,
     );
   });
@@ -167,7 +169,7 @@ describe('recordRun', () => {
     });
 
     const record = store.world[subject];
-    const schema = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const schema = await ensureSchema(store, DRIVE, pluginSchema());
 
     expect(record.props[schema.properties['run-status']]).toBe('applied');
     expect(record.props[schema.properties['started-at']]).toBe(trigger.at);
@@ -187,7 +189,7 @@ describe('recordRun', () => {
       }),
     });
 
-    const schema = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const schema = await ensureSchema(store, DRIVE, pluginSchema());
     const record = store.world[subject];
 
     expect(record.props[schema.properties['run-status']]).toBe('blocked');
@@ -218,7 +220,7 @@ describe('recordRun', () => {
       report: report({ applied: 1 }),
     });
 
-    const schema = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const schema = await ensureSchema(store, DRIVE, pluginSchema());
 
     expect(
       store.world[subject].props[schema.properties['run-problems']],
@@ -233,7 +235,7 @@ describe('recordRun', () => {
 
   it('keeps the cursor only when something was actually written', async () => {
     const store = makeStore();
-    const schema = await ensureSchema(store, DRIVE, pluginRunSchema());
+    const schema = await ensureSchema(store, DRIVE, pluginSchema());
     const cursorProp = schema.properties['run-cursor'];
 
     const wrote = await recordRun(store, {
