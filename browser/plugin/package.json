@@ -31,6 +31,7 @@
     "lint-fix": "oxlint -c ../.oxlintrc.json --fix . && pnpm format",
     "start": "tsdown --watch",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
