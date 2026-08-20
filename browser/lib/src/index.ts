@@ -139,3 +139,12 @@ export {
   type PlannedProperty,
   type RunPlan,
 } from './plugin-plan.js';
+export {
+  applyPlan,
+  type ApplyHost,
+  type ApplyOptions,
+  type ApplyReport,
+  type ChangeOutcome,
+  type ChangeStatus,
+  type CreateRequest,
+} from './plugin-apply.js';
