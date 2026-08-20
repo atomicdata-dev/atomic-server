@@ -22,6 +22,7 @@ import { Button } from '../components/Button';
 import { Column, Row } from '../components/Row';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { editURL } from '../helpers/navigation';
+import { PluginRunHistory } from '@chunks/PluginRuns/PluginRunHistory';
 
 import type { JSX } from 'react';
 
@@ -95,6 +96,9 @@ export function ResourcePageDefault({
             editable
             columns
           />
+          {/* Only renders for plugins: what this one actually did, each time it
+              ran. Nothing else on this page answers that. */}
+          <PluginRunHistory resource={resource} />
         </Column>
       </ContainerNarrow>
     </>

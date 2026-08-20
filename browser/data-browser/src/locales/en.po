@@ -8236,6 +8236,28 @@ msgstr ""
 "Create a plugin here. It proposes changes that you review before anything is "
 "written."
 
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "Loading…"
+msgstr "Loading…"
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "This plugin has not run yet."
+msgstr "This plugin has not run yet."
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "Runs"
+msgstr "Runs"
+
+#. 0: applied
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "{0} applied"
+msgstr "{0} applied"
+
+#. 0: failed
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "{0} failed"
+msgstr "{0} failed"
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Context compacted"
 
@@ -8934,3 +8956,6 @@ msgstr ""
 
 #~ msgid "ResizeObserver loop"
 #~ msgstr "ResizeObserver loop"
+
+#~ msgid "{0} problems"
+#~ msgstr "{0} problems"
