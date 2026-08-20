@@ -228,6 +228,105 @@ describe('schema checks', () => {
   });
 });
 
+describe('links between resources this run creates', () => {
+  const EMPLOYER = 'https://x/employerOrg';
+  const withClassType: Property = {
+    subject: EMPLOYER,
+    datatype: Datatype.ATOMIC_URL,
+    shortname: 'employerOrg',
+    description: '',
+    classType: 'https://x/Org',
+  };
+
+  const hostWithClassType = () => {
+    const host = makeHost();
+    host.getProperty = vi.fn(async (subject: string) => {
+      if (subject === EMPLOYER) return withClassType;
+
+      const found = SCHEMA[subject];
+
+      if (!found) throw new Error(`Property ${subject} is not found`);
+
+      return found;
+    });
+
+    return host;
+  };
+
+  it('accepts a link to a resource created with the right class', async () => {
+    const plan = await planVerdict(
+      verdict({
+        intents: [
+          {
+            op: 'create',
+            localId: 'org',
+            parent: 'https://x/drive',
+            isA: ['https://x/Org'],
+            set: {},
+          },
+          {
+            op: 'create',
+            localId: 'person',
+            parent: 'https://x/drive',
+            isA: ['https://x/Person'],
+            set: { [EMPLOYER]: 'local:org' },
+          },
+        ],
+      }),
+      hostWithClassType(),
+    );
+
+    expect(plan.blocked).toBe(false);
+  });
+
+  it('blocks a link to a resource created with the wrong class', async () => {
+    const plan = await planVerdict(
+      verdict({
+        intents: [
+          {
+            op: 'create',
+            localId: 'note',
+            parent: 'https://x/drive',
+            isA: ['https://x/Note'],
+            set: {},
+          },
+          {
+            op: 'create',
+            localId: 'person',
+            parent: 'https://x/drive',
+            isA: ['https://x/Person'],
+            set: { [EMPLOYER]: 'local:note' },
+          },
+        ],
+      }),
+      hostWithClassType(),
+    );
+
+    expect(plan.blocked).toBe(true);
+    expect(plan.changes[1].problems[0].message).toContain('https://x/Note');
+    expect(plan.changes[1].problems[0].message).toContain('https://x/Org');
+  });
+
+  it('leaves links to resources that already exist alone', async () => {
+    const plan = await planVerdict(
+      verdict({
+        intents: [
+          {
+            op: 'create',
+            localId: 'person',
+            parent: 'https://x/drive',
+            isA: ['https://x/Person'],
+            set: { [EMPLOYER]: 'https://x/some-existing-thing' },
+          },
+        ],
+      }),
+      hostWithClassType(),
+    );
+
+    expect(plan.blocked).toBe(false);
+  });
+});
+
 describe('existing resources', () => {
   it('blocks a change to a resource that is not there', async () => {
     const plan = await planVerdict(
