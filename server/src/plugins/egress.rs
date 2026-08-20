@@ -176,6 +176,86 @@ pub async fn refuse_url(url: &str) -> Option<String> {
     None
 }
 
+/// The `scheme://host[:port]` of a URL, which is what an origin allowlist and a
+/// secret's scope are both expressed in.
+pub fn origin_of(url: &url::Url) -> Result<String, String> {
+    let host = url.host_str().ok_or("URL has no host")?;
+
+    Ok(match url.port() {
+        Some(port) => format!("{}://{}:{}", url.scheme(), host, port),
+        None => format!("{}://{}", url.scheme(), host),
+    })
+}
+
+/// Refuses a secret handle anywhere it must not be substituted.
+///
+/// A credential in a URL is written to access logs, proxy logs and `Referer`
+/// headers as a matter of course, so quietly sending one there would be worse
+/// than refusing. The same goes for a body, which the plugin can log itself.
+pub fn refuse_misplaced_handles(url: &str, body: Option<&str>) -> Option<String> {
+    use atomic_lib::db::plugin_secret::mentions_handle;
+
+    if mentions_handle(url) {
+        return Some(
+            "a secret handle in the URL is refused: credentials in a URL end up in logs. Put it in a header.".to_string(),
+        );
+    }
+
+    if body.is_some_and(mentions_handle) {
+        return Some(
+            "a secret handle in the body is refused; substitution happens only in header values."
+                .to_string(),
+        );
+    }
+
+    None
+}
+
+/// Substitutes `secret:<name>` in header values.
+///
+/// `resolve` is given the secret's name and returns its value if the plugin has
+/// one of that name scoped to this origin. A handle that does not resolve is an
+/// error rather than a request sent without credentials — a 401 from the far
+/// end is a much worse way to learn a secret is missing.
+pub fn substitute_headers<F>(
+    headers: Vec<(String, String)>,
+    mut resolve: F,
+) -> Result<Vec<(String, String)>, String>
+where
+    F: FnMut(&str) -> Option<String>,
+{
+    use atomic_lib::db::plugin_secret::{mentions_handle, SECRET_HANDLE_PREFIX};
+
+    let mut out = Vec::with_capacity(headers.len());
+
+    for (name, value) in headers {
+        // A handle is the whole value, or follows a scheme like `Bearer `.
+        let substituted = match value.rsplit_once(SECRET_HANDLE_PREFIX) {
+            None => value,
+            Some((prefix, secret_name)) => {
+                let Some(secret) = resolve(secret_name) else {
+                    return Err(format!(
+                        "no secret `{secret_name}` is available to this plugin for this origin",
+                    ));
+                };
+
+                format!("{prefix}{secret}")
+            }
+        };
+
+        // Belt and braces: a value that still mentions a handle after
+        // substitution means one was missed, and sending it would leak the
+        // shape of the plugin's secrets to the far end.
+        if mentions_handle(&substituted) {
+            return Err(format!("header `{name}` still contains a secret handle"));
+        }
+
+        out.push((name, substituted));
+    }
+
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +316,67 @@ mod tests {
         assert_eq!(refused("224.0.0.1"), Some(Refusal::Multicast));
         assert_eq!(refused("255.255.255.255"), Some(Refusal::Multicast));
         assert_eq!(refused("ff02::1"), Some(Refusal::Multicast));
+    }
+
+    #[test]
+    fn an_origin_is_scheme_host_and_port() {
+        let parse = |u: &str| origin_of(&url::Url::parse(u).unwrap()).unwrap();
+
+        assert_eq!(
+            parse("https://api.notion.com/v1/x?y=1"),
+            "https://api.notion.com"
+        );
+        assert_eq!(parse("http://localhost:9883/x"), "http://localhost:9883");
+        // A default port normalizes away, so a secret scoped to
+        // `https://api.notion.com` is still spent on `https://api.notion.com:443`.
+        // The handler's `normalize_origin` uses the same rule, so what is stored
+        // and what is compared cannot drift.
+        assert_eq!(parse("https://x.test:443/"), "https://x.test");
+        assert_eq!(parse("http://x.test:80/"), "http://x.test");
+    }
+
+    #[test]
+    fn a_handle_in_a_url_or_body_is_refused() {
+        assert!(refuse_misplaced_handles("https://x.test/?t=secret:notion", None).is_some());
+        assert!(
+            refuse_misplaced_handles("https://x.test/", Some("{\"t\":\"secret:notion\"}"))
+                .is_some()
+        );
+        assert!(refuse_misplaced_handles("https://x.test/", Some("{}")).is_none());
+    }
+
+    #[test]
+    fn a_handle_in_a_header_is_substituted() {
+        let headers = vec![
+            (
+                "Authorization".to_string(),
+                "Bearer secret:notion".to_string(),
+            ),
+            ("X-Key".to_string(), "secret:notion".to_string()),
+            ("Accept".to_string(), "application/json".to_string()),
+        ];
+
+        let out = substitute_headers(headers, |name| {
+            (name == "notion").then(|| "tok-abc".to_string())
+        })
+        .expect("substituted");
+
+        assert_eq!(out[0].1, "Bearer tok-abc");
+        assert_eq!(out[1].1, "tok-abc");
+        assert_eq!(out[2].1, "application/json");
+    }
+
+    #[test]
+    fn a_handle_that_does_not_resolve_fails_the_request() {
+        let headers = vec![(
+            "Authorization".to_string(),
+            "Bearer secret:missing".to_string(),
+        )];
+
+        // Not "send it without credentials" — a 401 from the far end is a far
+        // worse way to learn the secret was not there.
+        let err = substitute_headers(headers, |_| None).expect_err("refused");
+        assert!(err.contains("missing"));
     }
 
     #[tokio::test]
