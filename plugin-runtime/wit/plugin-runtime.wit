@@ -1,0 +1,36 @@
+package atomic:plugin-runtime@0.1.0;
+
+interface host {
+  /**
+  An HTTP request, as a JSON `{ method, url, headers, body }`.
+
+  The plugin has no sockets. The host checks the origin against the manifest,
+  refuses anything resolving off the public internet, and substitutes
+  `secret:<name>` in header values for credentials the plugin never sees.
+  */
+  fetch: func(request: string) -> result<string, string>;
+
+  /// A resource as JSON-AD.
+  get-resource: func(subject: string) -> result<string, string>;
+
+  /// Subjects matching a property/value, as a JSON array.
+  query: func(property: string, value: string) -> result<string, string>;
+}
+
+world plugin-runtime {
+  import host;
+
+  /**
+  Runs a plugin.
+
+  `source` is the plugin's JavaScript and `input` its RunInput as JSON; the
+  result is the verdict as JSON. Both cross as strings on purpose: the browser
+  runner already serializes the verdict, so one shape covers both placements
+  and the ABI stays small enough to read.
+
+  The script is data. One component runs every plugin, so there is no per-plugin
+  build, and promoting a plugin from the browser to the server is a placement
+  decision rather than a toolchain event.
+  */
+  export run: func(source: string, input: string) -> result<string, string>;
+}

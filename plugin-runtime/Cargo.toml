@@ -1,0 +1,16 @@
+[package]
+name = "atomic-plugin-runtime"
+version = "0.1.0"
+edition = "2021"
+description = "The WASM component that runs Atomic plugins written in JavaScript"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+rquickjs = { version = "0.12", features = ["bindgen"] }
+wit-bindgen = "0.41"
+
+[profile.release]
+opt-level = "s"
