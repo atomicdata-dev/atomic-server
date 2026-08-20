@@ -1,5 +1,6 @@
 export * from './rpc.js';
 export * from './types.js';
+export * from './run.js';
 // Re-export @tomic/lib ontologies for convenience
 // We use the full paths to help bundlers with tree-shaking.
 export { core } from '@tomic/lib/ontologies/core.js';
