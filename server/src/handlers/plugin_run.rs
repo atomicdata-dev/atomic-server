@@ -44,10 +44,22 @@ pub async fn handle_plugin_run(
     appstate: web::Data<AppState>,
     body: web::Json<RunBody>,
     req: actix_web::HttpRequest,
+    context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
     let resource = store.get_resource(&body.plugin.clone().into()).await?;
-    let agent = get_client_agent(req.headers(), &appstate, &body.plugin).await?;
+
+    // Signed over the request URL, as every other signed endpoint is.
+    let path_and_query = req
+        .head()
+        .uri
+        .path_and_query()
+        .ok_or("Path must be given")?
+        .to_string();
+    let signed_subject =
+        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
+
+    let agent = get_client_agent(req.headers(), &appstate, &signed_subject).await?;
     check_write(store, &resource, &agent).await?;
 
     let runtime = js_runtime::embedded_runtime()?;

@@ -123,12 +123,27 @@ fn normalize_origin(raw: &str) -> AtomicServerResult<String> {
 /// their secret to set.
 async fn authorize(
     appstate: &AppState,
-    headers: &actix_web::http::header::HeaderMap,
+    req: &actix_web::HttpRequest,
+    context: &crate::context::RequestContext,
     plugin: &str,
 ) -> AtomicServerResult<()> {
     let store = &appstate.store;
     let resource = store.get_resource(&plugin.into()).await?;
-    let agent = get_client_agent(headers, appstate, plugin).await?;
+
+    // The client signs the request URL, so that is what the signature is
+    // checked against. Passing the plugin subject here made every signed
+    // request fail verification — the rights check below is what decides
+    // whether this agent may touch this plugin.
+    let path_and_query = req
+        .head()
+        .uri
+        .path_and_query()
+        .ok_or("Path must be given")?
+        .to_string();
+    let signed_subject =
+        atomic_lib::Subject::from_raw(&path_and_query, None).resolve(&context.origin);
+
+    let agent = get_client_agent(req.headers(), appstate, &signed_subject).await?;
     check_write(store, &resource, &agent).await?;
 
     Ok(())
@@ -139,8 +154,9 @@ pub async fn handle_set_secret(
     appstate: web::Data<AppState>,
     body: web::Json<SetSecretBody>,
     req: actix_web::HttpRequest,
+    context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&appstate, req.headers(), &body.plugin).await?;
+    authorize(&appstate, &req, &context, &body.plugin).await?;
 
     PluginSecretKey::validate_name(&body.name)?;
 
@@ -180,8 +196,9 @@ pub async fn handle_list_secrets(
     appstate: web::Data<AppState>,
     query: web::Query<SecretQuery>,
     req: actix_web::HttpRequest,
+    context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&appstate, req.headers(), &query.plugin).await?;
+    authorize(&appstate, &req, &context, &query.plugin).await?;
 
     Ok(HttpResponse::Ok().json(view(&appstate, &query.drive, &query.plugin).await?))
 }
@@ -191,8 +208,9 @@ pub async fn handle_delete_secret(
     appstate: web::Data<AppState>,
     query: web::Query<SecretQuery>,
     req: actix_web::HttpRequest,
+    context: crate::context::RequestContext,
 ) -> AtomicServerResult<HttpResponse> {
-    authorize(&appstate, req.headers(), &query.plugin).await?;
+    authorize(&appstate, &req, &context, &query.plugin).await?;
 
     let name = query.name.as_ref().ok_or("Which secret? Pass `name`.")?;
 
