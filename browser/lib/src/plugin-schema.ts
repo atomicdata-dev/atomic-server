@@ -121,6 +121,53 @@ export async function ensureSchema(
   return { properties, classes };
 }
 
+/**
+ * Looks a spec up without creating anything.
+ *
+ * Menus and other read paths need to know whether a drive has plugin classes;
+ * they must not bring them into existence as a side effect of being rendered.
+ * Returns only what is actually there.
+ */
+export async function findSchema(
+  store: SchemaStore,
+  drive: string,
+  spec: SchemaSpec,
+): Promise<Partial<EnsuredSchema>> {
+  const driveResource = await store.getResource(drive);
+  const ontologySubject = driveResource.get(server.properties.defaultOntology);
+
+  if (typeof ontologySubject !== 'string' || ontologySubject.length === 0) {
+    return {};
+  }
+
+  const ontology = await store.getResource(ontologySubject);
+
+  const [properties, classes] = await Promise.all([
+    pick(
+      store,
+      asList(ontology.get(core.properties.properties)),
+      spec.properties,
+    ),
+    pick(store, asList(ontology.get(core.properties.classes)), spec.classes),
+  ]);
+
+  return { properties, classes };
+}
+
+async function pick(
+  store: SchemaStore,
+  subjects: string[],
+  specs: Array<{ shortname: string }>,
+): Promise<Record<string, string>> {
+  const found = await byShortname(store, subjects);
+
+  return Object.fromEntries(
+    specs
+      .map(spec => [spec.shortname, found.get(spec.shortname)] as const)
+      .filter((entry): entry is [string, string] => entry[1] !== undefined),
+  );
+}
+
 async function ensureAll<T extends { shortname: string }>(
   store: SchemaStore,
   ontology: SchemaResource,

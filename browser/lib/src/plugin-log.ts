@@ -27,9 +27,16 @@ import type { JSONValue } from './value.js';
  * `datatypes.js` has finished initializing and comes out undefined. Building
  * the spec on call sidesteps initialization order entirely.
  */
-export function pluginRunSchema(): SchemaSpec {
+export function pluginSchema(): SchemaSpec {
   return {
     properties: [
+      {
+        shortname: 'plugin-source',
+        name: 'Source',
+        description:
+          'The TypeScript the plugin runs. Compiled to a module before it reaches the sandbox.',
+        datatype: Datatype.MARKDOWN,
+      },
       {
         shortname: 'trigger',
         name: 'Trigger',
@@ -72,6 +79,14 @@ export function pluginRunSchema(): SchemaSpec {
     ],
     classes: [
       {
+        shortname: 'plugin-script',
+        name: 'Plugin',
+        description:
+          'A plugin that proposes changes. Its run export returns intents the host reviews before writing anything.',
+        requires: ['plugin-source'],
+        recommends: ['trigger'],
+      },
+      {
         shortname: 'plugin-run',
         name: 'Plugin run',
         description:
@@ -108,7 +123,7 @@ export async function recordRun(
   store: SchemaStore,
   options: RecordRunOptions,
 ): Promise<string> {
-  const schema = await ensureSchema(store, options.drive, pluginRunSchema());
+  const schema = await ensureSchema(store, options.drive, pluginSchema());
   const status = runStatus(options.plan, options.report);
 
   const propVals: Record<string, JSONValue> = {
