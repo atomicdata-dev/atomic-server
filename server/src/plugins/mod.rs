@@ -37,6 +37,7 @@ pub mod bind_drive;
 pub mod bookmark;
 pub mod chatroom;
 pub mod did;
+pub mod egress;
 pub mod export;
 pub mod files;
 pub mod importer;
