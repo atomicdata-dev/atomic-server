@@ -5,7 +5,7 @@ import type { ChangeOutcome, Problem } from '@tomic/react';
 import { Details } from '@components/Details';
 import { Column, Row } from '@components/Row';
 import { AtomicLink } from '@components/AtomicLink';
-import { pluginClassesFor, usePluginClass } from './runScript';
+import { onRunsChanged, pluginClassesFor, usePluginClass } from './runScript';
 
 /**
  * What a plugin has actually done, every time it ran.
@@ -38,10 +38,17 @@ export function PluginRunHistory({
     pluginClass !== undefined && resource.hasClasses(pluginClass);
 
   // Children are not materialized on the parent, so ask the index for them.
-  const { collection, ready } = useCollection({
+  const { collection, ready, invalidateCollection } = useCollection({
     property: core.properties.parent,
     value: subject,
   });
+
+  // A run creates a resource this query has never seen, so the query has to be
+  // told. Otherwise the log only catches up on reload.
+  useEffect(
+    () => onRunsChanged(subject, () => void invalidateCollection()),
+    [subject, invalidateCollection],
+  );
 
   useEffect(() => {
     if (!isPlugin || !drive || !ready) return;
