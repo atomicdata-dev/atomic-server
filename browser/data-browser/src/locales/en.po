@@ -8162,6 +8162,80 @@ msgstr ""
 "Start with a template,{0} <0>create a blank drive</0> , or describe a space "
 "of your own."
 
+#: src/views/FolderPage/ListView.tsx
+msgid "Last Modified"
+msgstr "Last Modified"
+
+#: src/routes/History/HistoryDesktopView.tsx
+msgid "Show Commit"
+msgstr "Show Commit"
+
+#: src/routes/SyncRoute.tsx
+msgid "Copy Node ID"
+msgstr "Copy Node ID"
+
+#: src/actions/resourceActions.tsx
+msgid "Run"
+msgstr "Run"
+
+#: src/actions/resourceActions.tsx
+msgid "Run this plugin and review what it proposes before anything is written."
+msgstr ""
+"Run this plugin and review what it proposes before anything is written."
+
+#. 0: e.message
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Could not run this plugin: {0}"
+msgstr "Could not run this plugin: {0}"
+
+#. 0: result.message
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Could not apply: {0}"
+msgstr "Could not apply: {0}"
+
+#. 0: report.applied; 1: report.failed
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Applied {0}, {1} failed"
+msgstr "Applied {0}, {1} failed"
+
+#. 0: report.applied
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Applied {0} changes"
+msgstr "Applied {0} changes"
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Applying…"
+msgstr "Applying…"
+
+#. 0: plan?.changes.length ?? 0
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Apply {0} changes"
+msgstr "Apply {0} changes"
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "This plugin ran too long and was stopped. Nothing was planned."
+msgstr "This plugin ran too long and was stopped. Nothing was planned."
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Nothing can be written until these are fixed."
+msgstr "Nothing can be written until these are fixed."
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "This run proposes no changes."
+msgstr "This run proposes no changes."
+
+#: src/actions/resourceActions.tsx
+msgid "New plugin"
+msgstr "New plugin"
+
+#: src/actions/resourceActions.tsx
+msgid ""
+"Create a plugin here. It proposes changes that you review before anything is "
+"written."
+msgstr ""
+"Create a plugin here. It proposes changes that you review before anything is "
+"written."
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Context compacted"
 
@@ -8815,3 +8889,48 @@ msgstr ""
 
 #~ msgid "☏ Team chat"
 #~ msgstr "☏ Team chat"
+
+#~ msgid "Never synced"
+#~ msgstr "Never synced"
+
+#~ msgid "{0} copied"
+#~ msgstr "{0} copied"
+
+#~ msgid "Address"
+#~ msgstr "Address"
+
+#~ msgid "Paired with this device"
+#~ msgstr "Paired with this device"
+
+#~ msgid "Sent {0}"
+#~ msgstr "Sent {0}"
+
+#~ msgid "Received {0}"
+#~ msgstr "Received {0}"
+
+#~ msgid "Sign in on this device to rename it."
+#~ msgstr "Sign in on this device to rename it."
+
+#~ msgid "This device is now “{0}”"
+#~ msgstr "This device is now “{0}”"
+
+#~ msgid "Device name"
+#~ msgstr "Device name"
+
+#~ msgid "Not signed in on this device."
+#~ msgstr "Not signed in on this device."
+
+#~ msgid "The node refused it ({0})."
+#~ msgstr "The node refused it ({0})."
+
+#~ msgid "(saving…)"
+#~ msgstr "(saving…)"
+
+#~ msgid "(this device)"
+#~ msgstr "(this device)"
+
+#~ msgid "Rename this device"
+#~ msgstr "Rename this device"
+
+#~ msgid "ResizeObserver loop"
+#~ msgstr "ResizeObserver loop"

@@ -12,6 +12,7 @@ import {
   type EnsuredSchema,
   type RunPlan,
   type RunTrigger,
+  server,
   useStore,
   type Store,
 } from '@tomic/react';
@@ -53,9 +54,12 @@ export function pluginClassesFor(
  * The plugin class of a drive, if it already has one.
  *
  * Read-only: rendering a context menu must not bring a schema into existence.
- * Resolved into React state rather than a module cache, because a cache read
- * during render never re-renders when it later fills — the action simply never
- * appeared.
+ * Resolved into React state, because a module cache read during render never
+ * re-renders when it later fills.
+ *
+ * Re-resolves when the drive's ontology changes, so a drive that gains plugin
+ * classes — from a plugin created in this tab, or synced from elsewhere — shows
+ * the action without a reload.
  */
 export function usePluginClass(drive: string | undefined): string | undefined {
   const store = useStore();
@@ -69,21 +73,95 @@ export function usePluginClass(drive: string | undefined): string | undefined {
     }
 
     let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-    findSchema(store, drive, pluginSchema())
-      .then(schema => {
-        if (!cancelled) setPluginClass(schema.classes?.['plugin-script']);
-      })
-      .catch(() => {
-        if (!cancelled) setPluginClass(undefined);
-      });
+    const resolve = () =>
+      findSchema(store, drive, pluginSchema())
+        .then(schema => {
+          if (!cancelled) setPluginClass(schema.classes?.['plugin-script']);
+        })
+        .catch(() => {
+          if (!cancelled) setPluginClass(undefined);
+        });
+
+    (async () => {
+      const driveResource = await store.getResource(drive);
+      const ontology = driveResource.get(server.properties.defaultOntology) as
+        | string
+        | undefined;
+
+      if (cancelled) return;
+
+      await resolve();
+
+      if (ontology && !cancelled) {
+        unsubscribe = store.subscribe(ontology, () => {
+          void resolve();
+        });
+      }
+    })().catch(() => undefined);
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
   }, [store, drive]);
 
   return pluginClass;
+}
+
+/**
+ * The source a new plugin starts with.
+ *
+ * Doubles as the contract's documentation: the shape of `run`, what the input
+ * carries, and the fact that returning intents is how a plugin writes. An LLM
+ * asked to change a plugin reads this first, so it is written to be copied.
+ */
+const STARTER_SOURCE = `// A plugin proposes changes; the host reviews and writes them.
+// Return intents — never write directly. You have no network and no clock:
+// use input.trigger.at for the time.
+
+export function run(input) {
+  return {
+    intents: [
+      {
+        op: 'create',
+        localId: 'example',
+        parent: input.trigger.subject,
+        isA: [],
+        set: {
+          'https://atomicdata.dev/properties/name': 'Made by a plugin',
+        },
+      },
+    ],
+    problems: [],
+  };
+}
+`;
+
+/**
+ * Creates a plugin, bringing the drive's plugin schema into existence if this
+ * is the first one. Returns its subject.
+ */
+export async function createPlugin(
+  store: Store,
+  target: { parent: string; drive: string },
+  name = 'New plugin',
+): Promise<string> {
+  const schema = await pluginClassesFor(store, target.drive);
+
+  const plugin = await store.newResource({
+    parent: target.parent,
+    isA: [schema.classes['plugin-script']],
+    propVals: {
+      'https://atomicdata.dev/properties/name': name,
+      [schema.properties['plugin-source']]: STARTER_SOURCE,
+      [schema.properties.trigger]: 'manual',
+    },
+  });
+  await plugin.save();
+
+  return plugin.subject;
 }
 
 export interface PreparedRun {

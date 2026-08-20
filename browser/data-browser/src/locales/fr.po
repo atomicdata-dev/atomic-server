@@ -7992,6 +7992,163 @@ msgid ""
 "of your own."
 msgstr ""
 
+#: src/routes/SyncRoute.tsx
+msgid "Manage account & plan →"
+msgstr ""
+
+#: src/views/getting-started/GettingStartedFlow.tsx
+msgid "Sign in to access this drive"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Your data lives on this device — it isn’t syncing anywhere yet."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid ""
+"This workspace is stored only on this device — it isn’t backed up or synced "
+"anywhere."
+msgstr ""
+
+#. 0: connectionCount; 1: connectionCount === 1 ? 'device' \\: 'devices'
+#: src/routes/SyncRoute.tsx
+msgid "Your data lives on this device and syncs with {0} other {1}."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Set up Cloud Server"
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/components/Vault/VaultPanel.tsx
+msgid ""
+"Keep an encrypted copy of this workspace in {0}. It is sealed on this "
+"device, so we store it without being able to read it."
+msgstr ""
+
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "Connect this device"
+msgstr ""
+
+#: src/components/Vault/VaultPanel.tsx
+msgid "Cloud Vault is on"
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid ""
+"A hosted workspace on {0}: shareable links, search across everything, API "
+"access, and no waiting on another device to be awake. Unlike Cloud Vault, "
+"our servers process what you put here."
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid ""
+"Not set up. With an account on {0} we hold your key sealed, so an email gets "
+"you back in on a new device. Without one, losing every device loses this "
+"workspace."
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/components/AccountRecoveryCard.tsx
+msgid ""
+"This backup is sealed in this browser only. {0} is not holding a copy, so a "
+"new device could not get you back in."
+msgstr ""
+
+#. 0: ' '; 1: `${ [hasPasskey && 'your passkey', hasCode && 'your recovery code'] .filter(Boolean) .join(' or ') || 'your recovery password' }${deviceOnly ? ', on this device' \\: ''}.`
+#: src/components/AccountRecoveryCard.tsx
+msgid "You can get back in with:{0} {1}"
+msgstr ""
+
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid ""
+"This app cannot sign in on its own, so approve it from somewhere you already "
+"are. Then it can keep an encrypted copy of your workspaces — sealed here, so"
+msgstr ""
+
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid "stores it without being able to read it."
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid ""
+"Existing content stays in this drive. Hosting requires a Server plan or an "
+"invitation for this drive."
+msgstr ""
+
+#: src/views/FolderPage/ListView.tsx
+msgid "Last Modified"
+msgstr "Dernière modification"
+
+#: src/routes/History/HistoryDesktopView.tsx
+msgid "Show Commit"
+msgstr "Afficher le Commit"
+
+#: src/routes/SyncRoute.tsx
+msgid "Copy Node ID"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Run"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Run this plugin and review what it proposes before anything is written."
+msgstr ""
+
+#. 0: e.message
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Could not run this plugin: {0}"
+msgstr ""
+
+#. 0: result.message
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Could not apply: {0}"
+msgstr ""
+
+#. 0: report.applied; 1: report.failed
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Applied {0}, {1} failed"
+msgstr ""
+
+#. 0: report.applied
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Applied {0} changes"
+msgstr ""
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Applying…"
+msgstr ""
+
+#. 0: plan?.changes.length ?? 0
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Apply {0} changes"
+msgstr ""
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "This plugin ran too long and was stopped. Nothing was planned."
+msgstr ""
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "Nothing can be written until these are fixed."
+msgstr ""
+
+#: src/chunks/PluginRuns/RunPluginDialog.tsx
+msgid "This run proposes no changes."
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "New plugin"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid ""
+"Create a plugin here. It proposes changes that you review before anything is "
+"written."
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexte compacté"
 

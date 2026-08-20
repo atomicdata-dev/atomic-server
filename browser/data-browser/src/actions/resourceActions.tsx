@@ -32,6 +32,7 @@ import {
 } from '../helpers/navigation';
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
+import { createPlugin } from '@chunks/PluginRuns/runScript';
 import type { ActionContext, ActionDefinition } from './types';
 
 const getParent = (ctx: ActionContext): string | undefined =>
@@ -64,6 +65,26 @@ export const resourceActions: ActionDefinition[] = [
     shortcutLabel: () => 'Show data view',
     disabled: ctx => ctx.pathname.startsWith(paths.data),
     run: ctx => ctx.navigate(dataURL(ctx.subject)),
+  },
+  {
+    id: 'new-plugin',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'New plugin',
+    helper: () =>
+      'Create a plugin here. It proposes changes that you review before anything is written.',
+    keywords: ['automation', 'script', 'import', 'plugin'],
+    icon: () => <FaPlay />,
+    searchOnly: true,
+    available: ctx => ctx.canWrite && ctx.drive !== undefined,
+    run: async ctx => {
+      const subject = await createPlugin(ctx.store, {
+        parent: ctx.subject,
+        drive: ctx.drive!,
+      });
+
+      ctx.navigate(constructOpenURL(subject));
+    },
   },
   {
     id: 'run-plugin',
