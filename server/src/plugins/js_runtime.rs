@@ -387,7 +387,7 @@ mod tests {
 
         let verdict = runtime
             .run(
-                "function run() { return { intents: [], problems: [], sum: [1,2,3].reduce((a,b)=>a+b,0) }; }",
+                "export function run() { return { intents: [], problems: [], sum: [1,2,3].reduce((a,b)=>a+b,0) }; }",
                 INPUT,
                 h,
             )
@@ -405,7 +405,7 @@ mod tests {
 
         let verdict = runtime
             .run(
-                r#"function run(ctx) {
+                r#"export function run(ctx) {
                      const res = ctx.http({ method: "GET", url: "https://api.test/me" });
                      const body = JSON.parse(res.body);
                      return { intents: [], problems: [], name: body.name };
@@ -429,7 +429,7 @@ mod tests {
             let (h, _) = host();
             runtime
                 .run(
-                    "function run() { return { at: Date.now(), iso: new Date().toISOString(), r: Math.random() }; }",
+                    "export function run() { return { at: Date.now(), iso: new Date().toISOString(), r: Math.random() }; }",
                     INPUT,
                     h,
                 )
@@ -456,7 +456,7 @@ mod tests {
 
         let error = runtime
             .run(
-                "function run() { throw new TypeError('no column called email'); }",
+                "export function run() { throw new TypeError('no column called email'); }",
                 INPUT,
                 h,
             )
@@ -475,7 +475,7 @@ mod tests {
         let (h, _) = host();
 
         let error = runtime
-            .run("function run() { this is not javascript }", INPUT, h)
+            .run("export function run() { this is not javascript }", INPUT, h)
             .await
             .unwrap()
             .expect_err("refused");
@@ -489,7 +489,7 @@ mod tests {
         let (h, _) = host();
 
         let error = runtime
-            .run("function run() { while (true) {} }", INPUT, h)
+            .run("export function run() { while (true) {} }", INPUT, h)
             .await
             .unwrap()
             .expect_err("stopped");
@@ -504,7 +504,7 @@ mod tests {
 
         let verdict = runtime
             .run(
-                "function run() { return { hasFetch: typeof fetch, hasProcess: typeof process }; }",
+                "export function run() { return { hasFetch: typeof fetch, hasProcess: typeof process }; }",
                 INPUT,
                 h,
             )

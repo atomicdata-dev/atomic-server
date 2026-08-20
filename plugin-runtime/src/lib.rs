@@ -15,7 +15,7 @@ wit_bindgen::generate!({
 });
 
 use crate::atomic::plugin_runtime::host;
-use rquickjs::{Context, Function, Runtime};
+use rquickjs::{Context, Function, Module, Runtime};
 
 struct Component;
 
@@ -130,12 +130,30 @@ impl Guest for Component {
             ctx.eval::<(), _>(PRELUDE)
                 .map_err(|e| describe(&ctx, e, "runtime prelude"))?;
 
-            ctx.eval::<(), _>(source)
+            // Evaluated as a module, not a script. The browser placement
+            // imports the source as an ES module, so `export function run`
+            // is the shape every plugin is written in — including the starter.
+            // Evaluating it as a script made that a syntax error, which meant
+            // no plugin at all could run server-side.
+            let (module, promise) = Module::declare(ctx.clone(), "plugin", source)
+                .map_err(|e| describe(&ctx, e, "plugin source"))?
+                .eval()
                 .map_err(|e| describe(&ctx, e, "plugin source"))?;
+
+            // A module body may await; finish it before reaching for `run`.
+            promise
+                .finish::<()>()
+                .map_err(|e| describe(&ctx, e, "plugin source"))?;
+
+            let run: Function = module
+                .get("run")
+                .map_err(|_| "the plugin does not export a run() function".to_string())?;
+
+            globals.set("__run", run).map_err(|e| e.to_string())?;
 
             // `run` returns the verdict; the host parses and validates it, so
             // anything shaped wrong is reported in the preview rather than here.
-            ctx.eval::<String, _>("JSON.stringify(run(__atomic) ?? null)")
+            ctx.eval::<String, _>("JSON.stringify(__run(__atomic) ?? null)")
                 .map_err(|e| describe(&ctx, e, "run()"))
         })
     }
