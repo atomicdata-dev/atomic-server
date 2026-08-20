@@ -107,7 +107,19 @@ export interface ApplyOptions {
    * is harder to reason about than a run that stopped.
    */
   continueOnError?: boolean;
+  /**
+   * How many writes may be in flight at once. Each write is a round trip, so
+   * applying an import one at a time costs rows × latency — a minute for two
+   * thousand rows on a 30ms link, spent almost entirely waiting.
+   *
+   * Only ever applied to changes that cannot affect each other: creates run
+   * after everything they refer to, and two changes to one subject stay in
+   * order.
+   */
+  concurrency?: number;
 }
+
+const DEFAULT_CONCURRENCY = 8;
 
 /**
  * Applies a plan and reports what happened to every change.
@@ -128,19 +140,23 @@ export async function applyPlan(
   }
 
   const subjects: Record<string, string> = {};
-  const outcomes: ChangeOutcome[] = [];
   const ordered = createsFirst(plan.changes);
   const plannedSubjects = new Set(
     plan.changes.filter(c => c.op === 'create').map(c => c.subject),
   );
+  const positions = new Map(ordered.map((change, index) => [change, index]));
+  const outcomes: Array<ChangeOutcome | undefined> = new Array(ordered.length);
+  const limit = Math.max(1, options.concurrency ?? DEFAULT_CONCURRENCY);
 
-  let stoppedEarly = false;
+  let stopped = false;
 
-  for (const [index, change] of ordered.entries()) {
-    if (stoppedEarly) {
-      outcomes.push(outcome(change, change.subject, 'not-attempted'));
+  const runOne = async (change: PlannedChange) => {
+    const index = positions.get(change)!;
 
-      continue;
+    if (stopped) {
+      outcomes[index] = outcome(change, change.subject, 'not-attempted');
+
+      return;
     }
 
     try {
@@ -150,26 +166,105 @@ export async function applyPlan(
         subjects[change.subject] = result.subject;
       }
 
-      outcomes.push(outcome(change, result.subject, result.status));
+      outcomes[index] = outcome(change, result.subject, result.status);
     } catch (e) {
-      outcomes.push(
-        outcome(change, change.subject, 'failed', describeError(e)),
+      outcomes[index] = outcome(
+        change,
+        change.subject,
+        'failed',
+        describeError(e),
       );
 
-      if (!options.continueOnError) {
-        stoppedEarly = index < ordered.length - 1;
-      }
+      if (!options.continueOnError) stopped = true;
     }
+  };
+
+  for (const wave of waves(ordered)) {
+    await runBounded(
+      wave.map(chain => async () => {
+        // A chain is one subject's changes, kept in order; separate chains
+        // cannot affect each other, so they run together.
+        for (const change of chain) await runOne(change);
+      }),
+      limit,
+    );
   }
 
+  const settled = outcomes.filter((o): o is ChangeOutcome => o !== undefined);
+
   return {
-    outcomes,
+    outcomes: settled,
     subjects,
-    stoppedEarly,
-    applied: outcomes.filter(o => o.status === 'applied').length,
-    skipped: outcomes.filter(o => o.status === 'skipped').length,
-    failed: outcomes.filter(o => o.status === 'failed').length,
+    stoppedEarly: settled.some(o => o.status === 'not-attempted'),
+    applied: settled.filter(o => o.status === 'applied').length,
+    skipped: settled.filter(o => o.status === 'skipped').length,
+    failed: settled.filter(o => o.status === 'failed').length,
   };
+}
+
+/**
+ * Groups changes into waves of independent chains.
+ *
+ * A create may only run once everything it refers to exists, so creates form
+ * one wave per dependency level. Everything else follows in a single wave,
+ * chained per subject so two writes to one resource never race.
+ */
+function waves(ordered: PlannedChange[]): PlannedChange[][][] {
+  const creates = ordered.filter(c => c.op === 'create');
+  const rest = ordered.filter(c => c.op !== 'create');
+  const bySubject = new Map(creates.map(c => [c.subject, c]));
+
+  const levels = new Map<string, number>();
+
+  // `ordered` is already topological, so a dependency's level is known by the
+  // time its dependent is reached.
+  for (const create of creates) {
+    const depth = referencedCreates(create, bySubject).reduce(
+      (deepest, dependency) =>
+        Math.max(deepest, (levels.get(dependency.subject) ?? 0) + 1),
+      0,
+    );
+    levels.set(create.subject, depth);
+  }
+
+  const createWaves: PlannedChange[][][] = [];
+
+  for (const create of creates) {
+    const level = levels.get(create.subject)!;
+    createWaves[level] ??= [];
+    createWaves[level].push([create]);
+  }
+
+  const chains = new Map<string, PlannedChange[]>();
+
+  for (const change of rest) {
+    const chain = chains.get(change.subject) ?? [];
+    chain.push(change);
+    chains.set(change.subject, chain);
+  }
+
+  return [
+    ...createWaves.filter(Boolean),
+    ...(chains.size > 0 ? [[...chains.values()]] : []),
+  ];
+}
+
+/** Runs thunks with at most `limit` in flight. */
+async function runBounded(
+  tasks: Array<() => Promise<void>>,
+  limit: number,
+): Promise<void> {
+  let next = 0;
+
+  const workers = Array.from({ length: Math.min(limit, tasks.length) }, () =>
+    (async () => {
+      while (next < tasks.length) {
+        await tasks[next++]();
+      }
+    })(),
+  );
+
+  await Promise.all(workers);
 }
 
 async function applyChange(
