@@ -130,3 +130,12 @@ export {
   type PluginWorkerLike,
   type RunPluginOptions,
 } from './plugin-runner.js';
+export {
+  planVerdict,
+  planHostFromStore,
+  type PlanHost,
+  type PlanStore,
+  type PlannedChange,
+  type PlannedProperty,
+  type RunPlan,
+} from './plugin-plan.js';
