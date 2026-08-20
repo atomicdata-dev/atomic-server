@@ -6476,127 +6476,127 @@ msgid "Cloud Server"
 msgstr "Serveur Cloud"
 
 msgid "Timed out connecting to the Cloud Server node."
-msgstr ""
+msgstr "Délai d'attente dépassé pour la connexion au nœud du serveur cloud."
 
 #. 0: PRODUCT_NAME
 #: src/components/Vault/VaultPanel.tsx
 msgid "Keep an encrypted copy of this workspace in {0}. It is sealed on this device, so we store it without being able to read it."
-msgstr ""
+msgstr "Conservez une copie cryptée de cet espace de travail dans {0}. Elle est scellée sur cet appareil, nous la stockons donc sans pouvoir la lire."
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Working…"
-msgstr ""
+msgstr "En cours…"
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Back up now"
-msgstr ""
+msgstr "Sauvegarder maintenant"
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Backups are paused. You can still restore what is already stored."
-msgstr ""
+msgstr "Les sauvegardes sont mises en pause. Vous pouvez toujours restaurer ce qui est déjà stocké."
 
 msgid "<0/> Restore"
-msgstr ""
+msgstr "<0/> Restaurer"
 
 #. 0: minutes
 #: src/components/Vault/VaultPanel.tsx
 msgid "{0} min ago"
-msgstr ""
+msgstr "Il y a {0} min"
 
 #. 0: hours
 #: src/components/Vault/VaultPanel.tsx
 msgid "{0}h ago"
-msgstr ""
+msgstr "Il y a {0}h"
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "That code expired. Start again when you are ready."
-msgstr ""
+msgstr "Ce code a expiré. Recommencez quand vous êtes prêt."
 
 #. 0: providerName(portalUrl)
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect your {0} account"
-msgstr ""
+msgstr "Connectez votre compte {0}"
 
 #. 0: ' '; 0.0: hostOf(portalUrl); 1: ' '
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Open{0} <0>{0}/link</0>{1} on a device where you are signed in, and enter this code."
-msgstr ""
+msgstr "Ouvrez{0} <0>{0}/link</0>{1} sur un appareil où vous êtes connecté et saisissez ce code."
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Waiting for you to approve it…"
-msgstr ""
+msgstr "En attente de votre approbation…"
 
 msgid "This app cannot sign in on its own, so approve it from somewhere you already are. Then it can keep an encrypted copy of your workspaces — sealed here, so {0} stores it without being able to read it."
-msgstr ""
+msgstr "Cette application ne peut pas se connecter seule, alors approuvez-la depuis un endroit où vous êtes déjà connecté. Elle pourra alors conserver une copie cryptée de vos espaces de travail — scellée ici, afin que {0} la stocke sans pouvoir la lire."
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Getting a code…"
-msgstr ""
+msgstr "Obtention d'un code…"
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "Connect this device"
-msgstr ""
+msgstr "Connecter cet appareil"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Android"
-msgstr ""
+msgstr "Android"
 
 #: src/actions/shortcuts.ts
 #: src/actions/shortcuts.ts
 #: src/actions/shortcuts.ts
 #: src/helpers/managed/deviceLink.ts
 msgid "Mac"
-msgstr ""
+msgstr "Mac"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Windows"
-msgstr ""
+msgstr "Windows"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Linux"
-msgstr ""
+msgstr "Linux"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Firefox"
-msgstr ""
+msgstr "Firefox"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Edge"
-msgstr ""
+msgstr "Edge"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Chrome"
-msgstr ""
+msgstr "Chrome"
 
 #: src/helpers/managed/deviceLink.ts
 msgid "Safari"
-msgstr ""
+msgstr "Safari"
 
 msgid "Use my own secret"
-msgstr ""
+msgstr "Utiliser mon propre secret"
 
 msgid "Restore this workspace"
-msgstr ""
+msgstr "Restaurer cet espace de travail"
 
 msgid "You’re signed in, and this workspace has an encrypted backup. We stored it sealed, so only this device can open it."
-msgstr ""
+msgstr "Vous êtes connecté et cet espace de travail possède une sauvegarde chiffrée. Nous l'avons stockée scellée, de sorte que seul cet appareil peut l'ouvrir."
 
 #: src/views/getting-started/ConnectDeviceStep.tsx
 msgid "Restore my workspace"
-msgstr ""
+msgstr "Restaurer mon espace de travail"
 
 msgid "…or bring it from another device instead"
-msgstr ""
+msgstr "…ou apportez-le depuis un autre appareil à la place"
 
 #. 0: PRODUCT_NAME
 #: src/components/Vault/VaultPanel.tsx
 msgid "Nothing has been backed up to {0} yet."
-msgstr ""
+msgstr "Aucune sauvegarde n'a encore été effectuée dans {0}."
 
 #. 0: details.confirmed_objects; 1: details.confirmed_objects === 1 ? '' \\: 's'; 2: formatBytes(enrollment.used_bytes); 3: PRODUCT_NAME
 #: src/components/Vault/VaultPanel.tsx
 msgid "{0} encrypted object{1} · {2} stored in {3}."
-msgstr ""
+msgstr "{0} objet crypté{1} · {2} stocké dans {3}."
 
 #: src/helpers/managed/deviceLink.test.ts
 #: src/helpers/managed/deviceLink.test.ts
@@ -6611,17 +6611,17 @@ msgstr ""
 #. 0: PRODUCT_NAME
 #: src/helpers/managed/enrollment.ts
 msgid "Your {0} session expired. Sign in and retry."
-msgstr ""
+msgstr "Votre session {0} a expiré. Connectez-vous et réessayez."
 
 #. 0: PRODUCT_NAME
 #: src/helpers/managed/enrollment.ts
 msgid "{0} could not place this drive right now. This is usually "
-msgstr ""
+msgstr "{0} n'a pas pu placer ce disque pour le moment. Cela est généralement "
 
 #. 0: PRODUCT_NAME; 1: response.status
 #: src/helpers/managed/enrollment.ts
 msgid "Could not enable {0} hosting (HTTP {1})."
-msgstr ""
+msgstr "Impossible d'activer l'hébergement {0} (HTTP {1})."
 
 #: src/helpers/managed/enrollment.test.ts
 msgid "Cloud Server requires a subscription"
@@ -6643,15 +6643,15 @@ msgstr "Gérer le compte →"
 #: src/components/Vault/VaultPanel.tsx
 #: src/components/Vault/VaultPanel.tsx
 msgid "Cloud Vault"
-msgstr ""
+msgstr "Coffre-fort cloud"
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Turn on Cloud Vault"
-msgstr ""
+msgstr "Activer le coffre-fort cloud"
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Cloud Vault is on"
-msgstr ""
+msgstr "Le coffre-fort cloud est activé"
 
 #. 0: PRODUCT_NAME
 #: src/routes/SyncRoute.tsx
@@ -6661,7 +6661,7 @@ msgstr "Un espace de travail hébergé sur {0} : liens partageables, recherche d
 #. 0: missing.join(', ')
 #: src/helpers/managed/useVaultBackup.ts
 msgid "Cloud Vault is not available here: {0}."
-msgstr ""
+msgstr "Cloud Vault n'est pas disponible ici : {0}."
 
 #: src/routes/SyncRoute.tsx
 msgid "Disconnect"
@@ -6750,7 +6750,7 @@ msgstr "Cet espace de travail vit déjà sur {0}. Le déplacer ici est une migra
 
 #: src/components/Vault/VaultPanel.tsx
 msgid "Checking this workspace’s backup…"
-msgstr ""
+msgstr "Vérification de la sauvegarde de cet espace de travail…"
 
 #. 0: withWhom
 #: src/routes/SyncRoute.tsx
