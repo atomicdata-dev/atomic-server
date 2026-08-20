@@ -136,3 +136,12 @@ export {
   type RunTrigger,
   type TriggerKind,
 } from './plugin-sandbox.js';
+export {
+  runPlugin,
+  type PluginRunOutcome,
+  type PluginRunRequest,
+  type PluginRunResponse,
+  type PluginWorkerFactory,
+  type PluginWorkerLike,
+  type RunPluginOptions,
+} from './plugin-runner.js';
