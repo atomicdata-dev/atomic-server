@@ -7518,6 +7518,226 @@ msgid ""
 "written."
 msgstr ""
 
+#. 0: imports; 1: await this.generateJSCodeBasic(); 2: propSubjectRef
+#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
+msgid ""
+"{0}{1}\n"
+"const value = resource.get({2});\n"
+msgstr ""
+
+#. 0: imports; 1: genericName ?? ''; 2: this.resource.subject
+#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
+msgid "{0}const resource = await store.getResource{1}('{2}');"
+msgstr ""
+
+#. 0: await this.generateTSCodeBasic(); 1: resourceShorthand ?? `resource.get('${prop}')`
+#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
+msgid ""
+"{0}\n"
+"const value = {1};\n"
+msgstr ""
+
+#. 0: imports; 1: this.resource.subject
+#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
+msgid ""
+"{0}const Component = () => {\n"
+"  const resource = useResource('{1}');\n"
+"\n"
+"  return <div>{resource.title}</div>;\n"
+"}"
+msgstr ""
+
+#. 0: imports; 1: this.resource.subject; 2: hook; 3: propSubjectRef
+#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
+msgid ""
+"{0}\n"
+"const Component = () => {\n"
+"  const resource = useResource('{1}');\n"
+"  const [value] = {2}(resource, {3});\n"
+"\n"
+"  return <div>{value}</div>;\n"
+"}"
+msgstr ""
+
+#. 0: imports; 1: genericName; 2: this.resource.subject; 3: propUsage
+#: src/views/CodeUsage/generators/BasicCodeGenerator.ts
+msgid ""
+"{0}\n"
+"const Component = () => {\n"
+"  const resource = useResource{1}('{2}');\n"
+"{3}\n"
+"}"
+msgstr ""
+
+#. 0: prefix; 1: formatImportNames(prefix, names); 2: file
+#: src/views/CodeUsage/generators/generatorUtils.ts
+msgid "{0}import {1} from '{2}';"
+msgstr ""
+
+#. 0.0: count
+#: src/chunks/AI/AIChatMessageParts/MessageToolPart.tsx
+msgid "Creating <0>{0} resources</0>"
+msgstr ""
+
+#: src/components/SideBar/DriveSwitcher.tsx
+msgid "Your personal space — visible only to you."
+msgstr ""
+
+#. 0: status.pendingDirtyCount > 0 && ( <PendingCount>{status.pendingDirtyCount} unsynced</PendingCount> )
+#: src/routes/SyncRoute.tsx
+msgid "Recent activity {0}"
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Backing up this workspace to {0}…"
+msgstr ""
+
+#: src/routes/SyncRoute.tsx
+msgid "Sign-in wasn’t completed — nothing was backed up."
+msgstr ""
+
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
+msgid "Could not enable {0} backup."
+msgstr ""
+
+#: src/components/ForkBar.tsx
+msgid "<0/> Merge"
+msgstr ""
+
+#: src/components/EditLanguagesDialog.tsx
+msgid "<0/> Add"
+msgstr ""
+
+#. 0: ' '
+#: src/routes/AppSettings.tsx
+msgid "<0/>{0} Colorful mode"
+msgstr ""
+
+#: src/chunks/TablePage/Timer/TimerToolbar.tsx
+msgid "<0/> Start"
+msgstr ""
+
+#: src/components/Vault/VaultPanel.tsx
+msgid "<0/> Restore"
+msgstr ""
+
+#. 0: serverHostname ?? 'another server'
+#: src/routes/SyncRoute.tsx
+msgid ""
+"Already set up for this workspace. This app is reading from {0} instead."
+msgstr ""
+
+#. 0: serverHostname ?? 'another server'
+#: src/routes/SyncRoute.tsx
+msgid ""
+"This workspace already lives on {0}. Moving it here is a migration, not a "
+"backup."
+msgstr ""
+
+#. 0: ' '; 1: signed ? ( <SignedBy attribution={signed} /> ) \\: ( <UnattributedBy peer={version.peer} /> ); 2: version.message && !signed && <> — {version.message}</>
+#: src/routes/History/VersionTitle.tsx
+msgid "Edited <0/>{0} {1} {2}"
+msgstr ""
+
+#. 0: ' '
+#: src/routes/History/VersionTitle.tsx
+msgid "by <0/>{0} <1/>"
+msgstr ""
+
+#. 0: shortPeer; 1: ' '
+#: src/routes/History/VersionTitle.tsx
+msgid "by peer {0}{1} <0>Unattributed</0>"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Go to parent resource"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"You’re signed in, but this device doesn’t have your workspace yet. Signing "
+"in restores who you are — your data stays where you made it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "…or let it scan this device"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"Scan this code from your other device instead. It only says where to reach "
+"this one — the other side still proves it holds your key."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Open <0>Sync</0> there to show its code, then scan or paste it here."
+msgstr ""
+
+#. 0: serverLabel(baseURL)
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"Syncs your workspace with {0}, which this browser reads from. Safe to show: "
+"a code only routes."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Connect a device that has it"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "An always-on device has an address — add it and your workspace appears."
+msgstr ""
+
+#: src/helpers/managed/cloudSync.ts
+msgid "Timed out connecting to the Cloud Server node."
+msgstr ""
+
+#. 0: providerName(portalUrl)
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid ""
+"This app cannot sign in on its own, so approve it from somewhere you already "
+"are. Then it can keep an encrypted copy of your workspaces — sealed here, so "
+"{0} stores it without being able to read it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Restore this workspace"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"You’re signed in, and this workspace has an encrypted backup. We stored it "
+"sealed, so only this device can open it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "…or bring it from another device instead"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "Loading…"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "This plugin has not run yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "Runs"
+msgstr ""
+
+#. 0: applied
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "{0} applied"
+msgstr ""
+
+#. 0: failed
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "{0} failed"
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexte compacté"
 

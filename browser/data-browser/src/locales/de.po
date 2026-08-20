@@ -7356,3 +7356,139 @@ msgid ""
 "Create a plugin here. It proposes changes that you review before anything is "
 "written."
 msgstr ""
+
+#: src/components/OverlayContainer.tsx
+msgid "<0/> open / chat"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Search"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Show or hide the sidebar"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Show these keyboard shortcuts"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> <1/>dit resource"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Show <1>d</1>ata for resource"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Show <1>h</1>ome page"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> <1/>ew resource"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Open <1>m</1>enu"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> <1/>ser settings"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> <1/>heme settings"
+msgstr ""
+
+#. 0: version.peer && <> by peer {version.peer.slice(0, 8)}...</>; 1: version.message && <> — {version.message}</>
+#: src/routes/History/VersionTitle.tsx
+msgid "Edited <0/> {0} {1}"
+msgstr ""
+
+#: src/routes/ShortcutsRoute.tsx
+msgid "<0/> Go to parent resource"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"You’re signed in, but this device doesn’t have your workspace yet. Signing "
+"in restores who you are — your data stays where you made it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "…or let it scan this device"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"Scan this code from your other device instead. It only says where to reach "
+"this one — the other side still proves it holds your key."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Open <0>Sync</0> there to show its code, then scan or paste it here."
+msgstr ""
+
+#. 0: serverLabel(baseURL)
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"Syncs your workspace with {0}, which this browser reads from. Safe to show: "
+"a code only routes."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Connect a device that has it"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "An always-on device has an address — add it and your workspace appears."
+msgstr ""
+
+#: src/helpers/managed/cloudSync.ts
+msgid "Timed out connecting to the Cloud Server node."
+msgstr ""
+
+#. 0: providerName(portalUrl)
+#: src/components/Vault/LinkProviderPanel.tsx
+msgid ""
+"This app cannot sign in on its own, so approve it from somewhere you already "
+"are. Then it can keep an encrypted copy of your workspaces — sealed here, so "
+"{0} stores it without being able to read it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "Restore this workspace"
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"You’re signed in, and this workspace has an encrypted backup. We stored it "
+"sealed, so only this device can open it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "…or bring it from another device instead"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "Loading…"
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "This plugin has not run yet."
+msgstr ""
+
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "Runs"
+msgstr ""
+
+#. 0: applied
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "{0} applied"
+msgstr ""
+
+#. 0: failed
+#: src/chunks/PluginRuns/PluginRunHistory.tsx
+msgid "{0} failed"
+msgstr ""
