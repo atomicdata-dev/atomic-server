@@ -163,8 +163,17 @@ authoring mistake, and the assistant should say so rather than route around it.
    features; closes the current hole and is independently shippable.
 2. **Secret storage + write-only endpoint + install dialog.**
 3. **`ctx.http` with handle substitution**, server placement only.
-4. **First consumer**: a Notion importer, which is the case that motivated all
-   of it, and the one that proves the token path end to end.
+4. **Prove the path**: a throwaway plugin that fetches one authenticated
+   endpoint with a stored secret, then is deleted. Every guard has unit tests;
+   nothing has yet made a real request.
+
+A Notion importer is deliberately *not* a step here. It is the acceptance
+criterion for the platform — a user asks, and the assistant builds one — and
+the assistant is the thing being tested. An importer hand-written by us would
+prove the opposite of what it looks like it proves: we would be careful where a
+model is sloppy, read the source when stuck, and work around rough edges that
+would stop the assistant dead. What that goal actually needs is the authoring
+loop in [`plugins.md`](./plugins.md) S3, not this document.
 
 ## Decisions
 
