@@ -111,10 +111,23 @@ export async function planVerdict(
 
   const resources = memoize((subject: string) => host.readResource(subject));
 
+  // Classes of resources this same plan creates, so a link between two new
+  // resources can be checked without a fetch. Links to resources that already
+  // exist are left alone: verifying those means one fetch per link, and an
+  // import that links 5,000 contacts to organizations would spend 5,000
+  // round-trips before the user has approved anything.
+  const inPlanClasses = new Map(
+    resolved
+      .filter(i => i.op === 'create')
+      .map(i => [minted[i.localId], i.isA]),
+  );
+
   const changes: PlannedChange[] = [];
 
   for (const intent of resolved) {
-    changes.push(await planIntent(intent, minted, properties, resources));
+    changes.push(
+      await planIntent(intent, minted, properties, resources, inPlanClasses),
+    );
   }
 
   const blocked =
@@ -215,6 +228,7 @@ async function planIntent(
   resources: (
     subject: string,
   ) => Promise<Record<string, JSONValue> | undefined>,
+  inPlanClasses: Map<string, string[]>,
 ): Promise<PlannedChange> {
   if (intent.op === 'create') {
     const subject = minted[intent.localId];
@@ -236,7 +250,13 @@ async function planIntent(
       });
     }
 
-    await checkProperties(intent.set, undefined, change, properties);
+    await checkProperties(
+      intent.set,
+      undefined,
+      change,
+      properties,
+      inPlanClasses,
+    );
 
     return change;
   }
@@ -280,7 +300,7 @@ async function planIntent(
     return change;
   }
 
-  await checkProperties(intent.set, current, change, properties);
+  await checkProperties(intent.set, current, change, properties, inPlanClasses);
 
   return change;
 }
@@ -290,6 +310,7 @@ async function checkProperties(
   current: Record<string, JSONValue> | undefined,
   change: PlannedChange,
   properties: (url: string) => Promise<Property | undefined>,
+  inPlanClasses: Map<string, string[]>,
 ): Promise<void> {
   for (const [url, value] of Object.entries(set)) {
     const property = await properties(url);
@@ -320,6 +341,19 @@ async function checkProperties(
       continue;
     }
 
+    const wrongClass = linksToWrongClass(value, property, inPlanClasses);
+
+    if (wrongClass) {
+      change.problems.push({
+        severity: 'error',
+        message: `${property.shortname} links to ${wrongClass.subject}, which this run creates as ${wrongClass.actual}, not ${property.classType}`,
+        subject: change.subject,
+        property: url,
+      });
+
+      continue;
+    }
+
     const from = current?.[url];
 
     if (from !== undefined && sameValue(from, value)) {
@@ -340,6 +374,37 @@ async function checkProperties(
       to: value,
     });
   }
+}
+
+/**
+ * Checks a link against the property's `classType`, but only when the target is
+ * created by this same plan — its class is already in hand there. Existing
+ * resources are not fetched to verify; that cost belongs at commit time, not in
+ * front of an approval prompt.
+ */
+function linksToWrongClass(
+  value: JSONValue,
+  property: Property,
+  inPlanClasses: Map<string, string[]>,
+): { subject: string; actual: string } | undefined {
+  if (!property.classType) return undefined;
+
+  const links =
+    typeof value === 'string'
+      ? [value]
+      : Array.isArray(value)
+        ? value.filter((v): v is string => typeof v === 'string')
+        : [];
+
+  for (const subject of links) {
+    const classes = inPlanClasses.get(subject);
+
+    if (!classes || classes.includes(property.classType)) continue;
+
+    return { subject, actual: classes.join(', ') || 'no class' };
+  }
+
+  return undefined;
 }
 
 /** Cheap structural equality; property values are JSON by construction. */
