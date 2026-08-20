@@ -270,6 +270,12 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     .service(web::resource("/export").to(handlers::export::handle_export))
     .service(web::resource("/plugin-ui").to(handlers::plugin_ui::handle_plugin_ui))
     .service(web::resource("/plugin-list").to(handlers::plugin_ui::handle_plugin_list))
+    .service(
+        web::resource("/plugin-secret")
+            .route(web::post().to(handlers::plugin_secret::handle_set_secret))
+            .route(web::get().to(handlers::plugin_secret::handle_list_secrets))
+            .route(web::delete().to(handlers::plugin_secret::handle_delete_secret)),
+    )
     // Serve pre-compressed brotli assets when:
     //   - The client sends `Accept-Encoding: br`, AND
     //   - The build script wrote a `<path>.br` sibling into the

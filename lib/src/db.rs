@@ -2107,6 +2107,29 @@ impl Db {
         )))
     }
 
+    /// Describes every secret a plugin has. Never their values.
+    pub fn list_plugin_secrets(
+        &self,
+        drive: &str,
+        plugin: &str,
+    ) -> AtomicResult<Vec<PluginSecretInfo>> {
+        let prefix = PluginSecretKey::plugin_prefix(drive, plugin);
+        let mut out = Vec::new();
+
+        for entry in self.kv.scan_prefix(Tree::PluginSecret, &prefix) {
+            let (key, value) = entry?;
+            let name = PluginSecretKey::name_from_key(&key)?;
+            out.push(PluginSecretInfo::of(
+                &name,
+                &PluginSecret::from_bytes(&value)?,
+            ));
+        }
+
+        out.sort_by(|a, b| a.name.cmp(&b.name));
+
+        Ok(out)
+    }
+
     pub fn delete_plugin_secret(&self, key: &PluginSecretKey) -> AtomicResult<()> {
         self.kv.remove(Tree::PluginSecret, &key.encode()?)?;
         Ok(())

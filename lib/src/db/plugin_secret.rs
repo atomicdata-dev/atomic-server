@@ -257,6 +257,57 @@ mod store_tests {
     }
 
     #[tokio::test]
+    async fn listing_describes_a_plugin_s_own_secrets_only() {
+        let db = db("listing").await;
+
+        db.set_plugin_secret(&key(), &secret()).unwrap();
+        db.set_plugin_secret(
+            &PluginSecretKey::new("did:ad:drive", "did:ad:plugin", "airtable"),
+            &PluginSecret::new("tok-2".to_string(), vec!["https://x".to_string()], 0),
+        )
+        .unwrap();
+        // Another plugin on the same drive, and the same plugin name on another.
+        db.set_plugin_secret(
+            &PluginSecretKey::new("did:ad:drive", "did:ad:other", "notion"),
+            &PluginSecret::new("nope".to_string(), vec![], 0),
+        )
+        .unwrap();
+        db.set_plugin_secret(
+            &PluginSecretKey::new("did:ad:other-drive", "did:ad:plugin", "notion"),
+            &PluginSecret::new("nope".to_string(), vec![], 0),
+        )
+        .unwrap();
+
+        let listed = db
+            .list_plugin_secrets("did:ad:drive", "did:ad:plugin")
+            .expect("listed");
+
+        assert_eq!(
+            listed.iter().map(|i| i.name.as_str()).collect::<Vec<_>>(),
+            vec!["airtable", "notion"],
+        );
+
+        // And still no values anywhere in it.
+        let json = serde_json::to_string(&listed).unwrap();
+        assert!(!json.contains("tok-abc"));
+        assert!(!json.contains("tok-2"));
+    }
+
+    #[tokio::test]
+    async fn a_key_round_trips_through_its_encoding() {
+        let encoded = key().encode().expect("encodes");
+
+        assert_eq!(
+            PluginSecretKey::name_from_key(&encoded).expect("name"),
+            "notion",
+        );
+        assert!(encoded.starts_with(&PluginSecretKey::plugin_prefix(
+            "did:ad:drive",
+            "did:ad:plugin"
+        )));
+    }
+
+    #[tokio::test]
     async fn a_name_that_could_smuggle_a_separator_is_refused() {
         let db = db("bad_name").await;
         let bad = PluginSecretKey::new("did:ad:drive", "did:ad:plugin", "has:colon");

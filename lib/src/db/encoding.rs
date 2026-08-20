@@ -147,20 +147,38 @@ impl crate::db::plugin_secret::PluginSecret {
 }
 
 impl crate::db::plugin_secret::PluginSecretKey {
+    /// `drive \0 plugin \0 name`.
+    ///
+    /// Not msgpack, unlike the value beside it: listing a plugin's secrets is a
+    /// prefix scan, and a msgpack struct is an array whose length is in the
+    /// first byte — so a two-field prefix is not a prefix of a three-field key.
+    /// Subjects cannot contain a NUL and names are validated not to, so the
+    /// separator is unambiguous.
     pub fn encode(&self) -> AtomicResult<Vec<u8>> {
-        let mut buf = Vec::new();
-        self.serialize(&mut Serializer::new(&mut buf))
-            .map_err(|e| format!("Failed to encode PluginSecretKey: {}", e))?;
+        let mut buf = Self::plugin_prefix(&self.drive, &self.plugin);
+        buf.extend_from_slice(self.name.as_bytes());
         Ok(buf)
     }
 
-    /// Prefix shared by every secret of one plugin, for listing.
-    pub fn plugin_prefix(drive: &str, plugin: &str) -> AtomicResult<Vec<u8>> {
-        let mut buf = Vec::new();
-        (drive, plugin)
-            .serialize(&mut Serializer::new(&mut buf))
-            .map_err(|e| format!("Failed to encode plugin secret prefix: {}", e))?;
-        Ok(buf)
+    /// Every secret of one plugin shares this prefix.
+    pub fn plugin_prefix(drive: &str, plugin: &str) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(drive.len() + plugin.len() + 2);
+        buf.extend_from_slice(drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(plugin.as_bytes());
+        buf.push(0);
+        buf
+    }
+
+    /// The secret's name, read back out of a key produced by `encode`.
+    pub fn name_from_key(key: &[u8]) -> AtomicResult<String> {
+        let name = key
+            .split(|b| *b == 0)
+            .nth(2)
+            .ok_or("Malformed plugin secret key")?;
+
+        String::from_utf8(name.to_vec())
+            .map_err(|e| format!("Plugin secret name is not UTF-8: {}", e).into())
     }
 }
 
