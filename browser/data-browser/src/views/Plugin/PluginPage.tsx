@@ -26,6 +26,7 @@ import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
 import { ConfigReference } from './ConfigReference';
 import { AssignRights } from './AssignRights';
+import { PluginSecrets } from './PluginSecrets';
 import { PluginPermissions } from './PluginPermissions';
 import { hasPermission, isPluginPermissions } from './pluginUtils';
 
@@ -81,6 +82,7 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
         {canWrite && (
           <AssignRights plugin={resource} disabled={hasFullDriveAccess} />
         )}
+        {canWrite && <PluginSecrets plugin={resource} drive={parent ?? ''} />}
         <Column>
           <Row center justify='space-between'>
             <h3 id={configLabelId}>
