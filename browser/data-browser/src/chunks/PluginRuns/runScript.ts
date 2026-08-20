@@ -298,12 +298,15 @@ async function runOnServer(
     throw new Error(`${response.status} ${await response.text()}`);
   }
 
+  // Absent fields arrive as `null`, not `undefined`: `error !== undefined` was
+  // true for every successful run, so every one of them took the error branch
+  // and reported "the run produced nothing".
   const body = (await response.json()) as {
-    verdict?: string;
-    error?: string;
+    verdict?: string | null;
+    error?: string | null;
   };
 
-  if (body.error !== undefined || body.verdict === undefined) {
+  if (body.error || !body.verdict) {
     return {
       verdict: {
         intents: [],
