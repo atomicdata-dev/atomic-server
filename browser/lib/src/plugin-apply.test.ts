@@ -231,6 +231,155 @@ describe('links between resources this run creates', () => {
   });
 });
 
+describe('concurrency', () => {
+  /** Records how many writes were in flight at once, and their order. */
+  const trackingHost = () => {
+    const state = { live: 0, peak: 0, order: [] as string[] };
+    let n = 0;
+
+    const enter = async (label: string) => {
+      state.order.push(label);
+      state.live++;
+      state.peak = Math.max(state.peak, state.live);
+      await new Promise(r => setTimeout(r, 5));
+      state.live--;
+    };
+
+    const host: ApplyHost = {
+      create: async request => {
+        await enter(`create:${request.propVals['https://x/tag'] ?? '?'}`);
+
+        return `did:ad:real-${++n}`;
+      },
+      set: async subject => enter(`set:${subject}`),
+      remove: async subject => enter(`remove:${subject}`),
+      destroy: async subject => enter(`destroy:${subject}`),
+    };
+
+    return { host, state };
+  };
+
+  const tagged = (
+    subject: string,
+    tag: string,
+    parent = 'https://x/drive',
+  ) => ({
+    ...create(subject, { parent }),
+    properties: [{ property: 'https://x/tag', to: tag }],
+  });
+
+  it('runs independent creates together', async () => {
+    const { host, state } = trackingHost();
+
+    await applyPlan(
+      plan([
+        tagged('_new:a', 'a'),
+        tagged('_new:b', 'b'),
+        tagged('_new:c', 'c'),
+      ]),
+      host,
+    );
+
+    expect(state.peak).toBeGreaterThan(1);
+  });
+
+  it('never overlaps a create with one it depends on', async () => {
+    const { host, state } = trackingHost();
+
+    await applyPlan(
+      plan([
+        tagged('_new:child', 'child', '_new:parent'),
+        tagged('_new:parent', 'parent'),
+      ]),
+      host,
+    );
+
+    expect(state.peak).toBe(1);
+    expect(state.order).toEqual(['create:parent', 'create:child']);
+  });
+
+  it('keeps two changes to one subject in order', async () => {
+    const { host, state } = trackingHost();
+
+    await applyPlan(
+      plan([
+        set('https://x/a', [{ property: 'https://x/name', to: 'first' }]),
+        {
+          op: 'remove',
+          subject: 'https://x/a',
+          properties: [{ property: 'https://x/old', from: 'x' }],
+          problems: [],
+        },
+      ]),
+      host,
+    );
+
+    expect(state.order).toEqual(['set:https://x/a', 'remove:https://x/a']);
+    expect(state.peak).toBe(1);
+  });
+
+  it('stays sequential when asked', async () => {
+    const { host, state } = trackingHost();
+
+    await applyPlan(
+      plan([tagged('_new:a', 'a'), tagged('_new:b', 'b')]),
+      host,
+      { concurrency: 1 },
+    );
+
+    expect(state.peak).toBe(1);
+  });
+
+  it('stops launching new work once something fails', async () => {
+    let started = 0;
+    const host: ApplyHost = {
+      create: async () => {
+        started++;
+        throw new Error('offline');
+      },
+      set: async () => undefined,
+      remove: async () => undefined,
+      destroy: async () => undefined,
+    };
+
+    const report = await applyPlan(
+      plan([
+        tagged('_new:a', 'a'),
+        tagged('_new:b', 'b'),
+        tagged('_new:c', 'c'),
+        tagged('_new:d', 'd'),
+      ]),
+      host,
+      { concurrency: 2 },
+    );
+
+    // The two in flight both fail; nothing after them is attempted.
+    expect(started).toBe(2);
+    expect(report.failed).toBe(2);
+    expect(report.stoppedEarly).toBe(true);
+  });
+
+  it('reports every change exactly once, in plan order', async () => {
+    const { host } = trackingHost();
+
+    const report = await applyPlan(
+      plan([
+        tagged('_new:a', 'a'),
+        tagged('_new:b', 'b'),
+        tagged('_new:c', 'c'),
+      ]),
+      host,
+    );
+
+    expect(report.outcomes).toHaveLength(3);
+    expect(report.outcomes.map(o => o.localId)).toEqual([
+      '_new:a',
+      '_new:b',
+      '_new:c',
+    ]);
+  });
+});
+
 describe('failures', () => {
   it('stops so dependents do not link to something that failed', async () => {
     const { host } = makeHost({
