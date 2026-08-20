@@ -147,19 +147,23 @@ impl JsRuntime {
     }
 }
 
-/// Where the runtime component lives.
+/// The runtime component, built and embedded by `build.rs`.
 ///
-/// Absent means plugins cannot run server-side, which is a configuration
-/// problem worth saying out loud rather than a silently missing feature.
-pub fn load_runtime(path: &std::path::Path) -> AtomicServerResult<Arc<JsRuntime>> {
-    let bytes = std::fs::read(path).map_err(|e| {
-        format!(
-            "could not read the plugin runtime at {}: {e}. Build it with `cargo build -p atomic-plugin-runtime --release --target wasm32-wasip2`.",
-            path.display(),
-        )
-    })?;
+/// Empty when the build could not produce it — a toolchain without
+/// `wasm32-wasip2`. That is a degraded server rather than a broken one, so the
+/// absence is reported where someone tries to use it.
+const EMBEDDED: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/plugin_runtime.wasm"));
 
-    Ok(Arc::new(JsRuntime::from_bytes(&bytes)?))
+/// The embedded runtime, compiled once for the process.
+pub fn embedded_runtime() -> AtomicServerResult<Arc<JsRuntime>> {
+    if EMBEDDED.is_empty() {
+        return Err(
+            "this server was built without the plugin runtime, so plugins cannot run server-side. Rebuild with the wasm32-wasip2 target installed."
+                .into(),
+        );
+    }
+
+    Ok(Arc::new(JsRuntime::from_bytes(EMBEDDED)?))
 }
 
 /// Adapts a store to what a plugin may do. Not yet wired to secrets or the
@@ -217,23 +221,18 @@ mod tests {
         }
     }
 
-    /// The component is built for a different target than the tests, so it has
-    /// to exist first. Skipping loudly beats a green suite that ran nothing.
-    fn runtime() -> Option<JsRuntime> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .unwrap()
-            .join("target/wasm32-wasip2/release/atomic_plugin_runtime.wasm");
+    /// The runtime as the server actually ships it.
+    ///
+    /// Not read from `target/`: a test that quietly skips when an artifact is
+    /// missing is a test that reports success for having run nothing. If the
+    /// build could not embed the runtime, these fail and say why.
+    fn runtime() -> JsRuntime {
+        assert!(
+            !EMBEDDED.is_empty(),
+            "no plugin runtime was embedded; install the wasm32-wasip2 target and rebuild",
+        );
 
-        if !path.exists() {
-            eprintln!(
-                "skipping: build it with `cargo build -p atomic-plugin-runtime --release --target wasm32-wasip2`",
-            );
-
-            return None;
-        }
-
-        Some(JsRuntime::from_bytes(&std::fs::read(path).unwrap()).unwrap())
+        JsRuntime::from_bytes(EMBEDDED).expect("the embedded runtime is a valid component")
     }
 
     const INPUT: &str = r#"{"trigger":{"kind":"manual","at":1700000000000}}"#;
@@ -251,7 +250,7 @@ mod tests {
 
     #[tokio::test]
     async fn runs_a_plugin_and_returns_its_verdict() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
         let (h, _) = host();
 
         let verdict = runtime
@@ -269,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_plugin_reaches_the_host() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
         let (h, fetched) = host();
 
         let verdict = runtime
@@ -292,7 +291,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_clock_and_the_prng_match_the_browser_placement() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
 
         let once = || async {
             let (h, _) = host();
@@ -320,7 +319,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_plugin_that_throws_reports_where() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
         let (h, _) = host();
 
         let error = runtime
@@ -340,7 +339,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_plugin_with_a_syntax_error_says_so() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
         let (h, _) = host();
 
         let error = runtime
@@ -354,7 +353,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_runaway_plugin_is_stopped_rather_than_the_server() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
         let (h, _) = host();
 
         let error = runtime
@@ -368,7 +367,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_plugin_has_no_ambient_io() {
-        let Some(runtime) = runtime() else { return };
+        let runtime = runtime();
         let (h, _) = host();
 
         let verdict = runtime
