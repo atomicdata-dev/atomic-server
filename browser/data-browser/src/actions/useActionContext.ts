@@ -24,6 +24,7 @@ export interface ActionContextOverrides {
   showCodeUsageDialog?: () => void;
   openEmojiPicker?: () => void;
   openPluginRun?: () => void;
+  pluginClass?: string;
   openCoverPicker?: () => void;
   onAfterDelete?: () => void;
   toggleSidebar?: () => void;
