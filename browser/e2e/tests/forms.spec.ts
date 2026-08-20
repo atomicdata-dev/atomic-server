@@ -22,9 +22,15 @@ const FIELDS: Array<[label: string, key: string]> = [
   ['Paragraph', 'paragraph'],
 ];
 
+// `window.store?.`, not `window.store.`: the predicate runs on every animation
+// frame, including ones where a reload or navigation has replaced the document
+// but the store has not attached to it yet. An unguarded read throws there, and
+// a throwing predicate fails `waitForFunction` outright instead of retrying —
+// turning a normal not-yet-ready frame into `Cannot read properties of
+// undefined (reading 'getSyncStatus')`. Optional chaining just polls again.
 const waitForSync = (page: Page) =>
   page.waitForFunction(
-    () => window.store.getSyncStatus().pendingDirtyCount === 0,
+    () => window.store?.getSyncStatus().pendingDirtyCount === 0,
     undefined,
     { timeout: 15000 },
   );
