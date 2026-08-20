@@ -1,7 +1,7 @@
 package atomic:class-extender@0.1.0;
 
 interface host {
-  use types.{resource-json, atomic-agent};
+  use types.{resource-json, atomic-agent, http-request, http-response};
 
   /// Returns a resource by subject.
   get-resource: func(subject: string, agent: option<string>) -> result<resource-json, string>;
@@ -15,9 +15,40 @@ interface host {
   The commit parameter should be a stringified JSON object of a CommitBuilder.
   */
   commit: func(commit: string) -> result<_, string>;
+  /**
+  Performs an HTTP request through the host.
+
+  The plugin has no sockets of its own, so this is the only way out. The host
+  checks the URL against the origins the manifest declares, refuses anything
+  that resolves outside the public internet, and substitutes credentials.
+
+  A header value of `secret:<name>` is replaced with that secret, if the plugin
+  has one of that name and it is scoped to this origin. The plugin never sees
+  the value. A `secret:` handle anywhere other than a header value is an error,
+  not a substitution — a credential in a URL ends up in logs by design.
+  */
+  fetch: func(request: http-request) -> result<http-response, string>;
 }
 
 interface types {
+
+  record http-header {
+    name: string,
+    value: string,
+  }
+
+  record http-request {
+    method: string,
+    url: string,
+    headers: list<http-header>,
+    body: option<string>,
+  }
+
+  record http-response {
+    status: u16,
+    headers: list<http-header>,
+    body: string,
+  }
   record atomic-agent {
     subject: string,
   }
