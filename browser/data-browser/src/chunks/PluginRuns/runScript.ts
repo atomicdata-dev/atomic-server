@@ -12,9 +12,11 @@ import {
   type EnsuredSchema,
   type RunPlan,
   type RunTrigger,
+  useStore,
   type Store,
 } from '@tomic/react';
 import pluginWorkerUrl from '@tomic/lib/plugin-run.worker.js?url';
+import { useEffect, useState } from 'react';
 
 /**
  * Running a plugin and applying what it proposed are separate calls on purpose.
@@ -27,34 +29,12 @@ import pluginWorkerUrl from '@tomic/lib/plugin-run.worker.js?url';
 /** Resolved once per drive: plugin classes are code-first, so drive-local. */
 const schemaByDrive = new Map<string, Promise<EnsuredSchema>>();
 
-/** What a read-only lookup found, for surfaces that must answer synchronously. */
-const knownClasses = new Map<string, string | undefined>();
-const lookedUp = new Set<string>();
-
 /**
- * The plugin class of a drive, if it already has one, without creating it.
+ * The drive's plugin schema, created if it is not there yet.
  *
- * `available()` on an action is synchronous, so the first call starts a lookup
- * and returns undefined; the menu shows the action from the next render on.
- * Deliberately read-only — opening a context menu must not bring a schema into
- * existence.
+ * Only called on the path that actually runs a plugin — creating classes is a
+ * write, and no read path should trigger one.
  */
-export function pluginClassNow(
-  store: Store,
-  drive: string,
-): string | undefined {
-  if (!lookedUp.has(drive)) {
-    lookedUp.add(drive);
-    void findSchema(store, drive, pluginSchema())
-      .then(schema =>
-        knownClasses.set(drive, schema.classes?.['plugin-script']),
-      )
-      .catch(() => knownClasses.set(drive, undefined));
-  }
-
-  return knownClasses.get(drive);
-}
-
 export function pluginClassesFor(
   store: Store,
   drive: string,
@@ -67,6 +47,43 @@ export function pluginClassesFor(
   schemaByDrive.set(drive, resolving);
 
   return resolving;
+}
+
+/**
+ * The plugin class of a drive, if it already has one.
+ *
+ * Read-only: rendering a context menu must not bring a schema into existence.
+ * Resolved into React state rather than a module cache, because a cache read
+ * during render never re-renders when it later fills — the action simply never
+ * appeared.
+ */
+export function usePluginClass(drive: string | undefined): string | undefined {
+  const store = useStore();
+  const [pluginClass, setPluginClass] = useState<string>();
+
+  useEffect(() => {
+    if (!drive) {
+      setPluginClass(undefined);
+
+      return;
+    }
+
+    let cancelled = false;
+
+    findSchema(store, drive, pluginSchema())
+      .then(schema => {
+        if (!cancelled) setPluginClass(schema.classes?.['plugin-script']);
+      })
+      .catch(() => {
+        if (!cancelled) setPluginClass(undefined);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [store, drive]);
+
+  return pluginClass;
 }
 
 export interface PreparedRun {
