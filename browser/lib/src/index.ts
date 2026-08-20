@@ -156,6 +156,8 @@ export {
 } from './plugin-plan.js';
 export {
   applyPlan,
+  applyHostFromStore,
+  type ApplyStore,
   type ApplyHost,
   type ApplyOptions,
   type ApplyReport,

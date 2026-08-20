@@ -25,6 +25,57 @@ export interface ApplyHost {
   destroy(subject: string): Promise<void>;
 }
 
+/**
+ * The slice of `Store` applying needs. Structural, matching `PlanStore`.
+ */
+export interface ApplyStore {
+  newResource(opts: {
+    parent: string;
+    isA: string[];
+    propVals: Record<string, JSONValue>;
+  }): Promise<{ subject: string; save(): Promise<unknown> }>;
+  getResource(subject: string): Promise<{
+    set(prop: string, value: JSONValue): Promise<void>;
+    remove(prop: string): void;
+    save(): Promise<unknown>;
+    destroy(): Promise<void>;
+  }>;
+}
+
+/** Adapts a `Store` to an {@link ApplyHost}. */
+export function applyHostFromStore(store: ApplyStore): ApplyHost {
+  return {
+    create: async request => {
+      const resource = await store.newResource(request);
+      await resource.save();
+
+      // Read the subject after saving: for a DID agent the store mints it from
+      // a genesis certificate during creation, so it is not knowable before.
+      return resource.subject;
+    },
+    set: async (subject, propVals) => {
+      const resource = await store.getResource(subject);
+
+      for (const [property, value] of Object.entries(propVals)) {
+        // Validation stays on: the planner already fetched every property, so
+        // this reads the store cache rather than the network.
+        await resource.set(property, value);
+      }
+
+      await resource.save();
+    },
+    remove: async (subject, properties) => {
+      const resource = await store.getResource(subject);
+      properties.forEach(property => resource.remove(property));
+      await resource.save();
+    },
+    destroy: async subject => {
+      const resource = await store.getResource(subject);
+      await resource.destroy();
+    },
+  };
+}
+
 export type ChangeStatus = 'applied' | 'skipped' | 'failed' | 'not-attempted';
 
 export interface ChangeOutcome {
@@ -130,7 +181,7 @@ async function applyChange(
       const created = await host.create({
         parent: subjects[change.parent!] ?? change.parent!,
         isA: change.isA ?? [],
-        propVals: rewrite(propVals(change), subjects),
+        propVals: rewrite(writableValues(change), subjects),
       });
 
       return { subject: created, status: 'applied' };
@@ -141,7 +192,7 @@ async function applyChange(
         return { subject, status: 'skipped' };
       }
 
-      await host.set(subject, rewrite(propVals(change), subjects));
+      await host.set(subject, rewrite(writableValues(change), subjects));
 
       return { subject, status: 'applied' };
     }
@@ -199,7 +250,7 @@ function createsFirst(changes: PlannedChange[]): PlannedChange[] {
   return [...ordered, ...rest];
 }
 
-function propVals(change: PlannedChange): Record<string, JSONValue> {
+function writableValues(change: PlannedChange): Record<string, JSONValue> {
   return Object.fromEntries(
     change.properties
       .filter(p => p.to !== undefined)
