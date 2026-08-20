@@ -47,6 +47,12 @@ export interface RunPlan {
   minted: Record<string, string>;
   /** True when the plan must not be applied. */
   blocked: boolean;
+  /**
+   * Carried through from the verdict so the caller can persist it after a
+   * successful apply. Only meaningful once the plan is actually applied: saving
+   * it earlier would skip work on the next run that this one never did.
+   */
+  cursor?: string;
 }
 
 /**
@@ -134,7 +140,13 @@ export async function planVerdict(
     problems.some(p => p.severity === 'error') ||
     changes.some(c => c.problems.some(p => p.severity === 'error'));
 
-  return { changes, problems, minted, blocked };
+  return {
+    changes,
+    problems,
+    minted,
+    blocked,
+    ...(verdict.cursor !== undefined ? { cursor: verdict.cursor } : {}),
+  };
 }
 
 /**

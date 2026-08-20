@@ -165,3 +165,18 @@ export {
   type ChangeStatus,
   type CreateRequest,
 } from './plugin-apply.js';
+export {
+  ensureSchema,
+  type ClassSpec,
+  type EnsuredSchema,
+  type PropertySpec,
+  type SchemaSpec,
+  type SchemaStore,
+} from './plugin-schema.js';
+export {
+  recordRun,
+  runStatus,
+  pluginRunSchema,
+  type RecordRunOptions,
+  type RunStatus,
+} from './plugin-log.js';
