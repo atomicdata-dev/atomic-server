@@ -178,6 +178,54 @@ describe('failures', () => {
   });
 });
 
+describe('sandbox containment', () => {
+  it('warns when the sandbox could not deny a global', async () => {
+    const worker = new FakeWorker(w =>
+      w.respond({ ok: true, json: verdictJson(), undeniable: ['fetch'] }),
+    );
+
+    const { verdict } = await runPlugin('', input, {
+      createWorker: () => worker,
+    });
+
+    expect(verdict.problems).toEqual([
+      expect.objectContaining({
+        severity: 'warning',
+        message: expect.stringContaining('fetch'),
+      }),
+    ]);
+  });
+
+  it('keeps the warning alongside a failure', async () => {
+    const worker = new FakeWorker(w =>
+      w.respond({
+        ok: false,
+        problem: { severity: 'error', message: 'run() threw' },
+        undeniable: ['indexedDB'],
+      }),
+    );
+
+    const { verdict } = await runPlugin('', input, {
+      createWorker: () => worker,
+    });
+
+    expect(verdict.problems).toHaveLength(2);
+    expect(verdict.problems[0].message).toContain('indexedDB');
+  });
+
+  it('says nothing when the sandbox denied everything', async () => {
+    const worker = new FakeWorker(w =>
+      w.respond({ ok: true, json: verdictJson(), undeniable: [] }),
+    );
+
+    const { verdict } = await runPlugin('', input, {
+      createWorker: () => worker,
+    });
+
+    expect(verdict.problems).toEqual([]);
+  });
+});
+
 describe('time budget', () => {
   it('stops a run that overruns and says so', async () => {
     vi.useFakeTimers();
