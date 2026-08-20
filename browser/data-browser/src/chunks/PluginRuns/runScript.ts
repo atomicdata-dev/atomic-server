@@ -164,6 +164,32 @@ export async function createPlugin(
   return plugin.subject;
 }
 
+/**
+ * Tells anything showing a plugin's runs that it just gained one.
+ *
+ * The run log is a collection query, and a query does not know a resource it
+ * has never seen was created. Without this the log only caught up on reload —
+ * which is exactly the moment someone wants to see what just happened.
+ */
+const runListeners = new Map<string, Set<() => void>>();
+
+export function onRunsChanged(
+  plugin: string,
+  listener: () => void,
+): () => void {
+  const listeners = runListeners.get(plugin) ?? new Set();
+  listeners.add(listener);
+  runListeners.set(plugin, listeners);
+
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+function notifyRunsChanged(plugin: string): void {
+  runListeners.get(plugin)?.forEach(listener => listener());
+}
+
 export interface PreparedRun {
   plan: RunPlan;
   trigger: RunTrigger;
@@ -223,6 +249,8 @@ export async function applyRun(
     report,
   });
 
+  notifyRunsChanged(target.plugin);
+
   return { report, logged };
 }
 
@@ -232,10 +260,14 @@ export async function recordBlockedRun(
   prepared: PreparedRun,
   target: { plugin: string; drive: string },
 ): Promise<string> {
-  return recordRun(store, {
+  const logged = await recordRun(store, {
     parent: target.plugin,
     drive: target.drive,
     trigger: prepared.trigger,
     plan: prepared.plan,
   });
+
+  notifyRunsChanged(target.plugin);
+
+  return logged;
 }
