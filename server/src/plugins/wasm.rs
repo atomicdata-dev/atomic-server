@@ -614,7 +614,27 @@ impl PluginHostState {
         //     .inherit_stdin()
 
         if PluginManifest::option_has_permission(manifest.as_ref(), PermissionType::Network) {
-            builder.inherit_network();
+            // Not `inherit_network()`, which is `socket_addr_check(|_, _| true)`
+            // and hands the plugin loopback, the private ranges and any cloud
+            // metadata endpoint the host can reach. The check runs on the
+            // resolved address, which is the only place it can work — a
+            // hostname resolving to 169.254.169.254 is the whole attack.
+            builder.socket_addr_check(|addr, _use| {
+                Box::pin(async move {
+                    match crate::plugins::egress::refuse_address(addr.ip()) {
+                        None => true,
+                        Some(refusal) => {
+                            tracing::warn!(
+                                address = %addr,
+                                ?refusal,
+                                "plugin refused an address outside the public internet",
+                            );
+
+                            false
+                        }
+                    }
+                })
+            });
         }
 
         if let Some(owned_folder_path) = owned_folder_path {
@@ -724,6 +744,14 @@ impl bindings::atomic::class_extender::host::Host for PluginHostState {
                 PermissionType::Network,
             ) {
                 return Err("Plugin does not have network access".to_string());
+            }
+
+            // The host fetches this one, so the guest's socket check never sees
+            // it. Same rules, applied here.
+            if let Some(refusal) = crate::plugins::egress::refuse_url(&subject).await {
+                tracing::warn!(%subject, %refusal, "plugin refused a foreign subject fetch");
+
+                return Err(format!("cannot fetch {subject}: {refusal}"));
             }
 
             let resource = self
