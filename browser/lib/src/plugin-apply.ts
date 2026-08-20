@@ -130,6 +130,9 @@ export async function applyPlan(
   const subjects: Record<string, string> = {};
   const outcomes: ChangeOutcome[] = [];
   const ordered = createsFirst(plan.changes);
+  const plannedSubjects = new Set(
+    plan.changes.filter(c => c.op === 'create').map(c => c.subject),
+  );
 
   let stoppedEarly = false;
 
@@ -141,7 +144,7 @@ export async function applyPlan(
     }
 
     try {
-      const result = await applyChange(change, host, subjects);
+      const result = await applyChange(change, host, subjects, plannedSubjects);
 
       if (result.subject !== change.subject) {
         subjects[change.subject] = result.subject;
@@ -173,15 +176,30 @@ async function applyChange(
   change: PlannedChange,
   host: ApplyHost,
   subjects: Record<string, string>,
+  plannedSubjects: Set<string>,
 ): Promise<{ subject: string; status: ChangeStatus }> {
   const subject = subjects[change.subject] ?? change.subject;
+  const values = writableValues(change);
+
+  const dangling = unresolvedReferences(
+    values,
+    change.parent,
+    plannedSubjects,
+    subjects,
+  );
+
+  if (dangling.length > 0) {
+    throw new Error(
+      `refers to ${dangling.join(', ')}, which this run did not create — writing it would link to nothing`,
+    );
+  }
 
   switch (change.op) {
     case 'create': {
       const created = await host.create({
         parent: subjects[change.parent!] ?? change.parent!,
         isA: change.isA ?? [],
-        propVals: rewrite(writableValues(change), subjects),
+        propVals: rewrite(values, subjects),
       });
 
       return { subject: created, status: 'applied' };
@@ -192,7 +210,7 @@ async function applyChange(
         return { subject, status: 'skipped' };
       }
 
-      await host.set(subject, rewrite(writableValues(change), subjects));
+      await host.set(subject, rewrite(values, subjects));
 
       return { subject, status: 'applied' };
     }
@@ -218,11 +236,17 @@ async function applyChange(
 }
 
 /**
- * Orders creates ahead of everything else, parents ahead of their children.
+ * Orders creates ahead of everything else, and each create after every create
+ * it refers to.
+ *
+ * Following only `parent` was not enough: an imported contact whose employer
+ * points at an Organization created by the same run is not that Organization's
+ * child, so it could be written first — and then the link was written as the
+ * planner's placeholder subject, which never exists. That is silent data
+ * corruption, and it is exactly what a linked import produces.
  *
  * The plan keeps intent order so the preview reads the way the run was written;
- * applying needs dependency order so a child is never created under a parent
- * that does not exist yet.
+ * only applying needs dependency order.
  */
 function createsFirst(changes: PlannedChange[]): PlannedChange[] {
   const creates = changes.filter(c => c.op === 'create');
@@ -237,9 +261,9 @@ function createsFirst(changes: PlannedChange[]): PlannedChange[] {
 
     seen.add(change.subject);
 
-    const parent = change.parent ? bySubject.get(change.parent) : undefined;
-
-    if (parent) place(parent, seen);
+    for (const dependency of referencedCreates(change, bySubject)) {
+      place(dependency, seen);
+    }
 
     placed.add(change.subject);
     ordered.push(change);
@@ -248,6 +272,67 @@ function createsFirst(changes: PlannedChange[]): PlannedChange[] {
   for (const create of creates) place(create, new Set());
 
   return [...ordered, ...rest];
+}
+
+/** Creates this change refers to, by parent or by any property value. */
+function referencedCreates(
+  change: PlannedChange,
+  bySubject: Map<string, PlannedChange>,
+): PlannedChange[] {
+  const found: PlannedChange[] = [];
+
+  const visit = (value: JSONValue) => {
+    if (typeof value === 'string') {
+      const hit = bySubject.get(value);
+
+      if (hit && hit.subject !== change.subject) found.push(hit);
+    } else if (Array.isArray(value)) {
+      value.forEach(visit);
+    } else if (value && typeof value === 'object') {
+      Object.values(value).forEach(visit);
+    }
+  };
+
+  if (change.parent) visit(change.parent);
+
+  change.properties.forEach(property => visit(property.to));
+
+  return found;
+}
+
+/**
+ * Planned subjects that no longer have a real one.
+ *
+ * Reachable when two creates refer to each other: no order can satisfy both, so
+ * one of them would write a link to a resource that does not exist. Reported
+ * rather than written — a dangling link that looks like data is worse than a
+ * change that refused.
+ */
+function unresolvedReferences(
+  values: Record<string, JSONValue>,
+  parent: string | undefined,
+  plannedSubjects: Set<string>,
+  subjects: Record<string, string>,
+): string[] {
+  const dangling = new Set<string>();
+
+  const visit = (value: JSONValue) => {
+    if (typeof value === 'string') {
+      if (plannedSubjects.has(value) && subjects[value] === undefined) {
+        dangling.add(value);
+      }
+    } else if (Array.isArray(value)) {
+      value.forEach(visit);
+    } else if (value && typeof value === 'object') {
+      Object.values(value).forEach(visit);
+    }
+  };
+
+  if (parent !== undefined) visit(parent);
+
+  Object.values(values).forEach(visit);
+
+  return [...dangling];
 }
 
 function writableValues(change: PlannedChange): Record<string, JSONValue> {
