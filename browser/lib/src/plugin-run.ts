@@ -1,4 +1,4 @@
-import type { JSONValue } from './types.js';
+import type { JSONValue } from './value.js';
 
 /**
  * The contract for a plugin's `run` export.

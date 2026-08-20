@@ -95,3 +95,29 @@ export {
   type PerfSnapshot,
 } from './perf-trace.js';
 export * from './child-order.js';
+export {
+  hasBlockingProblems,
+  LOCAL_REF_PREFIX,
+  parseVerdict,
+  type CreateIntent,
+  type DestroyIntent,
+  type Intent,
+  type ParseVerdictOptions,
+  type Problem,
+  type ProblemSeverity,
+  type RemoveIntent,
+  type SetIntent,
+  type Verdict,
+} from './plugin-run.js';
+export {
+  applyDeterministicGlobals,
+  denyAmbientGlobals,
+  invokeRun,
+  DENIED_GLOBALS,
+  type InvokeOptions,
+  type InvokeResult,
+  type PluginModule,
+  type RunInput,
+  type RunTrigger,
+  type TriggerKind,
+} from './plugin-sandbox.js';
