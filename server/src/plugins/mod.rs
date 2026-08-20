@@ -42,6 +42,8 @@ pub mod export;
 pub mod files;
 pub mod importer;
 pub mod invite;
+#[cfg(feature = "wasm-plugins")]
+pub mod js_runtime;
 pub mod path;
 pub mod plugin;
 pub mod prunetests;
