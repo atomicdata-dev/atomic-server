@@ -271,6 +271,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     .service(web::resource("/plugin-ui").to(handlers::plugin_ui::handle_plugin_ui))
     .service(web::resource("/plugin-list").to(handlers::plugin_ui::handle_plugin_list))
     .service(
+        web::resource("/plugin-run")
+            .guard(guard::Method(Method::POST))
+            .to(handlers::plugin_run::handle_plugin_run),
+    )
+    .service(
         web::resource("/plugin-secret")
             .route(web::post().to(handlers::plugin_secret::handle_set_secret))
             .route(web::get().to(handlers::plugin_secret::handle_list_secrets))
