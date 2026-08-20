@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hasBlockingProblems, parseVerdict } from './run.js';
+import { hasBlockingProblems, parseVerdict } from './plugin-run.js';
 
 const errors = (raw: unknown) =>
   parseVerdict(raw).problems.filter(p => p.severity === 'error');
