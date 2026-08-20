@@ -214,20 +214,38 @@ export const DENIED_GLOBALS = [
   'sessionStorage',
 ] as const;
 
+export interface DenyResult {
+  /** Globals that now throw when touched. */
+  denied: string[];
+  /**
+   * Globals that are present but could not be shadowed. Surfaced rather than
+   * swallowed: a denial that quietly did not apply is worse than none, because
+   * it reads as containment that is not there.
+   */
+  undeniable: string[];
+  restore: () => void;
+}
+
 /**
  * Makes ambient I/O throw a message that says what to do instead.
  *
  * `run` holds no authority by design, so reaching for the network is an
  * authoring mistake, not an attack — and `fetch is not a function` is a bad way
  * to learn that the host is supposed to do the fetching.
+ *
+ * Worker globals like `fetch` and `indexedDB` live on `WorkerGlobalScope.prototype`
+ * rather than on `globalThis` itself, so this shadows by defining an own
+ * property, and looks up the original along the prototype chain to restore.
  */
-export function denyAmbientGlobals(scope: Record<string, unknown>): () => void {
+export function denyAmbientGlobals(scope: Record<string, unknown>): DenyResult {
+  const denied: string[] = [];
+  const undeniable: string[] = [];
   const restores: Array<() => void> = [];
 
   for (const name of DENIED_GLOBALS) {
-    const descriptor = Object.getOwnPropertyDescriptor(scope, name);
+    if (!(name in scope)) continue;
 
-    if (!descriptor) continue;
+    const own = Object.getOwnPropertyDescriptor(scope, name);
 
     try {
       Object.defineProperty(scope, name, {
@@ -238,14 +256,27 @@ export function denyAmbientGlobals(scope: Record<string, unknown>): () => void {
           );
         },
       });
-      restores.push(() => Object.defineProperty(scope, name, descriptor));
     } catch {
-      // A non-configurable global cannot be shadowed here. The iframe CSP and
-      // the server sandbox are the enforcing layers; this one is for DX.
+      undeniable.push(name);
+      continue;
     }
+
+    denied.push(name);
+    restores.push(() => {
+      if (own) {
+        Object.defineProperty(scope, name, own);
+      } else {
+        // Was inherited; dropping the shadow exposes the original again.
+        delete scope[name];
+      }
+    });
   }
 
-  return () => restores.forEach(restore => restore());
+  return {
+    denied,
+    undeniable,
+    restore: () => restores.forEach(restore => restore()),
+  };
 }
 
 function describeError(e: unknown): string {

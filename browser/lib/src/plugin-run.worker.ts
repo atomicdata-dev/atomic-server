@@ -31,7 +31,7 @@ const reply = (response: PluginRunResponse) =>
 globalThis.onmessage = async (event: MessageEvent<PluginRunRequest>) => {
   const { source, input, maxOutputBytes } = event.data;
 
-  denyAmbientGlobals(scope);
+  const denial = denyAmbientGlobals(scope);
   applyDeterministicGlobals(scope, input);
 
   let module: PluginModule;
@@ -47,6 +47,7 @@ globalThis.onmessage = async (event: MessageEvent<PluginRunRequest>) => {
           e instanceof Error ? `${e.name}: ${e.message}` : String(e)
         }`,
       },
+      undeniable: denial.undeniable,
     });
 
     return;
@@ -56,13 +57,14 @@ globalThis.onmessage = async (event: MessageEvent<PluginRunRequest>) => {
 
   reply(
     result.json !== undefined
-      ? { ok: true, json: result.json }
+      ? { ok: true, json: result.json, undeniable: denial.undeniable }
       : {
           ok: false,
           problem: result.problem ?? {
             severity: 'error',
             message: 'run() produced no result',
           },
+          undeniable: denial.undeniable,
         },
   );
 };

@@ -174,10 +174,25 @@ describe('deterministic globals', () => {
 describe('denied globals', () => {
   it('explains what to do instead of failing as undefined', () => {
     const scope: Record<string, unknown> = { fetch: () => undefined };
-    restores.push(denyAmbientGlobals(scope));
+    restores.push(denyAmbientGlobals(scope).restore);
 
     expect(() => scope.fetch).toThrow(/no I\/O of its own/);
     expect(() => scope.fetch).toThrow(/network capability/);
+  });
+
+  it('denies globals inherited from a prototype, as in a Worker scope', () => {
+    // Worker globals live on WorkerGlobalScope.prototype, not on globalThis.
+    // Only checking own properties silently denied nothing at all.
+    const proto = { fetch: () => 'real', indexedDB: {} };
+    const scope: Record<string, unknown> = Object.create(proto);
+
+    const result = denyAmbientGlobals(scope);
+    restores.push(result.restore);
+
+    expect(result.denied).toContain('fetch');
+    expect(result.denied).toContain('indexedDB');
+    expect(() => scope.fetch).toThrow();
+    expect(() => scope.indexedDB).toThrow();
   });
 
   it('denies every ambient I/O global that is present', () => {
@@ -187,7 +202,7 @@ describe('denied globals', () => {
       WebSocket: 1,
       localStorage: 1,
     };
-    restores.push(denyAmbientGlobals(scope));
+    restores.push(denyAmbientGlobals(scope).restore);
 
     for (const name of ['fetch', 'indexedDB', 'WebSocket', 'localStorage']) {
       expect(() => scope[name]).toThrow();
@@ -196,16 +211,41 @@ describe('denied globals', () => {
 
   it('ignores globals the scope does not have', () => {
     const scope: Record<string, unknown> = {};
+    const result = denyAmbientGlobals(scope);
 
-    expect(() => denyAmbientGlobals(scope)).not.toThrow();
+    expect(result.denied).toEqual([]);
+    expect(result.undeniable).toEqual([]);
     expect(scope.fetch).toBeUndefined();
   });
 
-  it('puts the originals back', () => {
+  it('reports a global it could not shadow instead of implying it did', () => {
+    const scope: Record<string, unknown> = {};
+    Object.defineProperty(scope, 'fetch', {
+      value: () => 'real',
+      configurable: false,
+      writable: false,
+    });
+
+    const result = denyAmbientGlobals(scope);
+
+    expect(result.denied).toEqual([]);
+    expect(result.undeniable).toEqual(['fetch']);
+  });
+
+  it('puts an own global back', () => {
     const original = () => 'real';
     const scope: Record<string, unknown> = { fetch: original };
-    denyAmbientGlobals(scope)();
+    denyAmbientGlobals(scope).restore();
 
     expect(scope.fetch).toBe(original);
+  });
+
+  it('exposes an inherited global again after restore', () => {
+    const proto = { fetch: () => 'real' };
+    const scope: Record<string, unknown> = Object.create(proto);
+    denyAmbientGlobals(scope).restore();
+
+    expect(scope.fetch).toBe(proto.fetch);
+    expect(Object.hasOwn(scope, 'fetch')).toBe(false);
   });
 });

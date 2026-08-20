@@ -17,9 +17,13 @@ export interface PluginRunRequest {
   maxOutputBytes?: number;
 }
 
-export type PluginRunResponse =
-  | { ok: true; json: string }
-  | { ok: false; problem: Problem };
+export type PluginRunResponse = {
+  /**
+   * Ambient globals the sandbox could not shadow. Reported rather than
+   * swallowed so a weaker-than-intended sandbox shows up in the preview.
+   */
+  undeniable?: string[];
+} & ({ ok: true; json: string } | { ok: false; problem: Problem });
 
 /** The slice of `Worker` the runner uses, so hosts and tests can substitute. */
 export interface PluginWorkerLike {
@@ -139,13 +143,25 @@ function toOutcome(
   response: PluginRunResponse,
   maxIntents?: number,
 ): PluginRunOutcome {
+  const sandboxProblems: Problem[] = response?.undeniable?.length
+    ? [
+        {
+          severity: 'warning',
+          message: `the sandbox could not deny ${response.undeniable.join(', ')}; this run was less contained than intended`,
+        },
+      ]
+    : [];
+
   if (!response?.ok) {
     const problem = response?.problem ?? {
       severity: 'error' as const,
       message: 'the plugin sandbox returned no result',
     };
 
-    return { verdict: { intents: [], problems: [problem] }, timedOut: false };
+    return {
+      verdict: { intents: [], problems: [...sandboxProblems, problem] },
+      timedOut: false,
+    };
   }
 
   let raw: unknown;
@@ -156,8 +172,13 @@ function toOutcome(
     return failed(`could not read the verdict: ${describeError(e)}`);
   }
 
+  const verdict = parseVerdict(raw, { maxIntents });
+
   return {
-    verdict: parseVerdict(raw, { maxIntents }),
+    verdict: {
+      ...verdict,
+      problems: [...sandboxProblems, ...verdict.problems],
+    },
     timedOut: false,
   };
 }
