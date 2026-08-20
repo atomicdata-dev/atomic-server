@@ -11,6 +11,7 @@ mod migrations;
 #[cfg(all(feature = "db-redb", target_arch = "wasm32"))]
 pub mod opfs_backend;
 pub mod plugin_meta;
+pub mod plugin_secret;
 pub(crate) mod prop_val_sub_index;
 mod query_index;
 #[cfg(feature = "db-redb")]
@@ -43,6 +44,7 @@ use crate::{
     db::{
         encoding::{decode_propvals, encode_propvals},
         plugin_meta::{PluginMeta, PluginMetaKey},
+        plugin_secret::{PluginSecret, PluginSecretInfo, PluginSecretKey},
         query_index::requires_query_index,
         val_prop_sub_index::find_in_val_prop_sub_index,
     },
@@ -2020,6 +2022,74 @@ impl Db {
 
     pub fn delete_plugin_meta(&self, key: &PluginMetaKey) -> AtomicResult<()> {
         self.kv.remove(Tree::PluginMeta, &key.encode()?)?;
+        Ok(())
+    }
+
+    /// Stores a secret, replacing any of the same name.
+    ///
+    /// There is deliberately no `get_plugin_secret` returning a value. The only
+    /// reader is [`Db::use_plugin_secret`], which hands the value to a closure
+    /// and never out of it, so no endpoint can serve one by accident.
+    pub fn set_plugin_secret(
+        &self,
+        key: &PluginSecretKey,
+        secret: &PluginSecret,
+    ) -> AtomicResult<()> {
+        PluginSecretKey::validate_name(&key.name)?;
+        self.kv
+            .insert(Tree::PluginSecret, &key.encode()?, &secret.encode()?)?;
+        Ok(())
+    }
+
+    /// Runs `f` with the secret's value if it exists and allows `origin`.
+    ///
+    /// Records the use before returning, so "used 0 times in 90 days" is a
+    /// question the UI can answer when someone is deciding whether to revoke.
+    pub fn use_plugin_secret<T>(
+        &self,
+        key: &PluginSecretKey,
+        origin: &str,
+        at: i64,
+        f: impl FnOnce(&str) -> T,
+    ) -> AtomicResult<Option<T>> {
+        let encoded_key = key.encode()?;
+
+        let Some(bin) = self.kv.get(Tree::PluginSecret, &encoded_key)? else {
+            return Ok(None);
+        };
+
+        let mut secret = PluginSecret::from_bytes(&bin)?;
+
+        if !secret.allows(origin) {
+            return Ok(None);
+        }
+
+        let out = f(&secret.value);
+
+        secret.record_use(at);
+        self.kv
+            .insert(Tree::PluginSecret, &encoded_key, &secret.encode()?)?;
+
+        Ok(Some(out))
+    }
+
+    /// What may be said about a secret: never its value.
+    pub fn get_plugin_secret_info(
+        &self,
+        key: &PluginSecretKey,
+    ) -> AtomicResult<Option<PluginSecretInfo>> {
+        let Some(bin) = self.kv.get(Tree::PluginSecret, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PluginSecretInfo::of(
+            &key.name,
+            &PluginSecret::from_bytes(&bin)?,
+        )))
+    }
+
+    pub fn delete_plugin_secret(&self, key: &PluginSecretKey) -> AtomicResult<()> {
+        self.kv.remove(Tree::PluginSecret, &key.encode()?)?;
         Ok(())
     }
 
