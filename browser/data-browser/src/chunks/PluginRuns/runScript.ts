@@ -5,6 +5,7 @@ import {
   findSchema,
   planHostFromStore,
   planVerdict,
+  parseVerdict,
   pluginSchema,
   recordRun,
   runPlugin,
@@ -12,12 +13,14 @@ import {
   type EnsuredSchema,
   type RunPlan,
   type RunTrigger,
+  type Verdict,
   server,
   useStore,
   type Store,
 } from '@tomic/react';
 import pluginWorkerUrl from '@tomic/lib/plugin-run.worker.js?url';
 import { useEffect, useState } from 'react';
+import { signRequest } from '@tomic/react';
 
 /**
  * Running a plugin and applying what it proposed are separate calls on purpose.
@@ -194,6 +197,8 @@ export interface PreparedRun {
   plan: RunPlan;
   trigger: RunTrigger;
   timedOut: boolean;
+  /** True when the run happened on the server rather than in a Worker. */
+  serverPlaced: boolean;
 }
 
 /**
@@ -207,19 +212,113 @@ export async function prepareRun(
   store: Store,
   source: string,
   trigger: RunTrigger,
+  target?: { plugin: string; drive: string },
 ): Promise<PreparedRun> {
-  const { verdict, timedOut } = await runPlugin(
-    source,
-    { trigger },
-    {
-      createWorker: () =>
-        new Worker(pluginWorkerUrl, { type: 'module' }) as never,
-    },
-  );
+  // A plugin that reaches the network or spends a credential cannot run in the
+  // browser: the sandbox has no I/O, and a secret the page could read would not
+  // be a secret. Placement follows from that rather than being configured.
+  const serverPlaced = target ? await needsServer(store, target) : false;
+
+  const { verdict, timedOut } = serverPlaced
+    ? await runOnServer(store, source, trigger, target!)
+    : await runPlugin(
+        source,
+        { trigger },
+        {
+          createWorker: () =>
+            new Worker(pluginWorkerUrl, { type: 'module' }) as never,
+        },
+      );
 
   const plan = await planVerdict(verdict, planHostFromStore(store));
 
-  return { plan, trigger, timedOut };
+  return { plan, trigger, timedOut, serverPlaced };
+}
+
+/**
+ * A plugin belongs on the server once it has a secret: that is the only way it
+ * can reach anything, and the browser could never hold one.
+ */
+async function needsServer(
+  store: Store,
+  target: { plugin: string; drive: string },
+): Promise<boolean> {
+  const agent = store.getAgent();
+
+  if (!agent) return false;
+
+  const url = `${store.getServerUrl()}/plugin-secret?drive=${encodeURIComponent(
+    target.drive,
+  )}&plugin=${encodeURIComponent(target.plugin)}`;
+
+  try {
+    const response = await fetch(url, {
+      headers: await signRequest(url, agent, {}),
+    });
+
+    if (!response.ok) return false;
+
+    const view = (await response.json()) as { secrets?: unknown[] };
+
+    return (view.secrets?.length ?? 0) > 0;
+  } catch {
+    // Unreachable server: fall back to the browser, where the plugin will fail
+    // on its own terms rather than on a failed capability probe.
+    return false;
+  }
+}
+
+/** Runs in the embedded WASM runtime, which has the guards and the secrets. */
+async function runOnServer(
+  store: Store,
+  source: string,
+  trigger: RunTrigger,
+  target: { plugin: string; drive: string },
+): Promise<{ verdict: Verdict; timedOut: boolean }> {
+  const agent = store.getAgent();
+
+  if (!agent) throw new Error('Not signed in');
+
+  const url = `${store.getServerUrl()}/plugin-run`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...(await signRequest(url, agent, {})),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      drive: target.drive,
+      plugin: target.plugin,
+      source,
+      input: JSON.stringify({ trigger }),
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`${response.status} ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as {
+    verdict?: string;
+    error?: string;
+  };
+
+  if (body.error !== undefined || body.verdict === undefined) {
+    return {
+      verdict: {
+        intents: [],
+        problems: [
+          {
+            severity: 'error',
+            message: body.error ?? 'the run produced nothing',
+          },
+        ],
+      },
+      timedOut: false,
+    };
+  }
+
+  return { verdict: parseVerdict(JSON.parse(body.verdict)), timedOut: false };
 }
 
 export interface AppliedRun {

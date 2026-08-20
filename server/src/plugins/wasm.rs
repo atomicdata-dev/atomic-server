@@ -586,12 +586,6 @@ impl WasmPlugin {
     }
 }
 
-/// A plugin's fetch is a background job's worth of patience, not a user's.
-const FETCH_TIMEOUT_SECS: u64 = 30;
-/// Enough for an API page, far short of letting a plugin stream a disk image
-/// into the host's memory.
-const FETCH_MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
-
 struct PluginHostState {
     table: ResourceTable,
     ctx: WasiCtx,
@@ -800,7 +794,9 @@ impl bindings::atomic::class_extender::host::Host for PluginHostState {
             .map_err(|e| format!("not an HTTP method: {e}"))?;
 
         let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(FETCH_TIMEOUT_SECS))
+            .timeout(std::time::Duration::from_secs(
+                crate::plugins::egress::FETCH_TIMEOUT_SECS,
+            ))
             // Every redirect would need re-checking against the allowlist and
             // the address rules, and credential headers would have to be
             // dropped crossing origins. Refusing to follow them is the honest
@@ -841,10 +837,11 @@ impl bindings::atomic::class_extender::host::Host for PluginHostState {
             .await
             .map_err(|e| format!("could not read the response from {origin}: {e}"))?;
 
-        if bytes.len() > FETCH_MAX_RESPONSE_BYTES {
+        if bytes.len() > crate::plugins::egress::FETCH_MAX_RESPONSE_BYTES {
             return Err(format!(
-                "{origin} returned {} bytes, over the limit of {FETCH_MAX_RESPONSE_BYTES}",
+                "{origin} returned {} bytes, over the limit of {}",
                 bytes.len(),
+                crate::plugins::egress::FETCH_MAX_RESPONSE_BYTES,
             ));
         }
 

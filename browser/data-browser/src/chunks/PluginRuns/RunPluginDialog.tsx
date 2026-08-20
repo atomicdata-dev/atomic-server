@@ -91,11 +91,12 @@ export function RunPluginDialog({
         | string
         | undefined;
 
-      const result = await prepareRun(store, source ?? '', {
-        kind: 'manual',
-        at: Date.now(),
-        subject,
-      });
+      const result = await prepareRun(
+        store,
+        source ?? '',
+        { kind: 'manual', at: Date.now(), subject },
+        { plugin: subject, drive },
+      );
 
       if (!cancelled) setPrepared(result);
     })().catch((e: Error) => {

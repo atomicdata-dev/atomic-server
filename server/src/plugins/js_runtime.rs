@@ -166,16 +166,138 @@ pub fn embedded_runtime() -> AtomicServerResult<Arc<JsRuntime>> {
     Ok(Arc::new(JsRuntime::from_bytes(EMBEDDED)?))
 }
 
-/// Adapts a store to what a plugin may do. Not yet wired to secrets or the
-/// egress guard; those arrive with the endpoint that uses this.
+/// What a server-placed plugin may do.
+///
+/// Every capability here already exists as guarded host code; this only decides
+/// which of them a plugin gets and under whose name.
 pub struct StoreHost {
     pub db: Arc<Db>,
+    /// Whose secrets may be spent, and whose origins bound the fetch.
+    pub plugin: String,
+    pub drive: String,
+}
+
+impl StoreHost {
+    /// Origins this plugin may reach.
+    ///
+    /// Taken from the origins its secrets are scoped to. That makes "can reach"
+    /// and "has a credential for" the same thing, which is right for an
+    /// importer and wrong for a public API needing no auth — the latter is not
+    /// reachable yet. A declared-origins field on the plugin belongs here once
+    /// there is a bootstrapped property to put it in.
+    fn allowed_origins(&self) -> Vec<String> {
+        self.db
+            .list_plugin_secrets(&self.drive, &self.plugin)
+            .map(|secrets| {
+                secrets
+                    .into_iter()
+                    .flat_map(|secret| secret.origins)
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct JsRequest {
+    #[serde(default = "default_method")]
+    method: String,
+    url: String,
+    #[serde(default)]
+    headers: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    body: Option<String>,
+}
+
+fn default_method() -> String {
+    "GET".to_string()
 }
 
 #[async_trait::async_trait]
 impl PluginHost for StoreHost {
-    async fn fetch(&mut self, _request: String) -> Result<String, String> {
-        Err("fetch is not wired up for this placement yet".to_string())
+    async fn fetch(&mut self, request: String) -> Result<String, String> {
+        use crate::plugins::egress;
+
+        let request: JsRequest =
+            serde_json::from_str(&request).map_err(|e| format!("not a request: {e}"))?;
+
+        if let Some(refusal) =
+            egress::refuse_misplaced_handles(&request.url, request.body.as_deref())
+        {
+            return Err(refusal);
+        }
+
+        let url = url::Url::parse(&request.url).map_err(|e| format!("not a URL: {e}"))?;
+        let origin = egress::origin_of(&url)?;
+
+        if !self.allowed_origins().iter().any(|o| o == &origin) {
+            return Err(format!(
+                "this plugin has no secret scoped to {origin}, so it cannot reach it",
+            ));
+        }
+
+        if let Some(refusal) = egress::refuse_url(&request.url).await {
+            tracing::warn!(url = %request.url, %refusal, "plugin fetch refused");
+
+            return Err(format!("cannot reach {origin}: {refusal}"));
+        }
+
+        let db = self.db.clone();
+        let drive = self.drive.clone();
+        let plugin = self.plugin.clone();
+        let now = atomic_lib::utils::now();
+
+        let headers = egress::substitute_headers(request.headers.into_iter().collect(), |name| {
+            let key = atomic_lib::db::plugin_secret::PluginSecretKey::new(&drive, &plugin, name);
+
+            db.use_plugin_secret(&key, &origin, now, |value| value.to_string())
+                .ok()
+                .flatten()
+        })?;
+
+        let method = reqwest::Method::from_bytes(request.method.as_bytes())
+            .map_err(|e| format!("not an HTTP method: {e}"))?;
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(egress::FETCH_TIMEOUT_SECS))
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .map_err(|e| format!("could not build an HTTP client: {e}"))?;
+
+        let mut outgoing = client.request(method, url);
+
+        for (name, value) in headers {
+            outgoing = outgoing.header(name, value);
+        }
+
+        if let Some(body) = request.body {
+            outgoing = outgoing.body(body);
+        }
+
+        let response = outgoing
+            .send()
+            .await
+            .map_err(|e| format!("request to {origin} failed: {e}"))?;
+
+        let status = response.status().as_u16();
+        let bytes = response
+            .bytes()
+            .await
+            .map_err(|e| format!("could not read the response from {origin}: {e}"))?;
+
+        if bytes.len() > egress::FETCH_MAX_RESPONSE_BYTES {
+            return Err(format!(
+                "{origin} returned {} bytes, over the limit of {}",
+                bytes.len(),
+                egress::FETCH_MAX_RESPONSE_BYTES,
+            ));
+        }
+
+        serde_json::to_string(&serde_json::json!({
+            "status": status,
+            "body": String::from_utf8_lossy(&bytes),
+        }))
+        .map_err(|e| e.to_string())
     }
 
     async fn get_resource(&mut self, subject: String) -> Result<String, String> {
@@ -190,8 +312,18 @@ impl PluginHost for StoreHost {
         resource.to_json_ad(None).map_err(|e| e.to_string())
     }
 
-    async fn query(&mut self, _property: String, _value: String) -> Result<String, String> {
-        Err("query is not wired up for this placement yet".to_string())
+    async fn query(&mut self, property: String, value: String) -> Result<String, String> {
+        use atomic_lib::Storelike;
+
+        let query = atomic_lib::storelike::Query {
+            property: Some(property),
+            value: Some(atomic_lib::Value::String(value)),
+            ..Default::default()
+        };
+
+        let result = self.db.query(&query).await.map_err(|e| e.to_string())?;
+
+        serde_json::to_string(&result.subjects).map_err(|e| e.to_string())
     }
 }
 

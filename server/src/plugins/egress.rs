@@ -14,6 +14,12 @@
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
+/// A plugin's fetch is a background job's worth of patience, not a user's.
+pub const FETCH_TIMEOUT_SECS: u64 = 30;
+/// Enough for an API page, far short of letting a plugin stream a disk image
+/// into the host's memory.
+pub const FETCH_MAX_RESPONSE_BYTES: usize = 8 * 1024 * 1024;
+
 /// Why an address was refused. The plugin sees only that it was; this is for
 /// the host's log, where "which range" is the question worth answering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
