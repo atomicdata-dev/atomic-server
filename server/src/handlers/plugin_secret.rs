@@ -11,7 +11,10 @@
 
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
-    db::plugin_secret::{PluginSecret, PluginSecretKey},
+    db::{
+        plugin_meta::PluginMetaKey,
+        plugin_secret::{PluginSecret, PluginSecretInfo, PluginSecretKey},
+    },
     hierarchy::check_write,
     Storelike,
 };
@@ -37,6 +40,57 @@ pub struct SecretQuery {
     pub plugin: String,
     /// Only for delete.
     pub name: Option<String>,
+}
+
+/// What the UI needs in one request: which origins this plugin may reach at
+/// all, and which secrets exist. Without the first, "store a secret" is a form
+/// with nowhere to send it.
+#[derive(serde::Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SecretsView {
+    pub declared_origins: Vec<String>,
+    pub secrets: Vec<PluginSecretInfo>,
+}
+
+/// A plugin's manifest is keyed by namespace and name, which the plugin
+/// resource carries.
+fn declared_origins(
+    appstate: &AppState,
+    drive: &str,
+    plugin: &atomic_lib::Resource,
+) -> Vec<String> {
+    let field = |prop: &str| {
+        plugin
+            .get(prop)
+            .ok()
+            .and_then(|v| v.to_string().into())
+            .unwrap_or_default()
+    };
+
+    let namespace: String = field(atomic_lib::urls::NAMESPACE);
+    let name: String = field(atomic_lib::urls::NAME);
+
+    appstate
+        .store
+        .get_plugin_meta(&PluginMetaKey::new(drive, &namespace, &name))
+        .ok()
+        .flatten()
+        .and_then(|meta| meta.manifest.network)
+        .map(|network| network.origins)
+        .unwrap_or_default()
+}
+
+async fn view(
+    appstate: &AppState,
+    drive: &str,
+    plugin_subject: &str,
+) -> AtomicServerResult<SecretsView> {
+    let plugin = appstate.store.get_resource(&plugin_subject.into()).await?;
+
+    Ok(SecretsView {
+        declared_origins: declared_origins(appstate, drive, &plugin),
+        secrets: appstate.store.list_plugin_secrets(drive, plugin_subject)?,
+    })
 }
 
 /// An origin and nothing else: no path, no query, no credentials in the URL.
@@ -118,11 +172,7 @@ pub async fn handle_set_secret(
         "stored a plugin secret",
     );
 
-    Ok(HttpResponse::Ok().json(
-        appstate
-            .store
-            .list_plugin_secrets(&body.drive, &body.plugin)?,
-    ))
+    Ok(HttpResponse::Ok().json(view(&appstate, &body.drive, &body.plugin).await?))
 }
 
 #[tracing::instrument(skip(appstate, req))]
@@ -133,11 +183,7 @@ pub async fn handle_list_secrets(
 ) -> AtomicServerResult<HttpResponse> {
     authorize(&appstate, req.headers(), &query.plugin).await?;
 
-    Ok(HttpResponse::Ok().json(
-        appstate
-            .store
-            .list_plugin_secrets(&query.drive, &query.plugin)?,
-    ))
+    Ok(HttpResponse::Ok().json(view(&appstate, &query.drive, &query.plugin).await?))
 }
 
 #[tracing::instrument(skip(appstate, req))]
@@ -153,11 +199,7 @@ pub async fn handle_delete_secret(
     let key = PluginSecretKey::new(&query.drive, &query.plugin, name);
     appstate.store.delete_plugin_secret(&key)?;
 
-    Ok(HttpResponse::Ok().json(
-        appstate
-            .store
-            .list_plugin_secrets(&query.drive, &query.plugin)?,
-    ))
+    Ok(HttpResponse::Ok().json(view(&appstate, &query.drive, &query.plugin).await?))
 }
 
 #[cfg(test)]
