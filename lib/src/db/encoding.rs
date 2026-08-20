@@ -132,6 +132,38 @@ impl crate::db::plugin_meta::PluginMeta {
     }
 }
 
+impl crate::db::plugin_secret::PluginSecret {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode PluginSecret: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::plugin_secret::PluginSecret> {
+        rmp_serde::from_slice(bytes)
+            .map_err(|e| format!("Failed to decode PluginSecret: {}", e).into())
+    }
+}
+
+impl crate::db::plugin_secret::PluginSecretKey {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode PluginSecretKey: {}", e))?;
+        Ok(buf)
+    }
+
+    /// Prefix shared by every secret of one plugin, for listing.
+    pub fn plugin_prefix(drive: &str, plugin: &str) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        (drive, plugin)
+            .serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode plugin secret prefix: {}", e))?;
+        Ok(buf)
+    }
+}
+
 impl crate::db::plugin_meta::PluginMetaKey {
     pub fn encode(&self) -> AtomicResult<Vec<u8>> {
         let mut buf = Vec::new();
