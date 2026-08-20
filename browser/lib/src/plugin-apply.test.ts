@@ -170,6 +170,67 @@ describe('applyPlan', () => {
   });
 });
 
+describe('links between resources this run creates', () => {
+  const linkedCreate = (subject: string, to: string): PlannedChange => ({
+    ...create(subject),
+    properties: [{ property: 'https://x/employer', to }],
+  });
+
+  it('creates the target before the resource that links to it', async () => {
+    const { host, log } = makeHost();
+
+    // The linking resource comes first and is not the target's child, so
+    // ordering by parent alone would have written a link to `_new:org`.
+    await applyPlan(
+      plan([linkedCreate('_new:person', '_new:org'), create('_new:org')]),
+      host,
+    );
+
+    expect(log.creates[0].propVals).toEqual({});
+    expect(log.creates[1].propVals).toEqual({
+      'https://x/employer': 'did:ad:real-1',
+    });
+  });
+
+  it('follows links nested in arrays', async () => {
+    const { host, log } = makeHost();
+
+    await applyPlan(
+      plan([
+        {
+          ...create('_new:person'),
+          properties: [{ property: 'https://x/tags', to: ['_new:tag'] }],
+        },
+        create('_new:tag'),
+      ]),
+      host,
+    );
+
+    expect(log.creates[1].propVals).toEqual({
+      'https://x/tags': ['did:ad:real-1'],
+    });
+  });
+
+  it('refuses to write a link to a create that never happened', async () => {
+    const { host } = makeHost();
+
+    // Two creates naming each other: no order satisfies both.
+    const report = await applyPlan(
+      plan([
+        linkedCreate('_new:a', '_new:b'),
+        linkedCreate('_new:b', '_new:a'),
+      ]),
+      host,
+      { continueOnError: true },
+    );
+
+    expect(report.failed).toBeGreaterThan(0);
+
+    const failure = report.outcomes.find(o => o.status === 'failed')!;
+    expect(failure.error).toContain('link to nothing');
+  });
+});
+
 describe('failures', () => {
   it('stops so dependents do not link to something that failed', async () => {
     const { host } = makeHost({
