@@ -11,6 +11,7 @@ import {
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
+import { BasicSelect } from '@components/forms/BasicSelect';
 
 /**
  * The credentials a plugin asked for.
@@ -48,6 +49,8 @@ interface PluginSecretsProps {
    * is the one who cannot find where to enter it.
    */
   mentioned: string[];
+  /** Origins its source requests, used when it did not declare one. */
+  candidateOrigins: string[];
 }
 
 export function PluginSecrets({
@@ -55,6 +58,7 @@ export function PluginSecrets({
   drive,
   declared,
   mentioned,
+  candidateOrigins,
 }: PluginSecretsProps): React.JSX.Element {
   const store = useStore();
   const [stored, setStored] = useState<SecretInfo[]>();
@@ -175,6 +179,7 @@ export function PluginSecrets({
         <UndeclaredSlot
           key={name}
           name={name}
+          candidateOrigins={candidateOrigins}
           stored={byName.get(name)}
           onStore={(value, origin) => store_({ name, origin }, value)}
           onRevoke={() => revoke(name)}
@@ -273,34 +278,37 @@ function SecretSlot({
 /**
  * A secret the source spends without declaring.
  *
- * Asks for the origin as well as the value, because nothing said where it may
- * be sent — and a credential with no origin can never be spent, so guessing
- * one would only fail later and less clearly.
+ * Where it may be sent is read from the URLs the plugin requests, so the usual
+ * case is one field — a value — with the origin stated rather than typed. It is
+ * only a question when the source asks more than one origin, or builds its URLs
+ * at runtime, and in both cases guessing would be worse than asking.
  */
 function UndeclaredSlot({
   name,
+  candidateOrigins,
   stored,
   onStore,
   onRevoke,
 }: {
   name: string;
+  candidateOrigins: string[];
   stored?: SecretInfo;
   onStore: (value: string, origin: string) => Promise<boolean>;
   onRevoke: () => void;
 }): React.JSX.Element {
   const [value, setValue] = useState('');
-  const [origin, setOrigin] = useState('');
+  const [chosen, setChosen] = useState(candidateOrigins[0] ?? '');
   const [busy, setBusy] = useState(false);
+
+  const only = candidateOrigins.length === 1 ? candidateOrigins[0] : undefined;
+  const origin = only ?? chosen;
 
   const submit = useCallback(async () => {
     setBusy(true);
     const ok = await onStore(value, origin);
     setBusy(false);
 
-    if (ok) {
-      setValue('');
-      setOrigin('');
-    }
+    if (ok) setValue('');
   }, [onStore, value, origin]);
 
   return (
@@ -310,8 +318,23 @@ function UndeclaredSlot({
           <Column gap='0.1rem'>
             <strong>{name}</strong>
             <Muted>
-              Used in the source as <code>secret:{name}</code>, but the plugin
-              does not declare it — so say which origin it may be sent to.
+              {only ? (
+                <>
+                  Used as <code>secret:{name}</code>, sent only to{' '}
+                  <code>{only}</code>. Undeclared, so this was read from the
+                  URLs it requests.
+                </>
+              ) : candidateOrigins.length > 1 ? (
+                <>
+                  Used as <code>secret:{name}</code>. This plugin requests
+                  several origins — pick the one this credential belongs to.
+                </>
+              ) : (
+                <>
+                  Used as <code>secret:{name}</code>. Its URLs are built at run
+                  time, so say which origin it may be sent to.
+                </>
+              )}
             </Muted>
           </Column>
           {stored && (
@@ -341,13 +364,27 @@ function UndeclaredSlot({
                 onChange={e => setValue(e.target.value)}
               />
             </GrowingInput>
-            <GrowingInput>
-              <InputStyled
-                placeholder='https://api.example.com'
-                value={origin}
-                onChange={e => setOrigin(e.target.value)}
-              />
-            </GrowingInput>
+            {candidateOrigins.length > 1 && (
+              <BasicSelect
+                value={chosen}
+                onChange={e => setChosen(e.target.value)}
+              >
+                {candidateOrigins.map(candidate => (
+                  <option key={candidate} value={candidate}>
+                    {candidate}
+                  </option>
+                ))}
+              </BasicSelect>
+            )}
+            {candidateOrigins.length === 0 && (
+              <GrowingInput>
+                <InputStyled
+                  placeholder='https://api.example.com'
+                  value={chosen}
+                  onChange={e => setChosen(e.target.value)}
+                />
+              </GrowingInput>
+            )}
             <Button
               disabled={value.length === 0 || origin.length === 0 || busy}
               onClick={submit}
