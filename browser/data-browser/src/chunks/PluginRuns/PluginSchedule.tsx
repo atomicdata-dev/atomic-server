@@ -7,6 +7,7 @@ import { setPluginSchedule } from './runScript';
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
 import { BasicSelect } from '@components/forms/BasicSelect';
+import { Checkbox } from '@components/forms/Checkbox';
 
 /**
  * Running a plugin when nobody is watching.
@@ -22,6 +23,8 @@ interface ScheduleInfo {
   lastRunAt: number | null;
   pendingVerdict: string | null;
   lastError: string | null;
+  /** Present once someone has allowed background runs to write. */
+  autoApply: { agent: string; grantedAt: number } | null;
 }
 
 /** Intervals worth offering. Below a minute the server refuses anyway. */
@@ -87,6 +90,28 @@ export function PluginSchedule({
     [store, drive, plugin, load],
   );
 
+  const setAutoApply = useCallback(
+    async (enabled: boolean) => {
+      const result = await request(
+        store,
+        `${store.getServerUrl()}/plugin-auto-apply`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ drive, plugin, enabled }),
+        },
+      );
+
+      if (!result.ok) {
+        toast.error(result.error);
+
+        return;
+      }
+
+      setSchedule(result.body as ScheduleInfo | null);
+    },
+    [store, drive, plugin],
+  );
+
   const clearPending = useCallback(async () => {
     const result = await request(store, `${endpoint}?${params}`, {
       method: 'DELETE',
@@ -143,6 +168,23 @@ export function PluginSchedule({
           </Muted>
         )}
       </Row>
+
+      {schedule && (
+        <Checkbox.Label>
+          <Checkbox
+            checked={schedule.autoApply !== null}
+            onChange={setAutoApply}
+          />
+          <Column gap='0.1rem'>
+            <span>Apply background runs without asking me</span>
+            <Muted>
+              {schedule.autoApply
+                ? `Allowed by ${schedule.autoApply.agent}. Every write is still checked against what that account may change.`
+                : 'Available once you have run this plugin and applied its changes at least once.'}
+            </Muted>
+          </Column>
+        </Checkbox.Label>
+      )}
 
       {schedule?.lastError && (
         <Failed>The last background run failed: {schedule.lastError}</Failed>
