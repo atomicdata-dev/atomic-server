@@ -468,6 +468,43 @@ export async function applyRun(
   return { report, logged };
 }
 
+/**
+ * Sets or clears how often a plugin runs unattended.
+ *
+ * Shared by the page and the assistant so there is one place that knows the
+ * endpoint's shape — and so scheduling means the same thing however it is
+ * asked for.
+ */
+export async function setPluginSchedule(
+  store: Store,
+  target: { plugin: string; drive: string },
+  intervalSeconds: number | null,
+): Promise<void> {
+  const agent = store.getAgent();
+
+  if (!agent) throw new Error('Not signed in');
+
+  const url = `${store.getServerUrl()}/plugin-schedule`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      ...(await signRequest(url, agent, {})),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      drive: target.drive,
+      plugin: target.plugin,
+      intervalSeconds,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      errorMessageFromResponse(await response.text(), response.status),
+    );
+  }
+}
+
 /** Records a run that was refused, so the refusal is findable later. */
 export async function recordBlockedRun(
   store: Store,
