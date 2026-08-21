@@ -150,6 +150,7 @@ export async function createPlugin(
   store: Store,
   target: { parent: string; drive: string },
   name = 'New plugin',
+  source = STARTER_SOURCE,
 ): Promise<string> {
   const schema = await pluginClassesFor(store, target.drive);
 
@@ -158,13 +159,26 @@ export async function createPlugin(
     isA: [schema.classes['plugin-script']],
     propVals: {
       'https://atomicdata.dev/properties/name': name,
-      [schema.properties['plugin-source']]: STARTER_SOURCE,
+      [schema.properties['plugin-source']]: source,
       [schema.properties.trigger]: 'manual',
     },
   });
   await plugin.save();
 
   return plugin.subject;
+}
+
+/** Replaces a plugin's source, for an author iterating on it. */
+export async function setPluginSource(
+  store: Store,
+  plugin: string,
+  drive: string,
+  source: string,
+): Promise<void> {
+  const schema = await pluginClassesFor(store, drive);
+  const resource = await store.getResource(plugin);
+  await resource.set(schema.properties['plugin-source'], source);
+  await resource.save();
 }
 
 /**

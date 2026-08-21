@@ -18,6 +18,11 @@ import { useAddToOntology } from '@hooks/useAddToOntology';
 import { constructOpenURL } from '@helpers/navigation';
 import { buildTableFromSpec } from '@chunks/TablePage/createTableFromSpec';
 import {
+  createPlugin,
+  prepareRun,
+  setPluginSource,
+} from '@chunks/PluginRuns/runScript';
+import {
   addTableColumns,
   configureView,
   describeTable,
@@ -88,6 +93,8 @@ export const TOOL_NAMES = {
   FAVORITE_RESOURCE: 'favorite_resource',
   OPEN_SHARE_SETTINGS: 'open_share_settings',
   SHOW_HISTORY: 'show_history',
+  CREATE_PLUGIN: 'create_plugin',
+  RUN_PLUGIN: 'run_plugin',
 } as const;
 
 /** One column of a table, in the compact vocabulary `create_table` uses. */
@@ -1372,6 +1379,111 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
           }
         },
         strict: true,
+      }),
+      [TOOL_NAMES.CREATE_PLUGIN]: tool({
+        description:
+          "Create or update a plugin: JavaScript that proposes changes for the user to review. Use this for imports from an external service, or any repeatable transformation of the user's data. " +
+          "A plugin is a JavaScript module that PROPOSES changes and never writes. It must `export function run(ctx)` returning `{ intents: [...], problems: [...] }`. Intents are the only way to change data: `{op:'create', localId, parent, isA:[classSubject], set:{[propertySubject]: value}}`, `{op:'set', subject, set:{...}}`, `{op:'remove', subject, properties:[...]}`, `{op:'destroy', subject}`. Refer to something the same run creates as `'local:<localId>'` — links resolve in any order. Property and class keys are full subjects; use get_user_classes or create a table first if you need them. Problems are `{severity:'error'|'warning', message}`; an error blocks the whole run. \n\nWhat ctx gives you: `ctx.trigger.at` (the ONLY clock — Date.now() is frozen to it and Math.random is seeded, so runs are reproducible), `ctx.http({method,url,headers,body})` returning `{status, body}`, `ctx.read(subject)`, `ctx.query(property, value)`. There is no fetch, no process, no filesystem. \n\nCredentials: put `'Bearer secret:<name>'` in a HEADER VALUE and the host substitutes the real value; the plugin never sees it. A `secret:` handle in a URL or body is refused. The user stores secrets on the plugin's page, naming the origin — you cannot store one, and a plugin only reaches the network once it has one. So: write the plugin, then ask the user to add the secret and name the origin.",
+        inputSchema: z.object({
+          name: z.string().describe('Display name of the plugin.'),
+          source: z
+            .string()
+            .describe(
+              'The full JavaScript module, exporting `run(ctx)`. Replaces the previous source when `plugin` is given.',
+            ),
+          plugin: z
+            .string()
+            .optional()
+            .describe(
+              'Subject of an existing plugin to update. Omit to create a new one.',
+            ),
+          parent: z
+            .string()
+            .optional()
+            .describe('Where to create it. Defaults to the current drive.'),
+        }),
+        execute: async ({ name, source, plugin, parent }) => {
+          try {
+            if (plugin) {
+              const subject = expandSubject(plugin);
+              await setPluginSource(store, subject, drive, source);
+
+              return { plugin: shortenSubject(subject), updated: true };
+            }
+
+            const subject = await createPlugin(
+              store,
+              { parent: parent ? expandSubject(parent) : drive, drive },
+              name,
+              source,
+            );
+
+            return {
+              plugin: shortenSubject(subject),
+              created: true,
+              next: 'Run it with run_plugin to see what it proposes. If it needs a credential, ask the user to add a secret on the plugin page and name the origin.',
+            };
+          } catch (e) {
+            return { error: (e as Error).message };
+          }
+        },
+      }),
+      [TOOL_NAMES.RUN_PLUGIN]: tool({
+        description:
+          'Run a plugin and see what it proposes, WITHOUT writing anything. Use this after create_plugin to check your work, and again after each fix — the problems it returns are how you correct the plugin. Nothing is written: the user reviews and approves the changes themselves.',
+        inputSchema: z.object({
+          plugin: z.string().describe('Subject of the plugin to run.'),
+        }),
+        execute: async ({ plugin }) => {
+          try {
+            const subject = expandSubject(plugin);
+            const resource = await store.getResource(subject);
+            const source = Object.entries(resource.getPropVals()).find(
+              ([, value]) =>
+                typeof value === 'string' && value.includes('function run'),
+            )?.[1] as string | undefined;
+
+            if (!source) {
+              return { error: 'That resource has no plugin source.' };
+            }
+
+            const prepared = await prepareRun(
+              store,
+              source,
+              { kind: 'manual', at: Date.now(), subject },
+              { plugin: subject, drive },
+            );
+
+            const { plan } = prepared;
+
+            return {
+              placement: prepared.serverPlaced ? 'server' : 'browser',
+              blocked: plan.blocked,
+              // Problems are the feedback loop: they name the property that
+              // does not exist, the datatype that does not match, the secret
+              // that is not there.
+              problems: [
+                ...plan.problems,
+                ...plan.changes.flatMap(c => c.problems),
+              ].slice(0, 25),
+              // Enough of the diff to check the mapping, not the whole import.
+              changes: plan.changes.slice(0, 10).map(change => ({
+                op: change.op,
+                subject: change.localId ?? shortenSubject(change.subject),
+                properties: change.properties.map(p => ({
+                  property: p.shortname ?? p.property,
+                  to: p.to,
+                })),
+              })),
+              totalChanges: plan.changes.length,
+              next: plan.blocked
+                ? 'Fix the errors and call create_plugin again with the corrected source.'
+                : 'Looks runnable. Tell the user to open the plugin and press Run to review and apply it.',
+            };
+          } catch (e) {
+            return { error: (e as Error).message };
+          }
+        },
       }),
       [TOOL_NAMES.CREATE_TABLE]: tool({
         description:
