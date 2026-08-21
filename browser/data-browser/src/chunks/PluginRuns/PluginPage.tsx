@@ -11,6 +11,7 @@ import { useNavigateWithTransition } from '@hooks/useNavigateWithTransition';
 import { editURL } from '@helpers/navigation';
 import { PluginSecrets } from './PluginSecrets';
 import { PluginRunHistory } from './PluginRunHistory';
+import { PluginSchedule } from './PluginSchedule';
 import { RunPluginDialog } from './RunPluginDialog';
 import { usePluginManifest, usePluginSource } from './runScript';
 import { originsMentionedIn, secretsMentionedIn } from '@tomic/react';
@@ -36,10 +37,17 @@ export function PluginPage({
   const store = useStore();
   const navigate = useNavigateWithTransition();
   const [running, setRunning] = useState<boolean>();
+  // Set when reviewing what a background run produced, so the dialog plans
+  // that verdict instead of running the plugin again.
+  const [reviewing, setReviewing] = useState<string>();
+  const [reviewedNonce, setReviewedNonce] = useState(0);
   const source = usePluginSource(store, resource.subject, drive);
   const manifest = usePluginManifest(source);
 
-  const run = useCallback(() => setRunning(true), []);
+  const run = useCallback(() => {
+    setReviewing(undefined);
+    setRunning(true);
+  }, []);
 
   return (
     <ContainerWide>
@@ -66,6 +74,16 @@ export function PluginPage({
           candidateOrigins={originsMentionedIn(source ?? '')}
         />
 
+        <PluginSchedule
+          plugin={resource.subject}
+          drive={drive}
+          onReview={pending => {
+            setReviewing(pending);
+            setRunning(true);
+          }}
+          reviewedNonce={reviewedNonce}
+        />
+
         <PluginRunHistory resource={resource} />
 
         <Column gap='0.5rem'>
@@ -84,7 +102,17 @@ export function PluginPage({
             resource={resource}
             drive={drive}
             show={running}
-            onShowChange={setRunning}
+            onShowChange={open => {
+              setRunning(open);
+
+              if (!open) setReviewing(undefined);
+            }}
+            verdict={reviewing}
+            onReviewed={
+              reviewing === undefined
+                ? undefined
+                : () => setReviewedNonce(n => n + 1)
+            }
           />
         )}
       </Column>

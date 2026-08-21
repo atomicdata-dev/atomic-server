@@ -9,6 +9,7 @@ import { LoaderBlock } from '@components/Loader';
 import {
   applyRun,
   pluginClassesFor,
+  prepareFromVerdict,
   prepareRun,
   recordBlockedRun,
   type PreparedRun,
@@ -46,6 +47,14 @@ interface RunPluginDialogProps {
   drive: string;
   show: boolean;
   onShowChange: (show: boolean) => void;
+  /**
+   * A verdict a background run already produced. Reviewing one must not run
+   * the plugin again: that would hit the API twice and could show a different
+   * diff from the one being approved.
+   */
+  verdict?: string;
+  /** Called once a reviewed background verdict has been dealt with. */
+  onReviewed?: () => void;
 }
 
 /**
@@ -60,6 +69,8 @@ export function RunPluginDialog({
   drive,
   show,
   onShowChange,
+  verdict,
+  onReviewed,
 }: RunPluginDialogProps): React.JSX.Element {
   const store = useStore();
   const [dialogProps, showDialog, closeDialog] = useDialog({
@@ -83,6 +94,18 @@ export function RunPluginDialog({
     let cancelled = false;
 
     (async () => {
+      if (verdict !== undefined) {
+        const result = await prepareFromVerdict(store, verdict, {
+          kind: 'cron',
+          at: Date.now(),
+          subject,
+        });
+
+        if (!cancelled) setPrepared(result);
+
+        return;
+      }
+
       const schema = await pluginClassesFor(store, drive);
       // Read through the store rather than the passed resource, so the effect
       // depends on a subject string instead of a proxy whose identity churns.
@@ -107,7 +130,7 @@ export function RunPluginDialog({
     return () => {
       cancelled = true;
     };
-  }, [show, subject, drive, store, closeDialog]);
+  }, [show, subject, drive, store, closeDialog, verdict]);
 
   const apply = useCallback(async () => {
     if (!prepared) return;
@@ -133,8 +156,9 @@ export function RunPluginDialog({
         ? `Applied ${report.applied}, ${report.failed} failed`
         : `Applied ${report.applied} changes`,
     );
+    onReviewed?.();
     closeDialog(true);
-  }, [prepared, store, subject, drive, closeDialog]);
+  }, [prepared, store, subject, drive, closeDialog, onReviewed]);
 
   const dismiss = useCallback(() => {
     // A refused run is still a run: record it so the refusal is findable.

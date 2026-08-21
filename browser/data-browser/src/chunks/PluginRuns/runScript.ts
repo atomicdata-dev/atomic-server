@@ -418,6 +418,24 @@ async function runOnServer(
   return { verdict: parseVerdict(JSON.parse(body.verdict)), timedOut: false };
 }
 
+/**
+ * Plans a verdict that already exists, without running anything.
+ *
+ * A background run happened hours ago; reviewing it should not run the plugin
+ * again. Doing so would hit the API a second time and could show a different
+ * diff from the one being approved.
+ */
+export async function prepareFromVerdict(
+  store: Store,
+  verdictJson: string,
+  trigger: RunTrigger,
+): Promise<PreparedRun> {
+  const verdict = parseVerdict(JSON.parse(verdictJson));
+  const plan = await planVerdict(verdict, planHostFromStore(store));
+
+  return { plan, trigger, timedOut: false, serverPlaced: true };
+}
+
 export interface AppliedRun {
   report: ApplyReport;
   /** Subject of the record this run left behind. */
