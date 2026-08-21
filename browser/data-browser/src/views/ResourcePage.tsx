@@ -1,6 +1,7 @@
 import { useEffect, useState, lazy, Suspense } from 'react';
 import {
   useResource,
+  useStore,
   Resource,
   type OptionalClass,
   dataBrowser,
@@ -41,6 +42,8 @@ import { PluginPage } from '@views/Plugin/PluginPage';
 import { useCustomViews } from '@components/CustomViewProvider';
 import { PluginView } from './PluginView/PluginView';
 import { MeetingPage } from './Meeting/MeetingPage';
+import { PluginPage as AtomicPluginPage } from '@chunks/PluginRuns/PluginPage';
+import { useIsPlugin } from '@chunks/PluginRuns/PluginSection';
 
 const TablePage = lazy(() =>
   import('../chunks/TablePage').then(m => ({ default: m.TablePage })),
@@ -69,6 +72,9 @@ const ResourcePage: React.FC<Props> = ({ subject }) => {
   const { getPluginForClass, loading } = useCustomViews();
   const [isAList] = useArray(resource, core.properties.isA);
   const isA = isAList[0];
+  const isPlugin = useIsPlugin(resource);
+  const store = useStore();
+  const drive = store.getDrive();
 
   // The body can have an inert attribute when the user navigated from an open dialog.
   // we remove it to make the page interactive again.
@@ -153,6 +159,20 @@ const ResourcePage: React.FC<Props> = ({ subject }) => {
 
   if (ReturnComponent === ResourcePageDefault) {
     if (loading) return null;
+
+    // A plugin's class is minted per drive, so it has no fixed subject and
+    // cannot be a case in `selectComponent`. It gets a real page all the same.
+    if (isPlugin) {
+      return (
+        <Main subject={subject}>
+          <ErrorBoundary>
+            <Suspense fallback={<Spinner />}>
+              <AtomicPluginPage resource={resource} drive={drive!} />
+            </Suspense>
+          </ErrorBoundary>
+        </Main>
+      );
+    }
 
     const plugin = getPluginForClass(isA);
 

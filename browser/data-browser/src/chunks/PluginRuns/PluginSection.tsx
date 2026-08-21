@@ -1,26 +1,15 @@
 import { useStore, type Resource } from '@tomic/react';
-import { PluginView } from './PluginView';
 import { usePluginClass } from './runScript';
 
 /**
- * Renders the plugin view, and only for a plugin.
+ * Whether this resource is a plugin.
  *
- * The default resource page is the fallback for anything without a dedicated
- * page, and a plugin lands there because its class is drive-local — a subject
- * that cannot be in `ResourcePage`'s static switch. So the check happens here.
+ * A plugin's class is created per drive, so it has no fixed subject and cannot
+ * appear in `ResourcePage`'s static switch. The check has to be a hook.
  */
-export function PluginSection({
-  resource,
-}: {
-  resource: Resource;
-}): React.JSX.Element | null {
+export function useIsPlugin(resource: Resource): boolean {
   const store = useStore();
-  const drive = store.getDrive();
-  const pluginClass = usePluginClass(drive);
+  const pluginClass = usePluginClass(store.getDrive());
 
-  if (pluginClass === undefined || !resource.hasClasses(pluginClass)) {
-    return null;
-  }
-
-  return <PluginView resource={resource} drive={drive!} />;
+  return pluginClass !== undefined && resource.hasClasses(pluginClass);
 }

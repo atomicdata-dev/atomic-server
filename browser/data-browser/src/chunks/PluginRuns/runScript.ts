@@ -6,6 +6,7 @@ import {
   planHostFromStore,
   planVerdict,
   parseVerdict,
+  describePlugin,
   pluginSchema,
   recordRun,
   runPlugin,
@@ -14,6 +15,7 @@ import {
   type RunPlan,
   type RunTrigger,
   type Verdict,
+  type PluginManifest,
   server,
   useStore,
   type Store,
@@ -245,6 +247,41 @@ export function usePluginSource(
   }, [store, plugin, drive]);
 
   return source;
+}
+
+/**
+ * What a plugin declares it needs, read from its own source.
+ *
+ * Evaluated in the sandbox rather than parsed, so the declaration is whatever
+ * the plugin actually exports — and a plugin that fails to load simply declares
+ * nothing, with the reason surfacing when it is run.
+ */
+export function usePluginManifest(source: string | undefined): PluginManifest {
+  const [manifest, setManifest] = useState<PluginManifest>({ secrets: [] });
+
+  useEffect(() => {
+    if (!source) {
+      setManifest({ secrets: [] });
+
+      return;
+    }
+
+    let cancelled = false;
+
+    void describePlugin(source, {
+      createWorker: () =>
+        new Worker(pluginWorkerUrl, { type: 'module' }) as never,
+      timeoutMs: 5000,
+    }).then(found => {
+      if (!cancelled) setManifest(found);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [source]);
+
+  return manifest;
 }
 
 export interface PreparedRun {
