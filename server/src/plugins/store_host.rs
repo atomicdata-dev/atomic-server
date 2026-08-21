@@ -57,6 +57,15 @@ impl StoreApplyHost {
 #[async_trait::async_trait]
 impl PlanHost for StoreApplyHost {
     fn create_subject(&mut self, parent: &str) -> String {
+        // A resource under a DID drive gets its identity from a genesis
+        // certificate, which cannot be guessed before it is signed. So the
+        // plan carries a placeholder and the applier reports back what the
+        // store actually minted — showing a plausible-looking URL that will
+        // never exist would be worse than showing an obvious placeholder.
+        if is_did(parent) {
+            return format!("_new:{}", ulid::Ulid::new().to_string().to_lowercase());
+        }
+
         format!(
             "{}/{}",
             parent.trim_end_matches('/'),
@@ -91,8 +100,7 @@ impl ApplyHost for StoreApplyHost {
     async fn create(&mut self, request: CreateRequest) -> Result<String, String> {
         self.may_write(&request.parent).await?;
 
-        let subject = self.create_subject(&request.parent);
-        let mut resource = Resource::new(subject.clone());
+        let mut resource = Resource::new(self.create_subject(&request.parent));
 
         resource
             .set_unsafe(
@@ -128,12 +136,20 @@ impl ApplyHost for StoreApplyHost {
                 .map_err(|e| e.to_string())?;
         }
 
-        resource
-            .save(&self.store)
-            .await
-            .map_err(|e| format!("could not create {subject}: {e}"))?;
+        if is_did(&request.parent) {
+            resource.save_as_genesis(&self.store).await.map_err(|e| {
+                format!("could not create a resource under {}: {e}", request.parent)
+            })?;
+        } else {
+            resource
+                .save(&self.store)
+                .await
+                .map_err(|e| format!("could not create {}: {e}", resource.get_subject()))?;
+        }
 
-        Ok(subject)
+        // Read the subject after saving: genesis mints it from the signature,
+        // so it is not knowable before.
+        Ok(resource.get_subject().to_string())
     }
 
     async fn set(&mut self, subject: &str, prop_vals: HashMap<String, Json>) -> Result<(), String> {
@@ -240,4 +256,10 @@ fn json_to_value(value: Json, datatype: &DataType) -> Result<Value, String> {
         (datatype, Json::String(text)) => Value::new(&text, datatype).map_err(|e| e.to_string()),
         (datatype, value) => Err(format!("{value} is not a {datatype}")),
     }
+}
+
+/// Whether resources under this parent are identified by genesis certificate
+/// rather than by path.
+fn is_did(subject: &str) -> bool {
+    subject.starts_with("did:")
 }

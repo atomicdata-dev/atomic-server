@@ -232,6 +232,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .route(web::delete().to(handlers::plugin_schedule::handle_clear_pending)),
     )
     .service(
+        web::resource("/plugin-auto-apply")
+            .guard(guard::Method(Method::POST))
+            .to(handlers::plugin_schedule::handle_set_auto_apply),
+    )
+    .service(
         web::resource("/plugin-secret")
             .route(web::post().to(handlers::plugin_secret::handle_set_secret))
             .route(web::get().to(handlers::plugin_secret::handle_list_secrets))

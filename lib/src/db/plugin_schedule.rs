@@ -35,6 +35,23 @@ impl PluginScheduleKey {
 /// is a worse outcome than the run being late.
 pub const MIN_INTERVAL_SECONDS: u64 = 60;
 
+/// Consent for a plugin to write without anyone looking.
+///
+/// Named after the agent who gave it, because that is what makes it
+/// answerable: the server signs the commit with its own key — the only one it
+/// holds — so the record of who agreed to these writes lives nowhere else.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoApplyGrant {
+    /// The agent whose rights every unattended write is checked against.
+    pub agent: String,
+    pub granted_at: i64,
+    /// The run that was reviewed before the grant was given. Kept so the
+    /// question "what did I actually look at when I agreed to this" has an
+    /// answer a year later.
+    pub reviewed_run: Option<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PluginSchedule {
     /// How often to run, in seconds.
@@ -48,6 +65,12 @@ pub struct PluginSchedule {
     /// Why the last run produced nothing. Kept so a plugin that has been
     /// failing silently for a week is visible rather than merely quiet.
     pub last_error: Option<String>,
+    /// When set, an unattended run writes instead of waiting for review.
+    ///
+    /// `default` so schedules stored before this existed still load — and they
+    /// load without the grant, which is the safe direction.
+    #[serde(default)]
+    pub auto_apply: Option<AutoApplyGrant>,
 }
 
 impl PluginSchedule {
@@ -65,6 +88,7 @@ impl PluginSchedule {
             last_run_at: None,
             pending_verdict: None,
             last_error: None,
+            auto_apply: None,
         })
     }
 
@@ -102,6 +126,7 @@ pub struct PluginScheduleInfo {
     pub last_run_at: Option<i64>,
     pub pending_verdict: Option<String>,
     pub last_error: Option<String>,
+    pub auto_apply: Option<AutoApplyGrant>,
 }
 
 impl From<&PluginSchedule> for PluginScheduleInfo {
@@ -112,6 +137,7 @@ impl From<&PluginSchedule> for PluginScheduleInfo {
             last_run_at: schedule.last_run_at,
             pending_verdict: schedule.pending_verdict.clone(),
             last_error: schedule.last_error.clone(),
+            auto_apply: schedule.auto_apply.clone(),
         }
     }
 }
