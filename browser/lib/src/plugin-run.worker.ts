@@ -29,7 +29,7 @@ const reply = (response: PluginRunResponse) =>
   ).postMessage(response);
 
 globalThis.onmessage = async (event: MessageEvent<PluginRunRequest>) => {
-  const { source, input, maxOutputBytes } = event.data;
+  const { source, input, maxOutputBytes, want } = event.data;
 
   const denial = denyAmbientGlobals(scope);
   applyDeterministicGlobals(scope, input);
@@ -47,6 +47,17 @@ globalThis.onmessage = async (event: MessageEvent<PluginRunRequest>) => {
           e instanceof Error ? `${e.name}: ${e.message}` : String(e)
         }`,
       },
+      undeniable: denial.undeniable,
+    });
+
+    return;
+  }
+
+  if (want === 'manifest') {
+    // The module has been evaluated, which is all a declaration needs.
+    reply({
+      ok: true,
+      json: JSON.stringify((module as { manifest?: unknown }).manifest ?? null),
       undeniable: denial.undeniable,
     });
 
