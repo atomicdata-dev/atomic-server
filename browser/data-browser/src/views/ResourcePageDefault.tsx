@@ -22,7 +22,6 @@ import { Button } from '../components/Button';
 import { Column, Row } from '../components/Row';
 import { useNavigateWithTransition } from '../hooks/useNavigateWithTransition';
 import { editURL } from '../helpers/navigation';
-import { PluginSection } from '@chunks/PluginRuns/PluginSection';
 
 import type { JSX } from 'react';
 
@@ -96,9 +95,6 @@ export function ResourcePageDefault({
             editable
             columns
           />
-          {/* Only renders for plugins: the source, a Run button, its secrets
-              and what it did. Nothing else on this page answers those. */}
-          <PluginSection resource={resource} />
         </Column>
       </ContainerNarrow>
     </>

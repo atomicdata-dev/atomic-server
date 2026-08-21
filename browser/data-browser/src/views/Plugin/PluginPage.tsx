@@ -26,7 +26,6 @@ import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
 import { ConfigReference } from './ConfigReference';
 import { AssignRights } from './AssignRights';
-import { PluginSecrets } from './PluginSecrets';
 import { PluginPermissions } from './PluginPermissions';
 import { hasPermission, isPluginPermissions } from './pluginUtils';
 
@@ -82,7 +81,9 @@ export const PluginPage: React.FC<ResourcePageProps<Server.Plugin>> = ({
         {canWrite && (
           <AssignRights plugin={resource} disabled={hasFullDriveAccess} />
         )}
-        {canWrite && <PluginSecrets plugin={resource} drive={parent ?? ''} />}
+        {/* Secrets are declared by name in a plugin's source; a WASM plugin's
+            manifest carries origins but no names, so it has nothing to render
+            slots from yet. The endpoint still serves it. */}
         <Column>
           <Row center justify='space-between'>
             <h3 id={configLabelId}>
