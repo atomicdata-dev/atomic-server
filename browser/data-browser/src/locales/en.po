@@ -4882,6 +4882,7 @@ msgstr ""
 "Work in progress. Resources here are visible to people who can write to this "
 "drive, and are published by moving them somewhere publicly readable."
 
+#: src/chunks/PluginRuns/PluginSchedule.tsx
 #: src/components/ForkBar.tsx
 msgid "Discard"
 msgstr "Discard"
@@ -6767,7 +6768,10 @@ msgstr "Store it with "
 msgid "Could not store your backup with {0}."
 msgstr "Could not store your backup with {0}."
 
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
 #: src/components/AccountRecoveryCard.tsx
+#: src/views/Plugin/PluginSecrets.tsx
 msgid "Storing…"
 msgstr "Storing…"
 
@@ -7656,7 +7660,9 @@ msgstr ""
 "Create a plugin here. It proposes changes that you review before anything is "
 "written."
 
+#: src/chunks/PluginRuns/PluginPage.tsx
 #: src/chunks/PluginRuns/PluginRunHistory.tsx
+#: src/chunks/PluginRuns/PluginView.tsx
 msgid "Loading…"
 msgstr "Loading…"
 
@@ -8142,3 +8148,195 @@ msgstr "{0} failed"
 
 #~ msgid "{0} problems"
 #~ msgstr "{0} problems"
+
+#. 0: secret.name
+#. 0: name
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "Stored {0}"
+msgstr "Stored {0}"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "<0/> Secrets"
+msgstr "<0/> Secrets"
+
+#. 0: secret.name
+#. 0: name
+#. 0: secret.name
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "Revoke {0}"
+msgstr "Revoke {0}"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "Store"
+msgstr "Store"
+
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "A secret is sent only to the origin you name here, and moves this plugin to the server so it can reach it. The plugin uses it as"
+msgstr "A secret is sent only to the origin you name here, and moves this plugin to the server so it can reach it. The plugin uses it as"
+
+#: src/views/Plugin/PluginSecrets.tsx
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "and never sees the value."
+msgstr "and never sees the value."
+
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "Sent only to"
+msgstr "Sent only to"
+
+#: src/views/Plugin/PluginSecrets.tsx
+msgid ". Stored on the server and never shown again — the plugin uses it as"
+msgstr ". Stored on the server and never shown again — the plugin uses it as"
+
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "No secrets stored."
+msgstr "No secrets stored."
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/views/Plugin/PluginSecrets.tsx
+msgid "Not signed in"
+msgstr "Not signed in"
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+#: src/chunks/PluginRuns/PluginView.tsx
+msgid "Source"
+msgstr "Source"
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+#: src/chunks/PluginRuns/PluginView.tsx
+msgid "<0/> Run"
+msgstr "<0/> Run"
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+#: src/chunks/PluginRuns/PluginView.tsx
+msgid "This plugin has no source yet."
+msgstr "This plugin has no source yet."
+
+#: src/chunks/PluginRuns/PluginPage.tsx
+msgid "<0/> Edit"
+msgstr "<0/> Edit"
+
+#. 0: describeUse(secret)
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "No longer asked for by this plugin — {0}"
+msgstr "No longer asked for by this plugin — {0}"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "<0/> Revoke"
+msgstr "<0/> Revoke"
+
+#. 0: ' '
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "Sent only to <0/>. The plugin uses it as{0} <1/> and never sees the value."
+msgstr "Sent only to <0/>. The plugin uses it as{0} <1/> and never sees the value."
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "<0/> Stored"
+msgstr "<0/> Stored"
+
+#. 0: secret.name
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "Paste the value for {0}"
+msgstr "Paste the value for {0}"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "This plugin asks for no credentials. To use one, have it declare what it needs —"
+msgstr "This plugin asks for no credentials. To use one, have it declare what it needs —"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "— or reference"
+msgstr "— or reference"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "in a header and a slot will appear here."
+msgstr "in a header and a slot will appear here."
+
+#~ msgid "Used in the source as <0/>, but the plugin does not declare it — so say which origin it may be sent to."
+#~ msgstr "Used in the source as <0/>, but the plugin does not declare it — so say which origin it may be sent to."
+
+#. 0: name
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "Value for {0}"
+msgstr "Value for {0}"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid "Used as"
+msgstr "Used as"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid ", sent only to"
+msgstr ", sent only to"
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid ". Undeclared, so this was read from the URLs it requests."
+msgstr ". Undeclared, so this was read from the URLs it requests."
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid ". This plugin requests several origins — pick the one this credential belongs to."
+msgstr ". This plugin requests several origins — pick the one this credential belongs to."
+
+#: src/chunks/PluginRuns/PluginSecrets.tsx
+msgid ". Its URLs are built at run time, so say which origin it may be sent to."
+msgstr ". Its URLs are built at run time, so say which origin it may be sent to."
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "<0/> Schedule"
+msgstr "<0/> Schedule"
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Only when I press Run"
+msgstr "Only when I press Run"
+
+#. 0: new Date(schedule.lastRunAt).toLocaleString()
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Last ran {0}"
+msgstr "Last ran {0}"
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Has not run yet"
+msgstr "Has not run yet"
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "The last background run failed:"
+msgstr "The last background run failed:"
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "A background run has changes waiting"
+msgstr "A background run has changes waiting"
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "It ran without writing anything, because nothing is applied without you seeing it first."
+msgstr "It ran without writing anything, because nothing is applied without you seeing it first."
+
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Review"
+msgstr "Review"
+
+#. 0: seconds / 86400
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Every {0} day(s)"
+msgstr "Every {0} day(s)"
+
+#. 0: seconds / 3600
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Every {0} hour(s)"
+msgstr "Every {0} hour(s)"
+
+#. 0: seconds / 60
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Every {0} minute(s)"
+msgstr "Every {0} minute(s)"
+
+#. 0: seconds
+#: src/chunks/PluginRuns/PluginSchedule.tsx
+msgid "Every {0} seconds"
+msgstr "Every {0} seconds"
