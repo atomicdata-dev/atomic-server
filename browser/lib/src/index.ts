@@ -168,6 +168,7 @@ export {
 } from './plugin-log.js';
 export {
   parseManifest,
+  secretsMentionedIn,
   type DeclaredSecret,
   type PluginManifest,
 } from './plugin-manifest.js';

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseManifest } from './plugin-manifest.js';
+import { parseManifest, secretsMentionedIn } from './plugin-manifest.js';
 
 describe('parseManifest', () => {
   it('keeps a declaration a plugin actually made', () => {
@@ -66,5 +66,31 @@ describe('parseManifest', () => {
       name: 'a',
       origin: 'https://a.test',
     });
+  });
+});
+
+describe('secretsMentionedIn', () => {
+  it('finds what a plugin spends even when it declared nothing', () => {
+    const source = `
+      export function run(ctx) {
+        return ctx.http({
+          url: 'https://api.test/x',
+          headers: { Authorization: 'Bearer secret:google_calendar_token' },
+        });
+      }`;
+
+    expect(secretsMentionedIn(source)).toEqual(['google_calendar_token']);
+  });
+
+  it('lists each name once, in a stable order', () => {
+    const source = 'secret:b secret:a secret:b';
+
+    expect(secretsMentionedIn(source)).toEqual(['a', 'b']);
+  });
+
+  it('finds nothing in a plugin that spends nothing', () => {
+    expect(secretsMentionedIn('export function run() { return {}; }')).toEqual(
+      [],
+    );
   });
 });
