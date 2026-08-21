@@ -1,0 +1,27 @@
+{
+  "name": "a write that would change nothing is skipped, not blocked",
+  "schema": {
+    "https://atomicdata.dev/properties/name": {
+      "datatype": "https://atomicdata.dev/datatypes/string",
+      "shortname": "name"
+    }
+  },
+  "resources": {
+    "https://x/a": { "https://atomicdata.dev/properties/name": "Same" }
+  },
+  "verdict": {
+    "intents": [
+      {
+        "op": "set",
+        "subject": "https://x/a",
+        "set": { "https://atomicdata.dev/properties/name": "Same" }
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": false,
+    "problems": ["already has this value"],
+    "changes": [{ "op": "set", "subject": "https://x/a", "properties": [] }]
+  }
+}

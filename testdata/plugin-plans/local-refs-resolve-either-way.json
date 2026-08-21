@@ -1,0 +1,41 @@
+{
+  "name": "a link to something the same run creates resolves whichever order they appear",
+  "schema": {
+    "https://x/employer": {
+      "datatype": "https://atomicdata.dev/datatypes/atomicURL",
+      "shortname": "employer"
+    }
+  },
+  "resources": {},
+  "verdict": {
+    "intents": [
+      {
+        "op": "create",
+        "localId": "person",
+        "parent": "https://x/drive",
+        "isA": ["https://x/Person"],
+        "set": { "https://x/employer": "local:org" }
+      },
+      {
+        "op": "create",
+        "localId": "org",
+        "parent": "https://x/drive",
+        "isA": ["https://x/Org"],
+        "set": {}
+      }
+    ],
+    "problems": []
+  },
+  "expect": {
+    "blocked": false,
+    "problems": [],
+    "changes": [
+      {
+        "op": "create",
+        "localId": "person",
+        "properties": [{ "property": "https://x/employer", "toMintedFor": "org" }]
+      },
+      { "op": "create", "localId": "org", "properties": [] }
+    ]
+  }
+}
