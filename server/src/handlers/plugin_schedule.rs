@@ -192,7 +192,7 @@ pub async fn handle_set_auto_apply(
 ///
 /// Errors when there is none — the caller is asking to skip review, and the
 /// evidence that review has happened at least once is the precondition.
-async fn reviewed_run(
+pub async fn reviewed_run(
     appstate: &AppState,
     drive: &str,
     plugin: &str,
