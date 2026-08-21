@@ -135,4 +135,112 @@ test.describe('plugins', () => {
 
     await expect(main.getByText('blocked', { exact: true })).toBeVisible();
   });
+  test('a plugin asks for the credentials it declares, and nothing else', async ({
+    page,
+  }) => {
+    const main = page.getByRole('main');
+
+    await newPlugin(page);
+
+    // The starter needs no credentials, so it says so rather than showing an
+    // empty heading with nowhere to type.
+    await expect(main.getByText(/asks for no credentials/)).toBeVisible();
+
+    await setSource(
+      page,
+      `export const manifest = {
+         secrets: [{ name: 'notion', origin: 'https://api.notion.com',
+                     description: 'Notion integration token' }],
+       };
+       export function run(ctx) {
+         ctx.http({ url: 'https://api.notion.com/v1/search',
+                    headers: { Authorization: 'Bearer secret:notion' } });
+         return { intents: [], problems: [] };
+       }`,
+    );
+
+    // A declared secret is one labelled field: the name and origin come from
+    // the plugin, so neither is retyped.
+    await expect(main.getByText('Notion integration token')).toBeVisible();
+    await expect(
+      main.getByPlaceholder(/Paste the value for notion/),
+    ).toBeVisible();
+  });
+
+  test('a secret used but not declared still has somewhere to go', async ({
+    page,
+  }) => {
+    const main = page.getByRole('main');
+
+    await newPlugin(page);
+
+    await setSource(
+      page,
+      `export function run(ctx) {
+         ctx.http({ url: 'https://api.notion.com/v1/search',
+                    headers: { Authorization: 'Bearer secret:tok' } });
+         return { intents: [], problems: [] };
+       }`,
+    );
+
+    // The author who forgot to declare is the one who cannot work out where to
+    // enter it, so a slot appears anyway — with the origin read from the URL
+    // rather than asked for.
+    await expect(main.getByText(/sent only to/)).toBeVisible();
+    await expect(main.getByText(/api\.notion\.com/).first()).toBeVisible();
+    await expect(main.getByPlaceholder(/Value for tok/)).toBeVisible();
+  });
 });
+
+async function newPlugin(page: import('@playwright/test').Page) {
+  await page.getByRole('button', { name: 'More' }).click();
+  await page.getByPlaceholder(/filter/i).fill('plugin');
+  await page.locator('[data-testid="menu-item-new-plugin"]').click();
+  await expect(
+    page.getByRole('main').getByRole('heading', {
+      name: 'New plugin',
+      level: 1,
+    }),
+  ).toBeVisible();
+}
+
+/**
+ * Replaces a plugin's source through `window.store`.
+ *
+ * The source property is drive-local and has no fixed subject, so it is found
+ * by its value — which keeps the test off app module paths.
+ */
+async function setSource(
+  page: import('@playwright/test').Page,
+  source: string,
+) {
+  await page.evaluate(async (next: string) => {
+    const store = (
+      window as unknown as {
+        store: {
+          getResource(s: string): Promise<{
+            getPropVals(): Record<string, unknown>;
+            set(p: string, v: unknown): Promise<void>;
+            save(): Promise<unknown>;
+          }>;
+        };
+      }
+    ).store;
+
+    const subject = decodeURIComponent(
+      new URL(location.href).searchParams.get('subject')!,
+    );
+    const plugin = await store.getResource(subject);
+
+    const sourceProp = Object.entries(plugin.getPropVals()).find(
+      ([, value]) =>
+        typeof value === 'string' && value.includes('export function run'),
+    )?.[0];
+
+    if (!sourceProp) throw new Error('plugin has no source property');
+
+    await plugin.set(sourceProp, next);
+    await plugin.save();
+  }, source);
+}
+
