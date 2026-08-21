@@ -18,6 +18,7 @@ pub mod image;
 pub mod plugin_run;
 pub mod plugin_schedule;
 pub mod plugin_secret;
+pub mod plugin_trigger;
 pub mod plugin_ui;
 pub mod post_resource;
 pub mod search;
