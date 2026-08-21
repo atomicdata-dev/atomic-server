@@ -7,6 +7,7 @@ import {
   planVerdict,
   parseVerdict,
   describePlugin,
+  errorMessageFromResponse,
   pluginSchema,
   recordRun,
   runPlugin,
@@ -386,7 +387,9 @@ async function runOnServer(
   });
 
   if (!response.ok) {
-    throw new Error(`${response.status} ${await response.text()}`);
+    throw new Error(
+      errorMessageFromResponse(await response.text(), response.status),
+    );
   }
 
   // Absent fields arrive as `null`, not `undefined`: `error !== undefined` was

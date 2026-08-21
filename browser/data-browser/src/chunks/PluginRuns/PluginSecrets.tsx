@@ -2,7 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
 import { FaCheck, FaKey, FaTrash } from 'react-icons/fa6';
-import { signRequest, useStore, type DeclaredSecret } from '@tomic/react';
+import {
+  errorMessageFromResponse,
+  signRequest,
+  useStore,
+  type DeclaredSecret,
+} from '@tomic/react';
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
@@ -389,7 +394,7 @@ async function request(
     if (!response.ok) {
       return {
         ok: false,
-        error: `${response.status} ${await response.text()}`,
+        error: errorMessageFromResponse(await response.text(), response.status),
       };
     }
 
