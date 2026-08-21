@@ -20,6 +20,7 @@ import { buildTableFromSpec } from '@chunks/TablePage/createTableFromSpec';
 import {
   createPlugin,
   prepareRun,
+  setPluginSchedule,
   setPluginSource,
 } from '@chunks/PluginRuns/runScript';
 import {
@@ -95,6 +96,7 @@ export const TOOL_NAMES = {
   SHOW_HISTORY: 'show_history',
   CREATE_PLUGIN: 'create_plugin',
   RUN_PLUGIN: 'run_plugin',
+  SCHEDULE_PLUGIN: 'schedule_plugin',
 } as const;
 
 /** One column of a table, in the compact vocabulary `create_table` uses. */
@@ -1433,7 +1435,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
       [TOOL_NAMES.CREATE_PLUGIN]: tool({
         description:
           "Create or update a plugin: JavaScript that proposes changes for the user to review. Use this for imports from an external service, or any repeatable transformation of the user's data. " +
-          "A plugin is a JavaScript module that PROPOSES changes and never writes. It must `export function run(ctx)` returning `{ intents: [...], problems: [...] }`. Intents are the only way to change data: `{op:'create', localId, parent, isA:[classSubject], set:{[propertySubject]: value}}`, `{op:'set', subject, set:{...}}`, `{op:'remove', subject, properties:[...]}`, `{op:'destroy', subject}`. Refer to something the same run creates as `'local:<localId>'` — links resolve in any order. Property and class keys are full subjects; use get_user_classes or create a table first if you need them. Problems are `{severity:'error'|'warning', message}`; an error blocks the whole run. \n\nWhat ctx gives you: `ctx.trigger.at` (the ONLY clock — Date.now() is frozen to it and Math.random is seeded, so runs are reproducible), `ctx.http({method,url,headers,body})` returning `{status, body}`, `ctx.read(subject)`, `ctx.query(property, value)`. There is no fetch, no process, no filesystem. \n\nCredentials: put `'Bearer secret:<name>'` in a HEADER VALUE and the host substitutes the real value; the plugin never sees it. A `secret:` handle in a URL or body is refused. DECLARE every secret you use, or the user has to work out what to enter: `export const manifest = { secrets: [{ name: 'google', origin: 'https://www.googleapis.com', description: 'Google Calendar token' }] };` — the plugin page then shows one labelled field per declared secret, and the origin allowlist comes from this. `manifest` and `run` are the only exports that mean anything; anything else you export is ignored. You cannot store a secret yourself, so write the plugin, then tell the user to open it and fill in the fields.",
+          "A plugin is a JavaScript module that PROPOSES changes and never writes. It must `export function run(ctx)` returning `{ intents: [...], problems: [...] }`. Intents are the only way to change data: `{op:'create', localId, parent, isA:[classSubject], set:{[propertySubject]: value}}`, `{op:'set', subject, set:{...}}`, `{op:'remove', subject, properties:[...]}`, `{op:'destroy', subject}`. Refer to something the same run creates as `'local:<localId>'` — links resolve in any order. Property and class keys are full subjects; use get_user_classes or create a table first if you need them. Problems are `{severity:'error'|'warning', message}`; an error blocks the whole run. \n\nWhat ctx gives you: `ctx.trigger.at` (the ONLY clock — Date.now() is frozen to it and Math.random is seeded, so runs are reproducible), `ctx.http({method,url,headers,body})` returning `{status, body}`, `ctx.read(subject)`, `ctx.query(property, value)`. There is no fetch, no process, no filesystem. \n\nCredentials: put `'Bearer secret:<name>'` in a HEADER VALUE and the host substitutes the real value; the plugin never sees it. A `secret:` handle in a URL or body is refused. DECLARE every secret you use, or the user has to work out what to enter: `export const manifest = { secrets: [{ name: 'google', origin: 'https://www.googleapis.com', description: 'Google Calendar token' }] };` — the plugin page then shows one labelled field per declared secret, and the origin allowlist comes from this. `manifest` and `run` are the only exports that mean anything; anything else you export is ignored. You cannot store a secret yourself, so write the plugin, then tell the user to open it and fill in the fields. If the user wants this to happen regularly rather than on a button press, call schedule_plugin afterwards; `ctx.trigger.kind` is then `'cron'` instead of `'manual'`, and a scheduled run's changes wait for the user to review rather than being written.",
         inputSchema: z.object({
           name: z.string().describe('Display name of the plugin.'),
           source: z
@@ -1529,6 +1531,40 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               next: plan.blocked
                 ? 'Fix the errors and call create_plugin again with the corrected source.'
                 : 'Looks runnable. Tell the user to open the plugin and press Run to review and apply it.',
+            };
+          } catch (e) {
+            return { error: (e as Error).message };
+          }
+        },
+      }),
+      [TOOL_NAMES.SCHEDULE_PLUGIN]: tool({
+        description:
+          "Run a plugin on a schedule, for a user who asked for something to happen regularly rather than when they press a button. A scheduled run FETCHES BUT DOES NOT WRITE — nobody is there to approve at 3am — so what it proposes waits on the plugin page until the user reviews it. Say so when you set one. The plugin sees `ctx.trigger.kind === 'cron'`. Minimum 60 seconds, and prefer much longer: a plugin hammering an API gets the user's credential rate-limited.",
+        inputSchema: z.object({
+          plugin: z.string().describe('Subject of the plugin.'),
+          intervalSeconds: z
+            .number()
+            .nullable()
+            .describe(
+              'How often to run, in seconds. Use 3600 for hourly, 86400 for daily. Pass null to stop running it on a schedule.',
+            ),
+        }),
+        execute: async ({ plugin, intervalSeconds }) => {
+          try {
+            const subject = expandSubject(plugin);
+            await setPluginSchedule(
+              store,
+              { plugin: subject, drive },
+              intervalSeconds,
+            );
+
+            return {
+              plugin: shortenSubject(subject),
+              intervalSeconds,
+              next:
+                intervalSeconds === null
+                  ? 'It now runs only when the user presses Run.'
+                  : 'Tell the user it will run on its own, and that its proposed changes will wait on the plugin page for them to review.',
             };
           } catch (e) {
             return { error: (e as Error).message };

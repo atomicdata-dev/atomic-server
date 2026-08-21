@@ -3,6 +3,7 @@ import { styled } from 'styled-components';
 import toast from 'react-hot-toast';
 import { FaClock } from 'react-icons/fa6';
 import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
+import { setPluginSchedule } from './runScript';
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
 import { BasicSelect } from '@components/forms/BasicSelect';
@@ -69,10 +70,11 @@ export function PluginSchedule({
 
   const set = useCallback(
     async (intervalSeconds: number | null) => {
-      const result = await request(store, endpoint, {
-        method: 'POST',
-        body: JSON.stringify({ drive, plugin, intervalSeconds }),
-      });
+      const result = await attemptSchedule(
+        store,
+        { plugin, drive },
+        intervalSeconds,
+      );
 
       if (!result.ok) {
         toast.error(result.error);
@@ -80,9 +82,9 @@ export function PluginSchedule({
         return;
       }
 
-      setSchedule(result.body as ScheduleInfo | null);
+      await load();
     },
-    [store, endpoint, drive, plugin],
+    [store, drive, plugin, load],
   );
 
   const clearPending = useCallback(async () => {
@@ -178,6 +180,24 @@ function describeInterval(seconds: number): string {
   if (seconds % 60 === 0) return `Every ${seconds / 60} minute(s)`;
 
   return `Every ${seconds} seconds`;
+}
+
+/**
+ * Setting a schedule, shaped as a result: the React Compiler cannot compile
+ * try/catch inside a component, and this is called from one.
+ */
+async function attemptSchedule(
+  store: ReturnType<typeof useStore>,
+  target: { plugin: string; drive: string },
+  intervalSeconds: number | null,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  try {
+    await setPluginSchedule(store, target, intervalSeconds);
+
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: (e as Error).message };
+  }
 }
 
 type RequestResult = { ok: true; body: unknown } | { ok: false; error: string };
