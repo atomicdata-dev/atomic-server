@@ -1,4 +1,5 @@
 import { parseVerdict, type Problem, type Verdict } from './plugin-run.js';
+import { parseManifest, type PluginManifest } from './plugin-manifest.js';
 import type { RunInput } from './plugin-sandbox.js';
 
 /**
@@ -15,6 +16,11 @@ export interface PluginRunRequest {
   source: string;
   input: RunInput;
   maxOutputBytes?: number;
+  /**
+   * `manifest` evaluates the module and returns its declaration without
+   * calling `run`. Reading a declaration must not run the plugin.
+   */
+  want?: 'run' | 'manifest';
 }
 
 export type PluginRunResponse = {
@@ -194,4 +200,72 @@ function describeError(e: unknown): string {
   if (e instanceof Error) return `${e.name}: ${e.message}`;
 
   return String(e);
+}
+
+/**
+ * Reads a plugin's `manifest` export without running it.
+ *
+ * A declaration is meant to be read before anyone trusts the plugin, so it is
+ * evaluated in the same sandbox rather than on the page: a module body still
+ * runs, and that is code nobody has approved.
+ */
+export async function describePlugin(
+  source: string,
+  options: RunPluginOptions,
+): Promise<PluginManifest> {
+  let worker: PluginWorkerLike;
+
+  try {
+    worker = options.createWorker();
+  } catch {
+    return { secrets: [] };
+  }
+
+  return new Promise<PluginManifest>(resolve => {
+    let done = false;
+
+    const finish = (manifest: PluginManifest) => {
+      if (done) return;
+
+      done = true;
+      clearTimeout(timer);
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+      resolve(manifest);
+    };
+
+    const timer = setTimeout(
+      () => finish({ secrets: [] }),
+      options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    );
+
+    // A plugin that cannot be read declares nothing: the page still renders,
+    // and the reason surfaces when the plugin is actually run.
+    worker.onmessage = event => {
+      const data = event.data;
+
+      finish(data?.ok ? parseManifest(safeParse(data.json)) : { secrets: [] });
+    };
+
+    worker.onerror = () => finish({ secrets: [] });
+
+    try {
+      worker.postMessage({
+        source,
+        input: { trigger: { kind: 'manual', at: 0 } },
+        want: 'manifest',
+      });
+    } catch {
+      finish({ secrets: [] });
+    }
+  });
+}
+
+function safeParse(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return undefined;
+  }
 }

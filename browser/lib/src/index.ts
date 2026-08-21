@@ -166,3 +166,9 @@ export {
   type RecordRunOptions,
   type RunStatus,
 } from './plugin-log.js';
+export {
+  parseManifest,
+  type DeclaredSecret,
+  type PluginManifest,
+} from './plugin-manifest.js';
+export { describePlugin } from './plugin-runner.js';
