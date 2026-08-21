@@ -207,6 +207,46 @@ function notifyRunsChanged(plugin: string): void {
   runListeners.get(plugin)?.forEach(listener => listener());
 }
 
+/**
+ * A plugin's source, kept current as it is edited.
+ *
+ * The property is drive-local, so it is resolved through the schema rather than
+ * a constant; `undefined` means still loading, `''` means genuinely empty.
+ */
+export function usePluginSource(
+  store: Store,
+  plugin: string,
+  drive: string | undefined,
+): string | undefined {
+  const [source, setSource] = useState<string>();
+
+  useEffect(() => {
+    if (!drive) return;
+
+    let cancelled = false;
+
+    const read = async () => {
+      const schema = await pluginClassesFor(store, drive);
+      const resource = await store.getResource(plugin);
+      const value = resource.get(schema.properties['plugin-source']);
+
+      if (!cancelled) setSource(typeof value === 'string' ? value : '');
+    };
+
+    void read();
+
+    // The assistant edits the source while this page is open, so follow it.
+    const unsubscribe = store.subscribe(plugin, () => void read());
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [store, plugin, drive]);
+
+  return source;
+}
+
 export interface PreparedRun {
   plan: RunPlan;
   trigger: RunTrigger;
