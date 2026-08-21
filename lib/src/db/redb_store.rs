@@ -28,6 +28,8 @@ const TABLE_WATCHED_QUERIES: TableDefinition<&[u8], &[u8]> =
     TableDefinition::new("watched_queries_v3");
 const TABLE_PLUGIN_META: TableDefinition<&[u8], &[u8]> = TableDefinition::new("plugin_meta");
 const TABLE_PLUGIN_SECRET: TableDefinition<&[u8], &[u8]> = TableDefinition::new("plugin_secret");
+const TABLE_PLUGIN_SCHEDULE: TableDefinition<&[u8], &[u8]> =
+    TableDefinition::new("plugin_schedule");
 const TABLE_DRIVE_MAPPING: TableDefinition<&[u8], &[u8]> = TableDefinition::new("drive_mapping");
 const TABLE_DID_MAPPING: TableDefinition<&[u8], &[u8]> = TableDefinition::new("did_mapping");
 const TABLE_LORO_SNAPSHOTS: TableDefinition<&[u8], &[u8]> = TableDefinition::new("loro_snapshots");
@@ -50,6 +52,7 @@ fn table_def(tree: Tree) -> TableDefinition<'static, &'static [u8], &'static [u8
         Tree::WatchedQueries => TABLE_WATCHED_QUERIES,
         Tree::PluginMeta => TABLE_PLUGIN_META,
         Tree::PluginSecret => TABLE_PLUGIN_SECRET,
+        Tree::PluginSchedule => TABLE_PLUGIN_SCHEDULE,
         Tree::DriveMapping => TABLE_DRIVE_MAPPING,
         Tree::DidMapping => TABLE_DID_MAPPING,
         Tree::LoroSnapshots => TABLE_LORO_SNAPSHOTS,
@@ -71,6 +74,7 @@ fn create_all_tables(tx: &redb::WriteTransaction) {
         Tree::WatchedQueries,
         Tree::PluginMeta,
         Tree::PluginSecret,
+        Tree::PluginSchedule,
         Tree::DriveMapping,
         Tree::DidMapping,
         Tree::LoroSnapshots,

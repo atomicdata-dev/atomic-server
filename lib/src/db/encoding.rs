@@ -146,6 +146,42 @@ impl crate::db::plugin_secret::PluginSecret {
     }
 }
 
+impl crate::db::plugin_schedule::PluginSchedule {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode PluginSchedule: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::plugin_schedule::PluginSchedule> {
+        rmp_serde::from_slice(bytes)
+            .map_err(|e| format!("Failed to decode PluginSchedule: {}", e).into())
+    }
+}
+
+impl crate::db::plugin_schedule::PluginScheduleKey {
+    /// `drive \0 plugin`, so the scheduler can scan every schedule in order.
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::with_capacity(self.drive.len() + self.plugin.len() + 1);
+        buf.extend_from_slice(self.drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(self.plugin.as_bytes());
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<Self> {
+        let mut parts = bytes.splitn(2, |b| *b == 0);
+        let drive = parts.next().ok_or("Malformed plugin schedule key")?;
+        let plugin = parts.next().ok_or("Malformed plugin schedule key")?;
+
+        Ok(Self {
+            drive: String::from_utf8_lossy(drive).into_owned(),
+            plugin: String::from_utf8_lossy(plugin).into_owned(),
+        })
+    }
+}
+
 impl crate::db::plugin_secret::PluginSecretKey {
     /// `drive \0 plugin \0 name`.
     ///

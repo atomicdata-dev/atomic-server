@@ -276,6 +276,12 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .to(handlers::plugin_run::handle_plugin_run),
     )
     .service(
+        web::resource("/plugin-schedule")
+            .route(web::post().to(handlers::plugin_schedule::handle_set_schedule))
+            .route(web::get().to(handlers::plugin_schedule::handle_get_schedule))
+            .route(web::delete().to(handlers::plugin_schedule::handle_clear_pending)),
+    )
+    .service(
         web::resource("/plugin-secret")
             .route(web::post().to(handlers::plugin_secret::handle_set_secret))
             .route(web::get().to(handlers::plugin_secret::handle_list_secrets))

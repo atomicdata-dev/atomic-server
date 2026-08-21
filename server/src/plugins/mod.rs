@@ -49,6 +49,8 @@ pub mod plugin;
 pub mod prunetests;
 pub mod query;
 pub mod replicate;
+#[cfg(feature = "wasm-plugins")]
+pub mod scheduler;
 pub mod search;
 pub mod server_info;
 #[cfg(feature = "vector-search")]
