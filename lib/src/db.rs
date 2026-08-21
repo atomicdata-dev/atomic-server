@@ -11,6 +11,7 @@ mod migrations;
 #[cfg(all(feature = "db-redb", target_arch = "wasm32"))]
 pub mod opfs_backend;
 pub mod plugin_meta;
+pub mod plugin_schedule;
 pub mod plugin_secret;
 pub(crate) mod prop_val_sub_index;
 mod query_index;
@@ -44,6 +45,7 @@ use crate::{
     db::{
         encoding::{decode_propvals, encode_propvals},
         plugin_meta::{PluginMeta, PluginMetaKey},
+        plugin_schedule::{PluginSchedule, PluginScheduleKey},
         plugin_secret::{PluginSecret, PluginSecretInfo, PluginSecretKey},
         query_index::requires_query_index,
         val_prop_sub_index::find_in_val_prop_sub_index,
@@ -2114,6 +2116,55 @@ impl Db {
     pub fn delete_plugin_secret(&self, key: &PluginSecretKey) -> AtomicResult<()> {
         self.kv.remove(Tree::PluginSecret, &key.encode()?)?;
         Ok(())
+    }
+
+    pub fn set_plugin_schedule(
+        &self,
+        key: &PluginScheduleKey,
+        schedule: &PluginSchedule,
+    ) -> AtomicResult<()> {
+        self.kv
+            .insert(Tree::PluginSchedule, &key.encode()?, &schedule.encode()?)?;
+        Ok(())
+    }
+
+    pub fn get_plugin_schedule(
+        &self,
+        key: &PluginScheduleKey,
+    ) -> AtomicResult<Option<PluginSchedule>> {
+        let Some(bin) = self.kv.get(Tree::PluginSchedule, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PluginSchedule::from_bytes(&bin)?))
+    }
+
+    pub fn delete_plugin_schedule(&self, key: &PluginScheduleKey) -> AtomicResult<()> {
+        self.kv.remove(Tree::PluginSchedule, &key.encode()?)?;
+        Ok(())
+    }
+
+    /// Every schedule due at `now`.
+    ///
+    /// A whole-tree scan on purpose: one entry per scheduled plugin is a very
+    /// small set, and an index keyed by due-time would have to be rewritten on
+    /// every run for no gain at this size.
+    pub fn due_plugin_schedules(
+        &self,
+        now: i64,
+    ) -> AtomicResult<Vec<(PluginScheduleKey, PluginSchedule)>> {
+        let mut due = Vec::new();
+
+        for entry in self.kv.iter_tree(Tree::PluginSchedule) {
+            let (key, value) = entry?;
+            let schedule = PluginSchedule::from_bytes(&value)?;
+
+            if schedule.is_due(now) {
+                due.push((PluginScheduleKey::from_bytes(&key)?, schedule));
+            }
+        }
+
+        Ok(due)
     }
 
     fn get_index_iterator_for_query(&self, q: &Query) -> IndexIterator {
