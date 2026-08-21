@@ -80,6 +80,7 @@ wasmtime = { version = "47.0.4", optional = true, features = [
 ] }
 wasmtime-wasi = { version = "47.0.4", optional = true, features = ["p2"] }
 wasmtime-wasi-http = { version = "47.0.4", optional = true }
+ulid = "1.2.1"
 url = "2.5.8"
 html2md = "0.2.15"
 kuchikiki = "0.8.2"
