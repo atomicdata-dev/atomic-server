@@ -61,6 +61,10 @@ pub mod search;
 pub mod server_info;
 #[cfg(feature = "wasm-plugins")]
 pub mod store_host;
+#[cfg(all(test, feature = "wasm-plugins"))]
+pub mod test_fixture;
+#[cfg(feature = "wasm-plugins")]
+pub mod triggers;
 #[cfg(feature = "vector-search")]
 pub mod vector_search;
 pub mod versioning;
