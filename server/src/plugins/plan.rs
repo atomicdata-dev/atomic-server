@@ -12,16 +12,20 @@ use std::collections::{HashMap, HashSet};
 use atomic_lib::{datatype::match_datatype, Value};
 use serde_json::Value as Json;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Severity {
     Error,
     Warning,
 }
 
-#[derive(Debug, Clone)]
+/// Serialized into the run log, so its shape is the browser's: the same
+/// records render in the same UI whichever planner produced them.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct Problem {
     pub severity: Severity,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub subject: Option<String>,
 }
 
