@@ -45,6 +45,8 @@ pub mod invite;
 #[cfg(feature = "wasm-plugins")]
 pub mod js_runtime;
 pub mod path;
+#[cfg(feature = "wasm-plugins")]
+pub mod plan;
 pub mod plugin;
 pub mod prunetests;
 pub mod query;
