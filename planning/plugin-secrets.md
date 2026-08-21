@@ -2,7 +2,9 @@
 
 ## Status
 
-Proposal (2026-08-20). The gating dependency for
+Built (2026-08-21). Proposed 2026-08-20; every step below shipped and was
+proved end to end — a plugin fetched an echo endpoint and the response showed
+the substituted credential, which the plugin itself never saw. The gating dependency for
 [`plugins.md`](./plugins.md) A3, and named there and in
 [`importers.md`](./importers.md) as designed nowhere. Not started.
 
@@ -159,21 +161,45 @@ authoring mistake, and the assistant should say so rather than route around it.
 
 ## Rollout
 
-1. **Egress guard + origin allowlist**, replacing `inherit_network()`. No new
-   features; closes the current hole and is independently shippable.
-2. **Secret storage + write-only endpoint + install dialog.**
-3. **`ctx.http` with handle substitution**, server placement only.
-4. **Prove the path**: a throwaway plugin that fetches one authenticated
-   endpoint with a stored secret, then is deleted. Every guard has unit tests;
-   nothing has yet made a real request.
+1. **Egress guard + origin allowlist. Done.** `inherit_network()` is gone; both
+   ways out — the guest's sockets and the host's fetch of a foreign subject —
+   check the *resolved* address, because a hostname resolving to
+   169.254.169.254 is the whole attack.
+2. **Secret storage + write-only endpoint + UI. Done.** Secrets live in their
+   own tree beside `PluginMeta`. No accessor returns a value: `use_plugin_secret`
+   hands it to a closure and never out of one, and `PluginSecretInfo` has no
+   field to put one in.
+3. **`fetch` with handle substitution. Done.** Header values only; a handle in a
+   URL or body is refused, and one that does not resolve fails the request
+   rather than sending it bare.
+4. **Prove the path. Done.** Ran through the UI end to end.
 
 A Notion importer is deliberately *not* a step here. It is the acceptance
 criterion for the platform — a user asks, and the assistant builds one — and
 the assistant is the thing being tested. An importer hand-written by us would
-prove the opposite of what it looks like it proves: we would be careful where a
-model is sloppy, read the source when stuck, and work around rough edges that
-would stop the assistant dead. What that goal actually needs is the authoring
-loop in [`plugins.md`](./plugins.md) S3, not this document.
+prove the opposite of what it looks like it proves.
+
+## What changed while building
+
+**Origins come from the plugin's declaration, not from its secrets.** The
+design left this open and the first implementation inferred a plugin's
+reachable origins from whichever secrets existed — which made "can reach" follow
+from "has a credential for", backwards, and left a public API needing no auth
+unreachable. A plugin now declares `{ name, origin }` in its source (see
+[`plugins.md`](./plugins.md)), and the allowlist comes from that.
+
+**The UI is driven by the declaration.** One labelled field per declared secret,
+so nobody retypes a name that has to match the source. A plugin that spends an
+undeclared handle still gets a slot, with the origin read from the URLs its
+source requests — asking only when several origins appear or the URLs are built
+at run time.
+
+**Three bugs the guards' unit tests could not catch**, all found by a real
+request: the signature was verified against the plugin subject while the client
+signs the URL, so every authenticated request failed; plugins were evaluated as
+scripts, so `export function run` — the shape every plugin including the starter
+is written in — was a syntax error server-side; and an absent `error` field
+arrives as `null`, so every *successful* run was reported as a failure.
 
 ## Decisions
 
@@ -192,13 +218,18 @@ loop in [`plugins.md`](./plugins.md) S3, not this document.
 
 ## Open Questions
 
-- Encryption at rest: `agent_secret` is stored plaintext today. Do plugin
-  secrets inherit that, or does this become the forcing function for the
-  key hierarchy in [`encryption.md`](./encryption.md)?
-- Does a secret belong to a plugin, or to a drive with plugins granted use of
-  it? Per-plugin is simpler and revocation is obvious; per-drive avoids pasting
-  the same token into four importers.
-- Should `lastUsedAt` be a counter and a timestamp? "Used 0 times in 90 days"
-  is a better revocation prompt than a date alone.
-- Rate limiting is per plugin here. Per origin as well, so one plugin cannot
-  get a drive's token throttled by a provider?
+- Encryption at rest: `agent_secret` is stored plaintext today and plugin
+  secrets inherit that. A deliberate deferral, not an oversight — the key
+  hierarchy in [`encryption.md`](./encryption.md) is where it belongs.
+- **Answered: scope is per plugin.** Revoking one is then obviously about one
+  plugin. The cost is pasting the same token into two importers, which is the
+  cheaper mistake.
+- **Answered: `lastUsedAt` is a timestamp and a count.** "Used 0 times in 90
+  days" is what makes revoking easy; a date alone leaves you guessing.
+- Rate limiting is per plugin. Per origin as well, so one plugin cannot get a
+  drive's token throttled by a provider?
+- Redirects are refused rather than followed. Following one needs the allowlist
+  and address rules re-checked and credential headers dropped across origins —
+  worth doing once something legitimate needs it.
+- Invalid input answers 500: the server has no bad-request error type, and
+  everything that is not auth or not-found maps to a server error.
