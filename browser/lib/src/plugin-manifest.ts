@@ -92,3 +92,24 @@ export function secretsMentionedIn(source: string): string[] {
 
   return [...found].sort();
 }
+
+/**
+ * Origins a plugin's source actually requests.
+ *
+ * Where a credential may be sent is a fact about the plugin, not a second part
+ * of the credential — and the source already says it. Reading it here lets an
+ * undeclared secret be stored with one field, instead of asking someone to copy
+ * an origin out of code they were not looking at.
+ *
+ * Only literal URLs are found, which is the point: a host assembled at runtime
+ * is exactly the one nobody should pre-authorise by guess.
+ */
+export function originsMentionedIn(source: string): string[] {
+  const found = new Set<string>();
+
+  for (const match of source.matchAll(/https?:\/\/[a-zA-Z0-9.-]+(?::\d+)?/g)) {
+    found.add(match[0]);
+  }
+
+  return [...found].sort();
+}

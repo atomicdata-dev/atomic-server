@@ -13,7 +13,7 @@ import { PluginSecrets } from './PluginSecrets';
 import { PluginRunHistory } from './PluginRunHistory';
 import { RunPluginDialog } from './RunPluginDialog';
 import { usePluginManifest, usePluginSource } from './runScript';
-import { secretsMentionedIn } from '@tomic/react';
+import { originsMentionedIn, secretsMentionedIn } from '@tomic/react';
 
 /**
  * A plugin's page.
@@ -63,6 +63,7 @@ export function PluginPage({
           drive={drive}
           declared={manifest.secrets}
           mentioned={secretsMentionedIn(source ?? '')}
+          candidateOrigins={originsMentionedIn(source ?? '')}
         />
 
         <PluginRunHistory resource={resource} />

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { parseManifest, secretsMentionedIn } from './plugin-manifest.js';
+import {
+  originsMentionedIn,
+  parseManifest,
+  secretsMentionedIn,
+} from './plugin-manifest.js';
 
 describe('parseManifest', () => {
   it('keeps a declaration a plugin actually made', () => {
@@ -92,5 +96,34 @@ describe('secretsMentionedIn', () => {
     expect(secretsMentionedIn('export function run() { return {}; }')).toEqual(
       [],
     );
+  });
+});
+
+describe('originsMentionedIn', () => {
+  it('reads the origin out of a URL the plugin builds', () => {
+    const source =
+      'const url = `https://www.googleapis.com/calendar/v3/calendars/${id}/events`;';
+
+    expect(originsMentionedIn(source)).toEqual(['https://www.googleapis.com']);
+  });
+
+  it('keeps the port, since an origin includes it', () => {
+    expect(originsMentionedIn("'http://localhost:9883/x'")).toEqual([
+      'http://localhost:9883',
+    ]);
+  });
+
+  it('lists each origin once', () => {
+    const source = "'https://a.test/x' 'https://a.test/y' 'https://b.test/z'";
+
+    expect(originsMentionedIn(source)).toEqual([
+      'https://a.test',
+      'https://b.test',
+    ]);
+  });
+
+  it('finds nothing when every URL is assembled at runtime', () => {
+    // Which is exactly the case nobody should be pre-authorising by guess.
+    expect(originsMentionedIn('const url = base + path;')).toEqual([]);
   });
 });
