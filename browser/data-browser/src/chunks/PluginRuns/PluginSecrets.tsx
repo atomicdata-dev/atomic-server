@@ -35,15 +35,22 @@ interface SecretsView {
 interface PluginSecretsProps {
   plugin: string;
   drive: string;
-  /** What the plugin's source says it needs. */
+  /** What the plugin's `manifest` export says it needs. */
   declared: DeclaredSecret[];
+  /**
+   * Names its source actually spends. A plugin that writes
+   * `secret:x` without declaring it still needs `x`, and the author who forgot
+   * is the one who cannot find where to enter it.
+   */
+  mentioned: string[];
 }
 
 export function PluginSecrets({
   plugin,
   drive,
   declared,
-}: PluginSecretsProps): React.JSX.Element | null {
+  mentioned,
+}: PluginSecretsProps): React.JSX.Element {
   const store = useStore();
   const [stored, setStored] = useState<SecretInfo[]>();
 
@@ -111,13 +118,21 @@ export function PluginSecrets({
   );
 
   const byName = new Map((stored ?? []).map(s => [s.name, s]));
-  // Anything stored that the plugin no longer asks for. Still shown, because a
-  // credential nobody mentions is exactly the one worth revoking.
-  const orphans = (stored ?? []).filter(
-    s => !declared.some(d => d.name === s.name),
+
+  // Undeclared but spent: offered anyway, asking for the origin the
+  // declaration would have named.
+  const undeclared = mentioned.filter(
+    name => !declared.some(d => d.name === name),
   );
 
-  if (declared.length === 0 && orphans.length === 0) return null;
+  // Stored but neither declared nor spent. Still shown: a credential nothing
+  // mentions is exactly the one worth revoking.
+  const orphans = (stored ?? []).filter(
+    s => !declared.some(d => d.name === s.name) && !mentioned.includes(s.name),
+  );
+
+  const nothingToShow =
+    declared.length === 0 && undeclared.length === 0 && orphans.length === 0;
 
   return (
     <Column gap='0.5rem'>
@@ -128,6 +143,19 @@ export function PluginSecrets({
         </Row>
       </SectionTitle>
 
+      {nothingToShow && (
+        <Muted>
+          This plugin asks for no credentials. To use one, have it declare what
+          it needs —{' '}
+          <code>
+            export const manifest = {'{'} secrets: [{'{'} name, origin {'}'}]{' '}
+            {'}'}
+          </code>{' '}
+          — or reference <code>secret:&lt;name&gt;</code> in a header and a slot
+          will appear here.
+        </Muted>
+      )}
+
       {declared.map(secret => (
         <SecretSlot
           key={secret.name}
@@ -135,6 +163,16 @@ export function PluginSecrets({
           stored={byName.get(secret.name)}
           onStore={value => store_(secret, value)}
           onRevoke={() => revoke(secret.name)}
+        />
+      ))}
+
+      {undeclared.map(name => (
+        <UndeclaredSlot
+          key={name}
+          name={name}
+          stored={byName.get(name)}
+          onStore={(value, origin) => store_({ name, origin }, value)}
+          onRevoke={() => revoke(name)}
         />
       ))}
 
@@ -218,6 +256,97 @@ function SecretSlot({
               />
             </GrowingInput>
             <Button disabled={value.length === 0 || busy} onClick={submit}>
+              {busy ? 'Storing…' : 'Store'}
+            </Button>
+          </Row>
+        )}
+      </Column>
+    </Slot>
+  );
+}
+
+/**
+ * A secret the source spends without declaring.
+ *
+ * Asks for the origin as well as the value, because nothing said where it may
+ * be sent — and a credential with no origin can never be spent, so guessing
+ * one would only fail later and less clearly.
+ */
+function UndeclaredSlot({
+  name,
+  stored,
+  onStore,
+  onRevoke,
+}: {
+  name: string;
+  stored?: SecretInfo;
+  onStore: (value: string, origin: string) => Promise<boolean>;
+  onRevoke: () => void;
+}): React.JSX.Element {
+  const [value, setValue] = useState('');
+  const [origin, setOrigin] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const submit = useCallback(async () => {
+    setBusy(true);
+    const ok = await onStore(value, origin);
+    setBusy(false);
+
+    if (ok) {
+      setValue('');
+      setOrigin('');
+    }
+  }, [onStore, value, origin]);
+
+  return (
+    <Slot>
+      <Column gap='0.35rem'>
+        <Row center justify='space-between'>
+          <Column gap='0.1rem'>
+            <strong>{name}</strong>
+            <Muted>
+              Used in the source as <code>secret:{name}</code>, but the plugin
+              does not declare it — so say which origin it may be sent to.
+            </Muted>
+          </Column>
+          {stored && (
+            <Row gap='0.5rem' center>
+              <Stored>
+                <FaCheck aria-hidden /> Stored
+              </Stored>
+              <Button subtle onClick={onRevoke} title={`Revoke ${name}`}>
+                <FaTrash aria-hidden />
+              </Button>
+            </Row>
+          )}
+        </Row>
+
+        {stored ? (
+          <Muted>
+            {stored.origins.join(', ')} — {describeUse(stored)}
+          </Muted>
+        ) : (
+          <Row gap='0.5rem' center>
+            <GrowingInput>
+              <InputStyled
+                type='password'
+                autoComplete='off'
+                placeholder={`Value for ${name}`}
+                value={value}
+                onChange={e => setValue(e.target.value)}
+              />
+            </GrowingInput>
+            <GrowingInput>
+              <InputStyled
+                placeholder='https://api.example.com'
+                value={origin}
+                onChange={e => setOrigin(e.target.value)}
+              />
+            </GrowingInput>
+            <Button
+              disabled={value.length === 0 || origin.length === 0 || busy}
+              onClick={submit}
+            >
               {busy ? 'Storing…' : 'Store'}
             </Button>
           </Row>

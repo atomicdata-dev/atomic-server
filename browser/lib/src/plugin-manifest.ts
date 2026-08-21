@@ -73,3 +73,22 @@ export function parseManifest(raw: unknown): PluginManifest {
     }),
   };
 }
+
+/**
+ * Secret names a plugin's source actually spends, whether or not it declared
+ * them.
+ *
+ * A plugin that writes `secret:google_calendar_token` needs that credential
+ * even if it forgot to say so — and an author who forgot is exactly the one who
+ * cannot work out where to enter it. Scanning the source means the page can
+ * offer a slot anyway, asking for the origin the declaration would have named.
+ */
+export function secretsMentionedIn(source: string): string[] {
+  const found = new Set<string>();
+
+  for (const match of source.matchAll(/secret:([A-Za-z0-9_-]+)/g)) {
+    found.add(match[1]);
+  }
+
+  return [...found].sort();
+}
