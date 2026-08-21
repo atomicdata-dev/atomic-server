@@ -4,7 +4,7 @@ import { FaPencil, FaPlay } from 'react-icons/fa6';
 import { useStore, type Resource } from '@tomic/react';
 import { Button } from '@components/Button';
 import { Column, Row } from '@components/Row';
-import { ContainerNarrow } from '@components/Containers';
+import { ContainerWide } from '@components/Containers';
 import { EditableTitle } from '@components/EditableTitle';
 import { HighlightedCodeBlock } from '@components/HighlightedCodeBlock';
 import { useNavigateWithTransition } from '@hooks/useNavigateWithTransition';
@@ -42,18 +42,20 @@ export function PluginPage({
   const run = useCallback(() => setRunning(true), []);
 
   return (
-    <ContainerNarrow>
+    <ContainerWide>
       <Column gap='1.5rem'>
         <Row justify='space-between' align='flex-start'>
           <EditableTitle resource={resource} />
-          <Row gap='0.5rem' center>
+          {/* A long title was squeezing these until their labels wrapped one
+              letter per line. */}
+          <Actions gap='0.5rem' center>
             <Button subtle onClick={() => navigate(editURL(resource.subject))}>
               <FaPencil aria-hidden /> Edit
             </Button>
             <Button onClick={run}>
               <FaPlay aria-hidden /> Run
             </Button>
-          </Row>
+          </Actions>
         </Row>
 
         <PluginSecrets
@@ -85,9 +87,18 @@ export function PluginPage({
           />
         )}
       </Column>
-    </ContainerNarrow>
+    </ContainerWide>
   );
 }
+
+/** Never squeezed by the title beside it. */
+const Actions = styled(Row)`
+  flex-shrink: 0;
+
+  button {
+    white-space: nowrap;
+  }
+`;
 
 const SectionTitle = styled.h2`
   font-size: 1.1rem;
