@@ -13,6 +13,7 @@ pub mod opfs_backend;
 pub mod plugin_meta;
 pub mod plugin_schedule;
 pub mod plugin_secret;
+pub mod plugin_trigger;
 pub(crate) mod prop_val_sub_index;
 mod query_index;
 #[cfg(feature = "db-redb")]
@@ -47,6 +48,7 @@ use crate::{
         plugin_meta::{PluginMeta, PluginMetaKey},
         plugin_schedule::{PluginSchedule, PluginScheduleKey},
         plugin_secret::{PluginSecret, PluginSecretInfo, PluginSecretKey},
+        plugin_trigger::{PluginTrigger, PluginTriggerKey},
         query_index::requires_query_index,
         val_prop_sub_index::find_in_val_prop_sub_index,
     },
@@ -2165,6 +2167,82 @@ impl Db {
         }
 
         Ok(due)
+    }
+
+    pub fn set_plugin_trigger(
+        &self,
+        key: &PluginTriggerKey,
+        trigger: &PluginTrigger,
+    ) -> AtomicResult<()> {
+        // The store only fires membership events for queries it watches, so
+        // registering the filter is part of storing the trigger rather than a
+        // separate step someone can forget — a trigger that was never watched
+        // would sit there looking armed and never fire.
+        trigger.query.watch(self)?;
+
+        self.kv
+            .insert(Tree::PluginTrigger, &key.encode()?, &trigger.encode()?)?;
+        Ok(())
+    }
+
+    pub fn get_plugin_trigger(
+        &self,
+        key: &PluginTriggerKey,
+    ) -> AtomicResult<Option<PluginTrigger>> {
+        let Some(bin) = self.kv.get(Tree::PluginTrigger, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(PluginTrigger::from_bytes(&bin)?))
+    }
+
+    pub fn delete_plugin_trigger(&self, key: &PluginTriggerKey) -> AtomicResult<()> {
+        // The watched query stays. Another plugin — or a live `SUBSCRIBE_QUERY`
+        // — may be watching the same filter, and unwatching one that is still
+        // in use would silently stop delivering to it.
+        self.kv.remove(Tree::PluginTrigger, &key.encode()?)?;
+        Ok(())
+    }
+
+    /// Every trigger whose query is the one that just changed.
+    ///
+    /// A whole-tree scan, for the same reason `due_plugin_schedules` is one:
+    /// there is one entry per triggered plugin, which is a very small set. An
+    /// index keyed by query id would be another thing to keep in step for no
+    /// gain at this size.
+    pub fn plugin_triggers_for_query(
+        &self,
+        query_id: &[u8],
+    ) -> AtomicResult<Vec<(PluginTriggerKey, PluginTrigger)>> {
+        let mut found = Vec::new();
+
+        for entry in self.kv.iter_tree(Tree::PluginTrigger) {
+            let (key, value) = entry?;
+            let trigger = PluginTrigger::from_bytes(&value)?;
+
+            if crate::db::query_index::query_id(&trigger.query)?.as_slice() == query_id {
+                found.push((PluginTriggerKey::from_bytes(&key)?, trigger));
+            }
+        }
+
+        Ok(found)
+    }
+
+    /// Re-registers every stored trigger's query as watched.
+    ///
+    /// Called at startup: watched queries live in the store, but a trigger
+    /// written by a version that did not watch — or one whose watch entry was
+    /// lost — would otherwise never fire again, and nothing would say so.
+    pub fn watch_plugin_trigger_queries(&self) -> AtomicResult<usize> {
+        let mut watched = 0;
+
+        for entry in self.kv.iter_tree(Tree::PluginTrigger) {
+            let (_, value) = entry?;
+            PluginTrigger::from_bytes(&value)?.query.watch(self)?;
+            watched += 1;
+        }
+
+        Ok(watched)
     }
 
     fn get_index_iterator_for_query(&self, q: &Query) -> IndexIterator {
