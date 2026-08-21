@@ -5,8 +5,13 @@ We use `playwright` to run end-to-end tests in the browser.
 ## Running the server
 
 The suite needs the data-browser dev server on **6747** and an `atomic-server` on
-whatever port **`VITE_ATOMIC_SERVER_URL`** names in
-`browser/data-browser/.env.development` (currently 9885).
+whatever port **`VITE_ATOMIC_SERVER_URL`** resolves to. Vite reads
+`.env.development.local` first, then the committed `.env.development` (9885
+today), and falls back to the default in `browser/data-browser/vite.config.ts`
+(9883), which points the app and the dev proxy at the same server.
+`pnpm test-server` reads the same two files in the same order, so it follows
+the app; a shell export it cannot see, which is what `ATOMIC_E2E_SERVER_URL`
+is for.
 
 That indirection is the single easiest thing to get wrong here. The suite's own
 `SERVER_URL` variable only points the test _helpers_; the app the tests drive
