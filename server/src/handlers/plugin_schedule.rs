@@ -13,7 +13,9 @@ use atomic_lib::{
 };
 
 use crate::{
-    appstate::AppState, errors::AtomicServerResult, helpers::get_client_agent,
+    appstate::AppState,
+    errors::{AtomicServerError, AtomicServerResult},
+    helpers::get_client_agent,
     plugins::scheduler::drive_terms,
 };
 
@@ -154,10 +156,11 @@ pub async fn handle_set_auto_apply(
     let agent = authorize(&appstate, &req, &context, &body.plugin).await?;
     let key = PluginScheduleKey::new(&body.drive, &body.plugin);
 
-    let mut schedule = appstate
-        .store
-        .get_plugin_schedule(&key)?
-        .ok_or("This plugin has no schedule, so there is nothing to apply automatically")?;
+    let mut schedule = appstate.store.get_plugin_schedule(&key)?.ok_or_else(|| {
+        AtomicServerError::bad_request(
+            "This plugin has no schedule, so there is nothing to apply automatically",
+        )
+    })?;
 
     if !body.enabled {
         schedule.auto_apply = None;
@@ -169,7 +172,9 @@ pub async fn handle_set_auto_apply(
     let reviewed = reviewed_run(&appstate, &body.drive, &body.plugin).await?;
 
     let ForAgent::AgentSubject(subject) = &agent else {
-        return Err("Only a signed-in agent can allow a plugin to write unattended".into());
+        return Err(AtomicServerError::bad_request(
+            "Only a signed-in agent can allow a plugin to write unattended",
+        ));
     };
 
     schedule.auto_apply = Some(AutoApplyGrant {
@@ -194,10 +199,10 @@ async fn reviewed_run(
 ) -> AtomicServerResult<String> {
     let terms = drive_terms(&appstate.store, drive)
         .await
-        .ok_or("This drive has no plugin vocabulary yet")?;
+        .ok_or_else(|| AtomicServerError::bad_request("This drive has no plugin vocabulary yet"))?;
     let status_property = terms
         .property("run-status")
-        .ok_or("This drive has no run records yet")?;
+        .ok_or_else(|| AtomicServerError::bad_request("This drive has no run records yet"))?;
     let started_property = terms.property("started-at");
 
     let plugin_resource = appstate.store.get_resource(&plugin.into()).await?;
@@ -227,7 +232,9 @@ async fn reviewed_run(
     }
 
     best.map(|(_, subject)| subject).ok_or_else(|| {
-        "Run this plugin and apply its changes once before letting it write on its own".into()
+        AtomicServerError::bad_request(
+            "Run this plugin and apply its changes once before letting it write on its own",
+        )
     })
 }
 
