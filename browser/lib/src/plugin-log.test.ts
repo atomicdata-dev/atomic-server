@@ -114,6 +114,7 @@ describe('ensureSchema', () => {
     expect(store.world[ONTOLOGY].props[core.properties.classes]).toEqual([
       schema.classes['plugin-script'],
       schema.classes['plugin-run'],
+      schema.classes.app,
     ]);
     expect(
       store.world[ONTOLOGY].props[core.properties.properties],
