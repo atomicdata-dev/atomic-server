@@ -36,6 +36,9 @@ pub struct AppState {
     /// manifest endpoint so the welcome screen can route account creation to the
     /// dashboard.
     pub managed_dashboard_url: Arc<std::sync::RwLock<Option<String>>>,
+    /// Short-lived capabilities that let a null-origin plugin iframe read the
+    /// one plugin's source it was opened for. See `plugins::view_token`.
+    pub view_tokens: Arc<crate::plugins::view_token::ViewTokens>,
 }
 
 impl AppState {
@@ -219,6 +222,7 @@ impl AppState {
             index_status_broadcast,
             managed: server_info.managed,
             managed_dashboard_url: server_info.managed_dashboard_url,
+            view_tokens: Arc::new(Default::default()),
         })
     }
 
