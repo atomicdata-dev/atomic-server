@@ -8006,6 +8006,14 @@ msgstr ""
 msgid "Button.tsx"
 msgstr ""
 
+#: src/chunks/AppPage/index.tsx
+msgid "This app has no entry point, so there is nothing to open."
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Sign in to open this app."
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexte compacté"
 

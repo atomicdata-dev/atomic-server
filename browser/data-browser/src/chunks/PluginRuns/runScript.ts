@@ -68,6 +68,25 @@ export function pluginClassesFor(
  * the action without a reload.
  */
 export function usePluginClass(drive: string | undefined): string | undefined {
+  return useDriveClass(drive, 'plugin-script');
+}
+
+/** The drive's App class, once resolved. Absent while looking up. */
+export function useAppClass(drive: string | undefined): string | undefined {
+  return useDriveClass(drive, 'app');
+}
+
+/**
+ * One of the drive's plugin classes, by shortname.
+ *
+ * Resolved in state rather than read during render: filling a module cache
+ * re-renders nothing, so a page that asked during render would decide the
+ * class does not exist and never look again.
+ */
+function useDriveClass(
+  drive: string | undefined,
+  shortname: 'plugin-script' | 'app',
+): string | undefined {
   const store = useStore();
   const [pluginClass, setPluginClass] = useState<string>();
 
@@ -84,7 +103,7 @@ export function usePluginClass(drive: string | undefined): string | undefined {
     const resolve = () =>
       findSchema(store, drive, pluginSchema())
         .then(schema => {
-          if (!cancelled) setPluginClass(schema.classes?.['plugin-script']);
+          if (!cancelled) setPluginClass(schema.classes?.[shortname]);
         })
         .catch(() => {
           if (!cancelled) setPluginClass(undefined);
@@ -111,7 +130,7 @@ export function usePluginClass(drive: string | undefined): string | undefined {
       cancelled = true;
       unsubscribe?.();
     };
-  }, [store, drive]);
+  }, [store, drive, shortname]);
 
   return pluginClass;
 }

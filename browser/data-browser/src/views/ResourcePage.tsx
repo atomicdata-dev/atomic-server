@@ -44,6 +44,7 @@ import { PluginView } from './PluginView/PluginView';
 import { MeetingPage } from './Meeting/MeetingPage';
 import { PluginPage as AtomicPluginPage } from '@chunks/PluginRuns/PluginPage';
 import { useIsPlugin } from '@chunks/PluginRuns/PluginSection';
+import { useAppClass } from '@chunks/PluginRuns/runScript';
 
 const TablePage = lazy(() =>
   import('../chunks/TablePage').then(m => ({ default: m.TablePage })),
@@ -51,6 +52,10 @@ const TablePage = lazy(() =>
 
 const DashboardPage = lazy(() =>
   import('../chunks/DashboardPage').then(m => ({ default: m.DashboardPage })),
+);
+
+const AppPage = lazy(() =>
+  import('../chunks/AppPage').then(m => ({ default: m.AppPage })),
 );
 
 /** These properties are passed to every View at Page level */
@@ -75,6 +80,7 @@ const ResourcePage: React.FC<Props> = ({ subject }) => {
   const isPlugin = useIsPlugin(resource);
   const store = useStore();
   const drive = store.getDrive();
+  const appClass = useAppClass(drive);
 
   // The body can have an inert attribute when the user navigated from an open dialog.
   // we remove it to make the page interactive again.
@@ -159,6 +165,20 @@ const ResourcePage: React.FC<Props> = ({ subject }) => {
 
   if (ReturnComponent === ResourcePageDefault) {
     if (loading) return null;
+
+    // Like a plugin's, an app's class is minted per drive, so it cannot be a
+    // case in `selectComponent`. An app opens to its own view.
+    if (appClass !== undefined && resource.hasClasses(appClass)) {
+      return (
+        <Main subject={subject}>
+          <ErrorBoundary>
+            <Suspense fallback={<Spinner />}>
+              <AppPage resource={resource} />
+            </Suspense>
+          </ErrorBoundary>
+        </Main>
+      );
+    }
 
     // A plugin's class is minted per drive, so it has no fixed subject and
     // cannot be a case in `selectComponent`. It gets a real page all the same.
