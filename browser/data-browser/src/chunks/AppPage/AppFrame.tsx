@@ -30,6 +30,9 @@ export function AppFrame({
   const [src, setSrc] = useState<string>();
   const [problem, setProblem] = useState<string>();
   const frameRef = useRef<HTMLIFrameElement>(null);
+  // Subject to the store's unsubscribe, so a view that re-renders does not
+  // accumulate a listener per render and get told about one change N times.
+  const watching = useRef(new Map<string, () => void>());
   const stylesheet = useCreateThemeVars();
 
   useEffect(() => {
@@ -85,14 +88,47 @@ export function AppFrame({
       // one, and every other window on the origin can post here too.
       if (e.source !== frameRef.current?.contentWindow) return;
 
-      void answer(store, app, e.data, reply => {
-        frameRef.current?.contentWindow?.postMessage(reply, '*');
-      });
+      const post = (message: unknown) =>
+        frameRef.current?.contentWindow?.postMessage(message, '*');
+
+      // Subscriptions are wired here rather than in `handleRequest`, because
+      // this is what owns the frame that has to be posted back to.
+      if (e.data.op === 'subscribe' && e.data.subject) {
+        const subject = e.data.subject;
+
+        if (!watching.current.has(subject)) {
+          watching.current.set(
+            subject,
+            store.subscribe(subject, () => post({ __atomicChanged: subject })),
+          );
+        }
+
+        post({ id: e.data.id, result: true });
+
+        return;
+      }
+
+      if (e.data.op === 'unsubscribe' && e.data.subject) {
+        watching.current.get(e.data.subject)?.();
+        watching.current.delete(e.data.subject);
+        post({ id: e.data.id, result: true });
+
+        return;
+      }
+
+      void answer(store, app, e.data, post);
     };
 
     window.addEventListener('message', onMessage);
+    const released = watching.current;
 
-    return () => window.removeEventListener('message', onMessage);
+    return () => {
+      window.removeEventListener('message', onMessage);
+      // Navigating away must not leave the store notifying a frame that is
+      // gone — those callbacks would keep the whole component tree alive.
+      released.forEach(unsubscribe => unsubscribe());
+      released.clear();
+    };
   }, [sendStyle, store, app]);
 
   if (problem !== undefined) {

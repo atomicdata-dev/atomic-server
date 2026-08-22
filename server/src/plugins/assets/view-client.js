@@ -118,7 +118,14 @@ export const store = {
     return makeResource(result.subject, result.propVals);
   },
 
-  /** Calls back whenever `subject` changes, until the returned function runs. */
+  /**
+   * Calls back whenever `subject` changes, until the returned function runs.
+   *
+   * Writing from inside the handler can feed itself: adding a child counts as
+   * a change to its parent, so a view that subscribes to its app and writes
+   * into it on every notification will keep going. Guard on what actually
+   * changed, or write somewhere you are not watching.
+   */
   subscribe(subject, handler) {
     const listener = event => {
       if (event.data && event.data.__atomicChanged === subject) handler();
