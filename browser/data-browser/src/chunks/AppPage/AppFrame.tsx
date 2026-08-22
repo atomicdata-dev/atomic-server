@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
+import { handleRequest, isHostRequest, type HostReply } from './hostStore';
 import { LoaderBlock } from '@components/Loader';
 
 import resetCss from '../../reset.css?raw';
@@ -72,13 +73,27 @@ export function AppFrame({
 
   useEffect(() => {
     const onMessage = (e: MessageEvent) => {
-      if (e.data?.type === '__atomic_plugin_ready') sendStyle();
+      if (e.data?.type === '__atomic_plugin_ready') {
+        sendStyle();
+
+        return;
+      }
+
+      if (!isHostRequest(e.data)) return;
+
+      // Only from the frame this component owns. A page can host more than
+      // one, and every other window on the origin can post here too.
+      if (e.source !== frameRef.current?.contentWindow) return;
+
+      void answer(store, app, e.data, reply => {
+        frameRef.current?.contentWindow?.postMessage(reply, '*');
+      });
     };
 
     window.addEventListener('message', onMessage);
 
     return () => window.removeEventListener('message', onMessage);
-  }, [sendStyle]);
+  }, [sendStyle, store, app]);
 
   if (problem !== undefined) {
     return <Problem>{problem}</Problem>;
@@ -97,6 +112,23 @@ export function AppFrame({
       title='App'
     />
   );
+}
+
+/**
+ * Serving one request, shaped so failures come back to the app as errors it
+ * can render rather than as a promise nobody is watching.
+ */
+async function answer(
+  store: ReturnType<typeof useStore>,
+  app: string,
+  request: Parameters<typeof handleRequest>[2],
+  post: (reply: HostReply) => void,
+): Promise<void> {
+  try {
+    post({ id: request.id, result: await handleRequest(store, app, request) });
+  } catch (e) {
+    post({ id: request.id, error: (e as Error).message });
+  }
 }
 
 type MintResult = { ok: true; token: string } | { ok: false; error: string };
