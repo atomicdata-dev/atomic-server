@@ -170,6 +170,10 @@ fn render_plugin_ui_html_with(
         "/plugin-ui?{}",
         query_string.replace("format=html", "format=js")
     );
+    let client_url = format!(
+        "/plugin-ui?{}",
+        query_string.replace("format=html", "format=client")
+    );
     let css_link = if css_exists {
         let css_url = format!(
             "/plugin-ui?{}",
@@ -187,12 +191,13 @@ fn render_plugin_ui_html_with(
         format!(
             r#"<script type="module" nonce="{nonce}">
 import * as plugin from "{js_url}";
+import {{ store }} from "{client_url}";
 const root = document.getElementById('root');
 try {{
   if (typeof plugin.view !== 'function') {{
     throw new Error('This plugin exports no view() function.');
   }}
-  await plugin.view({{ root }});
+  await plugin.view({{ root, store }});
 }} catch (e) {{
   root.textContent = String(e && e.message ? e.message : e);
 }}
@@ -328,6 +333,15 @@ async fn serve_drive_plugin(
             .content_type("text/html; charset=utf-8")
             .insert_header(("Content-Security-Policy", csp))
             .body(body));
+    }
+
+    // The data API the view is handed. Embedded rather than generated, so it
+    // stays a real JS file that can be linted and read.
+    if format == "client" {
+        return Ok(HttpResponse::Ok()
+            .content_type("application/javascript")
+            .insert_header((header::ACCESS_CONTROL_ALLOW_ORIGIN, "*"))
+            .body(include_str!("../plugins/assets/view-client.js")));
     }
 
     if format != "js" {
