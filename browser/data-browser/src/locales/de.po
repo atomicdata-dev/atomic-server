@@ -8423,6 +8423,10 @@ msgstr ""
 msgid "Apply background runs without asking me"
 msgstr ""
 
+#: src/oxc-styled-components.test.ts
+msgid "Button.tsx"
+msgstr ""
+
 #~ msgid ""
 #~ "Enter your recovery code to show your secret or add a passkey on this "
 #~ "device. Your existing recovery code will keep working."
