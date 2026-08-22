@@ -64,6 +64,17 @@ impl AppState {
         .await?;
 
         crate::blob_storage::configure(&mut store).await?;
+        // Before anything reads or writes a secret, so nothing is stored in
+        // the clear during startup and then silently left that way.
+        store.set_node_key(crate::node_key::load_or_create(&config.config_dir)?);
+
+        // `config.toml` holds this server's agent secret and was created
+        // world-readable by every version before this one. Narrowed on every
+        // boot rather than at setup, so an existing installation is fixed by
+        // upgrading rather than by someone reading a release note.
+        if let Err(e) = crate::node_key::restrict(&config.config_file_path) {
+            tracing::warn!("could not restrict the config file: {e}");
+        }
 
         // Drop the persisted watched-query registry on startup. Every
         // entry was registered by a now-dead WS connection; live

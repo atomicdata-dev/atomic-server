@@ -164,6 +164,88 @@ mod store_tests {
         )
     }
 
+    const NODE_KEY: [u8; crate::vault::keys::KEK_LEN] = [7u8; crate::vault::keys::KEK_LEN];
+
+    /// The bytes a stolen disk, a backup or a copied store file would hold.
+    fn on_disk(db: &Db, key: &PluginSecretKey) -> Vec<u8> {
+        db.kv
+            .get(crate::db::trees::Tree::PluginSecret, &key.encode().unwrap())
+            .expect("read")
+            .expect("present")
+            .to_vec()
+    }
+
+    #[tokio::test]
+    async fn a_stored_secret_is_not_in_the_clear() {
+        let db = db("at_rest").await;
+        db.set_node_key(NODE_KEY);
+        db.set_plugin_secret(&key(), &secret()).expect("stored");
+
+        assert!(
+            !String::from_utf8_lossy(&on_disk(&db, &key())).contains("tok-abc"),
+            "the secret was written to disk in the clear",
+        );
+    }
+
+    #[tokio::test]
+    async fn the_node_can_still_spend_it_unattended() {
+        let db = db("at_rest_spend").await;
+        db.set_node_key(NODE_KEY);
+        db.set_plugin_secret(&key(), &secret()).expect("stored");
+
+        // No user and no credential — which is the whole reason the node
+        // holds a key rather than the person holding one.
+        let seen = db
+            .use_plugin_secret(&key(), "https://api.notion.com", 1, |v| v.to_string())
+            .expect("read")
+            .expect("allowed");
+
+        assert_eq!(seen, "tok-abc");
+    }
+
+    #[tokio::test]
+    async fn a_secret_written_before_there_was_a_key_still_opens() {
+        let db = db("at_rest_legacy").await;
+        db.set_plugin_secret(&key(), &secret()).expect("stored");
+
+        // The key arrives later, as it does on an installation that predates
+        // it. Refusing here would lock people out of their own credentials.
+        db.set_node_key(NODE_KEY);
+
+        let seen = db
+            .use_plugin_secret(&key(), "https://api.notion.com", 1, |v| v.to_string())
+            .expect("read")
+            .expect("allowed");
+
+        assert_eq!(seen, "tok-abc");
+    }
+
+    #[tokio::test]
+    async fn a_store_restored_on_another_node_is_inert() {
+        let origin = db("at_rest_stolen").await;
+        origin.set_node_key(NODE_KEY);
+        origin.set_plugin_secret(&key(), &secret()).expect("stored");
+        let stolen = on_disk(&origin, &key());
+
+        let elsewhere = db("at_rest_elsewhere").await;
+        elsewhere.set_node_key([9u8; crate::vault::keys::KEK_LEN]);
+        elsewhere
+            .kv
+            .insert(
+                crate::db::trees::Tree::PluginSecret,
+                &key().encode().unwrap(),
+                &stolen,
+            )
+            .expect("planted");
+
+        assert!(
+            elsewhere
+                .use_plugin_secret(&key(), "https://api.notion.com", 1, |v| v.to_string())
+                .is_err(),
+            "a store restored on another machine handed over its secrets",
+        );
+    }
+
     #[tokio::test]
     async fn a_secret_is_spendable_but_not_readable() {
         let db = db("spendable").await;

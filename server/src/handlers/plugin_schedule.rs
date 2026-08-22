@@ -75,6 +75,8 @@ pub async fn handle_set_schedule(
     match body.interval_seconds {
         None => appstate.store.delete_plugin_schedule(&key)?,
         Some(interval) => {
+            refuse_if_unattended_is_impossible(&appstate, &body.drive, &body.plugin).await?;
+
             // A new schedule rather than a reset: changing the interval should
             // not discard a verdict nobody has reviewed yet.
             let existing = appstate.store.get_plugin_schedule(&key)?;
@@ -186,6 +188,31 @@ pub async fn handle_set_auto_apply(
     appstate.store.set_plugin_schedule(&key, &schedule)?;
 
     Ok(HttpResponse::Ok().json(read(&appstate, &key)?))
+}
+
+/// Refuses to arm a plugin whose secrets need a person present.
+///
+/// Checked when the schedule or trigger is set, not when it fires: a run at
+/// 3am has nobody to tell, and "it silently stopped importing a week ago" is
+/// the failure this exists to prevent.
+pub async fn refuse_if_unattended_is_impossible(
+    appstate: &AppState,
+    drive: &str,
+    plugin: &str,
+) -> AtomicServerResult<()> {
+    let blocked = appstate
+        .store
+        .plugin_secrets_needing_a_person(drive, plugin)?;
+
+    if blocked.is_empty() {
+        return Ok(());
+    }
+
+    Err(AtomicServerError::bad_request(format!(
+        "This plugin cannot run unattended: {} can only be opened while you are here. \
+         Run it manually, or store that credential so this node can open it.",
+        blocked.join(", "),
+    )))
 }
 
 /// The most recent run of this plugin whose changes a person applied.

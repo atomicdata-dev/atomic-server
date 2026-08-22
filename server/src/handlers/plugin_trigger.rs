@@ -103,6 +103,13 @@ pub async fn handle_set_trigger(
         ));
     }
 
+    crate::handlers::plugin_schedule::refuse_if_unattended_is_impossible(
+        &appstate,
+        &body.drive,
+        &body.plugin,
+    )
+    .await?;
+
     let query = QueryFilter {
         filters: filters
             .iter()

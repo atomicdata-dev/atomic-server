@@ -300,6 +300,13 @@ pub struct Db {
     /// Optional remote file storage. Configure before sharing this Db.
     pub blob_backend: Option<Arc<dyn blob_backend::BlobBackend>>,
     default_agent: Arc<Mutex<Option<crate::agents::Agent>>>,
+    /// The key this node wraps stored secrets with, set once at startup.
+    ///
+    /// Held here rather than passed to each call so it cannot be forgotten at
+    /// one of them: a secret written in the clear because a caller did not
+    /// know about encryption is indistinguishable, on disk, from one nobody
+    /// meant to protect.
+    node_key: Arc<std::sync::OnceLock<[u8; crate::vault::keys::KEK_LEN]>>,
     /// Endpoints are checked whenever a resource is requested. They calculate (some properties of) the resource and return it.
     endpoints: Vec<Endpoint>,
     /// List of class extenders.
@@ -454,6 +461,7 @@ impl Db {
             blob_backend: None,
             kv: Arc::new(sled_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -494,6 +502,7 @@ impl Db {
             blob_backend: None,
             kv: Arc::new(btreemap_store::BTreeMapStore::new()),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -530,6 +539,7 @@ impl Db {
             blob_backend: None,
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -627,6 +637,7 @@ impl Db {
             blob_backend: None,
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -780,6 +791,7 @@ impl Db {
             blob_backend: None,
             kv: Arc::new(redb_store),
             default_agent: Arc::new(Mutex::new(None)),
+            node_key: Arc::new(std::sync::OnceLock::new()),
             endpoints: vec![],
             class_extenders: Arc::new(RwLock::new(vec![])),
 
@@ -2055,14 +2067,66 @@ impl Db {
     /// There is deliberately no `get_plugin_secret` returning a value. The only
     /// reader is [`Db::use_plugin_secret`], which hands the value to a closure
     /// and never out of it, so no endpoint can serve one by accident.
+    /// Sets the key stored secrets are wrapped with. Once per process.
+    ///
+    /// Silently ignored if already set: a second call would mean two parts of
+    /// the process disagree about which key opens the store, and the loser
+    /// would write secrets the winner cannot read.
+    pub fn set_node_key(&self, key: [u8; crate::vault::keys::KEK_LEN]) {
+        let _ = self.node_key.set(key);
+    }
+
+    /// Wraps a secret for storage, or passes it through when no key is set.
+    ///
+    /// Passing through is what lets a store predating the node key still be
+    /// read and written. It is not a fallback anyone should rely on, which is
+    /// why `has_node_key` exists for callers that must know.
+    fn wrap_secret(&self, value: &str) -> AtomicResult<String> {
+        let Some(key) = self.node_key.get() else {
+            return Ok(value.to_string());
+        };
+
+        crate::vault::secret_envelope::SecretEnvelope::create(
+            value.as_bytes(),
+            &[crate::vault::secret_envelope::NewWrapper::NodeKey { kek: *key }],
+        )?
+        .to_json()
+    }
+
+    /// Opens a stored secret, tolerating one written before there was a key.
+    fn unwrap_secret(&self, stored: &str) -> AtomicResult<String> {
+        let Ok(envelope) = crate::vault::secret_envelope::SecretEnvelope::from_json(stored) else {
+            // Written before this node had a key. Readable, and rewritten
+            // wrapped the next time it is set.
+            return Ok(stored.to_string());
+        };
+
+        let Some(key) = self.node_key.get() else {
+            return Err("this secret is wrapped, but this node has no key to open it".into());
+        };
+
+        let opened = envelope.unwrap_secret(&crate::vault::secret_envelope::Unlock::Kek(*key))?;
+
+        String::from_utf8(opened).map_err(|_| "a stored secret was not text".into())
+    }
+
+    /// Whether stored secrets are wrapped at all.
+    pub fn has_node_key(&self) -> bool {
+        self.node_key.get().is_some()
+    }
+
     pub fn set_plugin_secret(
         &self,
         key: &PluginSecretKey,
         secret: &PluginSecret,
     ) -> AtomicResult<()> {
         PluginSecretKey::validate_name(&key.name)?;
+
+        let mut stored = secret.clone();
+        stored.value = self.wrap_secret(&secret.value)?;
+
         self.kv
-            .insert(Tree::PluginSecret, &key.encode()?, &secret.encode()?)?;
+            .insert(Tree::PluginSecret, &key.encode()?, &stored.encode()?)?;
         Ok(())
     }
 
@@ -2089,7 +2153,7 @@ impl Db {
             return Ok(None);
         }
 
-        let out = f(&secret.value);
+        let out = f(&self.unwrap_secret(&secret.value)?);
 
         secret.record_use(at);
         self.kv
@@ -2114,6 +2178,37 @@ impl Db {
     }
 
     /// Describes every secret a plugin has. Never their values.
+    /// Secrets this node could not open with nobody present.
+    ///
+    /// A secret wrapped only by a user's credential has no unattended path —
+    /// that is the trade for the server not being able to read it, not a gap.
+    /// So arming a schedule or a trigger has to ask this first, while the
+    /// person is there to be told, rather than discovering it at 3am and
+    /// leaving an error nobody reads until the week is out.
+    pub fn plugin_secrets_needing_a_person(
+        &self,
+        drive: &str,
+        plugin: &str,
+    ) -> AtomicResult<Vec<String>> {
+        let prefix = PluginSecretKey::plugin_prefix(drive, plugin);
+        let mut blocked = Vec::new();
+
+        for entry in self.kv.scan_prefix(Tree::PluginSecret, &prefix) {
+            let (key, value) = entry?;
+            let stored = PluginSecret::from_bytes(&value)?;
+
+            // Anything this node can already open is fine, wrapped or not:
+            // a secret from before there was a key reads as plaintext.
+            if self.unwrap_secret(&stored.value).is_err() {
+                blocked.push(PluginSecretKey::name_from_key(&key)?);
+            }
+        }
+
+        blocked.sort();
+
+        Ok(blocked)
+    }
+
     pub fn list_plugin_secrets(
         &self,
         drive: &str,
