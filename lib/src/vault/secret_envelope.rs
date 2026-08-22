@@ -72,6 +72,18 @@ pub enum WrapperKind {
     /// nothing — `CLOUD_VAULT_ARCHITECTURE.md`'s key diagram says *wraps* for
     /// exactly this reason.
     AgentSecret,
+    /// A key the node itself holds, outside the database it protects.
+    ///
+    /// The wrapper that lets a secret be used with nobody present — a plugin
+    /// importing at 3am cannot be asked for a passkey. It follows that this
+    /// wrapper does **not** protect against a compromised running server: the
+    /// process can open what it can open. What it does protect is every way a
+    /// database leaves the machine intact — a stolen disk, a backup, a copied
+    /// store file, a support bundle — which is the realistic path.
+    ///
+    /// A secret wrapped only by a user credential has no unattended path, by
+    /// construction. That is the trade, not a gap to engineer around.
+    NodeKey,
 }
 
 /// Argon2id parameters as stored, so a blob written today stays openable after
@@ -164,6 +176,10 @@ pub enum NewWrapper<'a> {
     AgentSecret {
         agent_secret: &'a [u8],
     },
+    /// Wrap under the node's own key, so the host can open this unattended.
+    NodeKey {
+        kek: [u8; KEK_LEN],
+    },
 }
 
 impl NewWrapper<'_> {
@@ -173,6 +189,7 @@ impl NewWrapper<'_> {
             NewWrapper::Password { .. } => WrapperKind::Password,
             NewWrapper::WebauthnPrf { .. } => WrapperKind::WebauthnPrf,
             NewWrapper::AgentSecret { .. } => WrapperKind::AgentSecret,
+            NewWrapper::NodeKey { .. } => WrapperKind::NodeKey,
         }
     }
 
@@ -182,6 +199,7 @@ impl NewWrapper<'_> {
             NewWrapper::Password { .. } => "password".to_string(),
             NewWrapper::WebauthnPrf { credential_id, .. } => credential_id.clone(),
             NewWrapper::AgentSecret { .. } => "agent-secret".to_string(),
+            NewWrapper::NodeKey { .. } => "node-key".to_string(),
         }
     }
 }
@@ -313,6 +331,7 @@ fn wrap_dek(dek: &[u8; DEK_LEN], spec: &NewWrapper) -> AtomicResult<Wrapper> {
         // No KDF: the agent secret is already a full-strength random key, so
         // stretching it would cost time and add nothing.
         NewWrapper::AgentSecret { agent_secret } => (None, None, agent_secret_kek(agent_secret)),
+        NewWrapper::NodeKey { kek } => (None, None, *kek),
     };
 
     let (nonce, wrapped_dek) = seal(&kek, dek)?;
@@ -389,7 +408,7 @@ impl SecretEnvelope {
                         Err(_) => continue,
                     }
                 }
-                (Unlock::Kek(kek), WrapperKind::WebauthnPrf) => *kek,
+                (Unlock::Kek(kek), WrapperKind::WebauthnPrf | WrapperKind::NodeKey) => *kek,
                 (Unlock::AgentSecret(secret), WrapperKind::AgentSecret) => agent_secret_kek(secret),
                 _ => continue,
             };

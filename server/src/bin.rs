@@ -17,6 +17,7 @@ mod https;
 mod invite_token;
 mod jsonerrors;
 mod metrics;
+mod node_key;
 pub mod plugins;
 mod routes;
 pub mod serve;
