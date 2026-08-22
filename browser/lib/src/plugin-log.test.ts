@@ -115,6 +115,7 @@ describe('ensureSchema', () => {
       schema.classes['plugin-script'],
       schema.classes['plugin-run'],
       schema.classes.app,
+      schema.classes['plugin-grant'],
     ]);
     expect(
       store.world[ONTOLOGY].props[core.properties.properties],
