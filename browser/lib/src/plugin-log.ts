@@ -76,6 +76,13 @@ export function pluginSchema(): SchemaSpec {
           'Resume token the run returned, so the next one is incremental.',
         datatype: Datatype.STRING,
       },
+      {
+        shortname: 'entrypoint',
+        name: 'Entry point',
+        description:
+          'The plugin whose view() opens when someone opens this app.',
+        datatype: Datatype.ATOMIC_URL,
+      },
     ],
     classes: [
       {
@@ -93,6 +100,13 @@ export function pluginSchema(): SchemaSpec {
           'One execution of a plugin: what triggered it, what it proposed, and what was written.',
         requires: ['trigger', 'started-at', 'run-status'],
         recommends: ['run-problems', 'run-outcomes', 'run-cursor'],
+      },
+      {
+        shortname: 'app',
+        name: 'App',
+        description:
+          'A parent whose children are its parts: its own ontology, the plugin that renders it, and any handlers that run on a schedule or a query edge. Sharing the app means sharing the subtree, which drive rights already do.',
+        requires: ['entrypoint'],
       },
     ],
   };
