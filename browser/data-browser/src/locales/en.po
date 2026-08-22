@@ -7897,6 +7897,10 @@ msgstr ""
 msgid "Apply background runs without asking me"
 msgstr "Apply background runs without asking me"
 
+#: src/oxc-styled-components.test.ts
+msgid "Button.tsx"
+msgstr "Button.tsx"
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Context compacted"
 

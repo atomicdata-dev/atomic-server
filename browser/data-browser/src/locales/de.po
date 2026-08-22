@@ -7769,13 +7769,21 @@ msgstr ""
 
 #. 0: schedule.autoApply.agent
 #: src/chunks/PluginRuns/PluginSchedule.tsx
-msgid "Allowed by {0}. Every write is still checked against what that account may change."
+msgid ""
+"Allowed by {0}. Every write is still checked against what that account may "
+"change."
 msgstr ""
 
 #: src/chunks/PluginRuns/PluginSchedule.tsx
-msgid "Available once you have run this plugin and applied its changes at least once."
+msgid ""
+"Available once you have run this plugin and applied its changes at least "
+"once."
 msgstr ""
 
 #: src/chunks/PluginRuns/PluginSchedule.tsx
 msgid "Apply background runs without asking me"
+msgstr ""
+
+#: src/oxc-styled-components.test.ts
+msgid "Button.tsx"
 msgstr ""
