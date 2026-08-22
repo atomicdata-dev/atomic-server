@@ -83,25 +83,6 @@ export function pluginSchema(): SchemaSpec {
           'The plugin whose view() opens when someone opens this app.',
         datatype: Datatype.ATOMIC_URL,
       },
-      {
-        shortname: 'granted-to',
-        name: 'Granted to',
-        description: 'The app this grant is about.',
-        datatype: Datatype.ATOMIC_URL,
-      },
-      {
-        shortname: 'may-write',
-        name: 'May write',
-        description:
-          'Resources this app may write outside its own subtree. It may always write its own.',
-        datatype: Datatype.RESOURCEARRAY,
-      },
-      {
-        shortname: 'granted-by',
-        name: 'Granted by',
-        description: 'The agent who allowed it, so a grant can be answered for.',
-        datatype: Datatype.ATOMIC_URL,
-      },
     ],
     classes: [
       {
@@ -126,14 +107,6 @@ export function pluginSchema(): SchemaSpec {
         description:
           'A parent whose children are its parts: its own ontology, the plugin that renders it, and any handlers that run on a schedule or a query edge. Sharing the app means sharing the subtree, which drive rights already do.',
         requires: ['entrypoint'],
-      },
-      {
-        shortname: 'plugin-grant',
-        name: 'Plugin grant',
-        description:
-          'What an app is allowed to write beyond its own subtree. Lives on the drive, never under the app it is about — an app can write its own subtree, so a grant kept there would be a permission the app could widen for itself.',
-        requires: ['granted-to'],
-        recommends: ['may-write', 'granted-by'],
       },
     ],
   };

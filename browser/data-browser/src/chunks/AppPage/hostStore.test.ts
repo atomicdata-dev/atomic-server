@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { core } from '@tomic/react';
 import type { Store } from '@tomic/react';
 import { handleRequest, isHostRequest, isWithinApp } from './hostStore';
-import type { Allowance } from './hostStore';
 
 const APP = 'did:ad:app';
 
@@ -149,65 +148,3 @@ describe('isHostRequest', () => {
   });
 });
 
-describe('what a grant widens', () => {
-  const allowing = (...subjects: string[]): Allowance => ({
-    mayWrite: subjects,
-  });
-
-  it('lets an app write a subject it was granted', async () => {
-    const { store, saved } = fakeStore({ 'did:ad:shared': 'did:ad:drive' });
-
-    await handleRequest(
-      store,
-      APP,
-      req('save', { subject: 'did:ad:shared', propVals: { p: 'v' } }),
-      allowing('did:ad:shared'),
-    );
-
-    expect(saved).toHaveLength(1);
-  });
-
-  it('covers what is under a granted subject', async () => {
-    const { store, saved } = fakeStore({
-      'did:ad:child': 'did:ad:shared',
-      'did:ad:shared': 'did:ad:drive',
-    });
-
-    await handleRequest(
-      store,
-      APP,
-      req('save', { subject: 'did:ad:child', propVals: { p: 'v' } }),
-      allowing('did:ad:shared'),
-    );
-
-    expect(saved).toHaveLength(1);
-  });
-
-  it('does not widen to a sibling of the granted subject', async () => {
-    const { store } = fakeStore({
-      'did:ad:shared': 'did:ad:drive',
-      'did:ad:other': 'did:ad:drive',
-    });
-
-    await expect(
-      handleRequest(
-        store,
-        APP,
-        req('save', { subject: 'did:ad:other', propVals: { p: 'v' } }),
-        allowing('did:ad:shared'),
-      ),
-    ).rejects.toThrow(/needs your permission/);
-  });
-
-  it('still refuses with no grant at all', async () => {
-    const { store } = fakeStore({ 'did:ad:shared': 'did:ad:drive' });
-
-    await expect(
-      handleRequest(
-        store,
-        APP,
-        req('save', { subject: 'did:ad:shared', propVals: { p: 'v' } }),
-      ),
-    ).rejects.toThrow(/needs your permission/);
-  });
-});

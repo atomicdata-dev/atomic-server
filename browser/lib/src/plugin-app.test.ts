@@ -14,11 +14,24 @@ function fakeStore() {
 
   const wrap = (subject: string) => ({
     subject,
+    error: undefined,
+    new: false,
     get: (property: string) => resources.get(subject)?.[property],
     set: async (property: string, value: JSONValue) => {
       resources.set(subject, {
         ...(resources.get(subject) ?? {}),
         [property]: value,
+      });
+    },
+    // Issuing the app's key pushes its DID onto the app's read/write lists.
+    push: (property: string, values: string[]) => {
+      const existing = resources.get(subject) ?? {};
+      const current = Array.isArray(existing[property])
+        ? (existing[property] as string[])
+        : [];
+      resources.set(subject, {
+        ...existing,
+        [property]: [...current, ...values] as unknown as JSONValue,
       });
     },
     save: async () => undefined,
@@ -27,9 +40,24 @@ function fakeStore() {
   });
 
   const store: SchemaStore = {
+    // Signed in: issuing a key is something an agent does, and refusing when
+    // signed out is one of `issueAccessAgent`'s own rules.
+    getAgent: () => ({ subject: 'did:ad:agent:me' }),
+    resources: new Map(),
+    notifyResourceManuallyCreated: () => undefined,
     getResource: async (subject: string) => wrap(subject),
-    newResource: async ({ parent, isA, propVals }) => {
-      const subject = `local:minted-${++minted}`;
+    newResource: async ({
+      subject: given,
+      parent,
+      isA,
+      propVals,
+    }: {
+      subject?: string;
+      parent: string;
+      isA: string[] | string;
+      propVals: Record<string, JSONValue>;
+    }) => {
+      const subject = given ?? `local:minted-${++minted}`;
       resources.set(subject, {
         [core.properties.parent]: parent,
         [core.properties.isA]: isA as unknown as JSONValue,
@@ -108,6 +136,25 @@ describe('createApp', () => {
 
     expect(entrypointProperty).toBeDefined();
     expect(resources.get(created.entrypoint)).toBeDefined();
+  });
+
+  it('gives the app an identity of its own', async () => {
+    const { store, resources } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      source: SOURCE,
+    });
+
+    expect(created.agent).toMatch(/^did:ad:agent:/);
+    expect(created.secret).toBeTruthy();
+
+    // Not under the app: an app may write its own subtree, so its agent
+    // resource kept there would be a public key the app could replace.
+    expect(resources.get(created.agent)?.[core.properties.parent]).not.toBe(
+      created.app,
+    );
   });
 
   it('carries the source it was given', async () => {

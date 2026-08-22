@@ -72,24 +72,10 @@ export async function isWithinApp(
   return false;
 }
 
-/**
- * What an app may write beyond its own subtree.
- *
- * Resolved by the caller and passed in, so this module stays a pure decision
- * about a request rather than something that fetches while deciding.
- */
-export type Allowance = {
-  /** Subjects an app may write. Each also covers what is under it. */
-  mayWrite: string[];
-};
-
-export const NOTHING_EXTRA: Allowance = { mayWrite: [] };
-
 export async function handleRequest(
   store: Store,
   app: string,
   request: HostRequest,
-  allowance: Allowance = NOTHING_EXTRA,
 ): Promise<unknown> {
   switch (request.op) {
     case 'app':
@@ -119,7 +105,7 @@ export async function handleRequest(
       // place a view may always write, so it is the only sensible default.
       const parent = request.parent ?? app;
 
-      await refuseUnlessAllowed(store, parent, app, allowance);
+      await refuseOutsideApp(store, parent, app);
 
       const created = await store.newResource({
         parent,
@@ -134,7 +120,7 @@ export async function handleRequest(
     case 'save': {
       const subject = required(request.subject, 'subject');
 
-      await refuseUnlessAllowed(store, subject, app, allowance);
+      await refuseOutsideApp(store, subject, app);
 
       const resource = await store.getResource(subject);
 
@@ -150,7 +136,7 @@ export async function handleRequest(
     case 'destroy': {
       const subject = required(request.subject, 'subject');
 
-      await refuseUnlessAllowed(store, subject, app, allowance);
+      await refuseOutsideApp(store, subject, app);
 
       const resource = await store.getResource(subject);
       await resource.destroy();
@@ -169,22 +155,23 @@ export async function handleRequest(
   }
 }
 
-async function refuseUnlessAllowed(
+/**
+ * The app's subtree, checked here as well as on the server.
+ *
+ * Not the authority: what an app may write is what its agent's DID is on, and
+ * the rights walk decides that when the commit lands. This is the same answer
+ * arrived at early, so a refusal reaches the app as an error it can show
+ * rather than as a commit rejected after the fact.
+ */
+async function refuseOutsideApp(
   store: Store,
   subject: string,
   app: string,
-  allowance: Allowance,
 ): Promise<void> {
   if (await isWithinApp(store, subject, app)) return;
 
-  for (const allowed of allowance.mayWrite) {
-    if (subject === allowed) return;
-
-    if (await isWithinApp(store, subject, allowed)) return;
-  }
-
   throw new Error(
-    'This app may only write its own data. Writing here needs your permission.',
+    'This app may only write its own data. Writing here needs rights its key does not have.',
   );
 }
 

@@ -1,5 +1,7 @@
 import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
+import { issueAccessAgent } from './issue-access-agent.js';
+import type { Store } from './store.js';
 import { ensureSchema, type SchemaStore } from './plugin-schema.js';
 import { pluginSchema } from './plugin-log.js';
 
@@ -27,6 +29,16 @@ export interface CreatedApp {
   ontology: string;
   /** The plugin the app opens to. */
   entrypoint: string;
+  /** The app's own agent. Writes it makes are attributable to this DID. */
+  agent: string;
+  /**
+   * That agent's secret, returned once and stored nowhere by this function.
+   *
+   * A secret in a resource would sync, and the personal drive it lives on can
+   * later be shared. Whoever calls this decides where it belongs — for a
+   * server-run app that is the host's secret store, never the drive.
+   */
+  secret: string;
 }
 
 /**
@@ -89,10 +101,32 @@ export async function createApp(
   await saved.set(schema.properties.entrypoint, entrypoint.subject);
   await saved.save();
 
+  // The app's own identity, and the only thing that decides what it may
+  // write. An Agent already is a token: the DID is the principal, `read` and
+  // `write` on resources are the scopes, and revoking means taking the DID
+  // off those lists. A second permission model beside that one would be
+  // enforced only wherever someone remembered to check it — see
+  // planning/issued-agents.md.
+  //
+  // Granted on the app itself, so rights inherit to everything under it.
+  // "An app may write its own data" is then something the ordinary rights
+  // walk says, not a rule this codebase has to keep restating.
+  const key = await issueAccessAgent(store as unknown as Store, {
+    name: `${options.name} (app)`,
+    description: `The identity ${options.name} writes as.`,
+    write: true,
+    targets: [app.subject],
+    // Not under the app: an app may write its own subtree, so its agent
+    // resource kept there would be a public key the app could replace.
+    parent: options.drive,
+  });
+
   return {
     app: app.subject,
     ontology: ontology.subject,
     entrypoint: entrypoint.subject,
+    agent: key.subject,
+    secret: key.secret,
   };
 }
 
