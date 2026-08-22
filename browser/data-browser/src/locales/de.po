@@ -8427,6 +8427,14 @@ msgstr ""
 msgid "Button.tsx"
 msgstr ""
 
+#: src/chunks/AppPage/index.tsx
+msgid "This app has no entry point, so there is nothing to open."
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Sign in to open this app."
+msgstr ""
+
 #~ msgid ""
 #~ "Enter your recovery code to show your secret or add a passkey on this "
 #~ "device. Your existing recovery code will keep working."
