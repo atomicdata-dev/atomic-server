@@ -2,11 +2,41 @@
 
 ## Status
 
-Built (2026-08-21). Proposed 2026-08-20; every step below shipped and was
-proved end to end — a plugin fetched an echo endpoint and the response showed
-the substituted credential, which the plugin itself never saw. The gating dependency for
+Built (2026-08-21); encrypted at rest (2026-08-22). Proposed 2026-08-20;
+every step below shipped and was proved end to end — a plugin fetched an echo
+endpoint and the response showed the substituted credential, which the plugin
+itself never saw. The gating dependency for
 [`plugins.md`](./plugins.md) A3, and named there and in
-[`importers.md`](./importers.md) as designed nowhere. Not started.
+[`importers.md`](./importers.md) as designed nowhere.
+
+## At rest
+
+Stored secrets are wrapped with a **node key**, kept beside `config.toml` at
+mode 0600 and never inside the database it protects. The format is the
+envelope already built for vault secrets
+([`encrypted-vault-format.md`](./encrypted-vault-format.md)) with one wrapper
+kind added, rather than a second scheme.
+
+**What this protects, and what it cannot.** Every way a store leaves a machine
+intact — a stolen disk, a backup, a copied file, a support bundle — now leaves
+with ciphertext. It does not protect against a compromised running server, and
+no arrangement can while unattended runs exist: a plugin importing at 3am has
+nobody to ask for a passkey, so the process must be able to open what it
+opens.
+
+`config.toml` itself holds this server's agent secret and was created
+world-readable by every version before this one. It is narrowed on every boot,
+so an existing installation is fixed by upgrading rather than by someone
+reading a release note.
+
+**The wrapper set follows the trigger, and is not a setting.** A secret used
+only when someone presses Run could be wrapped to their credential, leaving
+the server unable to read it at all. A secret a schedule or a query trigger
+spends cannot be — that is the trade, not a gap to engineer around. So arming
+a schedule or trigger refuses when a plugin holds a secret this node cannot
+open alone, at the moment of arming, where a person is present to read why.
+The user-wrapped half is not built; the refusal is, so it cannot be
+retrofitted after the first silent overnight failure. Not started.
 
 ## Why
 
