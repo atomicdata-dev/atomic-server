@@ -72,10 +72,24 @@ export async function isWithinApp(
   return false;
 }
 
+/**
+ * What an app may write beyond its own subtree.
+ *
+ * Resolved by the caller and passed in, so this module stays a pure decision
+ * about a request rather than something that fetches while deciding.
+ */
+export type Allowance = {
+  /** Subjects an app may write. Each also covers what is under it. */
+  mayWrite: string[];
+};
+
+export const NOTHING_EXTRA: Allowance = { mayWrite: [] };
+
 export async function handleRequest(
   store: Store,
   app: string,
   request: HostRequest,
+  allowance: Allowance = NOTHING_EXTRA,
 ): Promise<unknown> {
   switch (request.op) {
     case 'app':
@@ -105,7 +119,7 @@ export async function handleRequest(
       // place a view may always write, so it is the only sensible default.
       const parent = request.parent ?? app;
 
-      await refuseOutsideApp(store, parent, app);
+      await refuseUnlessAllowed(store, parent, app, allowance);
 
       const created = await store.newResource({
         parent,
@@ -120,7 +134,7 @@ export async function handleRequest(
     case 'save': {
       const subject = required(request.subject, 'subject');
 
-      await refuseOutsideApp(store, subject, app);
+      await refuseUnlessAllowed(store, subject, app, allowance);
 
       const resource = await store.getResource(subject);
 
@@ -136,7 +150,7 @@ export async function handleRequest(
     case 'destroy': {
       const subject = required(request.subject, 'subject');
 
-      await refuseOutsideApp(store, subject, app);
+      await refuseUnlessAllowed(store, subject, app, allowance);
 
       const resource = await store.getResource(subject);
       await resource.destroy();
@@ -155,15 +169,22 @@ export async function handleRequest(
   }
 }
 
-async function refuseOutsideApp(
+async function refuseUnlessAllowed(
   store: Store,
   subject: string,
   app: string,
+  allowance: Allowance,
 ): Promise<void> {
   if (await isWithinApp(store, subject, app)) return;
 
+  for (const allowed of allowance.mayWrite) {
+    if (subject === allowed) return;
+
+    if (await isWithinApp(store, subject, allowed)) return;
+  }
+
   throw new Error(
-    'This app may only write its own data. Writing elsewhere needs your permission, which is not built yet.',
+    'This app may only write its own data. Writing here needs your permission.',
   );
 }
 

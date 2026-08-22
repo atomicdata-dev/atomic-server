@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
-import { handleRequest, isHostRequest, type HostReply } from './hostStore';
+import {
+  handleRequest,
+  isHostRequest,
+  NOTHING_EXTRA,
+  type Allowance,
+  type HostReply,
+} from './hostStore';
+import { readAllowance } from './grants';
 import { LoaderBlock } from '@components/Loader';
 
 import resetCss from '../../reset.css?raw';
@@ -33,10 +40,19 @@ export function AppFrame({
   // Subject to the store's unsubscribe, so a view that re-renders does not
   // accumulate a listener per render and get told about one change N times.
   const watching = useRef(new Map<string, () => void>());
+  // Read once per mount, so a request cannot pay for a grant lookup and a
+  // revoked grant stops applying on the next open rather than mid-session.
+  const allowance = useRef<Allowance>(NOTHING_EXTRA);
   const stylesheet = useCreateThemeVars();
 
   useEffect(() => {
     let cancelled = false;
+
+    readAllowance(store, drive, app)
+      .then(found => {
+        if (!cancelled) allowance.current = found;
+      })
+      .catch(() => undefined);
 
     mintViewToken(store, drive, entrypoint)
       .then(result => {
@@ -116,7 +132,7 @@ export function AppFrame({
         return;
       }
 
-      void answer(store, app, e.data, post);
+      void answer(store, app, allowance.current, e.data, post);
     };
 
     window.addEventListener('message', onMessage);
@@ -157,11 +173,15 @@ export function AppFrame({
 async function answer(
   store: ReturnType<typeof useStore>,
   app: string,
+  allowed: Allowance,
   request: Parameters<typeof handleRequest>[2],
   post: (reply: HostReply) => void,
 ): Promise<void> {
   try {
-    post({ id: request.id, result: await handleRequest(store, app, request) });
+    post({
+      id: request.id,
+      result: await handleRequest(store, app, request, allowed),
+    });
   } catch (e) {
     post({ id: request.id, error: (e as Error).message });
   }
