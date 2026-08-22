@@ -269,6 +269,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     .service(web::resource("/iroh-sync").route(web::post().to(iroh_sync_handler)))
     .service(web::resource("/export").to(handlers::export::handle_export))
     .service(web::resource("/plugin-ui").to(handlers::plugin_ui::handle_plugin_ui))
+    .service(
+        web::resource("/plugin-view-token")
+            .guard(guard::Method(Method::POST))
+            .to(handlers::plugin_ui::handle_mint_view_token),
+    )
     .service(web::resource("/plugin-list").to(handlers::plugin_ui::handle_plugin_list))
     .service(
         web::resource("/plugin-run")

@@ -68,5 +68,6 @@ pub mod triggers;
 #[cfg(feature = "vector-search")]
 pub mod vector_search;
 pub mod versioning;
+pub mod view_token;
 #[cfg(feature = "wasm-plugins")]
 pub mod wasm;
