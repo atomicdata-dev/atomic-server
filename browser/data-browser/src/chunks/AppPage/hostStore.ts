@@ -1,5 +1,5 @@
 import type { Store } from '@tomic/react';
-import { core } from '@tomic/react';
+import { core, errorMessageFromResponse, signRequest } from '@tomic/react';
 
 /**
  * Answers the data requests an app's view makes.
@@ -75,6 +75,7 @@ export async function isWithinApp(
 export async function handleRequest(
   store: Store,
   app: string,
+  drive: string,
   request: HostRequest,
 ): Promise<unknown> {
   switch (request.op) {
@@ -107,28 +108,27 @@ export async function handleRequest(
 
       await refuseOutsideApp(store, parent, app);
 
-      const created = await store.newResource({
+      const { subject } = await writeAsApp(store, drive, app, {
+        op: 'create',
         parent,
         isA: request.isA ?? [],
-        propVals: (request.propVals ?? {}) as Record<string, never>,
+        propVals: request.propVals ?? {},
       });
-      await created.save();
 
-      return { subject: created.subject, propVals: created.getPropVals() };
+      const created = await store.getResource(subject);
+
+      return { subject, propVals: created.getPropVals() };
     }
 
     case 'save': {
       const subject = required(request.subject, 'subject');
 
       await refuseOutsideApp(store, subject, app);
-
-      const resource = await store.getResource(subject);
-
-      for (const [property, value] of Object.entries(request.propVals ?? {})) {
-        await resource.set(property, value as never);
-      }
-
-      await resource.save();
+      await writeAsApp(store, drive, app, {
+        op: 'save',
+        subject,
+        propVals: request.propVals ?? {},
+      });
 
       return { subject };
     }
@@ -137,9 +137,7 @@ export async function handleRequest(
       const subject = required(request.subject, 'subject');
 
       await refuseOutsideApp(store, subject, app);
-
-      const resource = await store.getResource(subject);
-      await resource.destroy();
+      await writeAsApp(store, drive, app, { op: 'destroy', subject });
 
       return { subject };
     }
@@ -153,6 +151,47 @@ export async function handleRequest(
     default:
       throw new Error(`This app asked for something the host does not do: ${request.op}`);
   }
+}
+
+/**
+ * Asks the server to perform a write as the app.
+ *
+ * Not done in the page, because a commit is signed by whoever's key is here —
+ * the user's. A write signed by the person is authored by the person and
+ * bounded by what the person may reach, which makes this file's rules the only
+ * thing standing between a third-party app and the whole drive. The server
+ * holds the app's key, so it can sign as the app and let the ordinary rights
+ * walk decide.
+ *
+ * The frame is never given that key: a secret in a null-origin iframe is
+ * extractable and never expires.
+ */
+async function writeAsApp(
+  store: Store,
+  drive: string,
+  app: string,
+  request: Record<string, unknown>,
+): Promise<{ subject: string }> {
+  const agent = store.getAgent();
+
+  if (!agent) throw new Error('Sign in to use this app');
+
+  const url = `${store.getServerUrl()}/app-write`;
+  const headers = await signRequest(url, agent, {});
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ drive, app, ...request }),
+  });
+
+  if (!response.ok) {
+    throw new Error(
+      errorMessageFromResponse(await response.text(), response.status),
+    );
+  }
+
+  return (await response.json()) as { subject: string };
 }
 
 /**
