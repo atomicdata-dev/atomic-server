@@ -186,6 +186,12 @@ async fn auto_apply(
     let mut host = StoreApplyHost {
         store: appstate.store.clone(),
         for_agent: ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
+        signing_as: crate::plugins::store_host::app_signing_for(
+            &appstate.store,
+            &key.drive,
+            &key.plugin,
+        )
+        .await,
     };
 
     let plan = plan_verdict(&parsed, &mut host).await;
@@ -321,6 +327,86 @@ mod tests {
             0,
             "nothing may be written without a grant",
         );
+    }
+
+    #[actix_rt::test]
+    async fn a_granted_run_writes_as_the_app_not_as_the_server() {
+        let mut fixture = fixture("plugin_signs_as_app").await;
+        write_plugin(&mut fixture, "Signed by the app").await;
+
+        // The app's own key, which is what `app_signing_for` looks for. Keyed
+        // on the plugin itself here; in the product it hangs off the app the
+        // plugin sits under, which the same lookup walks up to find.
+        let app_agent = atomic_lib::agents::Agent::new(Some("the app")).unwrap();
+        fixture
+            .appstate
+            .store
+            .set_app_agent(
+                &atomic_lib::db::app_agent::AppAgentKey::new(&fixture.drive, &fixture.plugin),
+                &atomic_lib::db::app_agent::AppAgent::new(
+                    app_agent.subject.to_string(),
+                    app_agent.build_secret().unwrap(),
+                    0,
+                ),
+            )
+            .unwrap();
+
+        let key = arm(&fixture, true);
+
+        assert_eq!(run_due(&fixture.appstate).await, 1);
+        assert_eq!(
+            fixture
+                .appstate
+                .store
+                .get_plugin_schedule(&key)
+                .unwrap()
+                .unwrap()
+                .last_error,
+            None,
+        );
+
+        // The signer is the author: a commit carries one identity, so if the
+        // server signed this, the history says the server decided it.
+        let written = fixture
+            .appstate
+            .store
+            .get_resource(&fixture.drive.as_str().into())
+            .await
+            .unwrap()
+            .get_children(&fixture.appstate.store)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|child| {
+                child
+                    .get(urls::NAME)
+                    .is_ok_and(|name| name.to_string() == "Signed by the app")
+            })
+            .expect("the run should have written its resource");
+
+        let last_commit = written.get(urls::LAST_COMMIT).unwrap().to_string();
+        let commit = fixture
+            .appstate
+            .store
+            .get_resource(&last_commit.as_str().into())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            commit.get(urls::SIGNER).unwrap().to_string(),
+            app_agent.subject.to_string(),
+            "the commit was signed by something other than the app",
+        );
+
+        let server_agent = fixture
+            .appstate
+            .store
+            .get_default_agent()
+            .unwrap()
+            .subject
+            .to_string();
+
+        assert_ne!(commit.get(urls::SIGNER).unwrap().to_string(), server_agent,);
     }
 
     #[actix_rt::test]

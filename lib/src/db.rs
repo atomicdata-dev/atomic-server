@@ -1,6 +1,7 @@
 //! Persistent, ACID compliant, threadsafe to-disk store.
 //! Powered by Sled - an embedded database.
 
+pub mod app_agent;
 pub mod btreemap_store;
 mod encoding;
 #[cfg(feature = "db-redb")]
@@ -46,6 +47,7 @@ use crate::{
     },
     commit::{CommitOpts, CommitResponse},
     db::{
+        app_agent::{AppAgent, AppAgentInfo, AppAgentKey},
         encoding::{decode_propvals, encode_propvals},
         plugin_meta::{PluginMeta, PluginMetaKey},
         plugin_schedule::{PluginSchedule, PluginScheduleKey},
@@ -2159,6 +2161,51 @@ impl Db {
     }
 
     /// Describes every secret a plugin has. Never their values.
+    /// Records the key an app signs with, wrapped like every other secret.
+    pub fn set_app_agent(&self, key: &AppAgentKey, agent: &AppAgent) -> AtomicResult<()> {
+        let mut stored = agent.clone();
+        stored.secret = self.wrap_secret(&agent.secret)?;
+
+        self.kv
+            .insert(Tree::AppAgent, &key.encode()?, &stored.encode()?)?;
+        Ok(())
+    }
+
+    /// Which DID an app writes as, without opening its key.
+    pub fn get_app_agent_info(&self, key: &AppAgentKey) -> AtomicResult<Option<AppAgentInfo>> {
+        let Some(bin) = self.kv.get(Tree::AppAgent, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        Ok(Some(AppAgent::from_bytes(&bin)?.info()))
+    }
+
+    /// Runs `f` with the app's signing agent.
+    ///
+    /// A closure rather than a return value, for the same reason
+    /// `use_plugin_secret` is one: nothing that hands a private key back to a
+    /// caller can promise where it goes next.
+    pub fn with_app_agent<T>(
+        &self,
+        key: &AppAgentKey,
+        f: impl FnOnce(&crate::agents::Agent) -> T,
+    ) -> AtomicResult<Option<T>> {
+        let Some(bin) = self.kv.get(Tree::AppAgent, &key.encode()?)? else {
+            return Ok(None);
+        };
+
+        let stored = AppAgent::from_bytes(&bin)?;
+        let secret = self.unwrap_secret(&stored.secret)?;
+        let agent = crate::agents::Agent::from_secret(&secret)?;
+
+        Ok(Some(f(&agent)))
+    }
+
+    pub fn delete_app_agent(&self, key: &AppAgentKey) -> AtomicResult<()> {
+        self.kv.remove(Tree::AppAgent, &key.encode()?)?;
+        Ok(())
+    }
+
     /// Secrets this node could not open with nobody present.
     ///
     /// A secret wrapped only by a user's credential has no unattended path —

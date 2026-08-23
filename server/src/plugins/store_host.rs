@@ -7,8 +7,8 @@
 use std::collections::HashMap;
 
 use atomic_lib::{
-    agents::ForAgent, datatype::DataType, hierarchy::check_write, urls, Db, Resource, Storelike,
-    Subject, Value,
+    agents::ForAgent, datatype::DataType, db::app_agent::AppAgentKey, hierarchy::check_write, urls,
+    Db, Resource, Storelike, Subject, Value,
 };
 use serde_json::Value as Json;
 
@@ -23,12 +23,67 @@ use crate::plugins::{
 /// by the server's own agent — it is the only key the server holds — so
 /// without this check a plugin would be a way to write anywhere on the server
 /// regardless of who set it up.
+/// The app a plugin belongs to, if that app has a key.
+///
+/// A plugin's parent is its app — an entry point and a handler both sit under
+/// one. Bounded rather than exhaustive, like every other parent walk here: a
+/// cycle would otherwise hang a scheduled run, and nothing legitimate nests an
+/// app's own plugins deeper than this.
+pub async fn app_signing_for(db: &Db, drive: &str, plugin: &str) -> Option<AppAgentKey> {
+    let mut subject = plugin.to_string();
+
+    for _ in 0..3 {
+        let key = AppAgentKey::new(drive, &subject);
+
+        if db.get_app_agent_info(&key).ok().flatten().is_some() {
+            return Some(key);
+        }
+
+        let resource = db.get_resource(&subject.as_str().into()).await.ok()?;
+        subject = resource.get(urls::PARENT).ok()?.to_string();
+    }
+
+    None
+}
+
 pub struct StoreApplyHost {
     pub store: Db,
     pub for_agent: ForAgent,
+    /// The app whose key signs these writes, when it has one.
+    ///
+    /// Without it the server's own agent signs, and the history then says the
+    /// server made a change that an app decided on. The signer is the author —
+    /// a commit carries one identity — so this is the only place the two can
+    /// be made to agree.
+    pub signing_as: Option<AppAgentKey>,
 }
 
 impl StoreApplyHost {
+    /// Writes, signed by the app when it has a key of its own.
+    ///
+    /// Falling back to the store's default agent is what every write did
+    /// before app keys existed; an app created since always has one, so the
+    /// fallback covers only apps that predate this.
+    /// The app's signing agent, when this host is acting for one.
+    fn app_agent(&self) -> Result<Option<atomic_lib::agents::Agent>, String> {
+        let Some(key) = &self.signing_as else {
+            return Ok(None);
+        };
+
+        self.store
+            .with_app_agent(key, |agent| agent.clone())
+            .map_err(|e| format!("could not read {}'s key: {e}", key.app))
+    }
+
+    async fn commit(&self, resource: &mut Resource, what: &str) -> Result<(), String> {
+        let result = match self.app_agent()? {
+            Some(agent) => resource.save_as(&agent, &self.store).await,
+            None => resource.save(&self.store).await,
+        };
+
+        result.map(|_| ()).map_err(|e| format!("{what}: {e}"))
+    }
+
     /// Refuses unless `for_agent` may write here.
     async fn may_write(&self, subject: &str) -> Result<(), String> {
         let resource = self
@@ -136,16 +191,20 @@ impl ApplyHost for StoreApplyHost {
                 .map_err(|e| e.to_string())?;
         }
 
-        if is_did(&request.parent) {
-            resource.save_as_genesis(&self.store).await.map_err(|e| {
-                format!("could not create a resource under {}: {e}", request.parent)
-            })?;
-        } else {
-            resource
-                .save(&self.store)
-                .await
-                .map_err(|e| format!("could not create {}: {e}", resource.get_subject()))?;
+        // Signed by the app here too. Under a DID drive the signature *is* the
+        // subject, so signing as the server would mint the app's own data
+        // under the server's name rather than merely mislabelling its author.
+        match (is_did(&request.parent), self.app_agent()?) {
+            (true, Some(agent)) => {
+                resource
+                    .save_as_genesis_signed_by(&agent, &self.store)
+                    .await
+            }
+            (true, None) => resource.save_as_genesis(&self.store).await,
+            (false, Some(agent)) => resource.save_as(&agent, &self.store).await,
+            (false, None) => resource.save(&self.store).await,
         }
+        .map_err(|e| format!("could not create a resource under {}: {e}", request.parent))?;
 
         // Read the subject after saving: genesis mints it from the signature,
         // so it is not knowable before.
@@ -169,10 +228,8 @@ impl ApplyHost for StoreApplyHost {
                 .map_err(|e| e.to_string())?;
         }
 
-        resource
-            .save(&self.store)
-            .await
-            .map_err(|e| format!("could not write {subject}: {e}"))?;
+        self.commit(&mut resource, &format!("could not write {subject}"))
+            .await?;
 
         Ok(())
     }
@@ -192,10 +249,8 @@ impl ApplyHost for StoreApplyHost {
                 .map_err(|e| e.to_string())?;
         }
 
-        resource
-            .save(&self.store)
-            .await
-            .map_err(|e| format!("could not write {subject}: {e}"))?;
+        self.commit(&mut resource, &format!("could not write {subject}"))
+            .await?;
 
         Ok(())
     }

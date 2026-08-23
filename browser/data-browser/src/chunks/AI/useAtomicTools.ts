@@ -10,6 +10,8 @@ import {
   type Resource,
   type Store,
 } from '@tomic/react';
+import { createApp } from '@tomic/lib';
+import { handOverAppKey } from '@chunks/AppPage/appAgent';
 import { tool } from 'ai';
 import { z } from 'zod';
 import { useSettings } from '@helpers/AppSettings';
@@ -97,6 +99,7 @@ export const TOOL_NAMES = {
   CREATE_PLUGIN: 'create_plugin',
   RUN_PLUGIN: 'run_plugin',
   SCHEDULE_PLUGIN: 'schedule_plugin',
+  CREATE_APP: 'create_app',
 } as const;
 
 /** One column of a table, in the compact vocabulary `create_table` uses. */
@@ -1431,6 +1434,61 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
           }
         },
         strict: true,
+      }),
+      [TOOL_NAMES.CREATE_APP]: tool({
+        description:
+          "Create an app: a screen the user opens, backed by their own data. Use this when they want something to LOOK AT and INTERACT WITH — a tracker, a dashboard, a little tool — rather than a transformation they run. Use create_plugin instead when the job is importing or changing data on a schedule.\n\n" +
+          "You write one JavaScript module that `export async function view({ root, store })`. `root` is a DOM element to render into; build the UI with ordinary DOM calls. There is no React, no bundler and no npm — plain JS only, and no build step, which is why you can write it and it just runs.\n\n" +
+          "`store` is the same API as @tomic/lib: `await store.getResource(subject)` (then `.get(propertySubject)`, `.set(prop, value)`, `await .save()`, `await .destroy()`), `await store.newResource({ parent, isA, propVals })`, `await store.query({ property, value })` returning subjects, `await store.getApp()` for this app's own subject, and `store.subscribe(subject, cb)` which returns an unsubscribe function.\n\n" +
+          "The app may write ANYTHING UNDER ITSELF without asking, and nothing outside itself. So create its data with `store.newResource({...})` and no parent — it defaults to the app — rather than writing into the user's drive. Reading is not restricted.\n\n" +
+          "Careful with subscribe: adding a child counts as a change to its parent, so subscribing to the app and writing into it on every notification loops. Guard on what changed, or re-read on user actions instead.\n\n" +
+          "The app gets its own ontology, so define classes for it with create_class rather than reusing the drive's, unless the user asked to work with data they already have.",
+        inputSchema: z.object({
+          name: z.string().describe('Display name of the app.'),
+          source: z
+            .string()
+            .describe('The full JavaScript module, exporting `view({root, store})`.'),
+          description: z.string().optional(),
+        }),
+        execute: async ({ name, source, description }) => {
+          try {
+            const created = await createApp(store, {
+              drive,
+              name,
+              source,
+              description,
+            });
+
+            // The node needs the key to write as this app when nobody is
+            // present. Reported rather than thrown: the app exists and works
+            // either way, it just cannot act on its own yet.
+            let unattended = true;
+            let keyProblem: string | undefined;
+
+            try {
+              await handOverAppKey(store, {
+                drive,
+                app: created.app,
+                secret: created.secret,
+              });
+            } catch (e) {
+              unattended = false;
+              keyProblem = (e as Error).message;
+            }
+
+            return {
+              app: shortenSubject(created.app),
+              ontology: shortenSubject(created.ontology),
+              entrypoint: shortenSubject(created.entrypoint),
+              created: true,
+              unattended,
+              ...(keyProblem ? { keyProblem } : {}),
+              next: 'Tell the user to open the app to see it. To change it, call create_plugin with the entrypoint subject as `plugin` and the new source.',
+            };
+          } catch (e) {
+            return { error: (e as Error).message };
+          }
+        },
       }),
       [TOOL_NAMES.CREATE_PLUGIN]: tool({
         description:

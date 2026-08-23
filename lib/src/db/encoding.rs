@@ -182,6 +182,30 @@ impl crate::db::plugin_schedule::PluginScheduleKey {
     }
 }
 
+impl crate::db::app_agent::AppAgent {
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::new();
+        self.serialize(&mut Serializer::new(&mut buf))
+            .map_err(|e| format!("Failed to encode AppAgent: {}", e))?;
+        Ok(buf)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> AtomicResult<crate::db::app_agent::AppAgent> {
+        rmp_serde::from_slice(bytes).map_err(|e| format!("Failed to decode AppAgent: {}", e).into())
+    }
+}
+
+impl crate::db::app_agent::AppAgentKey {
+    /// `drive \0 app`, matching the other per-plugin keys.
+    pub fn encode(&self) -> AtomicResult<Vec<u8>> {
+        let mut buf = Vec::with_capacity(self.drive.len() + self.app.len() + 1);
+        buf.extend_from_slice(self.drive.as_bytes());
+        buf.push(0);
+        buf.extend_from_slice(self.app.as_bytes());
+        Ok(buf)
+    }
+}
+
 impl crate::db::plugin_trigger::PluginTrigger {
     pub fn encode(&self) -> AtomicResult<Vec<u8>> {
         let mut buf = Vec::new();

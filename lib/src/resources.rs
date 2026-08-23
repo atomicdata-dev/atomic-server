@@ -1168,6 +1168,21 @@ impl Resource {
         store: &impl Storelike,
     ) -> AtomicResult<crate::commit::CommitResponse> {
         let agent = store.get_default_agent()?;
+
+        self.save_as(&agent, store).await
+    }
+
+    /// Saves signed by a specific agent rather than the store's default.
+    ///
+    /// The signer is the author: a commit carries one identity, so "who wrote
+    /// this" and "whose rights allowed it" cannot be split. Code acting for
+    /// something other than the node itself — an app with its own key — has to
+    /// sign as that thing, or the history says the server did it.
+    pub async fn save_as(
+        &mut self,
+        agent: &crate::agents::Agent,
+        store: &impl Storelike,
+    ) -> AtomicResult<crate::commit::CommitResponse> {
         self.sync_loro_changes_to_commit_builder()?;
         if !self.get_commit_builder().has_changes() {
             self.reset_commit_builder();
@@ -1176,7 +1191,7 @@ impl Resource {
         let commit = self
             .get_commit_builder()
             .clone()
-            .sign(&agent, store, self)
+            .sign(agent, store, self)
             .await?;
         let should_post = match self.subject.clone() {
             crate::Subject::Internal { .. } => false,
@@ -1216,13 +1231,28 @@ impl Resource {
         store: &impl Storelike,
     ) -> AtomicResult<CommitResponse> {
         let agent = store.get_default_agent()?;
+
+        self.save_as_genesis_signed_by(&agent, store).await
+    }
+
+    /// Genesis signed by a specific agent rather than the store's default.
+    ///
+    /// The DID is derived from the signature, so the signer does not merely
+    /// author this resource — it determines the resource's identity. Code
+    /// acting for an app has to sign here too, or the app's own data is minted
+    /// under the server's name.
+    pub async fn save_as_genesis_signed_by(
+        &mut self,
+        agent: &crate::agents::Agent,
+        store: &impl Storelike,
+    ) -> AtomicResult<CommitResponse> {
         // Use a placeholder that starts with did:ad: to trigger special genesis serialization logic
         self.subject = Subject::from_raw("did:ad:placeholder", None);
         self.commit.set_subject(self.subject.clone());
 
         let mut commitbuilder = self.get_commit_builder().clone();
         commitbuilder.is_genesis = true;
-        let commit = commitbuilder.sign(&agent, store, self).await?;
+        let commit = commitbuilder.sign(agent, store, self).await?;
 
         let signature = commit
             .signature

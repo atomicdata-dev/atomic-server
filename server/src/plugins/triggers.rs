@@ -236,6 +236,12 @@ async fn run(
     let mut apply_host = StoreApplyHost {
         store: appstate.store.clone(),
         for_agent: ForAgent::AgentSubject(atomic_lib::Subject::from_raw(&grant.agent, None)),
+        signing_as: crate::plugins::store_host::app_signing_for(
+            &appstate.store,
+            &key.drive,
+            &key.plugin,
+        )
+        .await,
     };
 
     let plan = plan_verdict(&parsed, &mut apply_host).await;

@@ -23,6 +23,7 @@ pub struct SledStore {
     plugin_secret: sled::Tree,
     plugin_schedule: sled::Tree,
     plugin_trigger: sled::Tree,
+    app_agent: sled::Tree,
     drive_mapping: sled::Tree,
     did_mapping: sled::Tree,
     loro_snapshots: sled::Tree,
@@ -54,6 +55,7 @@ impl SledStore {
         let plugin_secret = db.open_tree(Tree::PluginSecret)?;
         let plugin_schedule = db.open_tree(Tree::PluginSchedule)?;
         let plugin_trigger = db.open_tree(Tree::PluginTrigger)?;
+        let app_agent = db.open_tree(Tree::AppAgent)?;
         let drive_mapping = db.open_tree(Tree::DriveMapping)?;
         let did_mapping = db.open_tree(Tree::DidMapping)?;
         let loro_snapshots = db.open_tree(Tree::LoroSnapshots)?;
@@ -75,6 +77,7 @@ impl SledStore {
             plugin_secret,
             plugin_schedule,
             plugin_trigger,
+            app_agent,
             drive_mapping,
             did_mapping,
             loro_snapshots,
@@ -103,6 +106,7 @@ impl SledStore {
             Tree::PluginSecret => &self.plugin_secret,
             Tree::PluginSchedule => &self.plugin_schedule,
             Tree::PluginTrigger => &self.plugin_trigger,
+            Tree::AppAgent => &self.app_agent,
             Tree::DriveMapping => &self.drive_mapping,
             Tree::DidMapping => &self.did_mapping,
             Tree::LoroSnapshots => &self.loro_snapshots,
@@ -190,6 +194,7 @@ impl KvStore for SledStore {
         let mut batch_plugin_secret = sled::Batch::default();
         let mut batch_plugin_schedule = sled::Batch::default();
         let mut batch_plugin_trigger = sled::Batch::default();
+        let mut batch_app_agent = sled::Batch::default();
         let mut batch_drive_mapping = sled::Batch::default();
         let mut batch_did_mapping = sled::Batch::default();
         let mut batch_loro_snapshots = sled::Batch::default();
@@ -211,6 +216,7 @@ impl KvStore for SledStore {
                 Tree::PluginSecret => &mut batch_plugin_secret,
                 Tree::PluginSchedule => &mut batch_plugin_schedule,
                 Tree::PluginTrigger => &mut batch_plugin_trigger,
+                Tree::AppAgent => &mut batch_app_agent,
                 Tree::DriveMapping => &mut batch_drive_mapping,
                 Tree::DidMapping => &mut batch_did_mapping,
                 Tree::LoroSnapshots => &mut batch_loro_snapshots,
@@ -277,6 +283,9 @@ impl KvStore for SledStore {
         self.plugin_trigger
             .apply_batch(batch_plugin_trigger)
             .map_err(|e| format!("Failed to apply plugin_trigger batch: {}", e))?;
+        self.app_agent
+            .apply_batch(batch_app_agent)
+            .map_err(|e| format!("Failed to apply app_agent batch: {}", e))?;
         self.loro_snapshots
             .apply_batch(batch_loro_snapshots)
             .map_err(|e| format!("Failed to apply loro_snapshots batch: {}", e))?;
