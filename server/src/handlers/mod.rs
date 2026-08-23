@@ -6,6 +6,7 @@ However, some features reside in atomic-server.
 */
 
 pub mod app_agent;
+pub mod app_write;
 pub mod blob;
 pub mod commit;
 pub mod download;

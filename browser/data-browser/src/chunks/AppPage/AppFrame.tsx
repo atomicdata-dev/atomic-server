@@ -116,7 +116,7 @@ export function AppFrame({
         return;
       }
 
-      void answer(store, app, e.data, post);
+      void answer(store, app, drive, e.data, post);
     };
 
     window.addEventListener('message', onMessage);
@@ -129,7 +129,7 @@ export function AppFrame({
       released.forEach(unsubscribe => unsubscribe());
       released.clear();
     };
-  }, [sendStyle, store, app]);
+  }, [sendStyle, store, app, drive]);
 
   if (problem !== undefined) {
     return <Problem>{problem}</Problem>;
@@ -157,11 +157,15 @@ export function AppFrame({
 async function answer(
   store: ReturnType<typeof useStore>,
   app: string,
-  request: Parameters<typeof handleRequest>[2],
+  drive: string,
+  request: Parameters<typeof handleRequest>[3],
   post: (reply: HostReply) => void,
 ): Promise<void> {
   try {
-    post({ id: request.id, result: await handleRequest(store, app, request) });
+    post({
+      id: request.id,
+      result: await handleRequest(store, app, drive, request),
+    });
   } catch (e) {
     post({ id: request.id, error: (e as Error).message });
   }

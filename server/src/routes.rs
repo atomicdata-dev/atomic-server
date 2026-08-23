@@ -292,6 +292,11 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
             .to(handlers::plugin_schedule::handle_set_auto_apply),
     )
     .service(
+        web::resource("/app-write")
+            .guard(guard::Method(Method::POST))
+            .to(handlers::app_write::handle_app_write),
+    )
+    .service(
         web::resource("/app-agent")
             .route(web::post().to(handlers::app_agent::handle_set_app_agent))
             .route(web::get().to(handlers::app_agent::handle_get_app_agent))
