@@ -7,6 +7,8 @@ However, some features reside in atomic-server.
 
 pub mod app_agent;
 pub mod app_write;
+#[cfg(all(test, feature = "wasm-plugins"))]
+mod app_endpoints_test;
 pub mod blob;
 pub mod commit;
 pub mod download;

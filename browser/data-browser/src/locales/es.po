@@ -8624,6 +8624,19 @@ msgstr ""
 msgid "Sign in to open this app."
 msgstr ""
 
+#: src/actions/resourceActions.tsx
+msgid "New app"
+msgstr ""
+
+#: src/actions/resourceActions.tsx
+msgid "Create an app here: a screen you open, backed by its own data."
+msgstr ""
+
+#. 0: (e as Error).message
+#: src/actions/resourceActions.tsx
+msgid "This app cannot write on its own: {0}"
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexto compactado"
 
