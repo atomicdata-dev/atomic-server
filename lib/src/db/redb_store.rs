@@ -31,6 +31,7 @@ const TABLE_PLUGIN_SECRET: TableDefinition<&[u8], &[u8]> = TableDefinition::new(
 const TABLE_PLUGIN_SCHEDULE: TableDefinition<&[u8], &[u8]> =
     TableDefinition::new("plugin_schedule");
 const TABLE_PLUGIN_TRIGGER: TableDefinition<&[u8], &[u8]> = TableDefinition::new("plugin_trigger");
+const TABLE_APP_AGENT: TableDefinition<&[u8], &[u8]> = TableDefinition::new("app_agent");
 const TABLE_DRIVE_MAPPING: TableDefinition<&[u8], &[u8]> = TableDefinition::new("drive_mapping");
 const TABLE_DID_MAPPING: TableDefinition<&[u8], &[u8]> = TableDefinition::new("did_mapping");
 const TABLE_LORO_SNAPSHOTS: TableDefinition<&[u8], &[u8]> = TableDefinition::new("loro_snapshots");
@@ -55,6 +56,7 @@ fn table_def(tree: Tree) -> TableDefinition<'static, &'static [u8], &'static [u8
         Tree::PluginSecret => TABLE_PLUGIN_SECRET,
         Tree::PluginSchedule => TABLE_PLUGIN_SCHEDULE,
         Tree::PluginTrigger => TABLE_PLUGIN_TRIGGER,
+        Tree::AppAgent => TABLE_APP_AGENT,
         Tree::DriveMapping => TABLE_DRIVE_MAPPING,
         Tree::DidMapping => TABLE_DID_MAPPING,
         Tree::LoroSnapshots => TABLE_LORO_SNAPSHOTS,
@@ -78,6 +80,7 @@ fn create_all_tables(tx: &redb::WriteTransaction) {
         Tree::PluginSecret,
         Tree::PluginSchedule,
         Tree::PluginTrigger,
+        Tree::AppAgent,
         Tree::DriveMapping,
         Tree::DidMapping,
         Tree::LoroSnapshots,

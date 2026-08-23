@@ -5,6 +5,7 @@ Most of the logic for routing and handling resides in [atomic_lib::Storelike::ge
 However, some features reside in atomic-server.
 */
 
+pub mod app_agent;
 pub mod blob;
 pub mod commit;
 pub mod download;
