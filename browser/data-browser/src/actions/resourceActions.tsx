@@ -19,6 +19,7 @@ import {
   FaStar,
   FaTrash,
   FaTurnUp,
+  FaWindowMaximize,
 } from 'react-icons/fa6';
 import { atomicArgu } from '../ontologies/atomic-argu';
 import { getOrCreateForksFolder } from '../helpers/forksFolder';
@@ -33,6 +34,9 @@ import {
 import { paths } from '../routes/paths';
 import { shortcuts } from './shortcuts';
 import { createPlugin } from '@chunks/PluginRuns/runScript';
+import { createApp } from '@tomic/lib';
+import { handOverAppKey } from '@chunks/AppPage/appAgent';
+import { STARTER_APP_SOURCE } from '@chunks/AppPage/starter';
 import type { ActionContext, ActionDefinition } from './types';
 
 const getParent = (ctx: ActionContext): string | undefined =>
@@ -84,6 +88,42 @@ export const resourceActions: ActionDefinition[] = [
       });
 
       ctx.navigate(constructOpenURL(subject));
+    },
+  },
+  {
+    id: 'new-app',
+    scope: 'resource',
+    section: 'action',
+    label: () => 'New app',
+    helper: () =>
+      'Create an app here: a screen you open, backed by its own data.',
+    keywords: ['app', 'view', 'screen', 'plugin'],
+    icon: () => <FaWindowMaximize />,
+    searchOnly: true,
+    available: ctx => ctx.canWrite && ctx.drive !== undefined,
+    run: async ctx => {
+      const created = await createApp(ctx.store, {
+        drive: ctx.drive!,
+        name: 'New app',
+        source: STARTER_APP_SOURCE,
+      });
+
+      // The node needs the key to write as this app when nobody is present.
+      // Reported rather than thrown: the app exists and works while you are
+      // here either way, it just cannot act on its own yet.
+      try {
+        await handOverAppKey(ctx.store, {
+          drive: ctx.drive!,
+          app: created.app,
+          secret: created.secret,
+        });
+      } catch (e) {
+        toast.error(
+          `This app cannot write on its own: ${(e as Error).message}`,
+        );
+      }
+
+      ctx.navigate(constructOpenURL(created.app));
     },
   },
   {

@@ -1,5 +1,10 @@
 import type { Store } from '@tomic/react';
-import { core, errorMessageFromResponse, signRequest } from '@tomic/react';
+import {
+  CollectionBuilder,
+  core,
+  errorMessageFromResponse,
+  signRequest,
+} from '@tomic/react';
 
 /**
  * Answers the data requests an app's view makes.
@@ -91,14 +96,17 @@ export async function handleRequest(
     }
 
     case 'query': {
-      const subjects = await store.search('', {
-        filters: {
-          [required(request.property, 'property')]: required(request.value, 'value'),
-        },
-        limit: 200,
-      });
+      // A collection, not `search`. Search drops `filters` whenever it falls
+      // back to the local index — property-value constraints need the
+      // server's — so an app asking for its own children quietly received the
+      // whole drive. Wrong, and a far bigger answer than it asked for.
+      const collection = new CollectionBuilder(store)
+        .setProperty(required(request.property, 'property'))
+        .setValue(required(request.value, 'value'))
+        .setPageSize(500)
+        .build();
 
-      return subjects;
+      return await collection.getAllMembers();
     }
 
     case 'create': {
