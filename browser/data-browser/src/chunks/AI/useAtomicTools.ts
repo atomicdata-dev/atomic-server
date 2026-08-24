@@ -102,6 +102,15 @@ export const TOOL_NAMES = {
   CREATE_APP: 'create_app',
 } as const;
 
+/**
+ * When a run began.
+ *
+ * Module scope so the compiler's purity rule can tell this clock is not read
+ * while rendering: every caller is an async tool `execute`, which runs when the
+ * model invokes the tool, not when the component renders.
+ */
+const startedAt = () => Date.now();
+
 /** One column of a table, in the compact vocabulary `create_table` uses. */
 const columnSchema = z.object({
   name: z.string().describe('The column (property) display name.'),
@@ -1437,37 +1446,57 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
       }),
       [TOOL_NAMES.CREATE_APP]: tool({
         description:
-          "Create an app: a screen the user opens, backed by their own data. Use this when they want something to LOOK AT and INTERACT WITH — a tracker, a dashboard, a little tool — rather than a transformation they run. Use create_plugin instead when the job is importing or changing data on a schedule.\n\n" +
-          "You write one JavaScript module that `export async function view({ root, store })`. `root` is a DOM element to render into; build the UI with ordinary DOM calls. There is no React, no bundler and no npm — plain JS only, and no build step, which is why you can write it and it just runs.\n\n" +
+          'Create an app: a screen the user opens, backed by their own data. Use this when they want something to LOOK AT and INTERACT WITH — a tracker, a dashboard, a little tool — rather than a transformation they run. Use create_plugin instead when the job is importing or changing data on a schedule.\n\n' +
+          'You write one JavaScript module that `export async function view({ root, store })`. `root` is a DOM element to render into; build the UI with ordinary DOM calls. There is no React, no bundler and no npm — plain JS only, and no build step, which is why you can write it and it just runs.\n\n' +
           "`store` is the same API as @tomic/lib: `await store.getResource(subject)` (then `.get(propertySubject)`, `.set(prop, value)`, `await .save()`, `await .destroy()`), `await store.newResource({ parent, isA, propVals })`, `await store.query({ property, value })` returning subjects, `await store.getApp()` for this app's own subject, `await store.getData()` for `{ table, rowClass }`, and `store.subscribe(subject, cb)` returning an unsubscribe function.\n\n" +
-
           "STORE EACH THING AS ITS OWN RESOURCE. The app comes with a table and a row class: `const { table, rowClass } = await store.getData()`. Create a row with `await store.newResource({ parent: table, isA: [rowClass], propVals: { [prop]: value } })` and list them with `await store.query({ property: 'https://atomicdata.dev/properties/parent', value: table })`.\n\n" +
-
           "DO NOT keep the app's data as JSON in one resource. It is the obvious move if you are used to localStorage, and it throws away everything this platform is for: a blob cannot be sorted, filtered or edited in the table view, cannot be queried or shared per-row, and two people editing at once overwrite each other wholesale instead of merging. One resource per row, always.\n\n" +
-
-          "There is no `children` or `sub-resources` property. Children are found by querying `parent`, as above.\n\n" +
-
+          'There is no `children` or `sub-resources` property. Children are found by querying `parent`, as above.\n\n' +
           "GIVE THE ROWS THEIR FIELDS FIRST. A new row class has only `name`. Before writing the view, call add_table_columns with the `data` subject this tool returns, to create the properties the app needs (a CRM's company, value, stage; a tracker's date, done). It returns each property's subject — use those as the keys in propVals. Rows then have real fields, which is what makes them useful in the table as well as in your UI.\n\n" +
-
-          "The app may write ANYTHING UNDER ITSELF without asking, and nothing outside itself. Reading is not restricted.\n\n" +
-
-          "Careful with subscribe: adding a child counts as a change to its parent, so subscribing to the app and writing into it on every notification loops. Guard on what changed, or re-read on user actions instead.\n\n" +
-
-          "Do not invent demo data. An empty app with an obvious way to add the first row is correct; seeded fake contacts are not the user's data and they have to delete them.",
+          'The app may write ANYTHING UNDER ITSELF without asking, and nothing outside itself. Reading is not restricted.\n\n' +
+          'Careful with subscribe: adding a child counts as a change to its parent, so subscribing to the app and writing into it on every notification loops. Guard on what changed, or re-read on user actions instead.\n\n' +
+          "Do not invent demo data. An empty app with an obvious way to add the first row is correct; seeded fake contacts are not the user's data and they have to delete them.\n\n" +
+          "NAME THINGS THE WAY THE USER WOULD. The app's rows show up in their sidebar as an ordinary table, so `rowNamePlural` is a title they read every day — 'Feeding sessions', not 'Items'. Same for the app's own name and its emoji.",
         inputSchema: z.object({
           name: z.string().describe('Display name of the app.'),
+          emoji: z
+            .string()
+            .describe(
+              'One emoji for the app, shown wherever it is listed. Pick something about what the app is FOR, not a generic 📱 or ✨.',
+            ),
+          rowNameSingular: z
+            .string()
+            .describe(
+              "What ONE of the app's records is called, in the user's words: 'Feeding session', 'Contact', 'Workout'. Never 'Item' or 'Record'. This names the class, and it is what the table's rows are called everywhere in the UI.",
+            ),
+          rowNamePlural: z
+            .string()
+            .describe(
+              "The plural of rowNameSingular: 'Feeding sessions', 'Contacts', 'Workouts'. This becomes the table's title, so it is what the user reads in the sidebar.",
+            ),
           source: z
             .string()
-            .describe('The full JavaScript module, exporting `view({root, store})`.'),
+            .describe(
+              'The full JavaScript module, exporting `view({root, store})`.',
+            ),
           description: z.string().optional(),
         }),
-        execute: async ({ name, source, description }) => {
+        execute: async ({
+          name,
+          emoji,
+          rowNameSingular,
+          rowNamePlural,
+          source,
+          description,
+        }) => {
           try {
             const created = await createApp(store, {
               drive,
               name,
               source,
               description,
+              emoji,
+              rowName: { singular: rowNameSingular, plural: rowNamePlural },
             });
 
             // The node needs the key to write as this app when nobody is
@@ -1573,7 +1602,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
             const prepared = await prepareRun(
               store,
               source,
-              { kind: 'manual', at: Date.now(), subject },
+              { kind: 'manual', at: startedAt(), subject },
               { plugin: subject, drive },
             );
 

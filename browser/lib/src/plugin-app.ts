@@ -1,9 +1,14 @@
 import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
 import { dataBrowser } from './ontologies/dataBrowser.js';
+import { classes } from './urls.js';
 import { issueAccessAgent } from './issue-access-agent.js';
 import type { Store } from './store.js';
-import { ensureSchema, type SchemaStore } from './plugin-schema.js';
+import {
+  ensureSchema,
+  type EnsuredSchema,
+  type SchemaStore,
+} from './plugin-schema.js';
 import { pluginSchema } from './plugin-log.js';
 
 /**
@@ -22,6 +27,24 @@ export interface CreateAppOptions {
   /** The module whose `view()` renders the app. */
   source: string;
   description?: string;
+  /**
+   * One emoji, shown wherever the app is listed.
+   *
+   * Asked for rather than defaulted: a wall of identical glyphs is how a
+   * sidebar of apps stops being scannable, and only the author knows what
+   * this one is about.
+   */
+  emoji?: string;
+  /**
+   * What the app's rows are called, singular then plural — "Feeding session",
+   * "Feeding sessions".
+   *
+   * Both, because English plurals are not derivable ("person" / "people") and
+   * a wrong guess is printed at the top of the user's table forever. Left out,
+   * the rows are generically "Item" / "Items", which tells a reader nothing
+   * about what the app holds.
+   */
+  rowName?: { singular: string; plural: string };
 }
 
 export interface CreatedApp {
@@ -68,6 +91,9 @@ export async function createApp(
     isA: [schema.classes.app],
     propVals: {
       [core.properties.name]: options.name,
+      ...(options.emoji
+        ? { [dataBrowser.properties.emoji]: options.emoji }
+        : {}),
       ...(options.description
         ? { [core.properties.description]: options.description }
         : {}),
@@ -79,9 +105,13 @@ export async function createApp(
     parent: app.subject,
     isA: [core.classes.ontology],
     propVals: {
-      [core.properties.name]: options.name,
+      // Not the app's own name. Two sidebar rows reading "Breastfeed Tracker"
+      // under a third reading "Breastfeed Tracker" is a puzzle the reader has
+      // to solve every time they look at it.
+      [core.properties.name]: `${options.name} schema`,
       [core.properties.shortname]: slug(options.name),
-      [core.properties.description]: `Classes and properties belonging to ${options.name}.`,
+      [core.properties.description]:
+        `Classes and properties belonging to ${options.name}.`,
       [core.properties.classes]: [],
       [core.properties.properties]: [],
     },
@@ -93,12 +123,14 @@ export async function createApp(
   // and display config, so the rows are sortable, filterable, editable and
   // exportable without the app implementing any of it, and someone who wants
   // the data rather than the app can just open it.
+  const rows = options.rowName ?? { singular: 'Item', plural: 'Items' };
+
   const rowClass = await store.newResource({
     parent: ontology.subject,
     isA: [core.classes.class],
     propVals: {
-      [core.properties.shortname]: 'item',
-      [core.properties.name]: 'Item',
+      [core.properties.shortname]: slug(rows.singular),
+      [core.properties.name]: rows.singular,
       [core.properties.description]: `A row in ${options.name}.`,
       [core.properties.recommends]: [core.properties.name],
     },
@@ -117,8 +149,10 @@ export async function createApp(
     propVals: {
       // Named for what it holds, not for the app. Both appear in the sidebar
       // under the app, and two entries with the same name is a question the
-      // reader has to answer every time.
-      [core.properties.name]: 'Items',
+      // reader has to answer every time. "Feeding sessions" also tells someone
+      // who never opens the app what is in here — which is the point of the
+      // rows being an ordinary table.
+      [core.properties.name]: rows.plural,
       [core.properties.classtype]: rowClass.subject,
     },
   });
@@ -164,7 +198,8 @@ export async function createApp(
     targets: [app.subject],
     // Not under the app: an app may write its own subtree, so its agent
     // resource kept there would be a public key the app could replace.
-    parent: options.drive,
+    // A folder beside the apps instead — see appIdentitiesFolder.
+    parent: await appIdentitiesFolder(store, options.drive, schema),
   });
 
   return {
@@ -176,6 +211,52 @@ export async function createApp(
     agent: key.subject,
     secret: key.secret,
   };
+}
+
+/**
+ * The drive's folder of app identities, made on first use.
+ *
+ * An app's agent cannot live under the app. The app may write its own subtree,
+ * so its own agent resource kept there would be a public key it could replace
+ * — a key stored in the room it unlocks. But one loose agent per app at the
+ * drive root is its own problem: they pile up in the listing, and the answer
+ * to "what can write to this drive?" is scattered through it.
+ *
+ * So: one folder, outside every app's subtree, holding all of them. It is the
+ * place to look before revoking something.
+ *
+ * Found by a pointer on the drive rather than by name, the way the drive
+ * already points at its default ontology, so renaming the folder does not
+ * silently start a second one.
+ */
+async function appIdentitiesFolder(
+  store: SchemaStore,
+  drive: string,
+  schema: EnsuredSchema,
+): Promise<string> {
+  const driveResource = await store.getResource(drive);
+  const existing = driveResource.get(schema.properties['app-identities']);
+
+  if (typeof existing === 'string' && existing.length > 0) {
+    return existing;
+  }
+
+  const folder = await store.newResource({
+    parent: drive,
+    isA: [dataBrowser.classes.folder],
+    propVals: {
+      [core.properties.name]: 'App identities',
+      [core.properties.description]:
+        'The agents apps on this drive write as. Removing one from a resource\u2019s rights revokes that app.',
+      [dataBrowser.properties.displayStyle]: classes.displayStyles.list,
+    },
+  });
+  await folder.save();
+
+  await driveResource.set(schema.properties['app-identities'], folder.subject);
+  await driveResource.save();
+
+  return folder.subject;
 }
 
 /** A shortname an ontology will accept: lowercase, letters, digits, dashes. */
