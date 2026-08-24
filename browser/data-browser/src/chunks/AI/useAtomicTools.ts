@@ -1389,10 +1389,21 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
         description:
           "Create an app: a screen the user opens, backed by their own data. Use this when they want something to LOOK AT and INTERACT WITH — a tracker, a dashboard, a little tool — rather than a transformation they run. Use create_plugin instead when the job is importing or changing data on a schedule.\n\n" +
           "You write one JavaScript module that `export async function view({ root, store })`. `root` is a DOM element to render into; build the UI with ordinary DOM calls. There is no React, no bundler and no npm — plain JS only, and no build step, which is why you can write it and it just runs.\n\n" +
-          "`store` is the same API as @tomic/lib: `await store.getResource(subject)` (then `.get(propertySubject)`, `.set(prop, value)`, `await .save()`, `await .destroy()`), `await store.newResource({ parent, isA, propVals })`, `await store.query({ property, value })` returning subjects, `await store.getApp()` for this app's own subject, and `store.subscribe(subject, cb)` which returns an unsubscribe function.\n\n" +
-          "The app may write ANYTHING UNDER ITSELF without asking, and nothing outside itself. So create its data with `store.newResource({...})` and no parent — it defaults to the app — rather than writing into the user's drive. Reading is not restricted.\n\n" +
+          "`store` is the same API as @tomic/lib: `await store.getResource(subject)` (then `.get(propertySubject)`, `.set(prop, value)`, `await .save()`, `await .destroy()`), `await store.newResource({ parent, isA, propVals })`, `await store.query({ property, value })` returning subjects, `await store.getApp()` for this app's own subject, `await store.getData()` for `{ table, rowClass }`, and `store.subscribe(subject, cb)` returning an unsubscribe function.\n\n" +
+
+          "STORE EACH THING AS ITS OWN RESOURCE. The app comes with a table and a row class: `const { table, rowClass } = await store.getData()`. Create a row with `await store.newResource({ parent: table, isA: [rowClass], propVals: { [prop]: value } })` and list them with `await store.query({ property: 'https://atomicdata.dev/properties/parent', value: table })`.\n\n" +
+
+          "DO NOT keep the app's data as JSON in one resource. It is the obvious move if you are used to localStorage, and it throws away everything this platform is for: a blob cannot be sorted, filtered or edited in the table view, cannot be queried or shared per-row, and two people editing at once overwrite each other wholesale instead of merging. One resource per row, always.\n\n" +
+
+          "There is no `children` or `sub-resources` property. Children are found by querying `parent`, as above.\n\n" +
+
+          "GIVE THE ROWS THEIR FIELDS FIRST. A new row class has only `name`. Before writing the view, call add_table_columns with the `data` subject this tool returns, to create the properties the app needs (a CRM's company, value, stage; a tracker's date, done). It returns each property's subject — use those as the keys in propVals. Rows then have real fields, which is what makes them useful in the table as well as in your UI.\n\n" +
+
+          "The app may write ANYTHING UNDER ITSELF without asking, and nothing outside itself. Reading is not restricted.\n\n" +
+
           "Careful with subscribe: adding a child counts as a change to its parent, so subscribing to the app and writing into it on every notification loops. Guard on what changed, or re-read on user actions instead.\n\n" +
-          "The app gets its own ontology, so define classes for it with create_class rather than reusing the drive's, unless the user asked to work with data they already have.",
+
+          "Do not invent demo data. An empty app with an obvious way to add the first row is correct; seeded fake contacts are not the user's data and they have to delete them.",
         inputSchema: z.object({
           name: z.string().describe('Display name of the app.'),
           source: z
@@ -1430,10 +1441,12 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               app: shortenSubject(created.app),
               ontology: shortenSubject(created.ontology),
               entrypoint: shortenSubject(created.entrypoint),
+              data: shortenSubject(created.data),
+              rowClass: shortenSubject(created.rowClass),
               created: true,
               unattended,
               ...(keyProblem ? { keyProblem } : {}),
-              next: 'Tell the user to open the app to see it. To change it, call create_plugin with the entrypoint subject as `plugin` and the new source.',
+              next: 'Give the rows their fields with add_table_columns on `data`, then tell the user to open the app. To change the app, call create_plugin with the entrypoint subject as `plugin` and the new source.',
             };
           } catch (e) {
             return { error: (e as Error).message };
