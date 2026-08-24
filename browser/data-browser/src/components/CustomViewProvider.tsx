@@ -7,6 +7,7 @@ import {
 } from 'react';
 import { useStore } from '@tomic/react';
 import { useSettings } from '@helpers/AppSettings';
+import { useRegisterAppCreation } from '@chunks/AppPage/useRegisterAppCreation';
 
 interface UIPluginManifest {
   css: boolean;
@@ -81,6 +82,11 @@ const fetchPluginList = async (
 export function CustomViewProvider({ children }: PropsWithChildren) {
   const store = useStore();
   const { drive } = useSettings();
+
+  // Choosing "App" in the New menu has to build a whole app, not one empty
+  // resource. Registered here because this provider is always mounted and
+  // already knows the drive, and the App class is minted per drive.
+  useRegisterAppCreation(drive);
   const [customViews, setCustomViews] = useState<Map<string, string>>(
     new Map(),
   );

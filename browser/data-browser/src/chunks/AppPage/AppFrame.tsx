@@ -184,7 +184,12 @@ export function AppFrame({
       ref={frameRef}
       src={src}
       onLoad={sendStyle}
-      sandbox='allow-scripts'
+      // `allow-modals` because confirm() and alert() are the first things an
+      // app reaches for to guard a delete, and without it they return false
+      // silently — the button does nothing and nothing says why. Still no
+      // allow-same-origin, so the frame stays null-origin and cannot touch
+      // this page.
+      sandbox='allow-scripts allow-modals'
       title='App'
     />
   );
