@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createApp } from './plugin-app.js';
-import { core, server } from './index.js';
+import { core, dataBrowser, server } from './index.js';
 import type { SchemaStore } from './plugin-schema.js';
 import type { JSONValue } from './value.js';
 
@@ -104,6 +104,78 @@ describe('createApp', () => {
     expect(resources.get(created.app)?.[core.properties.parent]).toBe('drive');
   });
 
+  it('names the app’s parts after the domain, not after the app', async () => {
+    const { store, resources } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Breastfeed Tracker',
+      emoji: '🍼',
+      rowName: { singular: 'Feeding session', plural: 'Feeding sessions' },
+      source: SOURCE,
+    });
+
+    // The table title is a line the user reads in their sidebar every day.
+    expect(resources.get(created.data)?.[core.properties.name]).toBe(
+      'Feeding sessions',
+    );
+    expect(resources.get(created.rowClass)?.[core.properties.name]).toBe(
+      'Feeding session',
+    );
+    expect(resources.get(created.app)?.[dataBrowser.properties.emoji]).toBe(
+      '🍼',
+    );
+
+    // Three sidebar rows reading "Breastfeed Tracker" is a puzzle, not a name.
+    expect(resources.get(created.ontology)?.[core.properties.name]).not.toBe(
+      'Breastfeed Tracker',
+    );
+  });
+
+  it('falls back to generic row names when the caller has none', async () => {
+    const { store, resources } = fakeStore();
+
+    // The hand-made starter has no domain yet — nobody has said what it is
+    // for — so generic is honest here in a way it never is for a built app.
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'New app',
+      source: SOURCE,
+    });
+
+    expect(resources.get(created.data)?.[core.properties.name]).toBe('Items');
+  });
+
+  it('keeps the app’s agent out of the app, in a folder of its own', async () => {
+    const { store, resources } = fakeStore();
+
+    const first = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      source: SOURCE,
+    });
+
+    const folder = resources.get(first.agent)?.[core.properties.parent];
+
+    // Never under the app. An app may write its whole subtree, so an agent
+    // resource kept there is a public key the app could replace — the key
+    // stored in the room it unlocks.
+    expect(folder).not.toBe(first.app);
+    expect(resources.get(folder as string)?.[core.properties.parent]).toBe(
+      'drive',
+    );
+
+    // And one folder for the drive, not one loose agent per app: the answer to
+    // "what can write here?" has to be somewhere you can look.
+    const second = await createApp(store, {
+      drive: 'drive',
+      name: 'Errands',
+      source: SOURCE,
+    });
+
+    expect(resources.get(second.agent)?.[core.properties.parent]).toBe(folder);
+  });
+
   it('gives the app its own ontology, not the drive’s', async () => {
     const { store, resources } = fakeStore();
 
@@ -116,9 +188,9 @@ describe('createApp', () => {
     // Two apps that both invent a `Task` must not collide, and an app must be
     // copyable without leaving its schema behind.
     expect(created.ontology).not.toBe('drive-ontology');
-    expect(resources.get(created.app)?.[server.properties.defaultOntology]).toBe(
-      created.ontology,
-    );
+    expect(
+      resources.get(created.app)?.[server.properties.defaultOntology],
+    ).toBe(created.ontology);
   });
 
   it('names its entry point only once that entry point exists', async () => {

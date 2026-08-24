@@ -77,6 +77,13 @@ export function pluginSchema(): SchemaSpec {
         datatype: Datatype.STRING,
       },
       {
+        shortname: 'app-identities',
+        name: 'App identities',
+        description:
+          'The folder holding the agents apps on this drive write as. Kept as a pointer rather than found by name, so renaming the folder does not orphan it.',
+        datatype: Datatype.ATOMIC_URL,
+      },
+      {
         shortname: 'entrypoint',
         name: 'Entry point',
         description:

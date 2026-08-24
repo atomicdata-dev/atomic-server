@@ -105,6 +105,10 @@ export const resourceActions: ActionDefinition[] = [
       const created = await createApp(ctx.store, {
         drive: ctx.drive!,
         name: 'New app',
+        // Every app carries a glyph, so a sidebar of them stays scannable.
+        // A placeholder here because nobody has said yet what this one is;
+        // an app built from a description picks its own.
+        emoji: '🧩',
         source: STARTER_APP_SOURCE,
       });
 
