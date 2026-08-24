@@ -4,9 +4,8 @@ import type { Store } from '@tomic/react';
 import { handleRequest, isHostRequest, isWithinApp } from './hostStore';
 
 vi.mock('@tomic/react', async () => {
-  const actual = await vi.importActual<typeof import('@tomic/react')>(
-    '@tomic/react',
-  );
+  const actual =
+    await vi.importActual<typeof import('@tomic/react')>('@tomic/react');
 
   // Signing needs a real key and a real agent; what these tests are about is
   // which requests leave and which are refused before they do.

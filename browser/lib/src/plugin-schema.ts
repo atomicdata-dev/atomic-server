@@ -188,7 +188,10 @@ async function reconcile(
   const resource = await store.getResource(subject);
   let changed = false;
 
-  for (const property of [core.properties.requires, core.properties.recommends]) {
+  for (const property of [
+    core.properties.requires,
+    core.properties.recommends,
+  ]) {
     const wanted = desired[property];
 
     if (!Array.isArray(wanted)) continue;
