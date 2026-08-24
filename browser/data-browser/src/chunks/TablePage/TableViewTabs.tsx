@@ -27,7 +27,11 @@ import {
 import { InputStyled } from '@components/forms/InputStyles';
 import { useStore } from '@tomic/react';
 import { TablePageContext } from './tablePageContext';
-import { useDriveApps, type DriveApp } from '@chunks/AppPage/useDriveApps';
+import {
+  appsForClass,
+  useDriveApps,
+  type DriveApp,
+} from '@chunks/AppPage/useDriveApps';
 import type { DerivedColumnSpec } from './derivedColumns';
 import { derivedFilterKey, filterKey } from './tableFiltering';
 import { usePropertyTitles } from './helpers/usePropertyTitles';
@@ -42,6 +46,8 @@ import { QuickAddDialog } from './QuickAddDialog';
 import type { QuickAddSpec } from './quickAdd';
 
 interface TableViewTabsProps {
+  /** The class of this table's rows, which decides what apps can show it. */
+  rowClass: string;
   views: string[];
   activeView: string | undefined;
   setActiveView: (subject: string) => void;
@@ -78,6 +84,7 @@ interface TableViewTabsProps {
  * tab is renamed inline by double-clicking it.
  */
 export function TableViewTabs({
+  rowClass,
   views,
   activeView,
   setActiveView,
@@ -100,7 +107,7 @@ export function TableViewTabs({
 }: TableViewTabsProps): JSX.Element {
   // A table with no saved views yet still shows one implicit "Default View" tab.
   const tabs = views.length > 0 ? views : [undefined];
-  const apps = useDriveApps(useStore().getDrive());
+  const apps = appsForClass(useDriveApps(useStore().getDrive()), rowClass);
 
   return (
     <Bar>

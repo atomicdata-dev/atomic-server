@@ -196,6 +196,24 @@ describe('createApp', () => {
     ]);
   });
 
+  it('says it can show its own rows, and nothing else', async () => {
+    const { store, resources } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      source: SOURCE,
+    });
+
+    // A table offers an app only for rows it claims. Without this, every app
+    // on a drive is offered for every table and breaks on most of them.
+    // Matched by value: the property's subject is minted per drive, and `isA`
+    // is an array on this resource too.
+    expect(Object.values(resources.get(created.app) ?? {})).toContainEqual([
+      created.rowClass,
+    ]);
+  });
+
   it('carries the source it was given', async () => {
     const { store, resources } = fakeStore();
 

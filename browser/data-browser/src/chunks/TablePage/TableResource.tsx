@@ -1092,6 +1092,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
       <TablePresenceContext value={presenceValue}>
         {!embedded && (
           <TableViewTabs
+            rowClass={tableClass.subject}
             views={views}
             activeView={activeView}
             setActiveView={setActiveView}

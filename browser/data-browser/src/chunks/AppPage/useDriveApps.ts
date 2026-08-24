@@ -1,10 +1,31 @@
 import { useEffect, useState } from 'react';
 import { CollectionBuilder, core, useStore } from '@tomic/react';
+import { findSchema, pluginSchema } from '@tomic/lib';
 import { useAppClass } from '@chunks/PluginRuns/runScript';
 
 export interface DriveApp {
   subject: string;
   name: string;
+  /** The row classes this app can show. */
+  renders: string[];
+}
+
+/**
+ * The apps that can show rows of `rowClass`.
+ *
+ * An app declares what it handles, and is offered nowhere else. Listing every
+ * app on every table would mean a calendar app offered for a table of
+ * invoices — and with fifty apps on a drive, a menu nobody can read.
+ *
+ * Pure, so the rule can be read and tested without a store.
+ */
+export function appsForClass(
+  apps: DriveApp[],
+  rowClass: string | undefined,
+): DriveApp[] {
+  if (!rowClass) return [];
+
+  return apps.filter(app => app.renders.includes(rowClass));
 }
 
 /**
@@ -41,12 +62,23 @@ export function useDriveApps(drive: string | undefined): DriveApp[] {
         .setPageSize(100)
         .build();
 
+      const schema = await findSchema(store, drive, pluginSchema());
+      const rendersProperty = schema.properties?.renders;
       const found: DriveApp[] = [];
 
       for (const subject of await collection.getAllMembers()) {
         const resource = await store.getResource(subject);
+        const renders = rendersProperty
+          ? resource.get(rendersProperty)
+          : undefined;
 
-        found.push({ subject, name: resource.title });
+        found.push({
+          subject,
+          name: resource.title,
+          renders: Array.isArray(renders)
+            ? renders.filter((c): c is string => typeof c === 'string')
+            : [],
+        });
       }
 
       if (!cancelled) setApps(found);
