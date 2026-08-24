@@ -168,6 +168,46 @@ async function pick(
   );
 }
 
+/**
+ * Brings an existing class or property back in line with the spec.
+ *
+ * Without this a drive keeps whatever shape the schema had the day it was
+ * first used, and a fix to the spec never reaches anyone who already ran the
+ * old one — which is the worst case, because their data is the data that
+ * already exists.
+ *
+ * Only `requires` and `recommends` are reconciled. Names and descriptions are
+ * left alone: someone may have edited them, and overwriting a person's words
+ * on every boot is not a migration.
+ */
+async function reconcile(
+  store: SchemaStore,
+  subject: string,
+  desired: Record<string, JSONValue>,
+): Promise<void> {
+  const resource = await store.getResource(subject);
+  let changed = false;
+
+  for (const property of [core.properties.requires, core.properties.recommends]) {
+    const wanted = desired[property];
+
+    if (!Array.isArray(wanted)) continue;
+
+    const current = resource.get(property);
+    const same =
+      Array.isArray(current) &&
+      current.length === wanted.length &&
+      wanted.every(value => current.includes(value));
+
+    if (same) continue;
+
+    await resource.set(property, wanted);
+    changed = true;
+  }
+
+  if (changed) await resource.save();
+}
+
 async function ensureAll<T extends { shortname: string }>(
   store: SchemaStore,
   ontology: SchemaResource,
@@ -185,6 +225,7 @@ async function ensureAll<T extends { shortname: string }>(
 
     if (hit) {
       result[spec.shortname] = hit;
+      await reconcile(store, hit, build(spec).propVals);
 
       continue;
     }

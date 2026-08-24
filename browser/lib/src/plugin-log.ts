@@ -120,8 +120,11 @@ export function pluginSchema(): SchemaSpec {
         name: 'App',
         description:
           'A parent whose children are its parts: its own ontology, the plugin that renders it, and any handlers that run on a schedule or a query edge. Sharing the app means sharing the subtree, which drive rights already do.',
-        requires: ['entrypoint'],
-        recommends: ['app-data', 'renders'],
+        // Nothing is required. An app's parts are its children, so they can
+        // only be made once the app has a subject — a property that cannot be
+        // set at creation time must not be required, or creating one is
+        // impossible.
+        recommends: ['entrypoint', 'app-data', 'renders'],
       },
     ],
   };
