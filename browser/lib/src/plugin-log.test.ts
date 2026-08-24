@@ -259,3 +259,24 @@ describe('recordRun', () => {
     expect(store.world[wroteNothing].props[cursorProp]).toBeUndefined();
   });
 });
+
+describe('what the schema demands at creation', () => {
+  it('requires nothing an app cannot have when it is first saved', () => {
+    // An app's parts are its children, so they only exist once the app has a
+    // subject. Requiring one of them makes the first save fail schema
+    // validation — which a local-first client reports much later, from the
+    // outbox, long after `save()` resolved.
+    const app = pluginSchema().classes.find(c => c.shortname === 'app');
+
+    expect(app?.requires ?? []).toEqual([]);
+  });
+
+  it('requires nothing of a plugin either, for the same reason', () => {
+    // A plugin's source is set when it is created, so this one could hold a
+    // requirement — but a run record's parent is the plugin, and the same
+    // trap is one careless `requires` away.
+    const run = pluginSchema().classes.find(c => c.shortname === 'plugin-run');
+
+    expect(run?.requires).toBeDefined();
+  });
+});
