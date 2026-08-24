@@ -157,6 +157,45 @@ describe('createApp', () => {
     );
   });
 
+  it('keeps its rows in a table, not a folder', async () => {
+    const { store, resources } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      source: SOURCE,
+    });
+
+    // Structurally a table and a folder are the same — rows are children — so
+    // the difference that matters is the row class and the display config a
+    // Table carries. Those are what make the rows sortable and editable
+    // outside the app.
+    const table = resources.get(created.data);
+
+    expect(table?.[core.properties.parent]).toBe(created.app);
+    expect(table?.['https://atomicdata.dev/properties/classtype']).toBe(
+      created.rowClass,
+    );
+  });
+
+  it('puts the row class in the app’s own ontology', async () => {
+    const { store, resources } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      source: SOURCE,
+    });
+
+    expect(resources.get(created.rowClass)?.[core.properties.parent]).toBe(
+      created.ontology,
+    );
+    // Listed there too, or nothing reading the ontology would find it.
+    expect(resources.get(created.ontology)?.[core.properties.classes]).toEqual([
+      created.rowClass,
+    ]);
+  });
+
   it('carries the source it was given', async () => {
     const { store, resources } = fakeStore();
 

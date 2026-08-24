@@ -1,25 +1,22 @@
 /**
  * What a new app starts as.
  *
- * Doubles as the contract's documentation: what `view` receives, how to write
- * without asking, and — the part that is easy to get wrong — that an app's own
- * parts are children of the app too, so its data needs somewhere of its own.
- * Someone changing an app, often a model, reads this before anything else, so
- * it is written to be copied.
+ * Doubles as the contract's documentation: what `view` receives, and — the
+ * part worth getting right — that an app's rows belong in its table rather
+ * than in a list the app draws itself. Someone changing an app, often a
+ * model, reads this before anything else, so it is written to be copied.
  */
-export const STARTER_APP_SOURCE = `// An app renders into \`root\` and keeps its data under itself.
+export const STARTER_APP_SOURCE = `// An app renders into \`root\` and keeps its rows in its own table.
 // \`store\` is the same API as @tomic/lib. No build step, no npm: plain JS.
 
 const NAME = 'https://atomicdata.dev/properties/name';
 const PARENT = 'https://atomicdata.dev/properties/parent';
 
 export async function view({ root, store }) {
-  const app = await store.getApp();
-
-  // The app's ontology and its view are children of the app as well, so
-  // "everything under the app" is not "my data". Keep data under a folder of
-  // its own and query that instead.
-  const items = await folder(store, app, 'Items');
+  // The app's table, and the class its rows are. Rows created here show up in
+  // the table view too — sortable, filterable and editable — without this
+  // file implementing any of that.
+  const { table, rowClass } = await store.getData();
 
   const heading = document.createElement('h1');
   heading.textContent = 'New app';
@@ -32,17 +29,18 @@ export async function view({ root, store }) {
   async function refresh() {
     list.textContent = '';
 
-    for (const subject of await store.query({ property: PARENT, value: items })) {
-      const item = await store.getResource(subject);
-      const row = document.createElement('li');
-      row.textContent = item.get(NAME) ?? subject;
-      list.appendChild(row);
+    for (const subject of await store.query({ property: PARENT, value: table })) {
+      const row = await store.getResource(subject);
+      const item = document.createElement('li');
+      item.textContent = row.get(NAME) ?? subject;
+      list.appendChild(item);
     }
   }
 
   add.onclick = async () => {
     await store.newResource({
-      parent: items,
+      parent: table,
+      isA: [rowClass],
       propVals: { [NAME]: 'Item ' + (list.children.length + 1) },
     });
     await refresh();
@@ -50,18 +48,5 @@ export async function view({ root, store }) {
 
   root.append(heading, add, list);
   await refresh();
-}
-
-/** The app's folder of that name, made once. */
-async function folder(store, app, name) {
-  for (const subject of await store.query({ property: PARENT, value: app })) {
-    const child = await store.getResource(subject);
-
-    if (child.get(NAME) === name) return subject;
-  }
-
-  const made = await store.newResource({ parent: app, propVals: { [NAME]: name } });
-
-  return made.subject;
 }
 `;
