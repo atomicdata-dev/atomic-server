@@ -13,6 +13,7 @@ import {
 } from '@tomic/react';
 import type { CellIndex } from '@chunks/TableEditor';
 import toast from 'react-hot-toast';
+import { AppFrame } from '@chunks/AppPage/AppFrame';
 import { computeSortOrder, readSortKey } from '@helpers/fractionalSortOrder';
 import { useHandleClearCells } from '@chunks/TablePage/helpers/useHandleClearCells';
 import { useHandleColumnResize } from '@chunks/TablePage/helpers/useHandleColumnResize';
@@ -137,6 +138,7 @@ export const TableResource: React.FC<TableResourceProps> = ({
     ready,
     invalidateCollection,
     viewKind,
+    appView,
     viewGroupBy,
     setViewGroupBy,
     viewEndProp,
@@ -1133,7 +1135,16 @@ export const TableResource: React.FC<TableResourceProps> = ({
             onRowCreated={notifyEntryCreated}
           />
         )}
-        {viewKind === 'kanban' ? (
+        {appView !== undefined ? (
+          // An app rendering this table's rows. It sits beside the Table tab
+          // rather than in place of it: adding a way to look at rows never
+          // takes one away, and the table is always one tab over.
+          <AppFrame
+            app={appView}
+            drive={store.getDrive()!}
+            table={resource.subject}
+          />
+        ) : viewKind === 'kanban' ? (
           <KanbanView
             tableSubject={resource.subject}
             tableClass={tableClass}

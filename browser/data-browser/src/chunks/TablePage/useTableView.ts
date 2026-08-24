@@ -44,6 +44,7 @@ import { TableSorting, DEFAULT_SORT_PROP } from './tableSorting';
 import {
   ViewKind,
   DEFAULT_VIEW_KIND,
+  appViewOf,
   normalizeViewKind,
   VIEW_KIND_LABELS,
 } from './tableViewKinds';
@@ -98,15 +99,17 @@ export interface UseTableViewResult {
   /** Switch the active view, via the `?view=` search param. */
   setActiveView: (subject: string) => void;
   /** Create a new (empty) view of the given kind, link it, and switch to it. */
-  createView: (kind?: ViewKind) => void;
+  createView: (kind?: ViewKind | string, label?: string) => void;
   /** Change a view's renderer kind (table/kanban/calendar/timer). */
-  setViewKind: (subject: string, kind: ViewKind) => void;
+  setViewKind: (subject: string, kind: ViewKind | string) => void;
   /** Copy a view (its config) into a new "<name> copy" view and switch to it. */
   duplicateView: (subject: string) => void;
   /** Remove a view from the table and destroy its resource. */
   deleteView: (subject: string) => void;
   /** Which renderer the active view uses ('table' until a View exists). */
   viewKind: ViewKind;
+  /** Set when this view is rendered by an app rather than a built-in kind. */
+  appView: string | undefined;
   /**
    * The property this view arranges rows by: a SelectProperty (kanban), a date
    * property (calendar), or the start timestamp (timer).
@@ -409,7 +412,7 @@ export function useTableView(
   const createViewResource = useCallback(
     async (
       name: string,
-      kind: ViewKind = DEFAULT_VIEW_KIND,
+      kind: ViewKind | string = DEFAULT_VIEW_KIND,
     ): Promise<Resource> => {
       const isFirst = views.length === 0 && !defaultViewSubject;
       const created = await store.newResource({
@@ -465,14 +468,29 @@ export function useTableView(
   );
 
   const createView = useCallback(
-    (kind: ViewKind = DEFAULT_VIEW_KIND) => {
+    (kind: ViewKind | string = DEFAULT_VIEW_KIND, label?: string) => {
       void (async () => {
-        // A new view is named after its kind ("Table" / "Kanban" / …).
-        const created = await createViewResource(VIEW_KIND_LABELS[kind], kind);
+        // A table with no saved views shows one implicit Table tab, and that
+        // tab disappears the moment a real view exists. So adding an app to a
+        // fresh table would take the table away — the one thing an extra way
+        // of looking at rows must never do. Give it back explicitly first.
+        if (appViewOf(kind) && views.length === 0 && !defaultViewSubject) {
+          await createViewResource(
+            VIEW_KIND_LABELS[DEFAULT_VIEW_KIND],
+            DEFAULT_VIEW_KIND,
+          );
+        }
+
+        // Named after its kind ("Table" / "Kanban" / …), or after the app,
+        // whose subject would be a meaningless tab title.
+        const created = await createViewResource(
+          label ?? VIEW_KIND_LABELS[kind as ViewKind],
+          kind,
+        );
         goToView(created.subject, true);
       })().catch(() => undefined);
     },
-    [createViewResource],
+    [createViewResource, views.length, defaultViewSubject],
   );
 
   // --- Persist (debounced) whenever the local config changes post-hydration. ---
@@ -820,7 +838,7 @@ export function useTableView(
   );
 
   const setViewKind = useCallback(
-    (subject: string, kind: ViewKind) => {
+    (subject: string, kind: ViewKind | string) => {
       void (async () => {
         const v = store.getResourceLoading(subject);
         await v.set(dataBrowser.properties.viewKind, kind, false);
@@ -939,6 +957,7 @@ export function useTableView(
     duplicateView,
     deleteView,
     viewKind: normalizeViewKind(storedKind),
+    appView: appViewOf(storedKind),
     viewGroupBy,
     setViewGroupBy,
     viewEndProp,

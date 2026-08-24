@@ -7797,7 +7797,6 @@ msgid "Sign in to open this app."
 msgstr ""
 
 #: src/actions/resourceActions.tsx
-#: src/actions/resourceActions.tsx
 msgid "New app"
 msgstr ""
 
