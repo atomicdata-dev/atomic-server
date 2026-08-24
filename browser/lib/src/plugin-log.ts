@@ -83,6 +83,13 @@ export function pluginSchema(): SchemaSpec {
           'The plugin whose view() opens when someone opens this app.',
         datatype: Datatype.ATOMIC_URL,
       },
+      {
+        shortname: 'app-data',
+        name: 'Data',
+        description:
+          "The table this app's rows live in. A table rather than a folder so the rows are sortable, filterable and editable without the app implementing any of that — and so they can be opened directly when the app is not what someone wants.",
+        datatype: Datatype.ATOMIC_URL,
+      },
     ],
     classes: [
       {
@@ -107,6 +114,7 @@ export function pluginSchema(): SchemaSpec {
         description:
           'A parent whose children are its parts: its own ontology, the plugin that renders it, and any handlers that run on a schedule or a query edge. Sharing the app means sharing the subtree, which drive rights already do.',
         requires: ['entrypoint'],
+        recommends: ['app-data'],
       },
     ],
   };

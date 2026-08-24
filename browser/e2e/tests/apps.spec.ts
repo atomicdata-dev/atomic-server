@@ -49,6 +49,32 @@ test.describe('apps', () => {
     await expect(app.getByRole('listitem')).toHaveCount(2);
   });
 
+  test('rows an app adds are in its table, editable without the app', async ({
+    page,
+  }) => {
+    const main = page.getByRole('main');
+
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByPlaceholder(/filter/i).fill('app');
+    await page.locator('[data-testid="menu-item-new-app"]').click();
+    await expect(main.locator('iframe[title="App"]')).toBeVisible();
+
+    const app = page.frameLocator('iframe[title="App"]');
+    await app.getByRole('button', { name: 'Add an item' }).click();
+    await expect(app.getByRole('listitem')).toHaveCount(1);
+
+    // The app's rows are a table's rows. Opening that table gives the full
+    // table UI — which is the point of not having the app draw a list:
+    // sorting, filtering and editing come from the table, not from the app.
+    const sidebar = page.getByRole('navigation').last();
+    await sidebar.getByRole('button', { name: 'Expand folder' }).last().click();
+    await sidebar.getByRole('button', { name: 'Items', exact: true }).click();
+
+    // The table renders the row the app made, with the table's own UI around
+    // it — nothing the app implemented.
+    await expect(main.getByText('Item 1')).toBeVisible();
+  });
+
   test('an app survives a reload, because its data is in the drive', async ({
     page,
   }) => {

@@ -3,6 +3,8 @@ import {
   CollectionBuilder,
   core,
   errorMessageFromResponse,
+  findSchema,
+  pluginSchema,
   signRequest,
 } from '@tomic/react';
 
@@ -86,6 +88,28 @@ export async function handleRequest(
   switch (request.op) {
     case 'app':
       return app;
+
+    case 'data': {
+      const resource = await store.getResource(app);
+      const schema = await findSchema(store, drive, pluginSchema());
+      const table = schema.properties?.['app-data']
+        ? (resource.get(schema.properties['app-data']) as string | undefined)
+        : undefined;
+
+      if (!table) return undefined;
+
+      // The row class comes off the table rather than the app: a table already
+      // names what its rows are, and duplicating that on the app would be two
+      // places to disagree.
+      const tableResource = await store.getResource(table);
+
+      return {
+        table,
+        rowClass: tableResource.get(core.properties.classtype) as
+          | string
+          | undefined,
+      };
+    }
 
     case 'get': {
       const resource = await store.getResource(required(request.subject, 'subject'));

@@ -1,5 +1,6 @@
 import { core } from './ontologies/core.js';
 import { server } from './ontologies/server.js';
+import { dataBrowser } from './ontologies/dataBrowser.js';
 import { issueAccessAgent } from './issue-access-agent.js';
 import type { Store } from './store.js';
 import { ensureSchema, type SchemaStore } from './plugin-schema.js';
@@ -29,6 +30,10 @@ export interface CreatedApp {
   ontology: string;
   /** The plugin the app opens to. */
   entrypoint: string;
+  /** The table this app's rows live in. */
+  data: string;
+  /** The class those rows are. */
+  rowClass: string;
   /** The app's own agent. Writes it makes are attributable to this DID. */
   agent: string;
   /**
@@ -83,6 +88,42 @@ export async function createApp(
   });
   await ontology.save();
 
+  // The app's rows are a Table, not a folder. Structurally they are the same
+  // thing — a table's rows are its children — but a Table carries a row class
+  // and display config, so the rows are sortable, filterable, editable and
+  // exportable without the app implementing any of it, and someone who wants
+  // the data rather than the app can just open it.
+  const rowClass = await store.newResource({
+    parent: ontology.subject,
+    isA: [core.classes.class],
+    propVals: {
+      [core.properties.shortname]: 'item',
+      [core.properties.name]: 'Item',
+      [core.properties.description]: `A row in ${options.name}.`,
+      [core.properties.recommends]: [core.properties.name],
+    },
+  });
+  await rowClass.save();
+
+  // Registered on the ontology, or it is a class the app's own vocabulary
+  // does not list — and nothing that reads the ontology would find it.
+  const ontologyResource = await store.getResource(ontology.subject);
+  await ontologyResource.set(core.properties.classes, [rowClass.subject]);
+  await ontologyResource.save();
+
+  const data = await store.newResource({
+    parent: app.subject,
+    isA: [dataBrowser.classes.table],
+    propVals: {
+      // Named for what it holds, not for the app. Both appear in the sidebar
+      // under the app, and two entries with the same name is a question the
+      // reader has to answer every time.
+      [core.properties.name]: 'Items',
+      [core.properties.classtype]: rowClass.subject,
+    },
+  });
+  await data.save();
+
   const entrypoint = await store.newResource({
     parent: app.subject,
     isA: [schema.classes['plugin-script']],
@@ -99,6 +140,7 @@ export async function createApp(
   const saved = await store.getResource(app.subject);
   await saved.set(server.properties.defaultOntology, ontology.subject);
   await saved.set(schema.properties.entrypoint, entrypoint.subject);
+  await saved.set(schema.properties['app-data'], data.subject);
   await saved.save();
 
   // The app's own identity, and the only thing that decides what it may
@@ -125,6 +167,8 @@ export async function createApp(
     app: app.subject,
     ontology: ontology.subject,
     entrypoint: entrypoint.subject,
+    data: data.subject,
+    rowClass: rowClass.subject,
     agent: key.subject,
     secret: key.secret,
   };

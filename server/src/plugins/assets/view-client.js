@@ -97,6 +97,17 @@ export const store = {
     return send('app', {});
   },
 
+  /**
+   * The table this app's rows live in, and the class they are.
+   *
+   * A table rather than a folder, so the same rows are sortable, filterable
+   * and editable outside the app without the app implementing any of that.
+   * Create rows with this as their parent and class and they show up in both.
+   */
+  async getData() {
+    return send('data', {});
+  },
+
   async getResource(subject) {
     const result = await send('get', { subject });
 
