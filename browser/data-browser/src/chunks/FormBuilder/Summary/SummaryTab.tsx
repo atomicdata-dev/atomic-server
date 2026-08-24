@@ -4,6 +4,8 @@ import { FaArrowsRotate } from 'react-icons/fa6';
 import { styled } from 'styled-components';
 import { Button } from '@components/Button';
 import { Row } from '@components/Row';
+import { useLocale } from '@components/LocaleContext';
+import { countryName } from '@tomic/form-renderer';
 import { AnswerList } from './AnswerList';
 import { ChoiceBars } from './ChoiceBars';
 import { Histogram } from './Histogram';
@@ -156,8 +158,21 @@ function FieldCard({ field }: { field: FieldSummary }): JSX.Element {
 }
 
 function FieldBody({ field }: { field: FieldSummary }): JSX.Element {
+  const { locale } = useLocale();
+
   if (isChoiceSummary(field)) {
-    return <ChoiceBars counts={field.counts} answered={field.answered} />;
+    // A `country` field counts ISO codes; nobody wants to read a bar chart of
+    // "NL", so the labels become names here rather than on the server, which
+    // has no business knowing the reader's language.
+    const counts: Array<[string, number]> =
+      field.type === 'country'
+        ? field.counts.map(([code, count]) => [
+            countryName(code, locale),
+            count,
+          ])
+        : field.counts;
+
+    return <ChoiceBars counts={counts} answered={field.answered} />;
   }
 
   if (isCheckboxSummary(field)) {

@@ -196,7 +196,7 @@ const TabButton = styled.button<{ $active: boolean }>`
 const FieldsGrid = styled.div`
   display: grid;
   grid-template-areas: 'main settings' 'pages pages';
-  grid-template-columns: 1fr 18rem;
+  grid-template-columns: 1fr 25rem;
   grid-template-rows: 1fr min-content;
   flex: 1;
   min-height: 0;

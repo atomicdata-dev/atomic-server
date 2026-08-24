@@ -226,7 +226,7 @@
   {
     "@id": "https://atomicdata.dev/properties/form-field-type",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
-    "https://atomicdata.dev/properties/description": "The kind of question a FormField renders and validates as. One of: short-text, long-text, email, number, date, datetime, checkbox, radio, multi-select.",
+    "https://atomicdata.dev/properties/description": "The kind of question a FormField renders and validates as. One of: short-text, long-text, email, phone, url, number, currency, date, datetime, checkbox, radio, dropdown, multi-select, dropdown-multi, picture-choice, likert, rating, choice-matrix, table-input, address, country.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],

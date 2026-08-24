@@ -306,7 +306,7 @@ function ValueInput({
   }
 
   if (
-    (question.type === 'radio' || question.type === 'multi-select') &&
+    CHOICE_TYPES.includes(question.type) &&
     question.choiceOptions &&
     question.choiceOptions.length > 0
   ) {
@@ -327,7 +327,7 @@ function ValueInput({
     );
   }
 
-  if (question.type === 'number') {
+  if (NUMERIC_TYPES.includes(question.type)) {
     return (
       <InputWrapper>
         <InputStyled
@@ -368,10 +368,23 @@ function ValueInput({
   );
 }
 
+/** Question types whose answer is one of a configured list of labels — the
+ * condition value is then picked from that list instead of typed. */
+const CHOICE_TYPES: string[] = [
+  'radio',
+  'multi-select',
+  'dropdown',
+  'dropdown-multi',
+  'picture-choice',
+];
+
+/** Question types whose answer is a number, so the condition value is too. */
+const NUMERIC_TYPES: string[] = ['number', 'currency', 'likert', 'rating'];
+
 function defaultValueFor(question: FormQuestionRef): JSONValue {
   if (question.type === 'checkbox') return true;
 
-  if (question.type === 'number') return 0;
+  if (NUMERIC_TYPES.includes(question.type)) return 0;
 
   if (question.choiceOptions && question.choiceOptions.length > 0) {
     return question.choiceOptions[0];

@@ -14,8 +14,14 @@ import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Column } from '@components/Row';
 import { useDebounce } from '@helpers/useDebounce';
 import { TextOptions } from './FieldOptions/TextOptions';
+import { CountryDefaultField } from './FieldOptions/CountryDefaultField';
 import { NumberOptions } from './FieldOptions/NumberOptions';
 import { ChoiceOptions } from './FieldOptions/ChoiceOptions';
+import { CurrencyOptions } from './FieldOptions/CurrencyOptions';
+import { LikertOptions, RatingOptions } from './FieldOptions/ScaleOptions';
+import { PictureChoiceOptions } from './FieldOptions/PictureChoiceOptions';
+import { MatrixOptions } from './FieldOptions/MatrixOptions';
+import { TableInputOptions } from './FieldOptions/TableInputOptions';
 import type { FormFieldType } from './fieldTypes';
 import { useFormFieldPropertySync } from './useFormFieldPropertySync';
 import { ConditionsEditor } from './ConditionsEditor';
@@ -151,12 +157,48 @@ function TypeOptions({
     case 'short-text':
     case 'long-text':
     case 'email':
+    case 'url':
       return <TextOptions field={field} />;
+    case 'phone':
+      return (
+        <>
+          <TextOptions field={field} />
+          <CountryDefaultField
+            field={field}
+            helper='The country the number selector starts on. Visitors can still pick another one.'
+          />
+        </>
+      );
+    case 'country':
+      return (
+        <>
+          <TextOptions field={field} />
+          <CountryDefaultField
+            field={field}
+            helper='Pre-selected when the form opens. Leave on "No default" to make the visitor choose.'
+          />
+        </>
+      );
     case 'number':
       return <NumberOptions field={field} />;
+    case 'currency':
+      return <CurrencyOptions field={field} />;
     case 'radio':
     case 'multi-select':
+    case 'dropdown':
+    case 'dropdown-multi':
       return <ChoiceOptions field={field} />;
+    case 'picture-choice':
+      return <PictureChoiceOptions field={field} />;
+    case 'likert':
+      return <LikertOptions field={field} />;
+    case 'rating':
+      return <RatingOptions field={field} />;
+    case 'choice-matrix':
+      return <MatrixOptions field={field} />;
+    case 'table-input':
+      return <TableInputOptions field={field} />;
+    // checkbox, date, datetime and address have nothing to configure.
     default:
       return null;
   }

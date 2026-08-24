@@ -59,11 +59,58 @@ Properties:
 
 - [`name`](https://atomicdata.dev/properties/name) - (required, String) the question label.
 - [`form-maps-to`](https://atomicdata.dev/properties/form-maps-to) - (required, AtomicURL, Property) the Property on the Form's data class that this field's answers are written to.
-- [`form-field-type`](https://atomicdata.dev/properties/form-field-type) - (required, String) the kind of question. One of: `short-text`, `long-text`, `email`, `number`, `date`, `datetime`, `checkbox`, `radio`, `multi-select` — enforced by the application, not the store (see note below).
+- [`form-field-type`](https://atomicdata.dev/properties/form-field-type) - (required, String) the kind of question — one of the values in the table below, enforced by the application, not the store (see note at the bottom of this page).
 - [`description`](https://atomicdata.dev/properties/description) - (recommended, Markdown) helper text shown below the label.
 - [`required`](https://atomicdata.dev/properties/required) - (recommended, Boolean) whether an answer is mandatory.
 - [`form-field-options`](https://atomicdata.dev/properties/form-field-options) - (recommended, JSON) type-specific settings (placeholder, min/max, choice options, ...); shape depends on `form-field-type`.
 - [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates. All must match (AND) for the field to be shown. Hidden fields are not validated and their submitted values are dropped.
+
+### Question types
+
+Each type fixes the datatype of the Property the answers are written to
+(`form-maps-to`), the shape of the `form-field-options` bag, and the JSON shape
+of a submitted answer. Options not listed for a type are ignored.
+
+| `form-field-type` | Property datatype | `form-field-options` | submitted value |
+| ----------------- | ----------------- | -------------------- | --------------- |
+| `short-text`      | String            | `placeholder`        | string |
+| `long-text`       | String            | `placeholder`        | string |
+| `email`           | String            | `placeholder`        | string, validated as an email address |
+| `phone`           | String            | `placeholder`, `defaultCountry` | string; the renderer's country-select input submits E.164 (`+31612345678`), and the server also accepts digits with the usual separators and an optional `+` prefix |
+| `country`         | String            | `placeholder`, `defaultCountry` | ISO 3166-1 alpha-2 code (`"NL"`); the renderer shows the country's name in the visitor's own language |
+| `url`             | String            | `placeholder`        | string, must start with `http://` or `https://` |
+| `number`          | Float             | `placeholder`, `min`, `max` | number |
+| `currency`        | Float             | `currency` (ISO code), `placeholder`, `min`, `max` | number |
+| `date`            | Date              | —                    | `"YYYY-MM-DD"` |
+| `datetime`        | Timestamp         | —                    | milliseconds since epoch |
+| `checkbox`        | Boolean           | `defaultValue`       | boolean |
+| `radio`           | String            | `options`            | one of `options` |
+| `dropdown`        | String            | `options`, `placeholder` | one of `options` |
+| `multi-select`    | JSON              | `options`            | array of `options` |
+| `dropdown-multi`  | JSON              | `options`            | array of `options` |
+| `picture-choice`  | String            | `options`, `optionImages` | one of `options` |
+| `likert`          | Integer           | `scale` (2–11, default 5), `minLabel`, `maxLabel` | integer `1..scale` |
+| `rating`          | Integer           | `max` (2–10, default 5), `icon` (`star`/`heart`) | integer `1..max` |
+| `choice-matrix`   | JSON              | `rows`, `columns`    | object mapping a row to one of `columns` |
+| `table-input`     | JSON              | `columns` (`{label, type}`, type `text`/`number`), `minRows`, `maxRows` | array of row objects keyed by column label |
+| `address`         | JSON              | —                    | object with any of `line1`, `line2`, `postalCode`, `city`, `state`, `country`; `country` is an ISO 3166-1 alpha-2 code, the rest is free text |
+
+`defaultCountry` is an ISO 3166-1 alpha-2 code. On a `phone` field it decides
+which country the number input starts on (the visitor can still switch); on a
+`country` field it is pre-selected as the answer. Leave it out and the visitor
+picks from scratch.
+
+`optionImages` is an array of File subjects positionally matched to `options`,
+so renaming an option keeps its image. Because a published form has no agent,
+the definition JSON replaces those subjects with URLs on the publish-gated
+`GET /form/{id}/image?file=…` route (which only serves images this form
+actually references) — the Files themselves stay private, the same way the
+Form's `cover-image` does.
+
+For `required` fields, "answered" is per-subfield on the composite types: a
+`choice-matrix` needs every row answered, and an `address` needs at least
+`line1`, `city` and `country`. An array or object whose entries are all empty
+counts as unanswered rather than as a partial answer.
 
 ## FormHeading
 

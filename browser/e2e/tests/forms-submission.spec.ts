@@ -727,6 +727,145 @@ test.describe('form publish and anonymous submit', () => {
     await expect(page.getByText('Spot')).toBeVisible({ timeout: 15000 });
   });
 
+  /**
+   * The extended question types (`planning/form-field-types.md`) end-to-end:
+   * configured in the builder, rendered by the published runtime, validated
+   * and coerced by the submit handler, and stored on the row. One type per
+   * value shape — `dropdown` (string enum), `rating` (bounded integer) and
+   * `address` (composite JSON) — the rest share those paths and are covered
+   * by the Rust unit tests in `server/src/forms.rs`.
+   */
+  test('extended field types round-trip from builder to submission', async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Signup');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('editable-title').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    // --- Dropdown, with its options renamed ---
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Dropdown', exact: true }).click();
+    await expect(page.getByTestId('field-row-dropdown')).toBeVisible();
+    await page.getByTestId('field-row-dropdown').click();
+    await page.getByTestId('field-label-input').fill('Plan');
+
+    const choiceInputs = page.getByTestId('choice-option-input');
+    await expect(choiceInputs).toHaveCount(2);
+    await choiceInputs.nth(0).fill('Basic');
+    await choiceInputs.nth(1).fill('Pro');
+
+    // --- Rating ---
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Rating', exact: true }).click();
+    await expect(page.getByTestId('field-row-rating')).toBeVisible();
+    await page.getByTestId('field-row-rating').click();
+    await page.getByTestId('field-label-input').fill('Score');
+
+    // --- Address ---
+    await page.getByTitle('Add field').click();
+    await page.getByRole('menuitem', { name: 'Address', exact: true }).click();
+    await expect(page.getByTestId('field-row-address')).toBeVisible();
+    await page.getByTestId('field-row-address').click();
+    await page.getByTestId('field-label-input').fill('Where');
+
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await page.waitForFunction(
+      ({ subject, prop }) =>
+        typeof window.store.resources.get(subject)?.get(prop) === 'number',
+      { subject: formSubject, prop: FORM_PUBLISHED_AT },
+      { timeout: 10000 },
+    );
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    const tableSubject = await page.evaluate(
+      ({ subject, prop }) =>
+        window.store.resources.get(subject)?.get(prop) as string | undefined,
+      { subject: formSubject, prop: FORM_TARGET_TABLE },
+    );
+    expect(tableSubject).toBeTruthy();
+
+    await waitForPublished(page, formSubject);
+
+    // --- Anonymous visitor fills in one of each ---
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    await visitorPage.goto(`${SERVER_URL}/form/${formSubject}`);
+
+    const planSelect = visitorPage.getByLabel('Plan', { exact: false });
+    await expect(planSelect).toBeVisible({ timeout: 15000 });
+    await planSelect.selectOption('Pro');
+
+    // The rating radios carry their own aria-labels; the star glyph itself is
+    // decorative.
+    await visitorPage.getByLabel('4 out of 5').check();
+
+    await visitorPage.getByLabel('Address', { exact: true }).fill('Main St 1');
+    await visitorPage.getByLabel('City', { exact: true }).fill('Utrecht');
+    await visitorPage
+      .getByLabel('Country', { exact: true })
+      .fill('Netherlands');
+
+    const submitButton = visitorPage.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    await expect(submitButton).toBeEnabled({ timeout: 30000 });
+    await submitButton.click();
+    await expect(visitorPage.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
+    await visitorContext.close();
+
+    // --- Owner: the row landed, one column per question, each answer in the
+    // shape its datatype implies: the picked option as a string, the rating as
+    // a whole number, the address as a JSON object. ---
+    await openSubject(page, tableSubject as string);
+    await expect(
+      page.getByRole('gridcell', { name: 'Pro', exact: true }),
+    ).toBeVisible({ timeout: 15000 });
+    await expect(
+      page.getByRole('gridcell', { name: '4', exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole('gridcell', { name: /Utrecht/ })).toBeVisible();
+
+    // --- Owner: the summary aggregates each type on its existing path —
+    // option counts for the dropdown, a numeric summary for the rating, and
+    // a raw answer sample for the composite address value.
+    await openSubject(page, formSubject);
+    await page.getByRole('tab', { name: 'Summary' }).click();
+    await expect(page.getByText('1 response', { exact: true })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.getByText(/Utrecht/).first()).toBeVisible();
+  });
+
   test('unpublished form shows a friendly not-available page', async ({
     page,
     browser,

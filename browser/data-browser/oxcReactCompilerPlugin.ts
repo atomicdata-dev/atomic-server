@@ -8,7 +8,13 @@ import { transform } from 'oxc-transform-react';
 const looksLikeReactCode = /\b[A-Z]|\buse/;
 
 const includeRE = /\.[cm]?[jt]sx?(?:$|\?)/;
-const excludeRE = /\/node_modules\//;
+// Worker entrypoints are excluded along with node_modules: Fast Refresh
+// instrumentation calls `$RefreshReg$`, which only exists on `window`, so a
+// worker module that picks it up dies on load. `@tomic/lib`'s
+// `client-db.worker.js` is the one that bites — pnpm links it from
+// `browser/lib/dist`, outside any `node_modules/` path, and it is in
+// `optimizeDeps.exclude`, so it reaches this transform like first-party code.
+const excludeRE = /\/node_modules\/|\.worker\.[cm]?[jt]sx?(?:$|\?)/;
 
 /**
  * Matches the old `babel-plugin-styled-components` options: `displayName` so

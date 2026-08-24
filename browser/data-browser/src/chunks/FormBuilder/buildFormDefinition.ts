@@ -9,6 +9,7 @@ import type {
   FormStyling,
 } from '@tomic/form-renderer';
 import { parseStylingValue } from './SettingsTab';
+import { parseFieldOptions } from './FieldOptions/useFieldOptions';
 
 /**
  * Client-side mirror of `atomic_lib::forms::build_form_definition`
@@ -196,10 +197,12 @@ async function buildBlock(
     };
   }
 
-  const options =
-    (field.get(forms.properties.formFieldOptions) as JSONValue as
-      | FieldOptions
-      | undefined) ?? {};
+  const options = (await resolveOptionImages(
+    store,
+    parseFieldOptions(
+      field.get(forms.properties.formFieldOptions) as JSONValue | undefined,
+    ),
+  )) as FieldOptions;
 
   return {
     kind: 'field',
@@ -213,4 +216,34 @@ async function buildBlock(
     options,
     ...(conditions.length > 0 ? { conditions } : {}),
   };
+}
+
+/**
+ * `picture-choice` stores its option images as File subjects. The server
+ * rewrites them into publish-gated `/form/{id}/image?file=…` URLs for
+ * agent-less visitors (`fill_image_url`); the preview instead uses the File's
+ * own `downloadURL`, since the builder is authenticated — same split as the
+ * cover image in `buildStyling`.
+ */
+async function resolveOptionImages(
+  store: Store,
+  options: Record<string, JSONValue>,
+): Promise<Record<string, JSONValue>> {
+  const images = options.optionImages;
+
+  if (!Array.isArray(images)) {
+    return options;
+  }
+
+  const resolved = await Promise.all(
+    images.map(async subject => {
+      if (typeof subject !== 'string' || subject === '') return '';
+
+      const file = await store.getResource(subject);
+
+      return (file.get(server.properties.downloadUrl) as string) ?? '';
+    }),
+  );
+
+  return { ...options, optionImages: resolved };
 }

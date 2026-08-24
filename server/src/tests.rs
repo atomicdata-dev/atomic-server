@@ -1247,6 +1247,116 @@ async fn form_submission_flow() {
         }};
     }
 
+    // 3d. Picture-choice option images: the definition rewrites File subjects
+    // into publish-gated `/form/{id}/image?file=` URLs (the visitor has no
+    // agent, so `/download` is unreachable), and that route only serves images
+    // this form actually references — otherwise it would be an open proxy for
+    // anything the server agent can read.
+    let mut picture_prop = Resource::new_instance(urls::PROPERTY, store).await.unwrap();
+    picture_prop
+        .set(urls::SHORTNAME.into(), Value::Slug("pick".into()), store)
+        .await
+        .unwrap();
+    picture_prop
+        .set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("Picture choice".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop
+        .set(
+            urls::DATATYPE_PROP.into(),
+            Value::AtomicUrl(urls::STRING.into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop.save_locally(store).await.unwrap();
+
+    let referenced_image = "https://example.com/files/cat";
+    let mut picture_field = Resource::new_instance(urls::FORM_FIELD, store)
+        .await
+        .unwrap();
+    picture_field
+        .set(urls::NAME.into(), Value::String("Pick one".into()), store)
+        .await
+        .unwrap();
+    picture_field
+        .set(
+            urls::FORM_MAPS_TO.into(),
+            Value::AtomicUrl(picture_prop.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_field
+        .set(
+            urls::FORM_FIELD_TYPE.into(),
+            Value::String("picture-choice".into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_field
+        .set(
+            urls::FORM_FIELD_OPTIONS.into(),
+            Value::Json(serde_json::json!({
+                "options": ["Cat", "Dog"],
+                "optionImages": [referenced_image, ""],
+            })),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_field.save_locally(store).await.unwrap();
+
+    page.set(
+        urls::FORM_FIELDS.into(),
+        Value::ResourceArray(vec![
+            field.get_subject().to_string().into(),
+            picture_field.get_subject().to_string().into(),
+        ]),
+        store,
+    )
+    .await
+    .unwrap();
+    page.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(resp.status().is_success());
+    let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
+    assert_eq!(
+        body["pages"][0]["blocks"][1]["options"]["optionImages"],
+        serde_json::json!([
+            format!(
+                "/form/{}/image?file={}",
+                slug,
+                urlencoding::encode(referenced_image)
+            ),
+            ""
+        ]),
+        "option image subjects should be rewritten into gated URLs"
+    );
+
+    let req = test::TestRequest::get()
+        .uri(&format!(
+            "/form/{}/image?file={}",
+            slug,
+            urlencoding::encode("https://example.com/files/not-referenced")
+        ))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        404,
+        "the image route must not serve files the form doesn't reference"
+    );
+
     // 4. Valid submission (with solved captcha) -> 201, row lands under the table
     let captcha_payload = solve_captcha!();
     let submit_body = serde_json::json!({

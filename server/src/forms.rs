@@ -155,11 +155,16 @@ pub struct FormVisibility {
     pub blocks: Vec<HashSet<usize>>,
 }
 
+/// Whether an answer counts as "not given". Mirrored by `isEmptyValue` in
+/// `browser/form-renderer/src/conditions.ts` — an array or object whose
+/// entries are all themselves empty (e.g. an untouched `table-input` grid or
+/// a blank `address`) counts as unanswered, not as a partial answer.
 fn json_is_empty(value: Option<&JsonValue>) -> bool {
     match value {
         None | Some(JsonValue::Null) => true,
         Some(JsonValue::String(s)) => s.is_empty(),
-        Some(JsonValue::Array(a)) => a.is_empty(),
+        Some(JsonValue::Array(a)) => a.iter().all(|v| json_is_empty(Some(v))),
+        Some(JsonValue::Object(o)) => o.values().all(|v| json_is_empty(Some(v))),
         _ => false,
     }
 }
@@ -323,6 +328,87 @@ pub async fn build_form_definition(
     })
 }
 
+/// `form-field-options` key holding a `picture-choice` question's images,
+/// positionally matched to its `options`. Values are File subjects in the
+/// store and URLs on the wire — see [rewrite_option_images].
+pub const OPTION_IMAGES_KEY: &str = "optionImages";
+
+/// Turns every `picture-choice` option image from a File subject into
+/// something an agent-less visitor can fetch. Same split as
+/// `FormStyling::image_url`: [build_form_definition] stays id-agnostic and
+/// the caller owns URL construction (the HTTP handlers point at
+/// `/form/{id}/image?file=…`, the data-browser preview at the File's own
+/// `downloadURL`). Entries that aren't subjects are left alone.
+pub fn rewrite_option_images(definition: &mut FormDefinition, to_url: impl Fn(&str) -> String) {
+    for page in definition.pages.iter_mut() {
+        for block in page.blocks.iter_mut() {
+            let FormBlock::Field { options, .. } = block else {
+                continue;
+            };
+            let Some(images) = options
+                .get_mut(OPTION_IMAGES_KEY)
+                .and_then(|v| v.as_array_mut())
+            else {
+                continue;
+            };
+            for image in images.iter_mut() {
+                if let Some(subject) = image.as_str().filter(|s| !s.is_empty()) {
+                    *image = JsonValue::String(to_url(subject));
+                }
+            }
+        }
+    }
+}
+
+/// Every File subject this form is allowed to serve anonymously through
+/// `GET /form/{id}/image?file=…`, i.e. the images its `picture-choice`
+/// questions reference. Gating on this set is what keeps that route from
+/// becoming a proxy for any file the server agent can read. (The form's own
+/// `cover-image` is served by the same route *without* a `file` param, so it
+/// doesn't need to be listed here.)
+pub async fn collect_option_image_subjects(
+    store: &impl Storelike,
+    form: &Resource,
+) -> AtomicResult<HashSet<String>> {
+    let mut subjects = HashSet::new();
+
+    let page_subjects = form
+        .get(atomic_lib::urls::FORM_PAGES)
+        .and_then(|v| v.to_subjects(None))
+        .unwrap_or_default();
+
+    for page_subject in page_subjects {
+        let Ok(page) = store.get_resource(&page_subject.into()).await else {
+            continue;
+        };
+        let field_subjects = page
+            .get(atomic_lib::urls::FORM_FIELDS)
+            .and_then(|v| v.to_subjects(None))
+            .unwrap_or_default();
+
+        for field_subject in field_subjects {
+            let Ok(field) = store.get_resource(&field_subject.into()).await else {
+                continue;
+            };
+            let Ok(Value::Json(options)) = field.get(atomic_lib::urls::FORM_FIELD_OPTIONS) else {
+                continue;
+            };
+            let Some(images) = options.get(OPTION_IMAGES_KEY).and_then(|v| v.as_array()) else {
+                continue;
+            };
+            subjects.extend(
+                images
+                    .iter()
+                    .filter_map(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
+                    .map(str::to_string),
+            );
+        }
+    }
+
+    Ok(subjects)
+}
+
 fn build_form_styling(form: &Resource) -> FormStyling {
     // The String arm covers docs written before the client could resolve the
     // form-styling Property (no `json` datatype tag → the value materializes
@@ -469,6 +555,10 @@ async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<F
             .unwrap_or(false);
         let options = match field.get(atomic_lib::urls::FORM_FIELD_OPTIONS) {
             Ok(Value::Json(v)) => v.clone(),
+            // Same fallback as `build_form_styling`: a JSON value written
+            // while its Property was unresolvable materializes as the raw
+            // serialized string.
+            Ok(Value::String(s)) => serde_json::from_str(s).unwrap_or_else(|_| json!({})),
             _ => json!({}),
         };
         return Ok(FormBlock::Field {
@@ -544,14 +634,8 @@ pub fn validate_submission(
         }
 
         let raw = values.get(maps_to);
-        let is_empty = match raw {
-            None | Some(JsonValue::Null) => true,
-            Some(JsonValue::String(s)) => s.is_empty(),
-            Some(JsonValue::Array(a)) => a.is_empty(),
-            _ => false,
-        };
 
-        if is_empty {
+        if json_is_empty(raw) {
             if required {
                 errors.push(ValidationError {
                     field: maps_to.clone(),
@@ -561,7 +645,12 @@ pub fn validate_submission(
             continue;
         }
 
-        match coerce_value(field_type, options, raw.expect("checked non-empty above")) {
+        match coerce_value(
+            field_type,
+            options,
+            required,
+            raw.expect("checked non-empty above"),
+        ) {
             Ok(value) => coerced.push((maps_to.clone(), value)),
             Err(message) => errors.push(ValidationError {
                 field: maps_to.clone(),
@@ -577,7 +666,16 @@ pub fn validate_submission(
     }
 }
 
-fn coerce_value(field_type: &str, options: &JsonValue, raw: &JsonValue) -> Result<Value, String> {
+/// Validates one non-empty answer and converts it into the `Value` the
+/// mapped Property expects. `required` only matters for composite types
+/// (`choice-matrix`, `address`), where "answered" is per-subfield — plain
+/// requiredness of the whole field is handled by the caller.
+fn coerce_value(
+    field_type: &str,
+    options: &JsonValue,
+    required: bool,
+    raw: &JsonValue,
+) -> Result<Value, String> {
     match field_type {
         "short-text" | "long-text" => Ok(Value::String(
             raw.as_str().ok_or("Expected a string")?.to_string(),
@@ -591,16 +689,7 @@ fn coerce_value(field_type: &str, options: &JsonValue, raw: &JsonValue) -> Resul
         }
         "number" => {
             let f = raw.as_f64().ok_or("Expected a number")?;
-            if let Some(min) = options.get("min").and_then(|v| v.as_f64()) {
-                if f < min {
-                    return Err(format!("Must be at least {min}"));
-                }
-            }
-            if let Some(max) = options.get("max").and_then(|v| v.as_f64()) {
-                if f > max {
-                    return Err(format!("Must be at most {max}"));
-                }
-            }
+            check_bounds(f, options)?;
             Ok(Value::Float(f))
         }
         "date" => {
@@ -619,7 +708,7 @@ fn coerce_value(field_type: &str, options: &JsonValue, raw: &JsonValue) -> Resul
             check_membership(std::slice::from_ref(&s), options)?;
             Ok(Value::String(s))
         }
-        "multi-select" => {
+        "multi-select" | "dropdown-multi" => {
             let arr = raw.as_array().ok_or("Expected an array of strings")?;
             let items: Vec<String> = arr
                 .iter()
@@ -632,8 +721,253 @@ fn coerce_value(field_type: &str, options: &JsonValue, raw: &JsonValue) -> Resul
             check_membership(&items, options)?;
             Ok(Value::Json(raw.clone()))
         }
+        "phone" => {
+            let s = raw.as_str().ok_or("Expected a string")?.to_string();
+            if !is_valid_phone(s.trim()) {
+                return Err("Not a valid phone number".into());
+            }
+            Ok(Value::String(s))
+        }
+        "country" => {
+            let c = raw.as_str().ok_or("Expected a string")?.trim().to_string();
+            if !is_valid_country(&c) {
+                return Err("Not a valid country".into());
+            }
+            Ok(Value::String(c))
+        }
+        "url" => {
+            let s = raw.as_str().ok_or("Expected a string")?.to_string();
+            if !is_valid_url(s.trim()) {
+                return Err("Not a valid URL (must start with http:// or https://)".into());
+            }
+            Ok(Value::String(s))
+        }
+        "currency" => {
+            let f = raw.as_f64().ok_or("Expected a number")?;
+            check_bounds(f, options)?;
+            Ok(Value::Float(f))
+        }
+        "dropdown" | "picture-choice" => {
+            let s = raw.as_str().ok_or("Expected a string")?.to_string();
+            check_membership(std::slice::from_ref(&s), options)?;
+            Ok(Value::String(s))
+        }
+        "likert" => Ok(Value::Integer(check_step(
+            raw,
+            likert_scale(options),
+            "Answer",
+        )?)),
+        "rating" => Ok(Value::Integer(check_step(
+            raw,
+            rating_max(options),
+            "Rating",
+        )?)),
+        "choice-matrix" => {
+            let answers = raw.as_object().ok_or("Expected an object of row answers")?;
+            let rows = string_list(options, "rows");
+            let columns = matrix_columns(options);
+
+            for (row, answer) in answers {
+                if !rows.contains(row) {
+                    return Err(format!("'{row}' is not one of the rows"));
+                }
+                if json_is_empty(Some(answer)) {
+                    continue;
+                }
+                let picked = answer.as_str().unwrap_or_default();
+                if !columns.iter().any(|c| c == picked) {
+                    return Err(format!(
+                        "'{}' is not one of the allowed options",
+                        json_as_str(answer)
+                    ));
+                }
+            }
+
+            if required && rows.iter().any(|row| json_is_empty(answers.get(row))) {
+                return Err("Please answer every row".into());
+            }
+
+            Ok(Value::Json(raw.clone()))
+        }
+        "table-input" => {
+            let rows = raw.as_array().ok_or("Expected a list of rows")?;
+            let columns = table_columns(options);
+
+            for row in rows {
+                let cells = row.as_object().ok_or("Expected a list of rows")?;
+                for (key, cell) in cells {
+                    let Some((_, column_type)) = columns.iter().find(|(label, _)| label == key)
+                    else {
+                        return Err(format!("'{key}' is not one of the columns"));
+                    };
+                    if json_is_empty(Some(cell)) {
+                        continue;
+                    }
+                    if column_type == "number" {
+                        if cell.as_f64().is_none() {
+                            return Err(format!("'{key}' must be a number"));
+                        }
+                    } else if !cell.is_string() {
+                        return Err(format!("'{key}' must be text"));
+                    }
+                }
+            }
+
+            let filled = rows.iter().filter(|row| !json_is_empty(Some(row))).count();
+            if let Some(min) = options.get("minRows").and_then(|v| v.as_u64()) {
+                if (filled as u64) < min {
+                    return Err(format!("Please fill in at least {min} row(s)"));
+                }
+            }
+            if let Some(max) = options.get("maxRows").and_then(|v| v.as_u64()) {
+                if (filled as u64) > max {
+                    return Err(format!("At most {max} row(s) allowed"));
+                }
+            }
+
+            Ok(Value::Json(raw.clone()))
+        }
+        "address" => {
+            let address = raw.as_object().ok_or("Expected an address object")?;
+
+            for (key, value) in address {
+                let Some((_, label)) = ADDRESS_FIELDS.iter().find(|(k, _)| k == key) else {
+                    return Err(format!("'{key}' is not part of an address"));
+                };
+                if !json_is_empty(Some(value)) && !value.is_string() {
+                    return Err(format!("'{label}' must be text"));
+                }
+            }
+
+            if required {
+                for key in ADDRESS_REQUIRED_FIELDS {
+                    if json_is_empty(address.get(*key)) {
+                        let label = ADDRESS_FIELDS
+                            .iter()
+                            .find(|(k, _)| k == key)
+                            .map(|(_, label)| *label)
+                            .unwrap_or(key);
+                        return Err(format!("{label} is required"));
+                    }
+                }
+            }
+
+            Ok(Value::Json(raw.clone()))
+        }
         other => Err(format!("Unknown field type: {other}")),
     }
+}
+
+/// The `address` subfields, in render order. Mirrors `ADDRESS_FIELDS` in
+/// `browser/form-renderer/src/types.ts` (key, human label).
+const ADDRESS_FIELDS: [(&str, &str); 6] = [
+    ("line1", "Address"),
+    ("line2", "Address line 2"),
+    ("postalCode", "Postal code"),
+    ("city", "City"),
+    ("state", "State / Province"),
+    ("country", "Country"),
+];
+
+/// Subfields that must be filled when an `address` field is required.
+const ADDRESS_REQUIRED_FIELDS: &[&str] = &["line1", "city", "country"];
+
+/// Default number of points on a `likert` scale / steps in a `rating`.
+const DEFAULT_LIKERT_SCALE: i64 = 5;
+const DEFAULT_RATING_MAX: i64 = 5;
+
+fn bounded_option(options: &JsonValue, key: &str, min: i64, max: i64, fallback: i64) -> i64 {
+    options
+        .get(key)
+        .and_then(|v| v.as_i64())
+        .filter(|n| *n >= min && *n <= max)
+        .unwrap_or(fallback)
+}
+
+fn likert_scale(options: &JsonValue) -> i64 {
+    bounded_option(options, "scale", 2, 11, DEFAULT_LIKERT_SCALE)
+}
+
+fn rating_max(options: &JsonValue) -> i64 {
+    bounded_option(options, "max", 2, 10, DEFAULT_RATING_MAX)
+}
+
+fn string_list(options: &JsonValue, key: &str) -> Vec<String> {
+    options
+        .get(key)
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| v.as_str().map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// `choice-matrix` and `table-input` share the `columns` key: the former
+/// stores plain labels, the latter `{label, type}` objects.
+fn matrix_columns(options: &JsonValue) -> Vec<String> {
+    options
+        .get("columns")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| match v {
+                    JsonValue::String(s) => Some(s.clone()),
+                    JsonValue::Object(o) => {
+                        o.get("label").and_then(|l| l.as_str()).map(str::to_string)
+                    }
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn table_columns(options: &JsonValue) -> Vec<(String, String)> {
+    options
+        .get("columns")
+        .and_then(|v| v.as_array())
+        .map(|a| {
+            a.iter()
+                .filter_map(|v| match v {
+                    JsonValue::String(s) => Some((s.clone(), "text".to_string())),
+                    JsonValue::Object(o) => o.get("label").and_then(|l| l.as_str()).map(|label| {
+                        let column_type = o
+                            .get("type")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or("text")
+                            .to_string();
+                        (label.to_string(), column_type)
+                    }),
+                    _ => None,
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Integer answer within `1..=max` (likert / rating).
+fn check_step(raw: &JsonValue, max: i64, what: &str) -> Result<i64, String> {
+    let n = raw.as_i64().ok_or("Expected a whole number")?;
+    if n < 1 || n > max {
+        return Err(format!("{what} must be between 1 and {max}"));
+    }
+    Ok(n)
+}
+
+fn check_bounds(value: f64, options: &JsonValue) -> Result<(), String> {
+    if let Some(min) = options.get("min").and_then(|v| v.as_f64()) {
+        if value < min {
+            return Err(format!("Must be at least {min}"));
+        }
+    }
+    if let Some(max) = options.get("max").and_then(|v| v.as_f64()) {
+        if value > max {
+            return Err(format!("Must be at most {max}"));
+        }
+    }
+    Ok(())
 }
 
 fn check_membership(items: &[String], options: &JsonValue) -> Result<(), String> {
@@ -651,6 +985,28 @@ fn check_membership(items: &[String], options: &JsonValue) -> Result<(), String>
 
 fn is_valid_email(s: &str) -> bool {
     let re = regex::Regex::new(r"^[^\s@]+@[^\s@]+\.[^\s@]+$").expect("valid regex");
+    re.is_match(s)
+}
+
+/// Deliberately permissive: digits with the usual separators, optional
+/// country prefix. Mirrors `PHONE_RE` in
+/// `browser/form-renderer/src/validation.ts`.
+fn is_valid_phone(s: &str) -> bool {
+    let re = regex::Regex::new(r"^\+?[0-9(][0-9\s\-().]{4,24}$").expect("valid regex");
+    re.is_match(s)
+}
+
+/// A country answer is an ISO 3166-1 alpha-2 code. Only the shape is checked
+/// here: the canonical list lives in `browser/form-renderer/src/countries.ts`,
+/// where the picker is, and duplicating 249 codes on this side would buy
+/// nothing but a second thing to keep current.
+fn is_valid_country(s: &str) -> bool {
+    s.len() == 2 && s.bytes().all(|b| b.is_ascii_uppercase())
+}
+
+/// Mirrors `URL_RE` in `browser/form-renderer/src/validation.ts`.
+fn is_valid_url(s: &str) -> bool {
+    let re = regex::Regex::new(r"(?i)^https?://[^\s/$.?#][^\s]*$").expect("valid regex");
     re.is_match(s)
 }
 
@@ -762,11 +1118,12 @@ fn summarize_field(
     let obj = summary.as_object_mut().expect("built as an object above");
 
     match field_type {
-        "radio" => {
+        // Single-pick choice questions all aggregate as option counts.
+        "radio" | "dropdown" | "picture-choice" => {
             let picks = values.iter().map(|v| v.to_string());
             obj.insert("counts".into(), choice_counts(options, picks));
         }
-        "multi-select" => {
+        "multi-select" | "dropdown-multi" => {
             // Each answer is a `Value::Json` array of picked option strings.
             let picks = values.iter().flat_map(|v| match v {
                 Value::Json(JsonValue::Array(items)) => items
@@ -777,6 +1134,14 @@ fn summarize_field(
             });
             obj.insert("counts".into(), choice_counts(options, picks));
         }
+        // No configured option list to zero-fill: count the codes that were
+        // actually picked, most-picked first.
+        "country" => {
+            obj.insert(
+                "counts".into(),
+                distinct_counts(values.iter().map(|v| v.to_string())),
+            );
+        }
         "checkbox" => {
             let checked = values
                 .iter()
@@ -785,7 +1150,9 @@ fn summarize_field(
             obj.insert("checked".into(), json!(checked));
             obj.insert("unchecked".into(), json!(answered - checked));
         }
-        "number" => {
+        // Numeric questions (incl. the bounded likert/rating scales) share the
+        // histogram treatment.
+        "number" | "currency" | "likert" | "rating" => {
             let numbers: Vec<f64> = values.iter().filter_map(|v| as_f64(v)).collect();
             if let Some((bins, min, max, mean)) = histogram(&numbers) {
                 obj.insert("bins".into(), bins);
@@ -794,7 +1161,9 @@ fn summarize_field(
                 obj.insert("mean".into(), json!(mean));
             }
         }
-        // short-text, long-text, email, date, datetime: a sample of answers.
+        // short-text, long-text, email, phone, url, date, datetime and the
+        // composite JSON types (address, choice-matrix, table-input): a
+        // sample of raw answers.
         _ => {
             let answers: Vec<JsonValue> = values
                 .iter()
@@ -840,6 +1209,24 @@ fn choice_counts(options: &JsonValue, picks: impl Iterator<Item = String>) -> Js
     json!(counts
         .into_iter()
         .map(|(option, count)| json!([option, count]))
+        .collect::<Vec<_>>())
+}
+
+/// Counts repeats of free-form answers (`country`), ordered by count and then
+/// alphabetically so the same data always renders the same way.
+fn distinct_counts(picks: impl Iterator<Item = String>) -> JsonValue {
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for pick in picks {
+        match counts.iter_mut().find(|(value, _)| value == &pick) {
+            Some((_, count)) => *count += 1,
+            None => counts.push((pick, 1)),
+        }
+    }
+    counts.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+
+    json!(counts
+        .into_iter()
+        .map(|(value, count)| json!([value, count]))
         .collect::<Vec<_>>())
 }
 
@@ -1440,6 +1827,370 @@ mod tests {
         assert!(errors[0].message.contains("not one of the allowed options"));
     }
 
+    // ── Extended field types (planning/form-field-types.md) ──────────────
+
+    const Q: &str = "https://example.com/q";
+
+    /// A one-question form, so the extended types can be validated without
+    /// building a whole resource graph.
+    fn single_field_definition(
+        field_type: &str,
+        required: bool,
+        options: JsonValue,
+    ) -> FormDefinition {
+        FormDefinition {
+            version: 1,
+            id: String::new(),
+            name: "n".into(),
+            settings: json!({}),
+            styling: FormStyling::default(),
+            honeypot_field: HONEYPOT_FIELD.into(),
+            captcha: None,
+            pages: vec![FormPageDefinition {
+                name: None,
+                cover_image: None,
+                image_position: None,
+                conditions: vec![],
+                blocks: vec![FormBlock::Field {
+                    maps_to: Q.into(),
+                    label: "Q".into(),
+                    description: None,
+                    field_type: field_type.into(),
+                    required,
+                    options,
+                    conditions: vec![],
+                }],
+            }],
+        }
+    }
+
+    /// Submits `answer` to a one-question form and returns the coerced value
+    /// or the first error message.
+    fn submit_one(
+        field_type: &str,
+        required: bool,
+        options: JsonValue,
+        answer: JsonValue,
+    ) -> Result<Value, String> {
+        let definition = single_field_definition(field_type, required, options);
+        let mut values = Map::new();
+        values.insert(Q.into(), answer);
+        match validate_submission(&definition, &values) {
+            Ok(mut coerced) => Ok(coerced.remove(0).1),
+            Err(errors) => Err(errors[0].message.clone()),
+        }
+    }
+
+    /// `Value` has no `PartialEq`, so accepted answers are asserted through
+    /// these narrowing helpers (which also pin down the `Value` variant, i.e.
+    /// the datatype the mapped Property will receive).
+    fn ok_string(result: Result<Value, String>) -> String {
+        match result.expect("expected the answer to validate") {
+            Value::String(s) => s,
+            other => panic!("expected a String value, got {other:?}"),
+        }
+    }
+
+    fn ok_integer(result: Result<Value, String>) -> i64 {
+        match result.expect("expected the answer to validate") {
+            Value::Integer(i) => i,
+            other => panic!("expected an Integer value, got {other:?}"),
+        }
+    }
+
+    fn ok_float(result: Result<Value, String>) -> f64 {
+        match result.expect("expected the answer to validate") {
+            Value::Float(f) => f,
+            other => panic!("expected a Float value, got {other:?}"),
+        }
+    }
+
+    fn err_message(result: Result<Value, String>) -> String {
+        result.err().expect("expected a validation error")
+    }
+
+    #[test]
+    fn phone_field_accepts_common_shapes_and_rejects_junk() {
+        // `+31612345678` is the E.164 shape the browser's phone input submits.
+        for good in [
+            "+31612345678",
+            "+31 6 1234 5678",
+            "0201234567",
+            "(020) 123-4567",
+        ] {
+            assert!(
+                submit_one("phone", false, json!({}), json!(good)).is_ok(),
+                "expected {good} to be accepted"
+            );
+        }
+        assert_eq!(
+            err_message(submit_one("phone", false, json!({}), json!("call me"))),
+            "Not a valid phone number"
+        );
+    }
+
+    #[test]
+    fn country_field_takes_an_iso_code_and_rejects_a_name() {
+        assert_eq!(
+            ok_string(submit_one("country", false, json!({}), json!("NL"))),
+            "NL"
+        );
+        for bad in ["Netherlands", "nl", "N", "NLD", "N1"] {
+            assert_eq!(
+                err_message(submit_one("country", false, json!({}), json!(bad))),
+                "Not a valid country",
+                "expected {bad} to be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn url_field_requires_an_http_scheme() {
+        assert_eq!(
+            ok_string(submit_one(
+                "url",
+                false,
+                json!({}),
+                json!("https://example.com/x")
+            )),
+            "https://example.com/x"
+        );
+        assert!(submit_one("url", false, json!({}), json!("example.com")).is_err());
+        assert!(submit_one("url", false, json!({}), json!("javascript:alert(1)")).is_err());
+    }
+
+    #[test]
+    fn currency_field_enforces_bounds() {
+        assert_eq!(
+            ok_float(submit_one(
+                "currency",
+                false,
+                json!({"currency": "EUR"}),
+                json!(12.5)
+            )),
+            12.5
+        );
+        assert_eq!(
+            err_message(submit_one("currency", false, json!({"min": 10}), json!(5))),
+            "Must be at least 10"
+        );
+    }
+
+    #[test]
+    fn dropdowns_enforce_option_membership() {
+        let options = json!({"options": ["A", "B"]});
+        assert_eq!(
+            ok_string(submit_one("dropdown", false, options.clone(), json!("A"))),
+            "A"
+        );
+        assert!(submit_one("dropdown", false, options.clone(), json!("C")).is_err());
+        assert!(submit_one("dropdown-multi", false, options.clone(), json!(["A", "B"])).is_ok());
+        assert!(submit_one("dropdown-multi", false, options, json!(["A", "C"])).is_err());
+    }
+
+    #[test]
+    fn likert_and_rating_are_bounded_integers() {
+        assert_eq!(
+            ok_integer(submit_one("likert", false, json!({"scale": 7}), json!(7))),
+            7
+        );
+        assert_eq!(
+            err_message(submit_one("likert", false, json!({"scale": 5}), json!(6))),
+            "Answer must be between 1 and 5"
+        );
+        // An out-of-range `scale` falls back to the default rather than
+        // trusting whatever the options bag says.
+        assert_eq!(
+            err_message(submit_one("likert", false, json!({"scale": 99}), json!(6))),
+            "Answer must be between 1 and 5"
+        );
+        assert_eq!(
+            err_message(submit_one("rating", false, json!({}), json!(0))),
+            "Rating must be between 1 and 5"
+        );
+        assert_eq!(
+            ok_integer(submit_one("rating", false, json!({"max": 10}), json!(9))),
+            9
+        );
+    }
+
+    #[test]
+    fn picture_choice_validates_like_a_radio() {
+        let options = json!({
+            "options": ["Cat", "Dog"],
+            "optionImages": ["did:ad:file-a", "did:ad:file-b"],
+        });
+        assert_eq!(
+            ok_string(submit_one(
+                "picture-choice",
+                false,
+                options.clone(),
+                json!("Dog")
+            )),
+            "Dog"
+        );
+        assert!(submit_one("picture-choice", false, options, json!("Bird")).is_err());
+    }
+
+    #[test]
+    fn choice_matrix_checks_rows_columns_and_completeness() {
+        let options = json!({"rows": ["Speed", "Price"], "columns": ["Bad", "Good"]});
+
+        assert!(submit_one(
+            "choice-matrix",
+            false,
+            options.clone(),
+            json!({"Speed": "Good"})
+        )
+        .is_ok());
+        assert!(submit_one(
+            "choice-matrix",
+            false,
+            options.clone(),
+            json!({"Weight": "Good"})
+        )
+        .is_err());
+        assert!(submit_one(
+            "choice-matrix",
+            false,
+            options.clone(),
+            json!({"Speed": "Amazing"})
+        )
+        .is_err());
+        // Required means every row, not just "something was picked".
+        assert_eq!(
+            err_message(submit_one(
+                "choice-matrix",
+                true,
+                options.clone(),
+                json!({"Speed": "Good"})
+            )),
+            "Please answer every row"
+        );
+        assert!(submit_one(
+            "choice-matrix",
+            true,
+            options,
+            json!({"Speed": "Good", "Price": "Bad"})
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn table_input_checks_columns_types_and_row_bounds() {
+        let options = json!({
+            "columns": [{"label": "Item", "type": "text"}, {"label": "Qty", "type": "number"}],
+            "maxRows": 2,
+        });
+
+        assert!(submit_one(
+            "table-input",
+            false,
+            options.clone(),
+            json!([{"Item": "Bolt", "Qty": 4}])
+        )
+        .is_ok());
+        assert_eq!(
+            err_message(submit_one(
+                "table-input",
+                false,
+                options.clone(),
+                json!([{"Item": "Bolt", "Qty": "four"}])
+            )),
+            "'Qty' must be a number"
+        );
+        assert_eq!(
+            err_message(submit_one(
+                "table-input",
+                false,
+                options.clone(),
+                json!([{"Nope": "x"}])
+            )),
+            "'Nope' is not one of the columns"
+        );
+        assert_eq!(
+            err_message(submit_one(
+                "table-input",
+                false,
+                options,
+                json!([{"Item": "a"}, {"Item": "b"}, {"Item": "c"}])
+            )),
+            "At most 2 row(s) allowed"
+        );
+    }
+
+    #[test]
+    fn address_rejects_unknown_keys_and_enforces_core_subfields() {
+        assert_eq!(
+            err_message(submit_one(
+                "address",
+                false,
+                json!({}),
+                json!({"planet": "Mars"})
+            )),
+            "'planet' is not part of an address"
+        );
+        assert_eq!(
+            err_message(submit_one(
+                "address",
+                true,
+                json!({}),
+                json!({"line1": "Main St 1", "city": "Utrecht"})
+            )),
+            "Country is required"
+        );
+        assert!(submit_one(
+            "address",
+            true,
+            json!({}),
+            json!({"line1": "Main St 1", "city": "Utrecht", "country": "NL"})
+        )
+        .is_ok());
+    }
+
+    #[test]
+    fn all_empty_composites_count_as_unanswered() {
+        // An untouched address / matrix / table grid must read as "not
+        // answered" (so `required` fires) rather than as a partial answer.
+        for (field_type, answer) in [
+            ("address", json!({"line1": "", "city": ""})),
+            ("choice-matrix", json!({})),
+            ("table-input", json!([{"Item": ""}])),
+        ] {
+            assert_eq!(
+                err_message(submit_one(
+                    field_type,
+                    true,
+                    json!({"columns": [{"label": "Item"}]}),
+                    answer
+                )),
+                "This field is required",
+                "{field_type} should read as unanswered"
+            );
+        }
+    }
+
+    #[test]
+    fn rewrite_option_images_only_touches_option_image_subjects() {
+        let mut definition = single_field_definition(
+            "picture-choice",
+            false,
+            json!({"options": ["A", "B"], "optionImages": ["did:ad:file-a", ""]}),
+        );
+
+        rewrite_option_images(&mut definition, |subject| format!("/img/{subject}"));
+
+        let FormBlock::Field { options, .. } = &definition.pages[0].blocks[0] else {
+            panic!("expected a field block");
+        };
+        assert_eq!(
+            options["optionImages"],
+            json!(["/img/did:ad:file-a", ""]),
+            "only non-empty subjects are rewritten"
+        );
+        assert_eq!(options["options"], json!(["A", "B"]));
+    }
+
     #[tokio::test]
     async fn mints_and_resolves_publish_slug() {
         let store = init_store().await;
@@ -1477,6 +2228,56 @@ mod tests {
             &refs,
             total,
         )
+    }
+
+    #[test]
+    fn extended_types_reuse_the_existing_summary_shapes() {
+        // Deliberately no new aggregate shapes: the extended types route onto
+        // the choice-count / histogram / answer-sample paths that already exist.
+        let dropdown = field_summary(
+            "dropdown",
+            json!({"options": ["A", "B"]}),
+            &[Value::String("A".into())],
+            1,
+        );
+        assert_eq!(dropdown["counts"], json!([["A", 1], ["B", 0]]));
+
+        let rating = field_summary(
+            "rating",
+            json!({"max": 5}),
+            &[Value::Integer(4), Value::Integer(2)],
+            2,
+        );
+        assert_eq!(rating["mean"], json!(3.0));
+        assert!(rating.get("bins").is_some());
+
+        let address = field_summary(
+            "address",
+            json!({}),
+            &[Value::Json(json!({"city": "Utrecht"}))],
+            1,
+        );
+        assert_eq!(address["answers"].as_array().map(Vec::len), Some(1));
+    }
+
+    #[test]
+    fn country_counts_rank_by_popularity_then_code() {
+        // No configured options to zero-fill, so the codes people actually
+        // picked are the buckets — most-picked first, ties alphabetical.
+        let values = vec![
+            Value::String("BE".into()),
+            Value::String("NL".into()),
+            Value::String("NL".into()),
+            Value::String("DE".into()),
+        ];
+        let summary = field_summary("country", json!({}), &values, 5);
+
+        assert_eq!(summary["answered"], 4);
+        assert_eq!(summary["skipped"], 1);
+        assert_eq!(
+            summary["counts"],
+            json!([["NL", 2], ["BE", 1], ["DE", 1]])
+        );
     }
 
     #[test]

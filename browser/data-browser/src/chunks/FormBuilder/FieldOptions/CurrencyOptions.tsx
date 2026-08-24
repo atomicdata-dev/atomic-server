@@ -1,18 +1,38 @@
 import { Resource } from '@tomic/react';
 import type { JSX } from 'react';
 import Field from '@components/forms/Field';
+import { BasicSelect } from '@components/forms/BasicSelect';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Row } from '@components/Row';
 import { useFieldOptions } from './useFieldOptions';
 
-interface NumberOptionsProps {
+/** Currencies the renderer knows a symbol for (`CURRENCY_SYMBOLS` in
+ * `@tomic/form-renderer`'s FieldInput); anything else renders as its code. */
+const CURRENCIES = [
+  'EUR',
+  'USD',
+  'GBP',
+  'CHF',
+  'SEK',
+  'NOK',
+  'DKK',
+  'PLN',
+  'CAD',
+  'AUD',
+  'JPY',
+  'CNY',
+  'INR',
+  'BRL',
+];
+
+interface CurrencyOptionsProps {
   field: Resource;
 }
 
-export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
+export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
 
-  const placeholder = (options.placeholder as string | undefined) ?? '';
+  const currency = (options.currency as string | undefined) ?? 'EUR';
   const min = options.min as number | undefined;
   const max = options.max as number | undefined;
 
@@ -30,6 +50,18 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
 
   return (
     <>
+      <Field label='Currency'>
+        <BasicSelect
+          value={currency}
+          onChange={e => setOptions({ ...options, currency: e.target.value })}
+        >
+          {CURRENCIES.map(code => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </BasicSelect>
+      </Field>
       <Row gap='0.5rem' wrapItems>
         <Field label='Min'>
           <InputWrapper>
@@ -50,16 +82,6 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
           </InputWrapper>
         </Field>
       </Row>
-      <Field label='Placeholder'>
-        <InputWrapper>
-          <InputStyled
-            value={placeholder}
-            onChange={e =>
-              setOptions({ ...options, placeholder: e.target.value })
-            }
-          />
-        </InputWrapper>
-      </Field>
     </>
   );
 }

@@ -14,8 +14,20 @@ export interface FieldSummaryBase {
   skipped: number;
 }
 
+/** Every type the server aggregates as `counts` — the choice questions, plus
+ * `country`, whose pairs are ISO codes counted by popularity rather than
+ * configured options. */
+export const COUNTS_SUMMARY_TYPES = [
+  'radio',
+  'dropdown',
+  'picture-choice',
+  'multi-select',
+  'dropdown-multi',
+  'country',
+] as const;
+
 export interface ChoiceFieldSummary extends FieldSummaryBase {
-  type: 'radio' | 'multi-select';
+  type: (typeof COUNTS_SUMMARY_TYPES)[number];
   /** `[option, count]` pairs in the field's configured order (+ "Other"). */
   counts: Array<[string, number]>;
 }
@@ -58,7 +70,7 @@ export interface FormSummary {
 }
 
 export function isChoiceSummary(f: FieldSummary): f is ChoiceFieldSummary {
-  return f.type === 'radio' || f.type === 'multi-select';
+  return (COUNTS_SUMMARY_TYPES as readonly string[]).includes(f.type);
 }
 
 export function isCheckboxSummary(f: FieldSummary): f is CheckboxFieldSummary {

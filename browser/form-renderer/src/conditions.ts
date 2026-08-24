@@ -35,8 +35,17 @@ export function isEmptyValue(value: unknown): boolean {
     return value.length === 0;
   }
 
+  // An array of empty things (e.g. a table-input grid the visitor never typed
+  // in) counts as unanswered, same as an empty array.
   if (Array.isArray(value)) {
-    return value.length === 0;
+    return value.every(isEmptyValue);
+  }
+
+  // Composite answers (address, choice-matrix) are objects: an object whose
+  // subfields are all themselves empty counts as unanswered. Mirrored by
+  // `json_is_empty` in server/src/forms.rs.
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).every(isEmptyValue);
   }
 
   return false;

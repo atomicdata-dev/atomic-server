@@ -30,6 +30,10 @@ export const DIVIDER = 'divider' as const;
 /** Space between a menu and its trigger, so the trigger stays clickable. */
 const MENU_TRIGGER_GAP = 4;
 
+/** Breathing room a height-capped menu keeps from the viewport edge, so a
+ * scrollable menu reads as scrollable rather than as cut off. */
+const MENU_VIEWPORT_MARGIN = 12;
+
 export type MenuItemMinimial = {
   onClick: () => unknown;
   label: string;
@@ -234,6 +238,10 @@ export function DropdownMenu({
         return;
       }
 
+      // Drop any height cap a previous open left behind BEFORE measuring —
+      // measuring through it reports the clamped height, which then reads as
+      // "fits" and the cap gets cleared, leaving the menu overflowing again.
+      dropdownRef.current.style.maxHeight = '';
       const menuRect = dropdownRef.current.getBoundingClientRect();
 
       // The menu is positioned while visibility:hidden, so the entrance
@@ -299,12 +307,29 @@ export function DropdownMenu({
         // Prefer opening above the trigger, below when there's no room. A
         // small gap instead of overlapping the trigger — covering it half-way
         // made it unclickable for toggling the menu closed.
-        const topPos = triggerRect.y - menuRect.height - MENU_TRIGGER_GAP;
+        const spaceAbove =
+          triggerRect.y - MENU_TRIGGER_GAP - MENU_VIEWPORT_MARGIN;
+        const spaceBelow =
+          window.innerHeight -
+          triggerRect.bottom -
+          MENU_TRIGGER_GAP -
+          MENU_VIEWPORT_MARGIN;
 
-        if (topPos < 0) {
+        // A menu taller than the space on either side used to be placed
+        // anyway, running off the bottom of the screen with its last items
+        // unreachable (`overflow: auto` on Menu only scrolls what's inside the
+        // box, not the part hanging past the viewport). Cap it to the room it
+        // actually has so the overflow becomes scroll instead of clipping.
+        if (menuRect.height <= spaceAbove) {
+          dropdownRef.current.style.top = `${triggerRect.y - menuRect.height - MENU_TRIGGER_GAP}px`;
+        } else if (menuRect.height <= spaceBelow) {
           dropdownRef.current.style.top = `${triggerRect.bottom + MENU_TRIGGER_GAP}px`;
+        } else if (spaceBelow >= spaceAbove) {
+          dropdownRef.current.style.top = `${triggerRect.bottom + MENU_TRIGGER_GAP}px`;
+          dropdownRef.current.style.maxHeight = `${spaceBelow}px`;
         } else {
-          dropdownRef.current.style.top = `${topPos}px`;
+          dropdownRef.current.style.top = `${MENU_VIEWPORT_MARGIN}px`;
+          dropdownRef.current.style.maxHeight = `${spaceAbove}px`;
         }
 
         const leftPos = triggerRect.x - menuRect.width;

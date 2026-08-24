@@ -592,6 +592,25 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Definition serializer inlines FormCondition resources as `{field, operator, value}` | `server/src/forms.rs::definition_inlines_field_conditions` |
 | Form ontology populate (incl. FormCondition) | `lib/src/store.rs::populate_forms_ontology` |
 | Publish → anonymous submit of a branching follow-up | `browser/e2e/tests/forms-submission.spec.ts` ("branching hides a follow-up unless its condition matches") |
+| Extended question types: validation + coercion per type (phone/url shape, currency bounds, dropdown membership, likert/rating range, matrix rows/columns + completeness, table columns/types/row bounds, address subfields), and all-empty composites reading as unanswered | `server/src/forms.rs` (`phone_field_accepts_common_shapes_and_rejects_junk` … `all_empty_composites_count_as_unanswered`) |
+| Extended types route onto the existing summary shapes (choice counts / histogram / answer sample) | `server/src/forms.rs::extended_types_reuse_the_existing_summary_shapes` |
+| `picture-choice` option images: subjects rewritten into `/form/{id}/image?file=`, and that route refuses files the form doesn't reference | `server/src/forms.rs::rewrite_option_images_only_touches_option_image_subjects` + `server/src/tests.rs::form_submission_flow` (step 3d) |
+| Builder can add every question type and they survive a reload | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…") |
+| `phone` accepts both the renderer's E.164 output and loosely formatted national numbers, and rejects a half-typed one | `browser/form-renderer/src/validation.test.ts` + `server/src/forms.rs::phone_field_accepts_common_shapes_and_rejects_junk` |
+| `country` stores an ISO 3166-1 code: the list is complete and named, names localize, and a country *name* is rejected | `browser/form-renderer/src/validation.test.ts` + `server/src/forms.rs::country_field_takes_an_iso_code_and_rejects_a_name` |
+| `country` summaries count picked codes by popularity (no configured option list to zero-fill) | `server/src/forms.rs::country_counts_rank_by_popularity_then_code` |
+| Builder → publish → anonymous submit → row, for one type per value shape (dropdown/rating/address) | `browser/e2e/tests/forms-submission.spec.ts` ("extended field types round-trip from builder to submission") |
+
+Not covered (extended types): the client-side mirror of the new validators in
+`browser/form-renderer/src/validation.ts` is only unit-tested for `phone` (the
+one rule that deliberately diverges — it is stricter than the server for E.164
+values); every other type is tested on the Rust side only, and the two are
+hand-mirrored, so they can drift (the
+same known gap as `buildFormDefinition.ts` vs `build_form_definition`); the
+option-image *picker* in `PictureChoiceOptions.tsx` (uploading or picking a file
+for an option) is only exercised manually; `choice-matrix` / `table-input` /
+`picture-choice` are rendered and validated but never submitted end-to-end in
+e2e.
 
 Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it); add/delete-page write ordering in `PageTabBar` (both now `await` the form's `form-pages` save — add before selecting, delete before destroying — but no test pins that ordering).
 

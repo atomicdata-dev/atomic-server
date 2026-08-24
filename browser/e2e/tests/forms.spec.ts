@@ -12,12 +12,24 @@ const FIELDS: Array<[label: string, key: string]> = [
   ['Short text', 'short-text'],
   ['Long text', 'long-text'],
   ['Email', 'email'],
+  ['Phone number', 'phone'],
+  ['URL', 'url'],
   ['Number', 'number'],
-  ['Date', 'date'],
-  ['Date & time', 'datetime'],
+  ['Currency', 'currency'],
+  ['Rating', 'rating'],
+  ['Likert scale', 'likert'],
   ['Checkbox', 'checkbox'],
   ['Radio group', 'radio'],
+  ['Dropdown', 'dropdown'],
   ['Multi-select', 'multi-select'],
+  ['Dropdown multi-select', 'dropdown-multi'],
+  ['Picture choice', 'picture-choice'],
+  ['Date', 'date'],
+  ['Date & time', 'datetime'],
+  ['Choice matrix', 'choice-matrix'],
+  ['Table', 'table-input'],
+  ['Address', 'address'],
+  ['Country', 'country'],
   ['Heading', 'heading'],
   ['Paragraph', 'paragraph'],
 ];
@@ -161,8 +173,16 @@ test.describe('forms', async () => {
     expect(tableSubject).toBeTruthy();
 
     await openSubject(page, tableSubject as string);
-    await expect(page.getByRole('button', { name: 'Full name' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Number' })).toBeVisible();
+    // `toBeAttached`, not `toBeVisible`: one column per question means the
+    // grid scrolls sideways, so a column this far right is in the DOM but
+    // outside the viewport. Presence is what's under test here — the deleted
+    // field's Property (and its column) must survive the delete.
+    await expect(
+      page.getByRole('button', { name: 'Full name', exact: true }),
+    ).toBeAttached();
+    await expect(
+      page.getByRole('button', { name: 'Number', exact: true }),
+    ).toBeAttached();
 
     // Back to the Form to keep building.
     await openSubject(page, formSubject);
@@ -209,7 +229,7 @@ test.describe('forms', async () => {
       timeout: 15000,
     });
 
-    // 10 fields remain (11 added, 1 deleted).
+    // Every field added except Number, which was deleted above.
     for (const [, key] of FIELDS) {
       if (key === 'number') {
         await expect(page.getByTestId(`field-row-${key}`)).not.toBeVisible();
@@ -232,7 +252,11 @@ test.describe('forms', async () => {
     await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
 
     await openSubject(page, tableSubject as string);
-    await expect(page.getByRole('button', { name: 'Full name' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Number' })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Full name', exact: true }),
+    ).toBeAttached();
+    await expect(
+      page.getByRole('button', { name: 'Number', exact: true }),
+    ).toBeAttached();
   });
 });

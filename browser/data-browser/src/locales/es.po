@@ -8252,3 +8252,107 @@ msgstr "{0} — no hay copia de seguridad de recuperación almacenada. Si pierde
 #: src/chunks/FormBuilder/DeleteFormDialog.tsx
 msgid "Are you sure you want to delete this form?"
 msgstr "¿Estás seguro de que quieres eliminar este formulario?"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "points"
+msgstr "puntos"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "Scale"
+msgstr "Escala"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "Low end label"
+msgstr "Etiqueta de valor bajo"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "High end label"
+msgstr "Etiqueta de valor alto"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "Steps"
+msgstr "Pasos"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "★ Star"
+msgstr "★ Estrella"
+
+#: src/chunks/FormBuilder/FieldOptions/ScaleOptions.tsx
+msgid "♥ Heart"
+msgstr "♥ Corazón"
+
+#: src/chunks/FormBuilder/FieldOptions/PictureChoiceOptions.tsx
+msgid "Replace"
+msgstr "Reemplazar"
+
+#: src/chunks/FormBuilder/FieldOptions/PictureChoiceOptions.tsx
+msgid "Add image"
+msgstr "Agregar imagen"
+
+#: src/chunks/FormBuilder/FieldOptions/TableInputOptions.tsx
+msgid "<0/> Add column"
+msgstr "<0/> Agregar columna"
+
+#. 0: columns.length + 1
+#: src/chunks/FormBuilder/FieldOptions/TableInputOptions.tsx
+msgid "Column {0}"
+msgstr "Columna {0}"
+
+#: src/chunks/FormBuilder/FieldOptions/TableInputOptions.tsx
+msgid "Columns"
+msgstr "Columnas"
+
+#: src/chunks/FormBuilder/FieldOptions/TableInputOptions.tsx
+msgid "Min rows"
+msgstr "Filas mínimas"
+
+#: src/chunks/FormBuilder/FieldOptions/TableInputOptions.tsx
+msgid "Max rows"
+msgstr "Filas máximas"
+
+#: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
+msgid "Rows (statements)"
+msgstr "Filas (afirmaciones)"
+
+#: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
+msgid "Add row"
+msgstr "Agregar fila"
+
+#: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
+msgid "Remove row"
+msgstr "Eliminar fila"
+
+#. 0: index
+#: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
+msgid "Statement {0}"
+msgstr "Declaración {0}"
+
+#: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
+msgid "Columns (answers)"
+msgstr "Columnas (respuestas)"
+
+#. 0: index
+#: src/chunks/FormBuilder/FieldOptions/MatrixOptions.tsx
+msgid "Answer {0}"
+msgstr "Respuesta {0}"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+msgid "Add option"
+msgstr "Agregar opción"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "The country the number selector starts on. Visitors can still pick another one."
+msgstr "El país en el que el selector de número comienza. Los visitantes aún pueden elegir otro."
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Pre-selected when the form opens. Leave on \"No default\" to make the visitor choose."
+msgstr "Preseleccionado cuando el formulario se abre. Déjelo en \"Sin valor predeterminado\" para que el visitante elija."
+
+#: src/chunks/FormBuilder/FieldOptions/CountryDefaultField.tsx
+#: src/chunks/FormBuilder/FieldOptions/CountryDefaultField.tsx
+msgid "No default"
+msgstr "Sin predeterminado"
+
+#: src/chunks/FormBuilder/FieldOptions/CountryDefaultField.tsx
+msgid "Default country"
+msgstr "País predeterminado"

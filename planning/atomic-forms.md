@@ -715,11 +715,21 @@ Rough priority order:
     `pendingDirtyCount === 0` yet never reach the server). Same
     pre-existing outbox/sync race already documented under Phase 4; not a
     Private Links regression.
-[] **More field types** (each = enum value + options schema + renderer + validator +
-   datatype mapping): phone, URL, currency, dropdown multi-select, likert, rating,
-   picture choice, file upload (needs upload path for anonymous users — scoped,
-   size-limited `POST /form/:id/upload` writing into the commit as a blob), choice
-   matrix, table input, location/address.
+[x] **More field types** — DONE, except file upload. Shipped: phone, URL,
+   currency, dropdown, dropdown multi-select, likert, rating, picture choice,
+   choice matrix, table input, address. Each is an enum value +
+   `form-field-options` schema + builder settings editor + renderer input +
+   client validator + server validator/coercion + datatype mapping; summaries
+   route onto the existing choice-count / histogram / answer-sample paths
+   rather than growing new ones. See
+   [`form-field-types.md`](./form-field-types.md) for the type table,
+   decisions, and what turned up along the way (notably: picture-choice option
+   images ride a gated `?file=` on `/form/{id}/image`, and long dropdown menus
+   were unreachable app-wide until `components/Dropdown` learned to cap its
+   height).
+- **File upload is deliberately still open** and wants its own work item: it
+    needs an anonymous upload path (scoped, size-limited
+    `POST /form/:id/upload`) before a field type can exist for it.
 [x] **Branching** — DONE. FormCondition resources on pages, fields, and layout
    blocks; evaluator implemented once in TS (`form-renderer/src/conditions.ts`)
    and once in Rust (`server/src/forms.rs`); shared fixtures

@@ -95,6 +95,19 @@ pub struct AccessQuery {
     code: Option<String>,
 }
 
+/// Query for [form_image]. Without `file` it serves the form's own
+/// `cover-image`; with it, one of the `picture-choice` option images. The
+/// `q`/`w`/`f` triple is [DownloadParams]' image-processing knobs, repeated
+/// here because `serde_urlencoded` (what `web::Query` uses) can't flatten a
+/// nested struct.
+#[derive(Deserialize)]
+pub struct FormImageQuery {
+    file: Option<String>,
+    q: Option<f32>,
+    w: Option<u32>,
+    f: Option<String>,
+}
+
 /// Enforces a Form's `form-access` mode. Public forms always pass. For
 /// invite-only forms the presented code must exist, belong to this form, and
 /// be unused — checked *without* consuming, so a visitor can load the form
@@ -309,13 +322,19 @@ pub async fn get_challenge(
         .json(challenge))
 }
 
-/// Points the definition's styling at the publish-gated image route (see
-/// [form_image]) — the visitor has no agent, so the File's own rights-checked
-/// `/download` URL would be unreachable. Requires `definition.id` to be set.
+/// Points every image in the definition — the form's cover image and any
+/// `picture-choice` option images — at the publish-gated image route (see
+/// [form_image]). The visitor has no agent, so the Files' own rights-checked
+/// `/download` URLs would be unreachable. Requires `definition.id` to be set.
 fn fill_image_url(definition: &mut forms::FormDefinition) {
     if definition.styling.has_image {
         definition.styling.image_url = Some(format!("/form/{}/image", definition.id));
     }
+
+    let id = definition.id.clone();
+    forms::rewrite_option_images(definition, |subject| {
+        format!("/form/{}/image?file={}", id, urlencoding::encode(subject))
+    });
 }
 
 /// `GET /form/{id}/image` — serves the published form's `cover-image` File.
@@ -330,17 +349,36 @@ fn fill_image_url(definition: &mut forms::FormDefinition) {
 /// below (per-code URLs) for zero meaningful confidentiality gain.
 pub async fn form_image(
     path: web::Path<String>,
-    params: web::Query<DownloadParams>,
+    params: web::Query<FormImageQuery>,
     req: HttpRequest,
     appstate: web::Data<AppState>,
 ) -> Result<HttpResponse, FormApiError> {
     let store = &appstate.store;
     let form = resolve_published_form(store, &path.into_inner()).await?;
 
-    let image_subject = form
-        .get(urls::COVER_IMAGE)
-        .map_err(|_| not_found())?
-        .to_string();
+    let image_subject = match params.file.as_deref().filter(|s| !s.is_empty()) {
+        // `?file=` serves a picture-choice option image. Gated on the subject
+        // actually being referenced by this form — without that check the
+        // route would be an open proxy for anything the server agent can read.
+        Some(requested) => {
+            let allowed = forms::collect_option_image_subjects(store, &form)
+                .await
+                .map_err(internal_error)?;
+            if !allowed.contains(requested) {
+                return Err(not_found());
+            }
+            requested.to_string()
+        }
+        None => form
+            .get(urls::COVER_IMAGE)
+            .map_err(|_| not_found())?
+            .to_string(),
+    };
+    let params = web::Query(DownloadParams {
+        q: params.q,
+        w: params.w,
+        f: params.f.clone(),
+    });
     let file = store
         .get_resource(&image_subject.into())
         .await

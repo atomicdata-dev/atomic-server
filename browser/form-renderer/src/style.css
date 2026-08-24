@@ -1,7 +1,13 @@
-/* Minimal, dependency-free styling for @tomic/form-renderer. Import this
-   file once (`import '@tomic/form-renderer/style.css'`) alongside the
-   component. Everything is scoped under `.atomic-form-*` class names so it
-   can be safely loaded next to a host app's own styles. */
+/* Minimal styling for @tomic/form-renderer. Import this file once
+   (`import '@tomic/form-renderer/style.css'`) alongside the component.
+   Everything of ours is scoped under `.atomic-form-*` class names so it can
+   be safely loaded next to a host app's own styles. */
+
+/* The only styles this pulls in from elsewhere: the phone field's country
+   selector comes from `react-phone-number-input`, and importing its
+   stylesheet here keeps consumers on a single import. Resolved by the
+   consumer's bundler, from the copy of the package this one depends on. */
+@import 'react-phone-number-input/style.css';
 
 :root {
   --atomic-form-accent: #1e43a3;
@@ -139,6 +145,46 @@
   resize: vertical;
 }
 
+/* Country pickers (the `country` field and an address's country subfield)
+   are native selects wearing the input's skin. */
+.atomic-form-select {
+  cursor: pointer;
+  /* Safari gives selects a taller intrinsic box than inputs; matching the
+     line height keeps a select and an input the same height side by side in
+     the address grid. */
+  line-height: 1.2;
+}
+
+/* Phone: the bordered box moves to the container so the country selector and
+   the number input read as a single control. */
+.atomic-form-phone {
+  --PhoneInput-color--focus: var(--atomic-form-accent);
+  --PhoneInputCountryFlag-borderColor: var(--atomic-form-border);
+  --PhoneInputCountrySelectArrow-color: var(--atomic-form-text-light);
+  color: var(--atomic-form-text);
+  background: var(--atomic-form-bg);
+  border: 1px solid var(--atomic-form-border);
+  border-radius: var(--atomic-form-radius);
+  padding-left: 0.75rem;
+  box-sizing: border-box;
+}
+
+.atomic-form-phone:focus-within {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 1px;
+}
+
+.atomic-form-phone .atomic-form-input {
+  border: none;
+  background: transparent;
+  padding-left: 0;
+  width: auto;
+}
+
+.atomic-form-phone .atomic-form-input:focus {
+  outline: none;
+}
+
 .atomic-form-checkbox-row,
 .atomic-form-choice-row {
   display: flex;
@@ -206,6 +252,224 @@
   font-size: 1.1rem;
   text-align: center;
   padding: 3rem 1rem;
+}
+
+/* ── Extended field types ────────────────────────────────────────────────
+   dropdown, currency, likert, rating, picture choice, choice matrix,
+   table input and address. All dependency-free and themed off the same
+   --atomic-form-* custom properties as the basic inputs. */
+
+.atomic-form-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.atomic-form-select {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    calc(100% - 1.1rem) 55%,
+    calc(100% - 0.75rem) 55%;
+  background-size: 0.35rem 0.35rem;
+  background-repeat: no-repeat;
+  padding-right: 2rem;
+}
+
+.atomic-form-select-multi {
+  appearance: auto;
+  background-image: none;
+  padding: 0.35rem;
+}
+
+.atomic-form-currency {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.atomic-form-currency-symbol {
+  color: var(--atomic-form-text-light);
+  font-weight: 600;
+  min-width: 1.5rem;
+}
+
+.atomic-form-likert {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.atomic-form-likert-end {
+  color: var(--atomic-form-text-light);
+  font-size: 0.9rem;
+}
+
+.atomic-form-likert-scale {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.atomic-form-likert-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--atomic-form-text);
+  cursor: pointer;
+}
+
+.atomic-form-rating {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.atomic-form-rating-step {
+  cursor: pointer;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--atomic-form-accent);
+}
+
+.atomic-form-rating-step input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.atomic-form-rating-step input:focus-visible + span {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 2px;
+  border-radius: 0.2rem;
+}
+
+.atomic-form-picture-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+  gap: 0.75rem;
+}
+
+.atomic-form-picture-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--atomic-form-border);
+  border-radius: var(--atomic-form-radius);
+  color: var(--atomic-form-text);
+  cursor: pointer;
+}
+
+.atomic-form-picture-card-selected {
+  border-color: var(--atomic-form-accent);
+  box-shadow: 0 0 0 1px var(--atomic-form-accent);
+}
+
+.atomic-form-picture-card img,
+.atomic-form-picture-placeholder {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: calc(var(--atomic-form-radius) / 1.5);
+  background: var(--atomic-form-border);
+}
+
+.atomic-form-picture-label {
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Tables (choice matrix + table input) scroll inside their own container so
+   a wide scale can't force the whole page sideways. */
+.atomic-form-matrix-wrapper {
+  overflow-x: auto;
+}
+
+.atomic-form-matrix,
+.atomic-form-table-input {
+  border-collapse: collapse;
+  width: 100%;
+  color: var(--atomic-form-text);
+}
+
+.atomic-form-matrix th,
+.atomic-form-matrix td,
+.atomic-form-table-input th,
+.atomic-form-table-input td {
+  border-bottom: 1px solid var(--atomic-form-border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  font-weight: normal;
+}
+
+.atomic-form-matrix thead th,
+.atomic-form-table-input thead th {
+  font-size: 0.85rem;
+  color: var(--atomic-form-text-light);
+  text-align: center;
+}
+
+.atomic-form-table-input thead th {
+  text-align: left;
+}
+
+.atomic-form-matrix tbody td {
+  text-align: center;
+}
+
+.atomic-form-matrix-cell {
+  display: inline-flex;
+  padding: 0.25rem;
+  cursor: pointer;
+}
+
+.atomic-form-row-button {
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: var(--atomic-form-text-light);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+}
+
+.atomic-form-add-row {
+  margin-top: 0.75rem;
+  padding: 0.4rem 1rem;
+  font-size: 0.9rem;
+}
+
+.atomic-form-address {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.75rem;
+}
+
+.atomic-form-address-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.atomic-form-address-field:first-child,
+.atomic-form-address-field:nth-child(2) {
+  grid-column: 1 / -1;
+}
+
+.atomic-form-address-label {
+  font-size: 0.85rem;
+  color: var(--atomic-form-text-light);
 }
 
 /* ── FormShell: page chrome + cover-image layouts ─────────────────────────
