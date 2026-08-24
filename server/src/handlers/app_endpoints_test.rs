@@ -46,6 +46,72 @@ fn signed(path: &str, appstate: &AppState) -> TestRequest {
     request
 }
 
+/// Signs as someone other than this node's own agent — a collaborator.
+fn signed_as(path: &str, appstate: &AppState, agent: &Agent) -> TestRequest {
+    let origin = appstate.config.get_origin();
+    let url = format!("{origin}{path}");
+    let headers =
+        atomic_lib::client::get_authentication_headers(&url, agent).expect("auth headers");
+
+    let mut request = TestRequest::with_uri(path);
+
+    for (key, value) in headers {
+        request = request.insert_header((key, value));
+    }
+
+    if let Ok(parsed) = url::Url::parse(&origin) {
+        if let Some(host) = parsed.host_str() {
+            let authority = match parsed.port() {
+                Some(port) => format!("{host}:{port}"),
+                None => host.to_string(),
+            };
+            request = request.insert_header(("Host", authority));
+        }
+    }
+
+    request
+}
+
+/// Publishes an agent so the server can verify its signatures, and gives it
+/// `right` on `target` — which is exactly what the Share dialog does.
+async fn share(fixture: &Fixture, target: &str, agent: &Agent, right: &str) {
+    let mut profile = atomic_lib::Resource::new(agent.subject.to_string());
+    profile
+        .set_unsafe(
+            urls::IS_A.into(),
+            Value::ResourceArray(vec![urls::AGENT.into()]),
+        )
+        .unwrap();
+    profile
+        .set_unsafe(
+            urls::PUBLIC_KEY.into(),
+            Value::String(agent.public_key.clone()),
+        )
+        .unwrap();
+    profile.save(&fixture.appstate.store).await.unwrap();
+
+    let mut resource = fixture
+        .appstate
+        .store
+        .get_resource(&target.into())
+        .await
+        .unwrap();
+    resource
+        .push(right, agent.subject.to_string().into(), true)
+        .unwrap();
+    resource.save(&fixture.appstate.store).await.unwrap();
+}
+
+fn create_payload(fixture: &Fixture, app: &str, name: &str) -> String {
+    format!(
+        r#"{{"drive":{:?},"app":{:?},"op":"create","propVals":{{{:?}:{:?}}}}}"#,
+        fixture.drive,
+        app,
+        urls::NAME,
+        name,
+    )
+}
+
 fn body_of(response: ServiceResponse) -> String {
     let bytes = response
         .into_body()
@@ -78,7 +144,9 @@ async fn app_fixture(name: &str) -> (Fixture, String) {
             (urls::NAME, Value::String("Test app view".into())),
             (
                 fixture.terms.property("plugin-source").unwrap(),
-                Value::Markdown("export function view({ root }) { root.textContent = 'hi'; }".into()),
+                Value::Markdown(
+                    "export function view({ root }) { root.textContent = 'hi'; }".into(),
+                ),
             ),
         ],
     )
@@ -98,10 +166,7 @@ async fn app_fixture(name: &str) -> (Fixture, String) {
     app_resource
         .push(urls::WRITE, agent.subject.to_string().into(), true)
         .unwrap();
-    app_resource
-        .save(&fixture.appstate.store)
-        .await
-        .unwrap();
+    app_resource.save(&fixture.appstate.store).await.unwrap();
 
     fixture
         .appstate
@@ -234,7 +299,9 @@ async fn an_app_writes_its_own_data_as_itself() {
             .insert_header(("Content-Type", "application/json"))
             .set_payload(format!(
                 r#"{{"drive":{:?},"app":{:?},"op":"create","propVals":{{{:?}:"A note"}}}}"#,
-                fixture.drive, app, urls::NAME,
+                fixture.drive,
+                app,
+                urls::NAME,
             ))
             .to_request(),
     )
@@ -341,4 +408,115 @@ async fn an_app_with_no_key_is_told_so() {
 
     assert_eq!(response.status(), 400);
     assert!(body_of(response).contains("no key of its own"));
+}
+
+#[actix_rt::test]
+async fn someone_the_app_was_shared_with_can_use_it() {
+    let (fixture, app) = app_fixture("app_shared_write").await;
+    let service = test::init_service(
+        App::new()
+            .app_data(Data::new(fixture.appstate.clone()))
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+
+    // Sharing an app is sharing a resource: the same rights arrays, the same
+    // dialog, no mechanism of its own.
+    let collaborator = Agent::new(Some("collaborator")).unwrap();
+    share(&fixture, &app, &collaborator, urls::WRITE).await;
+
+    // Opening it first: the view is a child of the app, so read inherits down
+    // the parent chain and sharing the app shares the screen with it. Nothing
+    // has to be shared twice.
+    let opened = test::call_service(
+        &service,
+        signed_as("/plugin-view-token", &fixture.appstate, &collaborator)
+            .method(actix_web::http::Method::POST)
+            .insert_header(("Content-Type", "application/json"))
+            .set_payload(format!(
+                r#"{{"drive":{:?},"plugin":{:?}}}"#,
+                fixture.drive, fixture.plugin,
+            ))
+            .to_request(),
+    )
+    .await;
+
+    assert_eq!(opened.status(), 200, "{}", body_of(opened));
+
+    let response = test::call_service(
+        &service,
+        signed_as("/app-write", &fixture.appstate, &collaborator)
+            .method(actix_web::http::Method::POST)
+            .insert_header(("Content-Type", "application/json"))
+            .set_payload(create_payload(&fixture, &app, "Added by a collaborator"))
+            .to_request(),
+    )
+    .await;
+
+    assert_eq!(response.status(), 200, "{}", body_of(response));
+
+    // Still authored by the app, not by whoever happened to click. Two people
+    // using one app produce one voice, which is what makes its data coherent.
+    let written: serde_json::Value = serde_json::from_str(&body_of(response)).expect("json");
+    let subject = written["subject"].as_str().expect("a subject");
+    let resource = fixture
+        .appstate
+        .store
+        .get_resource(&subject.into())
+        .await
+        .unwrap();
+    let commit = fixture
+        .appstate
+        .store
+        .get_resource(
+            &resource
+                .get(urls::LAST_COMMIT)
+                .unwrap()
+                .to_string()
+                .as_str()
+                .into(),
+        )
+        .await
+        .unwrap();
+
+    let app_agent = fixture
+        .appstate
+        .store
+        .get_app_agent_info(&AppAgentKey::new(&fixture.drive, &app))
+        .unwrap()
+        .unwrap()
+        .agent;
+
+    assert_eq!(commit.get(urls::SIGNER).unwrap().to_string(), app_agent);
+    assert_ne!(
+        commit.get(urls::SIGNER).unwrap().to_string(),
+        collaborator.subject.to_string(),
+    );
+}
+
+#[actix_rt::test]
+async fn read_only_means_look_not_touch() {
+    let (fixture, app) = app_fixture("app_shared_read").await;
+    let service = test::init_service(
+        App::new()
+            .app_data(Data::new(fixture.appstate.clone()))
+            .configure(crate::routes::config_routes),
+    )
+    .await;
+
+    // Shared to look at. An app's buttons must not be a way around that.
+    let onlooker = Agent::new(Some("onlooker")).unwrap();
+    share(&fixture, &app, &onlooker, urls::READ).await;
+
+    let response = test::call_service(
+        &service,
+        signed_as("/app-write", &fixture.appstate, &onlooker)
+            .method(actix_web::http::Method::POST)
+            .insert_header(("Content-Type", "application/json"))
+            .set_payload(create_payload(&fixture, &app, "Should not exist"))
+            .to_request(),
+    )
+    .await;
+
+    assert_eq!(response.status(), 401, "{}", body_of(response));
 }
