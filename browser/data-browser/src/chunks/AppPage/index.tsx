@@ -1,5 +1,5 @@
+import { styled } from 'styled-components';
 import { useStore, type Resource } from '@tomic/react';
-import { ContainerFull } from '@components/Containers';
 import { LoaderBlock } from '@components/Loader';
 import { AppFrame } from './AppFrame';
 
@@ -23,8 +23,24 @@ export function AppPage({
   }
 
   return (
-    <ContainerFull>
+    <PageWrapper>
       <AppFrame app={resource.subject} drive={drive} />
-    </ContainerFull>
+    </PageWrapper>
   );
 }
+
+/**
+ * An app gets the whole page.
+ *
+ * Not ContainerFull: its bottom padding exists so a scrolling column of
+ * resources clears the navigation bar, but a frame cannot grow into padding —
+ * it would just leave a strip of empty page under an app that had already run
+ * out of room.
+ */
+const PageWrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  padding: ${p => p.theme.size()};
+`;

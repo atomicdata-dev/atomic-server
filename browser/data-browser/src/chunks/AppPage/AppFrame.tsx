@@ -172,7 +172,11 @@ export function AppFrame({
   }
 
   if (entrypoint === null) {
-    return <Problem>This app has no entry point, so there is nothing to open.</Problem>;
+    return (
+      <Problem>
+        This app has no entry point, so there is nothing to open.
+      </Problem>
+    );
   }
 
   if (src === undefined) {
@@ -261,8 +265,13 @@ async function mintViewToken(
 const Frame = styled.iframe`
   border: none;
   width: 100%;
+  /* An iframe never grows to fit its document: whatever height it is given is
+   * the height the app gets, and anything taller is clipped. So take the whole
+   * box the caller sized, and let the app scroll inside it. Both callers hand
+   * it a sized box; the floor is only for the case where one forgets. */
+  flex: 1;
   height: 100%;
-  min-height: 60vh;
+  min-height: 20rem;
   background: ${p => p.theme.colors.bg};
 `;
 
