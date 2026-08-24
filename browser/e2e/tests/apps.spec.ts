@@ -75,6 +75,34 @@ test.describe('apps', () => {
     await expect(main.getByText('Item 1')).toBeVisible();
   });
 
+  test('an app can be a view on a table, beside the table view', async ({
+    page,
+  }) => {
+    const main = page.getByRole('main');
+
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByPlaceholder(/filter/i).fill('app');
+    await page.locator('[data-testid="menu-item-new-app"]').click();
+    await expect(main.locator('iframe[title="App"]')).toBeVisible();
+
+    // Open the app's own table and add the app as a second way to see it.
+    const sidebar = page.getByRole('navigation').last();
+    await sidebar.getByRole('button', { name: 'Expand folder' }).last().click();
+    await sidebar.getByRole('button', { name: 'Items', exact: true }).click();
+    await expect(main.getByRole('tablist')).toBeVisible();
+
+    await main.getByRole('button', { name: 'Add view' }).click();
+    await page.getByRole('menuitem', { name: 'New app' }).click();
+
+    // The app now renders these rows, in a tab of its own...
+    await expect(main.locator('iframe[title="App"]')).toBeVisible();
+
+    // ...and the table is still right there. Adding a way to look at rows
+    // must never take one away.
+    await main.getByRole('tab', { name: 'Table' }).click();
+    await expect(main.locator('iframe[title="App"]')).toBeHidden();
+  });
+
   test('an app survives a reload, because its data is in the drive', async ({
     page,
   }) => {

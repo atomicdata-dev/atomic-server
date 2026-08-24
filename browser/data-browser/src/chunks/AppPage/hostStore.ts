@@ -84,27 +84,33 @@ export async function handleRequest(
   app: string,
   drive: string,
   request: HostRequest,
+  /** The table this app is a view of, when it is being used as one. */
+  table?: string,
 ): Promise<unknown> {
   switch (request.op) {
     case 'app':
       return app;
 
     case 'data': {
+      // The table it was pointed at, if any, and its own otherwise. So one
+      // app can be its own thing on its own page and a view of someone
+      // else's rows on a table tab, without knowing which it is.
       const resource = await store.getResource(app);
       const schema = await findSchema(store, drive, pluginSchema());
-      const table = schema.properties?.['app-data']
+      const own = schema.properties?.['app-data']
         ? (resource.get(schema.properties['app-data']) as string | undefined)
         : undefined;
+      const subject = table ?? own;
 
-      if (!table) return undefined;
+      if (!subject) return undefined;
 
       // The row class comes off the table rather than the app: a table already
       // names what its rows are, and duplicating that on the app would be two
       // places to disagree.
-      const tableResource = await store.getResource(table);
+      const tableResource = await store.getResource(subject);
 
       return {
-        table,
+        table: subject,
         rowClass: tableResource.get(core.properties.classtype) as
           | string
           | undefined,

@@ -162,6 +162,22 @@ describe('writing as the app', () => {
     expect(sent).toHaveLength(0);
   });
 
+  it('sees the table it is a view of, not its own', async () => {
+    const store = fakeStore();
+
+    // The same app is its own thing on its own page and a way of looking at
+    // someone else's rows on a table tab. It should not have to know which.
+    const viewing = (await handleRequest(
+      store,
+      APP,
+      DRIVE,
+      req('data'),
+      'did:ad:someone-elses-table',
+    )) as { table: string };
+
+    expect(viewing.table).toBe('did:ad:someone-elses-table');
+  });
+
   it('refuses an operation it does not implement', async () => {
     const store = fakeStore();
 

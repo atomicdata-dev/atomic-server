@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { styled } from 'styled-components';
 import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
+import { findSchema, pluginSchema } from '@tomic/lib';
 import { handleRequest, isHostRequest, type HostReply } from './hostStore';
 import { LoaderBlock } from '@components/Loader';
 
@@ -20,14 +21,22 @@ import { useCreateThemeVars } from '@views/PluginView/useCreateThemeVars';
 export function AppFrame({
   app,
   drive,
-  entrypoint,
+  table,
 }: {
   app: string;
   drive: string;
-  entrypoint: string;
+  /**
+   * The table this app is a view of, when it is being used as one.
+   *
+   * Without it an app reads its own rows. With it, the same app can be
+   * pointed at rows someone already has — which is the difference between an
+   * app that owns its data and an app that is a way of looking at data.
+   */
+  table?: string;
 }): React.JSX.Element {
   const store = useStore();
   const [src, setSrc] = useState<string>();
+  const [entrypoint, setEntrypoint] = useState<string | null>();
   const [problem, setProblem] = useState<string>();
   const frameRef = useRef<HTMLIFrameElement>(null);
   // Subject to the store's unsubscribe, so a view that re-renders does not
@@ -35,7 +44,34 @@ export function AppFrame({
   const watching = useRef(new Map<string, () => void>());
   const stylesheet = useCreateThemeVars();
 
+  // Which plugin renders it. Resolved here rather than by each caller: a
+  // table tab and an app page both need it, and two copies would drift.
   useEffect(() => {
+    let cancelled = false;
+
+    (async () => {
+      const schema = await findSchema(store, drive, pluginSchema());
+      const property = schema.properties?.entrypoint;
+      // Read through the store rather than from a passed resource, so this
+      // depends on a subject string instead of a proxy whose identity churns.
+      const resource = await store.getResource(app);
+      const found = property
+        ? (resource.get(property) as string | undefined)
+        : undefined;
+
+      if (!cancelled) setEntrypoint(found ?? null);
+    })().catch(() => {
+      if (!cancelled) setEntrypoint(null);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [store, drive, app]);
+
+  useEffect(() => {
+    if (!entrypoint) return;
+
     let cancelled = false;
 
     mintViewToken(store, drive, entrypoint)
@@ -116,7 +152,7 @@ export function AppFrame({
         return;
       }
 
-      void answer(store, app, drive, e.data, post);
+      void answer(store, app, drive, table, e.data, post);
     };
 
     window.addEventListener('message', onMessage);
@@ -129,10 +165,14 @@ export function AppFrame({
       released.forEach(unsubscribe => unsubscribe());
       released.clear();
     };
-  }, [sendStyle, store, app, drive]);
+  }, [sendStyle, store, app, drive, table]);
 
   if (problem !== undefined) {
     return <Problem>{problem}</Problem>;
+  }
+
+  if (entrypoint === null) {
+    return <Problem>This app has no entry point, so there is nothing to open.</Problem>;
   }
 
   if (src === undefined) {
@@ -158,13 +198,14 @@ async function answer(
   store: ReturnType<typeof useStore>,
   app: string,
   drive: string,
+  table: string | undefined,
   request: Parameters<typeof handleRequest>[3],
   post: (reply: HostReply) => void,
 ): Promise<void> {
   try {
     post({
       id: request.id,
-      result: await handleRequest(store, app, drive, request),
+      result: await handleRequest(store, app, drive, request, table),
     });
   } catch (e) {
     post({ id: request.id, error: (e as Error).message });
