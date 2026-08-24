@@ -84,6 +84,13 @@ export function pluginSchema(): SchemaSpec {
         datatype: Datatype.ATOMIC_URL,
       },
       {
+        shortname: 'renders',
+        name: 'Renders',
+        description:
+          'The row classes this app knows how to show. A table offers an app as a view only when its rows are one of these — an app written against its own schema would otherwise be offered for every table on the drive and break on most of them.',
+        datatype: Datatype.RESOURCEARRAY,
+      },
+      {
         shortname: 'app-data',
         name: 'Data',
         description:
@@ -114,7 +121,7 @@ export function pluginSchema(): SchemaSpec {
         description:
           'A parent whose children are its parts: its own ontology, the plugin that renders it, and any handlers that run on a schedule or a query edge. Sharing the app means sharing the subtree, which drive rights already do.',
         requires: ['entrypoint'],
-        recommends: ['app-data'],
+        recommends: ['app-data', 'renders'],
       },
     ],
   };

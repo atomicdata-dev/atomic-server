@@ -141,6 +141,10 @@ export async function createApp(
   await saved.set(server.properties.defaultOntology, ontology.subject);
   await saved.set(schema.properties.entrypoint, entrypoint.subject);
   await saved.set(schema.properties['app-data'], data.subject);
+  // What it can show. Its own rows to begin with — an author who wants it
+  // offered on someone else's table adds that class deliberately, rather than
+  // every app being offered for every table.
+  await saved.set(schema.properties.renders, [rowClass.subject]);
   await saved.save();
 
   // The app's own identity, and the only thing that decides what it may
