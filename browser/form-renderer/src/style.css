@@ -30,6 +30,38 @@
   }
 }
 
+/* Interaction colors, derived from the four theme colors above so a form
+   with custom styling gets matching hover states for free. Mixing towards
+   `--atomic-form-text` moves *away* from the background in either color
+   scheme, so the same formula reads correctly light and dark.
+
+   Declared on `.atomic-form-shell` as well as `:root`: `var()` inside a
+   custom property is substituted against the element the property is
+   declared on, so a copy on the shell is what picks up the per-form
+   overrides FormShell writes there as inline styles. */
+:root,
+.atomic-form-shell {
+  /* Hover border for inputs — a step darker than the resting border. */
+  --atomic-form-border-hover: color-mix(
+    in srgb,
+    var(--atomic-form-border) 60%,
+    var(--atomic-form-text)
+  );
+  /* Translucent wash behind hovered rows, cells and secondary buttons. */
+  --atomic-form-hover-bg: color-mix(
+    in srgb,
+    var(--atomic-form-text) 8%,
+    transparent
+  );
+  /* Primary button hover — darker in light mode, lighter in dark mode. */
+  --atomic-form-accent-hover: color-mix(
+    in srgb,
+    var(--atomic-form-accent) 82%,
+    var(--atomic-form-text)
+  );
+  --atomic-form-transition: 120ms ease;
+}
+
 .atomic-form-progress {
   height: 0.35rem;
   background: var(--atomic-form-border);
@@ -134,11 +166,39 @@
   padding: 0.6rem 0.75rem;
   width: 100%;
   box-sizing: border-box;
+  transition:
+    border-color var(--atomic-form-transition),
+    background-color var(--atomic-form-transition);
 }
 
+.atomic-form-input:hover:not(:disabled) {
+  border-color: var(--atomic-form-border-hover);
+}
+
+/* Focus reads as a thicker accent edge: the border itself turns accent and
+   the outline sits flush against it (offset 0) rather than as a detached
+   ring, so it is clearly a step up from the hover border. */
 .atomic-form-input:focus {
+  border-color: var(--atomic-form-accent);
   outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 1px;
+  outline-offset: 0;
+}
+
+/* Native constraint failures — a malformed email or URL, a number outside
+   min/max — turn the border red. `:user-invalid` rather than `:invalid` so a
+   field stays neutral while it is still being filled in, and only complains
+   once the visitor has typed something and moved on. Requiredness is checked
+   by the JS layer instead, which renders `.atomic-form-error` below the
+   field. The `:hover` twin is needed because `:hover:not(:disabled)` above
+   is a specificity step higher than a bare `:user-invalid`. */
+.atomic-form-input:user-invalid,
+.atomic-form-input:user-invalid:hover:not(:disabled) {
+  border-color: var(--atomic-form-error);
+}
+
+.atomic-form-input:user-invalid:focus {
+  border-color: var(--atomic-form-error);
+  outline-color: var(--atomic-form-error);
 }
 
 .atomic-form-textarea {
@@ -167,11 +227,17 @@
   border-radius: var(--atomic-form-radius);
   padding-left: 0.75rem;
   box-sizing: border-box;
+  transition: border-color var(--atomic-form-transition);
+}
+
+.atomic-form-phone:hover:not(:focus-within) {
+  border-color: var(--atomic-form-border-hover);
 }
 
 .atomic-form-phone:focus-within {
+  border-color: var(--atomic-form-accent);
   outline: 2px solid var(--atomic-form-accent);
-  outline-offset: 1px;
+  outline-offset: 0;
 }
 
 .atomic-form-phone .atomic-form-input {
@@ -185,18 +251,42 @@
   outline: none;
 }
 
+/* Choice rows carry their own padding so hovering highlights a pill around
+   the whole row, not just the text. The negative inline-start margin pulls
+   the control back under the field label, keeping the left edge aligned. */
 .atomic-form-checkbox-row,
 .atomic-form-choice-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   color: var(--atomic-form-text);
+  cursor: pointer;
+  padding: 0.3rem 0.5rem;
+  margin-inline-start: -0.5rem;
+  border-radius: var(--atomic-form-radius);
+  transition: background-color var(--atomic-form-transition);
+}
+
+.atomic-form-checkbox-row:hover,
+.atomic-form-choice-row:hover {
+  background: var(--atomic-form-hover-bg);
+}
+
+.atomic-form-checkbox-row:has(input:focus-visible),
+.atomic-form-choice-row:has(input:focus-visible) {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 1px;
+}
+
+.atomic-form-checkbox-row input,
+.atomic-form-choice-row input {
+  cursor: pointer;
 }
 
 .atomic-form-choice-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.15rem;
 }
 
 .atomic-form-error {
@@ -234,6 +324,18 @@
   border-radius: var(--atomic-form-radius);
   padding: 0.65rem 1.5rem;
   cursor: pointer;
+  transition:
+    background-color var(--atomic-form-transition),
+    border-color var(--atomic-form-transition);
+}
+
+.atomic-form-button:hover:not(:disabled) {
+  background: var(--atomic-form-accent-hover);
+}
+
+.atomic-form-button:focus-visible {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 2px;
 }
 
 .atomic-form-button:disabled {
@@ -245,6 +347,13 @@
   background: transparent;
   color: var(--atomic-form-text);
   border: 1px solid var(--atomic-form-border);
+}
+
+/* After the primary hover rule so the secondary variant keeps its outline
+   look instead of filling with the accent color. */
+.atomic-form-button-secondary:hover:not(:disabled) {
+  background: var(--atomic-form-hover-bg);
+  border-color: var(--atomic-form-border-hover);
 }
 
 .atomic-form-success {
@@ -283,22 +392,287 @@
   padding-right: 2rem;
 }
 
-.atomic-form-select-multi {
-  appearance: auto;
-  background-image: none;
-  padding: 0.35rem;
+/* Multi-select combobox (`dropdown-multi`). The closed trigger carries the
+   chosen options as chips, so an answer stays readable without opening the
+   menu; the menu itself is a listbox of tickable rows. See MultiSelect.tsx. */
+.atomic-form-combobox {
+  position: relative;
 }
 
-.atomic-form-currency {
+.atomic-form-combobox-trigger {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  cursor: pointer;
+  /* A multi-select's chips set the height, so the fixed one
+     `.atomic-form-input` gives text inputs would clip them — keep it as a
+     floor instead. */
+  height: auto;
+  min-height: 2.75rem;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  padding-right: 2rem;
+}
+
+.atomic-form-combobox-trigger:focus-visible,
+.atomic-form-combobox-trigger-open {
+  border-color: var(--atomic-form-accent);
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 0;
+}
+
+.atomic-form-combobox-answer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Single-select: the chosen option reads as the field's value, so it gets no
+   chip treatment — just the text, and the ✕ that empties the field again. */
+.atomic-form-combobox-value {
+  overflow-wrap: anywhere;
+}
+
+/* The single-select's ✕ — a direct child, where a chip's sits nested inside
+   `.atomic-form-combobox-chip`. It belongs at the trailing edge next to the
+   caret, not trailing the label, so that its position holds still as the
+   answer changes length. */
+.atomic-form-combobox-answer > button {
+  margin-left: auto;
+}
+
+.atomic-form-combobox-placeholder {
+  color: var(--atomic-form-text-light);
+}
+
+.atomic-form-combobox-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0.1rem 0.2rem 0.1rem 0.5rem;
+  font-size: 0.85em;
+  line-height: 1.5;
+  border-radius: calc(var(--atomic-form-radius) * 0.75);
+  background: color-mix(
+    in srgb,
+    var(--atomic-form-accent) 14%,
+    var(--atomic-form-bg)
+  );
+  color: var(--atomic-form-text);
+  overflow-wrap: anywhere;
+}
+
+.atomic-form-combobox-answer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  font: inherit;
+  font-size: 0.8em;
+  line-height: 1;
+  color: var(--atomic-form-text-light);
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    color var(--atomic-form-transition),
+    background-color var(--atomic-form-transition);
+}
+
+.atomic-form-combobox-answer button:hover {
+  color: var(--atomic-form-text);
+  background: var(--atomic-form-hover-bg);
+}
+
+/* The same caret `.atomic-form-select` draws, but as an element rather than a
+   background — the trigger is a flex row, not a native select. */
+.atomic-form-combobox-arrow {
+  flex-shrink: 0;
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-right: -1.25rem;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-0.15em) rotate(45deg);
+  color: var(--atomic-form-text-light);
+}
+
+.atomic-form-combobox-panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.25rem);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--atomic-form-bg);
+  border: 1px solid var(--atomic-form-border);
+  border-radius: var(--atomic-form-radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+}
+
+/* Beats the `display: flex` above, which would otherwise win over the UA's
+   `[hidden] { display: none }` on specificity. */
+.atomic-form-combobox-panel[hidden] {
+  display: none;
+}
+
+.atomic-form-combobox-panel-up {
+  top: auto;
+  bottom: calc(100% + 0.25rem);
+}
+
+.atomic-form-combobox-filter {
+  font: inherit;
+  color: var(--atomic-form-text);
+  background: var(--atomic-form-bg);
+  border: none;
+  border-bottom: 1px solid var(--atomic-form-border);
+  padding: 0.6rem 0.75rem;
+}
+
+.atomic-form-combobox-filter:focus {
+  outline: none;
+}
+
+.atomic-form-combobox-menu {
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem;
+  max-height: 15rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* `margin` and `list-style` are reset explicitly, not left to the `<ul>`:
+   this package renders inside host pages whose own `ul li` rules would
+   otherwise indent every row and space it out (the data-browser's global
+   stylesheet does exactly that). The 0.5rem left padding is all the inset
+   there should be — with the menu's own 0.25rem it puts the checkbox under
+   the first character of the filter box above it. */
+.atomic-form-combobox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0.45rem 0.5rem;
+  list-style: none;
+  border-radius: calc(var(--atomic-form-radius) * 0.75);
+  cursor: pointer;
+}
+
+/* Keyboard and pointer share one highlight: downshift moves
+   `highlightedIndex` on hover too, so a `:hover` rule would double up. */
+.atomic-form-combobox-option[data-highlighted] {
+  background: var(--atomic-form-hover-bg);
+}
+
+/* Which row is the current answer, for the single-select — it has no
+   checkbox column to say so. Colour and weight rather than a glyph: a tick
+   in the checkbox's place would suggest the rows toggle independently. */
+.atomic-form-combobox-option[data-current] {
+  color: var(--atomic-form-accent);
+  font-weight: 600;
+}
+
+.atomic-form-combobox-check {
+  flex-shrink: 0;
+  position: relative;
+  width: 1rem;
+  height: 1rem;
+  border: 1px solid var(--atomic-form-border-hover);
+  border-radius: 0.25rem;
+  transition:
+    background-color var(--atomic-form-transition),
+    border-color var(--atomic-form-transition);
+}
+
+.atomic-form-combobox-check[data-checked] {
+  background: var(--atomic-form-accent);
+  border-color: var(--atomic-form-accent);
+}
+
+.atomic-form-combobox-check[data-checked]::after {
+  content: '';
+  position: absolute;
+  left: 0.3rem;
+  top: 0.1rem;
+  width: 0.25rem;
+  height: 0.5rem;
+  border-right: 2px solid var(--atomic-form-bg);
+  border-bottom: 2px solid var(--atomic-form-bg);
+  transform: rotate(45deg);
+}
+
+.atomic-form-combobox-empty {
+  margin: 0;
+  padding: 0.55rem 0.5rem;
+  list-style: none;
+  color: var(--atomic-form-text-light);
+}
+
+/* Like the phone field, the bordered box moves to the container so the
+   currency symbol sits inside the input's frame rather than floating next to
+   it. The container is a `<label>` (see FieldInput), so clicking the symbol
+   or the padding around it focuses the number. */
+.atomic-form-currency {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--atomic-form-text);
+  background: var(--atomic-form-bg);
+  border: 1px solid var(--atomic-form-border);
+  border-radius: var(--atomic-form-radius);
+  padding-left: 0.75rem;
+  box-sizing: border-box;
+  cursor: text;
+  transition: border-color var(--atomic-form-transition);
+}
+
+.atomic-form-currency:hover:not(:focus-within) {
+  border-color: var(--atomic-form-border-hover);
+}
+
+.atomic-form-currency:focus-within {
+  border-color: var(--atomic-form-accent);
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 0;
+}
+
+/* The inner input's border is `none`, so an out-of-range amount has to turn
+   the container red instead. The `:hover` and `:focus-within` twins clear
+   the specificity of the two rules above. */
+.atomic-form-currency:has(input:user-invalid),
+.atomic-form-currency:has(input:user-invalid):hover,
+.atomic-form-currency:has(input:user-invalid):focus-within {
+  border-color: var(--atomic-form-error);
+  outline-color: var(--atomic-form-error);
+}
+
+.atomic-form-currency .atomic-form-input {
+  flex: 1;
+  width: auto;
+  border: none;
+  background: transparent;
+  padding-left: 0;
+}
+
+.atomic-form-currency .atomic-form-input:focus {
+  outline: none;
 }
 
 .atomic-form-currency-symbol {
   color: var(--atomic-form-text-light);
   font-weight: 600;
-  min-width: 1.5rem;
 }
 
 .atomic-form-likert {
@@ -306,6 +680,7 @@
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  width: 100%;
 }
 
 .atomic-form-likert-end {
@@ -313,9 +688,15 @@
   font-size: 0.9rem;
 }
 
+/* Takes whatever width the min/max end labels leave over and spreads the
+   steps across it, so the scale reads as a full-width ruler rather than a
+   cluster of radios hugging the left edge. The gap is only a floor for when
+   the row is too narrow for `space-around` to give any. */
 .atomic-form-likert-scale {
   display: flex;
-  gap: 0.75rem;
+  flex: 1;
+  justify-content: space-around;
+  gap: 0.25rem;
 }
 
 .atomic-form-likert-step {
@@ -325,18 +706,52 @@
   gap: 0.25rem;
   color: var(--atomic-form-text);
   cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--atomic-form-radius);
+  transition: background-color var(--atomic-form-transition);
 }
 
+.atomic-form-likert-step:hover {
+  background: var(--atomic-form-hover-bg);
+}
+
+.atomic-form-likert-step:has(input:focus-visible) {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 1px;
+}
+
+/* Outer element is the hover zone (see RatingField); `fit-content` keeps it
+   hugging the glyphs so the preview clears as soon as the pointer leaves
+   them. The inner element is the radiogroup and the flex row. */
 .atomic-form-rating {
+  width: fit-content;
+}
+
+.atomic-form-rating-scale {
   display: flex;
   gap: 0.2rem;
 }
 
+/* `atomic-form-rating-step-hot` is set by FieldInput on every step up to
+   and including the pointer, so the whole run lights up together the way a
+   star rating is expected to preview. */
 .atomic-form-rating-step {
   cursor: pointer;
   font-size: 1.6rem;
   line-height: 1;
   color: var(--atomic-form-accent);
+}
+
+.atomic-form-rating-step span {
+  display: block;
+  transition:
+    transform var(--atomic-form-transition),
+    color var(--atomic-form-transition);
+}
+
+.atomic-form-rating-step-hot span {
+  color: var(--atomic-form-accent-hover);
+  transform: scale(1.15);
 }
 
 .atomic-form-rating-step input {
@@ -368,9 +783,25 @@
   border-radius: var(--atomic-form-radius);
   color: var(--atomic-form-text);
   cursor: pointer;
+  transition:
+    border-color var(--atomic-form-transition),
+    background-color var(--atomic-form-transition);
 }
 
-.atomic-form-picture-card-selected {
+.atomic-form-picture-card:hover {
+  border-color: var(--atomic-form-border-hover);
+  background: var(--atomic-form-hover-bg);
+}
+
+.atomic-form-picture-card:has(input:focus-visible) {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 2px;
+}
+
+/* The `:hover` twin keeps the accent edge on a card that is already picked,
+   overriding the plain hover border above. */
+.atomic-form-picture-card-selected,
+.atomic-form-picture-card-selected:hover {
   border-color: var(--atomic-form-accent);
   box-shadow: 0 0 0 1px var(--atomic-form-accent);
 }
@@ -427,9 +858,32 @@
   text-align: center;
 }
 
+.atomic-form-matrix tbody tr {
+  transition: background-color var(--atomic-form-transition);
+}
+
+.atomic-form-matrix tbody tr:hover {
+  background: var(--atomic-form-hover-bg);
+}
+
 .atomic-form-matrix-cell {
   display: inline-flex;
-  padding: 0.25rem;
+  padding: 0.35rem;
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background-color var(--atomic-form-transition);
+}
+
+.atomic-form-matrix-cell:hover {
+  background: var(--atomic-form-hover-bg);
+}
+
+.atomic-form-matrix-cell:has(input:focus-visible) {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 1px;
+}
+
+.atomic-form-matrix-cell input {
   cursor: pointer;
 }
 
@@ -442,6 +896,20 @@
   border: none;
   cursor: pointer;
   padding: 0.2rem 0.4rem;
+  border-radius: var(--atomic-form-radius);
+  transition:
+    color var(--atomic-form-transition),
+    background-color var(--atomic-form-transition);
+}
+
+.atomic-form-row-button:hover {
+  color: var(--atomic-form-error);
+  background: var(--atomic-form-hover-bg);
+}
+
+.atomic-form-row-button:focus-visible {
+  outline: 2px solid var(--atomic-form-accent);
+  outline-offset: 1px;
 }
 
 .atomic-form-add-row {

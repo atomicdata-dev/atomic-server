@@ -12,6 +12,7 @@
     "url": "https://github.com/atomicdata-dev/atomic-server/issues"
   },
   "dependencies": {
+    "downshift": "^9.3.3",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",

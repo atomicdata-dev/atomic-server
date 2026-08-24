@@ -168,6 +168,7 @@ msgstr "Agentenname"
 #: src/chunks/AI/AgentConfig.tsx
 #: src/chunks/AI/MCPConfigTab.tsx
 #: src/chunks/AI/SkillsConfigTab.tsx
+#: src/chunks/FormBuilder/PageSettingsPanel.tsx
 #: src/chunks/TablePage/DerivedColumnDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewDashboardDialog.tsx
 #: src/components/forms/NewForm/CustomCreateActions/CustomForms/NewDriveDialog.tsx
@@ -8381,3 +8382,6 @@ msgstr "Kein Standardwert"
 #: src/chunks/FormBuilder/FieldOptions/CountryDefaultField.tsx
 msgid "Default country"
 msgstr "Standardland"
+
+#~ msgid "Page name"
+#~ msgstr "Seitenname"

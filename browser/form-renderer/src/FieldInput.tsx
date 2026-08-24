@@ -1,5 +1,6 @@
-import { lazy, Suspense, type JSX } from 'react';
+import { lazy, Suspense, useState, type JSX } from 'react';
 import { CountrySelect } from './CountrySelect.js';
+import { MultiSelect, SingleSelect } from './SelectMenu.js';
 import {
   ADDRESS_FIELDS,
   type AddressValue,
@@ -146,7 +147,12 @@ export function FieldInput({
       );
     case 'currency':
       return (
-        <div className='atomic-form-currency'>
+        // A `<label>` rather than a `<div>`: the symbol now sits inside the
+        // bordered box, so clicking it — or the padding around it — should
+        // put the cursor in the number, the way it would anywhere else in an
+        // input. The symbol is `aria-hidden`, so this second label adds
+        // nothing to the field's accessible name.
+        <label className='atomic-form-currency' htmlFor={inputId}>
           <span className='atomic-form-currency-symbol' aria-hidden='true'>
             {currencySymbol(field.options)}
           </span>
@@ -165,7 +171,7 @@ export function FieldInput({
               )
             }
           />
-        </div>
+        </label>
       );
     case 'date':
       return (
@@ -247,46 +253,27 @@ export function FieldInput({
 
     case 'dropdown':
       return (
-        <select
-          id={inputId}
-          className='atomic-form-input atomic-form-select'
-          value={(value as string) ?? ''}
-          onChange={e => onChange(e.target.value || undefined)}
-        >
-          <option value=''>{placeholder ?? 'Choose an option…'}</option>
-          {(field.options.options ?? []).map(option => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        <SingleSelect
+          options={field.options.options ?? []}
+          value={typeof value === 'string' ? value : undefined}
+          onChange={onChange}
+          inputId={inputId}
+          labelId={labelId}
+          placeholder={placeholder}
+        />
       );
 
-    case 'dropdown-multi': {
-      const selected = Array.isArray(value) ? (value as string[]) : [];
-      const options = field.options.options ?? [];
-
+    case 'dropdown-multi':
       return (
-        <select
-          id={inputId}
-          className='atomic-form-input atomic-form-select atomic-form-select-multi'
-          multiple
-          size={Math.min(Math.max(options.length, 2), 6)}
-          value={selected}
-          onChange={e =>
-            onChange(
-              Array.from(e.target.selectedOptions, option => option.value),
-            )
-          }
-        >
-          {options.map(option => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        <MultiSelect
+          options={field.options.options ?? []}
+          value={Array.isArray(value) ? (value as string[]) : []}
+          onChange={onChange}
+          inputId={inputId}
+          labelId={labelId}
+          placeholder={placeholder}
+        />
       );
-    }
 
     case 'likert': {
       const scale = likertScale(field.options);
@@ -324,39 +311,16 @@ export function FieldInput({
       );
     }
 
-    case 'rating': {
-      const max = ratingMax(field.options);
-      const glyphs =
-        RATING_GLYPHS[field.options.icon ?? 'star'] ?? RATING_GLYPHS.star;
-      const current = typeof value === 'number' ? value : 0;
-
+    case 'rating':
       return (
-        <div
-          className='atomic-form-rating'
-          role='radiogroup'
-          aria-labelledby={labelId}
-        >
-          {Array.from({ length: max }, (_, i) => i + 1).map(step => (
-            <label
-              className='atomic-form-rating-step'
-              key={step}
-              title={`${step} / ${max}`}
-            >
-              <input
-                type='radio'
-                name={inputId}
-                aria-label={`${step} out of ${max}`}
-                checked={current === step}
-                onChange={() => onChange(step)}
-              />
-              <span aria-hidden='true'>
-                {step <= current ? glyphs.filled : glyphs.empty}
-              </span>
-            </label>
-          ))}
-        </div>
+        <RatingField
+          field={field}
+          value={value}
+          onChange={onChange}
+          inputId={inputId}
+          labelId={labelId}
+        />
       );
-    }
 
     case 'picture-choice': {
       const options = field.options.options ?? [];
@@ -574,6 +538,67 @@ export function FieldInput({
     default:
       return <></>;
   }
+}
+
+/** Star/heart rating. Hovering a step previews that score by filling every
+ * glyph up to the pointer — the behaviour a rating widget is expected to
+ * have, and the reason this one needs state of its own instead of living in
+ * `FieldInput`'s switch. */
+function RatingField({
+  field,
+  value,
+  onChange,
+  inputId,
+  labelId,
+}: FieldInputProps): JSX.Element {
+  const [hovered, setHovered] = useState<number | undefined>(undefined);
+  const max = ratingMax(field.options);
+  const glyphs =
+    RATING_GLYPHS[field.options.icon ?? 'star'] ?? RATING_GLYPHS.star;
+  const current = typeof value === 'number' ? value : 0;
+  // While hovering, the preview stands in for the stored value.
+  const shown = hovered ?? current;
+
+  return (
+    // Enter is tracked per glyph and leave on a plain `fit-content` wrapper —
+    // one handler for the whole scale, so crossing the gap between two glyphs
+    // can't blank the preview for a frame. Neither element carries a role:
+    // mouse handlers on a non-interactive role (the radiogroup, a label) are
+    // an a11y lint error.
+    <div
+      className='atomic-form-rating'
+      onMouseLeave={() => setHovered(undefined)}
+    >
+      <div
+        className='atomic-form-rating-scale'
+        role='radiogroup'
+        aria-labelledby={labelId}
+      >
+        {Array.from({ length: max }, (_, i) => i + 1).map(step => (
+          <label
+            className={`atomic-form-rating-step${
+              hovered !== undefined && step <= hovered
+                ? ' atomic-form-rating-step-hot'
+                : ''
+            }`}
+            key={step}
+            title={`${step} / ${max}`}
+          >
+            <input
+              type='radio'
+              name={inputId}
+              aria-label={`${step} out of ${max}`}
+              checked={current === step}
+              onChange={() => onChange(step)}
+            />
+            <span aria-hidden='true' onMouseEnter={() => setHovered(step)}>
+              {step <= shown ? glyphs.filled : glyphs.empty}
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 /** `react-phone-number-input` + its flag icons dwarf the rest of this
