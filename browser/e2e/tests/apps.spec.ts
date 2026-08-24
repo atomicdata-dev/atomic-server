@@ -30,6 +30,16 @@ test.describe('apps', () => {
     // An app page is the app: no chrome of its own, just the frame.
     await expect(main.locator('iframe[title="App"]')).toBeVisible();
 
+    // And the frame is the page. An iframe never grows to fit its document,
+    // so a box shorter than the page does not scroll — it clips the app and
+    // leaves dead space underneath. Only the container's own padding should
+    // sit between the bottom of the frame and the bottom of the page.
+    const pageBox = (await main.boundingBox())!;
+    const frameBox = (await main.locator('iframe[title="App"]').boundingBox())!;
+    expect(frameBox.y + frameBox.height).toBeGreaterThan(
+      pageBox.y + pageBox.height - 48,
+    );
+
     // Null-origin, so Playwright reaches it as a frame rather than through
     // the parent's DOM — which is the isolation doing its job.
     const app = page.frameLocator('iframe[title="App"]');
