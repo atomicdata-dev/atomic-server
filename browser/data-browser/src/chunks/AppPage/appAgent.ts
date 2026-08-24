@@ -1,4 +1,8 @@
-import { errorMessageFromResponse, signRequest, type Store } from '@tomic/react';
+import {
+  errorMessageFromResponse,
+  signRequest,
+  type Store,
+} from '@tomic/react';
 
 /**
  * Hands an app's freshly minted key to the node, once.

@@ -124,9 +124,7 @@ test.describe('plugins', () => {
 
     const dialog = page.locator('dialog[open]');
     await expect(dialog.getByText(/does not exist/)).toBeVisible();
-    await expect(
-      dialog.getByRole('button', { name: /Apply/ }),
-    ).toBeDisabled();
+    await expect(dialog.getByRole('button', { name: /Apply/ })).toBeDisabled();
 
     // Cancelling a blocked run still records it: a refusal that leaves no
     // trace reads the same as a plugin that never ran.
@@ -243,4 +241,3 @@ async function setSource(
     await plugin.save();
   }, source);
 }
-

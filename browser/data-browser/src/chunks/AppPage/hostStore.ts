@@ -118,7 +118,9 @@ export async function handleRequest(
     }
 
     case 'get': {
-      const resource = await store.getResource(required(request.subject, 'subject'));
+      const resource = await store.getResource(
+        required(request.subject, 'subject'),
+      );
 
       if (resource.error) throw resource.error;
 
@@ -187,7 +189,9 @@ export async function handleRequest(
       return true;
 
     default:
-      throw new Error(`This app asked for something the host does not do: ${request.op}`);
+      throw new Error(
+        `This app asked for something the host does not do: ${request.op}`,
+      );
   }
 }
 
