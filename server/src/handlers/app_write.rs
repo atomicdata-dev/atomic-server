@@ -20,7 +20,7 @@ use std::collections::HashMap;
 
 use actix_web::{web, HttpResponse};
 use atomic_lib::{
-    agents::ForAgent, db::app_agent::AppAgentKey, hierarchy::check_read, Storelike, Subject,
+    agents::ForAgent, db::app_agent::AppAgentKey, hierarchy::check_write, Storelike, Subject,
 };
 use serde_json::Value as Json;
 
@@ -66,9 +66,15 @@ pub async fn handle_app_write(
 ) -> AtomicServerResult<HttpResponse> {
     let store = &appstate.store;
 
-    // Read rights on the app: opening it is enough to drive it. What it may
-    // then write is the app's business, not this person's — which is the whole
-    // point of the app having an identity.
+    // Write rights on the app, which is what sharing one already means: read
+    // to open and look, write to use it to change things. Someone given
+    // read-only should not be able to add data through the app's buttons.
+    //
+    // Two checks have to pass, and they are different questions. This one asks
+    // whether this person may use the app to write at all. The app's own
+    // rights, checked further down, ask where the app may write — so a person
+    // who may write the whole drive still cannot make a buggy app escape its
+    // own subtree.
     let app_resource = store.get_resource(&body.app.as_str().into()).await?;
 
     let path_and_query = req
@@ -80,7 +86,7 @@ pub async fn handle_app_write(
     let signed_subject = Subject::from_raw(&path_and_query, None).resolve(&context.origin);
 
     let agent = get_client_agent(req.headers(), &appstate, &signed_subject).await?;
-    check_read(store, &app_resource, &agent).await?;
+    check_write(store, &app_resource, &agent).await?;
 
     let key = AppAgentKey::new(&body.drive, &body.app);
     let app_agent = store.get_app_agent_info(&key)?.ok_or_else(|| {
