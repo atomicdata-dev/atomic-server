@@ -10,7 +10,7 @@ import {
   type Resource,
   type Store,
 } from '@tomic/react';
-import { createApp } from '@tomic/lib';
+import { createApp, describeApp, updateApp } from '@tomic/lib';
 import { handOverAppKey } from '@chunks/AppPage/appAgent';
 import { tool } from 'ai';
 import { z } from 'zod';
@@ -100,6 +100,8 @@ export const TOOL_NAMES = {
   RUN_PLUGIN: 'run_plugin',
   SCHEDULE_PLUGIN: 'schedule_plugin',
   CREATE_APP: 'create_app',
+  DESCRIBE_APP: 'describe_app',
+  UPDATE_APP: 'update_app',
 } as const;
 
 /**
@@ -1475,7 +1477,69 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               created: true,
               unattended,
               ...(keyProblem ? { keyProblem } : {}),
-              next: 'Give the rows their fields with add_table_columns on `data`, then tell the user to open the app. To change the app, call create_plugin with the entrypoint subject as `plugin` and the new source.',
+              next: 'Give the rows their fields with add_table_columns on `data`, then tell the user to open the app. To change it later, use update_app.',
+            };
+          } catch (e) {
+            return { error: (e as Error).message };
+          }
+        },
+      }),
+      [TOOL_NAMES.DESCRIBE_APP]: tool({
+        description:
+          "Read an app back: its name, emoji, its full source, and the table and row class its data lives in. Call this BEFORE update_app whenever you did not write the source yourself in this conversation — fixing a bug means editing the code that is actually running, not the code you would have written.",
+        inputSchema: z.object({
+          app: z.string().describe('Subject (or #ref) of the app.'),
+        }),
+        execute: async ({ app: reference }) => {
+          try {
+            const described = await describeApp(
+              store,
+              drive,
+              expandSubject(reference),
+            );
+
+            return shortenRefsDeep(described);
+          } catch (e) {
+            return { error: (e as Error).message };
+          }
+        },
+        strict: true,
+      }),
+      [TOOL_NAMES.UPDATE_APP]: tool({
+        description:
+          "Change an existing app: its source, its name, its emoji, or any combination. Use this to fix a bug, add a feature, or rename — never create_app a second time, which would leave the user with two apps and strand the rows in the first.\n\n" +
+
+          "`source` REPLACES the whole module, so pass the complete file, not a fragment or a diff. Call describe_app first if you do not already have the current source in front of you.\n\n" +
+
+          "The app's table, row class, schema, identity and rights all survive this — only the code changes. So the user's existing rows are still there after a fix, and your new source has to keep reading them the same way.\n\n" +
+
+          "If the fix needs a field the rows do not have yet, add it with add_table_columns first, then write source that uses it.",
+        inputSchema: z.object({
+          app: z.string().describe('Subject (or #ref) of the app to change.'),
+          source: z
+            .string()
+            .optional()
+            .describe(
+              'The complete replacement module, exporting `view({root, store})`. Omit to leave the code alone.',
+            ),
+          name: z.string().optional().describe('A new display name.'),
+          emoji: z.string().optional().describe('A new emoji.'),
+        }),
+        execute: async ({ app: reference, source, name, emoji }) => {
+          try {
+            const updated = await updateApp(store, drive, {
+              app: expandSubject(reference),
+              source,
+              name,
+              emoji,
+            });
+
+            return {
+              app: shortenSubject(updated.app),
+              updated: true,
+              data: shortenSubject(updated.data ?? ''),
+              rowClass: shortenSubject(updated.rowClass ?? ''),
+              next: 'Tell the user to reload the app to see the change.',
             };
           } catch (e) {
             return { error: (e as Error).message };

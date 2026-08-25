@@ -6,6 +6,7 @@ import { issueAccessAgent } from './issue-access-agent.js';
 import type { Store } from './store.js';
 import {
   ensureSchema,
+  findSchema,
   type EnsuredSchema,
   type SchemaStore,
 } from './plugin-schema.js';
@@ -257,6 +258,131 @@ async function appIdentitiesFolder(
   await driveResource.save();
 
   return folder.subject;
+}
+
+/** What an app is made of, as much as a reader (or a model) needs to revise it. */
+export interface AppDescription {
+  app: string;
+  name: string;
+  emoji?: string;
+  description?: string;
+  /** The resource holding the source. Where `updateApp` writes. */
+  entrypoint?: string;
+  /** The module the app opens to, verbatim. */
+  source?: string;
+  /** The table this app's rows live in. */
+  data?: string;
+  /** The class those rows are, and what one of them is called. */
+  rowClass?: string;
+  rowName?: string;
+}
+
+/**
+ * Reads an app back, source included.
+ *
+ * An app that cannot be read cannot be revised, and the only repair for a
+ * broken one would be to delete it and start over — which throws away the
+ * user's rows along with the bug.
+ */
+export async function describeApp(
+  store: SchemaStore,
+  drive: string,
+  app: string,
+): Promise<AppDescription> {
+  const schema = await findSchema(store, drive, pluginSchema());
+  const resource = await store.getResource(app);
+
+  const entrypointProp = schema.properties?.entrypoint;
+  const entrypoint = entrypointProp
+    ? resource.get(entrypointProp)
+    : undefined;
+
+  const data = schema.properties?.['app-data']
+    ? resource.get(schema.properties['app-data'])
+    : undefined;
+
+  const description: AppDescription = {
+    app,
+    name: asString(resource.get(core.properties.name)) ?? '',
+    emoji: asString(resource.get(dataBrowser.properties.emoji)),
+    description: asString(resource.get(core.properties.description)),
+    entrypoint: asString(entrypoint),
+    data: asString(data),
+  };
+
+  const sourceProp = schema.properties?.['plugin-source'];
+
+  if (description.entrypoint && sourceProp) {
+    const script = await store.getResource(description.entrypoint);
+    description.source = asString(script.get(sourceProp));
+  }
+
+  if (description.data) {
+    const table = await store.getResource(description.data);
+    description.rowClass = asString(table.get(core.properties.classtype));
+
+    if (description.rowClass) {
+      const rowClass = await store.getResource(description.rowClass);
+      description.rowName = asString(rowClass.get(core.properties.name));
+    }
+  }
+
+  return description;
+}
+
+/**
+ * Replaces an app's source.
+ *
+ * Writes to the entry point rather than to the app, so an app's rows, its
+ * schema, its agent and its rights all survive a rewrite — revising the code
+ * is not the same act as replacing the app, and only one of the two should
+ * ever lose data.
+ */
+export async function updateApp(
+  store: SchemaStore,
+  drive: string,
+  options: { app: string; source?: string; name?: string; emoji?: string },
+): Promise<AppDescription> {
+  const current = await describeApp(store, drive, options.app);
+
+  if (options.source !== undefined) {
+    if (!current.entrypoint) {
+      throw new Error(
+        'This app has no entry point, so there is no source to replace.',
+      );
+    }
+
+    const schema = await findSchema(store, drive, pluginSchema());
+    const sourceProp = schema.properties?.['plugin-source'];
+
+    if (!sourceProp) {
+      throw new Error('This drive has no plugin schema, so apps cannot be read.');
+    }
+
+    const script = await store.getResource(current.entrypoint);
+    await script.set(sourceProp, options.source);
+    await script.save();
+  }
+
+  if (options.name !== undefined || options.emoji !== undefined) {
+    const resource = await store.getResource(options.app);
+
+    if (options.name !== undefined) {
+      await resource.set(core.properties.name, options.name);
+    }
+
+    if (options.emoji !== undefined) {
+      await resource.set(dataBrowser.properties.emoji, options.emoji);
+    }
+
+    await resource.save();
+  }
+
+  return describeApp(store, drive, options.app);
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 /** A shortname an ontology will accept: lowercase, letters, digits, dashes. */
