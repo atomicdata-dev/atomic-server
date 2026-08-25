@@ -1268,14 +1268,65 @@ async fn form_submission_flow() {
     picture_prop
         .set(
             urls::DATATYPE_PROP.into(),
-            Value::AtomicUrl(urls::STRING.into()),
+            Value::AtomicUrl(urls::RESOURCE_ARRAY.into()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop
+        .set(
+            urls::CLASSTYPE_PROP.into(),
+            Value::AtomicUrl(urls::TAG.into()),
             store,
         )
         .await
         .unwrap();
     picture_prop.save_locally(store).await.unwrap();
 
+    // Options are Tags on the property's `allowsOnly`; a picture-choice
+    // option's image is the Tag's `cover-image`.
     let referenced_image = "https://example.com/files/cat";
+    let mut tag_subjects = Vec::new();
+    for (name, image) in [("Cat", Some(referenced_image)), ("Dog", None)] {
+        let mut tag = Resource::new_instance(urls::TAG, store).await.unwrap();
+        tag.set(urls::NAME.into(), Value::String(name.into()), store)
+            .await
+            .unwrap();
+        tag.set(
+            urls::SHORTNAME.into(),
+            Value::Slug(name.to_lowercase()),
+            store,
+        )
+        .await
+        .unwrap();
+        if let Some(image) = image {
+            tag.set(
+                urls::COVER_IMAGE.into(),
+                Value::AtomicUrl(image.into()),
+                store,
+            )
+            .await
+            .unwrap();
+        }
+        tag.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(picture_prop.get_subject().to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+        tag.save_locally(store).await.unwrap();
+        tag_subjects.push(tag.get_subject().to_string());
+    }
+    picture_prop
+        .set(
+            urls::ALLOWS_ONLY.into(),
+            Value::ResourceArray(tag_subjects.iter().cloned().map(Into::into).collect()),
+            store,
+        )
+        .await
+        .unwrap();
+    picture_prop.save_locally(store).await.unwrap();
     let mut picture_field = Resource::new_instance(urls::FORM_FIELD, store)
         .await
         .unwrap();
@@ -1295,17 +1346,6 @@ async fn form_submission_flow() {
         .set(
             urls::FORM_FIELD_TYPE.into(),
             Value::String("picture-choice".into()),
-            store,
-        )
-        .await
-        .unwrap();
-    picture_field
-        .set(
-            urls::FORM_FIELD_OPTIONS.into(),
-            Value::Json(serde_json::json!({
-                "options": ["Cat", "Dog"],
-                "optionImages": [referenced_image, ""],
-            })),
             store,
         )
         .await
@@ -1331,16 +1371,20 @@ async fn form_submission_flow() {
     assert!(resp.status().is_success());
     let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
     assert_eq!(
-        body["pages"][0]["blocks"][1]["options"]["optionImages"],
+        body["pages"][0]["blocks"][1]["options"]["options"],
         serde_json::json!([
-            format!(
-                "/form/{}/image?file={}",
-                slug,
-                urlencoding::encode(referenced_image)
-            ),
-            ""
+            {
+                "value": tag_subjects[0],
+                "label": "Cat",
+                "image": format!(
+                    "/form/{}/image?file={}",
+                    slug,
+                    urlencoding::encode(referenced_image)
+                ),
+            },
+            { "value": tag_subjects[1], "label": "Dog" },
         ]),
-        "option image subjects should be rewritten into gated URLs"
+        "tags resolve into inline options, with image subjects rewritten into gated URLs"
     );
 
     let req = test::TestRequest::get()

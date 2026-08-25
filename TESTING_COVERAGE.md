@@ -595,6 +595,16 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Extended question types: validation + coercion per type (phone/url shape, currency bounds, dropdown membership, likert/rating range, matrix rows/columns + completeness, table columns/types/row bounds, address subfields), and all-empty composites reading as unanswered | `server/src/forms.rs` (`phone_field_accepts_common_shapes_and_rejects_junk` … `all_empty_composites_count_as_unanswered`) |
 | Extended types route onto the existing summary shapes (choice counts / histogram / answer sample) | `server/src/forms.rs::extended_types_reuse_the_existing_summary_shapes` |
 | `picture-choice` option images: subjects rewritten into `/form/{id}/image?file=`, and that route refuses files the form doesn't reference | `server/src/forms.rs::rewrite_option_images_only_touches_option_image_subjects` + `server/src/tests.rs::form_submission_flow` (step 3d) |
+| Choice options resolve from the mapped SelectProperty's `allowsOnly` Tags into inline `{value,label,color,emoji,image}` objects, in order, with unset keys omitted | `server/src/forms.rs::resolves_choice_options_from_the_mapped_propertys_tags` |
+| Option membership fails closed: a question with no options allows nothing, and a *label* is not an answer (answers are option subjects) | `server/src/forms.rs::choice_options_are_empty_when_the_property_allows_nothing` + `browser/form-renderer/src/validation.test.ts` ("choice option membership") |
+| Non-choice questions keep their options bag untouched by option resolution | `server/src/forms.rs::non_choice_fields_keep_their_options_bag` |
+| A question can borrow another column's Tags (`optionsSource.property`) — the source's list wins over the question's own | `server/src/forms.rs::choice_options_can_mirror_another_columns_tags` |
+| A question can offer a table's *rows* (`optionsSource.table`) — answers are row subjects, a row *label* is not an answer | `server/src/forms.rs::choice_options_can_be_the_rows_of_a_table` |
+| An `optionsSource` pointing at a deleted Property/Table fails closed (empty list) rather than falling back to the question's own tags | `server/src/forms.rs::an_unresolvable_options_source_allows_nothing` |
+| A row whose label column is empty is left out of the options instead of falling back to its `name` | `server/src/forms.rs::rows_the_label_column_is_empty_for_are_not_offered` |
+| A freshly added choice question has *no* options (no placeholder Tag resources) | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…", step 4) |
+| Every choice type stores a `resourceArray` of option subjects, single-pick included | `server/src/forms.rs::dropdowns_enforce_option_membership` |
+| Renaming an option in the builder rewrites the label in place (options are Tags, not copied strings) | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…", step 4) |
 | Builder can add every question type and they survive a reload | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…") |
 | `phone` accepts both the renderer's E.164 output and loosely formatted national numbers, and rejects a half-typed one | `browser/form-renderer/src/validation.test.ts` + `server/src/forms.rs::phone_field_accepts_common_shapes_and_rejects_junk` |
 | `country` stores an ISO 3166-1 code: the list is complete and named, names localize, and a country *name* is rejected | `browser/form-renderer/src/validation.test.ts` + `server/src/forms.rs::country_field_takes_an_iso_code_and_rejects_a_name` |
@@ -611,6 +621,25 @@ option-image *picker* in `PictureChoiceOptions.tsx` (uploading or picking a file
 for an option) is only exercised manually; `choice-matrix` / `table-input` /
 `picture-choice` are rendered and validated but never submitted end-to-end in
 e2e.
+
+Not covered (options as resources): that a form's choice column is usable *as a
+table column* — picking its tags in `SelectCell`, grouping a kanban by it — is
+untested, even though making that work is the reason the mapped Property is a
+real SelectProperty. `max` enforcement in `SelectCell` (how single-pick is
+expressed) has no test either. Deleting an option that submissions already
+reference folds those answers into the summary's "Other" bucket; that path is
+reasoned about but not pinned by a test.
+
+Not covered (options from another table): the whole builder side is manual —
+`LinkOptionsDialog` (picking a table + column), the "linked to X" panel and
+unlinking, and everything `applyOptionsSource` does to the mapped Property
+(mirroring `allowsOnly`, switching to a relation column for row-sourced
+questions, destroying the question's own orphaned Tags). The client mirror
+`rowOptions`/`tagOptions` in `buildFormDefinition.ts` has no test either — the
+same hand-mirroring drift as the rest of that file. `OPTIONS_ROW_LIMIT`
+truncation (a table with more than 1,000 rows silently offering only the first
+1,000, and rejecting a pick past the cap) is untested, and the preview
+deliberately applies no cap at all.
 
 Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it); add/delete-page write ordering in `PageTabBar` (both now `await` the form's `form-pages` save — add before selecting, delete before destroying — but no test pins that ordering).
 

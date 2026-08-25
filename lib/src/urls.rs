@@ -64,6 +64,9 @@ pub const IS_LOCKED: &str = "https://atomicdata.dev/properties/isLocked";
 pub const DATATYPE_PROP: &str = "https://atomicdata.dev/properties/datatype";
 pub const CLASSTYPE_PROP: &str = "https://atomicdata.dev/properties/classtype";
 pub const ALLOWS_ONLY: &str = "https://atomicdata.dev/properties/allowsOnly";
+// ... for Tags
+pub const COLOR: &str = "https://atomicdata.dev/properties/color";
+pub const EMOJI: &str = "https://atomicdata.dev/properties/emoji";
 // ... for Classes
 pub const REQUIRES: &str = "https://atomicdata.dev/properties/requires";
 pub const RECOMMENDS: &str = "https://atomicdata.dev/properties/recommends";

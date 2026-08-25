@@ -8358,5 +8358,75 @@ msgstr "Sin predeterminado"
 msgid "Default country"
 msgstr "País predeterminado"
 
-#~ msgid "Page name"
-#~ msgstr "Nombre de página"
+msgid "Page name"
+msgstr "Nombre de página"
+
+#: src/components/Tag/Tag.tsx
+msgid "Tag name"
+msgstr "Nombre de la etiqueta"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkableTagList.tsx
+msgid "Change the linked table"
+msgstr "Cambiar la tabla vinculada"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+#: src/chunks/FormBuilder/FieldOptions/LinkableTagList.tsx
+msgid "Link options to a table"
+msgstr "Vincular opciones a una tabla"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkedOptions.tsx
+msgid "The options are that column’s tags. Add or rename them on the table."
+msgstr "Las opciones son las etiquetas de esa columna. Añádelas o renómbralas en la tabla."
+
+#: src/chunks/FormBuilder/FieldOptions/LinkedOptions.tsx
+msgid "Every row of that table is an option, so answers link back to the row. The list follows the table."
+msgstr "Cada fila de esa tabla es una opción, por lo que las respuestas se vinculan de vuelta a la fila. La lista sigue la tabla."
+
+#: src/chunks/FormBuilder/FieldOptions/LinkedOptions.tsx
+msgid "<0/> Unlink"
+msgstr "<0/> Desvincular"
+
+#. 0: ' '
+#: src/chunks/FormBuilder/FieldOptions/LinkedOptions.tsx
+msgid "Linked to <0/> in{0} <1/>"
+msgstr "Vinculado a <0/> en {0} <1/>"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "The table these options come from."
+msgstr "La tabla de la que provienen estas opciones."
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "Column"
+msgstr "Columna"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "A select column contributes its tags. Any other column turns each row into an option, labelled by that column."
+msgstr "Una columna de selección contribuye con sus etiquetas. Cualquier otra columna convierte cada fila en una opción, etiquetada por esa columna."
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "This table has no columns to link to."
+msgstr "Esta tabla no tiene columnas a las que vincular."
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "Everyone who opens this form sees every row of"
+msgstr "Todos los que abren este formulario ven cada fila de"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "as an option. Only link a table whose contents you are happy to make public."
+msgstr "como opción. Solo vincule una tabla cuyos contenidos esté dispuesto a hacer públicos."
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "This publishes the rows"
+msgstr "Esto publica las filas"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "Link options"
+msgstr "Opciones de vínculo"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "Use its tags as the options"
+msgstr "Usar sus etiquetas como opciones"
+
+#: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
+msgid "Use each row, labelled by this column"
+msgstr "Usar cada fila, etiquetada por esta columna"

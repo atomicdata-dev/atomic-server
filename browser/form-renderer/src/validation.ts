@@ -116,19 +116,19 @@ function isEmpty(value: unknown): boolean {
   return isEmptyValue(value);
 }
 
+/** Checks picked option subjects against the question's resolved options.
+ * Mirrors `check_membership` in `server/src/forms.rs`, including its
+ * fail-closed empty case: options come from `allowsOnly`, so "no options"
+ * means there is nothing to pick, not that anything goes. */
 function checkMembership(
   items: string[],
   options: FieldBlock['options'],
 ): string | null {
-  const allowed = options.options;
-
-  if (!allowed) {
-    return null;
-  }
+  const allowed = (options.options ?? []).map(option => option.value);
 
   for (const item of items) {
     if (!allowed.includes(item)) {
-      return `'${item}' is not one of the allowed options`;
+      return 'Not one of the allowed options';
     }
   }
 

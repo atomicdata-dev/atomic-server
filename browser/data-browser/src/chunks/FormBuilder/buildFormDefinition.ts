@@ -1,5 +1,16 @@
-import { core, forms, server, Store, type JSONValue } from '@tomic/react';
+import {
+  CollectionBuilder,
+  core,
+  dataBrowser,
+  forms,
+  server,
+  Store,
+  type JSONValue,
+} from '@tomic/react';
+import { isChoiceField } from '@tomic/form-renderer';
 import type {
+  FieldOption,
+  OptionsSource,
   FieldOptions,
   FieldType,
   FormBlock,
@@ -10,6 +21,7 @@ import type {
 } from '@tomic/form-renderer';
 import { parseStylingValue } from './SettingsTab';
 import { parseFieldOptions } from './FieldOptions/useFieldOptions';
+import { OPTIONS_SOURCE_KEY } from './FieldOptions/optionsSource';
 
 /**
  * Client-side mirror of `atomic_lib::forms::build_form_definition`
@@ -197,8 +209,15 @@ async function buildBlock(
     };
   }
 
-  const options = (await resolveOptionImages(
+  const mapsTo = (field.get(forms.properties.formMapsTo) as string) ?? '';
+  const type =
+    (field.get(forms.properties.formFieldType) as FieldType | undefined) ??
+    'short-text';
+
+  const options = (await resolveChoiceOptions(
     store,
+    type,
+    mapsTo,
     parseFieldOptions(
       field.get(forms.properties.formFieldOptions) as JSONValue | undefined,
     ),
@@ -206,12 +225,10 @@ async function buildBlock(
 
   return {
     kind: 'field',
-    mapsTo: (field.get(forms.properties.formMapsTo) as string) ?? '',
+    mapsTo,
     label: (field.get(core.properties.name) as string) ?? '',
     description: field.get(core.properties.description) as string | undefined,
-    type:
-      (field.get(forms.properties.formFieldType) as FieldType | undefined) ??
-      'short-text',
+    type,
     required: Boolean(field.get(forms.properties.required)),
     options,
     ...(conditions.length > 0 ? { conditions } : {}),
@@ -219,31 +236,159 @@ async function buildBlock(
 }
 
 /**
- * `picture-choice` stores its option images as File subjects. The server
- * rewrites them into publish-gated `/form/{id}/image?file=…` URLs for
- * agent-less visitors (`fill_image_url`); the preview instead uses the File's
- * own `downloadURL`, since the builder is authenticated — same split as the
- * cover image in `buildStyling`.
+ * Mirrors `resolve_choice_options` (server/src/forms.rs): a choice question's
+ * options resolved into inline option objects, from wherever its
+ * `optionsSource` points — by default the Tags on its own mapped Property's
+ * `allowsOnly`.
+ *
+ * One deliberate difference, the same split as the cover image in
+ * `buildStyling`: a `picture-choice` option's image is a File subject, which
+ * the server rewrites into a publish-gated `/form/{id}/image?file=…` URL for
+ * agent-less visitors (`fill_image_url`). The preview uses the File's own
+ * `downloadURL` instead, since the builder is authenticated.
  */
-async function resolveOptionImages(
+async function resolveChoiceOptions(
   store: Store,
+  type: FieldType,
+  mapsTo: string,
   options: Record<string, JSONValue>,
 ): Promise<Record<string, JSONValue>> {
-  const images = options.optionImages;
-
-  if (!Array.isArray(images)) {
+  if (!isChoiceField(type)) {
     return options;
   }
 
-  const resolved = await Promise.all(
-    images.map(async subject => {
-      if (typeof subject !== 'string' || subject === '') return '';
+  const source = (options[OPTIONS_SOURCE_KEY] ?? {}) as OptionsSource;
 
-      const file = await store.getResource(subject);
+  let resolved: FieldOption[];
 
-      return (file.get(server.properties.downloadUrl) as string) ?? '';
-    }),
+  if (source.property) {
+    resolved = await tagOptions(store, source.property);
+  } else if (source.table) {
+    resolved = await rowOptions(store, source.table, source.labelProperty);
+  } else if (mapsTo) {
+    resolved = await tagOptions(store, mapsTo);
+  } else {
+    return options;
+  }
+
+  return { ...options, options: resolved as unknown as JSONValue };
+}
+
+const nonEmpty = (value: unknown) =>
+  typeof value === 'string' && value !== '' ? value : undefined;
+
+/** Mirrors `tag_options` (server/src/forms.rs). */
+async function tagOptions(
+  store: Store,
+  propertySubject: string,
+): Promise<FieldOption[]> {
+  const property = await store.getResource(propertySubject);
+  const tagSubjects =
+    (property.get(core.properties.allowsOnly) as string[] | undefined) ?? [];
+
+  return Promise.all(
+    tagSubjects.map(async subject =>
+      buildOption(store, await store.getResource(subject), subject),
+    ),
   );
+}
 
-  return { ...options, optionImages: resolved };
+/**
+ * Mirrors `row_options` (server/src/forms.rs): every row of the table becomes
+ * an option whose `value` is the row's subject, labelled by `labelProperty`.
+ *
+ * The row query is the same `parent` + `isA` pair the server uses (and
+ * `DeleteFormDialog`, and `useSubmissionCount`). No cap here, unlike the
+ * server's `OPTIONS_ROW_LIMIT` — the preview runs against the builder's own
+ * drive, and a mismatch shows up as a longer list than the published form
+ * offers rather than a shorter one.
+ */
+async function rowOptions(
+  store: Store,
+  tableSubject: string,
+  labelProperty: string | undefined,
+): Promise<FieldOption[]> {
+  const table = await store.getResource(tableSubject);
+  const rowClass = nonEmpty(table.get(core.properties.classtype));
+
+  if (!rowClass) return [];
+
+  const collection = await new CollectionBuilder(store)
+    .setProperty(core.properties.parent)
+    .setValue(tableSubject)
+    .setFilters([{ property: core.properties.isA, value: rowClass }])
+    .buildAndFetch();
+
+  const out: FieldOption[] = [];
+
+  for await (const rowSubject of collection) {
+    const row = await store.getResource(rowSubject);
+    const label = labelProperty ? rowLabel(row, labelProperty) : undefined;
+
+    // A row the picked column is empty for is not offered — see `rowLabel`.
+    if (labelProperty && label === undefined) continue;
+
+    out.push(await buildOption(store, row, rowSubject, label));
+  }
+
+  return out;
+}
+
+/**
+ * Mirrors `row_label` (server/src/forms.rs): the picked column's value as one
+ * line of text, or `undefined` — which means the row is left out of the list
+ * entirely rather than labelled from some other column.
+ */
+function rowLabel(
+  row: Awaited<ReturnType<Store['getResource']>>,
+  labelProperty: string,
+): string | undefined {
+  const value = row.get(labelProperty);
+
+  if (typeof value === 'string') return nonEmpty(value.trim());
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  // Arrays and objects (a relation, a nested resource, a JSON blob) have no
+  // one-line rendering, so they read as no label at all.
+  return undefined;
+}
+
+async function buildOption(
+  store: Store,
+  resource: Awaited<ReturnType<Store['getResource']>>,
+  subject: string,
+  /** Already-resolved label ({@link rowLabel}); absent for Tags, which title
+   * themselves. */
+  resolvedLabel?: string,
+): Promise<FieldOption> {
+  const imageSubject = nonEmpty(resource.get(forms.properties.coverImage));
+  const image = imageSubject
+    ? ((await store.getResource(imageSubject)).get(
+        server.properties.downloadUrl,
+      ) as string | undefined)
+    : undefined;
+
+  const option: FieldOption = {
+    value: subject,
+    // Same precedence as `useTitle`: the free-text name, else the slug.
+    label:
+      resolvedLabel ??
+      nonEmpty(resource.get(core.properties.name)) ??
+      nonEmpty(resource.get(core.properties.shortname)) ??
+      subject,
+  };
+
+  const color = nonEmpty(resource.get(dataBrowser.properties.color));
+  const emoji = nonEmpty(resource.get(dataBrowser.properties.emoji));
+
+  if (color) option.color = color;
+
+  if (emoji) option.emoji = emoji;
+
+  if (image) option.image = image;
+
+  return option;
 }

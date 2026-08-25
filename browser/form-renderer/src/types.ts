@@ -34,6 +34,58 @@ export interface TableColumn {
   type?: 'text' | 'number';
 }
 
+/** The question types whose options are Tag resources on the mapped
+ * Property's `allowsOnly`. Mirrors `CHOICE_FIELD_TYPES` in
+ * `server/src/forms.rs`. */
+export const CHOICE_FIELD_TYPES: FieldType[] = [
+  'radio',
+  'multi-select',
+  'dropdown',
+  'dropdown-multi',
+  'picture-choice',
+];
+
+export function isChoiceField(type: string): boolean {
+  return (CHOICE_FIELD_TYPES as string[]).includes(type);
+}
+
+/**
+ * One resolved choice option. Mirrors `FieldOption` in `server/src/forms.rs`,
+ * which resolves these from the Tags on the mapped Property's `allowsOnly` —
+ * a published form's visitor has no agent and could not fetch them itself.
+ *
+ * `value` is the Tag's subject: what the answer stores and what conditions
+ * compare against. Everything user-facing renders `label`.
+ */
+export interface FieldOption {
+  value: string;
+  label: string;
+  color?: string;
+  emoji?: string;
+  /** `picture-choice`: the Tag's cover image, already rewritten into a URL the
+   * visitor can fetch (`/form/{id}/image?file=…`). */
+  image?: string;
+}
+
+/** An option's display text. Matches `useTagData`, which prefixes the emoji. */
+export function optionText(option: FieldOption): string {
+  return option.emoji ? `${option.emoji} ${option.label}` : option.label;
+}
+
+/** Where a choice question's options come from, when they are not the Tags on
+ * its own mapped Property. Mirrors [OPTIONS_SOURCE_KEY] in
+ * `server/src/forms.rs` and `OptionsSource` in the builder
+ * (`chunks/FormBuilder/FieldOptions/optionsSource.ts`).
+ *
+ * `property` set → another column's Tags. Otherwise `table` alone → that
+ * table's rows, labelled by `labelProperty`. `table` is stored in both cases
+ * (the builder picks a table first) and ignored when `property` is set. */
+export interface OptionsSource {
+  table?: string;
+  property?: string;
+  labelProperty?: string;
+}
+
 /** The `form-field-options` bag. Every key is type-specific; a field only
  * ever reads the keys its own type defines. Kept flat (rather than a
  * discriminated union per type) because that is how the property is stored
@@ -42,7 +94,14 @@ export interface FieldOptions {
   placeholder?: string;
   min?: number;
   max?: number;
-  options?: string[];
+  /** Choice questions: the resolved options, in `allowsOnly` order. */
+  options?: FieldOption[];
+  /** Choice questions: where {@link FieldOptions.options} was resolved from,
+   * when it is not the question's own column. Mirrors `OPTIONS_SOURCE_KEY` in
+   * `server/src/forms.rs`. Builder-facing only — by the time a definition
+   * reaches the renderer the options are already resolved, whatever the
+   * source. */
+  optionsSource?: OptionsSource;
   defaultValue?: boolean;
   /** currency: ISO 4217-ish code, e.g. `EUR`. Rendered as a symbol when known. */
   currency?: string;
@@ -56,10 +115,6 @@ export interface FieldOptions {
   maxLabel?: string;
   /** rating: glyph to render. */
   icon?: 'star' | 'heart' | string;
-  /** picture-choice: image URLs, positionally matched to `options`. Filled in
-   * by the server (`/form/{id}/image?file=…`) or, in the builder preview, with
-   * the File's own `downloadURL`. Entries may be empty for option-without-image. */
-  optionImages?: (string | null)[];
   /** choice-matrix: statements (one per row) and the scale shared by them. */
   rows?: string[];
   columns?: string[] | TableColumn[];

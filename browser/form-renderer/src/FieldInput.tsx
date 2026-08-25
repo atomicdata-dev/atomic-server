@@ -3,6 +3,7 @@ import { CountrySelect } from './CountrySelect.js';
 import { MultiSelect, SingleSelect } from './SelectMenu.js';
 import {
   ADDRESS_FIELDS,
+  optionText,
   type AddressValue,
   type FieldBlock,
   type FieldOptions,
@@ -213,14 +214,14 @@ export function FieldInput({
           aria-labelledby={labelId}
         >
           {(field.options.options ?? []).map(option => (
-            <label className='atomic-form-choice-row' key={option}>
+            <label className='atomic-form-choice-row' key={option.value}>
               <input
                 type='radio'
                 name={inputId}
-                checked={value === option}
-                onChange={() => onChange(option)}
+                checked={value === option.value}
+                onChange={() => onChange(option.value)}
               />
-              <span>{option}</span>
+              <span>{optionText(option)}</span>
             </label>
           ))}
         </div>
@@ -232,19 +233,19 @@ export function FieldInput({
       return (
         <div className='atomic-form-choice-group' aria-labelledby={labelId}>
           {(field.options.options ?? []).map(option => (
-            <label className='atomic-form-choice-row' key={option}>
+            <label className='atomic-form-choice-row' key={option.value}>
               <input
                 type='checkbox'
-                checked={selected.includes(option)}
+                checked={selected.includes(option.value)}
                 onChange={e =>
                   onChange(
                     e.target.checked
-                      ? [...selected, option]
-                      : selected.filter(o => o !== option),
+                      ? [...selected, option.value]
+                      : selected.filter(v => v !== option.value),
                   )
                 }
               />
-              <span>{option}</span>
+              <span>{optionText(option)}</span>
             </label>
           ))}
         </div>
@@ -324,7 +325,6 @@ export function FieldInput({
 
     case 'picture-choice': {
       const options = field.options.options ?? [];
-      const images = field.options.optionImages ?? [];
 
       return (
         <div
@@ -332,23 +332,25 @@ export function FieldInput({
           role='radiogroup'
           aria-labelledby={labelId}
         >
-          {options.map((option, index) => (
+          {options.map(option => (
             <label
-              className={`atomic-form-picture-card${value === option ? ' atomic-form-picture-card-selected' : ''}`}
-              key={option}
+              className={`atomic-form-picture-card${value === option.value ? ' atomic-form-picture-card-selected' : ''}`}
+              key={option.value}
             >
               <input
                 type='radio'
                 name={inputId}
-                checked={value === option}
-                onChange={() => onChange(option)}
+                checked={value === option.value}
+                onChange={() => onChange(option.value)}
               />
-              {images[index] ? (
-                <img src={images[index] as string} alt='' loading='lazy' />
+              {option.image ? (
+                <img src={option.image} alt='' loading='lazy' />
               ) : (
                 <span className='atomic-form-picture-placeholder' />
               )}
-              <span className='atomic-form-picture-label'>{option}</span>
+              <span className='atomic-form-picture-label'>
+                {optionText(option)}
+              </span>
             </label>
           ))}
         </div>

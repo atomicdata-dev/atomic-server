@@ -1,10 +1,16 @@
 import { core, forms, Resource, useResource, useStore } from '@tomic/react';
 import { useCallback } from 'react';
-import { createPropertyOnClass } from '../TablePage/Kanban/createSelectProperty';
 import {
+  createPropertyOnClass,
+  createSelectPropertyOnClass,
+} from '../TablePage/Kanban/createSelectProperty';
+import {
+  DEFAULT_CHOICE_TAGS,
   FIELD_TYPE_DEFAULT_OPTIONS,
   FIELD_TYPE_TO_DATATYPE,
+  isChoiceFieldType,
   isLayoutType,
+  SINGLE_CHOICE_FIELD_TYPES,
   type AddableFieldType,
 } from './fieldTypes';
 
@@ -42,10 +48,25 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
         });
         await field.save();
       } else {
-        const propertySubject = await createPropertyOnClass(store, dataClass, {
-          name: opts.label,
-          datatype: FIELD_TYPE_TO_DATATYPE[opts.type],
-        });
+        // A choice question's column is an ordinary enum column: a
+        // SelectProperty whose `allowsOnly` Tags *are* the question's options.
+        // That is what gives form answers tag pills, colors and kanban
+        // grouping, and what lets renaming an option leave past submissions
+        // reading correctly.
+        const propertySubject = isChoiceFieldType(opts.type)
+          ? (
+              await createSelectPropertyOnClass(store, dataClass, {
+                name: opts.label,
+                tags: DEFAULT_CHOICE_TAGS.map(name => ({ name })),
+                max: SINGLE_CHOICE_FIELD_TYPES.includes(opts.type)
+                  ? 1
+                  : undefined,
+              })
+            ).subject
+          : await createPropertyOnClass(store, dataClass, {
+              name: opts.label,
+              datatype: FIELD_TYPE_TO_DATATYPE[opts.type],
+            });
 
         field = await store.newResource({
           parent: page.subject,

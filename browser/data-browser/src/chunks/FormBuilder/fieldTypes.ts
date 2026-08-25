@@ -83,6 +83,40 @@ export function isLayoutType(type: AddableFieldType): type is FormLayoutType {
   return type === 'heading' || type === 'paragraph';
 }
 
+/** The question types whose options are Tag resources on the mapped
+ * Property's `allowsOnly`, making that Property a SelectProperty. Mirrors
+ * `CHOICE_FIELD_TYPES` in `server/src/forms.rs`. */
+export const CHOICE_FIELD_TYPES: FormFieldType[] = [
+  'radio',
+  'multi-select',
+  'dropdown',
+  'dropdown-multi',
+  'picture-choice',
+];
+
+export function isChoiceFieldType(type: AddableFieldType): boolean {
+  return (CHOICE_FIELD_TYPES as string[]).includes(type);
+}
+
+/** The choice types that accept exactly one option. The mapped Property is a
+ * SelectProperty either way — always a `resourceArray`, as everywhere else in
+ * the app — so single-pick is expressed as `max: 1`. */
+export const SINGLE_CHOICE_FIELD_TYPES: FormFieldType[] = [
+  'radio',
+  'dropdown',
+  'picture-choice',
+];
+
+/**
+ * The options a freshly created choice question starts with, as Tag names.
+ *
+ * Deliberately empty. Every option is a real Tag resource, and the first thing
+ * many questions do is get linked to another table's column — which deletes
+ * whatever placeholders were seeded here. Starting empty means the builder
+ * never creates resources nobody asked for.
+ */
+export const DEFAULT_CHOICE_TAGS: string[] = [];
+
 /** Maps a question type to the `Datatype` of the Property generated for it. */
 export const FIELD_TYPE_TO_DATATYPE: Record<FormFieldType, Datatype> = {
   'short-text': Datatype.STRING,
@@ -92,17 +126,17 @@ export const FIELD_TYPE_TO_DATATYPE: Record<FormFieldType, Datatype> = {
   date: Datatype.DATE,
   datetime: Datatype.TIMESTAMP,
   checkbox: Datatype.BOOLEAN,
-  radio: Datatype.STRING,
-  'multi-select': Datatype.JSON,
+  radio: Datatype.RESOURCEARRAY,
+  'multi-select': Datatype.RESOURCEARRAY,
   phone: Datatype.STRING,
   country: Datatype.STRING,
   url: Datatype.STRING,
   currency: Datatype.FLOAT,
-  dropdown: Datatype.STRING,
-  'dropdown-multi': Datatype.JSON,
+  dropdown: Datatype.RESOURCEARRAY,
+  'dropdown-multi': Datatype.RESOURCEARRAY,
   likert: Datatype.INTEGER,
   rating: Datatype.INTEGER,
-  'picture-choice': Datatype.STRING,
+  'picture-choice': Datatype.RESOURCEARRAY,
   'choice-matrix': Datatype.JSON,
   'table-input': Datatype.JSON,
   address: Datatype.JSON,
@@ -117,24 +151,21 @@ export const FIELD_TYPE_DEFAULT_OPTIONS: Record<FormFieldType, JSONValue> = {
   date: {},
   datetime: {},
   checkbox: { defaultValue: false },
-  radio: { options: ['Option 1', 'Option 2'] },
-  'multi-select': { options: ['Option 1', 'Option 2'] },
+  radio: {},
+  'multi-select': {},
   phone: { placeholder: '' },
   country: { placeholder: '' },
   url: { placeholder: 'https://' },
   currency: { currency: 'EUR', placeholder: '' },
-  dropdown: { options: ['Option 1', 'Option 2'] },
-  'dropdown-multi': { options: ['Option 1', 'Option 2'] },
+  dropdown: {},
+  'dropdown-multi': {},
   likert: {
     scale: 5,
     minLabel: 'Strongly disagree',
     maxLabel: 'Strongly agree',
   },
   rating: { max: 5, icon: 'star' },
-  'picture-choice': {
-    options: ['Option 1', 'Option 2'],
-    optionImages: ['', ''],
-  },
+  'picture-choice': {},
   'choice-matrix': {
     rows: ['Statement 1', 'Statement 2'],
     columns: ['Disagree', 'Neutral', 'Agree'],

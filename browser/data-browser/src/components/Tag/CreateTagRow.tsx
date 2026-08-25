@@ -33,7 +33,12 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
       parent,
       isA: dataBrowser.classes.tag,
       propVals: {
-        [core.properties.shortname]: tagName,
+        // `shortname` is the slug the Tag class requires; `name` keeps the
+        // text as typed, since labels like "Strongly agree — daily" do not
+        // survive slugification. `useTitle` prefers `name`, so tags render
+        // as written.
+        [core.properties.shortname]: stringToSlug(tagName),
+        [core.properties.name]: tagName,
         [dataBrowser.properties.color]: randomItem(tagColours),
       },
     });
@@ -49,7 +54,7 @@ export function CreateTagRow({ parent, onNewTag }: CreateTagRowProps) {
   }, [parent, store, tagName, emoji, onNewTag]);
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setTagName(stringToSlug(e.target.value));
+    setTagName(e.target.value);
   }, []);
 
   const handleKeyDown = useCallback(

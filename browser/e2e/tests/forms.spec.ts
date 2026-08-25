@@ -3,8 +3,9 @@ import { newResource, before, openSubject } from './test-utils';
 
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
 const FORM_FIELD_TYPE = 'https://atomicdata.dev/properties/form-field-type';
-const FORM_FIELD_OPTIONS =
-  'https://atomicdata.dev/properties/form-field-options';
+const FORM_MAPS_TO = 'https://atomicdata.dev/properties/form-maps-to';
+const ALLOWS_ONLY = 'https://atomicdata.dev/properties/allowsOnly';
+const NAME = 'https://atomicdata.dev/properties/name';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 
 /** Menu label -> field-row testid key, in AddFieldMenu order. */
@@ -80,6 +81,32 @@ const waitForPropertyValue = async (
  * testid'd select button — scope through the shared row wrapper. */
 const fieldRowDeleteButton = (page: Page, key: string) =>
   page.getByTestId(`field-row-${key}`).locator('..').getByTitle('Delete field');
+
+/**
+ * The option labels of a choice question. Options are not stored on the field:
+ * they are the Tags on its mapped Property's `allowsOnly`, so this walks
+ * field -> property -> tags the way the definition builder does.
+ */
+const getOptionLabels = (page: Page, fieldSubject: string) =>
+  page.evaluate(
+    ({ subject, mapsToProp, allowsOnlyProp, nameProp }) => {
+      const field = window.store.resources.get(subject);
+      const property = window.store.resources.get(
+        field?.get(mapsToProp) as string,
+      );
+      const tags = (property?.get(allowsOnlyProp) as string[]) ?? [];
+
+      return tags.map(
+        t => window.store.resources.get(t)?.get(nameProp) as string,
+      );
+    },
+    {
+      subject: fieldSubject,
+      mapsToProp: FORM_MAPS_TO,
+      allowsOnlyProp: ALLOWS_ONLY,
+      nameProp: NAME,
+    },
+  );
 
 /** Finds the subject of the (single) field of a given `form-field-type`. */
 const getFieldSubjectByType = (page: Page, type: string) =>
@@ -190,21 +217,25 @@ test.describe('forms', async () => {
     // --- 4. Edit the radio field's options ---
     await page.getByTestId('field-row-radio').click();
     const radioSubject = await getFieldSubjectByType(page, 'radio');
+    // Each input edits one option Tag's name in place, rather than rewriting a
+    // string list — so these renames follow through to any answer already
+    // submitted for them.
+    // A new choice question starts with no options at all — placeholder Tags
+    // would be real resources nobody asked for.
     const choiceInputs = page.getByTestId('choice-option-input');
-    await expect(choiceInputs).toHaveCount(2);
-    await choiceInputs.nth(0).fill('A');
-    await choiceInputs.nth(1).fill('B');
-    await page.getByRole('button', { name: 'Add option' }).click();
-    await expect(choiceInputs).toHaveCount(3);
-    await choiceInputs.nth(2).fill('C');
-    await waitForPropertyValue(
-      page,
-      radioSubject as string,
-      FORM_FIELD_OPTIONS,
-      {
-        options: ['A', 'B', 'C'],
-      },
-    );
+    await expect(choiceInputs).toHaveCount(0);
+
+    for (const [index, label] of ['A', 'B', 'C'].entries()) {
+      await page.getByRole('button', { name: 'Add option' }).click();
+      await expect(choiceInputs).toHaveCount(index + 1);
+      await choiceInputs.nth(index).fill(label);
+    }
+    await expect
+      .poll(() => getOptionLabels(page, radioSubject as string), {
+        timeout: 10000,
+      })
+      .toEqual(['A', 'B', 'C']);
+    await waitForSync(page);
 
     // --- 5. Publish ---
     await page.getByRole('button', { name: 'Publish', exact: true }).click();

@@ -6,6 +6,7 @@ import {
   type Resource,
 } from '@tomic/react';
 import { useMemo } from 'react';
+import type { FieldOption } from '@tomic/form-renderer';
 import type { FormFieldType } from './fieldTypes';
 
 export interface FormQuestionRef {
@@ -14,7 +15,9 @@ export interface FormQuestionRef {
   label: string;
   mapsTo: string;
   type: FormFieldType | string;
-  choiceOptions?: string[];
+  /** Resolved options of a choice question, so a condition can offer labels
+   * while storing the option's subject. */
+  choiceOptions?: FieldOption[];
 }
 
 /**
@@ -39,6 +42,30 @@ export function useFormQuestions(form: Resource): FormQuestionRef[] {
   }, [pages, pageResources]);
 
   const fieldResources = useResources(fieldSubjects);
+
+  // Choice options live on the mapped Property's `allowsOnly`, so resolving
+  // them takes two more hops: the Properties, then their Tags. A question
+  // borrowing another column's tags mirrors them here too (see
+  // `applyOptionsSource`), so it lands in the same place. A *row*-sourced
+  // question has no fixed list — `choiceOptions` stays undefined and
+  // `ConditionsEditor` falls back to a free-text value input.
+  const propertySubjects = useMemo(
+    () =>
+      [...fieldResources.values()]
+        .map(f => f.get(forms.properties.formMapsTo) as string | undefined)
+        .filter((s): s is string => !!s),
+    [fieldResources],
+  );
+  const propertyResources = useResources(propertySubjects);
+
+  const tagSubjects = useMemo(
+    () =>
+      [...propertyResources.values()].flatMap(
+        p => (p.get(core.properties.allowsOnly) as string[] | undefined) ?? [],
+      ),
+    [propertyResources],
+  );
+  const tagResources = useResources(tagSubjects);
 
   return useMemo(() => {
     const questions: FormQuestionRef[] = [];
@@ -71,15 +98,39 @@ export function useFormQuestions(form: Resource): FormQuestionRef[] {
           type:
             (field.get(forms.properties.formFieldType) as string | undefined) ??
             'short-text',
-          choiceOptions: choiceOptionsFrom(
-            field.get(forms.properties.formFieldOptions),
+          choiceOptions: choiceOptionsFor(
+            field.get(forms.properties.formMapsTo) as string | undefined,
           ),
         });
       }
     }
 
     return questions;
-  }, [pages, pageResources, fieldResources]);
+
+    function choiceOptionsFor(mapsTo?: string): FieldOption[] | undefined {
+      const property = mapsTo ? propertyResources.get(mapsTo) : undefined;
+      const tags = property?.get(core.properties.allowsOnly) as
+        | string[]
+        | undefined;
+
+      if (!tags?.length) return undefined;
+
+      return tags.map(subject => {
+        const tag = tagResources.get(subject);
+        const nonEmpty = (value: unknown) =>
+          typeof value === 'string' && value !== '' ? value : undefined;
+
+        return {
+          value: subject,
+          // Same precedence as `useTitle`: the free-text name, else the slug.
+          label:
+            nonEmpty(tag?.get(core.properties.name)) ??
+            nonEmpty(tag?.get(core.properties.shortname)) ??
+            subject,
+        };
+      });
+    }
+  }, [pages, pageResources, fieldResources, propertyResources, tagResources]);
 }
 
 /** Questions the current field/page is allowed to condition on: earlier
@@ -113,22 +164,4 @@ export function previousQuestions(
   }
 
   return questions;
-}
-
-function choiceOptionsFrom(raw: unknown): string[] | undefined {
-  if (raw === undefined || raw === null) return undefined;
-
-  let parsed: { options?: string[] } | undefined;
-
-  if (typeof raw === 'string') {
-    try {
-      parsed = JSON.parse(raw) as { options?: string[] };
-    } catch {
-      return undefined;
-    }
-  } else if (typeof raw === 'object') {
-    parsed = raw as { options?: string[] };
-  }
-
-  return parsed?.options;
 }

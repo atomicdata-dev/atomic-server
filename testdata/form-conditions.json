@@ -7,7 +7,8 @@
     "`visibleFields` / `visiblePages` are the evaluator's output.",
     "`storedFields` is which mapsTo keys validate_submission keeps (hidden",
     "values are dropped; missing required hidden fields are not errors).",
-    "`valid` is whether validation succeeds for the given `values`."
+    "`valid` is whether validation succeeds for the given `values`.",
+    "Choice questions (radio/dropdown/multi-select/...) carry resolved option objects; their answers and condition values are option subjects."
   ],
   "cases": [
     {
@@ -26,10 +27,18 @@
           ]
         }
       ],
-      "values": { "p1": "Ada" },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "Ada"
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -43,7 +52,18 @@
               "label": "Pet?",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             },
             {
               "kind": "field",
@@ -53,16 +73,31 @@
               "required": true,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "Yes" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "did:ad:tag:Yes"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "Yes", "p2": "Spot" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": "did:ad:tag:Yes",
+        "p2": "Spot"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -76,7 +111,18 @@
               "label": "Pet?",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             },
             {
               "kind": "field",
@@ -86,16 +132,28 @@
               "required": true,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "Yes" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "did:ad:tag:Yes"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "No" },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "did:ad:tag:No"
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -109,7 +167,18 @@
               "label": "Pet?",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             },
             {
               "kind": "field",
@@ -119,16 +188,29 @@
               "required": true,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "Yes" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "did:ad:tag:Yes"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "Yes" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "did:ad:tag:Yes"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": false
     },
     {
@@ -142,7 +224,18 @@
               "label": "Pet?",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             },
             {
               "kind": "field",
@@ -152,16 +245,29 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "Yes" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "did:ad:tag:Yes"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "No", "p2": "secret" },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "did:ad:tag:No",
+        "p2": "secret"
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -175,13 +281,28 @@
               "label": "Continue?",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             }
           ]
         },
         {
           "conditions": [
-            { "field": "p1", "operator": "equals", "value": "Yes" }
+            {
+              "field": "p1",
+              "operator": "equals",
+              "value": "did:ad:tag:Yes"
+            }
           ],
           "blocks": [
             {
@@ -195,10 +316,18 @@
           ]
         }
       ],
-      "values": { "p1": "No" },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "did:ad:tag:No"
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -212,13 +341,28 @@
               "label": "Continue?",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             }
           ]
         },
         {
           "conditions": [
-            { "field": "p1", "operator": "equals", "value": "Yes" }
+            {
+              "field": "p1",
+              "operator": "equals",
+              "value": "did:ad:tag:Yes"
+            }
           ],
           "blocks": [
             {
@@ -232,10 +376,22 @@
           ]
         }
       ],
-      "values": { "p1": "Yes", "p2": "ok" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0, 1],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": "did:ad:tag:Yes",
+        "p2": "ok"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0,
+        1
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -267,17 +423,37 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "x" },
-                { "field": "p2", "operator": "equals", "value": "y" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "x"
+                },
+                {
+                  "field": "p2",
+                  "operator": "equals",
+                  "value": "y"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "x", "p2": "nope", "p3": "hidden" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": "x",
+        "p2": "nope",
+        "p3": "hidden"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -301,16 +477,31 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "contains", "value": "CAT" }
+                {
+                  "field": "p1",
+                  "operator": "contains",
+                  "value": "CAT"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "I have a cat", "p2": "ok" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": "I have a cat",
+        "p2": "ok"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -324,7 +515,22 @@
               "label": "Colors",
               "type": "multi-select",
               "required": true,
-              "options": { "options": ["Red", "Green", "Blue"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Red",
+                    "label": "Red"
+                  },
+                  {
+                    "value": "did:ad:tag:Green",
+                    "label": "Green"
+                  },
+                  {
+                    "value": "did:ad:tag:Blue",
+                    "label": "Blue"
+                  }
+                ]
+              }
             },
             {
               "kind": "field",
@@ -334,16 +540,34 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "contains", "value": "Red" }
+                {
+                  "field": "p1",
+                  "operator": "contains",
+                  "value": "did:ad:tag:Red"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": ["Green", "Red"], "p2": "ok" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": [
+          "did:ad:tag:Green",
+          "did:ad:tag:Red"
+        ],
+        "p2": "ok"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -367,16 +591,29 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "not-equals", "value": "US" }
+                {
+                  "field": "p1",
+                  "operator": "not-equals",
+                  "value": "US"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "US", "p2": "dropped" },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "US",
+        "p2": "dropped"
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -400,16 +637,31 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "greater-than", "value": 18 }
+                {
+                  "field": "p1",
+                  "operator": "greater-than",
+                  "value": 18
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": 21, "p2": "ok" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": 21,
+        "p2": "ok"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -433,16 +685,28 @@
               "required": true,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "less-than", "value": 18 }
+                {
+                  "field": "p1",
+                  "operator": "less-than",
+                  "value": 18
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": 21 },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": 21
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -466,15 +730,23 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "x" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "x"
+                }
               ]
             }
           ]
         }
       ],
       "values": {},
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
       "storedFields": [],
       "valid": true
     },
@@ -489,7 +761,18 @@
               "label": "Gate",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             },
             {
               "kind": "field",
@@ -499,7 +782,11 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "Yes" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "did:ad:tag:Yes"
+                }
               ]
             },
             {
@@ -510,16 +797,30 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p2", "operator": "equals", "value": "cat" }
+                {
+                  "field": "p2",
+                  "operator": "equals",
+                  "value": "cat"
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": "No", "p2": "cat", "p3": "sneaky" },
-      "visibleFields": ["p1"],
-      "visiblePages": [0],
-      "storedFields": ["p1"],
+      "values": {
+        "p1": "did:ad:tag:No",
+        "p2": "cat",
+        "p3": "sneaky"
+      },
+      "visibleFields": [
+        "p1"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1"
+      ],
       "valid": true
     },
     {
@@ -543,16 +844,31 @@
               "required": false,
               "options": {},
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": true }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": true
+                }
               ]
             }
           ]
         }
       ],
-      "values": { "p1": true, "p2": "ok" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": true,
+        "p2": "ok"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     },
     {
@@ -566,13 +882,28 @@
               "label": "Gate",
               "type": "radio",
               "required": true,
-              "options": { "options": ["Yes", "No"] }
+              "options": {
+                "options": [
+                  {
+                    "value": "did:ad:tag:Yes",
+                    "label": "Yes"
+                  },
+                  {
+                    "value": "did:ad:tag:No",
+                    "label": "No"
+                  }
+                ]
+              }
             },
             {
               "kind": "heading",
               "text": "Only if yes",
               "conditions": [
-                { "field": "p1", "operator": "equals", "value": "Yes" }
+                {
+                  "field": "p1",
+                  "operator": "equals",
+                  "value": "did:ad:tag:Yes"
+                }
               ]
             },
             {
@@ -586,10 +917,21 @@
           ]
         }
       ],
-      "values": { "p1": "No", "p2": "still here" },
-      "visibleFields": ["p1", "p2"],
-      "visiblePages": [0],
-      "storedFields": ["p1", "p2"],
+      "values": {
+        "p1": "did:ad:tag:No",
+        "p2": "still here"
+      },
+      "visibleFields": [
+        "p1",
+        "p2"
+      ],
+      "visiblePages": [
+        0
+      ],
+      "storedFields": [
+        "p1",
+        "p2"
+      ],
       "valid": true
     }
   ]

@@ -328,10 +328,263 @@ pub async fn build_form_definition(
     })
 }
 
-/// `form-field-options` key holding a `picture-choice` question's images,
-/// positionally matched to its `options`. Values are File subjects in the
-/// store and URLs on the wire — see [rewrite_option_images].
-pub const OPTION_IMAGES_KEY: &str = "optionImages";
+/// `form-field-options` key holding a choice question's resolved options.
+pub const OPTIONS_KEY: &str = "options";
+
+/// The question types whose options are Tag resources listed on the mapped
+/// Property's `allowsOnly`. Mirrored by `CHOICE_FIELD_TYPES` in
+/// `chunks/FormBuilder/fieldTypes.ts`.
+pub const CHOICE_FIELD_TYPES: [&str; 5] = [
+    "radio",
+    "multi-select",
+    "dropdown",
+    "dropdown-multi",
+    "picture-choice",
+];
+
+/// The choice types that accept exactly one option. The mapped Property is a
+/// SelectProperty either way (always a `resourceArray`, as everywhere else in
+/// the app); single-pick is expressed as `max: 1` and stores a one-element
+/// array.
+const SINGLE_CHOICE_FIELD_TYPES: [&str; 3] = ["radio", "dropdown", "picture-choice"];
+
+pub fn is_choice_field(field_type: &str) -> bool {
+    CHOICE_FIELD_TYPES.contains(&field_type)
+}
+
+/// One resolved choice option on the wire. Mirrors `FieldOption` in
+/// `@tomic/form-renderer` (keep in lockstep, no codegen — same convention as
+/// [FormDefinition]). `value` is the Tag's subject: what a submission stores
+/// and what conditions compare against. Everything user-facing renders
+/// `label`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldOption {
+    pub value: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub emoji: Option<String>,
+    /// `picture-choice`: the Tag's `cover-image`. A File subject in the store
+    /// and a URL on the wire — see [rewrite_option_images].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+}
+
+fn option_str<'a>(option: &'a JsonValue, key: &str) -> Option<&'a str> {
+    option.get(key).and_then(|v| v.as_str())
+}
+
+/// The resolved options of a choice question, as stored in its options bag.
+fn options_list(options: &JsonValue) -> &[JsonValue] {
+    options
+        .get(OPTIONS_KEY)
+        .and_then(|v| v.as_array())
+        .map(Vec::as_slice)
+        .unwrap_or_default()
+}
+
+/// `form-field-options` key describing where a choice question's options come
+/// from, when they are not its own column's Tags. Mirrors `OptionsSource` in
+/// `chunks/FormBuilder/FieldOptions/optionsSource.ts`. Two shapes:
+///
+/// - `{ "property": <SelectProperty subject> }` — the options are another
+///   column's Tags. The builder mirrors those Tags onto the field's own
+///   Property too, so the response column keeps working standalone.
+/// - `{ "table": <Table subject>, "labelProperty": <Property subject> }` —
+///   the options are the table's *rows*, resolved on every definition read.
+///
+/// `table` is also stored alongside `property` (the builder picks a table
+/// first); resolution ignores it in that case.
+pub const OPTIONS_SOURCE_KEY: &str = "optionsSource";
+
+/// Cap on how many rows a table-sourced question turns into options. Smaller
+/// than [SUMMARY_ROW_LIMIT] deliberately: a summary is read once per results
+/// view, while this list is inlined into the form HTML on *every* page load,
+/// and a picker of more than a thousand entries is not a usable control
+/// anyway. Rows past the cap are not offered and would be rejected by
+/// [check_membership].
+const OPTIONS_ROW_LIMIT: usize = 1_000;
+
+fn source_str<'a>(options: &'a JsonValue, key: &str) -> Option<&'a str> {
+    options
+        .get(OPTIONS_SOURCE_KEY)
+        .and_then(|source| source.get(key))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+}
+
+/// Resolves a choice question's options and writes them into the options bag.
+/// A published form's visitor has no agent and so cannot fetch the underlying
+/// resources itself — this is the same denormalization
+/// [rewrite_option_images] does for Files.
+///
+/// Where the list comes from is [OPTIONS_SOURCE_KEY]'s business; by default it
+/// is the Tags on the field's own mapped Property's `allowsOnly`.
+///
+/// A non-choice field, an unreadable Property/Table, or an empty list all
+/// leave an empty list, which [check_membership] treats as "nothing is
+/// allowed" rather than "everything is".
+async fn resolve_choice_options(
+    store: &impl Storelike,
+    field_type: &str,
+    maps_to: &str,
+    options: &mut JsonValue,
+) {
+    if !is_choice_field(field_type) {
+        return;
+    }
+
+    let resolved = if let Some(property) = source_str(options, "property") {
+        tag_options(store, property).await
+    } else if let Some(table) = source_str(options, "table") {
+        row_options(store, table, source_str(options, "labelProperty")).await
+    } else {
+        tag_options(store, maps_to).await
+    };
+
+    match options.as_object_mut() {
+        Some(obj) => {
+            obj.insert(OPTIONS_KEY.into(), json!(resolved));
+        }
+        None => *options = json!({ OPTIONS_KEY: resolved }),
+    }
+}
+
+/// Reads a resource's property as a non-empty string, or `None`.
+fn option_prop(resource: &Resource, prop: &str) -> Option<String> {
+    resource
+        .get(prop)
+        .ok()
+        .map(|v| v.to_string())
+        .filter(|s| !s.is_empty())
+}
+
+/// The Tags on `property_subject`'s `allowsOnly`, as options. An unreadable
+/// Property or an empty `allowsOnly` yields an empty list.
+async fn tag_options(store: &impl Storelike, property_subject: &str) -> Vec<FieldOption> {
+    let mut resolved: Vec<FieldOption> = Vec::new();
+
+    let Ok(property) = store
+        .get_resource(&property_subject.to_string().into())
+        .await
+    else {
+        return resolved;
+    };
+
+    let tag_subjects = property
+        .get(atomic_lib::urls::ALLOWS_ONLY)
+        .and_then(|v| v.to_subjects(None))
+        .unwrap_or_default();
+
+    for subject in tag_subjects {
+        let Ok(tag) = store.get_resource(&subject.clone().into()).await else {
+            continue;
+        };
+        resolved.push(FieldOption {
+            // `name` is the free-text label; `shortname` is the slug every
+            // Tag is required to have. Same precedence as `useTitle`.
+            label: option_prop(&tag, atomic_lib::urls::NAME)
+                .or_else(|| option_prop(&tag, atomic_lib::urls::SHORTNAME))
+                .unwrap_or_else(|| subject.clone()),
+            color: option_prop(&tag, atomic_lib::urls::COLOR),
+            emoji: option_prop(&tag, atomic_lib::urls::EMOJI),
+            image: option_prop(&tag, atomic_lib::urls::COVER_IMAGE),
+            value: subject,
+        });
+    }
+
+    resolved
+}
+
+/// The rows of `table_subject`, as options: `value` is the row's subject, so
+/// an answer becomes a reference to the row rather than a copy of its label.
+///
+/// Same row query as [build_form_summary] (`parent` = table, `isA` = the
+/// table's `classtype`), capped at [OPTIONS_ROW_LIMIT]. Runs as
+/// [ForAgent::Sudo]: the caller is building a definition for an agent-less
+/// visitor, and publishing these labels is the deliberate tradeoff of linking
+/// a question to a table (the builder says so when you pick one).
+async fn row_options(
+    store: &impl Storelike,
+    table_subject: &str,
+    label_property: Option<&str>,
+) -> Vec<FieldOption> {
+    let Ok(table) = store.get_resource(&table_subject.to_string().into()).await else {
+        return Vec::new();
+    };
+    let Some(row_class) = option_prop(&table, atomic_lib::urls::CLASSTYPE_PROP) else {
+        return Vec::new();
+    };
+
+    let query = Query {
+        property: Some(atomic_lib::urls::PARENT.into()),
+        value: Some(Value::AtomicUrl(table_subject.to_string().into())),
+        filters: vec![PropVal {
+            property: Some(atomic_lib::urls::IS_A.into()),
+            value: Some(Value::AtomicUrl(row_class.into())),
+            operator: FilterOperator::Equal,
+        }],
+        limit: Some(OPTIONS_ROW_LIMIT),
+        for_agent: ForAgent::Sudo,
+        drive: Some(
+            table
+                .get_drive()
+                .unwrap_or_else(|| drive_prefix_from_subject(table.get_subject())),
+        ),
+        ..Query::new()
+    };
+
+    let Ok(QueryResult {
+        resources: rows, ..
+    }) = store.query(&query).await
+    else {
+        return Vec::new();
+    };
+
+    rows.iter()
+        .filter_map(|row| {
+            let subject = row.get_subject().to_string();
+            let label = match label_property {
+                Some(prop) => row_label(row, prop)?,
+                // No label column named: fall back to how the row titles
+                // itself, the same precedence `useTitle` uses.
+                None => option_prop(row, atomic_lib::urls::NAME)
+                    .or_else(|| option_prop(row, atomic_lib::urls::SHORTNAME))
+                    .unwrap_or_else(|| subject.clone()),
+            };
+            Some(FieldOption {
+                label,
+                color: option_prop(row, atomic_lib::urls::COLOR),
+                emoji: option_prop(row, atomic_lib::urls::EMOJI),
+                image: option_prop(row, atomic_lib::urls::COVER_IMAGE),
+                value: subject,
+            })
+        })
+        .collect()
+}
+
+/// A row's label for a table-sourced option: whatever the picked column holds,
+/// as one line of text.
+///
+/// `None` means the row is **not offered at all**, which is the point: falling
+/// back to the row's own name would put a different column's text in the list
+/// for exactly the rows the picked column is empty for, and an option labelled
+/// from somewhere else is worse than no option.
+///
+/// Composite values count as absent for the same reason — a relation, a nested
+/// resource or a JSON blob has no one-line rendering, only a debug one.
+/// Mirrored by `rowLabel` in `chunks/FormBuilder/buildFormDefinition.ts`.
+fn row_label(row: &Resource, label_property: &str) -> Option<String> {
+    match row.get(label_property).ok()? {
+        Value::ResourceArray(_)
+        | Value::NestedResource(_)
+        | Value::Json(_)
+        | Value::LoroDoc(_)
+        | Value::LocalizedText(_) => None,
+        value => Some(value.to_string()).filter(|s| !s.trim().is_empty()),
+    }
+}
 
 /// Turns every `picture-choice` option image from a File subject into
 /// something an agent-less visitor can fetch. Same split as
@@ -345,15 +598,18 @@ pub fn rewrite_option_images(definition: &mut FormDefinition, to_url: impl Fn(&s
             let FormBlock::Field { options, .. } = block else {
                 continue;
             };
-            let Some(images) = options
-                .get_mut(OPTION_IMAGES_KEY)
-                .and_then(|v| v.as_array_mut())
-            else {
+            let Some(list) = options.get_mut(OPTIONS_KEY).and_then(|v| v.as_array_mut()) else {
                 continue;
             };
-            for image in images.iter_mut() {
-                if let Some(subject) = image.as_str().filter(|s| !s.is_empty()) {
-                    *image = JsonValue::String(to_url(subject));
+            for option in list.iter_mut() {
+                let Some(subject) = option_str(option, "image")
+                    .filter(|s| !s.is_empty())
+                    .map(&to_url)
+                else {
+                    continue;
+                };
+                if let Some(obj) = option.as_object_mut() {
+                    obj.insert("image".into(), JsonValue::String(subject));
                 }
             }
         }
@@ -390,19 +646,30 @@ pub async fn collect_option_image_subjects(
             let Ok(field) = store.get_resource(&field_subject.into()).await else {
                 continue;
             };
-            let Ok(Value::Json(options)) = field.get(atomic_lib::urls::FORM_FIELD_OPTIONS) else {
+            // Option images live on the Tags, so the walk goes through the
+            // mapped Property's `allowsOnly` rather than the options bag.
+            let Ok(maps_to) = field.get(atomic_lib::urls::FORM_MAPS_TO) else {
                 continue;
             };
-            let Some(images) = options.get(OPTION_IMAGES_KEY).and_then(|v| v.as_array()) else {
+            let Ok(property) = store.get_resource(&maps_to.to_string().into()).await else {
                 continue;
             };
-            subjects.extend(
-                images
-                    .iter()
-                    .filter_map(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .map(str::to_string),
-            );
+            let tag_subjects = property
+                .get(atomic_lib::urls::ALLOWS_ONLY)
+                .and_then(|v| v.to_subjects(None))
+                .unwrap_or_default();
+
+            for tag_subject in tag_subjects {
+                let Ok(tag) = store.get_resource(&tag_subject.into()).await else {
+                    continue;
+                };
+                if let Ok(image) = tag.get(atomic_lib::urls::COVER_IMAGE) {
+                    let image = image.to_string();
+                    if !image.is_empty() {
+                        subjects.insert(image);
+                    }
+                }
+            }
         }
     }
 
@@ -553,7 +820,7 @@ async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<F
             .get(atomic_lib::urls::REQUIRED)
             .and_then(|v| v.to_bool())
             .unwrap_or(false);
-        let options = match field.get(atomic_lib::urls::FORM_FIELD_OPTIONS) {
+        let mut options = match field.get(atomic_lib::urls::FORM_FIELD_OPTIONS) {
             Ok(Value::Json(v)) => v.clone(),
             // Same fallback as `build_form_styling`: a JSON value written
             // while its Property was unresolvable materializes as the raw
@@ -561,6 +828,7 @@ async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<F
             Ok(Value::String(s)) => serde_json::from_str(s).unwrap_or_else(|_| json!({})),
             _ => json!({}),
         };
+        resolve_choice_options(store, &field_type, &maps_to, &mut options).await;
         return Ok(FormBlock::Field {
             maps_to,
             label,
@@ -703,11 +971,6 @@ fn coerce_value(
             Ok(Value::Timestamp(ts))
         }
         "checkbox" => Ok(Value::Boolean(raw.as_bool().ok_or("Expected a boolean")?)),
-        "radio" => {
-            let s = raw.as_str().ok_or("Expected a string")?.to_string();
-            check_membership(std::slice::from_ref(&s), options)?;
-            Ok(Value::String(s))
-        }
         "multi-select" | "dropdown-multi" => {
             let arr = raw.as_array().ok_or("Expected an array of strings")?;
             let items: Vec<String> = arr
@@ -719,7 +982,7 @@ fn coerce_value(
                 })
                 .collect::<Result<_, _>>()?;
             check_membership(&items, options)?;
-            Ok(Value::Json(raw.clone()))
+            Ok(items.into())
         }
         "phone" => {
             let s = raw.as_str().ok_or("Expected a string")?.to_string();
@@ -747,10 +1010,13 @@ fn coerce_value(
             check_bounds(f, options)?;
             Ok(Value::Float(f))
         }
-        "dropdown" | "picture-choice" => {
+        // Single-pick choice questions. The answer travels as one subject
+        // string and is stored as a one-element resourceArray, so the mapped
+        // column is an ordinary SelectProperty like any other.
+        t if SINGLE_CHOICE_FIELD_TYPES.contains(&t) => {
             let s = raw.as_str().ok_or("Expected a string")?.to_string();
             check_membership(std::slice::from_ref(&s), options)?;
-            Ok(Value::String(s))
+            Ok(vec![s].into())
         }
         "likert" => Ok(Value::Integer(check_step(
             raw,
@@ -970,14 +1236,18 @@ fn check_bounds(value: f64, options: &JsonValue) -> Result<(), String> {
     Ok(())
 }
 
+/// Checks picked option subjects against the question's resolved options.
+/// Unlike the other validators this fails closed on an empty list: options
+/// are resolved from `allowsOnly`, so "no options" means the question has
+/// none to pick, not that anything goes.
 fn check_membership(items: &[String], options: &JsonValue) -> Result<(), String> {
-    let Some(allowed) = options.get("options").and_then(|v| v.as_array()) else {
-        return Ok(());
-    };
-    let allowed: Vec<&str> = allowed.iter().filter_map(|v| v.as_str()).collect();
+    let allowed: Vec<&str> = options_list(options)
+        .iter()
+        .filter_map(|o| option_str(o, "value"))
+        .collect();
     for item in items {
         if !allowed.contains(&item.as_str()) {
-            return Err(format!("'{item}' is not one of the allowed options"));
+            return Err("Not one of the allowed options".to_string());
         }
     }
     Ok(())
@@ -1095,6 +1365,7 @@ fn is_empty_value(value: &Value) -> bool {
         Value::String(s) | Value::Markdown(s) | Value::Slug(s) => s.is_empty(),
         Value::Json(JsonValue::Null) => true,
         Value::Json(JsonValue::Array(a)) => a.is_empty(),
+        Value::ResourceArray(a) => a.is_empty(),
         _ => false,
     }
 }
@@ -1118,20 +1389,13 @@ fn summarize_field(
     let obj = summary.as_object_mut().expect("built as an object above");
 
     match field_type {
-        // Single-pick choice questions all aggregate as option counts.
-        "radio" | "dropdown" | "picture-choice" => {
-            let picks = values.iter().map(|v| v.to_string());
-            obj.insert("counts".into(), choice_counts(options, picks));
-        }
-        "multi-select" | "dropdown-multi" => {
-            // Each answer is a `Value::Json` array of picked option strings.
-            let picks = values.iter().flat_map(|v| match v {
-                Value::Json(JsonValue::Array(items)) => items
-                    .iter()
-                    .filter_map(|i| i.as_str().map(str::to_string))
-                    .collect::<Vec<_>>(),
-                _ => Vec::new(),
-            });
+        // Every choice question stores a resourceArray of option subjects —
+        // single-pick ones just hold exactly one — so they all aggregate the
+        // same way.
+        t if is_choice_field(t) => {
+            let picks = values
+                .iter()
+                .flat_map(|v| v.to_subjects(None).unwrap_or_default());
             obj.insert("counts".into(), choice_counts(options, picks));
         }
         // No configured option list to zero-fill: count the codes that were
@@ -1183,33 +1447,37 @@ fn summarize_field(
 /// Counts picks per configured option (field options JSON `{"options": [..]}`),
 /// preserving the configured order and zero-filling unpicked options. Picks
 /// not matching any configured option fold into a trailing `"Other"` bucket.
+/// Zero-filled counts in the question's configured option order. Picks are
+/// option subjects (that is what a submission stores); the pairs are keyed by
+/// the option's *label*, since that is what the results UI renders. Answers
+/// matching no current option — an option deleted since — collect in "Other".
 fn choice_counts(options: &JsonValue, picks: impl Iterator<Item = String>) -> JsonValue {
-    let configured: Vec<String> = options
-        .get("options")
-        .and_then(|v| v.as_array())
-        .map(|a| {
-            a.iter()
-                .filter_map(|v| v.as_str().map(str::to_string))
-                .collect()
+    // (value, label, count)
+    let mut counts: Vec<(&str, &str, usize)> = options_list(options)
+        .iter()
+        .filter_map(|o| {
+            let value = option_str(o, "value")?;
+            Some((value, option_str(o, "label").unwrap_or(value), 0))
         })
-        .unwrap_or_default();
+        .collect();
 
-    let mut counts: Vec<(String, usize)> = configured.iter().map(|o| (o.clone(), 0)).collect();
     let mut other = 0;
     for pick in picks {
-        match counts.iter_mut().find(|(option, _)| option == &pick) {
-            Some((_, count)) => *count += 1,
+        match counts.iter_mut().find(|(value, ..)| *value == pick) {
+            Some((.., count)) => *count += 1,
             None => other += 1,
         }
     }
+
+    let mut pairs: Vec<JsonValue> = counts
+        .into_iter()
+        .map(|(_, label, count)| json!([label, count]))
+        .collect();
     if other > 0 {
-        counts.push(("Other".to_string(), other));
+        pairs.push(json!(["Other", other]));
     }
 
-    json!(counts
-        .into_iter()
-        .map(|(option, count)| json!([option, count]))
-        .collect::<Vec<_>>())
+    json!(pairs)
 }
 
 /// Counts repeats of free-form answers (`country`), ordered by count and then
@@ -1632,6 +1900,282 @@ mod tests {
         }
     }
 
+    /// Creates a Tag under `parent`, as the builder's tag editor does:
+    /// `name` is the free-text label, `shortname` the required slug.
+    async fn make_tag(store: &Db, parent: &str, name: &str, color: Option<&str>) -> String {
+        let mut tag = Resource::new_instance(urls::TAG, store).await.unwrap();
+        tag.set(urls::NAME.into(), Value::String(name.into()), store)
+            .await
+            .unwrap();
+        tag.set(
+            urls::SHORTNAME.into(),
+            Value::Slug(name.to_lowercase().replace(' ', "-")),
+            store,
+        )
+        .await
+        .unwrap();
+        if let Some(color) = color {
+            tag.set(urls::COLOR.into(), Value::String(color.into()), store)
+                .await
+                .unwrap();
+        }
+        tag.set(
+            urls::PARENT.into(),
+            Value::AtomicUrl(parent.to_string().into()),
+            store,
+        )
+        .await
+        .unwrap();
+        tag.save_locally(store).await.unwrap();
+        tag.get_subject().to_string()
+    }
+
+    #[tokio::test]
+    async fn resolves_choice_options_from_the_mapped_propertys_tags() {
+        let store = init_store().await;
+        let (_class, prop) =
+            make_class_and_property(&store, "c", "pick", urls::RESOURCE_ARRAY).await;
+
+        let yes = make_tag(&store, &prop, "Yes please", Some("#ff0000")).await;
+        let no = make_tag(&store, &prop, "No thanks", None).await;
+
+        let mut property = store.get_resource(&prop.clone().into()).await.unwrap();
+        property
+            .set(
+                urls::ALLOWS_ONLY.into(),
+                Value::ResourceArray(vec![yes.clone().into(), no.clone().into()]),
+                &store,
+            )
+            .await
+            .unwrap();
+        property.save_locally(&store).await.unwrap();
+
+        let mut options = json!({});
+        resolve_choice_options(&store, "dropdown", &prop, &mut options).await;
+
+        assert_eq!(
+            options[OPTIONS_KEY],
+            json!([
+                { "value": yes, "label": "Yes please", "color": "#ff0000" },
+                { "value": no, "label": "No thanks" },
+            ]),
+            "options resolve in `allowsOnly` order, carrying the Tag's free-text \
+             name as the label and omitting unset keys"
+        );
+
+        // The resolved list is what membership is checked against, so a
+        // submission naming a tag subject validates and a stray one does not.
+        assert!(check_membership(&[yes], &options).is_ok());
+        assert!(check_membership(&["did:ad:tag:elsewhere".to_string()], &options).is_err());
+    }
+
+    #[tokio::test]
+    async fn choice_options_are_empty_when_the_property_allows_nothing() {
+        let store = init_store().await;
+        let (_class, prop) =
+            make_class_and_property(&store, "c2", "pick2", urls::RESOURCE_ARRAY).await;
+
+        let mut options = json!({ "placeholder": "Pick one" });
+        resolve_choice_options(&store, "dropdown", &prop, &mut options).await;
+
+        assert_eq!(options[OPTIONS_KEY], json!([]));
+        assert_eq!(
+            options["placeholder"], "Pick one",
+            "resolution only replaces the options key"
+        );
+        // Fails closed: an empty list allows nothing, rather than everything.
+        assert!(check_membership(&["anything".to_string()], &options).is_err());
+    }
+
+    /// A Table plus `count` rows under it, each labelled by `label_prop`.
+    /// Same shape `build_form_summary`'s rows have.
+    async fn make_table_with_rows(
+        store: &Db,
+        class: &str,
+        label_prop: &str,
+        labels: &[&str],
+    ) -> String {
+        let mut table = Resource::new_instance(urls::TABLE, store).await.unwrap();
+        table
+            .set(urls::NAME.into(), Value::String("Customers".into()), store)
+            .await
+            .unwrap();
+        table
+            .set(
+                urls::CLASSTYPE_PROP.into(),
+                Value::AtomicUrl(class.to_string().into()),
+                store,
+            )
+            .await
+            .unwrap();
+        table.save_locally(store).await.unwrap();
+        let table_subject = table.get_subject().to_string();
+
+        // An empty label leaves the column unset on that row.
+        for label in labels {
+            let mut row = Resource::new_instance(class, store).await.unwrap();
+            row.set(
+                urls::PARENT.into(),
+                Value::AtomicUrl(table_subject.clone().into()),
+                store,
+            )
+            .await
+            .unwrap();
+            row.set(urls::NAME.into(), Value::String(format!("row {label}")), store)
+                .await
+                .unwrap();
+            if !label.is_empty() {
+                row.set(
+                    label_prop.to_string(),
+                    Value::String((*label).to_string()),
+                    store,
+                )
+                .await
+                .unwrap();
+            }
+            row.save_locally(store).await.unwrap();
+        }
+
+        table_subject
+    }
+
+    #[tokio::test]
+    async fn choice_options_can_mirror_another_columns_tags() {
+        let store = init_store().await;
+        let (_class, own_prop) =
+            make_class_and_property(&store, "c-own", "pick-own", urls::RESOURCE_ARRAY).await;
+        let (_other_class, source_prop) =
+            make_class_and_property(&store, "c-src", "status", urls::RESOURCE_ARRAY).await;
+
+        let open = make_tag(&store, &source_prop, "Open", None).await;
+        let done = make_tag(&store, &source_prop, "Done", None).await;
+
+        let mut source = store
+            .get_resource(&source_prop.clone().into())
+            .await
+            .unwrap();
+        source
+            .set(
+                urls::ALLOWS_ONLY.into(),
+                Value::ResourceArray(vec![open.clone().into(), done.clone().into()]),
+                &store,
+            )
+            .await
+            .unwrap();
+        source.save_locally(&store).await.unwrap();
+
+        // The question's own Property allows nothing — the source is what
+        // counts, so this must not shadow it.
+        let mut options = json!({ OPTIONS_SOURCE_KEY: { "property": source_prop } });
+        resolve_choice_options(&store, "dropdown", &own_prop, &mut options).await;
+
+        assert_eq!(
+            options[OPTIONS_KEY],
+            json!([
+                { "value": open, "label": "Open" },
+                { "value": done, "label": "Done" },
+            ])
+        );
+        assert!(check_membership(&[open], &options).is_ok());
+    }
+
+    #[tokio::test]
+    async fn choice_options_can_be_the_rows_of_a_table() {
+        let store = init_store().await;
+        let (row_class, name_prop) =
+            make_class_and_property(&store, "customer", "customer-name", urls::STRING).await;
+        let (_c, own_prop) =
+            make_class_and_property(&store, "c-rows", "pick-row", urls::RESOURCE_ARRAY).await;
+
+        let table =
+            make_table_with_rows(&store, &row_class, &name_prop, &["Acme", "Globex"]).await;
+
+        let mut options = json!({
+            OPTIONS_SOURCE_KEY: { "table": table, "labelProperty": name_prop },
+        });
+        resolve_choice_options(&store, "dropdown", &own_prop, &mut options).await;
+
+        let resolved = options[OPTIONS_KEY].as_array().unwrap().clone();
+        let mut labels: Vec<&str> = resolved
+            .iter()
+            .map(|o| o["label"].as_str().unwrap())
+            .collect();
+        labels.sort_unstable();
+        assert_eq!(labels, ["Acme", "Globex"]);
+
+        // The answer is the row's subject, not a copy of its label — which is
+        // the whole point of sourcing from a table.
+        let picked = resolved[0]["value"].as_str().unwrap().to_string();
+        assert_ne!(picked, resolved[0]["label"].as_str().unwrap());
+        assert!(check_membership(&[picked], &options).is_ok());
+        assert!(check_membership(&["Acme".to_string()], &options).is_err());
+    }
+
+    #[tokio::test]
+    async fn rows_the_label_column_is_empty_for_are_not_offered() {
+        let store = init_store().await;
+        let (row_class, notes_prop) =
+            make_class_and_property(&store, "lead", "lead-notes", urls::STRING).await;
+        let (_c, own_prop) =
+            make_class_and_property(&store, "c-blank", "pick-blank", urls::RESOURCE_ARRAY).await;
+
+        // Two rows have notes, one does not — but all three have a `name`.
+        let table =
+            make_table_with_rows(&store, &row_class, &notes_prop, &["Hot", "", "Cold"]).await;
+
+        let mut options = json!({
+            OPTIONS_SOURCE_KEY: { "table": table, "labelProperty": notes_prop },
+        });
+        resolve_choice_options(&store, "dropdown", &own_prop, &mut options).await;
+
+        let mut labels: Vec<&str> = options[OPTIONS_KEY]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| o["label"].as_str().unwrap())
+            .collect();
+        labels.sort_unstable();
+        assert_eq!(
+            labels,
+            ["Cold", "Hot"],
+            "the unlabelled row is dropped rather than falling back to its \
+             `name` — an option labelled from a different column than the one \
+             the builder picked is worse than no option"
+        );
+    }
+
+    #[tokio::test]
+    async fn an_unresolvable_options_source_allows_nothing() {
+        let store = init_store().await;
+        let (_class, own_prop) =
+            make_class_and_property(&store, "c-gone", "pick-gone", urls::RESOURCE_ARRAY).await;
+
+        // Both branches fail closed rather than falling back to the field's
+        // own tags, which would silently offer a different list than the
+        // builder shows.
+        for source in [
+            json!({ "property": "did:ad:property:gone" }),
+            json!({ "table": "did:ad:table:gone" }),
+        ] {
+            let mut options = json!({ OPTIONS_SOURCE_KEY: source });
+            resolve_choice_options(&store, "dropdown", &own_prop, &mut options).await;
+
+            assert_eq!(options[OPTIONS_KEY], json!([]));
+            assert!(check_membership(&["anything".to_string()], &options).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn non_choice_fields_keep_their_options_bag() {
+        let store = init_store().await;
+        let (_class, prop) = make_class_and_property(&store, "c3", "txt", urls::STRING).await;
+
+        let mut options = json!({ "placeholder": "Your name" });
+        resolve_choice_options(&store, "short-text", &prop, &mut options).await;
+
+        assert_eq!(options, json!({ "placeholder": "Your name" }));
+    }
+
     #[tokio::test]
     async fn definition_includes_styling() {
         let store = init_store().await;
@@ -1815,16 +2359,16 @@ mod tests {
                     description: None,
                     field_type: "radio".into(),
                     required: true,
-                    options: json!({"options": ["A", "B"]}),
+                    options: choice_options(&["A", "B"]),
                     conditions: vec![],
                 }],
             }],
         };
 
         let mut values = Map::new();
-        values.insert("https://example.com/r".into(), json!("C"));
+        values.insert("https://example.com/r".into(), json!(tag("C")));
         let errors = validate_submission(&definition, &values).unwrap_err();
-        assert!(errors[0].message.contains("not one of the allowed options"));
+        assert!(errors[0].message.contains("Not one of the allowed options"));
     }
 
     // ── Extended field types (planning/form-field-types.md) ──────────────
@@ -1888,6 +2432,33 @@ mod tests {
         match result.expect("expected the answer to validate") {
             Value::String(s) => s,
             other => panic!("expected a String value, got {other:?}"),
+        }
+    }
+
+    /// The Tag subject a test's option label stands for. Choice answers are
+    /// option subjects now, so tests name options by label and go through
+    /// this to get what actually crosses the wire.
+    fn tag(label: &str) -> String {
+        format!("did:ad:tag:{label}")
+    }
+
+    /// An options bag as [resolve_choice_options] would leave it.
+    fn choice_options(labels: &[&str]) -> JsonValue {
+        json!({
+            OPTIONS_KEY: labels
+                .iter()
+                .map(|label| json!({ "value": tag(label), "label": label }))
+                .collect::<Vec<_>>()
+        })
+    }
+
+    /// Choice answers land as a `resourceArray` of option subjects — single-pick
+    /// questions included, which is what makes the mapped column an ordinary
+    /// SelectProperty.
+    fn ok_choice(result: Result<Value, String>) -> Vec<String> {
+        match result.expect("expected the answer to validate") {
+            value @ Value::ResourceArray(_) => value.to_subjects(None).expect("subjects"),
+            other => panic!("expected a ResourceArray value, got {other:?}"),
         }
     }
 
@@ -1978,14 +2549,34 @@ mod tests {
 
     #[test]
     fn dropdowns_enforce_option_membership() {
-        let options = json!({"options": ["A", "B"]});
+        let options = choice_options(&["A", "B"]);
         assert_eq!(
-            ok_string(submit_one("dropdown", false, options.clone(), json!("A"))),
-            "A"
+            ok_choice(submit_one(
+                "dropdown",
+                false,
+                options.clone(),
+                json!(tag("A"))
+            )),
+            vec![tag("A")],
+            "a single-pick answer stores a one-element resourceArray"
         );
-        assert!(submit_one("dropdown", false, options.clone(), json!("C")).is_err());
-        assert!(submit_one("dropdown-multi", false, options.clone(), json!(["A", "B"])).is_ok());
-        assert!(submit_one("dropdown-multi", false, options, json!(["A", "C"])).is_err());
+        assert!(submit_one("dropdown", false, options.clone(), json!(tag("C"))).is_err());
+        assert_eq!(
+            ok_choice(submit_one(
+                "dropdown-multi",
+                false,
+                options.clone(),
+                json!([tag("A"), tag("B")])
+            )),
+            vec![tag("A"), tag("B")]
+        );
+        assert!(submit_one(
+            "dropdown-multi",
+            false,
+            options,
+            json!([tag("A"), tag("C")])
+        )
+        .is_err());
     }
 
     #[test]
@@ -2017,19 +2608,21 @@ mod tests {
     #[test]
     fn picture_choice_validates_like_a_radio() {
         let options = json!({
-            "options": ["Cat", "Dog"],
-            "optionImages": ["did:ad:file-a", "did:ad:file-b"],
+            OPTIONS_KEY: [
+                { "value": tag("Cat"), "label": "Cat", "image": "did:ad:file-a" },
+                { "value": tag("Dog"), "label": "Dog", "image": "did:ad:file-b" },
+            ]
         });
         assert_eq!(
-            ok_string(submit_one(
+            ok_choice(submit_one(
                 "picture-choice",
                 false,
                 options.clone(),
-                json!("Dog")
+                json!(tag("Dog"))
             )),
-            "Dog"
+            vec![tag("Dog")]
         );
-        assert!(submit_one("picture-choice", false, options, json!("Bird")).is_err());
+        assert!(submit_one("picture-choice", false, options, json!(tag("Bird"))).is_err());
     }
 
     #[test]
@@ -2175,7 +2768,13 @@ mod tests {
         let mut definition = single_field_definition(
             "picture-choice",
             false,
-            json!({"options": ["A", "B"], "optionImages": ["did:ad:file-a", ""]}),
+            json!({
+                OPTIONS_KEY: [
+                    { "value": tag("A"), "label": "A", "image": "did:ad:file-a" },
+                    { "value": tag("B"), "label": "B", "image": "" },
+                    { "value": tag("C"), "label": "C" },
+                ]
+            }),
         );
 
         rewrite_option_images(&mut definition, |subject| format!("/img/{subject}"));
@@ -2184,11 +2783,14 @@ mod tests {
             panic!("expected a field block");
         };
         assert_eq!(
-            options["optionImages"],
-            json!(["/img/did:ad:file-a", ""]),
-            "only non-empty subjects are rewritten"
+            options[OPTIONS_KEY],
+            json!([
+                { "value": tag("A"), "label": "A", "image": "/img/did:ad:file-a" },
+                { "value": tag("B"), "label": "B", "image": "" },
+                { "value": tag("C"), "label": "C" },
+            ]),
+            "only non-empty image subjects are rewritten; the rest is untouched"
         );
-        assert_eq!(options["options"], json!(["A", "B"]));
     }
 
     #[tokio::test]
@@ -2236,8 +2838,8 @@ mod tests {
         // the choice-count / histogram / answer-sample paths that already exist.
         let dropdown = field_summary(
             "dropdown",
-            json!({"options": ["A", "B"]}),
-            &[Value::String("A".into())],
+            choice_options(&["A", "B"]),
+            &[vec![tag("A")].into()],
             1,
         );
         assert_eq!(dropdown["counts"], json!([["A", 1], ["B", 0]]));
@@ -2274,21 +2876,18 @@ mod tests {
 
         assert_eq!(summary["answered"], 4);
         assert_eq!(summary["skipped"], 1);
-        assert_eq!(
-            summary["counts"],
-            json!([["NL", 2], ["BE", 1], ["DE", 1]])
-        );
+        assert_eq!(summary["counts"], json!([["NL", 2], ["BE", 1], ["DE", 1]]));
     }
 
     #[test]
     fn radio_counts_preserve_option_order_and_fold_unknown() {
         let values = vec![
-            Value::String("B".into()),
-            Value::String("A".into()),
-            Value::String("B".into()),
-            Value::String("stray".into()),
+            vec![tag("B")].into(),
+            vec![tag("A")].into(),
+            vec![tag("B")].into(),
+            vec![tag("stray")].into(),
         ];
-        let summary = field_summary("radio", json!({"options": ["A", "B", "C"]}), &values, 5);
+        let summary = field_summary("radio", choice_options(&["A", "B", "C"]), &values, 5);
 
         assert_eq!(summary["answered"], 4);
         assert_eq!(summary["skipped"], 1);
@@ -2299,14 +2898,14 @@ mod tests {
     }
 
     #[test]
-    fn multi_select_counts_iterate_json_arrays() {
+    fn multi_select_counts_iterate_picked_subjects() {
         let values = vec![
-            Value::Json(json!(["Red", "Green"])),
-            Value::Json(json!(["Red"])),
+            vec![tag("Red"), tag("Green")].into(),
+            vec![tag("Red")].into(),
         ];
         let summary = field_summary(
             "multi-select",
-            json!({"options": ["Red", "Green", "Blue"]}),
+            choice_options(&["Red", "Green", "Blue"]),
             &values,
             2,
         );

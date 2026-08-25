@@ -90,3 +90,51 @@ describe('the country list', () => {
     expect(countryOptions('en')[0]?.code).toBe('AF'); // Afghanistan
   });
 });
+
+/**
+ * Choice answers are option *subjects*, not labels — the mapped column is a
+ * SelectProperty whose `allowsOnly` holds the Tags. Mirrors
+ * `dropdowns_enforce_option_membership` in `server/src/forms.rs`.
+ */
+describe('choice option membership', () => {
+  const tag = (label: string) => `did:ad:tag:${label}`;
+  const choice = (type: FieldBlock['type']): FieldBlock => ({
+    ...field(type, 'Pick'),
+    options: {
+      options: [
+        { value: tag('A'), label: 'A' },
+        { value: tag('B'), label: 'B' },
+      ],
+    },
+  });
+
+  it('accepts a subject the question offers', () => {
+    expect(validateFieldValue(choice('dropdown'), tag('A'))).toBeNull();
+    expect(
+      validateFieldValue(choice('dropdown-multi'), [tag('A'), tag('B')]),
+    ).toBeNull();
+  });
+
+  it('rejects a subject it does not', () => {
+    expect(validateFieldValue(choice('dropdown'), tag('C'))).toBe(
+      'Not one of the allowed options',
+    );
+    expect(
+      validateFieldValue(choice('dropdown-multi'), [tag('A'), tag('C')]),
+    ).toBe('Not one of the allowed options');
+  });
+
+  it('rejects a label, which is display text rather than an answer', () => {
+    expect(validateFieldValue(choice('radio'), 'A')).toBe(
+      'Not one of the allowed options',
+    );
+  });
+
+  // Fails closed, unlike the other validators: an empty list means the
+  // question offers nothing, not that anything goes.
+  it('allows nothing when the question has no options', () => {
+    expect(validateFieldValue(field('dropdown', 'Pick'), tag('A'))).toBe(
+      'Not one of the allowed options',
+    );
+  });
+});

@@ -8,6 +8,7 @@ import {
   type MouseEvent,
 } from 'react';
 import { useCombobox, useSelect } from 'downshift';
+import { optionText, type FieldOption } from './types.js';
 
 /** Above this many options the menu grows a filter box. Below it, scanning
  * the list is faster than typing, and downshift's built-in typeahead already
@@ -25,13 +26,13 @@ type Variant = 'single' | 'multi';
  * current answer without branching on the variant. */
 interface PickerProps {
   variant: Variant;
-  options: string[];
-  selected: string[];
+  options: FieldOption[];
+  selected: FieldOption[];
   /** Applies one pick from the menu. */
-  onPick: (option: string) => void;
+  onPick: (option: FieldOption) => void;
   /** Empties the field: the trigger's ✕ on a single-select, a chip's ✕ on a
    * multi-select (which passes the option to drop). */
-  onRemove: (option?: string) => void;
+  onRemove: (option?: FieldOption) => void;
   inputId: string;
   labelId: string;
   placeholder?: string;
@@ -81,9 +82,9 @@ function useTriggerButtonHandlers(): {
 }
 
 interface TriggerProps extends Pick<PickerProps, 'variant' | 'placeholder'> {
-  selected: string[];
+  selected: FieldOption[];
   isOpen: boolean;
-  onRemove: (option?: string) => void;
+  onRemove: (option?: FieldOption) => void;
   /** Spread from `getToggleButtonProps()`. */
   buttonProps: Record<string, unknown>;
 }
@@ -107,7 +108,7 @@ function Trigger({
 }: TriggerProps): JSX.Element {
   const buttonHandlers = useTriggerButtonHandlers();
 
-  const clearButton = (option: string | undefined, label: string) => (
+  const clearButton = (option: FieldOption | undefined, label: string) => (
     <button
       type='button'
       tabIndex={-1}
@@ -137,14 +138,16 @@ function Trigger({
           </span>
         ) : variant === 'multi' ? (
           selected.map(option => (
-            <span className='atomic-form-combobox-chip' key={option}>
-              {option}
-              {clearButton(option, `Remove ${option}`)}
+            <span className='atomic-form-combobox-chip' key={option.value}>
+              {optionText(option)}
+              {clearButton(option, `Remove ${option.label}`)}
             </span>
           ))
         ) : (
           <>
-            <span className='atomic-form-combobox-value'>{selected[0]}</span>
+            <span className='atomic-form-combobox-value'>
+              {optionText(selected[0])}
+            </span>
             {clearButton(undefined, 'Clear selection')}
           </>
         )}
@@ -170,11 +173,11 @@ function optionProps(
 
 interface MenuItemsProps {
   variant: Variant;
-  items: string[];
-  selected: string[];
+  items: FieldOption[];
+  selected: FieldOption[];
   highlightedIndex: number;
   getItemProps: (options: {
-    item: string;
+    item: FieldOption;
     index: number;
   }) => Record<string, unknown>;
 }
@@ -199,12 +202,12 @@ function MenuItems({
   return (
     <>
       {items.map((item, index) => {
-        const isSelected = selected.includes(item);
+        const isSelected = selected.some(o => o.value === item.value);
 
         return (
           <li
             className='atomic-form-combobox-option'
-            key={item}
+            key={item.value}
             data-highlighted={index === highlightedIndex || undefined}
             data-current={(variant === 'single' && isSelected) || undefined}
             {...optionProps(getItemProps({ item, index }), isSelected)}
@@ -219,7 +222,7 @@ function MenuItems({
                 aria-hidden='true'
               />
             )}
-            <span>{item}</span>
+            <span>{optionText(item)}</span>
           </li>
         );
       })}
@@ -283,6 +286,7 @@ function PlainPicker({
     highlightedIndex,
   } = useSelect({
     items: options,
+    itemToString: option => (option ? optionText(option) : ''),
     // Selection lives in `selected`; downshift only drives the menu.
     selectedItem: null,
     stateReducer: (state, { changes, type }) => {
@@ -379,7 +383,9 @@ function SearchablePicker({
 
     if (!needle) return options;
 
-    return options.filter(option => option.toLowerCase().includes(needle));
+    return options.filter(option =>
+      optionText(option).toLowerCase().includes(needle),
+    );
   }, [options, query]);
 
   const {
@@ -391,6 +397,7 @@ function SearchablePicker({
     highlightedIndex,
   } = useCombobox({
     items,
+    itemToString: option => (option ? optionText(option) : ''),
     inputValue: query,
     selectedItem: null,
     onInputValueChange: ({ inputValue }) => setQuery(inputValue ?? ''),
@@ -497,7 +504,7 @@ function Picker(props: PickerProps): JSX.Element {
 }
 
 interface SelectProps<T> {
-  options: string[];
+  options: FieldOption[];
   value: T;
   onChange: (value: T) => void;
   /** Goes on the trigger, so the field's `<label htmlFor>` points at it. */
@@ -517,12 +524,16 @@ export function SingleSelect({
   onChange,
   ...rest
 }: SelectProps<string | undefined>): JSX.Element {
+  // An answer naming an option that no longer exists resolves to nothing, so
+  // the field reads as unanswered rather than rendering a bare subject.
+  const picked = options.filter(option => option.value === value);
+
   return (
     <Picker
       variant='single'
       options={options}
-      selected={value === undefined || value === '' ? [] : [value]}
-      onPick={option => onChange(option)}
+      selected={picked}
+      onPick={option => onChange(option.value)}
       onRemove={() => onChange(undefined)}
       {...rest}
     />
@@ -541,19 +552,19 @@ export function MultiSelect({
 }: SelectProps<string[]>): JSX.Element {
   /** Add/remove one option, preserving the order `options` declares them in
    * so the chips don't shuffle around as the visitor toggles them. */
-  const toggle = (option: string) => {
-    const next = value.includes(option)
-      ? value.filter(o => o !== option)
-      : [...value, option];
+  const toggle = (option: FieldOption) => {
+    const next = value.includes(option.value)
+      ? value.filter(v => v !== option.value)
+      : [...value, option.value];
 
-    onChange(options.filter(o => next.includes(o)));
+    onChange(options.filter(o => next.includes(o.value)).map(o => o.value));
   };
 
   return (
     <Picker
       variant='multi'
       options={options}
-      selected={value}
+      selected={options.filter(o => value.includes(o.value))}
       onPick={toggle}
       onRemove={option => option !== undefined && toggle(option)}
       {...rest}

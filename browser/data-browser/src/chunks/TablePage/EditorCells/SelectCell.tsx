@@ -1,5 +1,6 @@
 import {
   core,
+  dataBrowser,
   JSONValue,
   Store,
   useArray,
@@ -13,7 +14,6 @@ import { TagButton, Tag } from '@components/Tag';
 import { CellContainer, DisplayCellProps, EditCellProps } from './Type';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { Row } from '@components/Row';
-import { stringToSlug } from '@helpers/stringToSlug';
 import { loopingIndex } from '@helpers/loopingIndex';
 import { fadeIn } from '@helpers/commonAnimations';
 import { KeyboardInteraction, useCellOptions } from '@chunks/TableEditor';
@@ -34,7 +34,11 @@ function buildListWithTitles(
     .filter(v => !ignore.includes(v))
     .map(subject => {
       const resource = store.getResourceLoading(subject);
-      const title = resource?.get(core.properties.shortname) ?? subject;
+      // Same precedence as `useTitle`: the free-text name, else the slug.
+      const title =
+        resource?.get(core.properties.name) ??
+        resource?.get(core.properties.shortname) ??
+        subject;
 
       return { subject, title: title as string };
     });
@@ -52,8 +56,15 @@ function SelectCellEdit({
   const [allowsOnly] = useArray(propertyResource, core.properties.allowsOnly);
   const [query, setQuery] = useState('');
 
+  // `max` on a SelectProperty caps how many tags may be picked at once — it is
+  // how single-select is expressed, since a SelectProperty is always a
+  // resourceArray. Form questions of a single-pick type set `max: 1`.
+  const max = propertyResource.get(dataBrowser.properties.max) as
+    | number
+    | undefined;
+
   const filteredTags = buildListWithTitles(store, allowsOnly, val)
-    .filter(v => v.title.includes(query))
+    .filter(v => v.title.toLowerCase().includes(query.toLowerCase()))
     .map(ft => ft.subject);
 
   const { triggerProps, popoverProps } = usePopover({
@@ -74,12 +85,16 @@ function SelectCellEdit({
   useCellOptions(cellOptions);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setQuery(stringToSlug(e.target.value));
+    setQuery(e.target.value);
     setSelectedIndex(0);
   };
 
   const handleAddTag = (subject: string) => {
-    onChange(Array.from(new Set([...val, subject])));
+    const next = Array.from(new Set([...val, subject]));
+
+    // At the cap, the new pick displaces the oldest rather than being
+    // dropped — so a `max: 1` column behaves as a single-select swap.
+    onChange(max !== undefined && next.length > max ? next.slice(-max) : next);
   };
 
   const handleRemoveTag = (subject: string) => {

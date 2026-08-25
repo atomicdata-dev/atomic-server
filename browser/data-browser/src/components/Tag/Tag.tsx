@@ -1,4 +1,4 @@
-import { urls, useResource, useString, useTitle } from '@tomic/react';
+import { core, urls, useResource, useString, useTitle } from '@tomic/react';
 import { lighten, setLightness, setSaturation, transparentize } from 'polished';
 import * as RadixPopover from '@radix-ui/react-popover';
 import { useCallback, useMemo, useState, type JSX } from 'react';
@@ -11,6 +11,9 @@ import { Column, Row } from '../Row';
 import { FaTrash } from 'react-icons/fa6';
 import { fadeIn } from '../../helpers/commonAnimations';
 import { tagColours } from './tagColours';
+import { InputStyled, InputWrapper } from '../forms/InputStyles';
+import { stringToSlug } from '../../helpers/stringToSlug';
+import { useDraftString } from '../../helpers/useDraftString';
 
 interface TagProps {
   subject: string;
@@ -156,6 +159,7 @@ export function EditableTag({
     >
       <PopoverContent>
         <Column>
+          <TagNameInput subject={subject} />
           <PalettePicker palette={tagColours} onChange={handleColorChange} />
           <DeleteButton onClick={() => onDelete(subject)}>
             <Row gap='0.5rem'>
@@ -166,6 +170,47 @@ export function EditableTag({
         </Column>
       </PopoverContent>
     </Popover>
+  );
+}
+
+/**
+ * Renames the tag. Writes `name` (free text) and keeps `shortname` in step as
+ * its slug — the class requires the slug, while `useTitle` displays the name.
+ *
+ * Renaming rather than replacing matters wherever the tag is referenced: every
+ * resource pointing at it (a table cell, a submitted form answer) re-reads the
+ * new label, instead of being stranded with a copy of the old text.
+ */
+function TagNameInput({ subject }: { subject: string }): JSX.Element {
+  const resource = useResource(subject);
+  const [name, setName] = useString(resource, core.properties.name, {
+    commit: true,
+  });
+  const [, setShortname] = useString(resource, core.properties.shortname, {
+    commit: true,
+  });
+
+  const commit = useCallback(
+    (value: string) => {
+      setName(value);
+      setShortname(stringToSlug(value));
+    },
+    [setName, setShortname],
+  );
+
+  // Dismissing the popover unmounts this input, so the draft has to survive
+  // that — see `useDraftString`.
+  const draft = useDraftString(name, commit, subject);
+
+  return (
+    <InputWrapper>
+      <InputStyled
+        data-testid='tag-name-input'
+        aria-label='Tag name'
+        value={draft.value}
+        onChange={e => draft.onChange(e.target.value)}
+      />
+    </InputWrapper>
   );
 }
 

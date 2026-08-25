@@ -1,26 +1,37 @@
-import { Resource } from '@tomic/react';
+import { forms, Resource, useResource, useString } from '@tomic/react';
 import type { JSX } from 'react';
-import { StringListEditor } from './StringListEditor';
-import { useFieldOptions } from './useFieldOptions';
+import { LinkableTagList } from './LinkableTagList';
 
 interface ChoiceOptionsProps {
   field: Resource;
 }
 
-/** Editable list of choice labels for `radio` / `multi-select` /
- * `dropdown` / `dropdown-multi` fields. */
+/**
+ * The options of a `radio` / `multi-select` / `dropdown` / `dropdown-multi`
+ * question: an editable list of labels, as it has always looked — or a link to
+ * another table's column, which replaces the list. See
+ * {@link LinkableTagList}.
+ *
+ * Each option is a Tag on the mapped Property's `allowsOnly` rather than a
+ * string in the field's options bag.
+ */
 export function ChoiceOptions({ field }: ChoiceOptionsProps): JSX.Element {
-  const [options, setOptions] = useFieldOptions(field);
+  const [mapsTo] = useString(field, forms.properties.formMapsTo);
+  const property = useResource(mapsTo);
+
+  // Only while the field's mapped Property is still loading — every saved
+  // choice field has one.
+  if (!mapsTo) {
+    return <></>;
+  }
 
   return (
-    <StringListEditor
+    <LinkableTagList
+      field={field}
+      property={property}
       label='Options'
-      value={(options.options as string[] | undefined) ?? []}
-      onChange={list => setOptions({ ...options, options: list })}
-      resetKey={field.subject}
       addLabel='Add option'
       removeLabel='Remove option'
-      newItemLabel={index => `Option ${index}`}
       itemTestId='choice-option-input'
     />
   );

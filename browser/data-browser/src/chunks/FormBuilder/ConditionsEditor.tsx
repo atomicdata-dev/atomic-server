@@ -319,8 +319,8 @@ function ValueInput({
         onChange={e => onChange(e.target.value)}
       >
         {question.choiceOptions.map(opt => (
-          <option key={opt} value={opt}>
-            {opt}
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
           </option>
         ))}
       </ShrinkSelect>
@@ -386,8 +386,9 @@ function defaultValueFor(question: FormQuestionRef): JSONValue {
 
   if (NUMERIC_TYPES.includes(question.type)) return 0;
 
+  // A choice answer is the option's subject, not its label.
   if (question.choiceOptions && question.choiceOptions.length > 0) {
-    return question.choiceOptions[0];
+    return question.choiceOptions[0].value;
   }
 
   return '';

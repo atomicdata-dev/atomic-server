@@ -159,6 +159,12 @@ export async function createSelectPropertyOnClass(
   opts: {
     name: string;
     tags: TagSeed[];
+    /**
+     * How many tags may be picked at once. A SelectProperty is always a
+     * `resourceArray`, so single-select is `max: 1` rather than a different
+     * datatype — see `SelectProperty`'s `max` in `lib/defaults/table.json`.
+     */
+    max?: number;
     /** See {@link createPropertyOnClass}'s `deferAttach`. */
     deferAttach?: boolean;
   },
@@ -175,6 +181,9 @@ export async function createSelectPropertyOnClass(
       [core.properties.datatype]: Datatype.RESOURCEARRAY,
       [core.properties.classtype]: dataBrowser.classes.tag,
       [core.properties.allowsOnly]: [],
+      ...(opts.max !== undefined
+        ? { [dataBrowser.properties.max]: opts.max }
+        : {}),
     },
   });
 
@@ -198,7 +207,12 @@ export async function createSelectPropertyOnClass(
       parent: property.subject,
       isA: dataBrowser.classes.tag,
       propVals: {
+        // `shortname` is the slug the class requires; `name` carries the
+        // label verbatim, since a seed like "Strongly agree — daily" does not
+        // survive slugification. `useTitle` prefers `name`, so every tag
+        // renderer shows the original text.
         [core.properties.shortname]: stringToSlug(seed.name),
+        [core.properties.name]: seed.name,
         [dataBrowser.properties.color]: seed.color ?? randomItem(tagColours),
       },
     });

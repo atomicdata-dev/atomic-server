@@ -2,6 +2,24 @@ import { test, expect, type Page } from '@playwright/test';
 import http from 'node:http';
 import { before, newResource, openSubject, SERVER_URL } from './test-utils';
 
+/** Gives the open choice field exactly these options, in order. A new choice
+ * question starts with none, and each input edits one option Tag's name — the
+ * answers reference the Tag, not the text. */
+const setOptionLabels = async (page: Page, labels: string[]) => {
+  const inputs = page.getByTestId('choice-option-input');
+
+  for (let i = await inputs.count(); i < labels.length; i++) {
+    await page.getByRole('button', { name: 'Add option' }).click();
+    await expect(inputs).toHaveCount(i + 1);
+  }
+
+  await expect(inputs).toHaveCount(labels.length);
+
+  for (const [index, label] of labels.entries()) {
+    await inputs.nth(index).fill(label);
+  }
+};
+
 const FORM_TARGET_TABLE = 'https://atomicdata.dev/properties/form-target-table';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 const FORM_STYLING = 'https://atomicdata.dev/properties/form-styling';
@@ -562,28 +580,7 @@ test.describe('form publish and anonymous submit', () => {
     await expect(page.getByTestId('field-row-radio')).toBeVisible();
     await page.getByTestId('field-row-radio').click();
     await page.getByTestId('field-label-input').fill('Do you have a pet?');
-    const optionInputs = page.getByTestId('choice-option-input');
-    await optionInputs.nth(0).fill('Yes');
-    await optionInputs.nth(1).fill('No');
-    await page.waitForFunction(
-      ({ typeProp, optionsProp }) => {
-        for (const r of window.store.resources.values()) {
-          if (r.get(typeProp) === 'radio') {
-            const raw = r.get(optionsProp);
-            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-
-            return parsed?.options?.[0] === 'Yes';
-          }
-        }
-
-        return false;
-      },
-      {
-        typeProp: 'https://atomicdata.dev/properties/form-field-type',
-        optionsProp: 'https://atomicdata.dev/properties/form-field-options',
-      },
-      { timeout: 10000 },
-    );
+    await setOptionLabels(page, ['Yes', 'No']);
 
     await page.getByTitle('Add field').click();
     await page
@@ -602,9 +599,9 @@ test.describe('form publish and anonymous submit', () => {
     await page.getByTestId('add-condition').click();
     await expect(page.getByTestId('condition-field')).toBeVisible();
     await expect(
-      page.getByTestId('condition-value').locator('option[value="Yes"]'),
+      page.getByTestId('condition-value').locator('option', { hasText: 'Yes' }),
     ).toHaveCount(1, { timeout: 10000 });
-    await page.getByTestId('condition-value').selectOption('Yes');
+    await page.getByTestId('condition-value').selectOption({ label: 'Yes' });
 
     // The conditions editor is a modal <dialog>; while it is open its
     // backdrop swallows every click on the page behind it (including
@@ -670,7 +667,17 @@ test.describe('form publish and anonymous submit', () => {
           b.kind === 'field' && b.label === "Pet's name",
       );
       expect(followUp?.conditions?.[0]?.operator).toBe('equals');
-      expect(followUp?.conditions?.[0]?.value).toBe('Yes');
+      // The condition stores the option's subject; the definition resolves
+      // that same subject to the 'Yes' label.
+      const radio = body.pages[0].blocks.find(
+        (b: { kind: string; type?: string }) =>
+          b.kind === 'field' && b.type === 'radio',
+      );
+      const yes = radio?.options?.options?.find(
+        (o: { label: string }) => o.label === 'Yes',
+      );
+      expect(yes?.value).toBeTruthy();
+      expect(followUp?.conditions?.[0]?.value).toBe(yes.value);
     }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
 
     const tableSubject = await page.evaluate(
@@ -765,10 +772,7 @@ test.describe('form publish and anonymous submit', () => {
     await page.getByTestId('field-row-dropdown').click();
     await page.getByTestId('field-label-input').fill('Plan');
 
-    const choiceInputs = page.getByTestId('choice-option-input');
-    await expect(choiceInputs).toHaveCount(2);
-    await choiceInputs.nth(0).fill('Basic');
-    await choiceInputs.nth(1).fill('Pro');
+    await setOptionLabels(page, ['Basic', 'Pro']);
 
     // --- Rating ---
     await page.getByTitle('Add field').click();
@@ -818,9 +822,13 @@ test.describe('form publish and anonymous submit', () => {
     const visitorPage = await visitorContext.newPage();
     await visitorPage.goto(`${SERVER_URL}/form/${formSubject}`);
 
+    // `dropdown` renders the combobox from `SelectMenu.tsx`, not a native
+    // <select>: open the trigger, then pick the row from the listbox.
     const planSelect = visitorPage.getByLabel('Plan', { exact: false });
     await expect(planSelect).toBeVisible({ timeout: 15000 });
-    await planSelect.selectOption('Pro');
+    await planSelect.click();
+    await visitorPage.getByRole('option', { name: 'Pro', exact: true }).click();
+    await expect(planSelect).toContainText('Pro');
 
     // The rating radios carry their own aria-labels; the star glyph itself is
     // decorative.
@@ -828,9 +836,11 @@ test.describe('form publish and anonymous submit', () => {
 
     await visitorPage.getByLabel('Address', { exact: true }).fill('Main St 1');
     await visitorPage.getByLabel('City', { exact: true }).fill('Utrecht');
+    // The address's country subfield is a native <select> over ISO codes
+    // (`CountrySelect`), not a free-text input.
     await visitorPage
-      .getByLabel('Country', { exact: true })
-      .fill('Netherlands');
+      .getByRole('combobox', { name: /Country/ })
+      .selectOption({ label: 'Netherlands' });
 
     const submitButton = visitorPage.getByRole('button', {
       name: 'Submit',

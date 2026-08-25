@@ -1,20 +1,19 @@
-import { Resource, server, useResource, type JSONValue } from '@tomic/react';
-import { useEffect, useState, type JSX } from 'react';
-import { styled } from 'styled-components';
-import { FaImage, FaPlus, FaTrash } from 'react-icons/fa6';
-import Field from '@components/forms/Field';
-import { Button } from '@components/Button';
-import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
-import { Column, Row } from '@components/Row';
 import {
-  IconButton,
-  IconButtonVariant,
-} from '@components/IconButton/IconButton';
+  forms,
+  Resource,
+  server,
+  useResource,
+  useStore,
+  useString,
+} from '@tomic/react';
+import { useState, type JSX } from 'react';
+import { styled } from 'styled-components';
+import { FaImage } from 'react-icons/fa6';
+import { Button } from '@components/Button';
+import { Row } from '@components/Row';
 import { FilePickerDialog } from '@components/forms/FilePicker/FilePickerDialog';
 import { useUpload } from '../../../hooks/useUpload';
-import { useDebounce } from '@helpers/useDebounce';
-import { AddButton } from './StringListEditor';
-import { useFieldOptions } from './useFieldOptions';
+import { LinkableTagList } from './LinkableTagList';
 
 const IMAGE_MIMES = new Set([
   'image/png',
@@ -29,138 +28,78 @@ interface PictureChoiceOptionsProps {
   field: Resource;
 }
 
-interface Draft {
-  options: string[];
-  images: string[];
-}
-
 /**
- * Options for a `picture-choice` question: a label plus an image per choice.
- * Images are File subjects stored in `optionImages`, positionally matched to
- * `options` — so renaming a label keeps its image. Labels and images share one
- * debounced draft: they live in the same JSON property, and writing them from
- * two places would let one write clobber the other's pending edit.
+ * Options for a `picture-choice` question: the same label list every choice
+ * question has ({@link LinkableTagList}), plus a thumbnail and an image picker
+ * per row.
+ *
+ * The image is the option Tag's `cover-image`, so an option is one resource
+ * rather than a label and an image held in two positionally matched arrays.
  */
 export function PictureChoiceOptions({
   field,
 }: PictureChoiceOptionsProps): JSX.Element {
-  const [options, setOptions] = useFieldOptions(field);
+  const store = useStore();
+  const [mapsTo] = useString(field, forms.properties.formMapsTo);
+  const property = useResource(mapsTo);
   const { upload, isUploading } = useUpload(field);
 
-  const stored: Draft = {
-    options: (options.options as string[] | undefined) ?? [],
-    images: (options.optionImages as string[] | undefined) ?? [],
-  };
+  const [pickingFor, setPickingFor] = useState<string | undefined>();
 
-  const [draft, setDraft] = useState<Draft>(stored);
-  const debounced = useDebounce(draft, 150);
-  const [pickingFor, setPickingFor] = useState<number | undefined>();
-
-  useEffect(() => {
-    setDraft(stored);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [field.subject]);
-
-  useEffect(() => {
-    if (JSON.stringify(debounced) !== JSON.stringify(stored)) {
-      setOptions({
-        ...options,
-        options: debounced.options,
-        optionImages: debounced.images as JSONValue,
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debounced]);
-
-  const setImage = (index: number, subject: string) => {
-    const images = [...draft.images];
-    images[index] = subject;
-    setDraft({ ...draft, images });
+  const setImage = async (tagSubject: string, fileSubject: string) => {
+    const tag = await store.getResource(tagSubject);
+    await tag.set(forms.properties.coverImage, fileSubject);
+    await tag.save();
     setPickingFor(undefined);
   };
 
   const handleUpload = async (file: File) => {
-    const index = pickingFor;
+    const tagSubject = pickingFor;
 
-    if (index === undefined) return;
+    if (tagSubject === undefined) return;
 
     const [subject] = await upload([file]);
 
     if (subject) {
-      setImage(index, subject);
+      await setImage(tagSubject, subject);
     }
   };
 
+  // Only while the field's mapped Property is still loading — every saved
+  // choice field has one.
+  if (!mapsTo) {
+    return <></>;
+  }
+
   return (
     <>
-      <Field label='Options'>
-        <Column gap='0.6rem'>
-          {draft.options.map((option, index) => (
-            <OptionRow key={`option-${index}`} gap='0.5rem' center>
-              <OptionImage subject={draft.images[index]} />
-              <Column gap='0.3rem'>
-                <InputWrapper>
-                  <InputStyled
-                    data-testid='picture-option-input'
-                    value={option}
-                    onChange={e => {
-                      const next = [...draft.options];
-                      next[index] = e.target.value;
-                      setDraft({ ...draft, options: next });
-                    }}
-                  />
-                </InputWrapper>
-                <Row gap='0.3rem'>
-                  <Button
-                    subtle
-                    type='button'
-                    disabled={isUploading}
-                    onClick={() => setPickingFor(index)}
-                  >
-                    <FaImage /> {draft.images[index] ? 'Replace' : 'Add image'}
-                  </Button>
-                  <IconButton
-                    variant={IconButtonVariant.Simple}
-                    size='0.8rem'
-                    color='textLight'
-                    title='Remove option'
-                    type='button'
-                    onClick={() =>
-                      setDraft({
-                        options: draft.options.filter((_, i) => i !== index),
-                        images: draft.images.filter((_, i) => i !== index),
-                      })
-                    }
-                  >
-                    <FaTrash />
-                  </IconButton>
-                </Row>
-              </Column>
-            </OptionRow>
-          ))}
-          <AddButton
-            type='button'
-            subtle
-            onClick={() =>
-              setDraft({
-                options: [
-                  ...draft.options,
-                  `Option ${draft.options.length + 1}`,
-                ],
-                images: [...draft.images, ''],
-              })
-            }
-          >
-            <Row gap='.5rem' center>
-              <FaPlus /> Add option
-            </Row>
-          </AddButton>
-        </Column>
-      </Field>
+      <LinkableTagList
+        field={field}
+        property={property}
+        label='Options'
+        addLabel='Add option'
+        removeLabel='Remove option'
+        itemTestId='picture-option-input'
+        leading={subject => <TagImage subject={subject} />}
+        belowInput={subject => (
+          <Row>
+            <Button
+              subtle
+              type='button'
+              disabled={isUploading}
+              onClick={() => setPickingFor(subject)}
+            >
+              <FaImage /> <ImageButtonLabel subject={subject} />
+            </Button>
+          </Row>
+        )}
+      />
       <FilePickerDialog
         show={pickingFor !== undefined}
         onShowChange={show => !show && setPickingFor(undefined)}
-        onResourcePicked={subject => setImage(pickingFor ?? 0, subject)}
+        onResourcePicked={subject =>
+          pickingFor !== undefined && setImage(pickingFor, subject)
+        }
         onNewFilePicked={handleUpload}
         allowedMimes={IMAGE_MIMES}
       />
@@ -168,12 +107,23 @@ export function PictureChoiceOptions({
   );
 }
 
-/** Thumbnail of the picked File. The builder is authenticated, so the File's
- * rights-checked `downloadURL` works here — the published form instead gets
- * the publish-gated `/form/{id}/image?file=…` URL from the server. */
-function OptionImage({ subject }: { subject?: string }): JSX.Element {
-  const file = useResource(subject);
-  const url = subject
+function ImageButtonLabel({ subject }: { subject: string }): JSX.Element {
+  const tag = useResource(subject);
+
+  return <>{tag.get(forms.properties.coverImage) ? 'Replace' : 'Add image'}</>;
+}
+
+/** Thumbnail of the option Tag's cover image. The builder is authenticated, so
+ * the File's rights-checked `downloadURL` works here — the published form
+ * instead gets the publish-gated `/form/{id}/image?file=…` URL from the
+ * server. */
+function TagImage({ subject }: { subject: string }): JSX.Element {
+  const tag = useResource(subject);
+  const fileSubject = tag.get(forms.properties.coverImage) as
+    | string
+    | undefined;
+  const file = useResource(fileSubject);
+  const url = fileSubject
     ? (file.get(server.properties.downloadUrl) as string | undefined)
     : undefined;
 
@@ -185,10 +135,6 @@ function OptionImage({ subject }: { subject?: string }): JSX.Element {
     </EmptyThumbnail>
   );
 }
-
-const OptionRow = styled(Row)`
-  align-items: flex-start;
-`;
 
 const Thumbnail = styled.img`
   width: 3.5rem;
