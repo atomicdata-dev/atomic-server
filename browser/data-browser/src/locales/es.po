@@ -8637,6 +8637,22 @@ msgstr ""
 msgid "This app cannot write on its own: {0}"
 msgstr ""
 
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Something went wrong."
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "This app hit an error."
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Fix it"
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Dismiss"
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexto compactado"
 
