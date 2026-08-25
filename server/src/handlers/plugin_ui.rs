@@ -188,6 +188,11 @@ fn render_plugin_ui_html_with(
         // Failures surface in the frame instead of only in a console nobody
         // has open: a plugin that throws on load would otherwise render as a
         // blank panel, which reads as "the host is broken".
+        //
+        // They are also reported to the host, because rendering the message
+        // here is a dead end: the frame is null-origin, so nothing outside it
+        // can read this text, and the person who has to fix the app is on the
+        // other side of that boundary.
         format!(
             r#"<script type="module" nonce="{nonce}">
 import * as plugin from "{js_url}";
@@ -200,6 +205,7 @@ try {{
   await plugin.view({{ root, store }});
 }} catch (e) {{
   root.textContent = String(e && e.message ? e.message : e);
+  window.__atomicReportError(e, 'load');
 }}
 </script>"#
         )
@@ -218,6 +224,41 @@ try {{
 <style id="__atomic_theme"></style>
 {script}
 <script nonce="{nonce}">
+// An app fails where the person who can fix it cannot see it. The frame is
+// null-origin by design, so its console belongs to nobody: a throw in a click
+// handler leaves a dead button and no trace anywhere reachable. Every error
+// route out of the frame therefore ends here, and goes to the host.
+//
+// This block sits after the module script in the document but runs before it:
+// a `type=module` script is deferred, a classic inline one is not. So the
+// reporter exists by the time a load-time throw looks for it.
+window.__atomicReportError = function (error, phase) {{
+  if (!window.parent) return;
+
+  var message = error && error.message ? error.message : String(error);
+
+  window.parent.postMessage({{
+    type: '__atomic_plugin_error',
+    phase: phase || 'runtime',
+    message: message,
+    // The stack names the line, which is the difference between "it broke"
+    // and a fix. It describes only the app's own source, which its author is
+    // already allowed to read.
+    stack: error && error.stack ? String(error.stack) : undefined,
+  }}, '*');
+}};
+
+window.addEventListener('error', function (e) {{
+  window.__atomicReportError(e.error || e.message, 'runtime');
+}});
+
+// A rejected promise nobody caught is the common shape here: the host refuses
+// a write the app is not allowed to make, and an app that never awaited the
+// refusal simply does nothing with no explanation.
+window.addEventListener('unhandledrejection', function (e) {{
+  window.__atomicReportError(e.reason, 'runtime');
+}});
+
 window.addEventListener('message', function (e) {{
   if (e.data && e.data.type === '__atomic_style') {{
     var s = document.getElementById('__atomic_theme');
@@ -453,4 +494,56 @@ pub async fn handle_plugin_list(
     }
 
     Ok(HttpResponse::Ok().json(plugin_list))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An app's frame is null-origin, so its console is reachable by nobody:
+    /// whatever it prints there, the person who could fix the app never sees.
+    /// Every way out of the frame therefore has to end in a message to the
+    /// host, and these are the three ways out.
+    #[test]
+    fn every_route_out_of_a_broken_app_reaches_the_host() {
+        let html = render_plugin_ui_html_with("format=html", false, "n0nce", true);
+
+        // Threw while opening.
+        assert!(html.contains("window.__atomicReportError(e, 'load')"));
+        // Threw while being used — the dead button.
+        assert!(html.contains("window.addEventListener('error'"));
+        // Refused by the host and never awaited, which is what a write outside
+        // the app's own subtree looks like from in there.
+        assert!(html.contains("window.addEventListener('unhandledrejection'"));
+
+        assert!(html.contains("'__atomic_plugin_error'"));
+    }
+
+    /// The reporter is declared after the module script in the document but has
+    /// to exist before it runs, which it does only because `type=module` defers
+    /// and a classic inline script does not. Reordering these silently loses
+    /// every load-time error.
+    #[test]
+    fn the_reporter_is_defined_by_the_time_a_load_error_looks_for_it() {
+        let html = render_plugin_ui_html_with("format=html", false, "n0nce", true);
+
+        let reporter = html
+            .find("window.__atomicReportError = function")
+            .expect("reporter is defined");
+
+        // Which <script> does it live in? The one that opens last before it.
+        let opening = html[..reporter]
+            .rfind("<script")
+            .expect("the reporter is inside a script tag");
+        let tag_end = html[opening..]
+            .find('>')
+            .map(|i| opening + i)
+            .expect("that script tag is closed");
+
+        assert!(
+            !html[opening..tag_end].contains("type=\"module\""),
+            "the reporter must stay in a classic script. A module defers, so \
+             moving it there would leave load-time throws with nothing to call."
+        );
+    }
 }
