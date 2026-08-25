@@ -6,10 +6,7 @@ import { handleRequest, isHostRequest, type HostReply } from './hostStore';
 import { LoaderBlock } from '@components/Loader';
 import { Button } from '@components/Button';
 import { Row } from '@components/Row';
-import {
-  newContextItem,
-  useAISidebar,
-} from '@components/AI/AISidebarContext';
+import { newContextItem, useAISidebar } from '@components/AI/AISidebarContext';
 import type { AIAtomicResourceMessageContext } from '@chunks/AI/types';
 
 import resetCss from '../../reset.css?raw';
@@ -29,6 +26,8 @@ export function AppFrame({
   app,
   drive,
   table,
+  onOutcome,
+  silent,
 }: {
   app: string;
   drive: string;
@@ -40,6 +39,16 @@ export function AppFrame({
    * app that owns its data and an app that is a way of looking at data.
    */
   table?: string;
+  /**
+   * Told once, when the app either finishes rendering or fails.
+   *
+   * This is what lets something other than a person watch an app run — the
+   * check that happens right after a model writes one, before it reports
+   * success.
+   */
+  onOutcome?: (outcome: AppOutcome) => void;
+  /** Report the outcome, but do not draw the error bar. For an unattended run. */
+  silent?: boolean;
 }): React.JSX.Element {
   const store = useStore();
   const [src, setSrc] = useState<string>();
@@ -48,6 +57,10 @@ export function AppFrame({
   const [appError, setAppError] = useState<AppError>();
   const { askAI } = useAISidebar();
   const frameRef = useRef<HTMLIFrameElement>(null);
+  // Held in a ref so an inline callback does not tear down the listener — and
+  // with it every subscription — on each render.
+  const onOutcomeRef = useRef(onOutcome);
+  onOutcomeRef.current = onOutcome;
   // Subject to the store's unsubscribe, so a view that re-renders does not
   // accumulate a listener per render and get told about one change N times.
   const watching = useRef(new Map<string, () => void>());
@@ -133,10 +146,24 @@ export function AppFrame({
         // the wrong app sends its author to fix code that is not broken.
         if (e.source !== frameRef.current?.contentWindow) return;
 
-        setAppError({
+        const failure: AppError = {
           message: String(e.data.message ?? 'Something went wrong.'),
           stack: typeof e.data.stack === 'string' ? e.data.stack : undefined,
           phase: e.data.phase === 'load' ? 'load' : 'runtime',
+        };
+
+        setAppError(failure);
+        onOutcomeRef.current?.({ ok: false, ...failure });
+
+        return;
+      }
+
+      if (e.data?.type === '__atomic_plugin_rendered') {
+        if (e.source !== frameRef.current?.contentWindow) return;
+
+        onOutcomeRef.current?.({
+          ok: true,
+          children: typeof e.data.children === 'number' ? e.data.children : 0,
         });
 
         return;
@@ -191,6 +218,22 @@ export function AppFrame({
     };
   }, [sendStyle, store, app, drive, table]);
 
+  // The app never got as far as running: no token, no entry point, no source.
+  // Reported as a failure like any other, so a caller waiting on an outcome
+  // hears now rather than sitting out the timeout for a verdict of "unknown".
+  useEffect(() => {
+    if (problem !== undefined) {
+      onOutcomeRef.current?.({ ok: false, phase: 'load', message: problem });
+    } else if (entrypoint === null) {
+      onOutcomeRef.current?.({
+        ok: false,
+        phase: 'load',
+        message:
+          /* @wc-ignore */ 'This app has no entry point, so there is nothing to run.',
+      });
+    }
+  }, [problem, entrypoint]);
+
   if (problem !== undefined) {
     return <Problem>{problem}</Problem>;
   }
@@ -213,7 +256,7 @@ export function AppFrame({
     askAI({
       // Written as what the user would say, because it becomes the first
       // message of the chat and they have to be able to read it back.
-      prompt: [
+      prompt: /* @wc-ignore */ [
         'The app I have open just hit an error. Read its source with',
         'describe_app, work out what went wrong, and fix it with update_app.',
         '',
@@ -231,7 +274,7 @@ export function AppFrame({
 
   return (
     <Wrapper>
-      {appError && (
+      {appError && !silent && (
         <ErrorBar role='alert'>
           <ErrorText>
             <strong>This app hit an error.</strong> {appError.message}
@@ -260,8 +303,13 @@ export function AppFrame({
   );
 }
 
+/** How a run of an app ended. */
+export type AppOutcome =
+  | { ok: true; children: number }
+  | ({ ok: false } & AppError);
+
 /** What the frame told us went wrong. */
-interface AppError {
+export interface AppError {
   message: string;
   stack?: string;
   /** Whether the app failed to open at all, or broke while being used. */

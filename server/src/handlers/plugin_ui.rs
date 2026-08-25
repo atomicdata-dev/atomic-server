@@ -203,6 +203,15 @@ try {{
     throw new Error('This plugin exports no view() function.');
   }}
   await plugin.view({{ root, store }});
+  // Says it got to the end, and how much it drew. Silence is not success: an
+  // app whose view() resolves having rendered nothing is a blank panel, which
+  // looks exactly like one that never loaded. The count tells those apart.
+  if (window.parent) {{
+    window.parent.postMessage({{
+      type: '__atomic_plugin_rendered',
+      children: root.childElementCount,
+    }}, '*');
+  }}
 }} catch (e) {{
   root.textContent = String(e && e.message ? e.message : e);
   window.__atomicReportError(e, 'load');
@@ -517,6 +526,17 @@ mod tests {
         assert!(html.contains("window.addEventListener('unhandledrejection'"));
 
         assert!(html.contains("'__atomic_plugin_error'"));
+    }
+
+    /// Success has to be reported too. Without it, "no error yet" is the only
+    /// evidence a caller has, and that is indistinguishable from a frame that
+    /// is still loading — or one that rendered nothing at all.
+    #[test]
+    fn an_app_that_worked_says_so_and_says_how_much_it_drew() {
+        let html = render_plugin_ui_html_with("format=html", false, "n0nce", true);
+
+        assert!(html.contains("'__atomic_plugin_rendered'"));
+        assert!(html.contains("root.childElementCount"));
     }
 
     /// The reporter is declared after the module script in the document but has

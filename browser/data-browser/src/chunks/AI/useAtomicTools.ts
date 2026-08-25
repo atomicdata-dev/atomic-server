@@ -11,6 +11,8 @@ import {
   type Store,
 } from '@tomic/react';
 import { createApp, describeApp, updateApp } from '@tomic/lib';
+import { useAppVerifier } from '@chunks/AppPage/AppVerifierContext';
+import { appCheckReport } from '@chunks/AppPage/appCheckReport';
 import { handOverAppKey } from '@chunks/AppPage/appAgent';
 import { tool } from 'ai';
 import { z } from 'zod';
@@ -487,6 +489,7 @@ export function useAtomicMCPTools({
         }
       : {}),
   };
+  const { verifyApp } = useAppVerifier();
 
   /** Resolves a `@class` shortname (or title) to a class subject on the
    *  current drive. Full URLs and `#refs` pass through/expand. */
@@ -1458,7 +1461,8 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
           'The app may write ANYTHING UNDER ITSELF without asking, and nothing outside itself. Reading is not restricted.\n\n' +
           'Careful with subscribe: adding a child counts as a change to its parent, so subscribing to the app and writing into it on every notification loops. Guard on what changed, or re-read on user actions instead.\n\n' +
           "Do not invent demo data. An empty app with an obvious way to add the first row is correct; seeded fake contacts are not the user's data and they have to delete them.\n\n" +
-          "NAME THINGS THE WAY THE USER WOULD. The app's rows show up in their sidebar as an ordinary table, so `rowNamePlural` is a title they read every day — 'Feeding sessions', not 'Items'. Same for the app's own name and its emoji.",
+          "NAME THINGS THE WAY THE USER WOULD. The app's rows show up in their sidebar as an ordinary table, so `rowNamePlural` is a title they read every day — 'Feeding sessions', not 'Items'. Same for the app's own name and its emoji.\n\n" +
+          "THE APP IS RUN BEFORE THIS TOOL RETURNS, and the result comes back as `ran`. If it is anything but 'ok' you are not finished: fix it with update_app and let it be checked again. Never tell the user an app is ready while `ran` says otherwise — they will open it and find what you already knew.",
         inputSchema: z.object({
           name: z.string().describe('Display name of the app.'),
           emoji: z
@@ -1518,6 +1522,12 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               keyProblem = (e as Error).message;
             }
 
+            // Run it once before saying it works. A typo, a property that does
+            // not exist, a view that draws nothing — none of those are visible
+            // in source the model just wrote, and all of them are obvious the
+            // moment something executes it.
+            const check = await verifyApp(created.app, drive);
+
             return {
               app: shortenSubject(created.app),
               ontology: shortenSubject(created.ontology),
@@ -1527,6 +1537,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               created: true,
               unattended,
               ...(keyProblem ? { keyProblem } : {}),
+              ...appCheckReport(check),
               next: 'Give the rows their fields with add_table_columns on `data`, then tell the user to open the app. To change it later, use update_app.',
             };
           } catch (e) {
@@ -1536,7 +1547,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
       }),
       [TOOL_NAMES.DESCRIBE_APP]: tool({
         description:
-          "Read an app back: its name, emoji, its full source, and the table and row class its data lives in. Call this BEFORE update_app whenever you did not write the source yourself in this conversation — fixing a bug means editing the code that is actually running, not the code you would have written.",
+          'Read an app back: its name, emoji, its full source, and the table and row class its data lives in. Call this BEFORE update_app whenever you did not write the source yourself in this conversation — fixing a bug means editing the code that is actually running, not the code you would have written.',
         inputSchema: z.object({
           app: z.string().describe('Subject (or #ref) of the app.'),
         }),
@@ -1557,13 +1568,11 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
       }),
       [TOOL_NAMES.UPDATE_APP]: tool({
         description:
-          "Change an existing app: its source, its name, its emoji, or any combination. Use this to fix a bug, add a feature, or rename — never create_app a second time, which would leave the user with two apps and strand the rows in the first.\n\n" +
-
-          "`source` REPLACES the whole module, so pass the complete file, not a fragment or a diff. Call describe_app first if you do not already have the current source in front of you.\n\n" +
-
+          'Change an existing app: its source, its name, its emoji, or any combination. Use this to fix a bug, add a feature, or rename — never create_app a second time, which would leave the user with two apps and strand the rows in the first.\n\n' +
+          '`source` REPLACES the whole module, so pass the complete file, not a fragment or a diff. Call describe_app first if you do not already have the current source in front of you.\n\n' +
           "The app's table, row class, schema, identity and rights all survive this — only the code changes. So the user's existing rows are still there after a fix, and your new source has to keep reading them the same way.\n\n" +
-
-          "If the fix needs a field the rows do not have yet, add it with add_table_columns first, then write source that uses it.",
+          'If the fix needs a field the rows do not have yet, add it with add_table_columns first, then write source that uses it.\n\n' +
+          "The app is run before this tool returns, and the result comes back as `ran`. A fix that does not make `ran` say 'ok' is not a fix — keep going.",
         inputSchema: z.object({
           app: z.string().describe('Subject (or #ref) of the app to change.'),
           source: z
@@ -1584,11 +1593,14 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
               emoji,
             });
 
+            const check = await verifyApp(updated.app, drive);
+
             return {
               app: shortenSubject(updated.app),
               updated: true,
               data: shortenSubject(updated.data ?? ''),
               rowClass: shortenSubject(updated.rowClass ?? ''),
+              ...appCheckReport(check),
               next: 'Tell the user to reload the app to see the change.',
             };
           } catch (e) {

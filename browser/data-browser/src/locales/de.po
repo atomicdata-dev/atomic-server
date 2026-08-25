@@ -7808,3 +7808,40 @@ msgstr ""
 #: src/actions/resourceActions.tsx
 msgid "This app cannot write on its own: {0}"
 msgstr ""
+
+#~ msgid "No verifier is mounted."
+#~ msgstr ""
+
+#~ msgid "Another app is being checked."
+#~ msgstr ""
+
+#~ msgid "The app had not finished rendering after 8 seconds. It may be slow rather than broken."
+#~ msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Something went wrong."
+msgstr ""
+
+#~ msgid "This app has no entry point, so there is nothing to run."
+#~ msgstr ""
+
+#~ msgid "The app I have open just hit an error. Read its source with"
+#~ msgstr ""
+
+#~ msgid "Error ({0}): {1}"
+#~ msgstr ""
+
+#~ msgid "Stack:"
+#~ msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "This app hit an error."
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Fix it"
+msgstr ""
+
+#: src/chunks/AppPage/AppFrame.tsx
+msgid "Dismiss"
+msgstr ""
