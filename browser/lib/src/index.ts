@@ -169,6 +169,9 @@ export {
 export * from './issue-access-agent.js';
 export {
   createApp,
+  describeApp,
+  updateApp,
+  type AppDescription,
   type CreateAppOptions,
   type CreatedApp,
 } from './plugin-app.js';

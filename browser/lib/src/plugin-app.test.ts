@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createApp } from './plugin-app.js';
+import { createApp, describeApp, updateApp } from './plugin-app.js';
 import { core, dataBrowser, server } from './index.js';
 import type { SchemaStore } from './plugin-schema.js';
 import type { JSONValue } from './value.js';
@@ -314,5 +314,76 @@ describe('createApp', () => {
     ] as string;
 
     expect(shortname).toMatch(/^[a-z][a-z0-9-]*$/);
+  });
+});
+
+describe('describeApp / updateApp', () => {
+  it('reads an app back, source included', async () => {
+    const { store } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Breastfeed Tracker',
+      emoji: '🍼',
+      rowName: { singular: 'Feeding session', plural: 'Feeding sessions' },
+      source: SOURCE,
+    });
+
+    const described = await describeApp(store, 'drive', created.app);
+
+    // The source is the point: an app that cannot be read cannot be revised,
+    // and the only repair left would be to delete it and lose the rows.
+    expect(described.source).toBe(SOURCE);
+    expect(described.name).toBe('Breastfeed Tracker');
+    expect(described.emoji).toBe('🍼');
+    expect(described.entrypoint).toBe(created.entrypoint);
+    expect(described.data).toBe(created.data);
+    expect(described.rowName).toBe('Feeding session');
+  });
+
+  it('replaces the source without disturbing the app’s data', async () => {
+    const { store, resources } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      rowName: { singular: 'Habit', plural: 'Habits' },
+      source: SOURCE,
+    });
+
+    const fixed = 'export function view({ root }) { root.textContent = "ok"; }';
+    const after = await updateApp(store, 'drive', {
+      app: created.app,
+      source: fixed,
+    });
+
+    expect(after.source).toBe(fixed);
+
+    // Fixing a bug must not cost the user their rows. The table, its class and
+    // the app's identity all outlive a rewrite, because the source lives on
+    // the entry point rather than being the app itself.
+    expect(after.data).toBe(created.data);
+    expect(after.rowClass).toBe(created.rowClass);
+    expect(resources.get(created.agent)).toBeDefined();
+  });
+
+  it('renames and re-badges without touching the source', async () => {
+    const { store } = fakeStore();
+
+    const created = await createApp(store, {
+      drive: 'drive',
+      name: 'Habits',
+      source: SOURCE,
+    });
+
+    const after = await updateApp(store, 'drive', {
+      app: created.app,
+      name: 'Daily habits',
+      emoji: '✅',
+    });
+
+    expect(after.name).toBe('Daily habits');
+    expect(after.emoji).toBe('✅');
+    expect(after.source).toBe(SOURCE);
   });
 });
