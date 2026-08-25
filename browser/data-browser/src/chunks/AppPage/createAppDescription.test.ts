@@ -34,6 +34,26 @@ describe('the app-building instructions', () => {
     }
   });
 
+  it('puts a ready-made template above building one by hand', () => {
+    // The CRM the model wrote from scratch already existed as a template —
+    // with the stage kanban, the value totals per stage and a computed
+    // "days since contact" column it never got round to.
+    expect(CREATE_APP_DESCRIPTION).toContain('list_table_templates');
+    expect(CREATE_APP_DESCRIPTION).toContain('create_table_from_template');
+
+    // Order matters, and the rungs have to be checked by their own labels:
+    // `create_table` is a substring of `create_table_from_template`, so
+    // searching for it finds rung 1 and the assertion passes without ever
+    // looking at rung 2.
+    const template = CREATE_APP_DESCRIPTION.indexOf('1. A READY-MADE TEMPLATE');
+    const table = CREATE_APP_DESCRIPTION.indexOf('2. A TABLE WITH VIEWS');
+    const app = CREATE_APP_DESCRIPTION.indexOf('3. THIS TOOL');
+
+    expect(template).toBeGreaterThan(-1);
+    expect(table).toBeGreaterThan(template);
+    expect(app).toBeGreaterThan(table);
+  });
+
   it('sends the row-shaped requests to the table tools instead', () => {
     expect(CREATE_APP_DESCRIPTION).toContain('configure_view');
     expect(CREATE_APP_DESCRIPTION).toContain('create_table');

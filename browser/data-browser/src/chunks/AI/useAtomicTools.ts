@@ -893,7 +893,7 @@ export function useAtomicMCPTools({
       }),
       [TOOL_NAMES.LIST_TABLE_TEMPLATES]: tool({
         description:
-          'List the ready-made table templates. Start from one of these when it fits what the user asked for — then adapt it with add_table_columns and configure_view — rather than deriving the same schema from scratch.',
+          'List the ready-made table templates. This is the FIRST thing to try when someone asks for a screen backed by their data — an issue tracker, a CRM, project tasks, expenses, a reading list and a dozen others already exist, complete with their kanban and calendar views, computed columns and totals. Start from one when it fits and adapt it with add_table_columns and configure_view, rather than deriving the same schema from scratch or, worse, writing it by hand as an app.',
         inputSchema: z.object({}),
         execute: async () => {
           return TABLE_TEMPLATES.filter(template => template.spec).map(
@@ -1688,7 +1688,7 @@ NEVER omit spans of pre-existing text without using the \`<unchanged-text>\` ele
       }),
       [TOOL_NAMES.CREATE_TABLE]: tool({
         description:
-          'Create a fully-configured table in ONE call: its row Class, all columns, any saved views (table, kanban, calendar or timer) including their computed columns, and optionally its initial rows. Prefer this over creating the class, properties, table and rows separately with create_resource. The response contains everything needed for follow-up work — the table subject, and per column its property subject plus (for select columns) each tag option subject — so you never need get_schema afterwards.',
+          'Check list_table_templates FIRST — a template that fits brings tested columns and views with it, and adapting one is both less work and a better result than deriving the same thing from scratch. Use this when none fits. Create a fully-configured table in ONE call: its row Class, all columns, any saved views (table, kanban, calendar or timer) including their computed columns, and optionally its initial rows. Prefer this over creating the class, properties, table and rows separately with create_resource. The response contains everything needed for follow-up work — the table subject, and per column its property subject plus (for select columns) each tag option subject — so you never need get_schema afterwards.',
         inputSchema: z.object({
           name: z.string().describe('The display name of the table.'),
           parent: z
