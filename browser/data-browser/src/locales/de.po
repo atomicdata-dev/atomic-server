@@ -8205,6 +8205,7 @@ msgid "Add a question before this one first"
 msgstr "Fügen Sie zuerst eine Frage vor dieser hinzu"
 
 #: src/chunks/FormBuilder/ConditionsEditor.tsx
+#: src/chunks/FormBuilder/FieldRowOptions.tsx
 msgid "and"
 msgstr "und"
 
@@ -8455,3 +8456,18 @@ msgstr "Verwenden Sie seine Tags als Optionen"
 #: src/chunks/FormBuilder/FieldOptions/LinkOptionsDialog.tsx
 msgid "Use each row, labelled by this column"
 msgstr "Verwenden Sie jede Zeile, gekennzeichnet durch diese Spalte"
+
+#~ msgid "and {0} more"
+#~ msgstr "und {0} weitere"
+
+#: src/chunks/FormBuilder/FieldRowOptions.tsx
+msgid "more"
+msgstr "mehr"
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Empty heading"
+msgstr "Leere Überschrift"
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Empty paragraph"
+msgstr "Leerer Absatz"
