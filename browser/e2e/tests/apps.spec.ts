@@ -133,4 +133,83 @@ test.describe('apps', () => {
     const reopened = page.frameLocator('iframe[title="App"]');
     await expect(reopened.getByRole('listitem')).toHaveCount(1);
   });
+
+  test('an app that breaks says so, and offers to have it fixed', async ({
+    page,
+  }) => {
+    const main = page.getByRole('main');
+
+    await page.getByRole('button', { name: 'More' }).click();
+    await page.getByPlaceholder(/filter/i).fill('app');
+    await page.locator('[data-testid="menu-item-new-app"]').click();
+    await expect(main.locator('iframe[title="App"]')).toBeVisible();
+
+    // Break it. The frame is null-origin, so its console belongs to nobody —
+    // without a report crossing the boundary this is a blank panel and the
+    // person who could fix it never learns there was anything to fix.
+    await setAppSource(
+      page,
+      'export function view() { throw new Error("kaboom"); }',
+    );
+    await page.reload();
+
+    const alert = main.getByRole('alert');
+    await expect(alert).toContainText('kaboom');
+
+    // The whole point of reporting it: somewhere to go next.
+    await expect(alert.getByRole('button', { name: 'Fix it' })).toBeVisible();
+  });
 });
+
+/**
+ * Replaces the source of the app on screen, through `window.store`.
+ *
+ * The entry point is a child of the app and the source property is drive-local
+ * with no fixed subject, so both are found by value rather than by a path this
+ * test would then have to keep up with.
+ */
+async function setAppSource(
+  page: import('@playwright/test').Page,
+  source: string,
+) {
+  await page.evaluate(async (next: string) => {
+    const store = (
+      window as unknown as {
+        store: {
+          getResource(s: string): Promise<{
+            getPropVals(): Record<string, unknown>;
+            set(p: string, v: unknown): Promise<void>;
+            save(): Promise<unknown>;
+          }>;
+        };
+      }
+    ).store;
+
+    const subject = decodeURIComponent(
+      new URL(location.href).searchParams.get('subject')!,
+    );
+    const app = await store.getResource(subject);
+
+    for (const value of Object.values(app.getPropVals())) {
+      if (typeof value !== 'string' || !value.includes(':')) continue;
+
+      const child = await store.getResource(value).catch(() => undefined);
+
+      if (!child) continue;
+
+      const sourceProp = Object.entries(child.getPropVals()).find(
+        ([, v]) =>
+          typeof v === 'string' && v.includes('export async function view'),
+      )?.[0];
+
+      if (!sourceProp) continue;
+
+      await child.set(sourceProp, next);
+      await child.save();
+
+      return;
+    }
+
+    throw new Error('could not find the app’s entry point');
+  }, source);
+}

@@ -4,6 +4,13 @@ import { errorMessageFromResponse, signRequest, useStore } from '@tomic/react';
 import { findSchema, pluginSchema } from '@tomic/lib';
 import { handleRequest, isHostRequest, type HostReply } from './hostStore';
 import { LoaderBlock } from '@components/Loader';
+import { Button } from '@components/Button';
+import { Row } from '@components/Row';
+import {
+  newContextItem,
+  useAISidebar,
+} from '@components/AI/AISidebarContext';
+import type { AIAtomicResourceMessageContext } from '@chunks/AI/types';
 
 import resetCss from '../../reset.css?raw';
 import { useCreateThemeVars } from '@views/PluginView/useCreateThemeVars';
@@ -38,6 +45,8 @@ export function AppFrame({
   const [src, setSrc] = useState<string>();
   const [entrypoint, setEntrypoint] = useState<string | null>();
   const [problem, setProblem] = useState<string>();
+  const [appError, setAppError] = useState<AppError>();
+  const { askAI } = useAISidebar();
   const frameRef = useRef<HTMLIFrameElement>(null);
   // Subject to the store's unsubscribe, so a view that re-renders does not
   // accumulate a listener per render and get told about one change N times.
@@ -118,6 +127,21 @@ export function AppFrame({
         return;
       }
 
+      if (e.data?.type === '__atomic_plugin_error') {
+        // Only from the frame this component owns, same as every other message
+        // here: any window on this origin can post, and an error attributed to
+        // the wrong app sends its author to fix code that is not broken.
+        if (e.source !== frameRef.current?.contentWindow) return;
+
+        setAppError({
+          message: String(e.data.message ?? 'Something went wrong.'),
+          stack: typeof e.data.stack === 'string' ? e.data.stack : undefined,
+          phase: e.data.phase === 'load' ? 'load' : 'runtime',
+        });
+
+        return;
+      }
+
       if (!isHostRequest(e.data)) return;
 
       // Only from the frame this component owns. A page can host more than
@@ -183,20 +207,65 @@ export function AppFrame({
     return <LoaderBlock />;
   }
 
+  const fixIt = () => {
+    if (!appError) return;
+
+    askAI({
+      // Written as what the user would say, because it becomes the first
+      // message of the chat and they have to be able to read it back.
+      prompt: [
+        'The app I have open just hit an error. Read its source with',
+        'describe_app, work out what went wrong, and fix it with update_app.',
+        '',
+        `Error (${appError.phase === 'load' ? 'while opening the app' : 'while using it'}): ${appError.message}`,
+        ...(appError.stack ? ['', 'Stack:', appError.stack] : []),
+      ].join('\n'),
+      context: [
+        newContextItem<AIAtomicResourceMessageContext>({
+          type: 'atomic-resource',
+          subject: app,
+        }),
+      ],
+    });
+  };
+
   return (
-    <Frame
-      ref={frameRef}
-      src={src}
-      onLoad={sendStyle}
-      // `allow-modals` because confirm() and alert() are the first things an
-      // app reaches for to guard a delete, and without it they return false
-      // silently — the button does nothing and nothing says why. Still no
-      // allow-same-origin, so the frame stays null-origin and cannot touch
-      // this page.
-      sandbox='allow-scripts allow-modals'
-      title='App'
-    />
+    <Wrapper>
+      {appError && (
+        <ErrorBar role='alert'>
+          <ErrorText>
+            <strong>This app hit an error.</strong> {appError.message}
+          </ErrorText>
+          <Row gap='0.5rem'>
+            <Button onClick={fixIt}>Fix it</Button>
+            <Button subtle onClick={() => setAppError(undefined)}>
+              Dismiss
+            </Button>
+          </Row>
+        </ErrorBar>
+      )}
+      <Frame
+        ref={frameRef}
+        src={src}
+        onLoad={sendStyle}
+        // `allow-modals` because confirm() and alert() are the first things
+        // an app reaches for to guard a delete, and without it they return
+        // false silently — the button does nothing and nothing says why. Still
+        // no allow-same-origin, so the frame stays null-origin and cannot
+        // touch this page.
+        sandbox='allow-scripts allow-modals'
+        title='App'
+      />
+    </Wrapper>
   );
+}
+
+/** What the frame told us went wrong. */
+interface AppError {
+  message: string;
+  stack?: string;
+  /** Whether the app failed to open at all, or broke while being used. */
+  phase: 'load' | 'runtime';
 }
 
 /**
@@ -273,6 +342,38 @@ const Frame = styled.iframe`
   height: 100%;
   min-height: 20rem;
   background: ${p => p.theme.colors.bg};
+`;
+
+/** Keeps the frame filling whatever is left once the bar has taken its height. */
+const Wrapper = styled.div`
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+`;
+
+/**
+ * Sits above the app rather than replacing it: an app that threw in one button
+ * is usually still readable, and throwing away what the user can see is a
+ * worse trade than showing a bar over it.
+ */
+const ErrorBar = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid ${p => p.theme.colors.alert};
+  border-radius: ${p => p.theme.radius};
+  background-color: ${p => p.theme.colors.bg1};
+  margin-bottom: 0.5rem;
+`;
+
+const ErrorText = styled.span`
+  color: ${p => p.theme.colors.textLight};
+  overflow-wrap: anywhere;
+  min-width: 0;
 `;
 
 const Problem = styled.p`
