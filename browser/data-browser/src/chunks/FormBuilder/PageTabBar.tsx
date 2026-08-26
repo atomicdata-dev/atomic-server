@@ -9,14 +9,11 @@ import {
 } from '@tomic/react';
 import { useState, type JSX } from 'react';
 import { styled } from 'styled-components';
-import { FaCodeBranch, FaPlus, FaTrash } from 'react-icons/fa6';
+import { FaCodeBranch, FaPlus } from 'react-icons/fa6';
 import { Row } from '@components/Row';
 import { Button } from '@components/Button';
 import { InputStyled } from '@components/forms/InputStyles';
-import {
-  IconButton,
-  IconButtonVariant,
-} from '@components/IconButton/IconButton';
+import { ScrollArea } from '@components/ScrollArea';
 import { ReorderableList } from './ReorderableList';
 
 interface PageTabBarProps {
@@ -57,38 +54,9 @@ export function PageTabBar({
     onSelectPage(page.subject);
   };
 
-  const deletePage = async (subject: string) => {
-    if (pages.length <= 1) {
-      return;
-    }
-
-    const remaining = pages.filter(p => p !== subject);
-
-    // Point the form away from the page BEFORE destroying anything, and
-    // await durability — the reverse order leaves the form referencing a
-    // destroyed page if the debounced commit never lands.
-    await formResource.set(forms.properties.formPages, remaining);
-    await formResource.save();
-
-    const page = await store.getResource(subject);
-    const conditions =
-      (page.get(forms.properties.formConditions) as string[] | undefined) ?? [];
-
-    for (const condSubject of conditions) {
-      const cond = await store.getResource(condSubject);
-      await cond.destroy();
-    }
-
-    await page.destroy();
-
-    if (activePage === subject) {
-      onSelectPage(remaining[0]);
-    }
-  };
-
   return (
     <TabBarRow gap='0.5rem' center>
-      <ScrollArea>
+      <TabScrollArea type='hover'>
         <ReorderableList
           subjects={pages}
           onReorder={setPages}
@@ -97,13 +65,11 @@ export function PageTabBar({
             <PageTab
               subject={subject}
               active={subject === activePage}
-              canDelete={pages.length > 1}
               onSelect={() => onSelectPage(subject)}
-              onDelete={() => deletePage(subject)}
             />
           )}
         />
-      </ScrollArea>
+      </TabScrollArea>
       <AddButton type='button' subtle onClick={addPage}>
         <Row gap='.5rem' center>
           <FaPlus /> Add page
@@ -116,18 +82,10 @@ export function PageTabBar({
 interface PageTabProps {
   subject: string;
   active: boolean;
-  canDelete: boolean;
   onSelect: () => void;
-  onDelete: () => void;
 }
 
-function PageTab({
-  subject,
-  active,
-  canDelete,
-  onSelect,
-  onDelete,
-}: PageTabProps): JSX.Element {
+function PageTab({ subject, active, onSelect }: PageTabProps): JSX.Element {
   const resource = useResource(subject);
   const [name, setName] = useTitle(resource, Infinity, { commit: true });
   const [conditions] = useArray(resource, forms.properties.formConditions);
@@ -176,18 +134,6 @@ function PageTab({
         {conditions.length > 0 && <BranchIcon aria-hidden />}
         {name || 'Untitled page'}
       </TabButton>
-      {canDelete && (
-        <IconButton
-          variant={IconButtonVariant.Simple}
-          size='0.8rem'
-          color='textLight'
-          title='Delete page'
-          type='button'
-          onClick={onDelete}
-        >
-          <FaTrash />
-        </IconButton>
-      )}
     </TabRow>
   );
 }
@@ -197,11 +143,11 @@ const TabBarRow = styled(Row)`
   min-width: 0;
 `;
 
-const ScrollArea = styled.div`
+/** The horizontal scrollbar overlays the tabs, so it only shows on hover. */
+const TabScrollArea = styled(ScrollArea)`
   flex: 1;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  padding-bottom: 0.4rem;
 `;
 
 const TabRow = styled(Row)<{ $active: boolean }>`

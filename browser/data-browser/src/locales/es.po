@@ -8061,7 +8061,7 @@ msgstr "<0/> Añadir página"
 msgid "Untitled page"
 msgstr "Página sin título"
 
-#: src/chunks/FormBuilder/PageTabBar.tsx
+#: src/chunks/FormBuilder/PageSettingsPanel.tsx
 msgid "Delete page"
 msgstr "Eliminar página"
 
@@ -8462,3 +8462,11 @@ msgstr "Editar nombre de datos"
 #: src/chunks/FormBuilder/FieldSettingsPanel.tsx
 msgid "Data name"
 msgstr "Nombre de datos"
+
+#: src/chunks/FormBuilder/PageSettingsPanel.tsx
+msgid "<0/> Delete page"
+msgstr "<0/> Eliminar página"
+
+#: src/chunks/FormBuilder/PageSettingsPanel.tsx
+msgid "Are you sure you want to delete this page? Its fields will no longer be part of the form."
+msgstr "¿Está seguro de que desea eliminar esta página? Sus campos ya no formarán parte del formulario."
