@@ -54,10 +54,43 @@ export function useDraftString(
     latestCommit.current = commitIfChanged;
   }, [commitIfChanged]);
 
+  // What the draft was last seeded from. Distinguishes "the box still shows
+  // what we put there" from "the user has typed something".
+  const seeded = useRef(stored ?? '');
+
   useEffect(() => {
+    seeded.current = stored ?? '';
     setDraft(stored ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resetKey]);
+
+  // Adopt a late-arriving `stored`. The row can mount while its resource is
+  // still loading — `stored` is `undefined`, so the draft seeds to `''` — and
+  // `resetKey` (the subject) does NOT change when the value finally lands, so
+  // without this the input stays empty for good. That is the post-reload
+  // "empty Tag label" bug: the value is in the store, the component even
+  // re-renders with it, but the draft never catches up.
+  //
+  // Only adopt while the box is untouched (`draft` is still exactly what we
+  // seeded), so a value landing mid-typing never overwrites the user.
+  useEffect(() => {
+    const next = stored ?? '';
+
+    if (next === seeded.current) return;
+
+    // Our own debounced commit round-tripping back through the resource.
+    // Re-baseline so a genuinely external change stays adoptable later.
+    if (next === draft) {
+      seeded.current = next;
+
+      return;
+    }
+
+    if (draft !== seeded.current) return;
+
+    seeded.current = next;
+    setDraft(next);
+  }, [stored, draft]);
 
   useEffect(() => {
     commitIfChanged(debounced);

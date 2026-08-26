@@ -8432,8 +8432,8 @@ msgstr "Usar sus etiquetas como opciones"
 msgid "Use each row, labelled by this column"
 msgstr "Usar cada fila, etiquetada por esta columna"
 
-#~ msgid "and {0} more"
-#~ msgstr "y {0} más"
+msgid "and {0} more"
+msgstr "y {0} más"
 
 #: src/chunks/FormBuilder/FieldRowOptions.tsx
 msgid "more"
@@ -8446,3 +8446,19 @@ msgstr "Encabezado vacío"
 #: src/chunks/FormBuilder/FieldRow.tsx
 msgid "Empty paragraph"
 msgstr "Párrafo vacío"
+
+#: src/chunks/FormBuilder/useFormFieldPropertySync.ts
+msgid "Already used by another question"
+msgstr "Ya utilizado por otra pregunta"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again."
+msgstr "Cómo se identifica esta pregunta en los datos y el encabezado de columna en la tabla de resultados. Por defecto, sigue la etiqueta — bórrelo para seguir la etiqueta nuevamente."
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Edit data name"
+msgstr "Editar nombre de datos"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Data name"
+msgstr "Nombre de datos"

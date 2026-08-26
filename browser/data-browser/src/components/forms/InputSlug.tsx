@@ -2,7 +2,7 @@ import { useState, type JSX } from 'react';
 import { useString, validateDatatype } from '@tomic/react';
 import { InputProps } from './ResourceField';
 import { InputStyled, InputWrapper } from './InputStyles';
-import { stringToSlug } from '../../helpers/stringToSlug';
+import { slugWhileTyping, stringToSlug } from '../../helpers/stringToSlug';
 import {
   checkForInitialRequiredValue,
   useValidation,
@@ -29,25 +29,9 @@ export default function InputSlug({
 
   const [inputValue, setInputValue] = useState(value);
 
-  /**
-   * `stringToSlug` is a *final form* — it strips leading and trailing dashes,
-   * which is right for turning a name like "Meat & fish" into a shortname in
-   * one go. Applied to every keystroke it also eats the dash you are in the
-   * middle of typing: "is-valid" arrives as "isvalid", because the `-` is
-   * trailing for exactly as long as it takes to press the next key. That made
-   * hyphenated shortnames untypeable.
-   *
-   * So while typing, keep a single trailing dash and let blur finish the job.
-   */
-  function slugWhileTyping(raw: string): string {
-    const endsWithSeparator = /[^a-z0-9]$/.test(raw.toLowerCase());
-
-    return stringToSlug(raw) + (endsWithSeparator ? '-' : '');
-  }
-
   function handleBlur(event: React.FocusEvent<HTMLInputElement>): void {
-    // Settle the value: a dash left dangling by the rule above is not valid on
-    // its own, so it goes once the field is done being typed into.
+    // Settle the value: a dash left dangling by `slugWhileTyping` is not valid
+    // on its own, so it goes once the field is done being typed into.
     const settled = stringToSlug(event.target.value);
 
     if (settled !== inputValue) {

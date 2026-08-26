@@ -41,8 +41,16 @@ export function FieldRow({
   const [fieldType] = useString(resource, forms.properties.formFieldType);
   const [description] = useString(resource, core.properties.description);
   const [conditions] = useArray(resource, forms.properties.formConditions);
-  const isHeading = resource.hasClasses(forms.classes.formHeading);
-  const isParagraph = resource.hasClasses(forms.classes.formParagraph);
+  // Read `isA` through `useArray`, NOT `resource.hasClasses()`. `hasClasses`
+  // is a raw read with no subscription, and `useResource`'s snapshot only
+  // changes when the store calls `notify()` — so a row whose `isA` lands
+  // late (reload hydration) never re-renders and stays stuck on the
+  // `short-text` fallback below. The input types escape this because they
+  // key off `form-field-type` via `useString`, which subscribes to that
+  // property; heading/paragraph are the only two that depend on `isA`.
+  const [classes] = useArray(resource, core.properties.isA);
+  const isHeading = classes.includes(forms.classes.formHeading);
+  const isParagraph = classes.includes(forms.classes.formParagraph);
 
   const type: AddableFieldType = isHeading
     ? 'heading'

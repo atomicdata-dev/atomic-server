@@ -6,6 +6,7 @@ const FORM_FIELD_TYPE = 'https://atomicdata.dev/properties/form-field-type';
 const FORM_MAPS_TO = 'https://atomicdata.dev/properties/form-maps-to';
 const ALLOWS_ONLY = 'https://atomicdata.dev/properties/allowsOnly';
 const NAME = 'https://atomicdata.dev/properties/name';
+const SHORTNAME = 'https://atomicdata.dev/properties/shortname';
 const FORM_PUBLISHED_AT = 'https://atomicdata.dev/properties/form-published-at';
 
 /** Menu label -> field-row testid key, in AddFieldMenu order. */
@@ -109,6 +110,18 @@ const getOptionLabels = (page: Page, fieldSubject: string) =>
   );
 
 /** Finds the subject of the (single) field of a given `form-field-type`. */
+/**
+ * The Property a field maps to. Form-generated Properties carry no `name` —
+ * their `shortname` is both the identifier and, via `useTitle`, the results
+ * table's column header (`planning/form-field-shortnames.md`).
+ */
+const getMappedProperty = (page: Page, fieldSubject: string) =>
+  page.evaluate(
+    ({ subject, prop }) =>
+      window.store.resources.get(subject)?.get(prop) as string | undefined,
+    { subject: fieldSubject, prop: FORM_MAPS_TO },
+  );
+
 const getFieldSubjectByType = (page: Page, type: string) =>
   page.evaluate(
     ({ fieldType, prop }) => {
@@ -172,19 +185,53 @@ test.describe('forms', async () => {
     await waitForSync(page);
 
     // --- 3. Property-sync spot checks ---
-    // Rename the short-text field's label; the mapped Property (and thus the
-    // Table column) must follow.
+    // Rename the short-text field's label; the mapped Property's shortname
+    // (and thus the Table column header) must follow.
     await page.getByTestId('field-row-short-text').click();
     const shortTextSubject = await getFieldSubjectByType(page, 'short-text');
+    const shortTextProperty = (await getMappedProperty(
+      page,
+      shortTextSubject as string,
+    )) as string;
+    expect(shortTextProperty).toBeTruthy();
     const labelInput = page.getByTestId('field-label-input');
+    // The Data name is read-only text until the pencil turns it into an input.
+    const shortnameValue = page.getByTestId('field-shortname-value');
     await expect(labelInput).toHaveValue('Short text');
+    await expect(shortnameValue).toHaveText('short-text');
     await labelInput.fill('Full name');
     await waitForPropertyValue(
       page,
       shortTextSubject as string,
-      'https://atomicdata.dev/properties/name',
+      NAME,
       'Full name',
     );
+    await waitForPropertyValue(page, shortTextProperty, SHORTNAME, 'full-name');
+    await expect(shortnameValue).toHaveText('full-name');
+
+    // An edited Data name is pinned: it is the identifier the answers are
+    // stored under, so a later Label edit must not silently re-slug it.
+    await page.getByTestId('field-shortname-edit').click();
+    const shortnameInput = page.getByTestId('field-shortname-input');
+    await expect(shortnameInput).toBeFocused();
+    await shortnameInput.fill('visitor-name');
+    // Enter commits and drops back to the read-only row (so does blur).
+    await shortnameInput.press('Enter');
+    await expect(shortnameInput).not.toBeVisible();
+    await waitForPropertyValue(
+      page,
+      shortTextProperty,
+      SHORTNAME,
+      'visitor-name',
+    );
+    await labelInput.fill('Your full name');
+    await waitForPropertyValue(
+      page,
+      shortTextSubject as string,
+      NAME,
+      'Your full name',
+    );
+    await expect(shortnameValue).toHaveText('visitor-name');
 
     // Delete a different field (Number) — its Property/Table column must
     // survive even though the FieldRow disappears.
@@ -205,10 +252,10 @@ test.describe('forms', async () => {
     // outside the viewport. Presence is what's under test here — the deleted
     // field's Property (and its column) must survive the delete.
     await expect(
-      page.getByRole('button', { name: 'Full name', exact: true }),
+      page.getByRole('button', { name: 'visitor-name', exact: true }),
     ).toBeAttached();
     await expect(
-      page.getByRole('button', { name: 'Number', exact: true }),
+      page.getByRole('button', { name: 'number', exact: true }),
     ).toBeAttached();
 
     // Back to the Form to keep building.
@@ -270,7 +317,7 @@ test.describe('forms', async () => {
     }
 
     await expect(page.getByTestId('field-row-short-text')).toContainText(
-      'Full name',
+      'Your full name',
     );
 
     await page.getByTestId('field-row-radio').click();
@@ -284,10 +331,10 @@ test.describe('forms', async () => {
 
     await openSubject(page, tableSubject as string);
     await expect(
-      page.getByRole('button', { name: 'Full name', exact: true }),
+      page.getByRole('button', { name: 'visitor-name', exact: true }),
     ).toBeAttached();
     await expect(
-      page.getByRole('button', { name: 'Number', exact: true }),
+      page.getByRole('button', { name: 'number', exact: true }),
     ).toBeAttached();
   });
 });

@@ -239,7 +239,10 @@ wired up; no public runtime yet.
       (reuse drag/drop + input components from `components/forms/`); field settings
       panel (label, helper, placeholder, required, min/max, default, options).
 - [x] **Property sync**: creating a field creates the mapped Property on the data
-      class (`form-maps-to`); renaming a field updates the Property's name;
+      class (`form-maps-to`); renaming a field re-derives the Property's
+      `shortname` unless the user pinned one in the field settings panel
+      (see [form-field-shortnames.md](./form-field-shortnames.md) — the
+      Property carries no `name`, the Label lives on the FormField);
       deleting a field keeps the Property (data preservation) but unlinks it.
       Encapsulate in a `useFormFieldPropertySync` hook — this is the trickiest
       invariant in the builder.

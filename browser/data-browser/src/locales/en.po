@@ -8421,8 +8421,8 @@ msgstr "Use its tags as the options"
 msgid "Use each row, labelled by this column"
 msgstr "Use each row, labelled by this column"
 
-#~ msgid "and {0} more"
-#~ msgstr "and {0} more"
+msgid "and {0} more"
+msgstr "and {0} more"
 
 #: src/chunks/FormBuilder/FieldRowOptions.tsx
 msgid "more"
@@ -8435,3 +8435,19 @@ msgstr "Empty heading"
 #: src/chunks/FormBuilder/FieldRow.tsx
 msgid "Empty paragraph"
 msgstr "Empty paragraph"
+
+#: src/chunks/FormBuilder/useFormFieldPropertySync.ts
+msgid "Already used by another question"
+msgstr "Already used by another question"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again."
+msgstr "How this question is identified in the data, and the column header in the results table. Defaults to the label — clear it to follow the label again."
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Edit data name"
+msgstr "Edit data name"
+
+#: src/chunks/FormBuilder/FieldSettingsPanel.tsx
+msgid "Data name"
+msgstr "Data name"
