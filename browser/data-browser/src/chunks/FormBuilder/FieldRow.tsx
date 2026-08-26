@@ -20,7 +20,7 @@ import {
   isLayoutType,
   type AddableFieldType,
 } from './fieldTypes';
-import { FormMarkdown } from '@tomic/form-renderer';
+import { FormMarkdown, infoBoxStyle } from '@tomic/form-renderer';
 import { FieldRowOptions } from './FieldRowOptions';
 
 interface FieldRowProps {
@@ -41,22 +41,29 @@ export function FieldRow({
   const [fieldType] = useString(resource, forms.properties.formFieldType);
   const [description] = useString(resource, core.properties.description);
   const [conditions] = useArray(resource, forms.properties.formConditions);
+  const [infoStyle] = useString(resource, forms.properties.formInfoBoxStyle);
+  // The info box's title, read raw rather than through `useTitle`: it is
+  // optional, and `useTitle`'s fallback would invent one from the subject.
+  const [infoTitle] = useString(resource, core.properties.name);
   // Read `isA` through `useArray`, NOT `resource.hasClasses()`. `hasClasses`
   // is a raw read with no subscription, and `useResource`'s snapshot only
   // changes when the store calls `notify()` — so a row whose `isA` lands
   // late (reload hydration) never re-renders and stays stuck on the
   // `short-text` fallback below. The input types escape this because they
   // key off `form-field-type` via `useString`, which subscribes to that
-  // property; heading/paragraph are the only two that depend on `isA`.
+  // property; the layout blocks are the only ones that depend on `isA`.
   const [classes] = useArray(resource, core.properties.isA);
   const isHeading = classes.includes(forms.classes.formHeading);
   const isParagraph = classes.includes(forms.classes.formParagraph);
+  const isInfoBox = classes.includes(forms.classes.formInfoBox);
 
   const type: AddableFieldType = isHeading
     ? 'heading'
     : isParagraph
       ? 'paragraph'
-      : ((fieldType as AddableFieldType | undefined) ?? 'short-text');
+      : isInfoBox
+        ? 'info-box'
+        : ((fieldType as AddableFieldType | undefined) ?? 'short-text');
 
   const meta = FIELD_TYPE_META[type];
   const Icon = meta.icon;
@@ -66,7 +73,7 @@ export function FieldRow({
   return (
     <RowWrapper $selected={selected} $plain={isLayout} data-selected={selected}>
       <SelectButton
-        type="button"
+        type='button'
         // While the resource is loading, `type` is just the fallback — don't
         // claim a concrete testid yet, or every hydrating row briefly reads
         // as `field-row-short-text` (breaks e2e strict-mode selectors).
@@ -75,7 +82,7 @@ export function FieldRow({
         }
         onClick={onSelect}
       >
-        <Column fullWidth gap="0.35rem">
+        <Column fullWidth gap='0.35rem'>
           {/* A layout block is nothing but the text it puts on the form, so it
               renders as that text — no card, no type, no icon. A question
               leads with what it asks, its type and options beneath. */}
@@ -83,6 +90,20 @@ export function FieldRow({
             <HeadingText>
               {name || <Placeholder>Empty heading</Placeholder>}
             </HeadingText>
+          ) : isInfoBox ? (
+            // Not the renderer's `InfoBox`: its stylesheet is only loaded by
+            // the preview dialog, so the row draws the same shape from the
+            // app theme instead.
+            <InfoBoxPreview $style={infoBoxStyle(infoStyle)}>
+              {infoTitle && <InfoBoxTitle>{infoTitle}</InfoBoxTitle>}
+              {description ? (
+                <ParagraphText>
+                  <FormMarkdown text={description} />
+                </ParagraphText>
+              ) : (
+                <Placeholder>Empty info box</Placeholder>
+              )}
+            </InfoBoxPreview>
           ) : isParagraph ? (
             description ? (
               <ParagraphText>
@@ -96,7 +117,7 @@ export function FieldRow({
           ) : (
             <>
               {name ? (
-                <FieldLabel gap="0.35rem" center>
+                <FieldLabel gap='0.35rem' center>
                   <Icon />
                   <Label bold>{name}</Label>
                 </FieldLabel>
@@ -108,7 +129,7 @@ export function FieldRow({
             </>
           )}
           {conditions.length > 0 && (
-            <FieldTypeRow gap="0.35rem" center>
+            <FieldTypeRow gap='0.35rem' center>
               <FaCodeBranch />
               <Label light>Conditional</Label>
             </FieldTypeRow>
@@ -117,10 +138,10 @@ export function FieldRow({
       </SelectButton>
       <DeleteButton
         variant={IconButtonVariant.Simple}
-        size="0.8rem"
-        color="textLight"
-        title="Delete field"
-        type="button"
+        size='0.8rem'
+        color='textLight'
+        title='Delete field'
+        type='button'
         onClick={onDelete}
       >
         <FaTrash />
@@ -218,6 +239,33 @@ const ParagraphText = styled.div`
   & > div > *:last-child {
     margin-bottom: 0;
   }
+`;
+
+/** Mirrors `.atomic-form-info-box` in the renderer's stylesheet, in the app's
+ * own theme colors. `info` follows the app's main color the same way the
+ * published box follows the form's accent. */
+const InfoBoxPreview = styled.div<{ $style: string }>`
+  --info-box-color: ${p =>
+    ({
+      info: p.theme.colors.main,
+      note: p.theme.colors.textLight,
+      tip: '#0d9488',
+      success: '#15803d',
+      warning: '#b45309',
+      danger: p.theme.colors.alert,
+    })[p.$style] ?? p.theme.colors.main};
+
+  width: 100%;
+  border-left: 3px solid var(--info-box-color);
+  background: color-mix(in srgb, var(--info-box-color) 10%, transparent);
+  border-radius: ${p => p.theme.radius};
+  padding: 0.5rem 0.75rem;
+`;
+
+const InfoBoxTitle = styled.span`
+  display: block;
+  font-weight: bold;
+  color: var(--info-box-color);
 `;
 
 const Placeholder = styled.span`

@@ -9,6 +9,7 @@ import { validatePage, validateAll } from './validation.js';
 import { computeVisibility } from './conditions.js';
 import { FieldInput } from './FieldInput.js';
 import { FormMarkdown } from './FormMarkdown.js';
+import { InfoBox } from './InfoBox.js';
 
 export type SubmitResult =
   | { ok: true }
@@ -235,6 +236,10 @@ export function FormRenderer({
                 text={block.text}
               />
             );
+          }
+
+          if (block.kind === 'info-box') {
+            return <InfoBox key={i} block={block} />;
           }
 
           const inputId = `${groupId}-${block.mapsTo}`;

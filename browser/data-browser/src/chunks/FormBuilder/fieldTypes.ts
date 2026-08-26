@@ -12,6 +12,7 @@ import {
   FaListCheck,
   FaHeading,
   FaParagraph,
+  FaCircleInfo,
   FaEarthEurope,
   FaPhone,
   FaLink,
@@ -54,7 +55,7 @@ export type FormFieldType =
   | 'address';
 
 /** Non-input layout blocks that live in the same `form-fields` array. */
-export type FormLayoutType = 'heading' | 'paragraph';
+export type FormLayoutType = 'heading' | 'paragraph' | 'info-box';
 
 export type AddableFieldType = FormFieldType | FormLayoutType;
 
@@ -77,10 +78,14 @@ export const FIELD_TYPE_GROUPS: FormFieldType[][] = [
 
 export const FORM_FIELD_TYPES: FormFieldType[] = FIELD_TYPE_GROUPS.flat();
 
-export const FORM_LAYOUT_TYPES: FormLayoutType[] = ['heading', 'paragraph'];
+export const FORM_LAYOUT_TYPES: FormLayoutType[] = [
+  'heading',
+  'paragraph',
+  'info-box',
+];
 
 export function isLayoutType(type: AddableFieldType): type is FormLayoutType {
-  return type === 'heading' || type === 'paragraph';
+  return (FORM_LAYOUT_TYPES as string[]).includes(type);
 }
 
 /** The question types whose options are Tag resources on the mapped
@@ -208,4 +213,5 @@ export const FIELD_TYPE_META: Record<AddableFieldType, FieldTypeMeta> = {
   address: { label: 'Address', icon: FaLocationDot },
   heading: { label: 'Heading', icon: FaHeading },
   paragraph: { label: 'Paragraph', icon: FaParagraph },
+  'info-box': { label: 'Info box', icon: FaCircleInfo },
 };

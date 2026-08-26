@@ -12,6 +12,7 @@ import {
   createSelectPropertyOnClass,
 } from '../TablePage/Kanban/createSelectProperty';
 import { stringToSlug } from '@helpers/stringToSlug';
+import { DEFAULT_INFO_BOX_STYLE } from '@tomic/form-renderer';
 import {
   DEFAULT_CHOICE_TAGS,
   FIELD_TYPE_DEFAULT_OPTIONS,
@@ -20,7 +21,15 @@ import {
   isLayoutType,
   SINGLE_CHOICE_FIELD_TYPES,
   type AddableFieldType,
+  type FormLayoutType,
 } from './fieldTypes';
+
+/** The class each layout block is created as. */
+const LAYOUT_TYPE_CLASS: Record<FormLayoutType, string> = {
+  heading: forms.classes.formHeading,
+  paragraph: forms.classes.formParagraph,
+  'info-box': forms.classes.formInfoBox,
+};
 
 interface CreateFieldOpts {
   type: AddableFieldType;
@@ -136,14 +145,19 @@ export function useFormFieldPropertySync(dataClassSubject: string) {
       if (isLayoutType(opts.type)) {
         field = await store.newResource({
           parent: page.subject,
-          isA:
-            opts.type === 'heading'
-              ? forms.classes.formHeading
-              : forms.classes.formParagraph,
+          isA: LAYOUT_TYPE_CLASS[opts.type],
+          // A heading _is_ its title; a paragraph and an info box are their
+          // body text. The info box's own (optional) title is left unset —
+          // an untitled callout is a perfectly good one.
           propVals:
             opts.type === 'heading'
               ? { [core.properties.name]: opts.label }
-              : { [core.properties.description]: opts.label },
+              : opts.type === 'info-box'
+                ? {
+                    [core.properties.description]: opts.label,
+                    [forms.properties.formInfoBoxStyle]: DEFAULT_INFO_BOX_STYLE,
+                  }
+                : { [core.properties.description]: opts.label },
         });
         await field.save();
       } else {

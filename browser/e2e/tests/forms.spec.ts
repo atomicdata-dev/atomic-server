@@ -34,6 +34,7 @@ const FIELDS: Array<[label: string, key: string]> = [
   ['Country', 'country'],
   ['Heading', 'heading'],
   ['Paragraph', 'paragraph'],
+  ['Info box', 'info-box'],
 ];
 
 // `window.store?.`, not `window.store.`: the predicate runs on every animation
@@ -173,7 +174,7 @@ test.describe('forms', async () => {
     });
     expect(formSubject).toBeTruthy();
 
-    // --- 2. Add one field of every input type + both layout types ---
+    // --- 2. Add one field of every input type + every layout type ---
     for (const [label, key] of FIELDS) {
       await page.getByTitle('Add field').click();
       await page.getByRole('menuitem', { name: label, exact: true }).click();
@@ -284,6 +285,14 @@ test.describe('forms', async () => {
       .toEqual(['A', 'B', 'C']);
     await waitForSync(page);
 
+    // --- 4b. Give the info box a style ---
+    // `form-info-box-style` is the one layout-block setting that is neither
+    // `name` nor `description`, so it is the one that can silently fail to
+    // persist.
+    await page.getByTestId('field-row-info-box').click();
+    await page.getByTestId('info-box-style').selectOption('warning');
+    await waitForSync(page);
+
     // --- 5. Publish ---
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
@@ -319,6 +328,9 @@ test.describe('forms', async () => {
     await expect(page.getByTestId('field-row-short-text')).toContainText(
       'Your full name',
     );
+
+    await page.getByTestId('field-row-info-box').click();
+    await expect(page.getByTestId('info-box-style')).toHaveValue('warning');
 
     await page.getByTestId('field-row-radio').click();
     const reloadedChoiceInputs = page.getByTestId('choice-option-input');

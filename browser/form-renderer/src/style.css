@@ -17,6 +17,12 @@
   --atomic-form-border: #d9dce1;
   --atomic-form-error: #c0392b;
   --atomic-form-radius: 0.5rem;
+  /* Info-box hues that are not derived from the form's own palette. The other
+     three (info, note, danger) follow accent / text-light / error, and so are
+     declared with the derived properties below. */
+  --atomic-form-info-box-tip: #0d9488;
+  --atomic-form-info-box-success: #15803d;
+  --atomic-form-info-box-warning: #b45309;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,6 +33,9 @@
     --atomic-form-bg: #16181d;
     --atomic-form-border: #33363d;
     --atomic-form-error: #ff6b5e;
+    --atomic-form-info-box-tip: #2dd4bf;
+    --atomic-form-info-box-success: #4ade80;
+    --atomic-form-info-box-warning: #fbbf24;
   }
 }
 
@@ -60,6 +69,12 @@
     var(--atomic-form-text)
   );
   --atomic-form-transition: 120ms ease;
+  /* An `info` box carries the form's own accent, so a themed form gets a
+     matching callout for free; `note` is deliberately colorless, and `danger`
+     shares the hue errors already use. */
+  --atomic-form-info-box-info: var(--atomic-form-accent);
+  --atomic-form-info-box-note: var(--atomic-form-text-light);
+  --atomic-form-info-box-danger: var(--atomic-form-error);
 }
 
 .atomic-form-progress {
@@ -119,6 +134,76 @@
 
 .atomic-form-paragraph img,
 .atomic-form-description img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--atomic-form-radius);
+}
+
+/* Callout blocks. Every variant is the same box with a different hue, so a
+   host app can restyle one by overriding a single custom property. `info` is
+   also the fallback for an unknown style (see `infoBoxStyle`). */
+.atomic-form-info-box {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-info);
+  border-left: 3px solid var(--atomic-form-info-box-color);
+  background: color-mix(
+    in srgb,
+    var(--atomic-form-info-box-color) 10%,
+    transparent
+  );
+  border-radius: var(--atomic-form-radius);
+  padding: 0.75rem 1rem;
+  color: var(--atomic-form-text);
+  line-height: 1.5;
+}
+
+.atomic-form-info-box--info {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-info);
+}
+
+.atomic-form-info-box--note {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-note);
+}
+
+.atomic-form-info-box--tip {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-tip);
+}
+
+.atomic-form-info-box--success {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-success);
+}
+
+.atomic-form-info-box--warning {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-warning);
+}
+
+.atomic-form-info-box--danger {
+  --atomic-form-info-box-color: var(--atomic-form-info-box-danger);
+}
+
+.atomic-form-info-box-title {
+  margin: 0 0 0.25rem;
+  font-weight: 600;
+  color: var(--atomic-form-info-box-color);
+}
+
+.atomic-form-info-box-body > :first-child {
+  margin-top: 0;
+}
+
+.atomic-form-info-box-body > :last-child {
+  margin-bottom: 0;
+}
+
+.atomic-form-info-box-body a {
+  color: var(--atomic-form-info-box-color);
+}
+
+.atomic-form-info-box-body ul,
+.atomic-form-info-box-body ol {
+  padding-left: 1.25rem;
+}
+
+.atomic-form-info-box-body img {
   max-width: 100%;
   height: auto;
   border-radius: var(--atomic-form-radius);

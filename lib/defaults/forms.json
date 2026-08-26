@@ -156,7 +156,7 @@
   {
     "@id": "https://atomicdata.dev/properties/form-fields",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
-    "https://atomicdata.dev/properties/description": "The fields of a FormPage, in display order. Mixes form fields (e.g. FormField) with layout blocks (e.g. FormHeading, FormParagraph); no classtype since multiple class-types aren't supported.",
+    "https://atomicdata.dev/properties/description": "The fields of a FormPage, in display order. Mixes form fields (e.g. FormField) with layout blocks (e.g. FormHeading, FormParagraph, FormInfoBox); no classtype since multiple class-types aren't supported.",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],
@@ -294,6 +294,33 @@
     "https://atomicdata.dev/properties/shortname": "form-paragraph"
   },
   {
+    "@id": "https://atomicdata.dev/classes/FormInfoBox",
+    "https://atomicdata.dev/properties/description": "A callout layout block inside a FormPage's `form-fields` list. Its body (`description`) is rendered as markdown, with an optional title (`name`), inside a box styled by `form-info-box-style`.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Class"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
+    "https://atomicdata.dev/properties/recommends": [
+      "https://atomicdata.dev/properties/name",
+      "https://atomicdata.dev/properties/form-info-box-style",
+      "https://atomicdata.dev/properties/form-conditions"
+    ],
+    "https://atomicdata.dev/properties/requires": [
+      "https://atomicdata.dev/properties/description"
+    ],
+    "https://atomicdata.dev/properties/shortname": "form-info-box"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-info-box-style",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/string",
+    "https://atomicdata.dev/properties/description": "How a FormInfoBox is styled. One of: info, note, tip, success, warning, danger. Defaults to `info` when unset. Unenforced at the store (plain String, same limitation as form-field-type); the form builder and renderer fall back to `info` for anything else.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-info-box-style"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/form-conditions",
     "https://atomicdata.dev/properties/classtype": "https://atomicdata.dev/classes/FormCondition",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/resourceArray",
@@ -366,6 +393,7 @@
       "https://atomicdata.dev/classes/FormField",
       "https://atomicdata.dev/classes/FormHeading",
       "https://atomicdata.dev/classes/FormParagraph",
+      "https://atomicdata.dev/classes/FormInfoBox",
       "https://atomicdata.dev/classes/FormInviteCode",
       "https://atomicdata.dev/classes/FormCondition"
     ],
@@ -391,7 +419,8 @@
       "https://atomicdata.dev/properties/form-conditions",
       "https://atomicdata.dev/properties/form-condition-field",
       "https://atomicdata.dev/properties/form-condition-operator",
-      "https://atomicdata.dev/properties/form-condition-value"
+      "https://atomicdata.dev/properties/form-condition-value",
+      "https://atomicdata.dev/properties/form-info-box-style"
     ]
   }
 ]

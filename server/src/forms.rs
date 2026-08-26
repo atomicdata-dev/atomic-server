@@ -102,6 +102,14 @@ pub struct FormConditionDef {
     pub value: JsonValue,
 }
 
+/// The styles a `FormInfoBox` may carry. Mirrors `INFO_BOX_STYLES` in
+/// `@tomic/form-renderer`; anything else falls back to
+/// [DEFAULT_INFO_BOX_STYLE], since `form-info-box-style` is a plain String at
+/// the store (same limitation as `form-field-type`).
+pub const INFO_BOX_STYLES: [&str; 6] = ["info", "note", "tip", "success", "warning", "danger"];
+
+pub const DEFAULT_INFO_BOX_STYLE: &str = "info";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FormBlock {
@@ -112,6 +120,18 @@ pub enum FormBlock {
     },
     Paragraph {
         text: String,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        conditions: Vec<FormConditionDef>,
+    },
+    /// A callout box: markdown `text`, an optional `title` line above it, and
+    /// a `style` picked from [INFO_BOX_STYLES]. `kind` is spelled kebab-case
+    /// (not serde's default `info_box`) to match the builder's field-type ids.
+    #[serde(rename = "info-box")]
+    InfoBox {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+        text: String,
+        style: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         conditions: Vec<FormConditionDef>,
     },
@@ -134,6 +154,7 @@ impl FormBlock {
         match self {
             Self::Heading { conditions, .. }
             | Self::Paragraph { conditions, .. }
+            | Self::InfoBox { conditions, .. }
             | Self::Field { conditions, .. } => conditions,
         }
     }
@@ -808,6 +829,27 @@ async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<F
         let text = field.get(atomic_lib::urls::DESCRIPTION)?.to_string();
         return Ok(FormBlock::Paragraph { text, conditions });
     }
+    if classes.iter().any(|c| c == atomic_lib::urls::FORM_INFO_BOX) {
+        let text = field.get(atomic_lib::urls::DESCRIPTION)?.to_string();
+        // A title is optional — an untitled box is just a styled paragraph.
+        let title = field
+            .get(atomic_lib::urls::NAME)
+            .ok()
+            .map(|v| v.to_string())
+            .filter(|t| !t.is_empty());
+        let style = field
+            .get(atomic_lib::urls::FORM_INFO_BOX_STYLE)
+            .ok()
+            .map(|v| v.to_string())
+            .filter(|s| INFO_BOX_STYLES.contains(&s.as_str()))
+            .unwrap_or_else(|| DEFAULT_INFO_BOX_STYLE.to_string());
+        return Ok(FormBlock::InfoBox {
+            title,
+            text,
+            style,
+            conditions,
+        });
+    }
     if classes.iter().any(|c| c == atomic_lib::urls::FORM_FIELD) {
         let maps_to = field.get(atomic_lib::urls::FORM_MAPS_TO)?.to_string();
         let label = field.get(atomic_lib::urls::NAME)?.to_string();
@@ -841,7 +883,7 @@ async fn build_block(store: &impl Storelike, field: &Resource) -> AtomicResult<F
     }
 
     Err(format!(
-        "Resource {} is not a recognized form block (expected FormField, FormHeading or FormParagraph)",
+        "Resource {} is not a recognized form block (expected FormField, FormHeading, FormParagraph or FormInfoBox)",
         field.get_subject()
     )
     .into())
@@ -1898,6 +1940,113 @@ mod tests {
             }
             other => panic!("expected a Field block, got {other:?}"),
         }
+    }
+
+    /// Appends a layout block to the form's only page, in place.
+    async fn append_block(store: &Db, form: &Resource, block: &Subject) {
+        let page_subject = form
+            .get(urls::FORM_PAGES)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap()[0]
+            .clone();
+        let mut page = store.get_resource(&page_subject.into()).await.unwrap();
+        let mut fields = page.get(urls::FORM_FIELDS).unwrap().to_subjects(None).unwrap();
+        fields.push(block.to_string());
+        page.set(
+            urls::FORM_FIELDS.into(),
+            Value::ResourceArray(fields.into_iter().map(|s| s.into()).collect()),
+            store,
+        )
+        .await
+        .unwrap();
+        page.save_locally(store).await.unwrap();
+    }
+
+    async fn make_info_box(store: &Db, title: Option<&str>, style: Option<&str>) -> Resource {
+        let mut info = Resource::new_instance(urls::FORM_INFO_BOX, store)
+            .await
+            .unwrap();
+        info.set(
+            urls::DESCRIPTION.into(),
+            Value::Markdown("Read **this** first.".into()),
+            store,
+        )
+        .await
+        .unwrap();
+        if let Some(title) = title {
+            info.set(urls::NAME.into(), Value::String(title.into()), store)
+                .await
+                .unwrap();
+        }
+        if let Some(style) = style {
+            info.set(
+                urls::FORM_INFO_BOX_STYLE.into(),
+                Value::String(style.into()),
+                store,
+            )
+            .await
+            .unwrap();
+        }
+        info.save_locally(store).await.unwrap();
+        info
+    }
+
+    #[tokio::test]
+    async fn builds_info_box_block() {
+        let store = init_store().await;
+        let (form, _) = build_test_form(&store).await;
+
+        let info = make_info_box(&store, Some("Heads up"), Some("warning")).await;
+        append_block(&store, &form, info.get_subject()).await;
+
+        let definition = build_form_definition(&store, &form).await.unwrap();
+        match &definition.pages[0].blocks[1] {
+            FormBlock::InfoBox { title, text, style, .. } => {
+                assert_eq!(title.as_deref(), Some("Heads up"));
+                assert_eq!(text, "Read **this** first.");
+                assert_eq!(style, "warning");
+            }
+            other => panic!("expected an InfoBox block, got {other:?}"),
+        }
+    }
+
+    /// `form-info-box-style` is a plain String at the store, so a definition
+    /// must never hand the renderer a style it has no CSS for. An untitled
+    /// box drops `title` rather than emitting an empty one.
+    #[tokio::test]
+    async fn info_box_falls_back_to_info_style() {
+        let store = init_store().await;
+        let (form, _) = build_test_form(&store).await;
+
+        let info = make_info_box(&store, None, Some("chartreuse")).await;
+        append_block(&store, &form, info.get_subject()).await;
+
+        let definition = build_form_definition(&store, &form).await.unwrap();
+        match &definition.pages[0].blocks[1] {
+            FormBlock::InfoBox { title, style, .. } => {
+                assert_eq!(*title, None);
+                assert_eq!(style, DEFAULT_INFO_BOX_STYLE);
+            }
+            other => panic!("expected an InfoBox block, got {other:?}"),
+        }
+    }
+
+    /// The `kind` a client sees is kebab-case, not serde's default
+    /// `info_box` — `@tomic/form-renderer` switches on the exact string.
+    #[tokio::test]
+    async fn info_box_serializes_as_kebab_kind() {
+        let store = init_store().await;
+        let (form, _) = build_test_form(&store).await;
+
+        let info = make_info_box(&store, None, None).await;
+        append_block(&store, &form, info.get_subject()).await;
+
+        let definition = build_form_definition(&store, &form).await.unwrap();
+        let json = serde_json::to_value(&definition.pages[0].blocks[1]).unwrap();
+        assert_eq!(json["kind"], "info-box");
+        assert_eq!(json["style"], "info");
+        assert!(json.get("title").is_none());
     }
 
     /// Creates a Tag under `parent`, as the builder's tag editor does:

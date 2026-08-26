@@ -12,6 +12,7 @@ export const forms = {
     formField: 'https://atomicdata.dev/classes/FormField',
     formHeading: 'https://atomicdata.dev/classes/FormHeading',
     formParagraph: 'https://atomicdata.dev/classes/FormParagraph',
+    formInfoBox: 'https://atomicdata.dev/classes/FormInfoBox',
     formInviteCode: 'https://atomicdata.dev/classes/FormInviteCode',
     formCondition: 'https://atomicdata.dev/classes/FormCondition',
   },
@@ -42,6 +43,7 @@ export const forms = {
       'https://atomicdata.dev/properties/form-condition-operator',
     formConditionValue:
       'https://atomicdata.dev/properties/form-condition-value',
+    formInfoBoxStyle: 'https://atomicdata.dev/properties/form-info-box-style',
   },
   __classDefs: {
     ['https://atomicdata.dev/classes/Form']: [
@@ -81,6 +83,12 @@ export const forms = {
       'https://atomicdata.dev/properties/description',
       'https://atomicdata.dev/properties/form-conditions',
     ],
+    ['https://atomicdata.dev/classes/FormInfoBox']: [
+      'https://atomicdata.dev/properties/description',
+      'https://atomicdata.dev/properties/name',
+      'https://atomicdata.dev/properties/form-info-box-style',
+      'https://atomicdata.dev/properties/form-conditions',
+    ],
     ['https://atomicdata.dev/classes/FormInviteCode']: [
       'https://atomicdata.dev/properties/form-code',
       'https://atomicdata.dev/properties/used-at',
@@ -100,6 +108,7 @@ export namespace Forms {
   export type FormField = typeof forms.classes.formField;
   export type FormHeading = typeof forms.classes.formHeading;
   export type FormParagraph = typeof forms.classes.formParagraph;
+  export type FormInfoBox = typeof forms.classes.formInfoBox;
   export type FormInviteCode = typeof forms.classes.formInviteCode;
   export type FormCondition = typeof forms.classes.formCondition;
 }
@@ -150,6 +159,13 @@ declare module '../index.js' {
       requires: BaseProps | 'https://atomicdata.dev/properties/description';
       recommends: typeof forms.properties.formConditions;
     };
+    [forms.classes.formInfoBox]: {
+      requires: BaseProps | 'https://atomicdata.dev/properties/description';
+      recommends:
+        | 'https://atomicdata.dev/properties/name'
+        | typeof forms.properties.formInfoBoxStyle
+        | typeof forms.properties.formConditions;
+    };
     [forms.classes.formInviteCode]: {
       requires: BaseProps | typeof forms.properties.formCode;
       recommends: typeof forms.properties.usedAt;
@@ -186,6 +202,7 @@ declare module '../index.js' {
     [forms.properties.formConditionField]: string;
     [forms.properties.formConditionOperator]: string;
     [forms.properties.formConditionValue]: JSONValue;
+    [forms.properties.formInfoBoxStyle]: string;
   }
 
   interface PropSubjectToNameMapping {
@@ -211,5 +228,6 @@ declare module '../index.js' {
     [forms.properties.formConditionField]: 'formConditionField';
     [forms.properties.formConditionOperator]: 'formConditionOperator';
     [forms.properties.formConditionValue]: 'formConditionValue';
+    [forms.properties.formInfoBoxStyle]: 'formInfoBoxStyle';
   }
 }

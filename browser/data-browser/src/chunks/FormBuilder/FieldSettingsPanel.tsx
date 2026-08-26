@@ -32,6 +32,7 @@ import { PictureChoiceOptions } from './FieldOptions/PictureChoiceOptions';
 import { MatrixOptions } from './FieldOptions/MatrixOptions';
 import { TableInputOptions } from './FieldOptions/TableInputOptions';
 import type { FormFieldType } from './fieldTypes';
+import { InfoBoxOptions } from './FieldOptions/InfoBoxOptions';
 import { useFormFieldPropertySync } from './useFormFieldPropertySync';
 import { ConditionsEditor } from './ConditionsEditor';
 
@@ -59,6 +60,7 @@ export function FieldSettingsPanel({
   const [classes] = useArray(field, core.properties.isA);
   const isHeading = classes.includes(forms.classes.formHeading);
   const isParagraph = classes.includes(forms.classes.formParagraph);
+  const isInfoBox = classes.includes(forms.classes.formInfoBox);
 
   if (isHeading) {
     return (
@@ -66,6 +68,19 @@ export function FieldSettingsPanel({
         <Field label='Heading text' required>
           <FieldLabelInput field={field} renameField={renameField} />
         </Field>
+        <ConditionsEditor
+          resource={field}
+          form={form}
+          beforeField={fieldSubject}
+        />
+      </Panel>
+    );
+  }
+
+  if (isInfoBox) {
+    return (
+      <Panel>
+        <InfoBoxOptions field={field} />
         <ConditionsEditor
           resource={field}
           form={form}

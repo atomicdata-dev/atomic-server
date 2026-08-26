@@ -348,6 +348,8 @@ mod test {
             urls::FORM_FIELD,
             urls::FORM_HEADING,
             urls::FORM_PARAGRAPH,
+            urls::FORM_INFO_BOX,
+            urls::FORM_INFO_BOX_STYLE,
             urls::FORM_CONDITION,
             urls::FORM_CONDITIONS,
             urls::FORM_CONDITION_FIELD,

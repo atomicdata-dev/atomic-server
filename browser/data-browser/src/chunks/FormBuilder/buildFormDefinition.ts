@@ -7,7 +7,7 @@ import {
   Store,
   type JSONValue,
 } from '@tomic/react';
-import { isChoiceField } from '@tomic/form-renderer';
+import { isChoiceField, infoBoxStyle } from '@tomic/form-renderer';
 import type {
   FieldOption,
   OptionsSource,
@@ -197,6 +197,21 @@ async function buildBlock(
     return {
       kind: 'heading',
       text: (field.get(core.properties.name) as string) ?? '',
+      ...(conditions.length > 0 ? { conditions } : {}),
+    };
+  }
+
+  if (field.hasClasses(forms.classes.formInfoBox)) {
+    const title = field.get(core.properties.name) as string | undefined;
+
+    return {
+      kind: 'info-box',
+      // An untitled box is a styled paragraph — don't emit an empty title.
+      ...(title ? { title } : {}),
+      text: (field.get(core.properties.description) as string) ?? '',
+      style: infoBoxStyle(
+        field.get(forms.properties.formInfoBoxStyle) as string | undefined,
+      ),
       ...(conditions.length > 0 ? { conditions } : {}),
     };
   }

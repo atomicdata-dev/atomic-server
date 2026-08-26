@@ -8459,3 +8459,14 @@ msgstr "<0/> Delete page"
 #: src/chunks/FormBuilder/PageSettingsPanel.tsx
 msgid "Are you sure you want to delete this page? Its fields will no longer be part of the form."
 msgstr "Are you sure you want to delete this page? Its fields will no longer be part of the form."
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Empty info box"
+msgstr "Empty info box"
+
+#: src/chunks/FormBuilder/FieldOptions/InfoBoxOptions.tsx
+msgid "Style"
+msgstr "Style"
+
+msgid "Optional — leave empty for a box of text."
+msgstr "Optional — leave empty for a box of text."

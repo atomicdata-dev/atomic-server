@@ -4,6 +4,8 @@ export { FormShell, stylingVars } from './FormShell.js';
 export type { FormShellProps } from './FormShell.js';
 export { FormMarkdown } from './FormMarkdown.js';
 export type { FormMarkdownProps } from './FormMarkdown.js';
+export { InfoBox } from './InfoBox.js';
+export type { InfoBoxProps } from './InfoBox.js';
 export * from './types.js';
 export {
   validateFieldValue,

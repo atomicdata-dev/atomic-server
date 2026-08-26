@@ -40,7 +40,7 @@ A single page of a Form, holding a list of fields and layout blocks.
 
 Properties:
 
-- [`form-fields`](https://atomicdata.dev/properties/form-fields) - (required, ResourceArray) the page's fields and layout blocks, in order. No `classtype`, since a page mixes input fields (`FormField`) with layout blocks (`FormHeading`, `FormParagraph`, ...) and Atomic Data doesn't support multiple class-types on one ResourceArray.
+- [`form-fields`](https://atomicdata.dev/properties/form-fields) - (required, ResourceArray) the page's fields and layout blocks, in order. No `classtype`, since a page mixes input fields (`FormField`) with layout blocks (`FormHeading`, `FormParagraph`, `FormInfoBox`, ...) and Atomic Data doesn't support multiple class-types on one ResourceArray.
 - [`name`](https://atomicdata.dev/properties/name) - (recommended, String) the page's title.
 - [`cover-image`](https://atomicdata.dev/properties/cover-image) - (recommended, AtomicURL, File) an optional cover image.
 - [`image-position`](https://atomicdata.dev/properties/image-position) - (recommended, String) where the cover image is positioned. Same values as on Form (see above); currently unused by the builder, which themes at the Form level.
@@ -129,6 +129,23 @@ A paragraph layout block inside a FormPage's `form-fields` list, rendered as mar
 
 - [`description`](https://atomicdata.dev/properties/description) - (required, Markdown) the paragraph body.
 - [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates, same AND semantics as on FormField.
+
+## FormInfoBox
+
+_URL: [`https://atomicdata.dev/classes/FormInfoBox`](https://atomicdata.dev/classes/FormInfoBox)_
+
+A callout layout block inside a FormPage's `form-fields` list — a paragraph in
+a tinted box, for the thing a respondent must not scroll past.
+
+- [`description`](https://atomicdata.dev/properties/description) - (required, Markdown) the box's body.
+- [`name`](https://atomicdata.dev/properties/name) - (recommended, String) an optional title line above the body. An untitled box is just a styled paragraph.
+- [`form-info-box-style`](https://atomicdata.dev/properties/form-info-box-style) - (recommended, String) one of: `info`, `note`, `tip`, `success`, `warning`, `danger`. Enforced by the application, not the store (same limitation as `form-field-type`); an unset or unknown value renders as `info`.
+- [`form-conditions`](https://atomicdata.dev/properties/form-conditions) - (recommended, ResourceArray, FormCondition) visibility predicates, same AND semantics as on FormField.
+
+`info` follows the form's own accent color, so a themed form gets a matching
+callout without configuring anything. `warning` and `danger` are announced to
+screen readers (`role="alert"`); the quieter variants are read as ordinary
+text.
 
 ## FormCondition
 

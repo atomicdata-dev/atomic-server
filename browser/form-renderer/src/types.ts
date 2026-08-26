@@ -170,6 +170,38 @@ export interface ParagraphBlock {
   conditions?: FormCondition[];
 }
 
+/** The visual variants a {@link InfoBoxBlock} may carry. Mirrors
+ * `INFO_BOX_STYLES` in `server/src/forms.rs`. */
+export const INFO_BOX_STYLES = [
+  'info',
+  'note',
+  'tip',
+  'success',
+  'warning',
+  'danger',
+] as const;
+
+export type InfoBoxStyle = (typeof INFO_BOX_STYLES)[number];
+
+export const DEFAULT_INFO_BOX_STYLE: InfoBoxStyle = 'info';
+
+/** `style` is a plain String at the store, so a definition can carry anything;
+ * everything reading one goes through here to land back on a known variant. */
+export function infoBoxStyle(style: string | undefined): InfoBoxStyle {
+  return (INFO_BOX_STYLES as readonly string[]).includes(style ?? '')
+    ? (style as InfoBoxStyle)
+    : DEFAULT_INFO_BOX_STYLE;
+}
+
+/** A callout: markdown `text` in a styled box, under an optional `title`. */
+export interface InfoBoxBlock {
+  kind: 'info-box';
+  title?: string | null;
+  text: string;
+  style: InfoBoxStyle | string;
+  conditions?: FormCondition[];
+}
+
 export interface FieldBlock {
   kind: 'field';
   mapsTo: string;
@@ -181,7 +213,11 @@ export interface FieldBlock {
   conditions?: FormCondition[];
 }
 
-export type FormBlock = HeadingBlock | ParagraphBlock | FieldBlock;
+export type FormBlock =
+  | HeadingBlock
+  | ParagraphBlock
+  | InfoBoxBlock
+  | FieldBlock;
 
 export type ConditionOperator =
   | 'equals'
