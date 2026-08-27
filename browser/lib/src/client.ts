@@ -21,6 +21,7 @@ import {
 } from './commit.js';
 import { JSONADParser } from './parse.js';
 import { Resource } from './resource.js';
+import { extractDidSubject } from './subject.js';
 import {
   recordServerVersionFromResponse,
   shouldSkipDidAuthForLegacyServer,
@@ -219,16 +220,26 @@ export class Client {
       }
 
       let url = subject;
+      const wrappedDid = extractDidSubject(subject);
 
       if (subject.startsWith('did:')) {
         // We can't fetch DIDs directly, so we use the server's /did endpoint.
-        const baseUrl =
-          signInfo?.serverURL ||
-          serverURL ||
-          (window as unknown as Record<'atomicServerUrl', string>)
-            .atomicServerUrl ||
-          window.location.origin;
+        const baseUrl = didResolutionBaseUrl(signInfo?.serverURL, serverURL);
+
+        if (!baseUrl) {
+          throw new AtomicError(
+            `Cannot fetch ${subject}: no server URL to resolve this DID against. ` +
+              `Pass serverURL to fetchResourceHTTP, call store.setServerUrl(), ` +
+              `or (for @tomic/cli) set "serverUrl" in atomic.config.json.`,
+          );
+        }
+
         url = `${baseUrl}/did?subject=${encodeURIComponent(subject)}`;
+      } else if (wrappedDid && wrappedDid !== subject) {
+        // `https://host/did:ad:…` is an HTTP alias, not the resource's
+        // identity. Fetch via the host's /did endpoint so the response
+        // `@id` (the DID) matches what JSON-AD actually contains.
+        url = `${new URL(subject).origin}/did?subject=${encodeURIComponent(wrappedDid)}`;
       }
 
       // Sign the request with the actual URL being fetched (not the raw DID
@@ -304,10 +315,15 @@ export class Client {
               );
             }
 
-            // For array responses, find the resource matching the requested subject.
-            // Falls back to the last item (the convention for non-array responses).
+            // For array responses, find the resource matching the requested
+            // subject (or its DID, when the request used an HTTP alias).
+            // Falls back to the last item (the convention for non-array
+            // responses).
             resource =
               resources.find(r => r.subject === subject) ??
+              (wrappedDid
+                ? resources.find(r => r.subject === wrappedDid)
+                : undefined) ??
               (resources.at(-1) as Resource);
             createdResources.push(...resources);
           }
@@ -429,4 +445,24 @@ export class Client {
 
     return fetch(...params);
   }
+}
+
+/** Origin used to turn a `did:ad:…` subject into `GET {origin}/did?subject=`. */
+function didResolutionBaseUrl(
+  ...candidates: Array<string | undefined>
+): string | undefined {
+  for (const candidate of candidates) {
+    if (candidate) {
+      return candidate.replace(/\/$/, '');
+    }
+  }
+
+  if (hasBrowserAPI()) {
+    const fromWindow = (window as unknown as Record<'atomicServerUrl', string>)
+      .atomicServerUrl;
+
+    return fromWindow || window.location.origin;
+  }
+
+  return undefined;
 }
