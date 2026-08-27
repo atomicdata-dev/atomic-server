@@ -137,6 +137,44 @@ const getFieldSubjectByType = (page: Page, type: string) =>
     { fieldType: type, prop: FORM_FIELD_TYPE },
   );
 
+/**
+ * Creates a Form and returns its subject, landing on the builder.
+ * Also provisions the data Class, results Table and Page 1.
+ */
+const createForm = async (page: Page, formName: string): Promise<string> => {
+  await newResource('form', page);
+  await page.getByPlaceholder('New Form').fill(formName);
+  await page.locator('dialog[open] button:has-text("Create")').click();
+  await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+    timeout: 15000,
+  });
+  await expect(page.getByTestId('editable-title').first()).toBeVisible({
+    timeout: 15000,
+  });
+
+  const formSubject = await page.evaluate(() => {
+    const main = document.querySelector('main[about]');
+
+    return main?.getAttribute('about') ?? '';
+  });
+  expect(formSubject).toBeTruthy();
+
+  return formSubject;
+};
+
+/**
+ * Adds one field per `FIELDS` entry, waiting for each row before the next
+ * click. The barrier is load-bearing: `createField` read-modify-writes the
+ * page's `formFields`, so overlapping adds would drop fields.
+ */
+const addField = async (page: Page, label: string, key: string) => {
+  await page.getByTitle('Add field').click();
+  await page.getByRole('menuitem', { name: label, exact: true }).click();
+  await expect(page.getByTestId(`field-row-${key}`)).toBeVisible({
+    timeout: 10000,
+  });
+};
+
 test.describe('forms', async () => {
   test.beforeEach(before);
 
@@ -147,40 +185,58 @@ test.describe('forms', async () => {
     await expect(input).toBeFocused();
   });
 
-  // One long walk instead of many small tests: the interesting bugs live in
-  // the sequence (creation -> property sync -> rename -> delete -> reload),
-  // not in any single step.
-  test('create a form, add every field type, and persist across reload', async ({
-    page,
-  }) => {
+  // Breadth, on its own: one field of every type, then a reload. This is
+  // orthogonal to the regression walk below — it proves each type can be
+  // created and rehydrated, not that a sequence of edits holds together — so
+  // it runs as its own test rather than lengthening that walk. Adding all 24
+  // costs ~5 resource saves each, which is most of why it is the slow half.
+  test('every field type is added and survives a reload', async ({ page }) => {
+    // 24 fields x ~5 resource saves each. Comfortable locally (~25s alone,
+    // ~38s under load) but the long pole of this file, and CI boxes are
+    // slower — keep the tripled budget. The regression walk below does not
+    // need it.
     test.slow();
 
-    // --- 1. Create the Form (also provisions a data Class + Table + Page 1) ---
-    const formName = 'Contact us';
-    await newResource('form', page);
-    await page.getByPlaceholder('New Form').fill(formName);
-    await page.locator('dialog[open] button:has-text("Create")').click();
-    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
-      timeout: 15000,
-    });
+    const formSubject = await createForm(page, 'Every field type');
+
+    for (const [label, key] of FIELDS) {
+      await addField(page, label, key);
+    }
+
+    await waitForSync(page);
+    await page.reload();
     await expect(page.getByTestId('editable-title').first()).toBeVisible({
       timeout: 15000,
     });
 
-    const formSubject = await page.evaluate(() => {
-      const main = document.querySelector('main[about]');
+    for (const [, key] of FIELDS) {
+      await expect(page.getByTestId(`field-row-${key}`)).toBeVisible();
+    }
 
-      return main?.getAttribute('about') ?? '';
-    });
     expect(formSubject).toBeTruthy();
+  });
 
-    // --- 2. Add one field of every input type + every layout type ---
-    for (const [label, key] of FIELDS) {
-      await page.getByTitle('Add field').click();
-      await page.getByRole('menuitem', { name: label, exact: true }).click();
-      await expect(page.getByTestId(`field-row-${key}`)).toBeVisible({
-        timeout: 10000,
-      });
+  // One long walk instead of many small tests: the interesting bugs live in
+  // the sequence (creation -> property sync -> rename -> delete -> reload),
+  // not in any single step. Only the four field types the walk actually
+  // manipulates are added — the other twenty proved nothing here that the
+  // breadth test above does not, and each one cost a second of it.
+  test('create a form, sync its properties, and persist across reload', async ({
+    page,
+  }) => {
+    // --- 1. Create the Form (also provisions a data Class + Table + Page 1) ---
+    const formSubject = await createForm(page, 'Contact us');
+
+    // --- 2. Add only the fields this walk edits ---
+    const WALKED: Array<[label: string, key: string]> = [
+      ['Short text', 'short-text'],
+      ['Number', 'number'],
+      ['Radio group', 'radio'],
+      ['Info box', 'info-box'],
+    ];
+
+    for (const [label, key] of WALKED) {
+      await addField(page, label, key);
     }
 
     await waitForSync(page);
@@ -318,7 +374,7 @@ test.describe('forms', async () => {
     });
 
     // Every field added except Number, which was deleted above.
-    for (const [, key] of FIELDS) {
+    for (const [, key] of WALKED) {
       if (key === 'number') {
         await expect(page.getByTestId(`field-row-${key}`)).not.toBeVisible();
       } else {
