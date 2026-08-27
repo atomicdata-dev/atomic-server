@@ -51,13 +51,13 @@ export function PageSettingsPanel({
 
   return (
     <Panel>
-      <Field label="Name" required>
+      <Field label='Name' required>
         <InputSwitcher
           commit
           resource={page}
           property={nameProp}
           required
-          data-testid="page-name-input"
+          data-testid='page-name-input'
         />
       </Field>
       <ConditionsEditor resource={page} form={form} beforePage={pageSubject} />
@@ -66,18 +66,18 @@ export function PageSettingsPanel({
         <>
           <Divider />
           <DeleteButton
-            type="button"
+            type='button'
             subtle
             onClick={() => setShowDelete(true)}
-            data-testid="delete-page"
+            data-testid='delete-page'
           >
-            <Row gap=".5rem" center>
+            <Row gap='.5rem' center>
               <FaTrash /> Delete page
             </Row>
           </DeleteButton>
           <ConfirmationDialog
-            title="Delete page"
-            confirmLabel="Delete"
+            title='Delete page'
+            confirmLabel='Delete'
             show={showDelete}
             bindShow={setShowDelete}
             theme={ConfirmationDialogTheme.Alert}

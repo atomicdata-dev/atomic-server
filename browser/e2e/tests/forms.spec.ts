@@ -278,6 +278,7 @@ test.describe('forms', async () => {
       await expect(choiceInputs).toHaveCount(index + 1);
       await choiceInputs.nth(index).fill(label);
     }
+
     await expect
       .poll(() => getOptionLabels(page, radioSubject as string), {
         timeout: 10000,

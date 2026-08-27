@@ -1951,7 +1951,11 @@ mod tests {
             .unwrap()[0]
             .clone();
         let mut page = store.get_resource(&page_subject.into()).await.unwrap();
-        let mut fields = page.get(urls::FORM_FIELDS).unwrap().to_subjects(None).unwrap();
+        let mut fields = page
+            .get(urls::FORM_FIELDS)
+            .unwrap()
+            .to_subjects(None)
+            .unwrap();
         fields.push(block.to_string());
         page.set(
             urls::FORM_FIELDS.into(),
@@ -2002,7 +2006,9 @@ mod tests {
 
         let definition = build_form_definition(&store, &form).await.unwrap();
         match &definition.pages[0].blocks[1] {
-            FormBlock::InfoBox { title, text, style, .. } => {
+            FormBlock::InfoBox {
+                title, text, style, ..
+            } => {
                 assert_eq!(title.as_deref(), Some("Heads up"));
                 assert_eq!(text, "Read **this** first.");
                 assert_eq!(style, "warning");
@@ -2170,9 +2176,13 @@ mod tests {
             )
             .await
             .unwrap();
-            row.set(urls::NAME.into(), Value::String(format!("row {label}")), store)
-                .await
-                .unwrap();
+            row.set(
+                urls::NAME.into(),
+                Value::String(format!("row {label}")),
+                store,
+            )
+            .await
+            .unwrap();
             if !label.is_empty() {
                 row.set(
                     label_prop.to_string(),
@@ -2236,8 +2246,7 @@ mod tests {
         let (_c, own_prop) =
             make_class_and_property(&store, "c-rows", "pick-row", urls::RESOURCE_ARRAY).await;
 
-        let table =
-            make_table_with_rows(&store, &row_class, &name_prop, &["Acme", "Globex"]).await;
+        let table = make_table_with_rows(&store, &row_class, &name_prop, &["Acme", "Globex"]).await;
 
         let mut options = json!({
             OPTIONS_SOURCE_KEY: { "table": table, "labelProperty": name_prop },

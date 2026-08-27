@@ -39,9 +39,9 @@ export function InfoBoxOptions({ field }: InfoBoxOptionsProps): JSX.Element {
 
   return (
     <>
-      <Field label="Style">
+      <Field label='Style'>
         <BasicSelect
-          data-testid="info-box-style"
+          data-testid='info-box-style'
           value={infoBoxStyle(style)}
           onChange={e => setStyle(e.target.value)}
         >
@@ -52,10 +52,10 @@ export function InfoBoxOptions({ field }: InfoBoxOptionsProps): JSX.Element {
           ))}
         </BasicSelect>
       </Field>
-      <Field label="Title">
+      <Field label='Title'>
         <InputSwitcher commit resource={field} property={nameProp} />
       </Field>
-      <Field label="Text" required>
+      <Field label='Text' required>
         <InputSwitcher
           commit
           resource={field}
