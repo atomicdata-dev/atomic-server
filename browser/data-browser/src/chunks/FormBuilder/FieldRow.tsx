@@ -2,6 +2,7 @@ import {
   core,
   forms,
   useArray,
+  useBoolean,
   useResource,
   useString,
   useTitle,
@@ -14,14 +15,15 @@ import {
   IconButton,
   IconButtonVariant,
 } from '@components/IconButton/IconButton';
+import { VisuallyHidden } from '@components/VisuallyHidden';
 import { transition } from '@helpers/transition';
 import {
-  FIELD_TYPE_META,
   isLayoutType,
   type AddableFieldType,
+  type FormFieldType,
 } from './fieldTypes';
 import { FormMarkdown, infoBoxStyle } from '@tomic/form-renderer';
-import { FieldRowOptions } from './FieldRowOptions';
+import { FieldPreview } from './FieldPreview';
 
 interface FieldRowProps {
   subject: string;
@@ -41,6 +43,7 @@ export function FieldRow({
   const [fieldType] = useString(resource, forms.properties.formFieldType);
   const [description] = useString(resource, core.properties.description);
   const [conditions] = useArray(resource, forms.properties.formConditions);
+  const [required] = useBoolean(resource, forms.properties.required);
   const [infoStyle] = useString(resource, forms.properties.formInfoBoxStyle);
   // The info box's title, read raw rather than through `useTitle`: it is
   // optional, and `useTitle`'s fallback would invent one from the subject.
@@ -65,13 +68,13 @@ export function FieldRow({
         ? 'info-box'
         : ((fieldType as AddableFieldType | undefined) ?? 'short-text');
 
-  const meta = FIELD_TYPE_META[type];
-  const Icon = meta.icon;
-
   const isLayout = isLayoutType(type);
+  // Like the published form, a checkbox puts its label beside the box rather
+  // than above it — so the preview draws it and the row must not.
+  const labelAbovePreview = !isLayout && type !== 'checkbox';
 
   return (
-    <RowWrapper $selected={selected} $plain={isLayout} data-selected={selected}>
+    <RowWrapper $selected={selected} data-selected={selected}>
       <SelectButton
         type='button'
         // While the resource is loading, `type` is just the fallback — don't
@@ -84,8 +87,8 @@ export function FieldRow({
       >
         <Column fullWidth gap='0.35rem'>
           {/* A layout block is nothing but the text it puts on the form, so it
-              renders as that text — no card, no type, no icon. A question
-              leads with what it asks, its type and options beneath. */}
+              renders as that text. A question renders the way the respondent
+              will meet it: label, helper text, and the actual control. */}
           {isHeading ? (
             <HeadingText>
               {name || <Placeholder>Empty heading</Placeholder>}
@@ -107,7 +110,7 @@ export function FieldRow({
           ) : isParagraph ? (
             description ? (
               <ParagraphText>
-                {/* The same renderer the published form uses, so the card
+                {/* The same renderer the published form uses, so the row
                     shows what the respondent will read. */}
                 <FormMarkdown text={description} />
               </ParagraphText>
@@ -116,23 +119,36 @@ export function FieldRow({
             )
           ) : (
             <>
-              {name ? (
-                <FieldLabel gap='0.35rem' center>
-                  <Icon />
-                  <Label bold>{name}</Label>
+              {labelAbovePreview ? (
+                <FieldLabel>
+                  {name || <Placeholder>Untitled question</Placeholder>}
+                  {required && <RequiredMark>*</RequiredMark>}
                 </FieldLabel>
-              ) : null}
-              {/* <FieldTypeRow gap="0.5rem" center>
-                <Label light>{meta.label}</Label>
-              </FieldTypeRow> */}
-              <FieldRowOptions field={resource} type={type} />
+              ) : (
+                // The preview draws the checkbox's label, but it is
+                // `aria-hidden` — so the select button would otherwise have no
+                // accessible name at all.
+                <VisuallyHidden>{name}</VisuallyHidden>
+              )}
+              {description && (
+                <Description>
+                  <FormMarkdown text={description} />
+                </Description>
+              )}
+              {/* Not a layout block, so `type` is an input type — the ternary
+                  above has already handled every other case. */}
+              <FieldPreview
+                field={resource}
+                type={type as FormFieldType}
+                label={name}
+              />
             </>
           )}
           {conditions.length > 0 && (
-            <FieldTypeRow gap='0.35rem' center>
+            <ConditionRow gap='0.35rem' center>
               <FaCodeBranch />
               <Label light>Conditional</Label>
-            </FieldTypeRow>
+            </ConditionRow>
           )}
         </Column>
       </SelectButton>
@@ -150,32 +166,23 @@ export function FieldRow({
   );
 }
 
-const FieldTypeRow = styled(Row)`
+const ConditionRow = styled(Row)`
   color: ${p => p.theme.colors.textLight};
 `;
-/** `$plain` is a layout block: no card at rest, because the row _is_ the text
- * the form will show. It still highlights on hover and while selected —
- * otherwise nothing says it can be clicked. */
-const RowWrapper = styled.div<{ $selected: boolean; $plain?: boolean }>`
+
+/** No card at rest — the row draws the field itself, and a border around a
+ * bordered input just reads as a box in a box. It still highlights on hover
+ * and while selected, otherwise nothing says it can be clicked. */
+const RowWrapper = styled.div<{ $selected: boolean }>`
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
   padding: 0.5rem 0.7rem;
-  border: 1px solid
-    ${p =>
-      p.$selected
-        ? p.theme.colors.main
-        : p.$plain
-          ? 'transparent'
-          : p.theme.colors.bg2};
+  border: 1px solid ${p => (p.$selected ? p.theme.colors.main : 'transparent')};
   border-radius: ${p => p.theme.radius};
   background-color: ${p =>
-    p.$selected
-      ? p.theme.colors.mainSelectedBg
-      : p.$plain
-        ? 'transparent'
-        : p.theme.colors.bg};
+    p.$selected ? p.theme.colors.mainSelectedBg : 'transparent'};
 
   &:hover {
     border-color: ${p => p.theme.colors.main};
@@ -189,6 +196,7 @@ const RowWrapper = styled.div<{ $selected: boolean; $plain?: boolean }>`
  * there it is simply always shown. */
 const DeleteButton = styled(IconButton)`
   opacity: 0;
+  align-self: flex-start;
   ${transition('opacity')}
 
   ${RowWrapper}:hover &,
@@ -215,6 +223,7 @@ const SelectButton = styled.button`
   /* A button does not inherit the page's text color on its own, and the
      layout blocks below render bare text rather than a styled Label. */
   color: ${p => p.theme.colors.text};
+  font-size: 1em;
   padding: 0;
   cursor: pointer;
   text-align: left;
@@ -282,8 +291,27 @@ const Label = styled.span<{ light?: boolean; bold?: boolean }>`
   color: ${p => (p.light ? p.theme.colors.textLight : p.theme.colors.text)};
 `;
 
-const FieldLabel = styled(Row)`
-  & svg {
-    color: ${p => p.theme.colors.textLight};
+/** The question's label, styled like `.atomic-form-label` in the renderer. */
+const FieldLabel = styled.span`
+  font-weight: bold;
+  word-break: break-word;
+`;
+
+const RequiredMark = styled.span`
+  color: ${p => p.theme.colors.alert};
+  margin-left: 0.2rem;
+`;
+
+/** The helper text, under the label and above the control — where the
+ * published form puts it. */
+const Description = styled.div`
+  width: 100%;
+  font-size: 0.85rem;
+  color: ${p => p.theme.colors.textLight};
+  /* The row is a select button: a link inside it must not swallow the click. */
+  pointer-events: none;
+
+  & > div > *:last-child {
+    margin-bottom: 0;
   }
 `;

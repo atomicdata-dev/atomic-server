@@ -8506,3 +8506,19 @@ msgstr "Stil"
 
 msgid "Optional — leave empty for a box of text."
 msgstr "Optional — leer lassen für eine Textbox."
+
+#: src/chunks/FormBuilder/FieldRow.tsx
+msgid "Untitled question"
+msgstr "Unbenannte Frage"
+
+#: src/chunks/FormBuilder/FieldPreview.tsx
+msgid "No options yet"
+msgstr "Noch keine Optionen"
+
+#: src/chunks/FormBuilder/FieldPreview.tsx
+msgid "No rows or columns yet"
+msgstr "Noch keine Zeilen oder Spalten"
+
+#: src/chunks/FormBuilder/FieldPreview.tsx
+msgid "No columns yet"
+msgstr "Noch keine Spalten"

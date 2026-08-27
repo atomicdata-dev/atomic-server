@@ -12,6 +12,10 @@ export {
   validatePage,
   validateAll,
   fieldBlocks,
+  likertScale,
+  ratingMax,
+  matrixColumns,
+  tableColumns,
 } from './validation.js';
 export type { ValidationResult } from './validation.js';
 export {
