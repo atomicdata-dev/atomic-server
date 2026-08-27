@@ -6775,17 +6775,17 @@ msgstr "Gekoppelt"
 
 #: src/routes/SyncRoute.tsx
 msgid "Paired device"
-msgstr ""
+msgstr "Gekoppeltes Gerät"
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Not synced yet"
-msgstr ""
+msgstr "Noch nicht synchronisiert"
 
 #. 0: label; 1: detail
 #: src/actions/runAction.ts
 msgid "{0} failed: {1}"
-msgstr ""
+msgstr "{0} fehlgeschlagen: {1}"
 
 #: src/routes/SyncRoute.tsx
 msgid "Sign in →"
@@ -6905,69 +6905,69 @@ msgstr "Ein ständig eingeschaltetes Gerät hat eine Adresse. Geben Sie sie hier
 #. 0: detail
 #: src/actions/resourceActions.tsx
 msgid "Could not delete: {0}"
-msgstr ""
+msgstr "Konnte nicht gelöscht werden: {0}"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Want a server of your own?"
-msgstr ""
+msgstr "Möchtest du einen eigenen Server?"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "This server is run by one person for their own data. You can sign in, or open a drive you were invited to."
-msgstr ""
+msgstr "Dieser Server wird von einer Person für ihre eigenen Daten betrieben. Du kannst dich anmelden oder einen Drive öffnen, zu dem du eingeladen wurdest."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Get one hosted"
-msgstr ""
+msgstr "Hol dir einen gehosteten Server"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "run it yourself"
-msgstr ""
+msgstr "betreib ihn selbst"
 
 #: src/handlers/errorHandler.ts
 msgid "Something failed, and reported no reason."
-msgstr ""
+msgstr "Etwas ist fehlgeschlagen und hat keinen Grund gemeldet."
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Your private drive keeps its name. It is tied to your account, not to a project."
-msgstr ""
+msgstr "Ihr privater Datenträger behält seinen Namen. Er ist mit Ihrem Konto verbunden, nicht mit einem Projekt."
 
 #: src/components/Drives/PersonalDriveBadge.tsx
 msgid "<0/> Private"
-msgstr ""
+msgstr "<0/> Privat"
 
 #: src/components/Drives/PersonalDriveBadge.tsx
 #: src/components/Drives/PrivateDriveBadge.tsx
 msgid "This is your private drive. It holds your drive list, favourites, notifications and chats, and its address comes from your account — so there is only ever one, and it is not a place for a project."
-msgstr ""
+msgstr "Dies ist Ihr privates Laufwerk. Es enthält Ihre Laufwerksliste, Favoriten, Benachrichtigungen und Chats, und seine Adresse stammt von Ihrem Konto — daher gibt es nur eines, und es ist kein Ort für ein Projekt."
 
 #: src/components/Share/ShareDialog.tsx
 msgid "This is your <0>private drive</0>. Sharing it shares your drive list, favourites, notifications and AI chats along with it. To work with someone, make a drive for the work and share that instead."
-msgstr ""
+msgstr "Dies ist Ihr <0>privates Laufwerk</0>. Wenn Sie es teilen, werden Ihre Laufwerksliste, Favoriten, Benachrichtigungen und KI-Chats ebenfalls geteilt. Um mit jemandem zusammenzuarbeiten, erstellen Sie ein Laufwerk für die Arbeit und teilen Sie stattdessen dieses."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Creating your private drive…"
-msgstr ""
+msgstr "Erstellen Ihres privaten Laufwerks…"
 
 #: src/hooks/usePersonalDriveList.ts
 #: src/hooks/usePrivateDriveList.ts
 msgid "Could not update your list: no private drive is set up for this account yet."
-msgstr ""
+msgstr "Die Liste konnte nicht aktualisiert werden: Für dieses Konto ist noch kein privater Datenträger eingerichtet."
 
 #: src/routes/SettingsAgent.tsx
 msgid "Your private drive is always first. Unstar any other drive to move it back to recently visited."
-msgstr ""
+msgstr "Ihr privates Laufwerk steht immer an erster Stelle. Entfernen Sie den Stern von einem anderen Laufwerk, um es zurück zu den kürzlich besuchten zu verschieben."
 
 #: src/components/Drives/DrivesCard.tsx
 msgid "Drives"
-msgstr ""
+msgstr "Laufwerke"
 
 #: src/routes/SettingsAgent.tsx
 msgid "Open a drive by URL"
-msgstr ""
+msgstr "Ein Laufwerk per URL öffnen"
 
 #: src/routes/SettingsAgent.tsx
 msgid "Open a drive by URL or DID"
-msgstr ""
+msgstr "Ein Laufwerk per URL oder DID öffnen"
 
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This workspace has an encrypted backup in Cloud Vault."

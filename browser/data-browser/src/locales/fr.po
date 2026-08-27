@@ -6769,17 +6769,17 @@ msgstr "Appairé"
 
 #: src/routes/SyncRoute.tsx
 msgid "Paired device"
-msgstr ""
+msgstr "Appareil apparié"
 
 #: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "Not synced yet"
-msgstr ""
+msgstr "Pas encore synchronisé"
 
 #. 0: label; 1: detail
 #: src/actions/runAction.ts
 msgid "{0} failed: {1}"
-msgstr ""
+msgstr "{0} a échoué : {1}"
 
 #: src/routes/SyncRoute.tsx
 msgid "Sign in →"
@@ -6899,69 +6899,69 @@ msgstr "Un appareil toujours allumé a une adresse. Tapez-la ici."
 #. 0: detail
 #: src/actions/resourceActions.tsx
 msgid "Could not delete: {0}"
-msgstr ""
+msgstr "Impossible de supprimer : {0}"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Want a server of your own?"
-msgstr ""
+msgstr "Tu veux un serveur à toi ?"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "This server is run by one person for their own data. You can sign in, or open a drive you were invited to."
-msgstr ""
+msgstr "Ce serveur est géré par une seule personne pour ses propres données. Tu peux te connecter ou ouvrir un drive auquel tu as été invité."
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "Get one hosted"
-msgstr ""
+msgstr "Obtenir un serveur hébergé"
 
 #: src/views/getting-started/GettingStartedFlow.tsx
 msgid "run it yourself"
-msgstr ""
+msgstr "lance-le toi-même"
 
 #: src/handlers/errorHandler.ts
 msgid "Something failed, and reported no reason."
-msgstr ""
+msgstr "Quelque chose a échoué et n'a signalé aucune raison."
 
 #: src/views/Drive/DrivePage.tsx
 msgid "Your private drive keeps its name. It is tied to your account, not to a project."
-msgstr ""
+msgstr "Votre disque privé conserve son nom. Il est lié à votre compte, pas à un projet."
 
 #: src/components/Drives/PersonalDriveBadge.tsx
 msgid "<0/> Private"
-msgstr ""
+msgstr "<0/> Privé"
 
 #: src/components/Drives/PersonalDriveBadge.tsx
 #: src/components/Drives/PrivateDriveBadge.tsx
 msgid "This is your private drive. It holds your drive list, favourites, notifications and chats, and its address comes from your account — so there is only ever one, and it is not a place for a project."
-msgstr ""
+msgstr "C'est votre disque privé. Il contient votre liste de disques, favoris, notifications et chats, et son adresse provient de votre compte — il n'y en a donc qu'un seul, et ce n'est pas un lieu pour un projet."
 
 #: src/components/Share/ShareDialog.tsx
 msgid "This is your <0>private drive</0>. Sharing it shares your drive list, favourites, notifications and AI chats along with it. To work with someone, make a drive for the work and share that instead."
-msgstr ""
+msgstr "Ceci est votre <0>disque privé</0>. Le partager partage votre liste de disques, favoris, notifications et chats IA avec lui. Pour travailler avec quelqu'un, créez un disque pour le travail et partagez-le à la place."
 
 #: src/components/NewIdentitySection.tsx
 msgid "Creating your private drive…"
-msgstr ""
+msgstr "Création de votre disque privé…"
 
 #: src/hooks/usePersonalDriveList.ts
 #: src/hooks/usePrivateDriveList.ts
 msgid "Could not update your list: no private drive is set up for this account yet."
-msgstr ""
+msgstr "Impossible de mettre à jour votre liste : aucun lecteur privé n'est encore configuré pour ce compte."
 
 #: src/routes/SettingsAgent.tsx
 msgid "Your private drive is always first. Unstar any other drive to move it back to recently visited."
-msgstr ""
+msgstr "Votre lecteur privé est toujours en premier. Désactivez l'étoile de tout autre lecteur pour le remettre dans les récemment consultés."
 
 #: src/components/Drives/DrivesCard.tsx
 msgid "Drives"
-msgstr ""
+msgstr "Lecteurs"
 
 #: src/routes/SettingsAgent.tsx
 msgid "Open a drive by URL"
-msgstr ""
+msgstr "Ouvrir un lecteur par URL"
 
 #: src/routes/SettingsAgent.tsx
 msgid "Open a drive by URL or DID"
-msgstr ""
+msgstr "Ouvrir un lecteur par URL ou DID"
 
 #: src/components/Vault/VaultRestoreAction.tsx
 msgid "This workspace has an encrypted backup in Cloud Vault."
