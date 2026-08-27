@@ -3,9 +3,9 @@ import { useEffect, useState, type JSX } from 'react';
 import Field from '@components/forms/Field';
 import { BasicSelect } from '@components/forms/BasicSelect';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
-import { Row } from '@components/Row';
 import { useDebounce } from '@helpers/useDebounce';
 import { useFieldOptions, type FieldOptionsBag } from './useFieldOptions';
+import { FieldPair } from './FieldPair';
 
 interface OptionsProps {
   field: Resource;
@@ -35,7 +35,7 @@ export function LikertOptions({ field }: OptionsProps): JSX.Element {
           ))}
         </BasicSelect>
       </Field>
-      <Row gap='0.5rem' wrapItems>
+      <FieldPair>
         <LabelInput
           label='Low end label'
           optionKey='minLabel'
@@ -50,7 +50,7 @@ export function LikertOptions({ field }: OptionsProps): JSX.Element {
           setOptions={setOptions}
           resetKey={field.subject}
         />
-      </Row>
+      </FieldPair>
     </>
   );
 }
@@ -59,7 +59,7 @@ export function RatingOptions({ field }: OptionsProps): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
 
   return (
-    <Row gap='0.5rem' wrapItems>
+    <FieldPair>
       <Field label='Steps'>
         <BasicSelect
           value={String((options.max as number | undefined) ?? 5)}
@@ -83,7 +83,7 @@ export function RatingOptions({ field }: OptionsProps): JSX.Element {
           <option value='heart'>♥ Heart</option>
         </BasicSelect>
       </Field>
-    </Row>
+    </FieldPair>
   );
 }
 

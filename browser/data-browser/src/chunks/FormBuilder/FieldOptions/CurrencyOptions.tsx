@@ -3,8 +3,8 @@ import type { JSX } from 'react';
 import Field from '@components/forms/Field';
 import { BasicSelect } from '@components/forms/BasicSelect';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
-import { Row } from '@components/Row';
 import { useFieldOptions } from './useFieldOptions';
+import { FieldPair } from './FieldPair';
 
 /** Currencies the renderer knows a symbol for (`CURRENCY_SYMBOLS` in
  * `@tomic/form-renderer`'s FieldInput); anything else renders as its code. */
@@ -62,7 +62,7 @@ export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
           ))}
         </BasicSelect>
       </Field>
-      <Row gap='0.5rem' wrapItems>
+      <FieldPair>
         <Field label='Min'>
           <InputWrapper>
             <InputStyled
@@ -81,7 +81,7 @@ export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
             />
           </InputWrapper>
         </Field>
-      </Row>
+      </FieldPair>
     </>
   );
 }

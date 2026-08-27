@@ -2,8 +2,8 @@ import { Resource } from '@tomic/react';
 import type { JSX } from 'react';
 import Field from '@components/forms/Field';
 import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
-import { Row } from '@components/Row';
 import { useFieldOptions } from './useFieldOptions';
+import { FieldPair } from './FieldPair';
 
 interface NumberOptionsProps {
   field: Resource;
@@ -30,7 +30,7 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
 
   return (
     <>
-      <Row gap='0.5rem' wrapItems>
+      <FieldPair>
         <Field label='Min'>
           <InputWrapper>
             <InputStyled
@@ -49,7 +49,7 @@ export function NumberOptions({ field }: NumberOptionsProps): JSX.Element {
             />
           </InputWrapper>
         </Field>
-      </Row>
+      </FieldPair>
       <Field label='Placeholder'>
         <InputWrapper>
           <InputStyled

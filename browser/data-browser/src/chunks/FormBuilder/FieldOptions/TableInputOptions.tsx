@@ -12,6 +12,7 @@ import {
 import { useDebounce } from '@helpers/useDebounce';
 import { AddButton } from './StringListEditor';
 import { useFieldOptions } from './useFieldOptions';
+import { FieldPair } from './FieldPair';
 
 interface TableColumn {
   label: string;
@@ -123,7 +124,7 @@ export function TableInputOptions({
           </AddButton>
         </Column>
       </Field>
-      <Row gap='0.5rem' wrapItems>
+      <FieldPair>
         <Field label='Min rows'>
           <InputWrapper>
             <InputStyled
@@ -144,7 +145,7 @@ export function TableInputOptions({
             />
           </InputWrapper>
         </Field>
-      </Row>
+      </FieldPair>
     </>
   );
 }
