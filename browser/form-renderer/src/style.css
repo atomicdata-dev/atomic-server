@@ -374,6 +374,30 @@
   gap: 0.15rem;
 }
 
+/* A multi-select that has reached its maximum: the options still to be had
+   go flat instead of the form growing an error nobody asked for. Hover stays
+   quiet too, or the row would still read as clickable. */
+.atomic-form-choice-row[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.atomic-form-choice-row[data-disabled]:hover {
+  background: transparent;
+}
+
+.atomic-form-choice-row[data-disabled] input {
+  cursor: not-allowed;
+}
+
+/* The "Select up to 3 options" line under a bounded multi-pick question.
+   Reads like the field's description, one notch quieter. */
+.atomic-form-hint {
+  color: var(--atomic-form-text-light);
+  font-size: 0.85rem;
+  margin: 0.15rem 0 0;
+}
+
 .atomic-form-error {
   color: var(--atomic-form-error);
   margin: 0;
@@ -659,6 +683,14 @@
    `highlightedIndex` on hover too, so a `:hover` rule would double up. */
 .atomic-form-combobox-option[data-highlighted] {
   background: var(--atomic-form-hover-bg);
+}
+
+/* Same story as the disabled choice row: past the maximum the remaining
+   options grey out. Downshift still moves the highlight past them, so the
+   `[data-highlighted]` background above never lands on one. */
+.atomic-form-combobox-option[data-disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* Which row is the current answer, for the single-select — it has no

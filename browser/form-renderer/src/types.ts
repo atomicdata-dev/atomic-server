@@ -121,6 +121,11 @@ export interface FieldOptions {
   /** table-input: row count bounds. */
   minRows?: number;
   maxRows?: number;
+  /** multi-select / dropdown-multi: how many options may be ticked. Kept
+   * apart from `min`/`max` (value bounds on `number`/`currency`, steps on
+   * `rating`) because these count picks, not magnitudes. */
+  minSelected?: number;
+  maxSelected?: number;
 }
 
 /** The subfields an `address` answer is made of. All are optional strings;

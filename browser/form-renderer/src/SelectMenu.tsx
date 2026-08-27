@@ -33,6 +33,10 @@ interface PickerProps {
   /** Empties the field: the trigger's ✕ on a single-select, a chip's ✕ on a
    * multi-select (which passes the option to drop). */
   onRemove: (option?: FieldOption) => void;
+  /** Rows that cannot be picked right now — a multi-select that has reached
+   * its maximum greys out everything not already ticked. Selected rows are
+   * never disabled: unticking has to stay possible, or the visitor is stuck. */
+  isDisabled?: (option: FieldOption) => boolean;
   inputId: string;
   labelId: string;
   placeholder?: string;
@@ -42,6 +46,11 @@ const DEFAULT_PLACEHOLDER: Record<Variant, string> = {
   single: 'Choose an option…',
   multi: 'Choose one or more…',
 };
+
+/** A stable default for [PickerProps.isDisabled]: downshift keeps the
+ * predicate in a dependency list, so a fresh `() => false` per render would
+ * churn it. */
+const neverDisabled = (): boolean => false;
 
 /** Flips the menu above the trigger when the trigger sits too close to the
  * bottom of the window — forms are long, and the last question is routinely
@@ -175,6 +184,7 @@ interface MenuItemsProps {
   variant: Variant;
   items: FieldOption[];
   selected: FieldOption[];
+  disabled: (option: FieldOption) => boolean;
   highlightedIndex: number;
   getItemProps: (options: {
     item: FieldOption;
@@ -192,6 +202,7 @@ function MenuItems({
   variant,
   items,
   selected,
+  disabled,
   highlightedIndex,
   getItemProps,
 }: MenuItemsProps): JSX.Element {
@@ -210,6 +221,7 @@ function MenuItems({
             key={item.value}
             data-highlighted={index === highlightedIndex || undefined}
             data-current={(variant === 'single' && isSelected) || undefined}
+            data-disabled={disabled(item) || undefined}
             {...optionProps(getItemProps({ item, index }), isSelected)}
           >
             {variant === 'multi' && (
@@ -269,6 +281,7 @@ function PlainPicker({
   selected,
   onPick,
   onRemove,
+  isDisabled = neverDisabled,
   inputId,
   labelId,
   placeholder,
@@ -286,6 +299,7 @@ function PlainPicker({
     highlightedIndex,
   } = useSelect({
     items: options,
+    isItemDisabled: isDisabled,
     itemToString: option => (option ? optionText(option) : ''),
     // Selection lives in `selected`; downshift only drives the menu.
     selectedItem: null,
@@ -348,6 +362,7 @@ function PlainPicker({
             variant={variant}
             items={options}
             selected={selected}
+            disabled={isDisabled}
             highlightedIndex={highlightedIndex}
             getItemProps={getItemProps}
           />
@@ -364,6 +379,7 @@ function SearchablePicker({
   selected,
   onPick,
   onRemove,
+  isDisabled = neverDisabled,
   inputId,
   labelId,
   placeholder,
@@ -397,6 +413,7 @@ function SearchablePicker({
     highlightedIndex,
   } = useCombobox({
     items,
+    isItemDisabled: isDisabled,
     itemToString: option => (option ? optionText(option) : ''),
     inputValue: query,
     selectedItem: null,
@@ -483,6 +500,7 @@ function SearchablePicker({
             variant={variant}
             items={items}
             selected={selected}
+            disabled={isDisabled}
             highlightedIndex={highlightedIndex}
             getItemProps={getItemProps}
           />
@@ -548,8 +566,14 @@ export function MultiSelect({
   options,
   value,
   onChange,
+  max,
   ...rest
-}: SelectProps<string[]>): JSX.Element {
+}: SelectProps<string[]> & {
+  /** How many options may be ticked at once, if the question says so. */
+  max?: number;
+}): JSX.Element {
+  const atMax = max !== undefined && value.length >= max;
+
   /** Add/remove one option, preserving the order `options` declares them in
    * so the chips don't shuffle around as the visitor toggles them. */
   const toggle = (option: FieldOption) => {
@@ -567,6 +591,7 @@ export function MultiSelect({
       selected={options.filter(o => value.includes(o.value))}
       onPick={toggle}
       onRemove={option => option !== undefined && toggle(option)}
+      isDisabled={option => atMax && !value.includes(option.value)}
       {...rest}
     />
   );

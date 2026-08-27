@@ -16,6 +16,8 @@ export {
   ratingMax,
   matrixColumns,
   tableColumns,
+  selectionBounds,
+  selectionHint,
 } from './validation.js';
 export type { ValidationResult } from './validation.js';
 export {

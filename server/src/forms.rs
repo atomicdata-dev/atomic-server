@@ -1024,6 +1024,7 @@ fn coerce_value(
                 })
                 .collect::<Result<_, _>>()?;
             check_membership(&items, options)?;
+            check_selection_count(items.len(), options)?;
             Ok(items.into())
         }
         "phone" => {
@@ -1273,6 +1274,40 @@ fn check_bounds(value: f64, options: &JsonValue) -> Result<(), String> {
     if let Some(max) = options.get("max").and_then(|v| v.as_f64()) {
         if value > max {
             return Err(format!("Must be at most {max}"));
+        }
+    }
+    Ok(())
+}
+
+/// How many options a multi-pick question accepts. A bound has to be a whole
+/// number of at least one to mean anything, so everything else — an absent
+/// key, `0`, junk from a hand-edited bag — reads as "no bound". Mirrors
+/// `selectionBounds` in `browser/form-renderer/src/validation.ts`.
+fn selection_bounds(options: &JsonValue) -> (Option<u64>, Option<u64>) {
+    let bound = |key: &str| {
+        options
+            .get(key)
+            .and_then(|v| v.as_u64())
+            .filter(|n| *n >= 1)
+    };
+
+    (bound("minSelected"), bound("maxSelected"))
+}
+
+/// Bounds on how many options a `multi-select` / `dropdown-multi` answer may
+/// carry. An *empty* answer never reaches here (it counts as unanswered, which
+/// is `required`'s business), so a minimum only ever applies to an answer the
+/// visitor actually gave.
+fn check_selection_count(picked: usize, options: &JsonValue) -> Result<(), String> {
+    let (min, max) = selection_bounds(options);
+    if let Some(min) = min {
+        if (picked as u64) < min {
+            return Err(format!("Please select at least {min} option(s)"));
+        }
+    }
+    if let Some(max) = max {
+        if (picked as u64) > max {
+            return Err(format!("At most {max} option(s) allowed"));
         }
     }
     Ok(())
@@ -2735,6 +2770,68 @@ mod tests {
             json!([tag("A"), tag("C")])
         )
         .is_err());
+    }
+
+    #[test]
+    fn multi_picks_enforce_selection_bounds() {
+        let mut options = choice_options(&["A", "B", "C"]);
+        options["minSelected"] = json!(2);
+        options["maxSelected"] = json!(3);
+
+        assert_eq!(
+            ok_choice(submit_one(
+                "multi-select",
+                false,
+                options.clone(),
+                json!([tag("A"), tag("B")])
+            )),
+            vec![tag("A"), tag("B")]
+        );
+        assert_eq!(
+            err_message(submit_one(
+                "multi-select",
+                false,
+                options.clone(),
+                json!([tag("A")])
+            )),
+            "Please select at least 2 option(s)"
+        );
+
+        let mut capped = choice_options(&["A", "B", "C"]);
+        capped["maxSelected"] = json!(2);
+        assert_eq!(
+            err_message(submit_one(
+                "dropdown-multi",
+                false,
+                capped,
+                json!([tag("A"), tag("B"), tag("C")])
+            )),
+            "At most 2 option(s) allowed"
+        );
+
+        // An unanswered question is unanswered, not short of the minimum —
+        // making it mandatory is `required`'s job. An empty answer never
+        // reaches `coerce_value`, so this one goes through
+        // `validate_submission` rather than [submit_one].
+        let definition = single_field_definition("multi-select", false, options.clone());
+        let mut empty = Map::new();
+        empty.insert(Q.into(), json!([]));
+        assert!(
+            validate_submission(&definition, &empty)
+                .expect("an empty answer to an optional question is not an error")
+                .is_empty(),
+            "nothing is stored for an unanswered question"
+        );
+        assert_eq!(
+            err_message(submit_one("multi-select", true, options, json!([]))),
+            "This field is required"
+        );
+
+        // Junk bounds from a hand-edited bag are no bounds at all.
+        let mut junk = choice_options(&["A", "B"]);
+        junk["minSelected"] = json!("two");
+        junk["maxSelected"] = json!(0);
+        assert!(submit_one("multi-select", false, junk, json!([tag("A")])).is_ok());
     }
 
     #[test]

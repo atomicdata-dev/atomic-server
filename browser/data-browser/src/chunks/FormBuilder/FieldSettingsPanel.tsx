@@ -342,10 +342,11 @@ function TypeOptions({
     case 'currency':
       return <CurrencyOptions field={field} />;
     case 'radio':
-    case 'multi-select':
     case 'dropdown':
-    case 'dropdown-multi':
       return <ChoiceOptions field={field} />;
+    case 'multi-select':
+    case 'dropdown-multi':
+      return <ChoiceOptions field={field} multiple />;
     case 'picture-choice':
       return <PictureChoiceOptions field={field} />;
     case 'likert':

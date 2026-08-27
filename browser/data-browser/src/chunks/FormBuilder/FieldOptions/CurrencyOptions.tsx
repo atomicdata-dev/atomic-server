@@ -2,9 +2,9 @@ import { Resource } from '@tomic/react';
 import type { JSX } from 'react';
 import Field from '@components/forms/Field';
 import { BasicSelect } from '@components/forms/BasicSelect';
-import { InputStyled, InputWrapper } from '@components/forms/InputStyles';
 import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
+import { BoundField } from './BoundField';
 
 /** Currencies the renderer knows a symbol for (`CURRENCY_SYMBOLS` in
  * `@tomic/form-renderer`'s FieldInput); anything else renders as its code. */
@@ -33,20 +33,6 @@ export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
   const [options, setOptions] = useFieldOptions(field);
 
   const currency = (options.currency as string | undefined) ?? 'EUR';
-  const min = options.min as number | undefined;
-  const max = options.max as number | undefined;
-
-  const setBound = (key: 'min' | 'max', value: string) => {
-    const next = { ...options };
-
-    if (value.trim() === '') {
-      delete next[key];
-    } else {
-      next[key] = Number(value);
-    }
-
-    setOptions(next);
-  };
 
   return (
     <>
@@ -63,24 +49,18 @@ export function CurrencyOptions({ field }: CurrencyOptionsProps): JSX.Element {
         </BasicSelect>
       </Field>
       <FieldPair>
-        <Field label='Min'>
-          <InputWrapper>
-            <InputStyled
-              type='number'
-              value={min ?? ''}
-              onChange={e => setBound('min', e.target.value)}
-            />
-          </InputWrapper>
-        </Field>
-        <Field label='Max'>
-          <InputWrapper>
-            <InputStyled
-              type='number'
-              value={max ?? ''}
-              onChange={e => setBound('max', e.target.value)}
-            />
-          </InputWrapper>
-        </Field>
+        <BoundField
+          label='Min'
+          optionKey='min'
+          options={options}
+          setOptions={setOptions}
+        />
+        <BoundField
+          label='Max'
+          optionKey='max'
+          options={options}
+          setOptions={setOptions}
+        />
       </FieldPair>
     </>
   );

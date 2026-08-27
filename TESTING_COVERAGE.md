@@ -604,6 +604,8 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | A row whose label column is empty is left out of the options instead of falling back to its `name` | `server/src/forms.rs::rows_the_label_column_is_empty_for_are_not_offered` |
 | A freshly added choice question has *no* options (no placeholder Tag resources) | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…", step 4) |
 | Every choice type stores a `resourceArray` of option subjects, single-pick included | `server/src/forms.rs::dropdowns_enforce_option_membership` |
+| Multi-pick selection bounds (`minSelected`/`maxSelected`): too few / too many rejected, membership checked first, an empty answer still reads as unanswered, unusable bounds ignored | `server/src/forms.rs::multi_picks_enforce_selection_bounds` + `browser/form-renderer/src/validation.test.ts` ("multi-select selection bounds") |
+| A maximum set in the builder reaches the rendered form: the hint line, options disabled at the cap, re-enabled on untick | `browser/e2e/tests/forms.spec.ts` ("a multi-select respects the maximum set in the builder") |
 | Renaming an option in the builder rewrites the label in place (options are Tags, not copied strings) | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…", step 4) |
 | Builder can add every question type and they survive a reload | `browser/e2e/tests/forms.spec.ts` ("create a form, add every field type…") |
 | `phone` accepts both the renderer's E.164 output and loosely formatted national numbers, and rejects a half-typed one | `browser/form-renderer/src/validation.test.ts` + `server/src/forms.rs::phone_field_accepts_common_shapes_and_rejects_junk` |

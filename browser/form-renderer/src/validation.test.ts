@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { validateFieldValue } from './validation.js';
+import {
+  selectionHint,
+  validateFieldValue,
+  validatePage,
+} from './validation.js';
 import { COUNTRY_CODES, countryName, countryOptions } from './countries.js';
 import type { FieldBlock } from './types.js';
 
@@ -136,5 +140,96 @@ describe('choice option membership', () => {
     expect(validateFieldValue(field('dropdown', 'Pick'), tag('A'))).toBe(
       'Not one of the allowed options',
     );
+  });
+});
+
+/**
+ * How many options a multi-pick question accepts. Mirrors
+ * `multi_picks_enforce_selection_bounds` in `server/src/forms.rs`.
+ */
+describe('multi-select selection bounds', () => {
+  const tag = (label: string) => `did:ad:tag:${label}`;
+  const bounded = (bounds: {
+    minSelected?: number;
+    maxSelected?: number;
+  }): FieldBlock => ({
+    ...field('multi-select', 'Pick'),
+    options: {
+      options: ['A', 'B', 'C'].map(label => ({ value: tag(label), label })),
+      ...bounds,
+    },
+  });
+
+  it('accepts an answer inside the bounds', () => {
+    expect(
+      validateFieldValue(bounded({ minSelected: 2, maxSelected: 3 }), [
+        tag('A'),
+        tag('B'),
+      ]),
+    ).toBeNull();
+  });
+
+  it('rejects too few and too many', () => {
+    expect(validateFieldValue(bounded({ minSelected: 2 }), [tag('A')])).toBe(
+      'Please select at least 2 option(s)',
+    );
+    expect(
+      validateFieldValue(bounded({ maxSelected: 2 }), [
+        tag('A'),
+        tag('B'),
+        tag('C'),
+      ]),
+    ).toBe('At most 2 option(s) allowed');
+  });
+
+  it('checks membership before counting', () => {
+    expect(
+      validateFieldValue(bounded({ maxSelected: 1 }), [tag('A'), tag('X')]),
+    ).toBe('Not one of the allowed options');
+  });
+
+  // A minimum bounds an answer; it does not make one mandatory. That is
+  // `required`'s job, and the two produce different messages.
+  it('leaves an empty answer unanswered rather than short', () => {
+    const min = bounded({ minSelected: 2 });
+    expect(validateFieldValue(min, [])).toBeNull();
+
+    const page = (required: boolean) => ({
+      version: 1 as const,
+      id: 'f',
+      name: 'Form',
+      settings: {},
+      styling: {},
+      honeypotField: 'hp',
+      pages: [{ blocks: [{ ...min, required }] }],
+    });
+
+    expect(validatePage(page(false), 0, { [min.mapsTo]: [] }).errors).toEqual(
+      {},
+    );
+    expect(validatePage(page(true), 0, { [min.mapsTo]: [] }).errors).toEqual({
+      [min.mapsTo]: 'This field is required',
+    });
+  });
+
+  it('ignores bounds a hand-edited bag left unusable', () => {
+    const junk = bounded({
+      minSelected: 'two' as unknown as number,
+      maxSelected: 0,
+    });
+    expect(validateFieldValue(junk, [tag('A')])).toBeNull();
+    expect(selectionHint(junk.options)).toBeUndefined();
+  });
+
+  it('describes the bounds in one line for the visitor', () => {
+    expect(selectionHint({ maxSelected: 3 })).toBe('Select up to 3 options');
+    expect(selectionHint({ minSelected: 1 })).toBe('Select at least 1 option');
+    expect(selectionHint({ minSelected: 2, maxSelected: 2 })).toBe(
+      'Select exactly 2 options',
+    );
+    expect(selectionHint({ minSelected: 2, maxSelected: 4 })).toBe(
+      'Select between 2 and 4 options',
+    );
+    expect(selectionHint({})).toBeUndefined();
   });
 });

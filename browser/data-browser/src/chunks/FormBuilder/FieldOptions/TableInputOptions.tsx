@@ -13,6 +13,7 @@ import { useDebounce } from '@helpers/useDebounce';
 import { AddButton } from './StringListEditor';
 import { useFieldOptions } from './useFieldOptions';
 import { FieldPair } from './FieldPair';
+import { BoundField } from './BoundField';
 
 interface TableColumn {
   label: string;
@@ -50,18 +51,6 @@ export function TableInputOptions({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedColumns]);
-
-  const setBound = (key: 'minRows' | 'maxRows', value: string) => {
-    const next = { ...options };
-
-    if (value.trim() === '') {
-      delete next[key];
-    } else {
-      next[key] = Number(value);
-    }
-
-    setOptions(next);
-  };
 
   return (
     <>
@@ -125,26 +114,20 @@ export function TableInputOptions({
         </Column>
       </Field>
       <FieldPair>
-        <Field label='Min rows'>
-          <InputWrapper>
-            <InputStyled
-              type='number'
-              min={0}
-              value={(options.minRows as number | undefined) ?? ''}
-              onChange={e => setBound('minRows', e.target.value)}
-            />
-          </InputWrapper>
-        </Field>
-        <Field label='Max rows'>
-          <InputWrapper>
-            <InputStyled
-              type='number'
-              min={1}
-              value={(options.maxRows as number | undefined) ?? ''}
-              onChange={e => setBound('maxRows', e.target.value)}
-            />
-          </InputWrapper>
-        </Field>
+        <BoundField
+          label='Min rows'
+          optionKey='minRows'
+          options={options}
+          setOptions={setOptions}
+          min={0}
+        />
+        <BoundField
+          label='Max rows'
+          optionKey='maxRows'
+          options={options}
+          setOptions={setOptions}
+          min={1}
+        />
       </FieldPair>
     </>
   );

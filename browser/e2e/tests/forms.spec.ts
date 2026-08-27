@@ -406,4 +406,55 @@ test.describe('forms', async () => {
       page.getByRole('button', { name: 'number', exact: true }),
     ).toBeAttached();
   });
+
+  /**
+   * The Preview dialog runs the real `@tomic/form-renderer` over the same
+   * definition a visitor gets, so it is the cheap place to prove a builder
+   * setting reaches the rendered form — no publish, no second browser
+   * context.
+   */
+  test('a multi-select respects the maximum set in the builder', async ({
+    page,
+  }) => {
+    await createForm(page, 'Toppings');
+    await addField(page, 'Multi-select', 'multi-select');
+
+    await page.getByTestId('field-row-multi-select').click();
+    await page.getByTestId('field-label-input').fill('Toppings');
+
+    const choiceInputs = page.getByTestId('choice-option-input');
+    const OPTIONS = ['Cheese', 'Olives', 'Basil'];
+
+    for (const [index, label] of OPTIONS.entries()) {
+      await page.getByRole('button', { name: 'Add option' }).click();
+      await expect(choiceInputs).toHaveCount(index + 1);
+      await choiceInputs.nth(index).fill(label);
+    }
+
+    await page.getByTestId('field-option-maxSelected').fill('2');
+
+    // The option names are debounced; the preview reads the store, so wait
+    // for the Tags themselves rather than for a commit to land.
+    const fieldSubject = await getFieldSubjectByType(page, 'multi-select');
+    await expect
+      .poll(() => getOptionLabels(page, fieldSubject as string), {
+        timeout: 10000,
+      })
+      .toEqual(OPTIONS);
+    await waitForSync(page);
+
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    const preview = page.getByRole('dialog');
+    await expect(preview.getByText('Select up to 2 options')).toBeVisible({
+      timeout: 15000,
+    });
+
+    await preview.getByLabel('Cheese').check();
+    await preview.getByLabel('Olives').check();
+    // At the maximum the rest goes flat rather than the form growing an
+    // error, and unticking one lights it back up.
+    await expect(preview.getByLabel('Basil')).toBeDisabled();
+    await preview.getByLabel('Olives').uncheck();
+    await expect(preview.getByLabel('Basil')).toBeEnabled();
+  });
 });

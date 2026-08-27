@@ -12,6 +12,8 @@ import {
   likertScale,
   matrixColumns,
   ratingMax,
+  selectionBounds,
+  selectionHint,
   tableColumns,
 } from './validation.js';
 
@@ -229,26 +231,43 @@ export function FieldInput({
 
     case 'multi-select': {
       const selected = Array.isArray(value) ? (value as string[]) : [];
+      const { max } = selectionBounds(field.options);
+      // Past the maximum the rest of the list goes flat rather than the form
+      // growing an error the visitor did not ask for. Unticking one lights
+      // the others back up.
+      const atMax = max !== undefined && selected.length >= max;
 
       return (
-        <div className='atomic-form-choice-group' aria-labelledby={labelId}>
-          {(field.options.options ?? []).map(option => (
-            <label className='atomic-form-choice-row' key={option.value}>
-              <input
-                type='checkbox'
-                checked={selected.includes(option.value)}
-                onChange={e =>
-                  onChange(
-                    e.target.checked
-                      ? [...selected, option.value]
-                      : selected.filter(v => v !== option.value),
-                  )
-                }
-              />
-              <span>{optionText(option)}</span>
-            </label>
-          ))}
-        </div>
+        <>
+          <div className='atomic-form-choice-group' aria-labelledby={labelId}>
+            {(field.options.options ?? []).map(option => {
+              const checked = selected.includes(option.value);
+
+              return (
+                <label
+                  className='atomic-form-choice-row'
+                  key={option.value}
+                  data-disabled={(atMax && !checked) || undefined}
+                >
+                  <input
+                    type='checkbox'
+                    checked={checked}
+                    disabled={atMax && !checked}
+                    onChange={e =>
+                      onChange(
+                        e.target.checked
+                          ? [...selected, option.value]
+                          : selected.filter(v => v !== option.value),
+                      )
+                    }
+                  />
+                  <span>{optionText(option)}</span>
+                </label>
+              );
+            })}
+          </div>
+          <SelectionHint options={field.options} />
+        </>
       );
     }
 
@@ -266,14 +285,18 @@ export function FieldInput({
 
     case 'dropdown-multi':
       return (
-        <MultiSelect
-          options={field.options.options ?? []}
-          value={Array.isArray(value) ? (value as string[]) : []}
-          onChange={onChange}
-          inputId={inputId}
-          labelId={labelId}
-          placeholder={placeholder}
-        />
+        <>
+          <MultiSelect
+            options={field.options.options ?? []}
+            value={Array.isArray(value) ? (value as string[]) : []}
+            onChange={onChange}
+            max={selectionBounds(field.options).max}
+            inputId={inputId}
+            labelId={labelId}
+            placeholder={placeholder}
+          />
+          <SelectionHint options={field.options} />
+        </>
       );
 
     case 'likert': {
@@ -622,4 +645,12 @@ const TEXTUAL_INPUT_TYPES: Record<string, string> = {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** The "Select up to 3 options" line under a bounded multi-pick question.
+ * Renders nothing when the question is unbounded, which most are. */
+function SelectionHint({ options }: { options: FieldOptions }): JSX.Element {
+  const hint = selectionHint(options);
+
+  return hint ? <p className='atomic-form-hint'>{hint}</p> : <></>;
 }

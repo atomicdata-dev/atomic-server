@@ -86,8 +86,8 @@ of a submitted answer. Options not listed for a type are ignored.
 | `checkbox`        | Boolean           | `defaultValue`       | boolean |
 | `radio`           | String            | `options`            | one of `options` |
 | `dropdown`        | String            | `options`, `placeholder` | one of `options` |
-| `multi-select`    | JSON              | `options`            | array of `options` |
-| `dropdown-multi`  | JSON              | `options`            | array of `options` |
+| `multi-select`    | JSON              | `options`, `minSelected`, `maxSelected` | array of `options` |
+| `dropdown-multi`  | JSON              | `options`, `minSelected`, `maxSelected` | array of `options` |
 | `picture-choice`  | String            | `options`, `optionImages` | one of `options` |
 | `likert`          | Integer           | `scale` (2–11, default 5), `minLabel`, `maxLabel` | integer `1..scale` |
 | `rating`          | Integer           | `max` (2–10, default 5), `icon` (`star`/`heart`) | integer `1..max` |
@@ -106,6 +106,12 @@ the definition JSON replaces those subjects with URLs on the publish-gated
 `GET /form/{id}/image?file=…` route (which only serves images this form
 actually references) — the Files themselves stay private, the same way the
 Form's `cover-image` does.
+
+`minSelected` / `maxSelected` bound how many options a multi-pick question
+accepts. Past the maximum the remaining options are disabled rather than
+flagged; the minimum is checked on submit. Both only constrain an answer that
+was given — an untouched question stays "unanswered", which is what `required`
+is for.
 
 For `required` fields, "answered" is per-subfield on the composite types: a
 `choice-matrix` needs every row answered, and an `address` needs at least

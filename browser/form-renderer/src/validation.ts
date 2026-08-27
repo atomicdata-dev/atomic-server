@@ -58,6 +58,52 @@ export function ratingMax(options: FieldOptions): number {
     : DEFAULT_RATING_MAX;
 }
 
+/** How many options a multi-pick question accepts. A bound has to be a whole
+ * number of at least one to mean anything, so everything else — a blank
+ * input, `0`, junk from a hand-edited bag — reads as "no bound". Mirrors
+ * `selection_bounds` in `server/src/forms.rs`. */
+export function selectionBounds(options: FieldOptions): {
+  min?: number;
+  max?: number;
+} {
+  return {
+    min: countBound(options.minSelected),
+    max: countBound(options.maxSelected),
+  };
+}
+
+function countBound(raw: unknown): number | undefined {
+  const n = Math.round(Number(raw));
+
+  return Number.isFinite(n) && n >= 1 ? n : undefined;
+}
+
+/** The line shown under a bounded multi-pick question, e.g. "Select up to
+ * 3 options". `undefined` when the question is unbounded — most are. */
+export function selectionHint(options: FieldOptions): string | undefined {
+  const { min, max } = selectionBounds(options);
+
+  if (min !== undefined && max !== undefined) {
+    return min === max
+      ? `Select exactly ${min} ${plural(min, 'option')}`
+      : `Select between ${min} and ${max} options`;
+  }
+
+  if (min !== undefined) {
+    return `Select at least ${min} ${plural(min, 'option')}`;
+  }
+
+  if (max !== undefined) {
+    return `Select up to ${max} ${plural(max, 'option')}`;
+  }
+
+  return undefined;
+}
+
+function plural(n: number, word: string): string {
+  return n === 1 ? word : `${word}s`;
+}
+
 /** `choice-matrix` shares `columns` with `table-input`, which stores objects
  * — normalize both to plain labels. */
 export function matrixColumns(options: FieldOptions): string[] {
@@ -196,7 +242,21 @@ export function validateFieldValue(
         return 'Expected an array of strings';
       }
 
-      return checkMembership(raw as string[], field.options);
+      const membership = checkMembership(raw as string[], field.options);
+
+      if (membership) return membership;
+
+      const { min, max } = selectionBounds(field.options);
+
+      if (min !== undefined && raw.length < min) {
+        return `Please select at least ${min} option(s)`;
+      }
+
+      if (max !== undefined && raw.length > max) {
+        return `At most ${max} option(s) allowed`;
+      }
+
+      return null;
     }
 
     case 'phone': {

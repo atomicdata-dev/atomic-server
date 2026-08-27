@@ -8497,3 +8497,19 @@ msgstr "Aún no hay filas ni columnas"
 #: src/chunks/FormBuilder/FieldPreview.tsx
 msgid "No columns yet"
 msgstr "Aún no hay columnas"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+msgid "Min selected"
+msgstr "Mínimo seleccionado"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+msgid "The fewest options an answer may carry. An unanswered question still counts as unanswered rather than as too few — that is what Required is for."
+msgstr "La menor cantidad de opciones que puede tener una respuesta. Una pregunta sin respuesta aún cuenta como no respondida en lugar de como demasiado pocas — para eso sirve Obligatorio."
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+msgid "Max selected"
+msgstr "Máximo seleccionado"
+
+#: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
+msgid "The most options a visitor may tick. Once they reach it the remaining options grey out."
+msgstr "La mayor cantidad de opciones que un visitante puede marcar. Una vez que las alcance, las opciones restantes se atenúan."
