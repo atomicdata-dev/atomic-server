@@ -24,12 +24,48 @@ import { CSS } from '@dnd-kit/utilities';
 import { FaGripVertical } from 'react-icons/fa6';
 import { useDragSensors } from '../TableEditor/hooks/useDragSensors';
 
+/**
+ * Handed to `renderItem` so an item can host its own grip instead of the
+ * external one. Only used when `handle` is `'custom'`.
+ */
+export interface ItemDragProps {
+  /**
+   * Spread on the element that acts as the visible grip. Carries the keyboard
+   * activator and the ARIA wiring, so keyboard reordering keeps working even
+   * when the grip is only revealed on hover.
+   */
+  handleProps: Record<string, unknown>;
+  /**
+   * Spread on the item as a whole so it can be dragged from anywhere. Pointer
+   * activators only: a pointer press on the grip bubbles up to here, so the
+   * drag activates exactly once whichever of the two was pressed.
+   */
+  itemProps: Record<string, unknown>;
+  isDragging: boolean;
+}
+
+const OVERLAY_DRAG_PROPS: ItemDragProps = {
+  handleProps: {},
+  itemProps: {},
+  isDragging: true,
+};
+
 interface ReorderableListProps {
   subjects: string[];
   onReorder: (next: string[]) => void;
-  renderItem: (subject: string, index: number) => ReactNode;
+  renderItem: (
+    subject: string,
+    index: number,
+    drag: ItemDragProps,
+  ) => ReactNode;
   disabled?: boolean;
   orientation?: 'vertical' | 'horizontal';
+  /**
+   * `'external'` puts an always-visible grip next to the item. `'custom'`
+   * renders no grip at all and hands the drag props to `renderItem`, letting
+   * the item place (and hide) its own.
+   */
+  handle?: 'external' | 'custom';
 }
 
 /**
@@ -45,6 +81,7 @@ export function ReorderableList({
   renderItem,
   disabled,
   orientation = 'vertical',
+  handle = 'external',
 }: ReorderableListProps): JSX.Element {
   const [activeSubject, setActiveSubject] = useState<string>();
   const [activeWidth, setActiveWidth] = useState<number>();
@@ -101,8 +138,9 @@ export function ReorderableList({
               subject={subject}
               disabled={disabled}
               orientation={orientation}
+              handle={handle}
             >
-              {renderItem(subject, index)}
+              {drag => renderItem(subject, index, drag)}
             </SortableRow>
           ))}
         </ListContainer>
@@ -118,11 +156,17 @@ export function ReorderableList({
                   : undefined
               }
             >
-              <DragHandle type='button' tabIndex={-1}>
-                <FaGripVertical />
-              </DragHandle>
+              {handle === 'external' && (
+                <DragHandle type='button' tabIndex={-1}>
+                  <FaGripVertical />
+                </DragHandle>
+              )}
               <RowContent $orientation={orientation}>
-                {renderItem(activeSubject, subjects.indexOf(activeSubject))}
+                {renderItem(
+                  activeSubject,
+                  subjects.indexOf(activeSubject),
+                  OVERLAY_DRAG_PROPS,
+                )}
               </RowContent>
             </DragPreview>
           )}
@@ -137,13 +181,15 @@ interface SortableRowProps {
   subject: string;
   disabled?: boolean;
   orientation: 'vertical' | 'horizontal';
-  children: ReactNode;
+  handle: 'external' | 'custom';
+  children: (drag: ItemDragProps) => ReactNode;
 }
 
 function SortableRow({
   subject,
   disabled,
   orientation,
+  handle,
   children,
 }: SortableRowProps): JSX.Element {
   const {
@@ -161,6 +207,15 @@ function SortableRow({
     zIndex: isDragging ? 1 : undefined,
   };
 
+  const drag: ItemDragProps = {
+    handleProps: { ...attributes, onKeyDown: listeners?.onKeyDown },
+    itemProps: {
+      onMouseDown: listeners?.onMouseDown,
+      onTouchStart: listeners?.onTouchStart,
+    },
+    isDragging,
+  };
+
   return (
     <RowWrapper
       ref={setNodeRef}
@@ -168,7 +223,7 @@ function SortableRow({
       $dragging={isDragging}
       $orientation={orientation}
     >
-      {!disabled && (
+      {handle === 'external' && !disabled && (
         <DragHandle
           {...listeners}
           {...attributes}
@@ -178,7 +233,7 @@ function SortableRow({
           <FaGripVertical />
         </DragHandle>
       )}
-      <RowContent $orientation={orientation}>{children}</RowContent>
+      <RowContent $orientation={orientation}>{children(drag)}</RowContent>
     </RowWrapper>
   );
 }
@@ -188,7 +243,7 @@ const ListContainer = styled.div<{
 }>`
   display: flex;
   flex-direction: ${p => (p.$orientation === 'horizontal' ? 'row' : 'column')};
-  ${p => p.$orientation === 'horizontal' && 'align-items: center;'}
+  ${p => p.$orientation === 'horizontal' && 'align-items: stretch;'}
   gap: ${p => (p.$orientation === 'horizontal' ? '0' : '0.5rem')};
 `;
 
@@ -197,14 +252,14 @@ const RowWrapper = styled.div<{
   $orientation: 'vertical' | 'horizontal';
 }>`
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  align-items: ${p => (p.$orientation === 'horizontal' ? 'stretch' : 'center')};
+  gap: ${p => (p.$orientation === 'horizontal' ? '0' : '0.4rem')};
   opacity: ${p => (p.$dragging ? 0.4 : 1)};
   ${p => (p.$orientation === 'vertical' ? 'width: 100%;' : '')}
 `;
 
 const RowContent = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
-  ${p => (p.$orientation === 'vertical' ? 'flex: 1;' : '')}
+  ${p => (p.$orientation === 'vertical' ? 'flex: 1;' : 'display: flex;')}
   min-width: 0;
 `;
 
