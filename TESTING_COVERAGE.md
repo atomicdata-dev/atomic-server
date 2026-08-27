@@ -835,3 +835,13 @@ Onboarding dialog feedback: the authorization/invite and chatroom cases in
 `browser/data-browser/src/helpers/isDriveSignInError.test.ts` covers a local-only missing-resource error with no app agent, including origins with a configured node. Signed-in users and unrelated transport failures retain their error handling.
 
 Paired SaaS `portal/e2e/passkey-open-drive.spec.ts` covers account/profile creation, passkey enrollment, recovery-code acknowledgement, completed app sign-out, portal passkey sign-in, and the Open link reaching the app unlock screen. It then unlocks and verifies the original drive title. Chromium virtual PRF state is tied to the original CDP target, so the unlock portion runs there after verifying the real popup handoff. Unlocking within the popup itself remains a physical-browser acceptance check.
+## Ontology codegen (`@tomic/cli`) and DID fetch
+
+| Flow | Where |
+|---|---|
+| HTTP path `https://host/did:ad:…` and `/did?subject=` extract the same DID | `browser/lib/src/subject.test.ts` |
+| JSON-AD parse accepts `@id: did:ad:…` when the request used the HTTP path alias | `browser/lib/src/parse.test.ts` |
+| `Client.fetchResourceHTTP` resolves DIDs via `/did?subject=` and does not touch `window` in Node | `browser/lib/src/client.fetch.test.ts` |
+| Store fetch by HTTP path alias returns the resource stored under the DID | `browser/lib/src/store.test.ts` |
+
+Not covered: `ad-generate ontologies` end-to-end against a live server (no CLI test runner).

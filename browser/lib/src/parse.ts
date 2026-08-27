@@ -1,7 +1,7 @@
 import { AtomicError } from './error.js';
-import { Client } from './index.js';
 import { server } from './ontologies/server.js';
 import { Resource, unknownSubject } from './resource.js';
+import { subjectsReferToSameResource } from './subject.js';
 import { type JSONObject, type AtomicValue, isJSONObject } from './value.js';
 import { decodeB64 } from './base64.js';
 
@@ -53,16 +53,18 @@ export class JSONADParser {
             throw new Error('Expected @id to be a string');
           }
 
-          // Only enforce subject match when a specific subject was requested
-          if (subject && subject !== unknownSubject && value !== subject) {
-            const subjectNoParams = Client.removeQueryParamsFromURL(subject);
-            const valueNoParams = Client.removeQueryParamsFromURL(value);
-
-            if (subjectNoParams !== valueNoParams) {
-              throw new Error(
-                `Resource has wrong subject in @id. Received subject was ${value}, expected ${resource.subject}.`,
-              );
-            }
+          // Only enforce subject match when a specific subject was requested.
+          // HTTP aliases of a DID (`https://host/did:ad:…`) are the same
+          // resource as `@id: did:ad:…` — the server keeps the DID as
+          // identity even when the resource was fetched by URL.
+          if (
+            subject &&
+            subject !== unknownSubject &&
+            !subjectsReferToSameResource(subject, value)
+          ) {
+            throw new Error(
+              `Resource has wrong subject in @id. Received subject was ${value}, expected ${resource.subject}.`,
+            );
           }
 
           resource.setSubject(value as string);
