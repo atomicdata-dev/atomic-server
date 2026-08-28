@@ -457,4 +457,219 @@ test.describe('forms', async () => {
     await preview.getByLabel('Olives').uncheck();
     await expect(preview.getByLabel('Basil')).toBeEnabled();
   });
+
+  /**
+   * Page-change animations, in the same Preview dialog. Asserted through
+   * `animationstart` rather than by catching the modifier class mid-flight:
+   * the exit phase is 180ms, far too short to poll for without flaking, but
+   * the events themselves are exact — and their names say which phase played
+   * and, for the exit, in which direction. The arriving page has no animation
+   * of its own: its elements fade in one by one, so what proves it ran is
+   * several `atomic-form-stagger-in`s, one per block.
+   *
+   * Which page is showing is read off the nav buttons (page 1 of two offers
+   * only Next; the last page offers Back + Submit) rather than off a field
+   * label — labels are debounced into the store, and this test is about the
+   * transition, not about label propagation.
+   */
+  test('page transitions animate once switched on', async ({ page }) => {
+    await createForm(page, 'Animated pages');
+    // Page 1 is a radio with two options plus a heading; page 2 is one field.
+    // Arriving at page 1 therefore has four things to fade in turn — the
+    // question, each of its options, then the heading — which is what the
+    // stagger is for, and the options are the part a block-level stagger
+    // would have missed.
+    await addField(page, 'Radio group', 'radio');
+    const OPTIONS = ['Yes', 'No'];
+    await page.getByTestId('field-row-radio').click();
+    const choiceInputs = page.getByTestId('choice-option-input');
+
+    for (const [index, label] of OPTIONS.entries()) {
+      await page.getByRole('button', { name: 'Add option' }).click();
+      await expect(choiceInputs).toHaveCount(index + 1);
+      await choiceInputs.nth(index).fill(label);
+    }
+
+    // Option names are debounced into Tag resources; the preview builds its
+    // definition from those, so wait for the Tags rather than for a commit.
+    const radioSubject = await getFieldSubjectByType(page, 'radio');
+    await expect
+      .poll(() => getOptionLabels(page, radioSubject as string), {
+        timeout: 10000,
+      })
+      .toEqual(OPTIONS);
+
+    await addField(page, 'Heading', 'heading');
+    await page.getByRole('button', { name: 'Add page' }).click();
+    await expect(page.getByRole('button', { name: 'Page 2' })).toBeVisible({
+      timeout: 10000,
+    });
+    // The tab appearing is not the builder having switched to it — page 2's
+    // (empty) field list is. Adding a field before that lands drops it onto
+    // the page being navigated away from.
+    await expect(page.getByTestId('field-row-radio')).toHaveCount(0);
+    await expect(page.getByTestId('field-row-heading')).toHaveCount(0);
+    await waitForSync(page);
+    await addField(page, 'Long text', 'long-text');
+    await waitForSync(page);
+
+    /** Records the form's own page animations as they start. Other keyframes
+     * on the page (the dialog's own entrance, under a hashed
+     * styled-components name) are filtered out here. */
+    const recordAnimations = () =>
+      page.evaluate(() => {
+        const names: string[] = [];
+        (window as unknown as { __formAnims: string[] }).__formAnims = names;
+        document.addEventListener(
+          'animationstart',
+          event => {
+            const name = (event as AnimationEvent).animationName;
+
+            if (
+              name.startsWith('atomic-form-page-') ||
+              name === 'atomic-form-stagger-in'
+            ) {
+              names.push(name);
+            }
+          },
+          true,
+        );
+      });
+
+    const readAnimations = () =>
+      page.evaluate(
+        () => (window as unknown as { __formAnims: string[] }).__formAnims,
+      );
+
+    const openPreview = async () => {
+      await page.getByRole('button', { name: 'Preview', exact: true }).click();
+      const dialog = page.getByRole('dialog');
+      await expect(dialog.getByRole('button', { name: 'Next' })).toBeVisible({
+        timeout: 15000,
+      });
+
+      return dialog;
+    };
+
+    // A form nobody switched this on for changes pages the way it always
+    // did: instantly, no animation.
+    let preview = await openPreview();
+    await recordAnimations();
+    await preview.getByRole('button', { name: 'Next' }).click();
+    await expect(preview.getByRole('button', { name: 'Submit' })).toBeVisible();
+    // Longer than a full transition, so a late animation would still be seen.
+    await page.waitForTimeout(600);
+    expect(await readAnimations()).toEqual([]);
+
+    // Switch it on in the builder.
+    await page.keyboard.press('Escape');
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    const toggle = page.getByLabel('Animate page transitions');
+    await expect(toggle).not.toBeChecked();
+    await toggle.check();
+    await waitForSync(page);
+    await page.getByRole('tab', { name: 'Fields' }).click();
+
+    preview = await openPreview();
+    await recordAnimations();
+    // Forward leaves upward, Back leaves downward, and each arrival fades its
+    // one block in. Polled rather than read once: the button that proves the
+    // page swapped is on screen a frame before the arriving element's fade
+    // starts. Each direction is also awaited before the next click — hitting
+    // Back inside the 160ms fade cancels it, which is the right behaviour
+    // (the newer intent wins) but would leave nothing to observe.
+    await preview.getByRole('button', { name: 'Next' }).click();
+    await expect(preview.getByRole('button', { name: 'Submit' })).toBeVisible();
+    await expect
+      .poll(readAnimations)
+      .toEqual(['atomic-form-page-exit-up', 'atomic-form-stagger-in']);
+
+    await preview.getByRole('button', { name: 'Back' }).click();
+    await expect(preview.getByRole('button', { name: 'Next' })).toBeVisible();
+    // Page 1's four things fade separately — not one event for the page, and
+    // not one for the whole radio question either.
+    await expect
+      .poll(readAnimations)
+      .toEqual([
+        'atomic-form-page-exit-up',
+        'atomic-form-stagger-in',
+        'atomic-form-page-exit-down',
+        'atomic-form-stagger-in',
+        'atomic-form-stagger-in',
+        'atomic-form-stagger-in',
+        'atomic-form-stagger-in',
+      ]);
+
+    // …in document order, and the options take the slots after the question
+    // they belong to rather than restarting from it, so the heading below
+    // them lands last. Read off the inline custom property rather than a
+    // computed delay: the index is static, so this says which element goes
+    // when without racing the animation it drives.
+    const staggerIndices = await preview
+      .locator('.atomic-form-stagger')
+      .evaluateAll(elements =>
+        elements.map(element =>
+          (element as HTMLElement).style.getPropertyValue(
+            '--atomic-form-stagger-index',
+          ),
+        ),
+      );
+    expect(staggerIndices).toEqual(['0', '1', '2', '3']);
+
+    // And those slots really do become four different delays. This is the
+    // half of the cascade that lives in the stylesheet, so no unit test can
+    // reach it: an earlier version capped the delay, which silently gave
+    // every element past the cap the same one — the page still "animated",
+    // it just stopped animating in any order. Read by putting the entering
+    // class on and taking it straight back off within one evaluate, so the
+    // delays are computed rather than raced.
+    const readDelays = (span?: number) =>
+      preview.locator('.atomic-form-blocks').evaluate((blocks, forcedSpan) => {
+        blocks.classList.add('atomic-form-blocks-enter');
+
+        if (forcedSpan !== undefined) {
+          (blocks as HTMLElement).style.setProperty(
+            '--atomic-form-stagger-span',
+            String(forcedSpan),
+          );
+        }
+
+        const computed = [...blocks.querySelectorAll('.atomic-form-stagger')]
+          .map(element => getComputedStyle(element).animationDelay)
+          .map(delay => Number.parseFloat(delay) * 1000);
+
+        blocks.classList.remove('atomic-form-blocks-enter');
+
+        return computed;
+      }, span);
+
+    const delays = await readDelays();
+    expect(delays).toHaveLength(4);
+    expect(delays[0]).toBe(0);
+
+    for (const [i, delay] of delays.entries()) {
+      if (i > 0) expect(delay).toBeGreaterThan(delays[i - 1]);
+    }
+
+    // A page with far more elements shortens the step instead of capping the
+    // delay, so the cascade keeps its order and still opens in one wave.
+    const compressed = await readDelays(100);
+    expect(compressed[3]).toBeLessThan(delays[3]);
+
+    for (const [i, delay] of compressed.entries()) {
+      if (i > 0) expect(delay).toBeGreaterThan(compressed[i - 1]);
+    }
+
+    // Even switched on, a visitor who asks for reduced motion gets the page
+    // change with no movement at all — and without the delay it would add.
+    await page.keyboard.press('Escape');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    preview = await openPreview();
+    await recordAnimations();
+    await preview.getByRole('button', { name: 'Next' }).click();
+    await expect(preview.getByRole('button', { name: 'Submit' })).toBeVisible();
+    await page.waitForTimeout(600);
+    expect(await readAnimations()).toEqual([]);
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+  });
 });

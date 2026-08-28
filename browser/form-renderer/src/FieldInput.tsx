@@ -1,5 +1,6 @@
 import { lazy, Suspense, useState, type JSX } from 'react';
 import { CountrySelect } from './CountrySelect.js';
+import { staggerStyle } from './pageTransition.js';
 import { MultiSelect, SingleSelect } from './SelectMenu.js';
 import {
   ADDRESS_FIELDS,
@@ -75,6 +76,12 @@ interface FieldInputProps {
    * FormRenderer.tsx) — used for `aria-labelledby` on radio/multi-select
    * groups, which have no single input to `htmlFor`. */
   labelId: string;
+  /** This field's own slot in the arriving page's staggered fade-in. Options
+   * laid out on the page take the slots after it, one each, so they ripple in
+   * under their question rather than all at once with it. `staggerSlots` in
+   * `pageTransition.ts` reserves exactly as many as are used here — keep the
+   * two in step, or a later block would land on a slot already spoken for. */
+  staggerBase?: number;
 }
 
 export function FieldInput({
@@ -83,8 +90,15 @@ export function FieldInput({
   onChange,
   inputId,
   labelId,
+  staggerBase = 0,
 }: FieldInputProps): JSX.Element {
   const placeholder = field.options.placeholder;
+  /** Marks the `index`-th option of this field as the next thing to fade in,
+   * keeping whatever classes the option already carries. */
+  const optionStagger = (index: number, className: string) => ({
+    className: `${className} atomic-form-stagger`,
+    style: staggerStyle(staggerBase + 1 + index),
+  });
 
   switch (field.type) {
     case 'short-text':
@@ -215,8 +229,11 @@ export function FieldInput({
           role='radiogroup'
           aria-labelledby={labelId}
         >
-          {(field.options.options ?? []).map(option => (
-            <label className='atomic-form-choice-row' key={option.value}>
+          {(field.options.options ?? []).map((option, i) => (
+            <label
+              key={option.value}
+              {...optionStagger(i, 'atomic-form-choice-row')}
+            >
               <input
                 type='radio'
                 name={inputId}
@@ -240,13 +257,13 @@ export function FieldInput({
       return (
         <>
           <div className='atomic-form-choice-group' aria-labelledby={labelId}>
-            {(field.options.options ?? []).map(option => {
+            {(field.options.options ?? []).map((option, i) => {
               const checked = selected.includes(option.value);
 
               return (
                 <label
-                  className='atomic-form-choice-row'
                   key={option.value}
+                  {...optionStagger(i, 'atomic-form-choice-row')}
                   data-disabled={(atMax && !checked) || undefined}
                 >
                   <input
@@ -355,10 +372,13 @@ export function FieldInput({
           role='radiogroup'
           aria-labelledby={labelId}
         >
-          {options.map(option => (
+          {options.map((option, i) => (
             <label
-              className={`atomic-form-picture-card${value === option.value ? ' atomic-form-picture-card-selected' : ''}`}
               key={option.value}
+              {...optionStagger(
+                i,
+                `atomic-form-picture-card${value === option.value ? ' atomic-form-picture-card-selected' : ''}`,
+              )}
             >
               <input
                 type='radio'

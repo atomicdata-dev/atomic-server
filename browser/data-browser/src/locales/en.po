@@ -8503,3 +8503,11 @@ msgstr "Max selected"
 #: src/chunks/FormBuilder/FieldOptions/ChoiceOptions.tsx
 msgid "The most options a visitor may tick. Once they reach it the remaining options grey out."
 msgstr "The most options a visitor may tick. Once they reach it the remaining options grey out."
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "<0/> Animate page transitions"
+msgstr "<0/> Animate page transitions"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Pages zoom out and slide away on Next / Back. Visitors who ask their system for reduced motion never see the animation."
+msgstr "Pages zoom out and slide away on Next / Back. Visitors who ask their system for reduced motion never see the animation."

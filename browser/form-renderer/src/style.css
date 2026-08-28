@@ -97,6 +97,148 @@
   gap: 1.5rem;
 }
 
+/* Page transitions (Next / Back). The two phases have deliberately different
+   shapes: the page leaves as one block, and arrives as its parts. Durations
+   are mirrored in `pageTransition.ts` — the content swap and the end of the
+   fade-in are both driven from JS. Only played by a form that opted in with
+   `styling.animatePageTransitions: true`, and never for anyone who asks for
+   reduced motion (below). */
+.atomic-form-blocks {
+  --atomic-form-page-exit: 150ms;
+  /* How far the leaving page travels before it is gone. */
+  --atomic-form-page-shift: 4rem;
+  /* How far it zooms out on its way out. */
+  --atomic-form-page-zoom: 0.94;
+  /* Gap between one arriving element's fade and the next one's, on a page
+     short enough to afford it. */
+  --atomic-form-stagger-step: 35ms;
+  /* The longest the cascade as a whole may take. A page with more elements
+     than fit at the step above shortens its step to land inside this. */
+  --atomic-form-stagger-wave: 2000ms;
+  /* How long a single element takes to fade in. */
+  --atomic-form-stagger-fade: 350ms;
+}
+
+.atomic-form-blocks-exit-forward,
+.atomic-form-blocks-exit-back {
+  will-change: transform, opacity;
+}
+
+.atomic-form-blocks-exit-forward {
+  animation: atomic-form-page-exit-up var(--atomic-form-page-exit) ease-in both;
+}
+
+.atomic-form-blocks-exit-back {
+  animation: atomic-form-page-exit-down var(--atomic-form-page-exit) ease-in
+    both;
+}
+
+/* Leaving: zoom out first, then slide away and fade. */
+@keyframes atomic-form-page-exit-up {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--atomic-form-page-shift)));
+  }
+}
+
+@keyframes atomic-form-page-exit-down {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  45% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+/* Arriving: no movement at all, just each element fading in a beat after the
+   one above it.
+
+   The generic half of this: anything marked `atomic-form-stagger` inside an
+   entering page takes its turn, and its turn is whatever
+   `--atomic-form-stagger-index` its renderer gave it (see `staggerStyle` —
+   the index comes from the component that owns the order, so a nested list
+   can offset from its parent's slot rather than fighting it). Nothing here is
+   specific to blocks. */
+.atomic-form-blocks-enter .atomic-form-stagger {
+  animation: atomic-form-stagger-in var(--atomic-form-stagger-fade)
+    linear(
+      0,
+      0.009 1.4%,
+      0.032 2.8%,
+      0.131 6%,
+      0.265 9.1%,
+      0.675 17.6%,
+      0.88 22.8%,
+      0.953 25.2%,
+      1.014 27.7%,
+      1.062 30.3%,
+      1.094 32.9%,
+      1.121 37.2%,
+      1.121 42.2%,
+      1.102 46.7%,
+      1.019 61.2%,
+      0.989 71.5%,
+      0.985 81.1%,
+      1
+    )
+    both;
+  /* Every element's delay from its own index and one number the container
+     publishes: how many steps the cascade spans. Short pages get the full
+     step; longer ones divide the wave instead, so the order always holds and
+     the page never takes longer to open. */
+  animation-delay: calc(
+    var(--atomic-form-stagger-index, 0) *
+      min(var(--atomic-form-stagger-step), var(--atomic-form-stagger-wave))
+  );
+  will-change: opacity;
+}
+
+@keyframes atomic-form-stagger-in {
+  0% {
+    opacity: 0;
+    transform: translateX(30px) scale(0.95);
+  }
+
+  75% {
+    transform: translateX(0px) scale(1);
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Belt and braces: FormRenderer already skips the animation (and the pause it
+   would add) when the visitor asks for reduced motion, but a definition
+   rendered by another host, or a media-query change mid-animation, must not
+   move either. */
+@media (prefers-reduced-motion: reduce) {
+  .atomic-form-blocks-exit-forward,
+  .atomic-form-blocks-exit-back,
+  .atomic-form-blocks-enter .atomic-form-stagger {
+    animation: none;
+  }
+
+  .atomic-form-progress-bar {
+    transition: none;
+  }
+}
+
 .atomic-form-heading {
   color: var(--atomic-form-text);
   margin: 0;

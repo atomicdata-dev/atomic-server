@@ -612,6 +612,9 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | `country` stores an ISO 3166-1 code: the list is complete and named, names localize, and a country *name* is rejected | `browser/form-renderer/src/validation.test.ts` + `server/src/forms.rs::country_field_takes_an_iso_code_and_rejects_a_name` |
 | `country` summaries count picked codes by popularity (no configured option list to zero-fill) | `server/src/forms.rs::country_counts_rank_by_popularity_then_code` |
 | Builder → publish → anonymous submit → row, for one type per value shape (dropdown/rating/address) | `browser/e2e/tests/forms-submission.spec.ts` ("extended field types round-trip from builder to submission") |
+| Page transitions: off until the builder's Animate-page-transitions switch is on, then the page leaves in the right direction and the arriving page fades in one element at a time — a choice question's options included, each taking the slot after its own question — and `prefers-reduced-motion` still skips both | `browser/e2e/tests/forms.spec.ts` ("page transitions animate once switched on") + `browser/form-renderer/src/pageTransition.test.ts` |
+| Every element in the cascade gets its own delay, in order, and a long page compresses the step rather than capping it (a cap made later options arrive with the question below them) | `browser/e2e/tests/forms.spec.ts` ("page transitions animate once switched on", computed-delay checks) + `pageTransition.test.ts::enterEnvelopeMs` |
+| The animation opt-in survives the definition round-trip (unset = no animation, `true` = animated) | `server/src/forms.rs::definition_can_enable_page_animations` + `definition_includes_styling` |
 
 Not covered (extended types): the client-side mirror of the new validators in
 `browser/form-renderer/src/validation.ts` is only unit-tested for `phone` (the

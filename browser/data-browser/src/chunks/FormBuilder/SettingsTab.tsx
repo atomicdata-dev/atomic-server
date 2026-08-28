@@ -106,6 +106,7 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
   };
 
   const showProgressBar = stylingObj.showProgressBar !== false;
+  const animatePageTransitions = stylingObj.animatePageTransitions === true;
 
   return (
     <Sections>
@@ -182,6 +183,22 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
           />
           Show progress bar on multi-page forms
         </CheckboxLabel>
+        <CheckboxLabel>
+          <Checkbox
+            checked={animatePageTransitions}
+            onChange={checked =>
+              setStylingKey(
+                'animatePageTransitions',
+                checked ? true : undefined,
+              )
+            }
+          />
+          Animate page transitions
+        </CheckboxLabel>
+        <Hint>
+          Pages zoom out and slide away on Next / Back. Visitors who ask their
+          system for reduced motion never see the animation.
+        </Hint>
       </Section>
     </Sections>
   );
@@ -309,6 +326,12 @@ const Sections = styled(Column)`
 
 const Section = styled(Column)`
   gap: 0.75rem;
+`;
+
+const Hint = styled.p`
+  margin: 0;
+  font-size: 0.85rem;
+  color: ${p => p.theme.colors.textLight};
 `;
 
 const SwatchTrigger = styled(RadixPopover.Trigger)`

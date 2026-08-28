@@ -66,7 +66,7 @@
   {
     "@id": "https://atomicdata.dev/properties/form-styling",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
-    "https://atomicdata.dev/properties/description": "Visual theming for a published Form, stored as a JSON object. Keys (all optional): textColor, mainColor, backgroundColor (hex colors), roundness (one of: sharp, rounded, round), showProgressBar (boolean, defaults to true) toggles the multi-page progress bar.",
+    "https://atomicdata.dev/properties/description": "Visual theming for a published Form, stored as a JSON object. Keys (all optional): textColor, mainColor, backgroundColor (hex colors), roundness (one of: sharp, rounded, round), showProgressBar (boolean, defaults to true) toggles the multi-page progress bar, animatePageTransitions (boolean, defaults to false) turns on the Next/Back page animation (always skipped for visitors who prefer reduced motion).",
     "https://atomicdata.dev/properties/isA": [
       "https://atomicdata.dev/classes/Property"
     ],

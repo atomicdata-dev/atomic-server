@@ -1,10 +1,29 @@
-import { useEffect, useId, useState, type FormEvent, type JSX } from 'react';
+import {
+  useEffect,
+  useId,
+  useState,
+  type AnimationEvent,
+  type FormEvent,
+  type JSX,
+} from 'react';
 import {
   CAPTCHA_VALUE_KEY,
   type FormDefinition,
   type FormErrors,
   type FormValues,
 } from './types.js';
+import {
+  PAGE_ANIMATION_PREFIX,
+  pageTransitionsEnabled,
+  phaseDeadlineMs,
+  staggerSlots,
+  staggerSpanStyle,
+  staggerStyle,
+  transitionClass,
+  useReducedMotion,
+  type PageTransition,
+  type TransitionDirection,
+} from './pageTransition.js';
 import { validatePage, validateAll } from './validation.js';
 import { computeVisibility } from './conditions.js';
 import { FieldInput } from './FieldInput.js';
@@ -39,7 +58,10 @@ export function FormRenderer({
   const [status, setStatus] = useState<Status>('filling');
   const [serverMessage, setServerMessage] = useState<string | undefined>();
   const [honeypot, setHoneypot] = useState('');
+  const [transition, setTransition] = useState<PageTransition | null>(null);
   const groupId = useId();
+  const reducedMotion = useReducedMotion();
+  const animate = pageTransitionsEnabled(definition.styling, reducedMotion);
 
   // ALTCHA proof-of-work captcha (server-provided config; previews get no
   // config and render no widget). The <altcha-widget> element itself is
@@ -98,6 +120,61 @@ export function FormRenderer({
     setPageIndex(next ?? indices[indices.length - 1]);
   }, [pageIndex, visiblePagesKey]);
 
+  // The blocks actually on screen, in order, each carrying the stagger slot
+  // it starts at. A block claims more than one slot when it lays options out
+  // on the page (see `staggerSlots`), so the running total — not the block
+  // count — is what the fade-in's length is measured in.
+  let slots = 0;
+  const visibleBlocks = (page?.blocks ?? []).flatMap((block, index) => {
+    if (!visibility.blocks[pageIndex]?.has(index)) return [];
+
+    const entry = { block, index, slot: slots };
+    slots += staggerSlots(block);
+
+    return [entry];
+  });
+
+  /** Ends the current phase: the exit hands over to the arriving page, the
+   * enter settles back to rest. Called by the phase's own `animationend`,
+   * and by the deadline below if that never arrives. */
+  const endPhase = () => {
+    if (!transition) return;
+
+    if (transition.phase === 'exit') {
+      setPageIndex(transition.target);
+      setTransition({ ...transition, phase: 'enter' });
+    } else {
+      setTransition(null);
+    }
+  };
+
+  // The enter phase's clock, and the exit phase's safety net. The exit
+  // normally ends on its own `animationend`; this catches the case where that
+  // never comes (a form animating in a hidden tab, a class change coalesced
+  // away under a stalled main thread) and would otherwise leave the visitor
+  // parked on the page they were trying to leave. Cleared on unmount and
+  // whenever a phase ends on its own.
+  useEffect(() => {
+    if (!transition) return;
+
+    const timer = setTimeout(endPhase, phaseDeadlineMs(transition, slots));
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transition]);
+
+  const handleAnimationEnd = (event: AnimationEvent<HTMLDivElement>) => {
+    // Only the page's own exit animation ends a phase. The staggered fades of
+    // the arriving page bubble their `animationend` up through this same
+    // handler, and the first of them to land would otherwise strip the enter
+    // class off — cutting every later element's fade before it started.
+    if (event.target !== event.currentTarget) return;
+
+    if (!event.animationName.startsWith(PAGE_ANIMATION_PREFIX)) return;
+
+    endPhase();
+  };
+
   const setValue = (mapsTo: string, value: unknown) => {
     setValues(prev => ({ ...prev, [mapsTo]: value }));
     setErrors(prev => {
@@ -110,7 +187,35 @@ export function FormRenderer({
     });
   };
 
+  /** Swaps the rendered page, playing the exit/enter animation around the
+   * swap when enabled. The leaving page stays mounted for the exit phase, so
+   * the content only changes once it is off the screen. */
+  const goToPage = (target: number, direction: TransitionDirection) => {
+    if (target === pageIndex) return;
+
+    if (!animate) {
+      setPageIndex(target);
+
+      return;
+    }
+
+    setTransition({ phase: 'exit', direction, target });
+  };
+
+  /** The neighbour of the current page among the visible ones. */
+  const siblingPage = (step: 1 | -1) => {
+    const pos = visiblePageIndices.indexOf(pageIndex);
+    const targetPos =
+      step === 1 ? (pos < 0 ? 0 : pos + 1) : Math.max(pos - 1, 0);
+
+    return visiblePageIndices[targetPos] ?? pageIndex;
+  };
+
   const goNext = () => {
+    // A second click during the exit phase would queue another page change
+    // against a stale index — the buttons stay inert until the swap lands.
+    if (transition?.phase === 'exit') return;
+
     const result = validatePage(definition, pageIndex, values);
 
     if (Object.keys(result.errors).length > 0) {
@@ -119,21 +224,14 @@ export function FormRenderer({
       return;
     }
 
-    setPageIndex(i => {
-      const pos = visiblePageIndices.indexOf(i);
-      const nextPos = pos < 0 ? 0 : pos + 1;
-
-      return visiblePageIndices[nextPos] ?? i;
-    });
+    goToPage(siblingPage(1), 'forward');
   };
 
-  const goBack = () =>
-    setPageIndex(i => {
-      const pos = visiblePageIndices.indexOf(i);
-      const prevPos = pos <= 0 ? 0 : pos - 1;
+  const goBack = () => {
+    if (transition?.phase === 'exit') return;
 
-      return visiblePageIndices[prevPos] ?? i;
-    });
+    goToPage(siblingPage(-1), 'back');
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -216,30 +314,46 @@ export function FormRenderer({
         </div>
       )}
 
-      <div className='atomic-form-blocks'>
-        {page?.blocks.map((block, i) => {
-          if (!visibility.blocks[pageIndex]?.has(i)) return null;
+      <div
+        className={`atomic-form-blocks ${transitionClass(transition)}`.trim()}
+        style={staggerSpanStyle(slots)}
+        onAnimationEnd={handleAnimationEnd}
+      >
+        {visibleBlocks.map(({ block, index, slot }) => {
+          // One wrapper per block, rather than the stagger class on each of
+          // the four block elements: it is the only thing every kind has in
+          // common, and `FormMarkdown` / `InfoBox` would otherwise both need
+          // to forward a style through.
+          const stagger = {
+            className: 'atomic-form-stagger',
+            style: staggerStyle(slot),
+          };
 
           if (block.kind === 'heading') {
             return (
-              <h3 key={i} className='atomic-form-heading'>
-                {block.text}
-              </h3>
+              <div key={index} {...stagger}>
+                <h3 className='atomic-form-heading'>{block.text}</h3>
+              </div>
             );
           }
 
           if (block.kind === 'paragraph') {
             return (
-              <FormMarkdown
-                key={i}
-                className='atomic-form-paragraph'
-                text={block.text}
-              />
+              <div key={index} {...stagger}>
+                <FormMarkdown
+                  className='atomic-form-paragraph'
+                  text={block.text}
+                />
+              </div>
             );
           }
 
           if (block.kind === 'info-box') {
-            return <InfoBox key={i} block={block} />;
+            return (
+              <div key={index} {...stagger}>
+                <InfoBox block={block} />
+              </div>
+            );
           }
 
           const inputId = `${groupId}-${block.mapsTo}`;
@@ -253,11 +367,25 @@ export function FormRenderer({
           const error = errors[block.mapsTo];
           const showLabel = block.type !== 'checkbox';
 
+          // A field whose options are laid out on the page fades in parts,
+          // not as a block: its label and helper text take the field's own
+          // slot, and each option the slots after it. Fading the field as a
+          // whole *as well* would fade those options a second time, as a
+          // group — and a group fading in together is exactly what the
+          // ripple is meant to replace.
+          const asParts = staggerSlots(block) > 1;
+          const heading = asParts ? stagger : undefined;
+
           return (
-            <div className='atomic-form-field' key={block.mapsTo}>
+            <div
+              key={block.mapsTo}
+              className={`atomic-form-field${asParts ? '' : ` ${stagger.className}`}`}
+              style={asParts ? undefined : stagger.style}
+            >
               {showLabel && (
                 <label
-                  className='atomic-form-label'
+                  className={`atomic-form-label${heading ? ` ${heading.className}` : ''}`}
+                  style={heading?.style}
                   htmlFor={inputId}
                   id={labelId}
                 >
@@ -269,7 +397,8 @@ export function FormRenderer({
               )}
               {block.description && (
                 <FormMarkdown
-                  className='atomic-form-description'
+                  className={`atomic-form-description${heading ? ` ${heading.className}` : ''}`}
+                  style={heading?.style}
                   text={block.description}
                 />
               )}
@@ -279,6 +408,7 @@ export function FormRenderer({
                 onChange={v => setValue(block.mapsTo, v)}
                 inputId={inputId}
                 labelId={labelId}
+                staggerBase={slot}
               />
               {error && (
                 <p className='atomic-form-error' role='alert'>

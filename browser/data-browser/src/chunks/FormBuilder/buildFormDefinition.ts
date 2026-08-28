@@ -82,6 +82,9 @@ async function buildStyling(
     backgroundColor: stylingJson.backgroundColor as string | undefined,
     roundness: stylingJson.roundness as string | undefined,
     showProgressBar: stylingJson.showProgressBar as boolean | undefined,
+    animatePageTransitions: stylingJson.animatePageTransitions as
+      | boolean
+      | undefined,
   };
 
   const coverImage = form.get(forms.properties.coverImage) as

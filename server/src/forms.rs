@@ -77,6 +77,16 @@ pub struct FormStyling {
     /// hiding it.
     #[serde(rename = "showProgressBar", skip_serializing_if = "Option::is_none")]
     pub show_progress_bar: Option<bool>,
+    /// Whether Next/Back page changes animate. Opt-in, unlike
+    /// [FormStyling::show_progress_bar]: only `Some(true)` animates, so a
+    /// form that predates the setting keeps its instant page changes. A
+    /// visitor's `prefers-reduced-motion` overrides it in the runtime
+    /// regardless.
+    #[serde(
+        rename = "animatePageTransitions",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub animate_page_transitions: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -727,6 +737,7 @@ fn build_form_styling(form: &Resource) -> FormStyling {
         background_color: get_str("backgroundColor"),
         roundness: get_str("roundness"),
         show_progress_bar: get_bool("showProgressBar"),
+        animate_page_transitions: get_bool("animatePageTransitions"),
     }
 }
 
@@ -2420,6 +2431,9 @@ mod tests {
         assert_eq!(styling.roundness.as_deref(), Some("round"));
         // Unset: the renderer treats this as "show" (only `Some(false)` hides it).
         assert_eq!(styling.show_progress_bar, None);
+        // The page animation is the other way round — unset means no
+        // animation, so this form's pages change instantly.
+        assert_eq!(styling.animate_page_transitions, None);
         // `has_image` never leaks into the wire format.
         let wire = serde_json::to_value(&styling).unwrap();
         assert!(wire.get("hasImage").is_none());
@@ -2443,6 +2457,26 @@ mod tests {
         assert_eq!(styling.show_progress_bar, Some(false));
         let wire = serde_json::to_value(&styling).unwrap();
         assert_eq!(wire["showProgressBar"], json!(false));
+    }
+
+    #[tokio::test]
+    async fn definition_can_enable_page_animations() {
+        let store = init_store().await;
+        let (mut form, _email_prop) = build_test_form(&store).await;
+
+        form.set(
+            urls::FORM_STYLING.into(),
+            Value::Json(json!({ "animatePageTransitions": true })),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        assert_eq!(styling.animate_page_transitions, Some(true));
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert_eq!(wire["animatePageTransitions"], json!(true));
     }
 
     #[tokio::test]

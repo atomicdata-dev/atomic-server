@@ -265,6 +265,10 @@ export interface FormStyling {
   roundness?: Roundness | string;
   /** Multi-page progress bar visibility. Defaults to shown when unset. */
   showProgressBar?: boolean;
+  /** Animate Next/Back page changes (zoom out + slide out, slide in + zoom
+   * in). Off unless set to `true`. A visitor's `prefers-reduced-motion`
+   * always wins over `true`. */
+  animatePageTransitions?: boolean;
 }
 
 /** Captcha client config, filled in by the server for published forms
