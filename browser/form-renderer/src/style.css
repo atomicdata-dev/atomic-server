@@ -1353,3 +1353,53 @@
   --altcha-spinner-color: var(--atomic-form-accent);
   --altcha-max-width: 100%;
 }
+
+/* ── Resume-draft dialog ──
+   Asked on load when answers were recovered from the visitor's localStorage
+   (see `draft.ts`). A native <dialog> opened with `showModal()`, so the
+   backdrop, focus trap and Escape handling come from the browser. It sits
+   inside the form, which is what lets it inherit the form's theme
+   variables — the top layer changes painting order, not inheritance. */
+.atomic-form-draft-dialog {
+  /* Reset the UA's centering box before re-centering: `inset: 0` + auto
+     margins is the one approach that lands the same in every engine. */
+  inset: 0;
+  margin: auto;
+  width: min(26rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 1.5rem;
+  border: 1px solid var(--atomic-form-border);
+  border-radius: var(--atomic-form-radius);
+  background: var(--atomic-form-bg);
+  color: var(--atomic-form-text);
+}
+
+.atomic-form-draft-dialog::backdrop {
+  /* Not a theme variable: the backdrop must read as "behind everything" in
+     both color schemes, and a translucent black does that whatever the form's
+     own background is. `::backdrop` also cannot see the element's inherited
+     custom properties in every engine. */
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.atomic-form-draft-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.15rem;
+  line-height: 1.3;
+}
+
+.atomic-form-draft-text {
+  margin: 0;
+  color: var(--atomic-form-text-light);
+  font-size: 0.95rem;
+}
+
+.atomic-form-draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}

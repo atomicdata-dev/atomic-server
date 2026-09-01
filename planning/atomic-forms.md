@@ -817,6 +817,64 @@ Rough priority order:
     atomic-server --lib forms::` (`definition_includes_styling`), and a
     manual pass (all 5 image modes with an SVG, colors, roundness,
     anonymous submit).
+[x] **Partial submissions / drafts** — DONE (moved up from Phase 7). A
+   half-filled form is kept in the visitor's own `localStorage`, so closing
+   the tab or a stray reload doesn't cost them their answers.
+- **No draft token in the URL** (the Phase 7 sketch called for one). The
+    draft already lives on the device that will resume it, so a token would
+    add a shareable secret, a URL-rewriting step and a server-side store to
+    buy nothing the device-local key doesn't already give us. Cross-device
+    resume is a different feature — it needs server storage — and is out of
+    scope.
+- **Where it lives**: `form-renderer/src/draft.ts`. Pure
+    `encodeDraft`/`decodeDraft` plus storage wrappers that take a
+    `Storage`-shaped object, so the interesting parts test under vitest's
+    node environment (`draft.test.ts`, 14 tests, no jsdom); `useFormDraft`
+    is the React glue. `FormRenderer` takes a `draftKey` prop — absent means
+    off, which is how the data-browser's **preview never touches a real
+    visitor's storage**. `form-app` derives the key from
+    `draftKey(definition.id, inviteCode)`.
+- **Key is the publish slug, not the URL's `:id`** (which may be either the
+    slug or the raw DID — one form would otherwise get two drafts). The
+    invite code scopes it further: each private link is its own one-time
+    response, so their drafts must not bleed together on a shared device.
+- **No definition fingerprint.** The payload records each answer's field
+    *type* alongside its value; on load, an answer whose question was
+    deleted or retyped since is dropped and the rest kept. That is strictly
+    more useful than an all-or-nothing hash, and needs no per-type logic.
+    `pageIndex` is clamped to a page the form still has.
+- **Write timing**: debounced 600 ms (a write per keystroke would be a
+    synchronous `localStorage` round-trip per character), flushed on
+    `pagehide` and on `visibilitychange` → hidden (iOS can discard a
+    backgrounded tab without `pagehide`). Every storage touch is
+    try/catch'd — Safari private mode, blocked site data and partitioned
+    third-party contexts (which an embedded form can be) all make even
+    *reading* `window.localStorage` throw; drafts then silently do nothing.
+- **The visitor is asked, not silently pre-filled.** A restored draft seeds
+    the form immediately and a modal **"Continue where you left off?"** dialog
+    opens over it with **Reset** / **Continue** — the seeded answers behind it
+    are the context for the question. A native `<dialog>` opened with
+    `showModal()`, so backdrop, focus trap and Escape come from the browser;
+    it is rendered inside the `<form>` so the theme's custom properties still
+    inherit (the top layer changes painting order, not inheritance), and
+    Escape/cancel maps to **Continue** — dismissing a question must never be
+    the destructive choice.
+- **Cleared** on successful submit (so the next person on a shared browser
+    gets a blank form) and by **Reset**. An empty value set removes the key
+    rather than writing an empty husk. TTL is 30 days.
+- **Owner opt-out**: `saveDrafts` in the `form-styling` JSON bag (default
+    on; only `false` opts out), edited in the Settings tab → Appearance,
+    for kiosks and other shared devices. Plumbed through
+    `server/src/forms.rs::FormStyling` and `buildFormDefinition.ts` like
+    `showProgressBar`.
+- Covered by `form-renderer`'s `draft.test.ts`, `cargo test -p
+    atomic-server --lib forms::definition_can_disable_drafts`, and
+    `forms-submission.spec.ts` ("an unfinished form is restored from the
+    visitor's own device": half-fill → reload asks, Continue keeps → Reset
+    wipes it on screen and on disk → submit clears it for the next visitor).
+- **Docs**: `docs/src/schema/forms.md`'s `form-styling` key list gained
+    `saveDrafts` — and, while there, the `fieldSpacing` and
+    `animatePageTransitions` keys that were already shipped but undocumented.
 [] **Progress bar** (trivial once settings exist).
 
 ## Phase 7 — Could-haves (sketch only)
@@ -828,8 +886,6 @@ Rough priority order:
 - **Question randomization**: per-page flag; shuffle in the renderer, seed stored
   in the submission for reproducibility.
 - **Dynamic text**: `{{field-shortname}}` interpolation in labels/paragraphs.
-- **Partial submissions / drafts**: localStorage in the runtime (no OPFS in the
-  embed); resume via draft token in the URL.
 - **Scheduled publish/unpublish**: `form-open-at` / `form-close-at` checked by the
   definition + submit handlers — no scheduler needed, just timestamp comparison.
 

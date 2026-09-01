@@ -876,6 +876,140 @@ test.describe('form publish and anonymous submit', () => {
     await expect(page.getByText(/Utrecht/).first()).toBeVisible();
   });
 
+  /**
+   * Partial submissions / drafts (`planning/atomic-forms.md` Phase 6). A
+   * visitor's half-filled answers live in their own `localStorage` — no draft
+   * token in the URL, because the draft never leaves the device that will
+   * resume it. Covers the three transitions that matter: the resume dialog on
+   * return (Continue), Reset, and the clear-on-submit that keeps one
+   * visitor's answers off the next visitor's screen.
+   */
+  test("an unfinished form is restored from the visitor's own device", async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    // --- 1. Owner: build and publish a minimal one-field form ---
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Draft form');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+    await expect(page.getByTestId('editable-title').first()).toBeVisible({
+      timeout: 15000,
+    });
+
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    await page.getByTitle('Add field').click();
+    await page
+      .getByRole('menuitem', { name: 'Short text', exact: true })
+      .click();
+    await expect(page.getByTestId('field-row-short-text')).toBeVisible();
+    await page.getByTestId('field-row-short-text').click();
+    await page.getByTestId('field-label-input').fill('Full name');
+
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await page.waitForFunction(
+      ({ subject, prop }) =>
+        typeof window.store.resources.get(subject)?.get(prop) === 'number',
+      { subject: formSubject, prop: FORM_PUBLISHED_AT },
+      { timeout: 10000 },
+    );
+    await page.waitForFunction(
+      () => window.store.getSyncStatus().pendingDirtyCount === 0,
+      undefined,
+      { timeout: 15000 },
+    );
+
+    await waitForPublished(page, formSubject);
+
+    // --- 2. Visitor: half-fill the form, then leave ---
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+
+    await visitorPage.goto(`${SERVER_URL}/form/${formSubject}`);
+
+    const nameInput = () =>
+      visitorPage.getByLabel('Full name', { exact: false });
+    const resumeDialog = () =>
+      visitorPage.getByRole('dialog', {
+        name: 'Continue where you left off?',
+      });
+
+    await expect(nameInput()).toBeVisible({ timeout: 15000 });
+    // Nothing to restore on a first visit, so nothing is asked.
+    await expect(resumeDialog()).toBeHidden();
+
+    await nameInput().fill('Ada Lovelace');
+
+    // The write is debounced; wait for it to actually land rather than
+    // sleeping past the debounce.
+    await visitorPage.waitForFunction(
+      () =>
+        Object.keys(window.localStorage).some(k =>
+          k.startsWith('atomic-form-draft:'),
+        ),
+      undefined,
+      { timeout: 10000 },
+    );
+
+    // --- 3. Coming back asks before carrying on. The answers are already
+    // seeded behind the dialog — they are the context for the question —
+    // and Continue just dismisses it. ---
+    await visitorPage.reload();
+    await expect(resumeDialog()).toBeVisible({ timeout: 15000 });
+    await expect(nameInput()).toHaveValue('Ada Lovelace');
+    await resumeDialog().getByRole('button', { name: 'Continue' }).click();
+    await expect(resumeDialog()).toBeHidden();
+    await expect(nameInput()).toHaveValue('Ada Lovelace');
+
+    // --- 4. Reset wipes the draft, on screen and on disk ---
+    await visitorPage.reload();
+    await expect(resumeDialog()).toBeVisible({ timeout: 15000 });
+    await resumeDialog().getByRole('button', { name: 'Reset' }).click();
+    await expect(resumeDialog()).toBeHidden();
+    await expect(nameInput()).toHaveValue('');
+    await visitorPage.reload();
+    await expect(nameInput()).toBeVisible({ timeout: 15000 });
+    await expect(resumeDialog()).toBeHidden();
+    await expect(nameInput()).toHaveValue('');
+
+    // --- 5. Submitting clears the draft: the next person on this browser
+    // gets a blank form, not Ada's answers ---
+    await nameInput().fill('Grace Hopper');
+    const submitButton = visitorPage.getByRole('button', {
+      name: 'Submit',
+      exact: true,
+    });
+    await expect(submitButton).toBeEnabled({ timeout: 30000 });
+    await submitButton.click();
+    await expect(visitorPage.getByRole('status')).toContainText('Thank you', {
+      timeout: 15000,
+    });
+
+    await visitorPage.goto(`${SERVER_URL}/form/${formSubject}`);
+    await expect(nameInput()).toBeVisible({ timeout: 15000 });
+    await expect(nameInput()).toHaveValue('');
+    await expect(resumeDialog()).toBeHidden();
+
+    await visitorContext.close();
+  });
+
   test('unpublished form shows a friendly not-available page', async ({
     page,
     browser,

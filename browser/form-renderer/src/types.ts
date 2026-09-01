@@ -271,6 +271,11 @@ export interface FormStyling {
   fieldSpacing?: FieldSpacing | string;
   /** Multi-page progress bar visibility. Defaults to shown when unset. */
   showProgressBar?: boolean;
+  /** Keep half-filled answers in the visitor's `localStorage` so they can
+   * close the tab and come back. Defaults to on; only `false` opts out (for
+   * kiosks and other shared devices, where a stranger's answers must not be
+   * waiting for the next person). See `draft.ts`. */
+  saveDrafts?: boolean;
   /** Animate Next/Back page changes (zoom out + slide out, slide in + zoom
    * in). Off unless set to `true`. A visitor's `prefers-reduced-motion`
    * always wins over `true`. */

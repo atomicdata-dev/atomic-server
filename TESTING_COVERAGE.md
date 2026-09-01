@@ -615,6 +615,9 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Page transitions: off until the builder's Animate-page-transitions switch is on, then the page leaves in the right direction and the arriving page fades in one element at a time — a choice question's options included, each taking the slot after its own question — and `prefers-reduced-motion` still skips both | `browser/e2e/tests/forms.spec.ts` ("page transitions animate once switched on") + `browser/form-renderer/src/pageTransition.test.ts` |
 | Every element in the cascade gets its own delay, in order, and a long page compresses the step rather than capping it (a cap made later options arrive with the question below them) | `browser/e2e/tests/forms.spec.ts` ("page transitions animate once switched on", computed-delay checks) + `pageTransition.test.ts::enterEnvelopeMs` |
 | The animation opt-in survives the definition round-trip (unset = no animation, `true` = animated) | `server/src/forms.rs::definition_can_enable_page_animations` + `definition_includes_styling` |
+| Drafts: what gets stored (answered values only, with each answer's field type), and what is dropped on load — another version, an expired draft, a deleted or retyped question, a page index the form no longer reaches. Storage that is absent or refuses (private mode, quota, partitioned iframe) leaves the form working | `browser/form-renderer/src/draft.test.ts` |
+| Drafts end to end: returning to a half-filled form opens the resume dialog over the seeded answers, Continue keeps them, Reset wipes them on screen *and* on disk, and submitting clears the draft so the next visitor on that browser gets a blank form | `browser/e2e/tests/forms-submission.spec.ts` ("an unfinished form is restored from the visitor's own device") |
+| The drafts opt-out survives the definition round-trip (unset = drafts on and the key absent from the wire format, `false` = off) | `server/src/forms.rs::definition_can_disable_drafts` |
 
 Not covered (extended types): the client-side mirror of the new validators in
 `browser/form-renderer/src/validation.ts` is only unit-tested for `phone` (the
@@ -645,6 +648,15 @@ same hand-mirroring drift as the rest of that file. `OPTIONS_ROW_LIMIT`
 truncation (a table with more than 1,000 rows silently offering only the first
 1,000, and rejecting a pick past the cap) is untested, and the preview
 deliberately applies no cap at all.
+
+Not covered (drafts): the debounce/flush wiring in `useFormDraft` — the
+`pagehide` and `visibilitychange` flushes in particular — is only exercised
+through the e2e (which waits for the debounced write rather than forcing a
+flush); a tab closed mid-keystroke is reasoned about, not pinned. The
+`saveDrafts` opt-out is tested at the definition layer but never toggled in
+the builder UI, and multi-page draft resume (the stored `pageIndex`) is unit
+tested only. The resume dialog is exercised through its buttons; dismissing it
+with Escape (which maps to Continue) is not.
 
 Not covered: builder UI for adding/removing conditions (the e2e walks it once as setup, not as its own assertion); page-level (not field-level) branching in e2e (unit fixtures cover it); add/delete-page write ordering in `PageTabBar` (both now `await` the form's `form-pages` save — add before selecting, delete before destroying — but no test pins that ordering).
 

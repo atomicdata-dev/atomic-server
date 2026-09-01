@@ -26,6 +26,7 @@ import {
 } from './pageTransition.js';
 import { validatePage, validateAll } from './validation.js';
 import { computeVisibility } from './conditions.js';
+import { useFormDraft } from './draft.js';
 import { FieldInput } from './FieldInput.js';
 import { FormMarkdown } from './FormMarkdown.js';
 import { InfoBox } from './InfoBox.js';
@@ -41,6 +42,14 @@ export interface FormRendererProps {
    * data-browser builder's preview mode, which renders the same definition
    * JSON but must never write a real submission. */
   preview?: boolean;
+  /** Enables partial-submission drafts, stored under this key in the
+   * visitor's `localStorage` (see `draft.ts`). Host-supplied so the
+   * data-browser's preview — which renders the same definition — can leave it
+   * off and never touch a real visitor's storage. `form-app` derives it from
+   * the definition's publish slug (stable whether the visitor arrived via the
+   * slug or the DID) plus any invite code. A form whose owner turned drafts
+   * off (`styling.saveDrafts === false`) ignores the key. */
+  draftKey?: string;
   className?: string;
 }
 
@@ -50,10 +59,25 @@ export function FormRenderer({
   definition,
   onSubmit,
   preview = false,
+  draftKey,
   className,
 }: FormRendererProps): JSX.Element {
-  const [pageIndex, setPageIndex] = useState(0);
-  const [values, setValues] = useState<FormValues>({});
+  const draft = useFormDraft(
+    definition,
+    !preview && definition.styling.saveDrafts !== false ? draftKey : undefined,
+  );
+  const [pageIndex, setPageIndex] = useState(draft.restored?.pageIndex ?? 0);
+  const [values, setValues] = useState<FormValues>(
+    () => draft.restored?.values ?? {},
+  );
+  // A restored draft seeds the form immediately, but the visitor is asked
+  // before carrying on with it: the answers behind the dialog are the context
+  // for the question, and Reset is right there for whoever did not expect to
+  // find them.
+  const [askResume, setAskResume] = useState(draft.restored !== undefined);
+  const [resumeDialog, setResumeDialog] = useState<HTMLDialogElement | null>(
+    null,
+  );
   const [errors, setErrors] = useState<FormErrors>({});
   const [status, setStatus] = useState<Status>('filling');
   const [serverMessage, setServerMessage] = useState<string | undefined>();
@@ -175,6 +199,37 @@ export function FormRenderer({
     endPhase();
   };
 
+  // Persist on every answer/page change. `save` debounces internally and
+  // flushes on `pagehide`, so this fires far more often than it writes.
+  useEffect(() => {
+    draft.save(values, pageIndex);
+  }, [draft, values, pageIndex]);
+
+  // `showModal()` — not the `open` attribute — is what puts the dialog in the
+  // top layer with a backdrop, a focus trap and Escape handling, none of
+  // which React can express declaratively.
+  useEffect(() => {
+    if (!resumeDialog || resumeDialog.open) return;
+
+    resumeDialog.showModal();
+  }, [resumeDialog]);
+
+  /** Keeps the restored answers. The form is already seeded with them, so
+   * this only has to dismiss the question. */
+  const resumeDraft = () => setAskResume(false);
+
+  /** Throws the restored answers away and starts the form from scratch. The
+   * save effect above then sees an empty value set and removes the stored
+   * draft rather than rewriting it. */
+  const resetDraft = () => {
+    draft.clear();
+    setValues({});
+    setErrors({});
+    setPageIndex(0);
+    setTransition(null);
+    setAskResume(false);
+  };
+
   const setValue = (mapsTo: string, value: unknown) => {
     setValues(prev => ({ ...prev, [mapsTo]: value }));
     setErrors(prev => {
@@ -280,6 +335,9 @@ export function FormRenderer({
     });
 
     if (outcome.ok) {
+      // The answers are on the server now; leaving them on the device would
+      // re-fill the form for the next visitor sharing this browser.
+      draft.clear();
       setStatus('submitted');
     } else {
       setStatus('error');
@@ -312,6 +370,49 @@ export function FormRenderer({
             style={{ width: `${progress}%` }}
           />
         </div>
+      )}
+
+      {askResume && (
+        // Rendered inside the <form> so the theme's custom properties reach
+        // it: the top layer changes painting order, not CSS inheritance.
+        // Both buttons are explicitly type='button' — a bare <button> here
+        // would submit the form.
+        <dialog
+          ref={setResumeDialog}
+          className='atomic-form-draft-dialog'
+          aria-labelledby={`${groupId}-resume-title`}
+          // Escape (and any other cancel) keeps the answers: dismissing a
+          // question must never be the destructive choice.
+          onCancel={resumeDraft}
+        >
+          <h2
+            className='atomic-form-draft-title'
+            id={`${groupId}-resume-title`}
+          >
+            Continue where you left off?
+          </h2>
+          <p className='atomic-form-draft-text'>
+            You started filling in this form on this device, and your answers
+            are still here.
+          </p>
+          <div className='atomic-form-draft-actions'>
+            <button
+              type='button'
+              className='atomic-form-button atomic-form-button-secondary'
+              onClick={resetDraft}
+            >
+              Reset
+            </button>
+            <button
+              type='button'
+              className='atomic-form-button'
+              onClick={resumeDraft}
+              autoFocus
+            >
+              Continue
+            </button>
+          </div>
+        </dialog>
       )}
 
       <div

@@ -91,6 +91,12 @@ pub struct FormStyling {
         skip_serializing_if = "Option::is_none"
     )]
     pub animate_page_transitions: Option<bool>,
+    /// Whether the runtime keeps a half-filled form in the visitor's
+    /// `localStorage` (see `@tomic/form-renderer`'s `draft.ts`). `None` means
+    /// unset — drafts are on by default; only `Some(false)` opts out, for
+    /// kiosks and other shared devices.
+    #[serde(rename = "saveDrafts", skip_serializing_if = "Option::is_none")]
+    pub save_drafts: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -743,6 +749,7 @@ fn build_form_styling(form: &Resource) -> FormStyling {
         field_spacing: get_str("fieldSpacing"),
         show_progress_bar: get_bool("showProgressBar"),
         animate_page_transitions: get_bool("animatePageTransitions"),
+        save_drafts: get_bool("saveDrafts"),
     }
 }
 
@@ -2482,6 +2489,35 @@ mod tests {
         assert_eq!(styling.show_progress_bar, Some(false));
         let wire = serde_json::to_value(&styling).unwrap();
         assert_eq!(wire["showProgressBar"], json!(false));
+    }
+
+    #[tokio::test]
+    async fn definition_can_disable_drafts() {
+        let store = init_store().await;
+        let (mut form, _email_prop) = build_test_form(&store).await;
+
+        // Unset means drafts are on: the key must be absent from the wire
+        // format so the runtime's `!== false` default applies.
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        assert_eq!(styling.save_drafts, None);
+        assert!(serde_json::to_value(&styling)
+            .unwrap()
+            .get("saveDrafts")
+            .is_none());
+
+        form.set(
+            urls::FORM_STYLING.into(),
+            Value::Json(json!({ "saveDrafts": false })),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        assert_eq!(styling.save_drafts, Some(false));
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert_eq!(wire["saveDrafts"], json!(false));
     }
 
     #[tokio::test]

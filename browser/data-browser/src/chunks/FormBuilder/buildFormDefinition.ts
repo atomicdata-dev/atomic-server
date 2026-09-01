@@ -83,6 +83,7 @@ async function buildStyling(
     roundness: stylingJson.roundness as string | undefined,
     fieldSpacing: stylingJson.fieldSpacing as string | undefined,
     showProgressBar: stylingJson.showProgressBar as boolean | undefined,
+    saveDrafts: stylingJson.saveDrafts as boolean | undefined,
     animatePageTransitions: stylingJson.animatePageTransitions as
       | boolean
       | undefined,

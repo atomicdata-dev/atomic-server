@@ -113,6 +113,7 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
 
   const showProgressBar = stylingObj.showProgressBar !== false;
   const animatePageTransitions = stylingObj.animatePageTransitions === true;
+  const saveDrafts = stylingObj.saveDrafts !== false;
 
   return (
     <Sections>
@@ -222,6 +223,20 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
         <Hint>
           Pages zoom out and slide away on Next / Back. Visitors who ask their
           system for reduced motion never see the animation.
+        </Hint>
+        <CheckboxLabel>
+          <Checkbox
+            checked={saveDrafts}
+            onChange={checked =>
+              setStylingKey('saveDrafts', checked ? undefined : false)
+            }
+          />
+          Let visitors resume unfinished forms
+        </CheckboxLabel>
+        <Hint>
+          Half-filled answers are kept in the visitor&apos;s own browser, so
+          closing the tab does not lose them, and are cleared once they submit.
+          Turn this off for kiosks and other shared devices.
         </Hint>
       </Section>
     </Sections>

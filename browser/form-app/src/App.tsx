@@ -2,6 +2,7 @@ import { useEffect, useState, type JSX } from 'react';
 import {
   FormRenderer,
   FormShell,
+  draftKey,
   type FormDefinition,
 } from '@tomic/form-renderer';
 import {
@@ -60,6 +61,12 @@ export function App(): JSX.Element {
     <FormShell definition={definition} embed={embed}>
       <FormRenderer
         definition={definition}
+        // Keyed on the publish slug rather than the URL's `:id`, which may be
+        // either the slug or the raw DID — one form, one draft either way.
+        // The invite code scopes it further: each private link is its own
+        // one-time response, so their drafts must not bleed together on a
+        // shared device.
+        draftKey={draftKey(definition.id, inviteCode)}
         onSubmit={async values => {
           const outcome = await submitForm(
             formId,

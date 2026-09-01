@@ -8515,3 +8515,11 @@ msgstr "Pages zoom out and slide away on Next / Back. Visitors who ask their sys
 #: src/chunks/FormBuilder/SettingsTab.tsx
 msgid "Field spacing"
 msgstr "Field spacing"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "<0/> Let visitors resume unfinished forms"
+msgstr "<0/> Let visitors resume unfinished forms"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Half-filled answers are kept in the visitor's own browser, so closing the tab does not lose them, and are cleared once they submit. Turn this off for kiosks and other shared devices."
+msgstr "Half-filled answers are kept in the visitor's own browser, so closing the tab does not lose them, and are cleared once they submit. Turn this off for kiosks and other shared devices."

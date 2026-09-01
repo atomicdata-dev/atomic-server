@@ -8550,3 +8550,11 @@ msgstr "Seiten zoomen heraus und gleiten bei Weiter / Zurück weg. Besucher, die
 #: src/chunks/FormBuilder/SettingsTab.tsx
 msgid "Field spacing"
 msgstr "Feldabstand"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "<0/> Let visitors resume unfinished forms"
+msgstr "<0/> Besuchern erlauben, unvollständige Formulare fortzusetzen"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Half-filled answers are kept in the visitor's own browser, so closing the tab does not lose them, and are cleared once they submit. Turn this off for kiosks and other shared devices."
+msgstr "Teilweise ausgefüllte Antworten werden im Browser des Besuchers gespeichert, sodass das Schließen des Tabs sie nicht verloren gehen lässt, und werden nach dem Absenden gelöscht. Deaktivieren Sie dies für Kioske und andere gemeinsam genutzte Geräte."

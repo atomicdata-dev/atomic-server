@@ -8525,3 +8525,11 @@ msgstr "Les pages effectuent un zoom arrière et glissent sur Suivant / Précéd
 #: src/chunks/FormBuilder/SettingsTab.tsx
 msgid "Field spacing"
 msgstr "Espacement des champs"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "<0/> Let visitors resume unfinished forms"
+msgstr "<0/> Permettre aux visiteurs de reprendre des formulaires incomplets"
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Half-filled answers are kept in the visitor's own browser, so closing the tab does not lose them, and are cleared once they submit. Turn this off for kiosks and other shared devices."
+msgstr "Les réponses à moitié remplies sont conservées dans le navigateur du visiteur, donc fermer l'onglet ne les perd pas, et sont effacées une fois qu'il soumet. Désactivez cette option pour les bornes et autres appareils partagés."
