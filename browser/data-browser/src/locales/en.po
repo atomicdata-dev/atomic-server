@@ -8511,3 +8511,7 @@ msgstr "<0/> Animate page transitions"
 #: src/chunks/FormBuilder/SettingsTab.tsx
 msgid "Pages zoom out and slide away on Next / Back. Visitors who ask their system for reduced motion never see the animation."
 msgstr "Pages zoom out and slide away on Next / Back. Visitors who ask their system for reduced motion never see the animation."
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Field spacing"
+msgstr "Field spacing"

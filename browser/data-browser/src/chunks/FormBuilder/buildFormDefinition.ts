@@ -81,6 +81,7 @@ async function buildStyling(
     mainColor: stylingJson.mainColor as string | undefined,
     backgroundColor: stylingJson.backgroundColor as string | undefined,
     roundness: stylingJson.roundness as string | undefined,
+    fieldSpacing: stylingJson.fieldSpacing as string | undefined,
     showProgressBar: stylingJson.showProgressBar as boolean | undefined,
     animatePageTransitions: stylingJson.animatePageTransitions as
       | boolean

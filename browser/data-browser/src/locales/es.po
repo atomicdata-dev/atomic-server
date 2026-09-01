@@ -8521,3 +8521,7 @@ msgstr "<0/> Animar transiciones de página"
 #: src/chunks/FormBuilder/SettingsTab.tsx
 msgid "Pages zoom out and slide away on Next / Back. Visitors who ask their system for reduced motion never see the animation."
 msgstr "Las páginas se alejan con zoom y se deslizan al presionar Siguiente / Anterior. Los visitantes que solicitan movimiento reducido en su sistema nunca ven la animación."
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Field spacing"
+msgstr "Espaciado de campo"

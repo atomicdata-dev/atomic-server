@@ -252,6 +252,9 @@ export type ImagePosition = 'top' | 'left' | 'right' | 'behind' | 'full';
 
 export type Roundness = 'sharp' | 'rounded' | 'round';
 
+/** How much vertical space sits between the blocks of a page. */
+export type FieldSpacing = 'small' | 'large';
+
 /** Visual theming for the published form. All keys optional; unset keys keep
  * the light/dark-adaptive defaults from `style.css`. `imageUrl` is filled by
  * the server (`/form/{id}/image`) or, in the builder preview, with the File's
@@ -263,6 +266,9 @@ export interface FormStyling {
   mainColor?: string;
   backgroundColor?: string;
   roundness?: Roundness | string;
+  /** Vertical space between blocks. Defaults to `small` (1.5rem) when unset;
+   * `large` (5rem) gives each question room of its own. */
+  fieldSpacing?: FieldSpacing | string;
   /** Multi-page progress bar visibility. Defaults to shown when unset. */
   showProgressBar?: boolean;
   /** Animate Next/Back page changes (zoom out + slide out, slide in + zoom

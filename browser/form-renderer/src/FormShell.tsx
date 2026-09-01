@@ -20,6 +20,11 @@ const ROUNDNESS: Record<string, string> = {
   round: '1rem',
 };
 
+const FIELD_SPACING: Record<string, string> = {
+  small: '1.5rem',
+  large: '5rem',
+};
+
 /** Perceived-luminance check so button text stays readable on a custom
  * accent color. Returns undefined for non-hex input (keeps the CSS default). */
 function readableTextOn(hexColor: string): string | undefined {
@@ -70,6 +75,10 @@ export function stylingVars(styling: FormDefinition['styling']): CSSProperties {
 
   if (styling.roundness && ROUNDNESS[styling.roundness]) {
     vars['--atomic-form-radius'] = ROUNDNESS[styling.roundness];
+  }
+
+  if (styling.fieldSpacing && FIELD_SPACING[styling.fieldSpacing]) {
+    vars['--atomic-form-field-gap'] = FIELD_SPACING[styling.fieldSpacing];
   }
 
   return vars as CSSProperties;

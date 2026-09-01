@@ -72,6 +72,10 @@ pub struct FormStyling {
     pub background_color: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub roundness: Option<String>,
+    /// Vertical space between the blocks of a page (`small` / `large`).
+    /// `None` keeps the renderer's default (`small`, 1.5rem).
+    #[serde(rename = "fieldSpacing", skip_serializing_if = "Option::is_none")]
+    pub field_spacing: Option<String>,
     /// Multi-page progress bar visibility. `None` means unset (shown by
     /// default); the runtime and preview both treat only `Some(false)` as
     /// hiding it.
@@ -736,6 +740,7 @@ fn build_form_styling(form: &Resource) -> FormStyling {
         main_color: get_str("mainColor"),
         background_color: get_str("backgroundColor"),
         roundness: get_str("roundness"),
+        field_spacing: get_str("fieldSpacing"),
         show_progress_bar: get_bool("showProgressBar"),
         animate_page_transitions: get_bool("animatePageTransitions"),
     }
@@ -2437,6 +2442,26 @@ mod tests {
         // `has_image` never leaks into the wire format.
         let wire = serde_json::to_value(&styling).unwrap();
         assert!(wire.get("hasImage").is_none());
+    }
+
+    #[tokio::test]
+    async fn definition_carries_field_spacing() {
+        let store = init_store().await;
+        let (mut form, _email_prop) = build_test_form(&store).await;
+
+        form.set(
+            urls::FORM_STYLING.into(),
+            Value::Json(json!({ "fieldSpacing": "large" })),
+            &store,
+        )
+        .await
+        .unwrap();
+        form.save_locally(&store).await.unwrap();
+
+        let styling = build_form_definition(&store, &form).await.unwrap().styling;
+        assert_eq!(styling.field_spacing.as_deref(), Some("large"));
+        let wire = serde_json::to_value(&styling).unwrap();
+        assert_eq!(wire["fieldSpacing"], json!("large"));
     }
 
     #[tokio::test]

@@ -54,14 +54,20 @@ const ROUNDNESS_LEVELS: Array<{ value: string; label: string }> = [
   { value: 'round', label: 'Round' },
 ];
 
+const FIELD_SPACINGS: Array<{ value: string; label: string; title: string }> = [
+  { value: 'small', label: 'Small', title: 'Compact list of questions' },
+  { value: 'large', label: 'Large', title: 'Lots of air between questions' },
+];
+
 interface SettingsTabProps {
   resource: Resource;
 }
 
 /** Form settings, grouped into collapsible sections like the app settings
- * page: Appearance (cover image, colors, roundness — previewed 1:1 by the
- * Preview dialog and the published runtime via the definition's `styling`
- * object) and Form access (public vs invite-only + invite link management). */
+ * page: Appearance (cover image, colors, roundness, spacing — previewed 1:1
+ * by the Preview dialog and the published runtime via the definition's
+ * `styling` object) and Form access (public vs invite-only + invite link
+ * management). */
 export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
   return (
     <Wrapper>
@@ -166,6 +172,24 @@ function AppearanceSettings({ resource }: SettingsTabProps): JSX.Element {
                   ((stylingObj.roundness as string) ?? 'rounded') !== value
                 }
                 onClick={() => setStylingKey('roundness', value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </Row>
+        </Field>
+      </Section>
+      <Section>
+        <Field label='Field spacing'>
+          <Row gap='0.5rem'>
+            {FIELD_SPACINGS.map(({ value, label, title }) => (
+              <Button
+                key={value}
+                subtle={
+                  ((stylingObj.fieldSpacing as string) ?? 'small') !== value
+                }
+                title={title}
+                onClick={() => setStylingKey('fieldSpacing', value)}
               >
                 {label}
               </Button>

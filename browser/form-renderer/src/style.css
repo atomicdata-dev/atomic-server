@@ -17,6 +17,9 @@
   --atomic-form-border: #d9dce1;
   --atomic-form-error: #c0392b;
   --atomic-form-radius: 0.5rem;
+  /* Vertical space between the blocks of a page. Overridden per form by the
+     `fieldSpacing` styling key (see `stylingVars`). */
+  --atomic-form-field-gap: 1.5rem;
   /* Info-box hues that are not derived from the form's own palette. The other
      three (info, note, danger) follow accent / text-light / error, and so are
      declared with the derived properties below. */
@@ -94,7 +97,7 @@
 .atomic-form-blocks {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: var(--atomic-form-field-gap);
 }
 
 /* Page transitions (Next / Back). The two phases have deliberately different
