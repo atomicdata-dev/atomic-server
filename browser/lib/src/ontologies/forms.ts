@@ -21,6 +21,8 @@ export const forms = {
     formTargetTable: 'https://atomicdata.dev/properties/form-target-table',
     formPages: 'https://atomicdata.dev/properties/form-pages',
     formPublishedAt: 'https://atomicdata.dev/properties/form-published-at',
+    formOpenAt: 'https://atomicdata.dev/properties/form-open-at',
+    formCloseAt: 'https://atomicdata.dev/properties/form-close-at',
     formSettings: 'https://atomicdata.dev/properties/form-settings',
     formPublishId: 'https://atomicdata.dev/properties/form-publish-id',
     formFields: 'https://atomicdata.dev/properties/form-fields',
@@ -52,6 +54,8 @@ export const forms = {
       'https://atomicdata.dev/properties/form-target-table',
       'https://atomicdata.dev/properties/form-pages',
       'https://atomicdata.dev/properties/form-published-at',
+      'https://atomicdata.dev/properties/form-open-at',
+      'https://atomicdata.dev/properties/form-close-at',
       'https://atomicdata.dev/properties/form-settings',
       'https://atomicdata.dev/properties/form-publish-id',
       'https://atomicdata.dev/properties/form-styling',
@@ -124,6 +128,8 @@ declare module '../index.js' {
         | typeof forms.properties.formPages;
       recommends:
         | typeof forms.properties.formPublishedAt
+        | typeof forms.properties.formOpenAt
+        | typeof forms.properties.formCloseAt
         | typeof forms.properties.formSettings
         | typeof forms.properties.formPublishId
         | typeof forms.properties.formStyling
@@ -184,6 +190,8 @@ declare module '../index.js' {
     [forms.properties.formTargetTable]: string;
     [forms.properties.formPages]: string[];
     [forms.properties.formPublishedAt]: number;
+    [forms.properties.formOpenAt]: number;
+    [forms.properties.formCloseAt]: number;
     [forms.properties.formSettings]: JSONValue;
     [forms.properties.formPublishId]: string;
     [forms.properties.formFields]: string[];
@@ -210,6 +218,8 @@ declare module '../index.js' {
     [forms.properties.formTargetTable]: 'formTargetTable';
     [forms.properties.formPages]: 'formPages';
     [forms.properties.formPublishedAt]: 'formPublishedAt';
+    [forms.properties.formOpenAt]: 'formOpenAt';
+    [forms.properties.formCloseAt]: 'formCloseAt';
     [forms.properties.formSettings]: 'formSettings';
     [forms.properties.formPublishId]: 'formPublishId';
     [forms.properties.formFields]: 'formFields';

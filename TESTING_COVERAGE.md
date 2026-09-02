@@ -618,13 +618,28 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Drafts: what gets stored (answered values only, with each answer's field type), and what is dropped on load — another version, an expired draft, a deleted or retyped question, a page index the form no longer reaches. Storage that is absent or refuses (private mode, quota, partitioned iframe) leaves the form working | `browser/form-renderer/src/draft.test.ts` |
 | Drafts end to end: returning to a half-filled form opens the resume dialog over the seeded answers, Continue keeps them, Reset wipes them on screen *and* on disk, and submitting clears the draft so the next visitor on that browser gets a blank form | `browser/e2e/tests/forms-submission.spec.ts` ("an unfinished form is restored from the visitor's own device") |
 | The drafts opt-out survives the definition round-trip (unset = drafts on and the key absent from the wire format, `false` = off) | `server/src/forms.rs::definition_can_disable_drafts` |
+| Scheduling: `form-published-at` stays the master switch (a schedule alone never publishes), half-open window edges, either bound alone, an inverted window never opening, and the UTC rendering of a bound | `server/src/forms.rs` (`unpublished_form_is_never_available` … `schedule_moment_renders_in_utc`) |
+| Scheduling end to end: a close-at in the past and an open-at in the future each 410 the definition, the HTML page (still embeddable) and submit; clearing both bounds reopens the form | `server/src/tests.rs::form_submission_flow` (step 7b) + `browser/e2e/tests/forms-submission.spec.ts` ("a scheduled window opens and closes a published form" — the reopen half is server-side only, see below) |
+
+Not covered (scheduling, blocked by a sync bug): that *clearing* a schedule
+makes the form reachable again is asserted server-side only. The e2e stops at
+the builder's status line, because the server's copy of a resource stops
+accepting commits once one has been parked ("Commit's Loro update depends on
+ops the server does not have"), and removing a propval reliably triggers that
+— `remove()` + re-`set()` of `form-published-at` through `@tomic/lib` alone
+reproduces it, which means **Unpublish → Publish again is broken in the product
+today**, not just in the test. Restore the trimmed block in
+`forms-submission.spec.ts` once that is fixed.
 
 Not covered (extended types): the client-side mirror of the new validators in
 `browser/form-renderer/src/validation.ts` is only unit-tested for `phone` (the
 one rule that deliberately diverges — it is stricter than the server for E.164
 values); every other type is tested on the Rust side only, and the two are
 hand-mirrored, so they can drift (the
-same known gap as `buildFormDefinition.ts` vs `build_form_definition`); the
+same known gap as `buildFormDefinition.ts` vs `build_form_definition`, and as
+`chunks/FormBuilder/formSchedule.ts` vs `form_availability_at` — the builder's
+schedule status line is hand-mirrored from the server rule and has no test of
+its own, though the server side it mirrors is fully covered); the
 option-image *picker* in `PictureChoiceOptions.tsx` (uploading or picking a file
 for an option) is only exercised manually; `choice-matrix` / `table-input` /
 `picture-choice` are rendered and validated but never submitted end-to-end in

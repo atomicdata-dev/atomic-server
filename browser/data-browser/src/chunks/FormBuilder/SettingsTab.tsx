@@ -22,6 +22,7 @@ import { Popover } from '@components/Popover';
 import { SettingsGroup, SettingsSection } from '@components/Settings';
 import { useDebounce } from '@helpers/useDebounce';
 import { FormAccessSection } from './FormAccessSection';
+import { FormScheduleSection } from './FormScheduleSection';
 
 const IMAGE_MIMES = new Set([
   'image/png',
@@ -66,14 +67,18 @@ interface SettingsTabProps {
 /** Form settings, grouped into collapsible sections like the app settings
  * page: Appearance (cover image, colors, roundness, spacing — previewed 1:1
  * by the Preview dialog and the published runtime via the definition's
- * `styling` object) and Form access (public vs invite-only + invite link
- * management). */
+ * `styling` object), Form access (public vs invite-only + invite link
+ * management) and Schedule (the optional open/close window on top of the
+ * publish switch). */
 export function SettingsTab({ resource }: SettingsTabProps): JSX.Element {
   return (
     <Wrapper>
       <SettingsGroup>
         <SettingsSection label='Form access' initialState>
           <FormAccessSection resource={resource} />
+        </SettingsSection>
+        <SettingsSection label='Schedule' initialState>
+          <FormScheduleSection resource={resource} />
         </SettingsSection>
         <SettingsSection label='Appearance' initialState>
           <AppearanceSettings resource={resource} />

@@ -88,6 +88,37 @@ fn unpublished() -> FormApiError {
     )
 }
 
+/// Turns a non-[forms::FormAvailability::Open] state into the 410 a visitor
+/// sees. Scheduled forms get their own wording (and the moment itself, when
+/// it renders) so "come back later" and "you missed it" don't read as the
+/// same dead link — see Phase 7 "Scheduled publish/unpublish".
+fn unavailable(availability: forms::FormAvailability) -> FormApiError {
+    let message = match availability {
+        // `Open` is unreachable in practice — the one caller only builds an
+        // error out of a non-open state — but exhaustiveness beats an
+        // unwrap, and the generic wording is the right fallback anyway.
+        forms::FormAvailability::Open | forms::FormAvailability::Unpublished => {
+            return unpublished()
+        }
+        forms::FormAvailability::NotYetOpen { opens_at } => {
+            match forms::format_schedule_moment(opens_at) {
+                Some(moment) => format!("This form isn't open yet. It opens on {moment}."),
+                None => "This form isn't open yet. Check back later.".to_string(),
+            }
+        }
+        forms::FormAvailability::Closed { closed_at } => {
+            match forms::format_schedule_moment(closed_at) {
+                Some(moment) => {
+                    format!("This form is closed. It stopped accepting responses on {moment}.")
+                }
+                None => "This form is closed and no longer accepts responses.".to_string(),
+            }
+        }
+    };
+
+    FormApiError::new(StatusCode::GONE, message)
+}
+
 /// `?code=` on the viewer-facing routes (Phase 6 "Private links"): the invite
 /// code a visitor presents for an invite-only form.
 #[derive(Deserialize)]
@@ -142,7 +173,9 @@ async fn check_form_access(
 }
 
 /// Resolves `{id}` to a Form resource, confirming it really is a Form and is
-/// currently published. Shared by both handlers.
+/// currently accepting visitors — published, and inside its optional
+/// `form-open-at`/`form-close-at` window. Shared by every `/form/{id}`
+/// handler.
 async fn resolve_published_form(
     store: &atomic_lib::Db,
     id: &str,
@@ -159,8 +192,10 @@ async fn resolve_published_form(
         return Err(not_found());
     }
 
-    if form.get(urls::FORM_PUBLISHED_AT).is_err() {
-        return Err(unpublished());
+    let availability = forms::form_availability(&form);
+
+    if !availability.is_open() {
+        return Err(unavailable(availability));
     }
 
     Ok(form)
@@ -561,7 +596,17 @@ fn form_submit_lock(form: &Resource) -> Arc<tokio::sync::Mutex<()>> {
 // ── Per-IP rate limiting (fixed window, in-process) ──────────────────────
 
 const RATE_LIMIT_WINDOW: Duration = Duration::from_secs(60);
+#[cfg(not(test))]
 const RATE_LIMIT_MAX: usize = 10;
+
+// The limiter's state is a process-global static keyed by IP, so every
+// submit in the integration test shares one bucket — at the production cap
+// the test hits 429 after its tenth POST, no matter which case it was
+// asserting. Raised here (same `cfg(test)` escape hatch the captcha
+// difficulty uses) so adding a submission case can't silently break an
+// unrelated one; nothing asserts the limiter itself.
+#[cfg(test)]
+const RATE_LIMIT_MAX: usize = 1000;
 
 fn rate_limiter() -> &'static Mutex<HashMap<String, VecDeque<Instant>>> {
     static LIMITER: OnceLock<Mutex<HashMap<String, VecDeque<Instant>>>> = OnceLock::new();

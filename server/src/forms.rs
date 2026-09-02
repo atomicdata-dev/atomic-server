@@ -1666,6 +1666,85 @@ fn round_clean(x: f64) -> f64 {
     (x * 1e9).round() / 1e9
 }
 
+// ── Publish state & scheduling (Phase 7 "Scheduled publish/unpublish") ──────
+
+/// Why a Form is (not) accepting visitors right now.
+///
+/// `form-published-at` stays the master switch — a form nobody published is
+/// never reachable, whatever its schedule says. `form-open-at` /
+/// `form-close-at` narrow the window *within* a published form, so an owner
+/// can hand out the link days ahead and let the form open and close on its
+/// own. Both are plain timestamp comparisons evaluated per request: there is
+/// no scheduler, no background job, and nothing to get out of sync if the
+/// server is down at the moment a form was due to open.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormAvailability {
+    Open,
+    /// No `form-published-at` — never published, or manually unpublished.
+    Unpublished,
+    /// Published, but `form-open-at` is still in the future.
+    NotYetOpen {
+        opens_at: i64,
+    },
+    /// Published, but `form-close-at` has passed.
+    Closed {
+        closed_at: i64,
+    },
+}
+
+impl FormAvailability {
+    pub fn is_open(&self) -> bool {
+        matches!(self, FormAvailability::Open)
+    }
+}
+
+/// Reads a timestamp propval, ignoring values that aren't numeric — a
+/// malformed schedule must not lock an owner out of their own published
+/// form, so an unreadable bound is treated as "no bound".
+fn timestamp_propval(form: &Resource, property: &str) -> Option<i64> {
+    form.get(property).ok().and_then(|v| v.to_int().ok())
+}
+
+/// [FormAvailability] for `form` at the current wall-clock time.
+pub fn form_availability(form: &Resource) -> FormAvailability {
+    form_availability_at(form, atomic_lib::utils::now())
+}
+
+/// Testable core of [form_availability]. `now` is epoch milliseconds, the
+/// same unit the timestamp datatype stores.
+///
+/// The bounds are half-open: a form opens *at* `form-open-at` and closes
+/// *at* `form-close-at`. A window whose end precedes its start simply never
+/// opens — the not-yet-open branch is checked first, so that misconfiguration
+/// reports the more actionable of the two states.
+pub fn form_availability_at(form: &Resource, now: i64) -> FormAvailability {
+    if form.get(atomic_lib::urls::FORM_PUBLISHED_AT).is_err() {
+        return FormAvailability::Unpublished;
+    }
+
+    if let Some(opens_at) = timestamp_propval(form, atomic_lib::urls::FORM_OPEN_AT) {
+        if now < opens_at {
+            return FormAvailability::NotYetOpen { opens_at };
+        }
+    }
+
+    if let Some(closed_at) = timestamp_propval(form, atomic_lib::urls::FORM_CLOSE_AT) {
+        if now >= closed_at {
+            return FormAvailability::Closed { closed_at };
+        }
+    }
+
+    FormAvailability::Open
+}
+
+/// Renders an epoch-ms timestamp for a visitor-facing message. UTC, spelled
+/// out — the visitor's own timezone is unknown server-side, so the zone is
+/// named explicitly rather than silently implied.
+pub fn format_schedule_moment(ms: i64) -> Option<String> {
+    chrono::DateTime::from_timestamp_millis(ms)
+        .map(|dt| dt.format("%-d %B %Y at %H:%M UTC").to_string())
+}
+
 // ── Invite codes (Phase 6 "Private links") ──────────────────────────────────
 
 /// `form-access` value that switches a Form from "anyone with the link" to
@@ -3395,6 +3474,134 @@ mod tests {
             .unwrap();
         invite.save_locally(store).await.unwrap();
         invite
+    }
+
+    // ── Scheduling (Phase 7) ────────────────────────────────────────────
+
+    /// `now` used by the scheduling tests. Arbitrary, but fixed — the point
+    /// of `form_availability_at` is that nothing depends on wall-clock time.
+    const NOW: i64 = 1_700_000_000_000;
+    const HOUR: i64 = 3_600_000;
+
+    async fn set_ts(store: &Db, form: &mut Resource, property: &str, ms: i64) {
+        form.set(property.into(), Value::Timestamp(ms), store)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn unpublished_form_is_never_available() {
+        let store = init_store().await;
+        let (mut form, _) = build_test_form(&store).await;
+
+        assert_eq!(
+            form_availability_at(&form, NOW),
+            FormAvailability::Unpublished
+        );
+
+        // A schedule alone must not publish a form — `form-published-at`
+        // stays the master switch.
+        set_ts(&store, &mut form, urls::FORM_OPEN_AT, NOW - HOUR).await;
+        set_ts(&store, &mut form, urls::FORM_CLOSE_AT, NOW + HOUR).await;
+        assert_eq!(
+            form_availability_at(&form, NOW),
+            FormAvailability::Unpublished
+        );
+    }
+
+    #[tokio::test]
+    async fn published_form_without_schedule_is_open() {
+        let store = init_store().await;
+        let (mut form, _) = build_test_form(&store).await;
+        set_ts(&store, &mut form, urls::FORM_PUBLISHED_AT, NOW - HOUR).await;
+
+        assert!(form_availability_at(&form, NOW).is_open());
+    }
+
+    #[tokio::test]
+    async fn schedule_window_opens_and_closes() {
+        let store = init_store().await;
+        let (mut form, _) = build_test_form(&store).await;
+        set_ts(&store, &mut form, urls::FORM_PUBLISHED_AT, NOW - HOUR).await;
+
+        let opens_at = NOW + HOUR;
+        let closed_at = NOW + 2 * HOUR;
+        set_ts(&store, &mut form, urls::FORM_OPEN_AT, opens_at).await;
+        set_ts(&store, &mut form, urls::FORM_CLOSE_AT, closed_at).await;
+
+        assert_eq!(
+            form_availability_at(&form, NOW),
+            FormAvailability::NotYetOpen { opens_at }
+        );
+        // Bounds are half-open: open *at* open-at, closed *at* close-at.
+        assert!(form_availability_at(&form, opens_at).is_open());
+        assert!(form_availability_at(&form, closed_at - 1).is_open());
+        assert_eq!(
+            form_availability_at(&form, closed_at),
+            FormAvailability::Closed { closed_at }
+        );
+    }
+
+    #[tokio::test]
+    async fn only_one_bound_is_enough() {
+        let store = init_store().await;
+        let (mut form, _) = build_test_form(&store).await;
+        set_ts(&store, &mut form, urls::FORM_PUBLISHED_AT, NOW - HOUR).await;
+
+        // Close-only: open until the deadline.
+        set_ts(&store, &mut form, urls::FORM_CLOSE_AT, NOW + HOUR).await;
+        assert!(form_availability_at(&form, NOW).is_open());
+        assert_eq!(
+            form_availability_at(&form, NOW + 2 * HOUR),
+            FormAvailability::Closed {
+                closed_at: NOW + HOUR
+            }
+        );
+
+        // Open-only: shut until the start, then open indefinitely.
+        form.remove_propval(urls::FORM_CLOSE_AT).unwrap();
+        set_ts(&store, &mut form, urls::FORM_OPEN_AT, NOW + HOUR).await;
+        assert_eq!(
+            form_availability_at(&form, NOW),
+            FormAvailability::NotYetOpen {
+                opens_at: NOW + HOUR
+            }
+        );
+        assert!(form_availability_at(&form, NOW + 999 * HOUR).is_open());
+    }
+
+    /// A window that ends before it begins is a mistake, not a lockout of
+    /// the owner's own data — it just never opens, and reports the more
+    /// actionable of the two reasons.
+    #[tokio::test]
+    async fn inverted_window_never_opens() {
+        let store = init_store().await;
+        let (mut form, _) = build_test_form(&store).await;
+        set_ts(&store, &mut form, urls::FORM_PUBLISHED_AT, NOW - HOUR).await;
+        set_ts(&store, &mut form, urls::FORM_OPEN_AT, NOW + 2 * HOUR).await;
+        set_ts(&store, &mut form, urls::FORM_CLOSE_AT, NOW + HOUR).await;
+
+        assert_eq!(
+            form_availability_at(&form, NOW),
+            FormAvailability::NotYetOpen {
+                opens_at: NOW + 2 * HOUR
+            }
+        );
+        assert_eq!(
+            form_availability_at(&form, NOW + 3 * HOUR),
+            FormAvailability::Closed {
+                closed_at: NOW + HOUR
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn schedule_moment_renders_in_utc() {
+        assert_eq!(
+            format_schedule_moment(1_700_000_000_000).as_deref(),
+            Some("14 November 2023 at 22:13 UTC")
+        );
+        assert_eq!(format_schedule_moment(i64::MAX), None);
     }
 
     #[tokio::test]

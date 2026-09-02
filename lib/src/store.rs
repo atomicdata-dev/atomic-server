@@ -355,6 +355,8 @@ mod test {
             urls::FORM_CONDITION_FIELD,
             urls::FORM_CONDITION_OPERATOR,
             urls::FORM_CONDITION_VALUE,
+            urls::FORM_OPEN_AT,
+            urls::FORM_CLOSE_AT,
         ] {
             store.get_resource(&url.into()).await.unwrap();
         }

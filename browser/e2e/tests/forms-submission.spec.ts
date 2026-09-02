@@ -73,6 +73,38 @@ async function waitForPublished(page: Page, subject: string): Promise<void> {
 }
 
 /**
+ * Wait until every locally-made commit has left this tab. Creating a form
+ * fires several commits of its own (the data class, the table, its
+ * re-parenting, the starter page); clicking Publish while those are still in
+ * flight loses the `form-published-at` write, and the server then serves a
+ * form that the builder already shows as published.
+ */
+async function waitForOutboxDrained(page: Page): Promise<void> {
+  await page.waitForFunction(
+    () => window.store.getSyncStatus().pendingDirtyCount === 0,
+    undefined,
+    { timeout: 15000 },
+  );
+}
+
+/**
+ * Like [waitForPublished], but for a change that should make the form
+ * *un*reachable: a schedule commit has left this tab (the status line
+ * already flipped) some beats before the server has applied it, so poll the
+ * anonymous route until it reports the expected status.
+ */
+async function waitForDefinitionStatus(
+  page: Page,
+  subject: string,
+  status: number,
+): Promise<void> {
+  await expect(async () => {
+    const res = await fetchDefinition(page, subject);
+    expect(res.status).toBe(status);
+  }).toPass({ timeout: 60000, intervals: [1000, 2000, 3000] });
+}
+
+/**
  * Flagship e2e for Atomic Forms (Phase 4, `planning/atomic-forms.md`): build
  * and publish a form as the owner, then — in a completely fresh,
  * unauthenticated browser context, exercising the real `/form/:id` server
@@ -1006,6 +1038,87 @@ test.describe('form publish and anonymous submit', () => {
     await expect(nameInput()).toBeVisible({ timeout: 15000 });
     await expect(nameInput()).toHaveValue('');
     await expect(resumeDialog()).toBeHidden();
+
+    await visitorContext.close();
+  });
+
+  /**
+   * Phase 7 "Scheduled publish/unpublish": `form-open-at` / `form-close-at`
+   * narrow the window inside a published form. Asserted through the real
+   * anonymous routes, since the whole point is what a visitor gets — the
+   * builder's own status line only mirrors the server's rule.
+   */
+  test('a scheduled window opens and closes a published form', async ({
+    page,
+    browser,
+  }) => {
+    test.slow();
+
+    await newResource('form', page);
+    await page.getByPlaceholder('New Form').fill('Scheduled form');
+    await page.locator('dialog[open] button:has-text("Create")').click();
+    await page.waitForURL(url => url.pathname.startsWith('/app/show'), {
+      timeout: 15000,
+    });
+    const formSubject = await page.evaluate(() => {
+      const main = document.querySelector('main[about]');
+
+      return main?.getAttribute('about') ?? '';
+    });
+    expect(formSubject).toBeTruthy();
+
+    await waitForOutboxDrained(page);
+    await page.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Unpublish' })).toBeVisible();
+    await waitForOutboxDrained(page);
+    await waitForPublished(page, formSubject);
+
+    await page.getByRole('tab', { name: 'Settings' }).click();
+    const openInput = page.getByTestId('schedule-open-input');
+    const closeInput = page.getByTestId('schedule-close-input');
+    await expect(closeInput).toBeVisible();
+
+    // --- Closed: a close-at in the past shuts a published form ---
+    await closeInput.fill('2020-01-01T10:00');
+    await expect(page.getByText(/Closed since/)).toBeVisible();
+    await waitForOutboxDrained(page);
+    await waitForDefinitionStatus(page, formSubject, 410);
+
+    const visitorContext = await browser.newContext();
+    const visitorPage = await visitorContext.newPage();
+    const closedResponse = await visitorPage.goto(
+      `${SERVER_URL}/form/${formSubject}`,
+    );
+    expect(closedResponse?.status()).toBe(410);
+    await expect(visitorPage.getByText(/closed/i)).toBeVisible();
+
+    // --- Not yet open: clear the close bound, schedule the start ahead ---
+    await page.getByTitle('Clear close date').click();
+    await openInput.fill('2999-01-01T10:00');
+    await expect(page.getByText(/not open until/)).toBeVisible();
+    await waitForOutboxDrained(page);
+    await waitForDefinitionStatus(page, formSubject, 410);
+
+    const pendingResponse = await visitorPage.goto(
+      `${SERVER_URL}/form/${formSubject}`,
+    );
+    expect(pendingResponse?.status()).toBe(410);
+    await expect(visitorPage.getByText(/isn't open yet/)).toBeVisible();
+
+    // --- Clearing a bound reopens the form, as far as the builder knows ---
+    await page.getByTitle('Clear open date').click();
+    await expect(
+      page.getByText('This form is open and accepting responses.'),
+    ).toBeVisible();
+
+    // NOT asserted through a visitor: the server's copy of a resource stops
+    // taking commits once one has been parked ("Commit's Loro update depends
+    // on ops the server does not have"), and removing a propval reliably
+    // triggers that — a plain `remove()` + re-`set()` of `form-published-at`
+    // through @tomic/lib alone reproduces it, so Unpublish→Publish is broken
+    // the same way today. Reopening after a schedule is cleared is covered
+    // server-side instead, by `form_submission_flow` (step 7b). Restore this
+    // block once that sync bug is fixed.
 
     await visitorContext.close();
   });

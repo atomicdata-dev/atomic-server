@@ -877,7 +877,7 @@ Rough priority order:
     `animatePageTransitions` keys that were already shipped but undocumented.
 [] **Progress bar** (trivial once settings exist).
 
-## Phase 7 — Could-haves (sketch only)
+## Phase 7 — Could-haves (sketch only, except where marked done)
 
 - **AI question suggestion**: reuse the AI sidebar infra; given a question label,
   generate `{type, options}` — maps 1:1 onto `form-field-type` +
@@ -886,8 +886,75 @@ Rough priority order:
 - **Question randomization**: per-page flag; shuffle in the renderer, seed stored
   in the submission for reproducibility.
 - **Dynamic text**: `{{field-shortname}}` interpolation in labels/paragraphs.
-- **Scheduled publish/unpublish**: `form-open-at` / `form-close-at` checked by the
-  definition + submit handlers — no scheduler needed, just timestamp comparison.
+[x] **Scheduled publish/unpublish** — DONE. `form-open-at` / `form-close-at`
+   narrow the window *inside* a published form, checked by every visitor-facing
+   `/form/:id` route. No scheduler, no background job: the bounds are compared
+   against the clock on each request, so a server that was down at the moment a
+   form was due to open still opens it on time.
+- **`form-published-at` stays the master switch.** A schedule alone never
+    publishes a form — the two bounds are only consulted once it is published,
+    so "publish" keeps meaning exactly what it meant, and an owner who never
+    touches the Schedule section sees no behavior change. The alternative
+    (open-at implying publication) would have made the toggle's meaning depend
+    on a setting two tabs away.
+- **Bounds are half-open**: open *at* `form-open-at`, closed *at*
+    `form-close-at`; either may be set alone. An inverted window (closes before
+    it opens) is a mistake, not a lockout — it simply never opens, reports the
+    not-yet-open reason (the more actionable one), and the builder warns about
+    it inline. A bound whose value isn't numeric is ignored rather than
+    honoured, so a malformed schedule can't strand a published form.
+- **One rule, two implementations**:
+    `server/src/forms.rs::form_availability_at` is authoritative — it sits in
+    the shared `resolve_published_form`, so every route that was already
+    publish-gated (`/form/{id}`, `/definition`, `/challenge`, `/image`,
+    `/submit`) picks the window up for free;
+    `chunks/FormBuilder/formSchedule.ts` mirrors it so the builder's status
+    line can say what a visitor would get without publishing and poking the
+    endpoint. Same master switch, same bounds, same precedence — keep them in
+    lockstep.
+- **Visitor wording is state-specific**: "isn't open yet, it opens on X" vs
+    "is closed, it stopped accepting responses on X" vs the existing
+    unpublished text — "come back later" and "you missed it" must not read as
+    the same dead link. The moment is rendered in **UTC** and says so: the
+    server has no visitor timezone to work with. The builder shows the same
+    moments in the *owner's* locale/timezone instead.
+- **UI**: a "Schedule" collapsible in the Settings tab (two `datetime-local`
+    fields, a live status line that re-evaluates every 30 s so it flips on its
+    own, and the inverted-window warning), plus a "Scheduled" / "Closed" badge
+    next to the Publish button — otherwise "Unpublish" would be the only
+    signal on a form no visitor can currently open.
+- **Found along the way**: the submit rate limiter (10/60 s, a process-global
+    static keyed by IP) silently capped how many submissions
+    `form_submission_flow` could ever assert — the eighth existing POST was two
+    away from the limit, and adding a case broke an *unrelated* later
+    assertion with a 429. Raised under `cfg(test)` (the same escape hatch the
+    captcha difficulty uses); production behavior is unchanged and nothing
+    asserts the limiter itself.
+- **Human follow-up needed**: add `form-open-at` and `form-close-at` to the
+    public atomicdata.dev forms ontology (same step as `form-styling` /
+    `FormCondition` above). Local dev servers need one restart with
+    `ATOMIC_REPOPULATE_DEFAULTS=true`.
+- **Uncovered a pre-existing sync bug while writing the e2e** (not caused by
+    this work, not fixed here): once a commit is parked server-side
+    ("Commit's Loro update depends on ops the server does not have", logged by
+    `POST /commit`), that resource's server copy never advances again — and
+    *removing* a propval reliably triggers it. `remove()` + re-`set()` of
+    `form-published-at` through `@tomic/lib` alone reproduces it, so
+    **Unpublish → Publish again does not reach the server today**; the builder
+    shows the new state while visitors keep seeing the old one. This is the
+    same symptom already logged twice above as "the Phase 2 e2e is
+    environment-flaky", now with a mechanism. Consequence for this phase: the
+    e2e asserts the two closing transitions through a real visitor but stops
+    at the builder's status line for the reopen, which is covered server-side
+    by `form_submission_flow` step 7b instead. Restore the trimmed block once
+    the sync bug is fixed.
+- Covered by `cargo test -p atomic-server --lib forms::` (6 scheduling unit
+    tests: master switch, no-schedule, window edges, single bound, inverted
+    window, UTC rendering), `form_submission_flow` (step 7b: definition + HTML
+    page + submit gated in both directions, closed page still embeddable, and
+    reopening once both bounds are cleared), `populate_forms_ontology`, and
+    `forms-submission.spec.ts` ("a scheduled window opens and closes a
+    published form").
 
 ## Open questions
 

@@ -43,6 +43,26 @@
     "https://atomicdata.dev/properties/shortname": "form-published-at"
   },
   {
+    "@id": "https://atomicdata.dev/properties/form-open-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a published form starts accepting responses. Absent means it is open as soon as it is published. Before this moment visitors see a 'not open yet' page instead of the form.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-open-at"
+  },
+  {
+    "@id": "https://atomicdata.dev/properties/form-close-at",
+    "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/timestamp",
+    "https://atomicdata.dev/properties/description": "The moment a published form stops accepting responses. Absent means it stays open until it is unpublished. From this moment on visitors see a 'closed' page instead of the form.",
+    "https://atomicdata.dev/properties/isA": [
+      "https://atomicdata.dev/classes/Property"
+    ],
+    "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/properties",
+    "https://atomicdata.dev/properties/shortname": "form-close-at"
+  },
+  {
     "@id": "https://atomicdata.dev/properties/form-settings",
     "https://atomicdata.dev/properties/datatype": "https://atomicdata.dev/datatypes/json",
     "https://atomicdata.dev/properties/description": "Miscellaneous Form settings, stored as a JSON object (e.g. whether to show a progress bar, the confirmation message shown after submitting).",
@@ -138,6 +158,8 @@
     "https://atomicdata.dev/properties/parent": "https://atomicdata.dev/classes",
     "https://atomicdata.dev/properties/recommends": [
       "https://atomicdata.dev/properties/form-published-at",
+      "https://atomicdata.dev/properties/form-open-at",
+      "https://atomicdata.dev/properties/form-close-at",
       "https://atomicdata.dev/properties/form-settings",
       "https://atomicdata.dev/properties/form-publish-id",
       "https://atomicdata.dev/properties/form-styling",
@@ -402,6 +424,8 @@
       "https://atomicdata.dev/properties/form-target-table",
       "https://atomicdata.dev/properties/form-pages",
       "https://atomicdata.dev/properties/form-published-at",
+      "https://atomicdata.dev/properties/form-open-at",
+      "https://atomicdata.dev/properties/form-close-at",
       "https://atomicdata.dev/properties/form-settings",
       "https://atomicdata.dev/properties/form-publish-id",
       "https://atomicdata.dev/properties/form-fields",

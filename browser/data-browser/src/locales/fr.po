@@ -8533,3 +8533,82 @@ msgstr "<0/> Permettre aux visiteurs de reprendre des formulaires incomplets"
 #: src/chunks/FormBuilder/SettingsTab.tsx
 msgid "Half-filled answers are kept in the visitor's own browser, so closing the tab does not lose them, and are cleared once they submit. Turn this off for kiosks and other shared devices."
 msgstr "Les réponses à moitié remplies sont conservées dans le navigateur du visiteur, donc fermer l'onglet ne les perd pas, et sont effacées une fois qu'il soumet. Désactivez cette option pour les bornes et autres appareils partagés."
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Opens"
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Before this moment visitors see a \"not open yet\" page"
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Closes"
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "From this moment on visitors see a \"closed\" page"
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "This form closes before it opens, so it will never accept responses."
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Leave a moment empty to skip that side of the window. Times are in your own timezone; visitors are told the moment in UTC."
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "This form is not published."
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "This form is not published, so the schedule below has no effect yet."
+msgstr ""
+
+#. 0: formatScheduleMoment( availability.opensAt, )
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Published, but not open until {0}."
+msgstr ""
+
+#. 0: formatScheduleMoment(availability.closedAt)
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Closed since {0}. Visitors can no longer respond."
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "This form is open and accepting responses."
+msgstr ""
+
+#~ msgid "Clear {0}"
+#~ msgstr ""
+
+#. 0: formatScheduleMoment(availability.opensAt)
+#: src/chunks/FormBuilder/PublishToggle.tsx
+msgid "Opens {0}"
+msgstr ""
+
+#. 0: formatScheduleMoment(availability.closedAt)
+#: src/chunks/FormBuilder/PublishToggle.tsx
+msgid "Closed {0}"
+msgstr ""
+
+#: src/chunks/FormBuilder/PublishToggle.tsx
+msgid "Scheduled"
+msgstr ""
+
+#: src/chunks/FormBuilder/PublishToggle.tsx
+msgid "Closed"
+msgstr ""
+
+#: src/chunks/FormBuilder/SettingsTab.tsx
+msgid "Schedule"
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Clear open date"
+msgstr ""
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Clear close date"
+msgstr ""

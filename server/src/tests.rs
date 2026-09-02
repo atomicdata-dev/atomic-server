@@ -1494,6 +1494,114 @@ async fn form_submission_flow() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 410, "submit to unpublished form should 410");
 
+    // 7b. Scheduling (Phase 7): a published form still obeys its
+    // `form-open-at` / `form-close-at` window, on every visitor-facing
+    // route. Republish first — step 7 left it unpublished.
+    form.set(
+        urls::FORM_PUBLISHED_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now()),
+        store,
+    )
+    .await
+    .unwrap();
+
+    let hour = 3_600_000;
+    let opens_at = atomic_lib::utils::now() + hour;
+    form.set(urls::FORM_OPEN_AT.into(), Value::Timestamp(opens_at), store)
+        .await
+        .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        410,
+        "form scheduled to open later should 410"
+    );
+    let body = get_body(resp);
+    assert!(
+        body.contains("isn't open yet"),
+        "a not-yet-open form needs its own wording, got: {body}"
+    );
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "submit before open-at should 410");
+
+    // Open-at in the past -> open again.
+    form.set(
+        urls::FORM_OPEN_AT.into(),
+        Value::Timestamp(atomic_lib::utils::now() - hour),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "form past its open-at should be reachable: {:?}",
+        resp.status()
+    );
+
+    // A close-at in the past shuts it again, with closed-specific wording.
+    let closed_at = atomic_lib::utils::now() - 1;
+    form.set(
+        urls::FORM_CLOSE_AT.into(),
+        Value::Timestamp(closed_at),
+        store,
+    )
+    .await
+    .unwrap();
+    form.save_locally(store).await.unwrap();
+
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}/definition", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "form past its close-at should 410");
+    let body = get_body(resp);
+    assert!(
+        body.contains("closed"),
+        "a closed form needs its own wording, got: {body}"
+    );
+
+    // The HTML page renders the friendly card (not a blank frame) and stays
+    // embeddable, same as the unpublished case in step 1b.
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "closed form page should 410");
+    assert_eq!(
+        resp.headers().get("Content-Security-Policy").unwrap(),
+        "frame-ancestors *",
+        "closed form page should allow embedding"
+    );
+
+    let req = test::TestRequest::post()
+        .uri(&format!("/form/{}/submit", slug))
+        .set_json(&submit_body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "submit after close-at should 410");
+
+    // Clear the schedule so the invite-code steps below run against a
+    // plainly-open form.
+    form.remove_propval(urls::FORM_OPEN_AT).unwrap();
+    form.remove_propval(urls::FORM_CLOSE_AT).unwrap();
+    form.save_locally(store).await.unwrap();
+
     // 8. Private links (Phase 6): republish and switch to invite-only.
     form.set(
         urls::FORM_PUBLISHED_AT.into(),
