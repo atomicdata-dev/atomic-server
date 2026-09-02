@@ -476,8 +476,28 @@ impl Resource {
     /// which decodes the CRDT snapshot — the exact cost the shallow query
     /// path exists to avoid. Never use this for state that must be merged
     /// or persisted; the doc will not know about it.
-    pub(crate) fn insert_propval_raw(&mut self, property: String, value: Value) {
+    pub fn insert_propval_raw(&mut self, property: String, value: Value) {
         self.propvals.insert(property, value);
+    }
+
+    /// Serve the persisted CRDT state instead of the live doc.
+    ///
+    /// Response shaping (class extenders, the `incomplete` marker) writes
+    /// dynamic propvals through `set`, which also records each write as a Loro
+    /// op on the doc that was decoded from the stored snapshot — and
+    /// `propvals_for_serialization` re-exports that doc as the served
+    /// `loroUpdate`. Those ops are never persisted, so they must not reach a
+    /// client: a doc seeded from such a response builds every later delta on
+    /// top of ops this store does not have, and `apply_commit` parks them as
+    /// pending ("Commit's Loro update depends on ops the server does not
+    /// have"). This drops the live doc and pins `loroUpdate` to `snapshot` — the
+    /// bytes read from `Tree::LoroSnapshots` — while keeping every propval,
+    /// dynamic ones included. Response-only: a resource shaped this way is not
+    /// meant to be edited and saved.
+    pub fn restore_persisted_state(&mut self, snapshot: Vec<u8>) {
+        self.propvals
+            .insert(urls::LORO_UPDATE.into(), Value::LoroDoc(snapshot));
+        self.loro = None;
     }
 
     /// Persisted or in-memory materialized state bytes (for sync and signing).

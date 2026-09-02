@@ -3635,6 +3635,32 @@ impl Storelike for Db {
 
             let mut root_subject: Option<String> = None;
 
+            // Response shaping below (`incomplete`, class extenders) writes
+            // dynamic propvals through `Resource::set`, which also records each
+            // write as a Loro op on the doc `get_resource` decoded from the
+            // stored snapshot; serialization would then re-export that doc as
+            // the served `loroUpdate`. Those ops are never persisted, so a
+            // client that seeds its doc from the response builds every later
+            // delta on ops this store does not have, and `apply_commit` parks
+            // them as pending ("Commit's Loro update depends on ops the server
+            // does not have"). Observed as the form builder's Publish never
+            // reaching visitors: the Form extender's `form-submission-summary`
+            // op poisoned every doc hydrated from an HTTP GET. Whatever the
+            // extender does to the doc, the response carries the persisted
+            // snapshot.
+            let persisted_snapshot = match resource.get(crate::urls::LORO_UPDATE) {
+                Ok(crate::Value::LoroDoc(bytes)) => Some(bytes.clone()),
+                _ => None,
+            };
+            let served_id = resource.get_subject().pure_id();
+            let serve_persisted = |shaped: &mut Resource| {
+                if let Some(snapshot) = &persisted_snapshot {
+                    if shaped.get_subject().pure_id() == served_id {
+                        shaped.restore_persisted_state(snapshot.clone());
+                    }
+                }
+            };
+
             let extenders = self
                 .class_extenders
                 .read()
@@ -3664,6 +3690,7 @@ impl Storelike for Db {
                                 self,
                             )
                             .await?;
+                        serve_persisted(&mut resource);
 
                         return Ok(resource.into());
                     }
@@ -3681,10 +3708,12 @@ impl Storelike for Db {
                         // make sure the actual subject matches the one requested - It should not be changed in the logic above
                         match resource_response {
                             ResourceResponse::Resource(mut resource) => {
+                                serve_persisted(&mut resource);
                                 resource.set_subject(subject.to_string());
                                 return Ok(resource.into());
                             }
                             ResourceResponse::ResourceWithReferenced(mut resource, referenced) => {
+                                serve_persisted(&mut resource);
                                 resource.set_subject(subject.to_string());
 
                                 return Ok(ResourceResponse::ResourceWithReferenced(

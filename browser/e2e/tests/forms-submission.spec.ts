@@ -39,6 +39,16 @@ const FORM_STYLING = 'https://atomicdata.dev/properties/form-styling';
  * to share an origin with the server (it does in CI, it does not locally),
  * so it measures what an actual visitor gets.
  *
+ * `cache: 'no-store'` makes it measure the *server*. A `410 Gone` is
+ * cacheable by default, and Chromium answered repeat fetches of the same
+ * definition URL from its HTTP cache: the first probe (form not yet
+ * published) kept being replayed for every later poll, so `waitForPublished`
+ * timed out on a form the server had long since published. That is what the
+ * "publish commits report pendingDirtyCount === 0 yet never reach the
+ * server" flake was. The server now sends `Cache-Control: no-store` on these
+ * routes as well; the probe stays explicit so the test cannot regress into
+ * reading its own cache again.
+ *
  * The subject goes into the path raw, exactly as the `goto`s below build it.
  * `encodeURIComponent` would be wrong here: a browser sends the `%3A`
  * literally, and the route then resolves to something other than the form
@@ -52,7 +62,7 @@ async function fetchDefinition(
   query = '',
 ): Promise<{ status: number; ok: boolean; body: string }> {
   return page.evaluate(async url => {
-    const res = await fetch(url, { credentials: 'omit' });
+    const res = await fetch(url, { credentials: 'omit', cache: 'no-store' });
 
     return { status: res.status, ok: res.ok, body: await res.text() };
   }, `${SERVER_URL}/form/${subject}/definition${query}`);
@@ -1111,14 +1121,16 @@ test.describe('form publish and anonymous submit', () => {
       page.getByText('This form is open and accepting responses.'),
     ).toBeVisible();
 
-    // NOT asserted through a visitor: the server's copy of a resource stops
-    // taking commits once one has been parked ("Commit's Loro update depends
-    // on ops the server does not have"), and removing a propval reliably
-    // triggers that — a plain `remove()` + re-`set()` of `form-published-at`
-    // through @tomic/lib alone reproduces it, so Unpublish→Publish is broken
-    // the same way today. Reopening after a schedule is cleared is covered
-    // server-side instead, by `form_submission_flow` (step 7b). Restore this
-    // block once that sync bug is fixed.
+    await waitForOutboxDrained(page);
+    await waitForPublished(page, formSubject);
+
+    const reopenedResponse = await visitorPage.goto(
+      `${SERVER_URL}/form/${formSubject}`,
+    );
+    expect(reopenedResponse?.status()).toBe(200);
+    await expect(
+      visitorPage.getByRole('heading', { name: 'Scheduled form' }),
+    ).toBeVisible({ timeout: 15000 });
 
     await visitorContext.close();
   });

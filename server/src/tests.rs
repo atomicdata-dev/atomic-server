@@ -12,7 +12,7 @@ use actix_web::{
     web::Data,
     App,
 };
-use atomic_lib::{urls, Storelike};
+use atomic_lib::{agents::ForAgent, urls, Storelike};
 use base64::Engine;
 
 /// Returns the request with signed headers. Also adds a json-ad accept header - overwrite this if you need something else.
@@ -533,6 +533,21 @@ async fn self_signed_agent_commit_keeps_name() {
 }
 
 /// Gets the body from the response as a String. Why doen't actix provide this?
+/// Every visitor-facing form response must forbid HTTP caching — see
+/// `handlers::form::NO_STORE`.
+fn assert_cache_control_no_store(resp: &ServiceResponse, what: &str) {
+    let cache_control = resp
+        .headers()
+        .get("Cache-Control")
+        .unwrap_or_else(|| panic!("{what}: missing Cache-Control header"))
+        .to_str()
+        .unwrap();
+    assert!(
+        cache_control.contains("no-store"),
+        "{what}: Cache-Control should contain no-store, got {cache_control}"
+    );
+}
+
 fn get_body(resp: ServiceResponse) -> String {
     let boxbody = resp.into_body();
     let bytes = boxbody.try_into_bytes().unwrap();
@@ -1141,6 +1156,10 @@ async fn form_submission_flow() {
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 410, "unpublished form should 410");
+    // A 410 is cacheable by default. Chromium replayed a cached "not
+    // accepting responses" for the definition of a form that had since been
+    // published, so every visitor-facing answer must forbid caching.
+    assert_cache_control_no_store(&resp, "410 definition");
 
     // 1b. The unpublished HTML page (`not_available_page`) still allows
     // embedding — Phase 6 "Embedding": a stale snippet should show the
@@ -1175,12 +1194,49 @@ async fn form_submission_flow() {
         "definition fetch after publish failed: {:?}",
         resp.status()
     );
+    assert_cache_control_no_store(&resp, "200 definition");
     let body: serde_json::Value = serde_json::from_str(&get_body(resp)).unwrap();
     let slug = body["id"]
         .as_str()
         .expect("slug should be minted")
         .to_string();
     assert!(!slug.is_empty());
+
+    // 2b. A GET must serve the *persisted* Loro state. The Form class
+    // extender adds `form-submission-summary` to every fetched Form; it used
+    // to do so through `set`, which also recorded a Loro op on the doc the
+    // response re-exported as `loroUpdate`. A client that seeded its doc from
+    // that response built every later delta on an op this store never
+    // persisted, and `apply_commit` parked them ("Commit's Loro update
+    // depends on ops the server does not have") — in the builder, Publish
+    // after a reload, and Unpublish → Publish, stopped reaching visitors.
+    let served = store
+        .get_resource_extended(form.get_subject(), false, &ForAgent::Sudo)
+        .await
+        .unwrap()
+        .to_single();
+    assert!(
+        served.get(urls::FORM_SUBMISSION_SUMMARY).is_ok(),
+        "the extender should still shape the response"
+    );
+    let served_json: serde_json::Value =
+        serde_json::from_str(&served.to_json_ad(None).unwrap()).unwrap();
+    let served_snapshot = base64::engine::general_purpose::STANDARD
+        .decode(served_json[urls::LORO_UPDATE].as_str().unwrap())
+        .unwrap();
+    let persisted_doc = store
+        .get_resource(form.get_subject())
+        .await
+        .unwrap()
+        .build_state_doc()
+        .unwrap();
+    let persisted_vv = persisted_doc.oplog_vv_map();
+    persisted_doc.import_update(&served_snapshot).unwrap();
+    assert_eq!(
+        persisted_vv,
+        persisted_doc.oplog_vv_map(),
+        "the served loroUpdate carried Loro ops the store has not persisted"
+    );
     assert_eq!(
         body["pages"][0]["blocks"][0]["mapsTo"],
         email_prop.get_subject().to_string()

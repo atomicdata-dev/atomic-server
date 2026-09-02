@@ -619,17 +619,23 @@ acks carrying no server-side apply confirmation beyond the echoed commit.
 | Drafts end to end: returning to a half-filled form opens the resume dialog over the seeded answers, Continue keeps them, Reset wipes them on screen *and* on disk, and submitting clears the draft so the next visitor on that browser gets a blank form | `browser/e2e/tests/forms-submission.spec.ts` ("an unfinished form is restored from the visitor's own device") |
 | The drafts opt-out survives the definition round-trip (unset = drafts on and the key absent from the wire format, `false` = off) | `server/src/forms.rs::definition_can_disable_drafts` |
 | Scheduling: `form-published-at` stays the master switch (a schedule alone never publishes), half-open window edges, either bound alone, an inverted window never opening, and the UTC rendering of a bound | `server/src/forms.rs` (`unpublished_form_is_never_available` … `schedule_moment_renders_in_utc`) |
-| Scheduling end to end: a close-at in the past and an open-at in the future each 410 the definition, the HTML page (still embeddable) and submit; clearing both bounds reopens the form | `server/src/tests.rs::form_submission_flow` (step 7b) + `browser/e2e/tests/forms-submission.spec.ts` ("a scheduled window opens and closes a published form" — the reopen half is server-side only, see below) |
+| Scheduling end to end: a close-at in the past and an open-at in the future each 410 the definition, the HTML page (still embeddable) and submit; clearing both bounds reopens the form, for a real anonymous visitor too | `server/src/tests.rs::form_submission_flow` (step 7b) + `browser/e2e/tests/forms-submission.spec.ts` ("a scheduled window opens and closes a published form") |
+| A GET of a Form serves the *persisted* Loro snapshot: the class extender's `form-submission-summary` is in the JSON-AD but never as a Loro op the store does not have (the op that parked every later commit from a builder tab that had hydrated over HTTP) | `server/src/tests.rs::form_submission_flow` (step 2b) + `lib/src/class_extender.rs::extended_get_serves_the_persisted_snapshot` |
+| Visitor-facing form routes forbid HTTP caching (`Cache-Control: no-store` on the definition, 200 and 410 alike) — a cached 410 is what made the builder's publish look like it never reached the server | `server/src/tests.rs::form_submission_flow` (steps 1 and 2) |
 
-Not covered (scheduling, blocked by a sync bug): that *clearing* a schedule
-makes the form reachable again is asserted server-side only. The e2e stops at
-the builder's status line, because the server's copy of a resource stops
-accepting commits once one has been parked ("Commit's Loro update depends on
-ops the server does not have"), and removing a propval reliably triggers that
-— `remove()` + re-`set()` of `form-published-at` through `@tomic/lib` alone
-reproduces it, which means **Unpublish → Publish again is broken in the product
-today**, not just in the test. Restore the trimmed block in
-`forms-submission.spec.ts` once that is fixed.
+Previously listed here as "Not covered (scheduling, blocked by a sync bug)":
+the reopen half of the scheduling e2e. Two things were going on, neither of
+them the sync race it was filed as. The commit that got parked ("Commit's
+Loro update depends on ops the server does not have") depended on a Loro op
+the server had written into the response of an HTTP GET but never persisted
+— the Form class extender used `set` for the summary, and the doc was
+re-exported as the served `loroUpdate` (fixed in `get_resource_extended`, and
+the extender now shapes the response without touching the doc). The client's
+recovery for a parked commit (drop the save cursor, re-send a full snapshot)
+did work, so the server converged; what kept the test — and a console
+`fetch` — reporting the old state was Chromium replaying a cached `410` for
+the definition URL. The e2e probe now fetches with `cache: 'no-store'` and the
+server sends `Cache-Control: no-store` on those routes.
 
 Not covered (extended types): the client-side mirror of the new validators in
 `browser/form-renderer/src/validation.ts` is only unit-tested for `phone` (the

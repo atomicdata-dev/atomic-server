@@ -717,7 +717,10 @@ Rough priority order:
     verified via stash A/B; publish/options commits report
     `pendingDirtyCount === 0` yet never reach the server). Same
     pre-existing outbox/sync race already documented under Phase 4; not a
-    Private Links regression.
+    Private Links regression. *Phase 7 below traced the parked-commit
+    mechanism (a server-side Loro op leaked into HTTP GET responses), which
+    a reload triggers exactly; that spec passes locally on the fix, but the
+    flake was not re-verified beyond that.*
 [x] **More field types** — DONE, except file upload. Shipped: phone, URL,
    currency, dropdown, dropdown multi-select, likert, rating, picture choice,
    choice matrix, table input, address. Each is an enum value +
@@ -935,26 +938,44 @@ Rough priority order:
     `FormCondition` above). Local dev servers need one restart with
     `ATOMIC_REPOPULATE_DEFAULTS=true`.
 - **Uncovered a pre-existing sync bug while writing the e2e** (not caused by
-    this work, not fixed here): once a commit is parked server-side
-    ("Commit's Loro update depends on ops the server does not have", logged by
-    `POST /commit`), that resource's server copy never advances again — and
-    *removing* a propval reliably triggers it. `remove()` + re-`set()` of
-    `form-published-at` through `@tomic/lib` alone reproduces it, so
-    **Unpublish → Publish again does not reach the server today**; the builder
-    shows the new state while visitors keep seeing the old one. This is the
-    same symptom already logged twice above as "the Phase 2 e2e is
-    environment-flaky", now with a mechanism. Consequence for this phase: the
-    e2e asserts the two closing transitions through a real visitor but stops
-    at the builder's status line for the reopen, which is covered server-side
-    by `form_submission_flow` step 7b instead. Restore the trimmed block once
-    the sync bug is fixed.
+    this work), first filed as "once a commit is parked server-side, that
+    resource's server copy never advances again, and removing a propval
+    triggers it". Traced and fixed; it was two unrelated things:
+  - *The parked commit.* `Db::get_resource_extended` let class extenders
+    shape the response with `Resource::set`, which also records a Loro op on
+    the doc decoded from the stored snapshot, and `to_json_ad` re-exported
+    that doc as the served `loroUpdate`. The Form extender did this for
+    `form-submission-summary` on every HTTP GET. A builder tab that hydrated
+    the form over HTTP (page load, the Summary tab, the refetch after a
+    dropped commit) therefore held an op the server never persisted, and its
+    next delta — whatever the edit — depended on it, so `apply_commit`
+    parked it. Removal was a red herring; it was simply the first edit
+    after such a fetch. The client's recovery (drop the save cursor,
+    re-send a full snapshot) did fire and the server converged, but the
+    snapshot then persisted the stray op and every visitor page load
+    (`mint_publish_slug` commits server-side, the tab merges the echo)
+    re-armed the cycle. Fix: `get_resource_extended` pins the served
+    `loroUpdate` to the persisted snapshot after any extender, and the Form
+    extender uses `insert_propval_raw`. Guarded by `form_submission_flow`
+    step 2b and `class_extender.rs::extended_get_serves_the_persisted_snapshot`.
+  - *"Never advances again" / `pendingDirtyCount === 0`.* The server had the
+    new state all along; the definition endpoint answered `410` without
+    `Cache-Control`, and Chromium replayed the cached `410` for every later
+    `fetch` of that URL — the e2e probe (`fetchDefinition`) and a console
+    `fetch` alike — while a `cache: 'no-store'` fetch or curl saw the truth.
+    (The Phase 2 spec reads `window.store`, not the endpoint, so this part
+    does not explain that one.) The form
+    routes now send `Cache-Control: no-store` on every answer, the probe
+    fetches with `cache: 'no-store'`, and the trimmed reopen block is back:
+    the e2e asserts all three transitions through a real anonymous visitor.
 - Covered by `cargo test -p atomic-server --lib forms::` (6 scheduling unit
     tests: master switch, no-schedule, window edges, single bound, inverted
     window, UTC rendering), `form_submission_flow` (step 7b: definition + HTML
     page + submit gated in both directions, closed page still embeddable, and
-    reopening once both bounds are cleared), `populate_forms_ontology`, and
-    `forms-submission.spec.ts` ("a scheduled window opens and closes a
-    published form").
+    reopening once both bounds are cleared; steps 1–2b: `no-store` on the
+    definition and the persisted-snapshot guarantee), `populate_forms_ontology`,
+    and `forms-submission.spec.ts` ("a scheduled window opens and closes a
+    published form", including the visitor seeing the reopened form).
 
 ## Open questions
 

@@ -51,13 +51,23 @@ impl std::fmt::Display for FormApiError {
 
 impl std::error::Error for FormApiError {}
 
+/// Every visitor-facing form response carries this. The routes answer for a
+/// form whose state the owner changes at will (publish, schedule, unpublish),
+/// and a `410 Gone` is cacheable by default: Chromium kept serving a cached
+/// "not accepting responses" for the definition of a form that had since been
+/// published — the builder said published, visitors kept the old answer, and
+/// nothing on the wire explained why.
+const NO_STORE: &str = "no-store, no-cache, must-revalidate, private";
+
 impl ResponseError for FormApiError {
     fn status_code(&self) -> StatusCode {
         self.status
     }
 
     fn error_response(&self) -> HttpResponse {
-        HttpResponse::build(self.status).json(json!({ "error": self.message }))
+        HttpResponse::build(self.status)
+            .insert_header(("Cache-Control", NO_STORE))
+            .json(json!({ "error": self.message }))
     }
 }
 
@@ -254,10 +264,7 @@ pub async fn form_page(
 
     HttpResponse::Ok()
         .content_type("text/html")
-        .insert_header((
-            "Cache-Control",
-            "no-store, no-cache, must-revalidate, private",
-        ))
+        .insert_header(("Cache-Control", NO_STORE))
         .insert_header((
             "Content-Security-Policy",
             // `worker-src blob:` — the ALTCHA widget's single-file bundle
@@ -304,10 +311,7 @@ fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
 
     HttpResponse::build(status)
         .content_type("text/html")
-        .insert_header((
-            "Cache-Control",
-            "no-store, no-cache, must-revalidate, private",
-        ))
+        .insert_header(("Cache-Control", NO_STORE))
         .insert_header(("Content-Security-Policy", "frame-ancestors *"))
         .body(body)
 }
@@ -333,7 +337,9 @@ pub async fn get_definition(
     fill_image_url(&mut definition);
     definition.captcha = Some(appstate.captcha.client_config(&definition.id));
 
-    Ok(HttpResponse::Ok().json(definition))
+    Ok(HttpResponse::Ok()
+        .insert_header(("Cache-Control", NO_STORE))
+        .json(definition))
 }
 
 /// `GET /form/{id}/challenge` — a fresh proof-of-work challenge for the
@@ -350,10 +356,7 @@ pub async fn get_challenge(
 
     let challenge = appstate.captcha.issue().map_err(internal_error)?;
     Ok(HttpResponse::Ok()
-        .insert_header((
-            "Cache-Control",
-            "no-store, no-cache, must-revalidate, private",
-        ))
+        .insert_header(("Cache-Control", NO_STORE))
         .json(challenge))
 }
 

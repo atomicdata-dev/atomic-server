@@ -409,4 +409,91 @@ mod tests {
             .resource_has_extender(&bare)
             .unwrap());
     }
+
+    /// An extender shapes the response with `set`, which also records a Loro
+    /// op on the doc the response is serialized from. That op is never
+    /// persisted, so a client seeding its doc from the response would build
+    /// every later delta on an op this store does not have, and
+    /// `apply_commit` would park it as pending. The served `loroUpdate` must
+    /// therefore be the persisted snapshot — with the dynamic propval still
+    /// in the JSON-AD.
+    #[tokio::test]
+    async fn extended_get_serves_the_persisted_snapshot() {
+        use crate::{agents::ForAgent, storelike::ResourceResponse, Storelike};
+        use base64::Engine;
+
+        let store = crate::test_utils::init_store().await;
+        let dynamic_prop = urls::NAME;
+
+        let mut resource = Resource::new_instance(urls::CLASS, &store).await.unwrap();
+        resource
+            .set(
+                urls::SHORTNAME.into(),
+                Value::Slug("extended".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        resource
+            .set(
+                urls::DESCRIPTION.into(),
+                Value::Markdown("stored".into()),
+                &store,
+            )
+            .await
+            .unwrap();
+        resource.save_locally(&store).await.unwrap();
+        let subject = resource.get_subject().clone();
+
+        store
+            .add_class_extender(
+                ClassExtender::builder()
+                    .id("leaky")
+                    .classes(vec![urls::CLASS.to_string()])
+                    .on_resource_get_fn(move |context| {
+                        Box::pin(async move {
+                            context
+                                .db_resource
+                                .set(
+                                    dynamic_prop.into(),
+                                    Value::String("computed on read".into()),
+                                    context.store,
+                                )
+                                .await?;
+                            Ok(ResourceResponse::Resource(context.db_resource.to_owned()))
+                        })
+                    })
+                    .build(),
+            )
+            .unwrap();
+
+        let served = store
+            .get_resource_extended(&subject, false, &ForAgent::Sudo)
+            .await
+            .unwrap()
+            .to_single();
+        let json: serde_json::Value =
+            serde_json::from_str(&served.to_json_ad(None).unwrap()).unwrap();
+        assert_eq!(
+            json[dynamic_prop], "computed on read",
+            "the dynamic propval must still reach the client"
+        );
+
+        let served_snapshot = base64::engine::general_purpose::STANDARD
+            .decode(json[urls::LORO_UPDATE].as_str().unwrap())
+            .unwrap();
+        let persisted = store
+            .get_resource(&subject)
+            .await
+            .unwrap()
+            .build_state_doc()
+            .unwrap();
+        let persisted_vv = persisted.oplog_vv_map();
+        persisted.import_update(&served_snapshot).unwrap();
+        assert_eq!(
+            persisted_vv,
+            persisted.oplog_vv_map(),
+            "the served loroUpdate carried Loro ops the store has not persisted"
+        );
+    }
 }

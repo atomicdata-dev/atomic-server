@@ -32,13 +32,16 @@ pub fn construct_form<'a>(
 
         match forms::build_form_summary(store, resource, for_agent).await {
             Ok(summary) => {
+                // Response shaping only — never `set`: that would also record
+                // the summary as a Loro op on the doc this response is
+                // serialized from, an op no client can ever have persisted
+                // here. Every delta a client then built on top of it was parked
+                // by `apply_commit` as depending on unknown ops, which is how
+                // Publish → Unpublish → Publish stopped reaching visitors.
+                // `get_resource_extended` also pins the served `loroUpdate` to
+                // the persisted snapshot as a safety net.
                 resource
-                    .set(
-                        urls::FORM_SUBMISSION_SUMMARY.into(),
-                        Value::Json(summary),
-                        store,
-                    )
-                    .await?;
+                    .insert_propval_raw(urls::FORM_SUBMISSION_SUMMARY.into(), Value::Json(summary));
             }
             Err(e) => {
                 tracing::warn!(
