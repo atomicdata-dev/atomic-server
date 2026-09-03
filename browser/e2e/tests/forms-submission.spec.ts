@@ -1094,7 +1094,13 @@ test.describe('form publish and anonymous submit', () => {
     await waitForOutboxDrained(page);
     await waitForDefinitionStatus(page, formSubject, 410);
 
-    const visitorContext = await browser.newContext();
+    // Pinned timezone/locale: the server can only spell a schedule bound out
+    // in UTC, so the visitor-facing moment has to be restated client-side —
+    // this context proves it lands in *their* zone, not the server's.
+    const visitorContext = await browser.newContext({
+      timezoneId: 'Asia/Tokyo',
+      locale: 'en-US',
+    });
     const visitorPage = await visitorContext.newPage();
     const closedResponse = await visitorPage.goto(
       `${SERVER_URL}/form/${formSubject}`,
@@ -1114,6 +1120,11 @@ test.describe('form publish and anonymous submit', () => {
     );
     expect(pendingResponse?.status()).toBe(410);
     await expect(visitorPage.getByText(/isn't open yet/)).toBeVisible();
+
+    // The moment reads in Tokyo time, not the UTC the server wrote.
+    const moment = visitorPage.locator('time[data-ms]');
+    await expect(moment).toHaveText(/GMT\+9/);
+    await expect(moment).not.toHaveText(/UTC/);
 
     // --- Clearing a bound reopens the form, as far as the builder knows ---
     await page.getByTitle('Clear open date').click();

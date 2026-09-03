@@ -1582,6 +1582,30 @@ async fn form_submission_flow() {
         body.contains("isn't open yet"),
         "a not-yet-open form needs its own wording, got: {body}"
     );
+    // The message spells the moment out in UTC (a request carries no
+    // timezone), and rides the raw moment along so the visitor's browser can
+    // restate it locally — `form-app`'s `localizeMoment`.
+    assert!(
+        body.contains("momentMs") && body.contains("momentUtc"),
+        "a scheduled 410 must carry the moment for client-side localization, got: {body}"
+    );
+
+    // The HTML page localizes it itself: the UTC text sits in a `<time>` the
+    // inline script rewrites in the visitor's timezone.
+    let req = test::TestRequest::get()
+        .uri(&format!("/form/{}", slug))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), 410, "not-yet-open form page should 410");
+    let page = get_body(resp);
+    assert!(
+        page.contains("<time datetime=") && page.contains("data-ms="),
+        "the not-available page must mark the moment up for localization, got: {page}"
+    );
+    assert!(
+        page.contains("Intl.DateTimeFormat"),
+        "the not-available page must ship the localization script, got: {page}"
+    );
 
     let req = test::TestRequest::post()
         .uri(&format!("/form/{}/submit", slug))

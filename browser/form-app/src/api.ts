@@ -29,6 +29,46 @@ export function getInviteCodeFromLocation(): string | undefined {
   return new URLSearchParams(window.location.search).get('code') ?? undefined;
 }
 
+/** The schedule bound a 410 for a not-yet-open / closed form carries
+ * alongside its message (see `server/src/handlers/form.rs`). */
+interface ErrorBody {
+  error?: string;
+  /** Epoch-ms of the moment named in `error`. */
+  momentMs?: number;
+  /** How that moment is spelled inside `error` — the substring to replace. */
+  momentUtc?: string;
+}
+
+/** Restates a scheduled form's open/close moment in the visitor's own
+ * timezone. The server spells it out in UTC because a request carries no
+ * timezone, and hands the raw moment over so the browser — which does know —
+ * can swap it in. Falls back to the server's UTC wording whenever the pair
+ * is missing or `Intl` can't render it. */
+export function localizeMoment(
+  body: ErrorBody | undefined,
+): string | undefined {
+  const { error, momentMs, momentUtc } = body ?? {};
+
+  if (!error || momentMs === undefined || !momentUtc) return error;
+
+  try {
+    // Explicit components, not `dateStyle`/`timeStyle` — combining either
+    // with `timeZoneName` throws, and naming the zone is the whole point.
+    const local = new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZoneName: 'short',
+    }).format(new Date(momentMs));
+
+    return local ? error.replace(momentUtc, local) : error;
+  } catch {
+    return error;
+  }
+}
+
 export async function fetchDefinition(
   id: string,
   code?: string,
@@ -39,11 +79,11 @@ export async function fetchDefinition(
   if (!res.ok) {
     // Invite-only rejections (403) come with a human-readable reason.
     const body = (await res.json().catch(() => undefined)) as
-      | { error?: string }
+      | ErrorBody
       | undefined;
 
     throw new Error(
-      body?.error ??
+      localizeMoment(body) ??
         (res.status === 410 || res.status === 404
           ? 'This form is not available.'
           : 'Could not load this form.'),
@@ -92,7 +132,7 @@ export async function submitForm(
   }
 
   const body = (await res.json().catch(() => undefined)) as
-    | { error?: string; errors?: Array<{ field: string; message: string }> }
+    | (ErrorBody & { errors?: Array<{ field: string; message: string }> })
     | undefined;
 
   const errors: Record<string, string> = {};
@@ -105,6 +145,6 @@ export async function submitForm(
     ok: false,
     status: res.status,
     errors: Object.keys(errors).length > 0 ? errors : undefined,
-    message: body?.error,
+    message: localizeMoment(body),
   };
 }

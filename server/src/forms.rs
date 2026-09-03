@@ -1738,11 +1738,21 @@ pub fn form_availability_at(form: &Resource, now: i64) -> FormAvailability {
 }
 
 /// Renders an epoch-ms timestamp for a visitor-facing message. UTC, spelled
-/// out — the visitor's own timezone is unknown server-side, so the zone is
-/// named explicitly rather than silently implied.
+/// out — the server cannot know the visitor's timezone, so this is the
+/// fallback wording for anyone who never runs the client-side localization
+/// (`not_available_page`'s inline script, `form-app`'s `localizeMoment`),
+/// and the zone is named explicitly rather than silently implied.
 pub fn format_schedule_moment(ms: i64) -> Option<String> {
     chrono::DateTime::from_timestamp_millis(ms)
         .map(|dt| dt.format("%-d %B %Y at %H:%M UTC").to_string())
+}
+
+/// The same moment as RFC 3339 / ISO 8601 UTC — what a `<time datetime>`
+/// attribute and any client re-formatting it in the visitor's own timezone
+/// need. Paired with [format_schedule_moment], which renders the human
+/// fallback shown until that re-formatting happens.
+pub fn schedule_moment_iso(ms: i64) -> Option<String> {
+    chrono::DateTime::from_timestamp_millis(ms).map(|dt| dt.to_rfc3339())
 }
 
 // ── Invite codes (Phase 6 "Private links") ──────────────────────────────────
@@ -3602,6 +3612,18 @@ mod tests {
             Some("14 November 2023 at 22:13 UTC")
         );
         assert_eq!(format_schedule_moment(i64::MAX), None);
+    }
+
+    /// The machine-readable half of the same moment: what a `<time datetime>`
+    /// carries, and what lets a visitor's browser restate the UTC wording in
+    /// its own timezone.
+    #[tokio::test]
+    async fn schedule_moment_renders_iso() {
+        assert_eq!(
+            schedule_moment_iso(1_700_000_000_000).as_deref(),
+            Some("2023-11-14T22:13:20+00:00")
+        );
+        assert_eq!(schedule_moment_iso(i64::MAX), None);
     }
 
     #[tokio::test]

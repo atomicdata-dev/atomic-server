@@ -26,6 +26,21 @@ use crate::{
 pub struct FormApiError {
     status: StatusCode,
     message: String,
+    /// The schedule bound named inside `message`, when there is one. The
+    /// message spells it out in UTC because the server has no idea where the
+    /// visitor is; carrying the raw moment alongside lets whoever *does*
+    /// know — the browser — restate it in the visitor's own timezone.
+    moment: Option<ScheduleMoment>,
+}
+
+/// A schedule bound as it appears in a visitor-facing message: the epoch-ms
+/// value, plus the exact UTC substring [forms::format_schedule_moment] put
+/// into the message, so consumers can swap that substring for a localized
+/// rendering without re-deriving the wording around it.
+#[derive(Clone)]
+struct ScheduleMoment {
+    ms: i64,
+    utc_text: String,
 }
 
 impl FormApiError {
@@ -33,7 +48,13 @@ impl FormApiError {
         Self {
             status,
             message: message.into(),
+            moment: None,
         }
+    }
+
+    fn with_moment(mut self, moment: ScheduleMoment) -> Self {
+        self.moment = Some(moment);
+        self
     }
 }
 
@@ -65,9 +86,19 @@ impl ResponseError for FormApiError {
     }
 
     fn error_response(&self) -> HttpResponse {
+        let mut body = json!({ "error": self.message });
+
+        // `momentMs` + `momentUtc` are the localization handle for JSON
+        // clients (`form-app`'s `localizeMoment`): the moment itself, and
+        // the UTC substring to replace inside `error`.
+        if let (Some(moment), Some(obj)) = (self.moment.as_ref(), body.as_object_mut()) {
+            obj.insert("momentMs".into(), json!(moment.ms));
+            obj.insert("momentUtc".into(), json!(moment.utc_text));
+        }
+
         HttpResponse::build(self.status)
             .insert_header(("Cache-Control", NO_STORE))
-            .json(json!({ "error": self.message }))
+            .json(body)
     }
 }
 
@@ -103,30 +134,32 @@ fn unpublished() -> FormApiError {
 /// it renders) so "come back later" and "you missed it" don't read as the
 /// same dead link — see Phase 7 "Scheduled publish/unpublish".
 fn unavailable(availability: forms::FormAvailability) -> FormApiError {
-    let message = match availability {
+    // Two wordings per state: one naming the moment, one for the timestamp
+    // that wouldn't render (which then leaves nothing to localize either).
+    let (ms, with_moment, without_moment): (i64, fn(&str) -> String, &str) = match availability {
         // `Open` is unreachable in practice — the one caller only builds an
         // error out of a non-open state — but exhaustiveness beats an
         // unwrap, and the generic wording is the right fallback anyway.
         forms::FormAvailability::Open | forms::FormAvailability::Unpublished => {
             return unpublished()
         }
-        forms::FormAvailability::NotYetOpen { opens_at } => {
-            match forms::format_schedule_moment(opens_at) {
-                Some(moment) => format!("This form isn't open yet. It opens on {moment}."),
-                None => "This form isn't open yet. Check back later.".to_string(),
-            }
-        }
-        forms::FormAvailability::Closed { closed_at } => {
-            match forms::format_schedule_moment(closed_at) {
-                Some(moment) => {
-                    format!("This form is closed. It stopped accepting responses on {moment}.")
-                }
-                None => "This form is closed and no longer accepts responses.".to_string(),
-            }
-        }
+        forms::FormAvailability::NotYetOpen { opens_at } => (
+            opens_at,
+            |moment| format!("This form isn't open yet. It opens on {moment}."),
+            "This form isn't open yet. Check back later.",
+        ),
+        forms::FormAvailability::Closed { closed_at } => (
+            closed_at,
+            |moment| format!("This form is closed. It stopped accepting responses on {moment}."),
+            "This form is closed and no longer accepts responses.",
+        ),
     };
 
-    FormApiError::new(StatusCode::GONE, message)
+    match forms::format_schedule_moment(ms) {
+        Some(utc_text) => FormApiError::new(StatusCode::GONE, with_moment(&utc_text))
+            .with_moment(ScheduleMoment { ms, utc_text }),
+        None => FormApiError::new(StatusCode::GONE, without_moment),
+    }
 }
 
 /// `?code=` on the viewer-facing routes (Phase 6 "Private links"): the invite
@@ -227,30 +260,36 @@ pub async fn form_page(
 
     let mut form = match resolve_published_form(store, &path.into_inner()).await {
         Ok(form) => form,
-        Err(err) => return not_available_page(err.status, &err.message),
+        Err(err) => return not_available_page(err.status, &err.message, err.moment.as_ref()),
     };
 
     // Invite-only gating happens here on the server (unlike `?embed=1`, which
     // stays client-side) — the definition is injected into the HTML below, so
     // serving the page without a valid code would leak the questions.
     if let Err(err) = check_form_access(store, &form, access.code.as_deref()).await {
-        return not_available_page(err.status, &err.message);
+        return not_available_page(err.status, &err.message, err.moment.as_ref());
     }
 
     let mut definition = match forms::build_form_definition(store, &form).await {
         Ok(d) => d,
-        Err(e) => return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+        Err(e) => {
+            return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string(), None)
+        }
     };
     definition.id = match forms::mint_publish_slug(store, &mut form).await {
         Ok(slug) => slug,
-        Err(e) => return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string()),
+        Err(e) => {
+            return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, &e.to_string(), None)
+        }
     };
     fill_image_url(&mut definition);
     definition.captcha = Some(appstate.captcha.client_config(&definition.id));
 
     let nonce = match generate_nonce() {
         Ok(n) => n,
-        Err(_) => return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, "Server error"),
+        Err(_) => {
+            return not_available_page(StatusCode::INTERNAL_SERVER_ERROR, "Server error", None)
+        }
     };
     let definition_json = serde_json::to_string(&definition).unwrap_or_default();
     let template = include_str!("../../assets_tmp/form-assets/index.html");
@@ -276,6 +315,23 @@ pub async fn form_page(
         .body(body)
 }
 
+/// Restates a schedule bound rendered server-side in UTC in whatever
+/// timezone and locale the visitor's browser is set to — the one thing this
+/// page can do that the server cannot, since a visitor sends no timezone.
+/// Purely additive: without JS (or if `Intl` throws on the tag) the UTC text
+/// the server wrote stays put, still correct, just not local.
+const LOCALIZE_MOMENT_SCRIPT: &str = "<script>\
+    for (const el of document.querySelectorAll('time[data-ms]')) {\
+      try {\
+        const local = new Intl.DateTimeFormat(undefined, {\
+          year: 'numeric', month: 'long', day: 'numeric',\
+          hour: 'numeric', minute: '2-digit', timeZoneName: 'short'\
+        }).format(new Date(Number(el.dataset.ms)));\
+        if (local) el.textContent = local;\
+      } catch (e) {}\
+    }\
+    </script>";
+
 /// Minimal, dependency-free HTML page for unknown/unpublished/errored forms
 /// — no JS bundle needed since there's nothing to render. Colors mirror
 /// `@tomic/form-renderer`'s palette (`browser/form-renderer/src/style.css`)
@@ -286,11 +342,33 @@ pub async fn form_page(
 /// forms are embeddable by any site once published, no auth boundary is
 /// involved) so a stale/unpublished embed shows this friendly card instead
 /// of a browser-blocked blank frame.
-fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
+fn not_available_page(
+    status: StatusCode,
+    message: &str,
+    moment: Option<&ScheduleMoment>,
+) -> HttpResponse {
     let escaped = message
         .replace('&', "&amp;")
         .replace('<', "&lt;")
         .replace('>', "&gt;");
+    // The UTC substring is what the message was built from, so the match
+    // always hits; a miss just leaves the page as the server wrote it.
+    let localizable = moment
+        .filter(|m| escaped.contains(&m.utc_text))
+        .and_then(|m| forms::schedule_moment_iso(m.ms).map(|iso| (m, iso)));
+    let (escaped, script) = match localizable {
+        Some((m, iso)) => (
+            escaped.replace(
+                &m.utc_text,
+                &format!(
+                    "<time datetime=\"{iso}\" data-ms=\"{}\">{}</time>",
+                    m.ms, m.utc_text
+                ),
+            ),
+            LOCALIZE_MOMENT_SCRIPT,
+        ),
+        None => (escaped, ""),
+    };
     let body = format!(
         "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\
@@ -306,7 +384,7 @@ fn not_available_page(status: StatusCode, message: &str) -> HttpResponse {
          h1{{font-size:1.1rem;margin:0 0 0.5rem}}\
          p{{margin:0;color:var(--text-light);line-height:1.5}}\
          </style>\
-         </head><body><div class=\"card\"><h1>Form not available</h1><p>{escaped}</p></div></body></html>"
+         </head><body><div class=\"card\"><h1>Form not available</h1><p>{escaped}</p></div>{script}</body></html>"
     );
 
     HttpResponse::build(status)
@@ -641,4 +719,54 @@ fn check_rate_limit(req: &HttpRequest) -> Result<(), FormApiError> {
     }
     entry.push_back(now);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn page_body(moment: Option<&ScheduleMoment>) -> String {
+        let resp = not_available_page(
+            StatusCode::GONE,
+            "This form isn't open yet. It opens on 14 November 2023 at 22:13 UTC.",
+            moment,
+        );
+        let bytes = actix_web::body::to_bytes(resp.into_body()).await.unwrap();
+
+        String::from_utf8(bytes.to_vec()).unwrap()
+    }
+
+    /// A scheduled form's moment reaches the visitor as a `<time>` carrying
+    /// the raw epoch-ms, so the inline script can restate it in their own
+    /// timezone. The UTC text stays as the element's contents — that is what
+    /// a visitor without JS keeps seeing.
+    #[actix_web::test]
+    async fn schedule_moment_is_marked_up_for_localization() {
+        let body = page_body(Some(&ScheduleMoment {
+            ms: 1_700_000_000_000,
+            utc_text: "14 November 2023 at 22:13 UTC".to_string(),
+        }))
+        .await;
+
+        assert!(
+            body.contains(
+                "<time datetime=\"2023-11-14T22:13:20+00:00\" data-ms=\"1700000000000\">14 November 2023 at 22:13 UTC</time>"
+            ),
+            "moment should be wrapped in a machine-readable <time>, got: {body}"
+        );
+        assert!(
+            body.contains("Intl.DateTimeFormat"),
+            "localization script missing"
+        );
+    }
+
+    /// Nothing to localize on the pages that name no moment (unpublished,
+    /// not-found, server errors) — they get no `<time>` and no script.
+    #[actix_web::test]
+    async fn page_without_moment_stays_script_free() {
+        let body = page_body(None).await;
+
+        assert!(!body.contains("<time"), "unexpected <time>, got: {body}");
+        assert!(!body.contains("<script"), "unexpected script, got: {body}");
+    }
 }

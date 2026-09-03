@@ -2,11 +2,12 @@
   "name": "@tomic/form-app",
   "version": "0.41.0-beta.0",
   "private": true,
-  "description": "Published-form runtime served at /form/:id — a small Vite app with no @tomic/lib or Loro dependency.",
+  "description": "Published-form runtime served at /form/:id \u2014 a small Vite app with no @tomic/lib or Loro dependency.",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "vitest run",
     "start": "pnpm dev",
     "format-check": "oxfmt -c ../.oxfmtrc.json --check ./src",
     "format": "oxfmt -c ../.oxfmtrc.json ./src",
@@ -25,6 +26,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "typescript": "^6.0.3",
-    "vite": "^8.0.14"
+    "vite": "^8.0.14",
+    "vitest": "^4.1.7"
   }
 }
