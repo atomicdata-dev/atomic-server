@@ -5,6 +5,11 @@
 * {
   box-sizing: border-box;
 }
+html {
+  scrollbar-gutter: stable;
+  background-color: var(--atomic-form-bg, #fff);
+  scrollbar-color: var(--atomic-form-border) var(--atomic-form-bg);
+}
 
 html,
 body {

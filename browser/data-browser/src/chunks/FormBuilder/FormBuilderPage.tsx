@@ -8,7 +8,6 @@ import {
 import { useEffect, useId, useState, type JSX } from 'react';
 import { styled } from 'styled-components';
 import { EditableTitle } from '@components/EditableTitle';
-import { Row } from '@components/Row';
 import type { ResourcePageProps } from '@views/ResourcePage';
 import { PageTabBar } from './PageTabBar';
 import { FieldList } from './FieldList';
@@ -47,14 +46,16 @@ export function FormBuilderPage({ resource }: ResourcePageProps): JSX.Element {
   return (
     <Shell>
       <TitleSlot>
-        <Row justify='space-between' center>
-          <EditableTitle resource={resource} id={titleId} />
-          <Row gap='0.5rem' center>
+        <HeaderRow>
+          <TitleArea>
+            <EditableTitle resource={resource} id={titleId} />
+          </TitleArea>
+          <HeaderActions>
             <ShareLinkPanel resource={resource} />
             <FormPreviewButton formSubject={resource.subject} />
             <PublishToggle resource={resource} />
-          </Row>
-        </Row>
+          </HeaderActions>
+        </HeaderRow>
       </TitleSlot>
       <TabsSlot role='tablist'>
         <TabButton
@@ -164,6 +165,55 @@ const Shell = styled.div`
 const TitleSlot = styled.div`
   flex-shrink: 0;
   padding: ${p => p.theme.size()};
+`;
+
+/**
+ * Title on the left, action buttons on the right. The title is the only part
+ * allowed to wrap: `Button` wraps its label by default (phones), which turned
+ * "Unpublish" into three stacked characters as soon as the header got tight —
+ * with the AI chat open, or on anything narrower than a full-screen laptop.
+ *
+ * So the actions keep their intrinsic width and the title takes the squeeze
+ * first. Once the title is down to its own floor (`min-width` below) there is
+ * nothing left to give, and the whole action group wraps onto a second line
+ * instead. No breakpoint involved: the flow reacts to the space actually
+ * available, so it works the same in a side panel as in the main view.
+ */
+const HeaderRow = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem ${p => p.theme.size()};
+`;
+
+const TitleArea = styled.div`
+  /* Basis 0, so the title never asks for its full single-line width: it takes
+     whatever the actions leave over and wraps inside it. With a basis of
+     auto the actions dropped to a second line the moment the title stopped
+     fitting on one, wasting a whole row on a header that had space left. */
+  flex: 1 1 0;
+  /* The floor at which the title stops shrinking and the actions wrap to
+     their own line instead. Wide enough for a long-ish word at h1 size, so
+     the squeeze wraps the title between words rather than through them.
+     Capped at 100% so a container narrower than the floor still wraps
+     instead of overflowing. */
+  min-width: min(100%, 16rem);
+`;
+
+const HeaderActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  /* Stay on one line and at intrinsic width: these are the items that must
+     not be squeezed. */
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+
+  button {
+    white-space: nowrap;
+    overflow-wrap: normal;
+  }
 `;
 
 const TabsSlot = styled.div`

@@ -33,6 +33,23 @@ export function App(): JSX.Element {
       );
   }, [definition, formId, inviteCode]);
 
+  // The custom background lives in a CSS variable FormShell writes as an
+  // inline style on the shell, so it cannot cascade up to <html> — and <html>
+  // is what paints the canvas, including the scrollbar gutter that
+  // `scrollbar-gutter: stable` reserves outside the shell. Mirror it onto the
+  // document element so the gutter matches the form instead of staying white.
+  useEffect(() => {
+    const background = definition?.styling.backgroundColor;
+
+    if (!background) return;
+
+    document.documentElement.style.setProperty('--atomic-form-bg', background);
+
+    return () => {
+      document.documentElement.style.removeProperty('--atomic-form-bg');
+    };
+  }, [definition]);
+
   useEffect(() => {
     if (!embed) return;
 

@@ -185,7 +185,7 @@ export const buildTheme = (
     containerWidth: 40,
     containerWidthWide: '900px',
     fontSizeBody: 1,
-    fontSizeH1: 2,
+    fontSizeH1: 1.5,
     sideBarWidth: 15,
     margin: 1,
     radius: '9px',
