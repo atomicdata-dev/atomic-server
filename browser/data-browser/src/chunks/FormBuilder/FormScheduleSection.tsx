@@ -47,22 +47,25 @@ export function FormScheduleSection({
     openAt !== undefined && closeAt !== undefined && closeAt <= openAt;
 
   return (
-    <Column gap='1rem'>
+    <Column gap="1rem">
       <StatusLine>
-        {describe(availability, publishedAt !== undefined)}
+        <Status
+          availability={availability}
+          isPublished={publishedAt !== undefined}
+        />
       </StatusLine>
       <MomentField
-        label='Opens'
-        testId='schedule-open-input'
-        clearTitle='Clear open date'
+        label="Opens"
+        testId="schedule-open-input"
+        clearTitle="Clear open date"
         title='Before this moment visitors see a "not open yet" page'
         value={openAt}
         onChange={setOpenAt}
       />
       <MomentField
-        label='Closes'
-        testId='schedule-close-input'
-        clearTitle='Clear close date'
+        label="Closes"
+        testId="schedule-close-input"
+        clearTitle="Clear close date"
         title='From this moment on visitors see a "closed" page'
         value={closeAt}
         onChange={setCloseAt}
@@ -72,36 +75,40 @@ export function FormScheduleSection({
           This form closes before it opens, so it will never accept responses.
         </Warning>
       )}
-      <Hint>
-        Leave a moment empty to skip that side of the window. Times are in your
-        own timezone; visitors are told the moment in UTC.
-      </Hint>
     </Column>
   );
 }
 
-/** The status sentence shown above the inputs. `isPublished` is passed
- * separately so an unpublished form with a schedule reads as "waiting on
- * you", not as a working schedule. */
-function describe(
-  availability: ReturnType<typeof getFormAvailability>,
-  isPublished: boolean,
-): string {
+const Status: React.FC<{
+  availability: ReturnType<typeof getFormAvailability>;
+  isPublished: boolean;
+}> = ({ availability, isPublished }) => {
   switch (availability.state) {
     case 'unpublished':
-      return isPublished
-        ? 'This form is not published.'
-        : 'This form is not published, so the schedule below has no effect yet.';
+      return isPublished ? <></> : 'Publish the form to apply the schedule';
     case 'not-yet-open':
-      return `Published, but not open until ${formatScheduleMoment(
-        availability.opensAt,
-      )}.`;
+      return (
+        <>
+          Scheduled for{' '}
+          <time dateTime={availability.opensAt.toString()}>
+            {formatScheduleMoment(availability.opensAt)}
+          </time>
+        </>
+      );
     case 'closed':
-      return `Closed since ${formatScheduleMoment(availability.closedAt)}. Visitors can no longer respond.`;
+      return (
+        <>
+          Status: <ClosedLabel>Closed</ClosedLabel>
+        </>
+      );
     case 'open':
-      return 'This form is open and accepting responses.';
+      return (
+        <>
+          Status: <OpenLabel>Open</OpenLabel>
+        </>
+      );
   }
-}
+};
 
 interface MomentFieldProps {
   label: string;
@@ -126,10 +133,10 @@ function MomentField({
 
   return (
     <Field label={label}>
-      <Row gap='0.5rem' center>
+      <Row gap="0.5rem" center>
         <NarrowInputWrapper>
           <InputStyled
-            type='datetime-local'
+            type="datetime-local"
             data-testid={testId}
             title={title}
             value={localDate ?? ''}
@@ -171,7 +178,10 @@ const NarrowInputWrapper = styled(InputWrapper)`
 
 const StatusLine = styled.p`
   margin: 0;
-  font-weight: bold;
+
+  & time {
+    font-weight: bold;
+  }
 `;
 
 const Hint = styled.p`
@@ -182,4 +192,14 @@ const Hint = styled.p`
 
 const Warning = styled(Hint)`
   color: ${p => p.theme.colors.alert};
+`;
+
+const ClosedLabel = styled.span`
+  color: ${p => p.theme.colors.alert};
+  font-weight: bold;
+`;
+
+const OpenLabel = styled.span`
+  color: ${p => p.theme.colors.main};
+  font-weight: bold;
 `;

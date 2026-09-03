@@ -8554,31 +8554,23 @@ msgstr "À partir de ce moment, les visiteurs voient une page \"fermé\""
 msgid "This form closes before it opens, so it will never accept responses."
 msgstr "Ce formulaire se ferme avant de s'ouvrir, donc il n'acceptera jamais de réponses."
 
-#: src/chunks/FormBuilder/FormScheduleSection.tsx
-msgid "Leave a moment empty to skip that side of the window. Times are in your own timezone; visitors are told the moment in UTC."
-msgstr "Laissez un moment vide pour ignorer ce côté de la fenêtre. Les heures sont dans votre propre fuseau horaire ; les visiteurs sont informés du moment en UTC."
+#~ msgid "Leave a moment empty to skip that side of the window. Times are in your own timezone; visitors are told the moment in UTC."
+#~ msgstr "Laissez un moment vide pour ignorer ce côté de la fenêtre. Les heures sont dans votre propre fuseau horaire ; les visiteurs sont informés du moment en UTC."
 
-#: src/chunks/FormBuilder/FormScheduleSection.tsx
-msgid "This form is not published."
-msgstr "Ce formulaire n'est pas publié."
+#~ msgid "This form is not published."
+#~ msgstr "Ce formulaire n'est pas publié."
 
-#: src/chunks/FormBuilder/FormScheduleSection.tsx
-msgid "This form is not published, so the schedule below has no effect yet."
-msgstr "Ce formulaire n'est pas publié, donc le calendrier ci-dessous n'a pas encore d'effet."
+#~ msgid "This form is not published, so the schedule below has no effect yet."
+#~ msgstr "Ce formulaire n'est pas publié, donc le calendrier ci-dessous n'a pas encore d'effet."
 
-#. 0: formatScheduleMoment( availability.opensAt, )
-#: src/chunks/FormBuilder/FormScheduleSection.tsx
-msgid "Published, but not open until {0}."
-msgstr "Publié, mais pas ouvert avant {0}."
+#~ msgid "Published, but not open until {0}."
+#~ msgstr "Publié, mais pas ouvert avant {0}."
 
-#. 0: formatScheduleMoment(availability.closedAt)
-#: src/chunks/FormBuilder/FormScheduleSection.tsx
-msgid "Closed since {0}. Visitors can no longer respond."
-msgstr "Fermé depuis {0}. Les visiteurs ne peuvent plus répondre."
+#~ msgid "Closed since {0}. Visitors can no longer respond."
+#~ msgstr "Fermé depuis {0}. Les visiteurs ne peuvent plus répondre."
 
-#: src/chunks/FormBuilder/FormScheduleSection.tsx
-msgid "This form is open and accepting responses."
-msgstr "Ce formulaire est ouvert et accepte les réponses."
+#~ msgid "This form is open and accepting responses."
+#~ msgstr "Ce formulaire est ouvert et accepte les réponses."
 
 #~ msgid "Clear {0}"
 #~ msgstr ""
@@ -8612,3 +8604,26 @@ msgstr "Effacer la date d'ouverture"
 #: src/chunks/FormBuilder/FormScheduleSection.tsx
 msgid "Clear close date"
 msgstr "Effacer la date de fermeture"
+
+#. 0: ' '
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Scheduled for{0} <0/>"
+msgstr "Planifié pour{0} <0/>"
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Status: <0>Closed</0>"
+msgstr "Statut : <0>Fermé</0>"
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Status: <0>Open</0>"
+msgstr "Statut : <0>Ouvert</0>"
+
+#~ msgid "Closed since {0}."
+#~ msgstr "Fermé depuis {0}."
+
+#~ msgid "Status:"
+#~ msgstr "Statut :"
+
+#: src/chunks/FormBuilder/FormScheduleSection.tsx
+msgid "Publish the form to apply the schedule"
+msgstr "Publier le formulaire pour appliquer le calendrier"

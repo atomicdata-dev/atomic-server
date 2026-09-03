@@ -66,6 +66,14 @@ interface ReorderableListProps {
    * the item place (and hide) its own.
    */
   handle?: 'external' | 'custom';
+  /** Space between items. Vertical lists only. */
+  gap?: string;
+  /**
+   * Where the external grip sits on a vertical item. `'center'` (the default)
+   * centers it against the whole item; `'start'` pins it to the item's first
+   * input row, for items that grow taller than one line.
+   */
+  align?: 'center' | 'start';
 }
 
 /**
@@ -82,6 +90,8 @@ export function ReorderableList({
   disabled,
   orientation = 'vertical',
   handle = 'external',
+  gap,
+  align = 'center',
 }: ReorderableListProps): JSX.Element {
   const [activeSubject, setActiveSubject] = useState<string>();
   const [activeWidth, setActiveWidth] = useState<number>();
@@ -131,7 +141,7 @@ export function ReorderableList({
             : verticalListSortingStrategy
         }
       >
-        <ListContainer $orientation={orientation}>
+        <ListContainer $orientation={orientation} $gap={gap}>
           {subjects.map((subject, index) => (
             <SortableRow
               key={subject}
@@ -139,6 +149,7 @@ export function ReorderableList({
               disabled={disabled}
               orientation={orientation}
               handle={handle}
+              align={align}
             >
               {drag => renderItem(subject, index, drag)}
             </SortableRow>
@@ -150,6 +161,7 @@ export function ReorderableList({
           {activeSubject && (
             <DragPreview
               $orientation={orientation}
+              $align={align}
               style={
                 orientation === 'vertical' && activeWidth
                   ? { width: activeWidth }
@@ -182,6 +194,7 @@ interface SortableRowProps {
   disabled?: boolean;
   orientation: 'vertical' | 'horizontal';
   handle: 'external' | 'custom';
+  align: 'center' | 'start';
   children: (drag: ItemDragProps) => ReactNode;
 }
 
@@ -190,6 +203,7 @@ function SortableRow({
   disabled,
   orientation,
   handle,
+  align,
   children,
 }: SortableRowProps): JSX.Element {
   const {
@@ -222,9 +236,11 @@ function SortableRow({
       style={style}
       $dragging={isDragging}
       $orientation={orientation}
+      $align={align}
     >
       {handle === 'external' && !disabled && (
         <DragHandle
+          $align={align}
           {...listeners}
           {...attributes}
           type='button'
@@ -240,19 +256,26 @@ function SortableRow({
 
 const ListContainer = styled.div<{
   $orientation: 'vertical' | 'horizontal';
+  $gap?: string;
 }>`
   display: flex;
   flex-direction: ${p => (p.$orientation === 'horizontal' ? 'row' : 'column')};
   ${p => p.$orientation === 'horizontal' && 'align-items: stretch;'}
-  gap: ${p => (p.$orientation === 'horizontal' ? '0' : '0.5rem')};
+  gap: ${p => (p.$orientation === 'horizontal' ? '0' : (p.$gap ?? '0.5rem'))};
 `;
 
 const RowWrapper = styled.div<{
   $dragging: boolean;
   $orientation: 'vertical' | 'horizontal';
+  $align: 'center' | 'start';
 }>`
   display: flex;
-  align-items: ${p => (p.$orientation === 'horizontal' ? 'stretch' : 'center')};
+  align-items: ${p =>
+    p.$orientation === 'horizontal'
+      ? 'stretch'
+      : p.$align === 'start'
+        ? 'flex-start'
+        : 'center'};
   gap: ${p => (p.$orientation === 'horizontal' ? '0' : '0.4rem')};
   opacity: ${p => (p.$dragging ? 0.4 : 1)};
   ${p => (p.$orientation === 'vertical' ? 'width: 100%;' : '')}
@@ -263,9 +286,12 @@ const RowContent = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
   min-width: 0;
 `;
 
-const DragHandle = styled.button`
+const DragHandle = styled.button<{ $align?: 'center' | 'start' }>`
   display: flex;
   align-items: center;
+  /* Matches the height of a single input row, so a grip pinned to the start of
+     a multi-line item still lines up with that item's first input. */
+  ${p => p.$align === 'start' && 'height: 2rem;'}
   cursor: grab;
   appearance: none;
   background: transparent;
@@ -285,9 +311,12 @@ const DragHandle = styled.button`
   }
 `;
 
-const DragPreview = styled.div<{ $orientation: 'vertical' | 'horizontal' }>`
+const DragPreview = styled.div<{
+  $orientation: 'vertical' | 'horizontal';
+  $align: 'center' | 'start';
+}>`
   display: flex;
-  align-items: center;
+  align-items: ${p => (p.$align === 'start' ? 'flex-start' : 'center')};
   gap: 0.4rem;
   cursor: grabbing;
   pointer-events: none;
