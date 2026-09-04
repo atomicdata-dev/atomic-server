@@ -8544,27 +8544,6 @@ msgstr "From this moment on visitors see a \"closed\" page"
 msgid "This form closes before it opens, so it will never accept responses."
 msgstr "This form closes before it opens, so it will never accept responses."
 
-#~ msgid "Leave a moment empty to skip that side of the window. Times are in your own timezone; visitors are told the moment in UTC."
-#~ msgstr "Leave a moment empty to skip that side of the window. Times are in your own timezone; visitors are told the moment in UTC."
-
-#~ msgid "This form is not published."
-#~ msgstr "This form is not published."
-
-#~ msgid "This form is not published, so the schedule below has no effect yet."
-#~ msgstr "This form is not published, so the schedule below has no effect yet."
-
-#~ msgid "Published, but not open until {0}."
-#~ msgstr "Published, but not open until {0}."
-
-#~ msgid "Closed since {0}. Visitors can no longer respond."
-#~ msgstr "Closed since {0}. Visitors can no longer respond."
-
-#~ msgid "This form is open and accepting responses."
-#~ msgstr "This form is open and accepting responses."
-
-#~ msgid "Clear {0}"
-#~ msgstr "Clear {0}"
-
 #. 0: formatScheduleMoment(availability.opensAt)
 #: src/chunks/FormBuilder/PublishToggle.tsx
 msgid "Opens {0}"
@@ -8608,12 +8587,22 @@ msgstr "Status: <0>Closed</0>"
 msgid "Status: <0>Open</0>"
 msgstr "Status: <0>Open</0>"
 
-#~ msgid "Closed since {0}."
-#~ msgstr "Closed since {0}."
-
-#~ msgid "Status:"
-#~ msgstr "Status:"
-
 #: src/chunks/FormBuilder/FormScheduleSection.tsx
 msgid "Publish the form to apply the schedule"
 msgstr "Publish the form to apply the schedule"
+
+#: src/chunks/FormBuilder/FieldOptions/TextOptions.tsx
+msgid "Min length"
+msgstr "Min length"
+
+#: src/chunks/FormBuilder/FieldOptions/TextOptions.tsx
+msgid "The fewest characters an answer may carry. An unanswered question still counts as unanswered rather than as too short — that is what Required is for."
+msgstr "The fewest characters an answer may carry. An unanswered question still counts as unanswered rather than as too short — that is what Required is for."
+
+#: src/chunks/FormBuilder/FieldOptions/TextOptions.tsx
+msgid "Max length"
+msgstr "Max length"
+
+#: src/chunks/FormBuilder/FieldOptions/TextOptions.tsx
+msgid "The most characters an answer may carry. Going over is shown as an error rather than blocked, but the form cannot be submitted until it is back under."
+msgstr "The most characters an answer may carry. Going over is shown as an error rather than blocked, but the form cannot be submitted until it is back under."

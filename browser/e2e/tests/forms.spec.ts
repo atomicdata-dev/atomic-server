@@ -459,6 +459,66 @@ test.describe('forms', async () => {
   });
 
   /**
+   * Same trick as above for a text question's length bounds: the counter
+   * they put under the input, and the invalid state going over it produces.
+   */
+  test('a text field respects the length bounds set in the builder', async ({
+    page,
+  }) => {
+    // The overflow highlight reaches for two APIs most browsers don't have
+    // yet. Whatever it does, it must not throw where they are missing.
+    const crashes: Error[] = [];
+    page.on('pageerror', error => crashes.push(error));
+
+    await createForm(page, 'Nickname');
+    await addField(page, 'Short text', 'short-text');
+
+    await page.getByTestId('field-row-short-text').click();
+    await page.getByTestId('field-label-input').fill('Nickname');
+    await page.getByTestId('field-option-minLength').fill('3');
+    await page.getByTestId('field-option-maxLength').fill('8');
+    await waitForSync(page);
+
+    await page.getByRole('button', { name: 'Preview', exact: true }).click();
+    const preview = page.getByRole('dialog');
+    await expect(preview.getByText('At least 3 characters')).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(preview.getByText('0/8')).toBeVisible();
+
+    // The maximum is not a cap: the characters land, and the field says so.
+    const input = preview.getByLabel('Nickname');
+    await input.fill('abcdefgh');
+    await expect(preview.getByText('8/8')).toBeVisible();
+    await expect(input).not.toHaveAttribute('aria-invalid', 'true');
+
+    await input.fill('abcdefghij');
+    await expect(input).toHaveValue('abcdefghij');
+    await expect(preview.getByText('10/8')).toBeVisible();
+    await expect(input).toHaveAttribute('aria-invalid', 'true');
+
+    // Blocking the submit is `validateAll`'s job, which the preview's no-op
+    // Submit never reaches — `validation.test.ts` covers it instead, as does
+    // `coerce_value` on the server.
+
+    /* Colouring the overflow inside the input is a progressive enhancement:
+     * it needs `createValueRange()`, which as of Chromium 148 (what this
+     * suite runs) does not exist, alongside the older CSS Custom Highlight
+     * API. Asserted against the browser's actual support rather than
+     * hard-coded either way, so this keeps testing the right half once
+     * Playwright's Chromium catches up. */
+    const highlighted = await page.evaluate(() => {
+      const supported =
+        typeof document.createElement('input').createValueRange === 'function';
+      const registered = CSS.highlights?.get('atomic-form-overflow');
+
+      return { supported, ranges: registered ? registered.size : 0 };
+    });
+    expect(highlighted.ranges).toBe(highlighted.supported ? 1 : 0);
+    expect(crashes).toEqual([]);
+  });
+
+  /**
    * Page-change animations, in the same Preview dialog. Asserted through
    * `animationstart` rather than by catching the modifier class mid-flight:
    * the exit phase is 180ms, far too short to poll for without flaking, but

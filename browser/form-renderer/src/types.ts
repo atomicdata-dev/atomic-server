@@ -126,6 +126,12 @@ export interface FieldOptions {
    * `rating`) because these count picks, not magnitudes. */
   minSelected?: number;
   maxSelected?: number;
+  /** short-text / long-text: how long the answer may be, in characters.
+   * Kept apart from `min`/`max` (value bounds on `number`/`currency`) for
+   * the same reason `minSelected` is: these count characters, not
+   * magnitudes. */
+  minLength?: number;
+  maxLength?: number;
 }
 
 /** The subfields an `address` answer is made of. All are optional strings;

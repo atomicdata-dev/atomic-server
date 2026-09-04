@@ -314,6 +314,7 @@ function TypeOptions({
   switch (type) {
     case 'short-text':
     case 'long-text':
+      return <TextOptions field={field} lengthBounds />;
     case 'email':
     case 'url':
       return <TextOptions field={field} />;

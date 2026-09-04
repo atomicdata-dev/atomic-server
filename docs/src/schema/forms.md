@@ -75,8 +75,8 @@ of a submitted answer. Options not listed for a type are ignored.
 
 | `form-field-type` | Property datatype | `form-field-options` | submitted value |
 | ----------------- | ----------------- | -------------------- | --------------- |
-| `short-text`      | String            | `placeholder`        | string |
-| `long-text`       | String            | `placeholder`        | string |
+| `short-text`      | String            | `placeholder`, `minLength`, `maxLength` | string |
+| `long-text`       | String            | `placeholder`, `minLength`, `maxLength` | string |
 | `email`           | String            | `placeholder`        | string, validated as an email address |
 | `phone`           | String            | `placeholder`, `defaultCountry` | string; the renderer's country-select input submits E.164 (`+31612345678`), and the server also accepts digits with the usual separators and an optional `+` prefix |
 | `country`         | String            | `placeholder`, `defaultCountry` | ISO 3166-1 alpha-2 code (`"NL"`); the renderer shows the country's name in the visitor's own language |
@@ -108,6 +108,17 @@ the definition JSON replaces those subjects with URLs on the publish-gated
 `GET /form/{id}/image?file=…` route (which only serves images this form
 actually references) — the Files themselves stay private, the same way the
 Form's `cover-image` does.
+
+`minLength` / `maxLength` bound how long a text answer may be, counted in
+UTF-16 code units (what `String.length` counts, so an emoji counts as two).
+A bounded question shows a `5/200` counter under its input. The maximum is
+not a hard cap — typing past it turns the counter and the field's border red
+rather than swallowing the characters (and, on browsers that have opaque
+ranges, the overflowing characters themselves), and the answer is rejected on
+submit;
+the minimum is checked on submit only. Like the bounds below, they only
+constrain an answer that was given — an untouched question stays
+"unanswered", which is what `required` is for.
 
 `minSelected` / `maxSelected` bound how many options a multi-pick question
 accepts. Past the maximum the remaining options are disabled rather than

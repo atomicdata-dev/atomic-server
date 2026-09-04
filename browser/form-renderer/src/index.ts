@@ -18,6 +18,9 @@ export {
   tableColumns,
   selectionBounds,
   selectionHint,
+  lengthBounds,
+  minLengthHint,
+  isOverLength,
 } from './validation.js';
 export type { ValidationResult } from './validation.js';
 export {

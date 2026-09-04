@@ -78,6 +78,46 @@ function countBound(raw: unknown): number | undefined {
   return Number.isFinite(n) && n >= 1 ? n : undefined;
 }
 
+/** How long a text answer may be, in characters. Read the same way as
+ * {@link selectionBounds}: a bound has to be a whole number of at least one
+ * to mean anything, so a blank input, `0` or junk from a hand-edited bag all
+ * read as "no bound". Mirrors `length_bounds` in `server/src/forms.rs`.
+ *
+ * Characters are UTF-16 code units — what `String.length` and the native
+ * `maxlength` attribute count — so the input's own cap and both validators
+ * agree on an emoji. */
+export function lengthBounds(options: FieldOptions): {
+  min?: number;
+  max?: number;
+} {
+  return {
+    min: countBound(options.minLength),
+    max: countBound(options.maxLength),
+  };
+}
+
+/** The line shown under a text question that has a minimum length, e.g. "At
+ * least 3 characters". `undefined` when it has none. The *maximum* is not
+ * described in words: it is the denominator of the `5/200` counter beside
+ * this, which says the same thing and keeps counting. */
+export function minLengthHint(options: FieldOptions): string | undefined {
+  const { min } = lengthBounds(options);
+
+  return min === undefined
+    ? undefined
+    : `At least ${min} ${plural(min, 'character')}`;
+}
+
+/** Whether an answer is past the question's maximum length. The input does
+ * not stop the visitor there — a hard cap silently eats a paste — so this
+ * is what turns the counter and the field's border red, and the same bound
+ * blocks the submit through {@link validateFieldValue}. */
+export function isOverLength(options: FieldOptions, value: unknown): boolean {
+  const { max } = lengthBounds(options);
+
+  return max !== undefined && typeof value === 'string' && value.length > max;
+}
+
 /** The line shown under a bounded multi-pick question, e.g. "Select up to
  * 3 options". `undefined` when the question is unbounded — most are. */
 export function selectionHint(options: FieldOptions): string | undefined {
@@ -195,8 +235,22 @@ export function validateFieldValue(
 
   switch (field.type) {
     case 'short-text':
-    case 'long-text':
-      return typeof raw === 'string' ? null : 'Expected a string';
+
+    case 'long-text': {
+      if (typeof raw !== 'string') return 'Expected a string';
+
+      const { min, max } = lengthBounds(field.options);
+
+      if (min !== undefined && raw.length < min) {
+        return `Please enter at least ${min} ${plural(min, 'character')}`;
+      }
+
+      if (max !== undefined && raw.length > max) {
+        return `At most ${max} ${plural(max, 'character')} allowed`;
+      }
+
+      return null;
+    }
 
     case 'email': {
       if (typeof raw !== 'string') return 'Expected a string';

@@ -1010,9 +1010,11 @@ fn coerce_value(
     raw: &JsonValue,
 ) -> Result<Value, String> {
     match field_type {
-        "short-text" | "long-text" => Ok(Value::String(
-            raw.as_str().ok_or("Expected a string")?.to_string(),
-        )),
+        "short-text" | "long-text" => {
+            let s = raw.as_str().ok_or("Expected a string")?.to_string();
+            check_length(&s, options)?;
+            Ok(Value::String(s))
+        }
         "email" => {
             let s = raw.as_str().ok_or("Expected a string")?.to_string();
             if !is_valid_email(&s) {
@@ -1300,6 +1302,61 @@ fn check_bounds(value: f64, options: &JsonValue) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// How long a text answer may be, in characters. Read the same way as
+/// [selection_bounds]: a bound has to be a whole number of at least one to
+/// mean anything, so an absent key, `0` or junk from a hand-edited bag all
+/// read as "no bound". Mirrors `lengthBounds` in
+/// `browser/form-renderer/src/validation.ts`.
+fn length_bounds(options: &JsonValue) -> (Option<u64>, Option<u64>) {
+    let bound = |key: &str| {
+        options
+            .get(key)
+            .and_then(|v| v.as_u64())
+            .filter(|n| *n >= 1)
+    };
+
+    (bound("minLength"), bound("maxLength"))
+}
+
+/// Bounds on how long a `short-text` / `long-text` answer may be. An *empty*
+/// answer never reaches here (it counts as unanswered, which is `required`'s
+/// business), so a minimum only ever applies to an answer the visitor
+/// actually gave.
+///
+/// Characters are counted in UTF-16 code units rather than `char`s: that is
+/// what JS `String.length` and the renderer's native `maxlength` attribute
+/// count, so both sides agree on an emoji.
+fn check_length(value: &str, options: &JsonValue) -> Result<(), String> {
+    let (min, max) = length_bounds(options);
+    let len = value.encode_utf16().count() as u64;
+    if let Some(min) = min {
+        if len < min {
+            return Err(format!(
+                "Please enter at least {min} {}",
+                plural(min, "character")
+            ));
+        }
+    }
+    if let Some(max) = max {
+        if len > max {
+            return Err(format!(
+                "At most {max} {} allowed",
+                plural(max, "character")
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Mirrors `plural` in `browser/form-renderer/src/validation.ts`.
+fn plural(n: u64, word: &str) -> String {
+    if n == 1 {
+        word.to_string()
+    } else {
+        format!("{word}s")
+    }
 }
 
 /// How many options a multi-pick question accepts. A bound has to be a whole
@@ -3016,6 +3073,86 @@ mod tests {
         junk["minSelected"] = json!("two");
         junk["maxSelected"] = json!(0);
         assert!(submit_one("multi-select", false, junk, json!([tag("A")])).is_ok());
+    }
+
+    /// Mirrors the `text length bounds` suite in
+    /// `browser/form-renderer/src/validation.test.ts`.
+    #[test]
+    fn text_answers_respect_length_bounds() {
+        let bounds = json!({"minLength": 2, "maxLength": 5});
+
+        assert_eq!(
+            ok_string(submit_one(
+                "short-text",
+                false,
+                bounds.clone(),
+                json!("abc")
+            )),
+            "abc"
+        );
+        assert_eq!(
+            err_message(submit_one("short-text", false, bounds.clone(), json!("a"))),
+            "Please enter at least 2 characters"
+        );
+        assert_eq!(
+            err_message(submit_one("long-text", false, bounds, json!("abcdef"))),
+            "At most 5 characters allowed"
+        );
+        assert_eq!(
+            err_message(submit_one(
+                "short-text",
+                false,
+                json!({"minLength": 1, "maxLength": 1}),
+                json!("ab")
+            )),
+            "At most 1 character allowed"
+        );
+
+        // Counted in UTF-16 code units, like `String.length` and the
+        // renderer's `maxlength`: one emoji is two of them.
+        assert_eq!(
+            err_message(submit_one(
+                "short-text",
+                false,
+                json!({"maxLength": 1}),
+                json!("\u{1F600}")
+            )),
+            "At most 1 character allowed"
+        );
+
+        // An unanswered question is unanswered, not short of the minimum —
+        // making it mandatory is `required`'s job. An empty answer never
+        // reaches `coerce_value`, so this one goes through
+        // `validate_submission` rather than [submit_one].
+        let definition = single_field_definition("short-text", false, json!({"minLength": 3}));
+        let mut empty = Map::new();
+        empty.insert(Q.into(), json!(""));
+        assert!(
+            validate_submission(&definition, &empty)
+                .expect("an empty answer to an optional question is not an error")
+                .is_empty(),
+            "nothing is stored for an unanswered question"
+        );
+        assert_eq!(
+            err_message(submit_one(
+                "short-text",
+                true,
+                json!({"minLength": 3}),
+                json!("")
+            )),
+            "This field is required"
+        );
+
+        // Junk bounds from a hand-edited bag are no bounds at all.
+        assert_eq!(
+            ok_string(submit_one(
+                "short-text",
+                false,
+                json!({"minLength": "three", "maxLength": 0}),
+                json!("a")
+            )),
+            "a"
+        );
     }
 
     #[test]

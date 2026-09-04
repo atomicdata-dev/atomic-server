@@ -431,6 +431,20 @@
   outline-color: var(--atomic-form-error);
 }
 
+/* The same red border for failures only the JS layer can see — today, a text
+   answer past its maximum length. `:user-invalid` cannot express that: there
+   is no native constraint for "too long" that does not also stop the typing.
+   Kept beside its native twin so the two never drift apart. */
+.atomic-form-input[aria-invalid='true'],
+.atomic-form-input[aria-invalid='true']:hover:not(:disabled) {
+  border-color: var(--atomic-form-error);
+}
+
+.atomic-form-input[aria-invalid='true']:focus {
+  border-color: var(--atomic-form-error);
+  outline-color: var(--atomic-form-error);
+}
+
 .atomic-form-textarea {
   resize: vertical;
 }
@@ -541,6 +555,36 @@
   color: var(--atomic-form-text-light);
   font-size: 0.85rem;
   margin: 0.15rem 0 0;
+}
+
+/* The line under a length-bounded text question: the minimum in words on the
+   left, the `5/200` count on the right. With no minimum the count is all
+   there is, and `margin-left: auto` keeps it against the right edge. */
+.atomic-form-length-meter {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+}
+
+.atomic-form-length-count {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Past the maximum. The border goes red too (see `aria-invalid` above); this
+   is the half that says by how much. */
+.atomic-form-length-count[data-over] {
+  color: var(--atomic-form-error);
+}
+
+/* The characters past the maximum, coloured inside the input itself. Painted
+   through the CSS Custom Highlight API over a range `createValueRange()`
+   hands back — see `overflowHighlight.ts`, which registers the ranges only
+   where both APIs exist. A browser without `::highlight()` drops this rule
+   as unparseable, which is exactly the wanted outcome: the counter and the
+   red border already carry the message. */
+::highlight(atomic-form-overflow) {
+  color: var(--atomic-form-error);
 }
 
 .atomic-form-error {

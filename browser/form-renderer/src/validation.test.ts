@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isOverLength,
+  minLengthHint,
   selectionHint,
   validateFieldValue,
   validatePage,
@@ -231,5 +233,123 @@ describe('multi-select selection bounds', () => {
       'Select between 2 and 4 options',
     );
     expect(selectionHint({})).toBeUndefined();
+  });
+});
+
+/**
+ * How long a text answer may be. Mirrors `text_answers_respect_length_bounds`
+ * in `server/src/forms.rs`.
+ */
+describe('text length bounds', () => {
+  const bounded = (
+    bounds: { minLength?: number; maxLength?: number },
+    type: FieldBlock['type'] = 'short-text',
+  ): FieldBlock => ({
+    ...field(type, 'Name'),
+    options: bounds,
+  });
+
+  it('accepts an answer inside the bounds', () => {
+    expect(
+      validateFieldValue(bounded({ minLength: 2, maxLength: 5 }), 'abc'),
+    ).toBeNull();
+    expect(validateFieldValue(bounded({}), 'anything at all')).toBeNull();
+  });
+
+  it('rejects too short and too long', () => {
+    expect(validateFieldValue(bounded({ minLength: 3 }), 'ab')).toBe(
+      'Please enter at least 3 characters',
+    );
+    expect(
+      validateFieldValue(bounded({ maxLength: 3 }, 'long-text'), 'abcd'),
+    ).toBe('At most 3 characters allowed');
+  });
+
+  it("counts UTF-16 code units, like the input's own maxlength", () => {
+    // One emoji, two code units — so a max of 1 rejects it, the same way
+    // `maxlength=1` would refuse to hold it.
+    expect(validateFieldValue(bounded({ maxLength: 1 }), '\u{1F600}')).toBe(
+      'At most 1 character allowed',
+    );
+  });
+
+  // A minimum bounds an answer; it does not make one mandatory. That is
+  // `required`'s job, and the two produce different messages.
+  it('leaves an empty answer unanswered rather than short', () => {
+    const min = bounded({ minLength: 3 });
+    expect(validateFieldValue(min, '')).toBeNull();
+
+    const page = (required: boolean) => ({
+      version: 1 as const,
+      id: 'f',
+      name: 'Form',
+      settings: {},
+      styling: {},
+      honeypotField: 'hp',
+      pages: [{ blocks: [{ ...min, required }] }],
+    });
+
+    expect(validatePage(page(false), 0, { [min.mapsTo]: '' }).errors).toEqual(
+      {},
+    );
+    expect(validatePage(page(true), 0, { [min.mapsTo]: '' }).errors).toEqual({
+      [min.mapsTo]: 'This field is required',
+    });
+  });
+
+  it('ignores bounds a hand-edited bag left unusable', () => {
+    const junk = bounded({
+      minLength: 'three' as unknown as number,
+      maxLength: 0,
+    });
+    expect(validateFieldValue(junk, 'a')).toBeNull();
+    expect(minLengthHint(junk.options)).toBeUndefined();
+    expect(isOverLength(junk.options, 'a')).toBe(false);
+  });
+
+  // Only the minimum is spelled out: the maximum is the denominator of the
+  // counter beside it.
+  it('describes the minimum in one line for the visitor', () => {
+    expect(minLengthHint({ minLength: 1 })).toBe('At least 1 character');
+    expect(minLengthHint({ minLength: 2, maxLength: 40 })).toBe(
+      'At least 2 characters',
+    );
+    expect(minLengthHint({ maxLength: 200 })).toBeUndefined();
+    expect(minLengthHint({})).toBeUndefined();
+  });
+
+  // Going over is a state the field renders, not a state it prevents — the
+  // visitor keeps typing, the counter goes red, and the submit is what the
+  // bound actually blocks.
+  it('flags an answer past the maximum without stopping it', () => {
+    expect(isOverLength({ maxLength: 3 }, 'abcd')).toBe(true);
+    expect(isOverLength({ maxLength: 3 }, 'abc')).toBe(false);
+    expect(isOverLength({ minLength: 3 }, 'a')).toBe(false);
+    expect(isOverLength({ maxLength: 3 }, undefined)).toBe(false);
+    expect(validateFieldValue(bounded({ maxLength: 3 }), 'abcd')).toBe(
+      'At most 3 characters allowed',
+    );
+  });
+
+  // What actually stops an over-long answer: the page the submit runs over.
+  it('blocks a page carrying an answer past the maximum', () => {
+    const over = bounded({ maxLength: 3 });
+    const page = {
+      version: 1 as const,
+      id: 'f',
+      name: 'Form',
+      settings: {},
+      styling: {},
+      honeypotField: 'hp',
+      pages: [{ blocks: [over] }],
+    };
+
+    const result = validatePage(page, 0, { [over.mapsTo]: 'abcd' });
+    expect(result.errors).toEqual({
+      [over.mapsTo]: 'At most 3 characters allowed',
+    });
+    expect(result.values).toEqual({});
+
+    expect(validatePage(page, 0, { [over.mapsTo]: 'abc' }).errors).toEqual({});
   });
 });

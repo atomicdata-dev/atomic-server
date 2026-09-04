@@ -1,5 +1,6 @@
-import { lazy, Suspense, useState, type JSX } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type JSX } from 'react';
 import { CountrySelect } from './CountrySelect.js';
+import { highlightOverflow } from './overflowHighlight.js';
 import { staggerStyle } from './pageTransition.js';
 import { MultiSelect, SingleSelect } from './SelectMenu.js';
 import {
@@ -10,8 +11,11 @@ import {
   type FieldOptions,
 } from './types.js';
 import {
+  isOverLength,
+  lengthBounds,
   likertScale,
   matrixColumns,
+  minLengthHint,
   ratingMax,
   selectionBounds,
   selectionHint,
@@ -93,6 +97,23 @@ export function FieldInput({
   staggerBase = 0,
 }: FieldInputProps): JSX.Element {
   const placeholder = field.options.placeholder;
+  /* One ref per control rather than one union-typed ref: a `RefObject` is
+   * invariant, so a shared one cannot be handed to both. Exactly one of them
+   * is ever attached — every other field type leaves both null, which is
+   * what stops the effect below. */
+  const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const overflowFrom = lengthBounds(field.options).max;
+  const overLength = isOverLength(field.options, value);
+
+  useEffect(() => {
+    const element = inputRef.current ?? textareaRef.current;
+
+    if (!element || !overLength || overflowFrom === undefined) return;
+
+    return highlightOverflow(element, overflowFrom);
+  }, [overLength, overflowFrom, value]);
+
   /** Marks the `index`-th option of this field as the next thing to fade in,
    * keeping whatever classes the option already carries. */
   const optionStagger = (index: number, className: string) => ({
@@ -102,6 +123,21 @@ export function FieldInput({
 
   switch (field.type) {
     case 'short-text':
+      return (
+        <>
+          <input
+            ref={inputRef}
+            id={inputId}
+            className='atomic-form-input'
+            type='text'
+            placeholder={placeholder}
+            aria-invalid={overLength || undefined}
+            value={(value as string) ?? ''}
+            onChange={e => onChange(e.target.value)}
+          />
+          <LengthMeter options={field.options} value={value} />
+        </>
+      );
     case 'email':
     case 'url':
       return (
@@ -138,14 +174,19 @@ export function FieldInput({
       );
     case 'long-text':
       return (
-        <textarea
-          id={inputId}
-          className='atomic-form-input atomic-form-textarea'
-          placeholder={placeholder}
-          value={(value as string) ?? ''}
-          onChange={e => onChange(e.target.value)}
-          rows={4}
-        />
+        <>
+          <textarea
+            ref={textareaRef}
+            id={inputId}
+            className='atomic-form-input atomic-form-textarea'
+            placeholder={placeholder}
+            aria-invalid={overLength || undefined}
+            value={(value as string) ?? ''}
+            onChange={e => onChange(e.target.value)}
+            rows={4}
+          />
+          <LengthMeter options={field.options} value={value} />
+        </>
       );
     case 'number':
       return (
@@ -658,7 +699,6 @@ function PhoneFieldFallback({ inputId }: { inputId: string }): JSX.Element {
 }
 
 const TEXTUAL_INPUT_TYPES: Record<string, string> = {
-  'short-text': 'text',
   email: 'email',
   url: 'url',
 };
@@ -673,4 +713,44 @@ function SelectionHint({ options }: { options: FieldOptions }): JSX.Element {
   const hint = selectionHint(options);
 
   return hint ? <p className='atomic-form-hint'>{hint}</p> : <></>;
+}
+
+/** What a length-bounded text question shows under its input: the minimum
+ * in words on the left, and a live `5/200` count against the maximum on the
+ * right. Renders nothing when the question is unbounded, which most are.
+ *
+ * The count goes red past the maximum rather than the input refusing the
+ * characters — the visitor can see by how much they are over, and finish
+ * their sentence before cutting it down. Submitting is what the bound
+ * actually blocks (`validateFieldValue`, and `coerce_value` on the
+ * server). */
+function LengthMeter({
+  options,
+  value,
+}: {
+  options: FieldOptions;
+  value: unknown;
+}): JSX.Element {
+  const { max } = lengthBounds(options);
+  const hint = minLengthHint(options);
+
+  if (max === undefined && hint === undefined) {
+    return <></>;
+  }
+
+  const length = typeof value === 'string' ? value.length : 0;
+
+  return (
+    <p className='atomic-form-hint atomic-form-length-meter'>
+      {hint && <span>{hint}</span>}
+      {max !== undefined && (
+        <span
+          className='atomic-form-length-count'
+          data-over={length > max || undefined}
+        >
+          {length}/{max}
+        </span>
+      )}
+    </p>
+  );
 }
