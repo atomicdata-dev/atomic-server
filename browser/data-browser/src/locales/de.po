@@ -7809,30 +7809,9 @@ msgstr ""
 msgid "This app cannot write on its own: {0}"
 msgstr ""
 
-#~ msgid "No verifier is mounted."
-#~ msgstr ""
-
-#~ msgid "Another app is being checked."
-#~ msgstr ""
-
-#~ msgid "The app had not finished rendering after 8 seconds. It may be slow rather than broken."
-#~ msgstr ""
-
 #: src/chunks/AppPage/AppFrame.tsx
 msgid "Something went wrong."
 msgstr ""
-
-#~ msgid "This app has no entry point, so there is nothing to run."
-#~ msgstr ""
-
-#~ msgid "The app I have open just hit an error. Read its source with"
-#~ msgstr ""
-
-#~ msgid "Error ({0}): {1}"
-#~ msgstr ""
-
-#~ msgid "Stack:"
-#~ msgstr ""
 
 #: src/chunks/AppPage/AppFrame.tsx
 msgid "This app hit an error."
@@ -7846,8 +7825,13 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
-#~ msgid "The app you just wrote does NOT run — this is the error it threw when opened. Fix it with update_app and let it be checked again. Do not tell the user the app is ready until it runs."
-#~ msgstr ""
+#. 0: PRODUCT_NAME
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"Your backup, if you made one, is kept by your {0} account — and this browser "
+"isn’t signed in to it."
+msgstr ""
 
-#~ msgid "The app ran without throwing but drew nothing, so the user sees an empty panel. An app with no rows yet still needs to render its heading and a way to add the first one. Fix it with update_app."
-#~ msgstr ""
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "I’ve signed in"
+msgstr ""
