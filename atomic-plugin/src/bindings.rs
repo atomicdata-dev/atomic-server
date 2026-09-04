@@ -6,297 +6,427 @@ pub type GetContext = atomic::class_extender::types::GetContext;
 pub type CommitContext = atomic::class_extender::types::CommitContext;
 #[doc(hidden)]
 #[allow(non_snake_case)]
-pub unsafe fn _export_class_url_cabi<T: Guest>() -> *mut u8 {#[cfg(target_arch="wasm32")]
-_rt::run_ctors_once();let result0 = T::class_url();
-let ptr1 = (&raw mut _RET_AREA.0).cast::<u8>();
-let vec3 = result0;
-let len3 = vec3.len();
-let layout3 = _rt::alloc::Layout::from_size_align_unchecked(vec3.len() * (2*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
-let result3 = if layout3.size() != 0 {
-  let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
-  if ptr.is_null()
-  {
-    _rt::alloc::handle_alloc_error(layout3);
-  }
-  ptr
-}else {
-  ::core::ptr::null_mut()
-};
-for (i, e) in vec3.into_iter().enumerate() {
-  let base = result3.add(i * (2*::core::mem::size_of::<*const u8>()));
-  {
-    let vec2 = (e.into_bytes()).into_boxed_slice();
-    let ptr2 = vec2.as_ptr().cast::<u8>();
-    let len2 = vec2.len();
-    ::core::mem::forget(vec2);
-    *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>() = len2;
-    *base.add(0).cast::<*mut u8>() = ptr2.cast_mut();
-  }
-}
-*ptr1.add(::core::mem::size_of::<*const u8>()).cast::<usize>() = len3;
-*ptr1.add(0).cast::<*mut u8>() = result3;
-ptr1
-}
-#[doc(hidden)]
-#[allow(non_snake_case)]
-pub unsafe fn __post_return_class_url<T: Guest>(arg0: *mut u8,) {
-  let l0 = *arg0.add(0).cast::<*mut u8>();
-  let l1 = *arg0.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-  let base4 = l0;
-  let len4 = l1;
-  for i in 0..len4 {
-    let base = base4.add(i * (2*::core::mem::size_of::<*const u8>()));
-    {
-      let l2 = *base.add(0).cast::<*mut u8>();
-      let l3 = *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-      _rt::cabi_dealloc(l2, l3, 1);
-    }
-  }
-  _rt::cabi_dealloc(base4, len4 * (2*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
-}
-#[doc(hidden)]
-#[allow(non_snake_case)]
-pub unsafe fn _export_on_resource_get_cabi<T: Guest>(arg0: *mut u8,arg1: usize,arg2: *mut u8,arg3: usize,arg4: *mut u8,arg5: usize,arg6: *mut u8,arg7: usize,arg8: *mut u8,arg9: usize,) -> *mut u8 {#[cfg(target_arch="wasm32")]
-_rt::run_ctors_once();let len0 = arg1;
-let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
-let len1 = arg3;
-let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
-let len2 = arg5;
-let bytes2 = _rt::Vec::from_raw_parts(arg4.cast(), len2, len2);
-let len3 = arg7;
-let bytes3 = _rt::Vec::from_raw_parts(arg6.cast(), len3, len3);
-let len4 = arg9;
-let bytes4 = _rt::Vec::from_raw_parts(arg8.cast(), len4, len4);
-let result5 = T::on_resource_get(atomic::class_extender::types::GetContext{
-  request_url: _rt::string_lift(bytes0),
-  requested_subject: _rt::string_lift(bytes1),
-  agent_subject: _rt::string_lift(bytes2),
-  snapshot: atomic::class_extender::types::ResourceJson{
-    subject: _rt::string_lift(bytes3),
-    json_ad: _rt::string_lift(bytes4),
-  },
-});
-let ptr6 = (&raw mut _RET_AREA.0).cast::<u8>();
-match result5 {
-  Ok(e) => { {
-    *ptr6.add(0).cast::<u8>() = (0i32) as u8;
-    match e {
-      Some(e) => {
-        *ptr6.add(::core::mem::size_of::<*const u8>()).cast::<u8>() = (1i32) as u8;
-        let atomic::class_extender::types::ResourceResponse{ primary:primary7, referenced:referenced7, } = e;
-        let atomic::class_extender::types::ResourceJson{ subject:subject8, json_ad:json_ad8, } = primary7;
-        let vec9 = (subject8.into_bytes()).into_boxed_slice();
-        let ptr9 = vec9.as_ptr().cast::<u8>();
-        let len9 = vec9.len();
-        ::core::mem::forget(vec9);
-        *ptr6.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>() = len9;
-        *ptr6.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr9.cast_mut();
-        let vec10 = (json_ad8.into_bytes()).into_boxed_slice();
-        let ptr10 = vec10.as_ptr().cast::<u8>();
-        let len10 = vec10.len();
-        ::core::mem::forget(vec10);
-        *ptr6.add(5*::core::mem::size_of::<*const u8>()).cast::<usize>() = len10;
-        *ptr6.add(4*::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr10.cast_mut();
-        let vec14 = referenced7;
-        let len14 = vec14.len();
-        let layout14 = _rt::alloc::Layout::from_size_align_unchecked(vec14.len() * (4*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
-        let result14 = if layout14.size() != 0 {
-          let ptr = _rt::alloc::alloc(layout14).cast::<u8>();
-          if ptr.is_null()
-          {
-            _rt::alloc::handle_alloc_error(layout14);
-          }
-          ptr
-        }else {
-          ::core::ptr::null_mut()
-        };
-        for (i, e) in vec14.into_iter().enumerate() {
-          let base = result14.add(i * (4*::core::mem::size_of::<*const u8>()));
-          {
-            let atomic::class_extender::types::ResourceJson{ subject:subject11, json_ad:json_ad11, } = e;
-            let vec12 = (subject11.into_bytes()).into_boxed_slice();
-            let ptr12 = vec12.as_ptr().cast::<u8>();
-            let len12 = vec12.len();
-            ::core::mem::forget(vec12);
-            *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>() = len12;
-            *base.add(0).cast::<*mut u8>() = ptr12.cast_mut();
-            let vec13 = (json_ad11.into_bytes()).into_boxed_slice();
-            let ptr13 = vec13.as_ptr().cast::<u8>();
-            let len13 = vec13.len();
-            ::core::mem::forget(vec13);
-            *base.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>() = len13;
-            *base.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr13.cast_mut();
-          }
+pub unsafe fn _export_class_url_cabi<T: Guest>() -> *mut u8 {
+    #[cfg(target_arch = "wasm32")]
+    _rt::run_ctors_once();
+    let result0 = T::class_url();
+    let ptr1 = (&raw mut _RET_AREA.0).cast::<u8>();
+    let vec3 = result0;
+    let len3 = vec3.len();
+    let layout3 = _rt::alloc::Layout::from_size_align_unchecked(
+        vec3.len() * (2 * ::core::mem::size_of::<*const u8>()),
+        ::core::mem::size_of::<*const u8>(),
+    );
+    let result3 = if layout3.size() != 0 {
+        let ptr = _rt::alloc::alloc(layout3).cast::<u8>();
+        if ptr.is_null() {
+            _rt::alloc::handle_alloc_error(layout3);
         }
-        *ptr6.add(7*::core::mem::size_of::<*const u8>()).cast::<usize>() = len14;
-        *ptr6.add(6*::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = result14;
-      },
-      None => {
+        ptr
+    } else {
+        ::core::ptr::null_mut()
+    };
+    for (i, e) in vec3.into_iter().enumerate() {
+        let base = result3.add(i * (2 * ::core::mem::size_of::<*const u8>()));
         {
-          *ptr6.add(::core::mem::size_of::<*const u8>()).cast::<u8>() = (0i32) as u8;
+            let vec2 = (e.into_bytes()).into_boxed_slice();
+            let ptr2 = vec2.as_ptr().cast::<u8>();
+            let len2 = vec2.len();
+            ::core::mem::forget(vec2);
+            *base
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<usize>() = len2;
+            *base.add(0).cast::<*mut u8>() = ptr2.cast_mut();
         }
-      },
-    };} },
-    Err(e) => { {
-      *ptr6.add(0).cast::<u8>() = (1i32) as u8;
-      let vec15 = (e.into_bytes()).into_boxed_slice();
-      let ptr15 = vec15.as_ptr().cast::<u8>();
-      let len15 = vec15.len();
-      ::core::mem::forget(vec15);
-      *ptr6.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>() = len15;
-      *ptr6.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr15.cast_mut();
-    } },
-  };ptr6
+    }
+    *ptr1
+        .add(::core::mem::size_of::<*const u8>())
+        .cast::<usize>() = len3;
+    *ptr1.add(0).cast::<*mut u8>() = result3;
+    ptr1
 }
 #[doc(hidden)]
 #[allow(non_snake_case)]
-pub unsafe fn __post_return_on_resource_get<T: Guest>(arg0: *mut u8,) {
-  let l0 = i32::from(*arg0.add(0).cast::<u8>());
-  match l0 {
-    0 => {
-      let l1 = i32::from(*arg0.add(::core::mem::size_of::<*const u8>()).cast::<u8>());
-      match l1 {
+pub unsafe fn __post_return_class_url<T: Guest>(arg0: *mut u8) {
+    let l0 = *arg0.add(0).cast::<*mut u8>();
+    let l1 = *arg0
+        .add(::core::mem::size_of::<*const u8>())
+        .cast::<usize>();
+    let base4 = l0;
+    let len4 = l1;
+    for i in 0..len4 {
+        let base = base4.add(i * (2 * ::core::mem::size_of::<*const u8>()));
+        {
+            let l2 = *base.add(0).cast::<*mut u8>();
+            let l3 = *base
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<usize>();
+            _rt::cabi_dealloc(l2, l3, 1);
+        }
+    }
+    _rt::cabi_dealloc(
+        base4,
+        len4 * (2 * ::core::mem::size_of::<*const u8>()),
+        ::core::mem::size_of::<*const u8>(),
+    );
+}
+#[doc(hidden)]
+#[allow(non_snake_case)]
+pub unsafe fn _export_on_resource_get_cabi<T: Guest>(
+    arg0: *mut u8,
+    arg1: usize,
+    arg2: *mut u8,
+    arg3: usize,
+    arg4: *mut u8,
+    arg5: usize,
+    arg6: *mut u8,
+    arg7: usize,
+    arg8: *mut u8,
+    arg9: usize,
+) -> *mut u8 {
+    #[cfg(target_arch = "wasm32")]
+    _rt::run_ctors_once();
+    let len0 = arg1;
+    let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
+    let len1 = arg3;
+    let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
+    let len2 = arg5;
+    let bytes2 = _rt::Vec::from_raw_parts(arg4.cast(), len2, len2);
+    let len3 = arg7;
+    let bytes3 = _rt::Vec::from_raw_parts(arg6.cast(), len3, len3);
+    let len4 = arg9;
+    let bytes4 = _rt::Vec::from_raw_parts(arg8.cast(), len4, len4);
+    let result5 = T::on_resource_get(atomic::class_extender::types::GetContext {
+        request_url: _rt::string_lift(bytes0),
+        requested_subject: _rt::string_lift(bytes1),
+        agent_subject: _rt::string_lift(bytes2),
+        snapshot: atomic::class_extender::types::ResourceJson {
+            subject: _rt::string_lift(bytes3),
+            json_ad: _rt::string_lift(bytes4),
+        },
+    });
+    let ptr6 = (&raw mut _RET_AREA.0).cast::<u8>();
+    match result5 {
+        Ok(e) => {
+            *ptr6.add(0).cast::<u8>() = (0i32) as u8;
+            match e {
+                Some(e) => {
+                    *ptr6.add(::core::mem::size_of::<*const u8>()).cast::<u8>() = (1i32) as u8;
+                    let atomic::class_extender::types::ResourceResponse {
+                        primary: primary7,
+                        referenced: referenced7,
+                    } = e;
+                    let atomic::class_extender::types::ResourceJson {
+                        subject: subject8,
+                        json_ad: json_ad8,
+                    } = primary7;
+                    let vec9 = (subject8.into_bytes()).into_boxed_slice();
+                    let ptr9 = vec9.as_ptr().cast::<u8>();
+                    let len9 = vec9.len();
+                    ::core::mem::forget(vec9);
+                    *ptr6
+                        .add(3 * ::core::mem::size_of::<*const u8>())
+                        .cast::<usize>() = len9;
+                    *ptr6
+                        .add(2 * ::core::mem::size_of::<*const u8>())
+                        .cast::<*mut u8>() = ptr9.cast_mut();
+                    let vec10 = (json_ad8.into_bytes()).into_boxed_slice();
+                    let ptr10 = vec10.as_ptr().cast::<u8>();
+                    let len10 = vec10.len();
+                    ::core::mem::forget(vec10);
+                    *ptr6
+                        .add(5 * ::core::mem::size_of::<*const u8>())
+                        .cast::<usize>() = len10;
+                    *ptr6
+                        .add(4 * ::core::mem::size_of::<*const u8>())
+                        .cast::<*mut u8>() = ptr10.cast_mut();
+                    let vec14 = referenced7;
+                    let len14 = vec14.len();
+                    let layout14 = _rt::alloc::Layout::from_size_align_unchecked(
+                        vec14.len() * (4 * ::core::mem::size_of::<*const u8>()),
+                        ::core::mem::size_of::<*const u8>(),
+                    );
+                    let result14 = if layout14.size() != 0 {
+                        let ptr = _rt::alloc::alloc(layout14).cast::<u8>();
+                        if ptr.is_null() {
+                            _rt::alloc::handle_alloc_error(layout14);
+                        }
+                        ptr
+                    } else {
+                        ::core::ptr::null_mut()
+                    };
+                    for (i, e) in vec14.into_iter().enumerate() {
+                        let base = result14.add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                        {
+                            let atomic::class_extender::types::ResourceJson {
+                                subject: subject11,
+                                json_ad: json_ad11,
+                            } = e;
+                            let vec12 = (subject11.into_bytes()).into_boxed_slice();
+                            let ptr12 = vec12.as_ptr().cast::<u8>();
+                            let len12 = vec12.len();
+                            ::core::mem::forget(vec12);
+                            *base
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len12;
+                            *base.add(0).cast::<*mut u8>() = ptr12.cast_mut();
+                            let vec13 = (json_ad11.into_bytes()).into_boxed_slice();
+                            let ptr13 = vec13.as_ptr().cast::<u8>();
+                            let len13 = vec13.len();
+                            ::core::mem::forget(vec13);
+                            *base
+                                .add(3 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len13;
+                            *base
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr13.cast_mut();
+                        }
+                    }
+                    *ptr6
+                        .add(7 * ::core::mem::size_of::<*const u8>())
+                        .cast::<usize>() = len14;
+                    *ptr6
+                        .add(6 * ::core::mem::size_of::<*const u8>())
+                        .cast::<*mut u8>() = result14;
+                }
+                None => {
+                    *ptr6.add(::core::mem::size_of::<*const u8>()).cast::<u8>() = (0i32) as u8;
+                }
+            };
+        }
+        Err(e) => {
+            *ptr6.add(0).cast::<u8>() = (1i32) as u8;
+            let vec15 = (e.into_bytes()).into_boxed_slice();
+            let ptr15 = vec15.as_ptr().cast::<u8>();
+            let len15 = vec15.len();
+            ::core::mem::forget(vec15);
+            *ptr6
+                .add(2 * ::core::mem::size_of::<*const u8>())
+                .cast::<usize>() = len15;
+            *ptr6
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<*mut u8>() = ptr15.cast_mut();
+        }
+    };
+    ptr6
+}
+#[doc(hidden)]
+#[allow(non_snake_case)]
+pub unsafe fn __post_return_on_resource_get<T: Guest>(arg0: *mut u8) {
+    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+    match l0 {
+        0 => {
+            let l1 = i32::from(*arg0.add(::core::mem::size_of::<*const u8>()).cast::<u8>());
+            match l1 {
+                0 => (),
+                _ => {
+                    let l2 = *arg0
+                        .add(2 * ::core::mem::size_of::<*const u8>())
+                        .cast::<*mut u8>();
+                    let l3 = *arg0
+                        .add(3 * ::core::mem::size_of::<*const u8>())
+                        .cast::<usize>();
+                    _rt::cabi_dealloc(l2, l3, 1);
+                    let l4 = *arg0
+                        .add(4 * ::core::mem::size_of::<*const u8>())
+                        .cast::<*mut u8>();
+                    let l5 = *arg0
+                        .add(5 * ::core::mem::size_of::<*const u8>())
+                        .cast::<usize>();
+                    _rt::cabi_dealloc(l4, l5, 1);
+                    let l6 = *arg0
+                        .add(6 * ::core::mem::size_of::<*const u8>())
+                        .cast::<*mut u8>();
+                    let l7 = *arg0
+                        .add(7 * ::core::mem::size_of::<*const u8>())
+                        .cast::<usize>();
+                    let base12 = l6;
+                    let len12 = l7;
+                    for i in 0..len12 {
+                        let base = base12.add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                        {
+                            let l8 = *base.add(0).cast::<*mut u8>();
+                            let l9 = *base
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l8, l9, 1);
+                            let l10 = *base
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>();
+                            let l11 = *base
+                                .add(3 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>();
+                            _rt::cabi_dealloc(l10, l11, 1);
+                        }
+                    }
+                    _rt::cabi_dealloc(
+                        base12,
+                        len12 * (4 * ::core::mem::size_of::<*const u8>()),
+                        ::core::mem::size_of::<*const u8>(),
+                    );
+                }
+            }
+        }
+        _ => {
+            let l13 = *arg0
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<*mut u8>();
+            let l14 = *arg0
+                .add(2 * ::core::mem::size_of::<*const u8>())
+                .cast::<usize>();
+            _rt::cabi_dealloc(l13, l14, 1);
+        }
+    }
+}
+#[doc(hidden)]
+#[allow(non_snake_case)]
+pub unsafe fn _export_before_commit_cabi<T: Guest>(
+    arg0: *mut u8,
+    arg1: usize,
+    arg2: *mut u8,
+    arg3: usize,
+    arg4: *mut u8,
+    arg5: usize,
+    arg6: *mut u8,
+    arg7: usize,
+    arg8: i32,
+) -> *mut u8 {
+    #[cfg(target_arch = "wasm32")]
+    _rt::run_ctors_once();
+    let len0 = arg1;
+    let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
+    let len1 = arg3;
+    let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
+    let len2 = arg5;
+    let bytes2 = _rt::Vec::from_raw_parts(arg4.cast(), len2, len2);
+    let len3 = arg7;
+    let bytes3 = _rt::Vec::from_raw_parts(arg6.cast(), len3, len3);
+    let result4 = T::before_commit(atomic::class_extender::types::CommitContext {
+        subject: _rt::string_lift(bytes0),
+        commit_json: _rt::string_lift(bytes1),
+        snapshot: atomic::class_extender::types::ResourceJson {
+            subject: _rt::string_lift(bytes2),
+            json_ad: _rt::string_lift(bytes3),
+        },
+        is_new: _rt::bool_lift(arg8 as u8),
+    });
+    let ptr5 = (&raw mut _RET_AREA.0).cast::<u8>();
+    match result4 {
+        Ok(_) => {
+            *ptr5.add(0).cast::<u8>() = (0i32) as u8;
+        }
+        Err(e) => {
+            *ptr5.add(0).cast::<u8>() = (1i32) as u8;
+            let vec6 = (e.into_bytes()).into_boxed_slice();
+            let ptr6 = vec6.as_ptr().cast::<u8>();
+            let len6 = vec6.len();
+            ::core::mem::forget(vec6);
+            *ptr5
+                .add(2 * ::core::mem::size_of::<*const u8>())
+                .cast::<usize>() = len6;
+            *ptr5
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<*mut u8>() = ptr6.cast_mut();
+        }
+    };
+    ptr5
+}
+#[doc(hidden)]
+#[allow(non_snake_case)]
+pub unsafe fn __post_return_before_commit<T: Guest>(arg0: *mut u8) {
+    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+    match l0 {
         0 => (),
         _ => {
-          let l2 = *arg0.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-          let l3 = *arg0.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>();
-          _rt::cabi_dealloc(l2, l3, 1);
-          let l4 = *arg0.add(4*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-          let l5 = *arg0.add(5*::core::mem::size_of::<*const u8>()).cast::<usize>();
-          _rt::cabi_dealloc(l4, l5, 1);
-          let l6 = *arg0.add(6*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-          let l7 = *arg0.add(7*::core::mem::size_of::<*const u8>()).cast::<usize>();
-          let base12 = l6;
-          let len12 = l7;
-          for i in 0..len12 {
-            let base = base12.add(i * (4*::core::mem::size_of::<*const u8>()));
-            {
-              let l8 = *base.add(0).cast::<*mut u8>();
-              let l9 = *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-              _rt::cabi_dealloc(l8, l9, 1);
-              let l10 = *base.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-              let l11 = *base.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>();
-              _rt::cabi_dealloc(l10, l11, 1);
-            }
-          }
-          _rt::cabi_dealloc(base12, len12 * (4*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
+            let l1 = *arg0
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<*mut u8>();
+            let l2 = *arg0
+                .add(2 * ::core::mem::size_of::<*const u8>())
+                .cast::<usize>();
+            _rt::cabi_dealloc(l1, l2, 1);
+        }
+    }
+}
+#[doc(hidden)]
+#[allow(non_snake_case)]
+pub unsafe fn _export_after_commit_cabi<T: Guest>(
+    arg0: *mut u8,
+    arg1: usize,
+    arg2: *mut u8,
+    arg3: usize,
+    arg4: *mut u8,
+    arg5: usize,
+    arg6: *mut u8,
+    arg7: usize,
+    arg8: i32,
+) -> *mut u8 {
+    #[cfg(target_arch = "wasm32")]
+    _rt::run_ctors_once();
+    let len0 = arg1;
+    let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
+    let len1 = arg3;
+    let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
+    let len2 = arg5;
+    let bytes2 = _rt::Vec::from_raw_parts(arg4.cast(), len2, len2);
+    let len3 = arg7;
+    let bytes3 = _rt::Vec::from_raw_parts(arg6.cast(), len3, len3);
+    let result4 = T::after_commit(atomic::class_extender::types::CommitContext {
+        subject: _rt::string_lift(bytes0),
+        commit_json: _rt::string_lift(bytes1),
+        snapshot: atomic::class_extender::types::ResourceJson {
+            subject: _rt::string_lift(bytes2),
+            json_ad: _rt::string_lift(bytes3),
         },
-      }
-    },
-    _ => {
-      let l13 = *arg0.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-      let l14 = *arg0.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-      _rt::cabi_dealloc(l13, l14, 1);
-    },
-  }
+        is_new: _rt::bool_lift(arg8 as u8),
+    });
+    let ptr5 = (&raw mut _RET_AREA.0).cast::<u8>();
+    match result4 {
+        Ok(_) => {
+            *ptr5.add(0).cast::<u8>() = (0i32) as u8;
+        }
+        Err(e) => {
+            *ptr5.add(0).cast::<u8>() = (1i32) as u8;
+            let vec6 = (e.into_bytes()).into_boxed_slice();
+            let ptr6 = vec6.as_ptr().cast::<u8>();
+            let len6 = vec6.len();
+            ::core::mem::forget(vec6);
+            *ptr5
+                .add(2 * ::core::mem::size_of::<*const u8>())
+                .cast::<usize>() = len6;
+            *ptr5
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<*mut u8>() = ptr6.cast_mut();
+        }
+    };
+    ptr5
 }
 #[doc(hidden)]
 #[allow(non_snake_case)]
-pub unsafe fn _export_before_commit_cabi<T: Guest>(arg0: *mut u8,arg1: usize,arg2: *mut u8,arg3: usize,arg4: *mut u8,arg5: usize,arg6: *mut u8,arg7: usize,arg8: i32,) -> *mut u8 {#[cfg(target_arch="wasm32")]
-_rt::run_ctors_once();let len0 = arg1;
-let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
-let len1 = arg3;
-let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
-let len2 = arg5;
-let bytes2 = _rt::Vec::from_raw_parts(arg4.cast(), len2, len2);
-let len3 = arg7;
-let bytes3 = _rt::Vec::from_raw_parts(arg6.cast(), len3, len3);
-let result4 = T::before_commit(atomic::class_extender::types::CommitContext{
-  subject: _rt::string_lift(bytes0),
-  commit_json: _rt::string_lift(bytes1),
-  snapshot: atomic::class_extender::types::ResourceJson{
-    subject: _rt::string_lift(bytes2),
-    json_ad: _rt::string_lift(bytes3),
-  },
-  is_new: _rt::bool_lift(arg8 as u8),
-});
-let ptr5 = (&raw mut _RET_AREA.0).cast::<u8>();
-match result4 {
-  Ok(_) => { {
-    *ptr5.add(0).cast::<u8>() = (0i32) as u8;
-  } },
-  Err(e) => { {
-    *ptr5.add(0).cast::<u8>() = (1i32) as u8;
-    let vec6 = (e.into_bytes()).into_boxed_slice();
-    let ptr6 = vec6.as_ptr().cast::<u8>();
-    let len6 = vec6.len();
-    ::core::mem::forget(vec6);
-    *ptr5.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>() = len6;
-    *ptr5.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr6.cast_mut();
-  } },
-};ptr5
-}
-#[doc(hidden)]
-#[allow(non_snake_case)]
-pub unsafe fn __post_return_before_commit<T: Guest>(arg0: *mut u8,) {
-  let l0 = i32::from(*arg0.add(0).cast::<u8>());
-  match l0 {
-    0 => (),
-    _ => {
-      let l1 = *arg0.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-      let l2 = *arg0.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-      _rt::cabi_dealloc(l1, l2, 1);
-    },
-  }
-}
-#[doc(hidden)]
-#[allow(non_snake_case)]
-pub unsafe fn _export_after_commit_cabi<T: Guest>(arg0: *mut u8,arg1: usize,arg2: *mut u8,arg3: usize,arg4: *mut u8,arg5: usize,arg6: *mut u8,arg7: usize,arg8: i32,) -> *mut u8 {#[cfg(target_arch="wasm32")]
-_rt::run_ctors_once();let len0 = arg1;
-let bytes0 = _rt::Vec::from_raw_parts(arg0.cast(), len0, len0);
-let len1 = arg3;
-let bytes1 = _rt::Vec::from_raw_parts(arg2.cast(), len1, len1);
-let len2 = arg5;
-let bytes2 = _rt::Vec::from_raw_parts(arg4.cast(), len2, len2);
-let len3 = arg7;
-let bytes3 = _rt::Vec::from_raw_parts(arg6.cast(), len3, len3);
-let result4 = T::after_commit(atomic::class_extender::types::CommitContext{
-  subject: _rt::string_lift(bytes0),
-  commit_json: _rt::string_lift(bytes1),
-  snapshot: atomic::class_extender::types::ResourceJson{
-    subject: _rt::string_lift(bytes2),
-    json_ad: _rt::string_lift(bytes3),
-  },
-  is_new: _rt::bool_lift(arg8 as u8),
-});
-let ptr5 = (&raw mut _RET_AREA.0).cast::<u8>();
-match result4 {
-  Ok(_) => { {
-    *ptr5.add(0).cast::<u8>() = (0i32) as u8;
-  } },
-  Err(e) => { {
-    *ptr5.add(0).cast::<u8>() = (1i32) as u8;
-    let vec6 = (e.into_bytes()).into_boxed_slice();
-    let ptr6 = vec6.as_ptr().cast::<u8>();
-    let len6 = vec6.len();
-    ::core::mem::forget(vec6);
-    *ptr5.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>() = len6;
-    *ptr5.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr6.cast_mut();
-  } },
-};ptr5
-}
-#[doc(hidden)]
-#[allow(non_snake_case)]
-pub unsafe fn __post_return_after_commit<T: Guest>(arg0: *mut u8,) {
-  let l0 = i32::from(*arg0.add(0).cast::<u8>());
-  match l0 {
-    0 => (),
-    _ => {
-      let l1 = *arg0.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-      let l2 = *arg0.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-      _rt::cabi_dealloc(l1, l2, 1);
-    },
-  }
+pub unsafe fn __post_return_after_commit<T: Guest>(arg0: *mut u8) {
+    let l0 = i32::from(*arg0.add(0).cast::<u8>());
+    match l0 {
+        0 => (),
+        _ => {
+            let l1 = *arg0
+                .add(::core::mem::size_of::<*const u8>())
+                .cast::<*mut u8>();
+            let l2 = *arg0
+                .add(2 * ::core::mem::size_of::<*const u8>())
+                .cast::<usize>();
+            _rt::cabi_dealloc(l1, l2, 1);
+        }
+    }
 }
 pub trait Guest {
-  /// Returns the class URL this extender applies to.
-  fn class_url() -> _rt::Vec::<_rt::String>;
-  /// Called before a Resource is returned to a client. Return `none` to leave the Resource untouched.
-  fn on_resource_get(ctx: GetContext,) -> Result<Option<ResourceResponse>,_rt::String>;
-  /// Called before a Commit that targets the class is persisted.
-  fn before_commit(ctx: CommitContext,) -> Result<(),_rt::String>;
-  /// Called after a Commit targeting the class has been applied.
-  fn after_commit(ctx: CommitContext,) -> Result<(),_rt::String>;
+    /// Returns the class URL this extender applies to.
+    fn class_url() -> _rt::Vec<_rt::String>;
+    /// Called before a Resource is returned to a client. Return `none` to leave the Resource untouched.
+    fn on_resource_get(ctx: GetContext) -> Result<Option<ResourceResponse>, _rt::String>;
+    /// Called before a Commit that targets the class is persisted.
+    fn before_commit(ctx: CommitContext) -> Result<(), _rt::String>;
+    /// Called after a Commit targeting the class has been applied.
+    fn after_commit(ctx: CommitContext) -> Result<(), _rt::String>;
 }
 #[doc(hidden)]
 #[macro_export]
@@ -340,563 +470,794 @@ macro_rules! __export_world_class_extender_cabi{
 #[doc(hidden)]
 pub(crate) use __export_world_class_extender_cabi;
 
-#[cfg_attr(target_pointer_width="64", repr(align(8)))]
-#[cfg_attr(target_pointer_width="32", repr(align(4)))]
-struct _RetArea([::core::mem::MaybeUninit::<u8>; 8*::core::mem::size_of::<*const u8>()]);
-static mut _RET_AREA: _RetArea = _RetArea([::core::mem::MaybeUninit::uninit(); 8*::core::mem::size_of::<*const u8>()]);
+#[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+#[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+struct _RetArea([::core::mem::MaybeUninit<u8>; 8 * ::core::mem::size_of::<*const u8>()]);
+static mut _RET_AREA: _RetArea =
+    _RetArea([::core::mem::MaybeUninit::uninit(); 8 * ::core::mem::size_of::<*const u8>()]);
 #[allow(dead_code, clippy::all)]
 pub mod atomic {
-  pub mod class_extender {
+    pub mod class_extender {
 
-    #[allow(dead_code, async_fn_in_trait, unused_imports, clippy::all)]
-    pub mod types {
-      #[used]
-      #[doc(hidden)]
-      static __FORCE_SECTION_REF: fn() =
-      super::super::super::__link_custom_section_describing_imports;
-      
-      use super::super::super::_rt;
-      #[derive(Clone)]
-      pub struct HttpHeader {
-        pub name: _rt::String,
-        pub value: _rt::String,
-      }
-      impl ::core::fmt::Debug for HttpHeader {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("HttpHeader").field("name", &self.name).field("value", &self.value).finish()
-        }
-      }
-      #[derive(Clone)]
-      pub struct HttpRequest {
-        pub method: _rt::String,
-        pub url: _rt::String,
-        pub headers: _rt::Vec::<HttpHeader>,
-        pub body: Option<_rt::String>,
-      }
-      impl ::core::fmt::Debug for HttpRequest {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("HttpRequest").field("method", &self.method).field("url", &self.url).field("headers", &self.headers).field("body", &self.body).finish()
-        }
-      }
-      #[derive(Clone)]
-      pub struct HttpResponse {
-        pub status: u16,
-        pub headers: _rt::Vec::<HttpHeader>,
-        pub body: _rt::String,
-      }
-      impl ::core::fmt::Debug for HttpResponse {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("HttpResponse").field("status", &self.status).field("headers", &self.headers).field("body", &self.body).finish()
-        }
-      }
-      /// JSON-AD encoded Resource.
-      #[derive(Clone)]
-      pub struct ResourceJson {
-        pub subject: _rt::String,
-        pub json_ad: _rt::String,
-      }
-      impl ::core::fmt::Debug for ResourceJson {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("ResourceJson").field("subject", &self.subject).field("json-ad", &self.json_ad).finish()
-        }
-      }
-      /// Response payload with optional referenced resources.
-      #[derive(Clone)]
-      pub struct ResourceResponse {
-        pub primary: ResourceJson,
-        pub referenced: _rt::Vec::<ResourceJson>,
-      }
-      impl ::core::fmt::Debug for ResourceResponse {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("ResourceResponse").field("primary", &self.primary).field("referenced", &self.referenced).finish()
-        }
-      }
-      /// Context passed when a Resource is being fetched.
-      #[derive(Clone)]
-      pub struct GetContext {
-        pub request_url: _rt::String,
-        pub requested_subject: _rt::String,
-        pub agent_subject: _rt::String,
-        pub snapshot: ResourceJson,
-      }
-      impl ::core::fmt::Debug for GetContext {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("GetContext").field("request-url", &self.request_url).field("requested-subject", &self.requested_subject).field("agent-subject", &self.agent_subject).field("snapshot", &self.snapshot).finish()
-        }
-      }
-      /// Context passed during Commit hooks.
-      #[derive(Clone)]
-      pub struct CommitContext {
-        pub subject: _rt::String,
-        pub commit_json: _rt::String,
-        pub snapshot: ResourceJson,
-        /// True if this is the first commit for the resource.
-        pub is_new: bool,
-      }
-      impl ::core::fmt::Debug for CommitContext {
-        fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
-          f.debug_struct("CommitContext").field("subject", &self.subject).field("commit-json", &self.commit_json).field("snapshot", &self.snapshot).field("is-new", &self.is_new).finish()
-        }
-      }
+        #[allow(dead_code, async_fn_in_trait, unused_imports, clippy::all)]
+        pub mod types {
+            #[used]
+            #[doc(hidden)]
+            static __FORCE_SECTION_REF: fn() =
+                super::super::super::__link_custom_section_describing_imports;
 
-    }
-
-
-    #[allow(dead_code, async_fn_in_trait, unused_imports, clippy::all)]
-    pub mod host {
-      #[used]
-      #[doc(hidden)]
-      static __FORCE_SECTION_REF: fn() =
-      super::super::super::__link_custom_section_describing_imports;
-      
-      use super::super::super::_rt;
-      pub type ResourceJson = super::super::super::atomic::class_extender::types::ResourceJson;
-      pub type HttpRequest = super::super::super::atomic::class_extender::types::HttpRequest;
-      pub type HttpResponse = super::super::super::atomic::class_extender::types::HttpResponse;
-      #[allow(unused_unsafe, clippy::all)]
-      /// Returns a resource by subject.
-      pub fn get_resource(subject: &str,agent: Option<&str>,) -> Result<ResourceJson,_rt::String>{
-        unsafe {
-
-          #[cfg_attr(target_pointer_width="64", repr(align(8)))]
-          #[cfg_attr(target_pointer_width="32", repr(align(4)))]
-          struct RetArea([::core::mem::MaybeUninit::<u8>; 5*::core::mem::size_of::<*const u8>()]);
-          let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 5*::core::mem::size_of::<*const u8>()]);
-          let vec0 = subject;
-          let ptr0 = vec0.as_ptr().cast::<u8>();
-          let len0 = vec0.len();
-          let (result2_0,result2_1,result2_2,) = match agent {
-            Some(e) => {
-              let vec1 = e;
-              let ptr1 = vec1.as_ptr().cast::<u8>();
-              let len1 = vec1.len();
-
-              (1i32, ptr1.cast_mut(), len1)
-            },
-            None => {
-              (0i32, ::core::ptr::null_mut(), 0usize)
-            },
-          };let ptr3 = ret_area.0.as_mut_ptr().cast::<u8>();
-          #[cfg(target_arch = "wasm32")]
-          #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
-          unsafe extern "C" {
-            #[link_name = "get-resource"]
-            fn wit_import4(_: *mut u8, _: usize, _: i32, _: *mut u8, _: usize, _: *mut u8, );
-          }
-
-          #[cfg(not(target_arch = "wasm32"))]
-          unsafe extern "C" fn wit_import4(_: *mut u8, _: usize, _: i32, _: *mut u8, _: usize, _: *mut u8, ){ unreachable!() }
-          unsafe { wit_import4(ptr0.cast_mut(), len0, result2_0, result2_1, result2_2, ptr3) };
-          let l5 = i32::from(*ptr3.add(0).cast::<u8>());
-          let result15 = match l5 {
-            0 => {
-              let e = {
-                let l6 = *ptr3.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l7 = *ptr3.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len8 = l7;
-                let bytes8 = _rt::Vec::from_raw_parts(l6.cast(), len8, len8);
-                let l9 = *ptr3.add(3*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l10 = *ptr3.add(4*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len11 = l10;
-                let bytes11 = _rt::Vec::from_raw_parts(l9.cast(), len11, len11);
-
-                super::super::super::atomic::class_extender::types::ResourceJson{
-                  subject: _rt::string_lift(bytes8),
-                  json_ad: _rt::string_lift(bytes11),
+            use super::super::super::_rt;
+            #[derive(Clone)]
+            pub struct HttpHeader {
+                pub name: _rt::String,
+                pub value: _rt::String,
+            }
+            impl ::core::fmt::Debug for HttpHeader {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("HttpHeader")
+                        .field("name", &self.name)
+                        .field("value", &self.value)
+                        .finish()
                 }
-              };
-              Ok(e)
             }
-            1 => {
-              let e = {
-                let l12 = *ptr3.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l13 = *ptr3.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len14 = l13;
-                let bytes14 = _rt::Vec::from_raw_parts(l12.cast(), len14, len14);
-
-                _rt::string_lift(bytes14)
-              };
-              Err(e)
+            #[derive(Clone)]
+            pub struct HttpRequest {
+                pub method: _rt::String,
+                pub url: _rt::String,
+                pub headers: _rt::Vec<HttpHeader>,
+                pub body: Option<_rt::String>,
             }
-            _ => _rt::invalid_enum_discriminant(),
-          };
-          result15
+            impl ::core::fmt::Debug for HttpRequest {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("HttpRequest")
+                        .field("method", &self.method)
+                        .field("url", &self.url)
+                        .field("headers", &self.headers)
+                        .field("body", &self.body)
+                        .finish()
+                }
+            }
+            #[derive(Clone)]
+            pub struct HttpResponse {
+                pub status: u16,
+                pub headers: _rt::Vec<HttpHeader>,
+                pub body: _rt::String,
+            }
+            impl ::core::fmt::Debug for HttpResponse {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("HttpResponse")
+                        .field("status", &self.status)
+                        .field("headers", &self.headers)
+                        .field("body", &self.body)
+                        .finish()
+                }
+            }
+            /// JSON-AD encoded Resource.
+            #[derive(Clone)]
+            pub struct ResourceJson {
+                pub subject: _rt::String,
+                pub json_ad: _rt::String,
+            }
+            impl ::core::fmt::Debug for ResourceJson {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("ResourceJson")
+                        .field("subject", &self.subject)
+                        .field("json-ad", &self.json_ad)
+                        .finish()
+                }
+            }
+            /// Response payload with optional referenced resources.
+            #[derive(Clone)]
+            pub struct ResourceResponse {
+                pub primary: ResourceJson,
+                pub referenced: _rt::Vec<ResourceJson>,
+            }
+            impl ::core::fmt::Debug for ResourceResponse {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("ResourceResponse")
+                        .field("primary", &self.primary)
+                        .field("referenced", &self.referenced)
+                        .finish()
+                }
+            }
+            /// Context passed when a Resource is being fetched.
+            #[derive(Clone)]
+            pub struct GetContext {
+                pub request_url: _rt::String,
+                pub requested_subject: _rt::String,
+                pub agent_subject: _rt::String,
+                pub snapshot: ResourceJson,
+            }
+            impl ::core::fmt::Debug for GetContext {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("GetContext")
+                        .field("request-url", &self.request_url)
+                        .field("requested-subject", &self.requested_subject)
+                        .field("agent-subject", &self.agent_subject)
+                        .field("snapshot", &self.snapshot)
+                        .finish()
+                }
+            }
+            /// Context passed during Commit hooks.
+            #[derive(Clone)]
+            pub struct CommitContext {
+                pub subject: _rt::String,
+                pub commit_json: _rt::String,
+                pub snapshot: ResourceJson,
+                /// True if this is the first commit for the resource.
+                pub is_new: bool,
+            }
+            impl ::core::fmt::Debug for CommitContext {
+                fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+                    f.debug_struct("CommitContext")
+                        .field("subject", &self.subject)
+                        .field("commit-json", &self.commit_json)
+                        .field("snapshot", &self.snapshot)
+                        .field("is-new", &self.is_new)
+                        .finish()
+                }
+            }
         }
-      }
-      #[allow(unused_unsafe, clippy::all)]
-      /// Returns a list of resources that match the query.
-      pub fn query(property: &str,value: &str,agent: Option<&str>,) -> Result<_rt::Vec::<ResourceJson>,_rt::String>{
-        unsafe {
 
-          #[cfg_attr(target_pointer_width="64", repr(align(8)))]
-          #[cfg_attr(target_pointer_width="32", repr(align(4)))]
-          struct RetArea([::core::mem::MaybeUninit::<u8>; 3*::core::mem::size_of::<*const u8>()]);
-          let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 3*::core::mem::size_of::<*const u8>()]);
-          let vec0 = property;
-          let ptr0 = vec0.as_ptr().cast::<u8>();
-          let len0 = vec0.len();
-          let vec1 = value;
-          let ptr1 = vec1.as_ptr().cast::<u8>();
-          let len1 = vec1.len();
-          let (result3_0,result3_1,result3_2,) = match agent {
-            Some(e) => {
-              let vec2 = e;
-              let ptr2 = vec2.as_ptr().cast::<u8>();
-              let len2 = vec2.len();
+        #[allow(dead_code, async_fn_in_trait, unused_imports, clippy::all)]
+        pub mod host {
+            #[used]
+            #[doc(hidden)]
+            static __FORCE_SECTION_REF: fn() =
+                super::super::super::__link_custom_section_describing_imports;
 
-              (1i32, ptr2.cast_mut(), len2)
-            },
-            None => {
-              (0i32, ::core::ptr::null_mut(), 0usize)
-            },
-          };let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
-          #[cfg(target_arch = "wasm32")]
-          #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
-          unsafe extern "C" {
-            #[link_name = "query"]
-            fn wit_import5(_: *mut u8, _: usize, _: *mut u8, _: usize, _: i32, _: *mut u8, _: usize, _: *mut u8, );
-          }
+            use super::super::super::_rt;
+            pub type ResourceJson =
+                super::super::super::atomic::class_extender::types::ResourceJson;
+            pub type HttpRequest = super::super::super::atomic::class_extender::types::HttpRequest;
+            pub type HttpResponse =
+                super::super::super::atomic::class_extender::types::HttpResponse;
+            #[allow(unused_unsafe, clippy::all)]
+            /// Returns a resource by subject.
+            pub fn get_resource(
+                subject: &str,
+                agent: Option<&str>,
+            ) -> Result<ResourceJson, _rt::String> {
+                unsafe {
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<u8>; 5 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit();
+                            5 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let vec0 = subject;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let (result2_0, result2_1, result2_2) = match agent {
+                        Some(e) => {
+                            let vec1 = e;
+                            let ptr1 = vec1.as_ptr().cast::<u8>();
+                            let len1 = vec1.len();
 
-          #[cfg(not(target_arch = "wasm32"))]
-          unsafe extern "C" fn wit_import5(_: *mut u8, _: usize, _: *mut u8, _: usize, _: i32, _: *mut u8, _: usize, _: *mut u8, ){ unreachable!() }
-          unsafe { wit_import5(ptr0.cast_mut(), len0, ptr1.cast_mut(), len1, result3_0, result3_1, result3_2, ptr4) };
-          let l6 = i32::from(*ptr4.add(0).cast::<u8>());
-          let result19 = match l6 {
-            0 => {
-              let e = {
-                let l7 = *ptr4.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l8 = *ptr4.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let base15 = l7;
-                let len15 = l8;
-                let mut result15 = _rt::Vec::with_capacity(len15);
-                for i in 0..len15 {
-                  let base = base15.add(i * (4*::core::mem::size_of::<*const u8>()));
-                  let e15 = {
-                    let l9 = *base.add(0).cast::<*mut u8>();
-                    let l10 = *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-                    let len11 = l10;
-                    let bytes11 = _rt::Vec::from_raw_parts(l9.cast(), len11, len11);
-                    let l12 = *base.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                    let l13 = *base.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                    let len14 = l13;
-                    let bytes14 = _rt::Vec::from_raw_parts(l12.cast(), len14, len14);
+                            (1i32, ptr1.cast_mut(), len1)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let ptr3 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
+                    unsafe extern "C" {
+                        #[link_name = "get-resource"]
+                        fn wit_import4(
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
 
-                    super::super::super::atomic::class_extender::types::ResourceJson{
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn wit_import4(
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        wit_import4(ptr0.cast_mut(), len0, result2_0, result2_1, result2_2, ptr3)
+                    };
+                    let l5 = i32::from(*ptr3.add(0).cast::<u8>());
+                    let result15 = match l5 {
+                        0 => {
+                            let e = {
+                                let l6 = *ptr3
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l7 = *ptr3
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len8 = l7;
+                                let bytes8 = _rt::Vec::from_raw_parts(l6.cast(), len8, len8);
+                                let l9 = *ptr3
+                                    .add(3 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l10 = *ptr3
+                                    .add(4 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len11 = l10;
+                                let bytes11 = _rt::Vec::from_raw_parts(l9.cast(), len11, len11);
+
+                                super::super::super::atomic::class_extender::types::ResourceJson {
+                                    subject: _rt::string_lift(bytes8),
+                                    json_ad: _rt::string_lift(bytes11),
+                                }
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l12 = *ptr3
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l13 = *ptr3
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len14 = l13;
+                                let bytes14 = _rt::Vec::from_raw_parts(l12.cast(), len14, len14);
+
+                                _rt::string_lift(bytes14)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    };
+                    result15
+                }
+            }
+            #[allow(unused_unsafe, clippy::all)]
+            /// Returns a list of resources that match the query.
+            pub fn query(
+                property: &str,
+                value: &str,
+                agent: Option<&str>,
+            ) -> Result<_rt::Vec<ResourceJson>, _rt::String> {
+                unsafe {
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<u8>; 3 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit();
+                            3 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let vec0 = property;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let vec1 = value;
+                    let ptr1 = vec1.as_ptr().cast::<u8>();
+                    let len1 = vec1.len();
+                    let (result3_0, result3_1, result3_2) = match agent {
+                        Some(e) => {
+                            let vec2 = e;
+                            let ptr2 = vec2.as_ptr().cast::<u8>();
+                            let len2 = vec2.len();
+
+                            (1i32, ptr2.cast_mut(), len2)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let ptr4 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
+                    unsafe extern "C" {
+                        #[link_name = "query"]
+                        fn wit_import5(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
+
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn wit_import5(
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        wit_import5(
+                            ptr0.cast_mut(),
+                            len0,
+                            ptr1.cast_mut(),
+                            len1,
+                            result3_0,
+                            result3_1,
+                            result3_2,
+                            ptr4,
+                        )
+                    };
+                    let l6 = i32::from(*ptr4.add(0).cast::<u8>());
+                    let result19 = match l6 {
+                        0 => {
+                            let e = {
+                                let l7 = *ptr4
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l8 = *ptr4
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let base15 = l7;
+                                let len15 = l8;
+                                let mut result15 = _rt::Vec::with_capacity(len15);
+                                for i in 0..len15 {
+                                    let base =
+                                        base15.add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                                    let e15 = {
+                                        let l9 = *base.add(0).cast::<*mut u8>();
+                                        let l10 = *base
+                                            .add(::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len11 = l10;
+                                        let bytes11 =
+                                            _rt::Vec::from_raw_parts(l9.cast(), len11, len11);
+                                        let l12 = *base
+                                            .add(2 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<*mut u8>();
+                                        let l13 = *base
+                                            .add(3 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len14 = l13;
+                                        let bytes14 =
+                                            _rt::Vec::from_raw_parts(l12.cast(), len14, len14);
+
+                                        super::super::super::atomic::class_extender::types::ResourceJson{
                       subject: _rt::string_lift(bytes11),
                       json_ad: _rt::string_lift(bytes14),
                     }
-                  };
-                  result15.push(e15);
+                                    };
+                                    result15.push(e15);
+                                }
+                                _rt::cabi_dealloc(
+                                    base15,
+                                    len15 * (4 * ::core::mem::size_of::<*const u8>()),
+                                    ::core::mem::size_of::<*const u8>(),
+                                );
+
+                                result15
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l16 = *ptr4
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l17 = *ptr4
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len18 = l17;
+                                let bytes18 = _rt::Vec::from_raw_parts(l16.cast(), len18, len18);
+
+                                _rt::string_lift(bytes18)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    };
+                    result19
                 }
-                _rt::cabi_dealloc(base15, len15 * (4*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
-
-                result15
-              };
-              Ok(e)
             }
-            1 => {
-              let e = {
-                let l16 = *ptr4.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l17 = *ptr4.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len18 = l17;
-                let bytes18 = _rt::Vec::from_raw_parts(l16.cast(), len18, len18);
+            #[allow(unused_unsafe, clippy::all)]
+            pub fn get_plugin_agent() -> _rt::String {
+                unsafe {
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<u8>; 2 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit();
+                            2 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
+                    unsafe extern "C" {
+                        #[link_name = "get-plugin-agent"]
+                        fn wit_import1(_: *mut u8);
+                    }
 
-                _rt::string_lift(bytes18)
-              };
-              Err(e)
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn wit_import1(_: *mut u8) {
+                        unreachable!()
+                    }
+                    unsafe { wit_import1(ptr0) };
+                    let l2 = *ptr0.add(0).cast::<*mut u8>();
+                    let l3 = *ptr0
+                        .add(::core::mem::size_of::<*const u8>())
+                        .cast::<usize>();
+                    let len4 = l3;
+                    let bytes4 = _rt::Vec::from_raw_parts(l2.cast(), len4, len4);
+                    let result5 = _rt::string_lift(bytes4);
+                    result5
+                }
             }
-            _ => _rt::invalid_enum_discriminant(),
-          };
-          result19
-        }
-      }
-      #[allow(unused_unsafe, clippy::all)]
-      pub fn get_plugin_agent() -> _rt::String{
-        unsafe {
+            #[allow(unused_unsafe, clippy::all)]
+            /// Returns the JSON config of the plugin as a string. The user can edit this config at any time.
+            pub fn get_config() -> _rt::String {
+                unsafe {
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<u8>; 2 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit();
+                            2 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
+                    unsafe extern "C" {
+                        #[link_name = "get-config"]
+                        fn wit_import1(_: *mut u8);
+                    }
 
-          #[cfg_attr(target_pointer_width="64", repr(align(8)))]
-          #[cfg_attr(target_pointer_width="32", repr(align(4)))]
-          struct RetArea([::core::mem::MaybeUninit::<u8>; 2*::core::mem::size_of::<*const u8>()]);
-          let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 2*::core::mem::size_of::<*const u8>()]);
-          let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
-          #[cfg(target_arch = "wasm32")]
-          #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
-          unsafe extern "C" {
-            #[link_name = "get-plugin-agent"]
-            fn wit_import1(_: *mut u8, );
-          }
-
-          #[cfg(not(target_arch = "wasm32"))]
-          unsafe extern "C" fn wit_import1(_: *mut u8, ){ unreachable!() }
-          unsafe { wit_import1(ptr0) };
-          let l2 = *ptr0.add(0).cast::<*mut u8>();
-          let l3 = *ptr0.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-          let len4 = l3;
-          let bytes4 = _rt::Vec::from_raw_parts(l2.cast(), len4, len4);
-          let result5 = _rt::string_lift(bytes4);
-          result5
-        }
-      }
-      #[allow(unused_unsafe, clippy::all)]
-      /// Returns the JSON config of the plugin as a string. The user can edit this config at any time.
-      pub fn get_config() -> _rt::String{
-        unsafe {
-
-          #[cfg_attr(target_pointer_width="64", repr(align(8)))]
-          #[cfg_attr(target_pointer_width="32", repr(align(4)))]
-          struct RetArea([::core::mem::MaybeUninit::<u8>; 2*::core::mem::size_of::<*const u8>()]);
-          let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 2*::core::mem::size_of::<*const u8>()]);
-          let ptr0 = ret_area.0.as_mut_ptr().cast::<u8>();
-          #[cfg(target_arch = "wasm32")]
-          #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
-          unsafe extern "C" {
-            #[link_name = "get-config"]
-            fn wit_import1(_: *mut u8, );
-          }
-
-          #[cfg(not(target_arch = "wasm32"))]
-          unsafe extern "C" fn wit_import1(_: *mut u8, ){ unreachable!() }
-          unsafe { wit_import1(ptr0) };
-          let l2 = *ptr0.add(0).cast::<*mut u8>();
-          let l3 = *ptr0.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-          let len4 = l3;
-          let bytes4 = _rt::Vec::from_raw_parts(l2.cast(), len4, len4);
-          let result5 = _rt::string_lift(bytes4);
-          result5
-        }
-      }
-      #[allow(unused_unsafe, clippy::all)]
-      /// Creates a commit and signs it using the plugin's agent.
-      ///   The commit parameter should be a stringified JSON object of a CommitBuilder.
-      pub fn commit(commit: &str,) -> Result<(),_rt::String>{
-        unsafe {
-
-          #[cfg_attr(target_pointer_width="64", repr(align(8)))]
-          #[cfg_attr(target_pointer_width="32", repr(align(4)))]
-          struct RetArea([::core::mem::MaybeUninit::<u8>; 3*::core::mem::size_of::<*const u8>()]);
-          let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 3*::core::mem::size_of::<*const u8>()]);
-          let vec0 = commit;
-          let ptr0 = vec0.as_ptr().cast::<u8>();
-          let len0 = vec0.len();
-          let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
-          #[cfg(target_arch = "wasm32")]
-          #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
-          unsafe extern "C" {
-            #[link_name = "commit"]
-            fn wit_import2(_: *mut u8, _: usize, _: *mut u8, );
-          }
-
-          #[cfg(not(target_arch = "wasm32"))]
-          unsafe extern "C" fn wit_import2(_: *mut u8, _: usize, _: *mut u8, ){ unreachable!() }
-          unsafe { wit_import2(ptr0.cast_mut(), len0, ptr1) };
-          let l3 = i32::from(*ptr1.add(0).cast::<u8>());
-          let result7 = match l3 {
-            0 => {
-              let e = ();
-              Ok(e)
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn wit_import1(_: *mut u8) {
+                        unreachable!()
+                    }
+                    unsafe { wit_import1(ptr0) };
+                    let l2 = *ptr0.add(0).cast::<*mut u8>();
+                    let l3 = *ptr0
+                        .add(::core::mem::size_of::<*const u8>())
+                        .cast::<usize>();
+                    let len4 = l3;
+                    let bytes4 = _rt::Vec::from_raw_parts(l2.cast(), len4, len4);
+                    let result5 = _rt::string_lift(bytes4);
+                    result5
+                }
             }
-            1 => {
-              let e = {
-                let l4 = *ptr1.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l5 = *ptr1.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len6 = l5;
-                let bytes6 = _rt::Vec::from_raw_parts(l4.cast(), len6, len6);
+            #[allow(unused_unsafe, clippy::all)]
+            /// Creates a commit and signs it using the plugin's agent.
+            ///   The commit parameter should be a stringified JSON object of a CommitBuilder.
+            pub fn commit(commit: &str) -> Result<(), _rt::String> {
+                unsafe {
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<u8>; 3 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit();
+                            3 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let vec0 = commit;
+                    let ptr0 = vec0.as_ptr().cast::<u8>();
+                    let len0 = vec0.len();
+                    let ptr1 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
+                    unsafe extern "C" {
+                        #[link_name = "commit"]
+                        fn wit_import2(_: *mut u8, _: usize, _: *mut u8);
+                    }
 
-                _rt::string_lift(bytes6)
-              };
-              Err(e)
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn wit_import2(_: *mut u8, _: usize, _: *mut u8) {
+                        unreachable!()
+                    }
+                    unsafe { wit_import2(ptr0.cast_mut(), len0, ptr1) };
+                    let l3 = i32::from(*ptr1.add(0).cast::<u8>());
+                    let result7 = match l3 {
+                        0 => {
+                            let e = ();
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l4 = *ptr1
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l5 = *ptr1
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len6 = l5;
+                                let bytes6 = _rt::Vec::from_raw_parts(l4.cast(), len6, len6);
+
+                                _rt::string_lift(bytes6)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    };
+                    result7
+                }
             }
-            _ => _rt::invalid_enum_discriminant(),
-          };
-          result7
-        }
-      }
-      #[allow(unused_unsafe, clippy::all)]
-      /// Performs an HTTP request through the host.
-      ///
-      ///   The plugin has no sockets of its own, so this is the only way out. The host
-      ///   checks the URL against the origins the manifest declares, refuses anything
-      ///   that resolves outside the public internet, and substitutes credentials.
-      ///
-      ///   A header value of `secret:<name>` is replaced with that secret, if the plugin
-      ///   has one of that name and it is scoped to this origin. The plugin never sees
-      ///   the value. A `secret:` handle anywhere other than a header value is an error,
-      ///   not a substitution — a credential in a URL ends up in logs by design.
-      pub fn fetch(request: &HttpRequest,) -> Result<HttpResponse,_rt::String>{
-        unsafe {
+            #[allow(unused_unsafe, clippy::all)]
+            /// Performs an HTTP request through the host.
+            ///
+            ///   The plugin has no sockets of its own, so this is the only way out. The host
+            ///   checks the URL against the origins the manifest declares, refuses anything
+            ///   that resolves outside the public internet, and substitutes credentials.
+            ///
+            ///   A header value of `secret:<name>` is replaced with that secret, if the plugin
+            ///   has one of that name and it is scoped to this origin. The plugin never sees
+            ///   the value. A `secret:` handle anywhere other than a header value is an error,
+            ///   not a substitution — a credential in a URL ends up in logs by design.
+            pub fn fetch(request: &HttpRequest) -> Result<HttpResponse, _rt::String> {
+                unsafe {
+                    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
+                    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+                    struct RetArea(
+                        [::core::mem::MaybeUninit<u8>; 6 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let mut ret_area = RetArea(
+                        [::core::mem::MaybeUninit::uninit();
+                            6 * ::core::mem::size_of::<*const u8>()],
+                    );
+                    let super::super::super::atomic::class_extender::types::HttpRequest {
+                        method: method0,
+                        url: url0,
+                        headers: headers0,
+                        body: body0,
+                    } = request;
+                    let vec1 = method0;
+                    let ptr1 = vec1.as_ptr().cast::<u8>();
+                    let len1 = vec1.len();
+                    let vec2 = url0;
+                    let ptr2 = vec2.as_ptr().cast::<u8>();
+                    let len2 = vec2.len();
+                    let vec6 = headers0;
+                    let len6 = vec6.len();
+                    let layout6 = _rt::alloc::Layout::from_size_align_unchecked(
+                        vec6.len() * (4 * ::core::mem::size_of::<*const u8>()),
+                        ::core::mem::size_of::<*const u8>(),
+                    );
+                    let result6 = if layout6.size() != 0 {
+                        let ptr = _rt::alloc::alloc(layout6).cast::<u8>();
+                        if ptr.is_null() {
+                            _rt::alloc::handle_alloc_error(layout6);
+                        }
+                        ptr
+                    } else {
+                        ::core::ptr::null_mut()
+                    };
+                    for (i, e) in vec6.into_iter().enumerate() {
+                        let base = result6.add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                        {
+                            let super::super::super::atomic::class_extender::types::HttpHeader {
+                                name: name3,
+                                value: value3,
+                            } = e;
+                            let vec4 = name3;
+                            let ptr4 = vec4.as_ptr().cast::<u8>();
+                            let len4 = vec4.len();
+                            *base
+                                .add(::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len4;
+                            *base.add(0).cast::<*mut u8>() = ptr4.cast_mut();
+                            let vec5 = value3;
+                            let ptr5 = vec5.as_ptr().cast::<u8>();
+                            let len5 = vec5.len();
+                            *base
+                                .add(3 * ::core::mem::size_of::<*const u8>())
+                                .cast::<usize>() = len5;
+                            *base
+                                .add(2 * ::core::mem::size_of::<*const u8>())
+                                .cast::<*mut u8>() = ptr5.cast_mut();
+                        }
+                    }
+                    let (result8_0, result8_1, result8_2) = match body0 {
+                        Some(e) => {
+                            let vec7 = e;
+                            let ptr7 = vec7.as_ptr().cast::<u8>();
+                            let len7 = vec7.len();
 
-          #[cfg_attr(target_pointer_width="64", repr(align(8)))]
-          #[cfg_attr(target_pointer_width="32", repr(align(4)))]
-          struct RetArea([::core::mem::MaybeUninit::<u8>; 6*::core::mem::size_of::<*const u8>()]);
-          let mut ret_area = RetArea([::core::mem::MaybeUninit::uninit(); 6*::core::mem::size_of::<*const u8>()]);
-          let super::super::super::atomic::class_extender::types::HttpRequest{ method:method0, url:url0, headers:headers0, body:body0, } = request;
-          let vec1 = method0;
-          let ptr1 = vec1.as_ptr().cast::<u8>();
-          let len1 = vec1.len();
-          let vec2 = url0;
-          let ptr2 = vec2.as_ptr().cast::<u8>();
-          let len2 = vec2.len();
-          let vec6 = headers0;
-          let len6 = vec6.len();
-          let layout6 = _rt::alloc::Layout::from_size_align_unchecked(vec6.len() * (4*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
-          let result6 = if layout6.size() != 0 {
-            let ptr = _rt::alloc::alloc(layout6).cast::<u8>();
-            if ptr.is_null()
-            {
-              _rt::alloc::handle_alloc_error(layout6);
-            }
-            ptr
-          }else {
-            ::core::ptr::null_mut()
-          };
-          for (i, e) in vec6.into_iter().enumerate() {
-            let base = result6.add(i * (4*::core::mem::size_of::<*const u8>()));
-            {
-              let super::super::super::atomic::class_extender::types::HttpHeader{ name:name3, value:value3, } = e;
-              let vec4 = name3;
-              let ptr4 = vec4.as_ptr().cast::<u8>();
-              let len4 = vec4.len();
-              *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>() = len4;
-              *base.add(0).cast::<*mut u8>() = ptr4.cast_mut();
-              let vec5 = value3;
-              let ptr5 = vec5.as_ptr().cast::<u8>();
-              let len5 = vec5.len();
-              *base.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>() = len5;
-              *base.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>() = ptr5.cast_mut();
-            }
-          }
-          let (result8_0,result8_1,result8_2,) = match body0 {
-            Some(e) => {
-              let vec7 = e;
-              let ptr7 = vec7.as_ptr().cast::<u8>();
-              let len7 = vec7.len();
+                            (1i32, ptr7.cast_mut(), len7)
+                        }
+                        None => (0i32, ::core::ptr::null_mut(), 0usize),
+                    };
+                    let ptr9 = ret_area.0.as_mut_ptr().cast::<u8>();
+                    #[cfg(target_arch = "wasm32")]
+                    #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
+                    unsafe extern "C" {
+                        #[link_name = "fetch"]
+                        fn wit_import10(
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                            _: usize,
+                            _: i32,
+                            _: *mut u8,
+                            _: usize,
+                            _: *mut u8,
+                        );
+                    }
 
-              (1i32, ptr7.cast_mut(), len7)
-            },
-            None => {
-              (0i32, ::core::ptr::null_mut(), 0usize)
-            },
-          };let ptr9 = ret_area.0.as_mut_ptr().cast::<u8>();
-          #[cfg(target_arch = "wasm32")]
-          #[link(wasm_import_module = "atomic:class-extender/host@0.1.0")]
-          unsafe extern "C" {
-            #[link_name = "fetch"]
-            fn wit_import10(_: *mut u8, _: usize, _: *mut u8, _: usize, _: *mut u8, _: usize, _: i32, _: *mut u8, _: usize, _: *mut u8, );
-          }
+                    #[cfg(not(target_arch = "wasm32"))]
+                    unsafe extern "C" fn wit_import10(
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                        _: usize,
+                        _: i32,
+                        _: *mut u8,
+                        _: usize,
+                        _: *mut u8,
+                    ) {
+                        unreachable!()
+                    }
+                    unsafe {
+                        wit_import10(
+                            ptr1.cast_mut(),
+                            len1,
+                            ptr2.cast_mut(),
+                            len2,
+                            result6,
+                            len6,
+                            result8_0,
+                            result8_1,
+                            result8_2,
+                            ptr9,
+                        )
+                    };
+                    let l11 = i32::from(*ptr9.add(0).cast::<u8>());
+                    let result28 = match l11 {
+                        0 => {
+                            let e = {
+                                let l12 = i32::from(
+                                    *ptr9.add(::core::mem::size_of::<*const u8>()).cast::<u16>(),
+                                );
+                                let l13 = *ptr9
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l14 = *ptr9
+                                    .add(3 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let base21 = l13;
+                                let len21 = l14;
+                                let mut result21 = _rt::Vec::with_capacity(len21);
+                                for i in 0..len21 {
+                                    let base =
+                                        base21.add(i * (4 * ::core::mem::size_of::<*const u8>()));
+                                    let e21 = {
+                                        let l15 = *base.add(0).cast::<*mut u8>();
+                                        let l16 = *base
+                                            .add(::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len17 = l16;
+                                        let bytes17 =
+                                            _rt::Vec::from_raw_parts(l15.cast(), len17, len17);
+                                        let l18 = *base
+                                            .add(2 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<*mut u8>();
+                                        let l19 = *base
+                                            .add(3 * ::core::mem::size_of::<*const u8>())
+                                            .cast::<usize>();
+                                        let len20 = l19;
+                                        let bytes20 =
+                                            _rt::Vec::from_raw_parts(l18.cast(), len20, len20);
 
-          #[cfg(not(target_arch = "wasm32"))]
-          unsafe extern "C" fn wit_import10(_: *mut u8, _: usize, _: *mut u8, _: usize, _: *mut u8, _: usize, _: i32, _: *mut u8, _: usize, _: *mut u8, ){ unreachable!() }
-          unsafe { wit_import10(ptr1.cast_mut(), len1, ptr2.cast_mut(), len2, result6, len6, result8_0, result8_1, result8_2, ptr9) };
-          let l11 = i32::from(*ptr9.add(0).cast::<u8>());
-          let result28 = match l11 {
-            0 => {
-              let e = {
-                let l12 = i32::from(*ptr9.add(::core::mem::size_of::<*const u8>()).cast::<u16>());
-                let l13 = *ptr9.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l14 = *ptr9.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let base21 = l13;
-                let len21 = l14;
-                let mut result21 = _rt::Vec::with_capacity(len21);
-                for i in 0..len21 {
-                  let base = base21.add(i * (4*::core::mem::size_of::<*const u8>()));
-                  let e21 = {
-                    let l15 = *base.add(0).cast::<*mut u8>();
-                    let l16 = *base.add(::core::mem::size_of::<*const u8>()).cast::<usize>();
-                    let len17 = l16;
-                    let bytes17 = _rt::Vec::from_raw_parts(l15.cast(), len17, len17);
-                    let l18 = *base.add(2*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                    let l19 = *base.add(3*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                    let len20 = l19;
-                    let bytes20 = _rt::Vec::from_raw_parts(l18.cast(), len20, len20);
-
-                    super::super::super::atomic::class_extender::types::HttpHeader{
+                                        super::super::super::atomic::class_extender::types::HttpHeader{
                       name: _rt::string_lift(bytes17),
                       value: _rt::string_lift(bytes20),
                     }
-                  };
-                  result21.push(e21);
-                }
-                _rt::cabi_dealloc(base21, len21 * (4*::core::mem::size_of::<*const u8>()), ::core::mem::size_of::<*const u8>());
-                let l22 = *ptr9.add(4*::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l23 = *ptr9.add(5*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len24 = l23;
-                let bytes24 = _rt::Vec::from_raw_parts(l22.cast(), len24, len24);
+                                    };
+                                    result21.push(e21);
+                                }
+                                _rt::cabi_dealloc(
+                                    base21,
+                                    len21 * (4 * ::core::mem::size_of::<*const u8>()),
+                                    ::core::mem::size_of::<*const u8>(),
+                                );
+                                let l22 = *ptr9
+                                    .add(4 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l23 = *ptr9
+                                    .add(5 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len24 = l23;
+                                let bytes24 = _rt::Vec::from_raw_parts(l22.cast(), len24, len24);
 
-                super::super::super::atomic::class_extender::types::HttpResponse{
-                  status: l12 as u16,
-                  headers: result21,
-                  body: _rt::string_lift(bytes24),
-                }
-              };
-              Ok(e)
-            }
-            1 => {
-              let e = {
-                let l25 = *ptr9.add(::core::mem::size_of::<*const u8>()).cast::<*mut u8>();
-                let l26 = *ptr9.add(2*::core::mem::size_of::<*const u8>()).cast::<usize>();
-                let len27 = l26;
-                let bytes27 = _rt::Vec::from_raw_parts(l25.cast(), len27, len27);
+                                super::super::super::atomic::class_extender::types::HttpResponse {
+                                    status: l12 as u16,
+                                    headers: result21,
+                                    body: _rt::string_lift(bytes24),
+                                }
+                            };
+                            Ok(e)
+                        }
+                        1 => {
+                            let e = {
+                                let l25 = *ptr9
+                                    .add(::core::mem::size_of::<*const u8>())
+                                    .cast::<*mut u8>();
+                                let l26 = *ptr9
+                                    .add(2 * ::core::mem::size_of::<*const u8>())
+                                    .cast::<usize>();
+                                let len27 = l26;
+                                let bytes27 = _rt::Vec::from_raw_parts(l25.cast(), len27, len27);
 
-                _rt::string_lift(bytes27)
-              };
-              Err(e)
+                                _rt::string_lift(bytes27)
+                            };
+                            Err(e)
+                        }
+                        _ => _rt::invalid_enum_discriminant(),
+                    };
+                    if layout6.size() != 0 {
+                        _rt::alloc::dealloc(result6.cast(), layout6);
+                    }
+                    result28
+                }
             }
-            _ => _rt::invalid_enum_discriminant(),
-          };
-          if layout6.size() != 0 {
-            _rt::alloc::dealloc(result6.cast(), layout6);
-          }
-          result28
         }
-      }
-
     }
-
-  }
 }
 mod _rt {
-  #![allow(dead_code, clippy::all)]
-  pub use alloc_crate::string::String;
-  pub use alloc_crate::vec::Vec;
-  pub unsafe fn string_lift(bytes: Vec<u8>) -> String {
-    if cfg!(debug_assertions) {
-      String::from_utf8(bytes).unwrap()
-    } else {
-      String::from_utf8_unchecked(bytes)
+    #![allow(dead_code, clippy::all)]
+    pub use alloc_crate::string::String;
+    pub use alloc_crate::vec::Vec;
+    pub unsafe fn string_lift(bytes: Vec<u8>) -> String {
+        if cfg!(debug_assertions) {
+            String::from_utf8(bytes).unwrap()
+        } else {
+            String::from_utf8_unchecked(bytes)
+        }
     }
-  }
-  pub unsafe fn invalid_enum_discriminant<T>() -> T {
-    if cfg!(debug_assertions) {
-      panic!("invalid enum discriminant")
-    } else {
-      unsafe { core::hint::unreachable_unchecked() }
+    pub unsafe fn invalid_enum_discriminant<T>() -> T {
+        if cfg!(debug_assertions) {
+            panic!("invalid enum discriminant")
+        } else {
+            unsafe { core::hint::unreachable_unchecked() }
+        }
     }
-  }
-  pub unsafe fn cabi_dealloc(ptr: *mut u8, size: usize, align: usize) {
-    if size == 0 {
-      return;
+    pub unsafe fn cabi_dealloc(ptr: *mut u8, size: usize, align: usize) {
+        if size == 0 {
+            return;
+        }
+        let layout = alloc::Layout::from_size_align_unchecked(size, align);
+        alloc::dealloc(ptr, layout);
     }
-    let layout = alloc::Layout::from_size_align_unchecked(size, align);
-    alloc::dealloc(ptr, layout);
-  }
-  pub use alloc_crate::alloc;
+    pub use alloc_crate::alloc;
 
-  #[cfg(target_arch = "wasm32")]
-  pub fn run_ctors_once() {
-    wit_bindgen::rt::run_ctors_once();
-  }
-  pub unsafe fn bool_lift(val: u8) -> bool {
-    if cfg!(debug_assertions) {
-      match val {
-        0 => false,
-        1 => true,
-        _ => panic!("invalid bool discriminant"),
-      }
-    } else {
-      val != 0
+    #[cfg(target_arch = "wasm32")]
+    pub fn run_ctors_once() {
+        wit_bindgen::rt::run_ctors_once();
     }
-  }
-  extern crate alloc as alloc_crate;
+    pub unsafe fn bool_lift(val: u8) -> bool {
+        if cfg!(debug_assertions) {
+            match val {
+                0 => false,
+                1 => true,
+                _ => panic!("invalid bool discriminant"),
+            }
+        } else {
+            val != 0
+        }
+    }
+    extern crate alloc as alloc_crate;
 }
 
 /// Generates `#[unsafe(no_mangle)]` functions to export the specified type as
@@ -964,6 +1325,5 @@ roducers\x01\x0cprocessed-by\x02\x0dwit-component\x070.227.1\x10wit-bindgen-rust
 #[inline(never)]
 #[doc(hidden)]
 pub fn __link_custom_section_describing_imports() {
-  wit_bindgen::rt::maybe_link_cabi_realloc();
+    wit_bindgen::rt::maybe_link_cabi_realloc();
 }
-
