@@ -22,16 +22,24 @@ export const ResourceCardTitle: FC<
     <TitleRow center gap='1ch' justify='space-between' wrapItems>
       <Row center gap='1ch'>
         <ResourceGlyph resource={resource} />
-        <AtomicLink subject={resource.subject}>
+        <TitleLink subject={resource.subject}>
           <Title subject={resource.subject}>
             {alternateTitle ?? resource.title}
           </Title>
-        </AtomicLink>
+        </TitleLink>
       </Row>
       {children}
     </TitleRow>
   );
 };
+
+const TitleLink = styled(AtomicLink)`
+  /* Firefox treats a block heading inside an inline <a> as an IB split and
+     reports a duplicate view-transition-name, skipping the whole page
+     transition. https://bugzilla.mozilla.org/show_bug.cgi?id=1999336 */
+  display: inline-block;
+  max-width: 100%;
+`;
 
 const Title = styled.h2<ViewTransitionProps>`
   font-size: 1.4rem;

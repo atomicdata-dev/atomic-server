@@ -4,6 +4,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Fix: page transitions on Firefox no longer smear into a giant overlay or get skipped entirely. Snapshot sizing is scoped by `view-transition-class` (titles keep the height-based aspect-ratio rule; card→page morphs fill the group), title links that wrap a heading are `inline-block` so Firefox does not treat them as duplicate names (IB splits), and a failed or hung `startViewTransition` still navigates and skips the overlay instead of covering the page.
 - Add peer rooms for up to eight simultaneous browsers on the Sync page with WebRTC collaboration, OPFS reconciliation and attachment sync without a Cloud subscription. Discovery defaults to shared Atomic SaaS signaling, independent of the drive’s data node. Export `BrowserPeerSync`, `WebRtcPeer` and `WebRtcTransport` from `@tomic/lib` ([#1396](https://github.com/ontola/atomic-server/issues/1396)).
 - Portal Open links select their workspace; ordinary resource links keep the current drive.
 - Sync distinguishes remote node data from Cloud Server enrollment, explains drive-specific plans, and refreshes account/recovery status after portal sign-in.
