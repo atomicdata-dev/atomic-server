@@ -1089,8 +1089,11 @@ test.describe('form publish and anonymous submit', () => {
     await expect(closeInput).toBeVisible();
 
     // --- Closed: a close-at in the past shuts a published form ---
+    // The status line names the state only; *when* it closed is the input
+    // sitting right beside it.
+    const status = page.getByTestId('schedule-status');
     await closeInput.fill('2020-01-01T10:00');
-    await expect(page.getByText(/Closed since/)).toBeVisible();
+    await expect(status).toHaveText(/Status:\s*Closed/);
     await waitForOutboxDrained(page);
     await waitForDefinitionStatus(page, formSubject, 410);
 
@@ -1111,7 +1114,7 @@ test.describe('form publish and anonymous submit', () => {
     // --- Not yet open: clear the close bound, schedule the start ahead ---
     await page.getByTitle('Clear close date').click();
     await openInput.fill('2999-01-01T10:00');
-    await expect(page.getByText(/not open until/)).toBeVisible();
+    await expect(status).toHaveText(/Scheduled for/);
     await waitForOutboxDrained(page);
     await waitForDefinitionStatus(page, formSubject, 410);
 
@@ -1128,9 +1131,7 @@ test.describe('form publish and anonymous submit', () => {
 
     // --- Clearing a bound reopens the form, as far as the builder knows ---
     await page.getByTitle('Clear open date').click();
-    await expect(
-      page.getByText('This form is open and accepting responses.'),
-    ).toBeVisible();
+    await expect(status).toHaveText(/Status:\s*Open/);
 
     await waitForOutboxDrained(page);
     await waitForPublished(page, formSubject);

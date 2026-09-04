@@ -48,7 +48,7 @@ export function FormScheduleSection({
 
   return (
     <Column gap="1rem">
-      <StatusLine>
+      <StatusLine data-testid="schedule-status">
         <Status
           availability={availability}
           isPublished={publishedAt !== undefined}

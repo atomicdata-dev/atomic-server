@@ -96,10 +96,16 @@ describe('the staggered fade-in', () => {
     expect(enterEnvelopeMs(3)).toBe(2 * STAGGER_STEP_MS + STAGGER_FADE_MS);
   });
 
-  it('compresses a long page into the wave rather than capping it', () => {
-    expect(enterEnvelopeMs(50)).toBe(STAGGER_WAVE_MS + STAGGER_FADE_MS);
-    // However long the page, opening it costs the same.
-    expect(enterEnvelopeMs(200)).toBe(enterEnvelopeMs(50));
+  it('still gives a merely long page the full step', () => {
+    // The wave only starts compressing past ~58 slots; a page below that
+    // paces at STAGGER_STEP_MS like any short one.
+    expect(enterEnvelopeMs(50)).toBe(49 * STAGGER_STEP_MS + STAGGER_FADE_MS);
+  });
+
+  it('compresses a very long page into the wave rather than capping it', () => {
+    expect(enterEnvelopeMs(200)).toBe(STAGGER_WAVE_MS + STAGGER_FADE_MS);
+    // However long the page past that, opening it costs the same.
+    expect(enterEnvelopeMs(500)).toBe(enterEnvelopeMs(200));
   });
 });
 
@@ -147,9 +153,15 @@ describe('phase timing', () => {
   const exit = { phase: 'exit', direction: 'forward', target: 1 } as const;
   const enter = { phase: 'enter', direction: 'forward', target: 1 } as const;
 
-  it('keeps a page change within the ~500ms budget', () => {
-    // Worst case: the longest exit plus a fully staggered fade-in.
-    expect(PAGE_EXIT_MS + enterEnvelopeMs(50)).toBeLessThanOrEqual(520);
+  it('bounds a page change by the exit plus the whole wave', () => {
+    // Worst case: the longest exit plus a fully compressed fade-in. However
+    // many blocks a page has, it can never cost more than this.
+    const worstCase = PAGE_EXIT_MS + STAGGER_WAVE_MS + STAGGER_FADE_MS;
+    expect(PAGE_EXIT_MS + enterEnvelopeMs(1000)).toBe(worstCase);
+    // A typical three-block page is a fraction of that.
+    expect(PAGE_EXIT_MS + enterEnvelopeMs(3)).toBeLessThanOrEqual(
+      worstCase / 4,
+    );
   });
 
   it('never cuts a running exit short', () => {

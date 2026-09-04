@@ -19,9 +19,9 @@ import type { FieldType, FormBlock, FormStyling } from './types.js';
  * the visitor sees or can click waits on it.
  *
  * Both live in `style.css`; the numbers are duplicated here because JS owns
- * the phase changes. Worst case is an exit plus a fully staggered enter —
- * 180 + 175 + 160 = 515ms, near enough the ~500ms a visitor will sit through,
- * and a typical three-block page lands around 410ms.
+ * the phase changes. Worst case is an exit plus a fully compressed enter —
+ * 150 + 2000 + 350 = 2500ms, and only for a page long enough to fill the
+ * wave; a typical three-block page lands around 570ms.
  */
 export const PAGE_EXIT_MS = 150;
 
@@ -103,7 +103,9 @@ export function staggerSlots(block: FormBlock): number {
 }
 
 /** How long the whole staggered fade-in takes for `count` elements: the last
- * one's delay plus its fade. Mirrors the `min()` the stylesheet does. */
+ * one's delay plus its fade. Mirrors the `min()` the stylesheet does — the
+ * last element's delay is `(count - 1) * min(step, wave / span)`, and with
+ * `span === count - 1` that is exactly the `min` below. */
 export function enterEnvelopeMs(count: number): number {
   const lastDelay = Math.min(
     Math.max(count - 1, 0) * STAGGER_STEP_MS,

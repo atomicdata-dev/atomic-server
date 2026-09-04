@@ -207,7 +207,11 @@
      the page never takes longer to open. */
   animation-delay: calc(
     var(--atomic-form-stagger-index, 0) *
-      min(var(--atomic-form-stagger-step), var(--atomic-form-stagger-wave))
+      min(
+        var(--atomic-form-stagger-step),
+        var(--atomic-form-stagger-wave) /
+          var(--atomic-form-stagger-span, 1)
+      )
   );
   will-change: opacity;
 }
