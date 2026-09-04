@@ -8674,6 +8674,17 @@ msgstr ""
 msgid "Dismiss"
 msgstr ""
 
+#. 0: PRODUCT_NAME
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid ""
+"Your backup, if you made one, is kept by your {0} account — and this browser "
+"isn’t signed in to it."
+msgstr ""
+
+#: src/views/getting-started/ConnectDeviceStep.tsx
+msgid "I’ve signed in"
+msgstr ""
+
 #~ msgid "{0} Context compacted"
 #~ msgstr "{0} Contexte compacté"
 
