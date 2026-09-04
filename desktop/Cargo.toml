@@ -71,8 +71,10 @@ async-trait = "0.1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
 
 [dependencies.atomic-server]
-# No HTTPS for desktop, but include Iroh for p2p sync
+# No HTTPS for desktop. Plugin/app endpoints depend on the shared Wasmtime
+# runtime, so embedded builds opt into that feature explicitly.
 default-features = false
+features = ["wasm-plugins"]
 path = "../server"
 
 [dependencies.atomic_lib]
