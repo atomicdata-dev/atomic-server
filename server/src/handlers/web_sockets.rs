@@ -27,7 +27,7 @@ use std::time::{Duration, Instant};
 use crate::{
     actor_messages::SendFrame, appstate::AppState, commit_monitor::CommitMonitor,
     errors::AtomicServerResult, handlers::ws_v2, helpers::get_auth_headers,
-    loro_sync_broadcaster::LoroSyncBroadcaster, vector_search::VectorSearchState,
+    vector_search::VectorSearchState,
 };
 
 const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(5);
@@ -77,7 +77,6 @@ pub async fn web_socket_handler(
             auth_nonce: atomic_lib::sync::protocol::new_challenge_nonce(),
             client_capabilities: Vec::new(),
             commit_monitor_addr: appstate.commit_monitor.clone(),
-            loro_sync_broadcaster_addr: appstate.loro_sync_broadcaster.clone(),
             agent: for_agent,
             store: appstate.store.clone(),
             connection_id: new_connection_id(),
@@ -121,7 +120,6 @@ pub struct WebSocketConnection {
     /// one. Consulted before answering `COMMIT` with a slim `COMMIT_OK`.
     client_capabilities: Vec<String>,
     commit_monitor_addr: Addr<CommitMonitor>,
-    loro_sync_broadcaster_addr: Addr<LoroSyncBroadcaster>,
     agent: ForAgent,
     store: Db,
     /// Unique-per-process identifier. Threaded through `CommitOpts` into
@@ -210,13 +208,11 @@ impl Actor for WebSocketConnection {
 
     fn stopped(&mut self, ctx: &mut Self::Context) {
         // Remove ourselves from every subscription map. Without this,
-        // closed connections leave stale `Addr`s in `CommitMonitor` and
-        // `LoroSyncBroadcaster`, which every subsequent fanout iterates
-        // over (do_send to a stopped actor silently no-ops).
+        // closed connections leave stale `Addr`s in `CommitMonitor`,
+        // which every subsequent fanout iterates over (do_send to a
+        // stopped actor silently no-ops).
         let addr = ctx.address();
         self.commit_monitor_addr
-            .do_send(crate::actor_messages::UnsubscribeAll { addr: addr.clone() });
-        self.loro_sync_broadcaster_addr
             .do_send(crate::actor_messages::UnsubscribeAll { addr });
     }
     fn stopping(&mut self, ctx: &mut Self::Context) -> Running {
@@ -371,22 +367,49 @@ impl WebSocketConnection {
             // where only the server resolved it and an Iroh peer received raw
             // `internal:/` subjects. Delegated alongside the other read-only
             // frames below.
+            //
+            // SUB/UNSUB are engine-owned as of 2026-09: parse + `check_read`
+            // live in `handle_frame_full`. This handler only registers the
+            // connection with the commit monitor when the engine admits the
+            // subscription. The monitor still re-checks on `Subscribe` as
+            // defence in depth.
             ws_v2::tag::GET
             | ws_v2::tag::SYNC
             | ws_v2::tag::SYNC_PUSH
             | ws_v2::tag::BLOB_REQUEST
-            | ws_v2::tag::BLOB_RESPONSE => {
+            | ws_v2::tag::BLOB_RESPONSE
+            | ws_v2::tag::SUB
+            | ws_v2::tag::UNSUB => {
                 let store = self.store.clone();
                 let mut agent = self.agent.clone();
                 let bin_vec = bin.to_vec();
                 ctx.spawn(
                     async move {
-                        atomic_lib::sync::engine::handle_frame(&bin_vec, &store, &mut agent).await
+                        atomic_lib::sync::engine::handle_frame_full(&bin_vec, &store, &mut agent)
+                            .await
                     }
                     .into_actor(self)
-                    .map(|responses, _actor, ctx| {
-                        for response in responses {
+                    .map(|out, actor, ctx| {
+                        for response in out.frames {
                             ctx.binary(response);
+                        }
+                        if let Some(subject) = out.subscribe {
+                            actor
+                                .commit_monitor_addr
+                                .do_send(crate::actor_messages::Subscribe {
+                                    addr: ctx.address(),
+                                    subject,
+                                    agent: actor.agent.to_string(),
+                                    source_id: actor.connection_id.clone(),
+                                });
+                        }
+                        if let Some(subject) = out.unsubscribe {
+                            actor
+                                .commit_monitor_addr
+                                .do_send(crate::actor_messages::Unsubscribe {
+                                    addr: ctx.address(),
+                                    subject,
+                                });
                         }
                     }),
                 );
@@ -452,35 +475,6 @@ impl WebSocketConnection {
                 );
             }
 
-            // The one subscription frame. The monitor looks at the subject:
-            // a drive registers drive-wide fan-out plus the drive resource
-            // itself, anything else registers that one subject. Not
-            // AUTH-gated: an anonymous session of a public share link
-            // subscribes to what it may read; `check_read` decides.
-            ws_v2::tag::SUB => {
-                if let Ok(subject) = std::str::from_utf8(&bin[1..]) {
-                    self.commit_monitor_addr
-                        .do_send(crate::actor_messages::Subscribe {
-                            addr: ctx.address(),
-                            subject: subject.to_string(),
-                            agent: self.agent.to_string(),
-                            source_id: self.connection_id.clone(),
-                        });
-                }
-            }
-
-            ws_v2::tag::UNSUB => {
-                if let Ok(subject) = std::str::from_utf8(&bin[1..]) {
-                    // Same raw key `SUB` registered under, so the fan-out
-                    // entry is actually found and removed.
-                    self.commit_monitor_addr
-                        .do_send(crate::actor_messages::Unsubscribe {
-                            addr: ctx.address(),
-                            subject: subject.to_string(),
-                        });
-                }
-            }
-
             // Liveness probe from the browser. A browser cannot see the
             // protocol-level pings this actor sends, so it sends this and
             // expects it back; no answer within its deadline means the socket
@@ -527,17 +521,16 @@ impl WebSocketConnection {
                 use atomic_lib::sync::protocol::ephemeral_kind;
                 match decoded.kind {
                     ephemeral_kind::DOC => {
-                        self.loro_sync_broadcaster_addr.do_send(
-                            crate::actor_messages::LoroSyncUpdate {
+                        self.commit_monitor_addr
+                            .do_send(crate::actor_messages::LoroSyncUpdate {
                                 subject,
                                 agent,
                                 update: decoded.payload,
                                 addr,
-                            },
-                        );
+                            });
                     }
                     ephemeral_kind::LORO => {
-                        self.loro_sync_broadcaster_addr.do_send(
+                        self.commit_monitor_addr.do_send(
                             crate::actor_messages::LoroEphemeralUpdate {
                                 subject,
                                 agent,
@@ -547,14 +540,13 @@ impl WebSocketConnection {
                         );
                     }
                     ephemeral_kind::PRESENCE => {
-                        self.loro_sync_broadcaster_addr.do_send(
-                            crate::actor_messages::PresenceUpdate {
+                        self.commit_monitor_addr
+                            .do_send(crate::actor_messages::PresenceUpdate {
                                 subject,
                                 agent,
                                 update: decoded.payload,
                                 addr,
-                            },
-                        );
+                            });
                     }
                     other => {
                         tracing::debug!("Unknown EPHEMERAL kind {other}");
@@ -600,7 +592,7 @@ impl WebSocketConnection {
             if let Ok(msg) =
                 serde_json::from_str::<crate::actor_messages::LoroSubscriptionJSON>(json)
             {
-                self.loro_sync_broadcaster_addr
+                self.commit_monitor_addr
                     .do_send(crate::actor_messages::SubscribeLoroSync {
                         addr: ctx.address(),
                         subject: msg.subject,
@@ -611,12 +603,11 @@ impl WebSocketConnection {
             if let Ok(msg) =
                 serde_json::from_str::<crate::actor_messages::LoroSubscriptionJSON>(json)
             {
-                self.loro_sync_broadcaster_addr.do_send(
-                    crate::actor_messages::UnsubscribeLoroSync {
+                self.commit_monitor_addr
+                    .do_send(crate::actor_messages::UnsubscribeLoroSync {
                         addr: ctx.address(),
                         subject: msg.subject,
-                    },
-                );
+                    });
             }
         } else if let Some(json) = text.strip_prefix("PRESENCE_SUBSCRIBE ") {
             // Drive-scoped ephemeral presence (issue #1229). Reuses the
@@ -627,7 +618,7 @@ impl WebSocketConnection {
             if let Ok(msg) =
                 serde_json::from_str::<crate::actor_messages::LoroSubscriptionJSON>(json)
             {
-                self.loro_sync_broadcaster_addr
+                self.commit_monitor_addr
                     .do_send(crate::actor_messages::SubscribePresence {
                         addr: ctx.address(),
                         drive: msg.subject,
@@ -638,12 +629,11 @@ impl WebSocketConnection {
             if let Ok(msg) =
                 serde_json::from_str::<crate::actor_messages::LoroSubscriptionJSON>(json)
             {
-                self.loro_sync_broadcaster_addr.do_send(
-                    crate::actor_messages::UnsubscribePresence {
+                self.commit_monitor_addr
+                    .do_send(crate::actor_messages::UnsubscribePresence {
                         addr: ctx.address(),
                         drive: msg.subject,
-                    },
-                );
+                    });
             }
         } else if let Some(json) = text.strip_prefix("RBSR_FP ") {
             // RBSR: answer range fingerprints so the client can find the

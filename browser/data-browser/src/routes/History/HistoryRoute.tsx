@@ -31,7 +31,7 @@ function History(): JSX.Element {
   const isSmallScreen = useMediaQuery('(max-width: 500px)');
   const [subject] = useCurrentSubject();
   const resource = useResource(subject);
-  const { versions, loading, error } = useVersions(resource);
+  const { versions, attribution, loading, error } = useVersions(resource);
   const [selectedVersion, setSelectedVersion] = useState<Version | undefined>();
 
   const resolvedVersion =
@@ -132,6 +132,7 @@ function History(): JSX.Element {
           resource={resource}
           groupedVersions={groupedVersions}
           selectedVersion={selectedForView}
+          attribution={attribution}
           olderVersion={olderVersion}
           isCurrentVersion={isCurrentVersion}
           onNextVersion={nextVersion}

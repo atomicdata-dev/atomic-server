@@ -190,18 +190,24 @@ unblocked:
   `sync::peer::accept_gate_tests::{naked_destroy_on_the_live_link_is_ignored,
   signed_destroy_commit_on_the_live_link_is_applied,
   signed_destroy_from_stranger_on_the_live_link_is_refused}`.
-- [ ] **Bulk `remove[]` is still unsigned**: `SYNC_DIFF.remove` comes from
-  local tombstones and is applied on the drive-level write verdict. Making
-  it signed needs retained destroy commits (commit retention floor).
+- [x] **Bulk `remove[]` carries a signed destroy when the sender still holds
+  it** (2026-09-05): the tombstone value is the commit JSON-AD (or a
+  one-byte unsigned marker). `SYNC_DIFF.removeCommits` attaches those
+  envelopes; the receiver applies them as a peer `COMMIT` and does not
+  fall back to the unsigned path on a bad signature. Unsigned entries
+  stay admission-gated for senders that never stored the envelope.
+  Requiring an envelope on every `remove[]` still waits on
+  `Tree::Envelopes` (commit-retention floor).
 - [x] Pre-auth frame budget in the live read loop (the `matches!(agent,
   Public)` gate exists in `handle_stream`; mirror it in
   `register_live_peer`). (2026-09-01: the live loop now refuses every
   non-AUTH frame from a still-`Public` peer we did not dial, which
   subsumes the budget.)
-- [ ] **OQ5 for serverless:** a drive is admitted on a device iff the
-  authenticated agent has write rights on it (same-agent: always true for
-  your own drives). The `Err(_) => true` carve-out is replaced by "the
-  pairing/first-sync flow explicitly enrolls the drive."
+- [x] (2026-09-05) **OQ5:** a drive this node has never stored is admitted
+  only through `admit_unknown_drive`. `Public` never creates one. Owner
+  enrolls only the owner. Open still admits an authenticated first-sync
+  (same-agent devices on `OpenPolicy` keep working). Pairing-as-explicit
+  enrollment of specific drives (`KnownPeer` capability records) remains P3.
 
 ### P1 — Consolidation (the "cleanly" part; build on one engine, not two)
 
@@ -222,10 +228,13 @@ now load-bearing rather than hygiene:
   not to need a `handle_frame` signature change — `source_id` is just a field
   on `CommitIngestOpts`, and the hub's per-source echo-suppression /
   domain-ownership / Loro-causality gates are opts booleans the peer path
-  leaves off. **`SUB`/`UNSUB` remain the only hand-rolled arms** (need the
-  commit-monitor actor handle). AUTH+GET were the pure request→response pair
-  that had actually drifted; COMMIT-apply was the additive capability peers
-  needed, and is now one implementation instead of two.
+  leaves off. **`SUB`/`UNSUB` parse + `check_read` live in
+  `handle_frame_full` (2026-09-05);** the WS handler still `do_send`s to the
+  commit monitor because the engine has no actor mailbox.   Folding
+  `LoroSyncBroadcaster` into `CommitMonitor` landed 2026-09-05. AUTH+GET
+  were the pure request→response pair that had actually drifted; COMMIT-apply
+  was the additive capability peers needed, and is now one implementation
+  instead of two.
 - [ ] **`trusted_hub` / `untrusted_peer` module split** in `ws_apply.rs` so
   the unconditional apply paths can't be reached from accept code.
 - [ ] Collapse the remaining four `sync_drive_with_peer*` variants (two of
@@ -238,17 +247,20 @@ now load-bearing rather than hygiene:
 
 ### P2 — Port the outbox + unified session API to Rust
 
+- [~] **`AtomicTransport` trait + `SyncSession::serve`** (2026-09-05):
+  `lib/src/sync/transport.rs` (`AtomicTransport`, in-process
+  `ChannelTransport`) and `lib/src/sync/session.rs` (responder loop over
+  `handle_frame_full`). `IrohTransport` / `WsTransport` wrappers are not
+  wired; `handle_stream` / `register_live_peer` still own the Iroh
+  lifecycle.
 - [ ] **Port `LocalOutbox` semantics into `atomic_lib`** (`AtomicNode`
   outbox): dirty bit, genesis envelope, `baseVersion`, backoff, blocked
   states, structured-error classification. Android needs durable offline
   queuing exactly like the browser; Flutter's `try_push_commit` is not it.
-- [ ] **`AtomicTransport` trait + `IrohTransport`/`WsTransport` impls**
-  (frame send/recv + connection lifecycle only — all semantics stay in the
-  engine/session).
-- [ ] **`SyncSession` state machine**: connect → mutual AUTH (fail closed) →
-  VV reconcile → live → drain-on-dirty; reconnect with backoff; emits
-  `NodeEvent`s. Replaces `handle_stream` + `register_live_peer` +
-  the auto-connect loop's inline logic.
+- [ ] **`SyncSession` state machine** beyond the responder loop: connect →
+  mutual AUTH (fail closed) → VV reconcile → live → drain-on-dirty;
+  reconnect with backoff; emits `NodeEvent`s. Replaces `handle_stream` +
+  `register_live_peer` + the auto-connect loop's inline logic.
 - [ ] **FRB surface**: `subscribe_events`, `open_sync_session(target)`,
   `close_sync_session`, where `target` is a server URL *or* a paired
   NodeID. `pollDbEvent`, `peer_sync`, `watch_children` are deleted.

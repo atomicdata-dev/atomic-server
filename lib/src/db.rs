@@ -328,6 +328,10 @@ pub struct Db {
     /// self-hosted / local-first nodes are unrestricted; a managed node
     /// installs a concrete policy via [`Db::set_sync_policy`].
     sync_policy: Arc<RwLock<Arc<dyn crate::sync::policy::SyncPolicy>>>,
+    /// Which signed envelopes `apply_commit` keeps per resource
+    /// (`crate::envelopes`). `Latest` by default; a node that wants a signed
+    /// audit log runs `All`.
+    envelope_retention: Arc<RwLock<crate::envelopes::EnvelopeRetention>>,
     /// Short-lived hash → (drive-subject, requested-at) map for blob hashes
     /// the server has asked a peer for (via `BLOB_REQUEST`, emitted from
     /// `import_sync_push` for an already-admitted drive). Consulted when
@@ -366,6 +370,22 @@ impl Db {
     }
 
     /// The currently-installed sync policy.
+    /// Set how many signed envelopes are kept per resource. Takes effect on
+    /// the next `apply_commit`; existing rows are pruned when their resource
+    /// is next written.
+    pub fn set_envelope_retention(&self, retention: crate::envelopes::EnvelopeRetention) {
+        if let Ok(mut guard) = self.envelope_retention.write() {
+            *guard = retention;
+        }
+    }
+
+    pub fn envelope_retention(&self) -> crate::envelopes::EnvelopeRetention {
+        self.envelope_retention
+            .read()
+            .map(|g| *g)
+            .unwrap_or_default()
+    }
+
     pub fn sync_policy(&self) -> Arc<dyn crate::sync::policy::SyncPolicy> {
         self.sync_policy
             .read()
@@ -432,6 +452,7 @@ impl Db {
             subject_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
+            envelope_retention: Arc::new(RwLock::new(Default::default())),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -470,6 +491,7 @@ impl Db {
             subject_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
+            envelope_retention: Arc::new(RwLock::new(Default::default())),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -504,6 +526,7 @@ impl Db {
             subject_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
+            envelope_retention: Arc::new(RwLock::new(Default::default())),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -599,6 +622,7 @@ impl Db {
             subject_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
+            envelope_retention: Arc::new(RwLock::new(Default::default())),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -750,6 +774,7 @@ impl Db {
             subject_locks: Default::default(),
             base_domain,
             sync_policy: default_sync_policy(),
+            envelope_retention: Arc::new(RwLock::new(Default::default())),
             pending_blob_requests: Arc::new(RwLock::new(HashMap::new())),
         };
 
@@ -876,7 +901,6 @@ impl Db {
         let opts = crate::commit::CommitOpts {
             validate_signature: true,
             validate_timestamp: false,
-            validate_previous_commit: false,
             validate_rights: false,
             update_index: true,
             ..crate::commit::CommitOpts::no_validations_no_index()
@@ -956,7 +980,6 @@ impl Db {
         let opts = crate::commit::CommitOpts {
             validate_signature: true,
             validate_timestamp: false,
-            validate_previous_commit: false,
             validate_rights: false,
             update_index: true,
             ..crate::commit::CommitOpts::no_validations_no_index()
@@ -1010,7 +1033,6 @@ impl Db {
         let opts = crate::commit::CommitOpts {
             validate_signature: true,
             validate_timestamp: false,
-            validate_previous_commit: false,
             validate_rights: false,
             update_index: true,
             ..crate::commit::CommitOpts::no_validations_no_index()
@@ -3062,6 +3084,26 @@ impl Storelike for Db {
         // a lock rather than a merge, and for the no-reentrancy invariant.
         let subject_guard = store.subject_locks.lock(&commit.subject.pure_id()).await;
 
+        // A signed destroy is durable (tombstone envelope, re-sent by bulk
+        // sync). If this exact commit is already stored here and the subject
+        // exists again, the subject was recreated after the destroy and this
+        // is a replay, not a delete. Local presence only — a commit DID must
+        // never be resolved over the network.
+        if commit.destroy.unwrap_or(false) && opts.validate_rights {
+            if let Some(sig) = commit.signature.as_ref() {
+                let commit_id = format!("did:ad:commit:{sig}");
+                if store.has_resource_locally(&commit_id)
+                    && store.has_resource_locally(&commit.subject.pure_id())
+                {
+                    return Err(format!(
+                        "Destroy commit for {} was already applied here; refusing replay",
+                        commit.subject
+                    )
+                    .into());
+                }
+            }
+        }
+
         let commit_response = commit.validate_and_build_response(opts, store).await?;
 
         let mut transaction = Transaction::new();
@@ -3118,12 +3160,24 @@ impl Storelike for Db {
             }
         }
 
-        // Save the Commit to the Store. We can skip the required props checking, but we need to make sure the commit hasn't been applied before.
-        store.add_resource_tx(&commit_response.commit_resource, &mut transaction)?;
-        // We still need to index the Commit!
-        for atom in commit_response.commit_resource.to_atoms() {
-            store.add_atom_to_index(&atom, &commit_response.commit_resource, &mut transaction)?;
+        // Commits are signed envelopes, not a queryable class. Keep genesis
+        // and rights/parent/destroy; drop ordinary content certificates.
+        if commit_response.auth_impact().is_critical() {
+            store.add_resource_tx(&commit_response.commit_resource, &mut transaction)?;
+            for atom in commit_response.commit_resource.to_atoms() {
+                store.add_atom_to_index(
+                    &atom,
+                    &commit_response.commit_resource,
+                    &mut transaction,
+                )?;
+            }
         }
+
+        // The signed envelope itself lives in `Tree::Envelopes`, keyed by the
+        // resource it is about, in the same transaction as the state it
+        // signs. This is what lets any node that holds the resource say who
+        // signed it, independent of the commit rows above.
+        crate::envelopes::record_ops(store, &commit_response, &mut transaction)?;
 
         match (&commit_response.resource_old, &commit_response.resource_new) {
             (None, None) => {
@@ -3143,6 +3197,9 @@ impl Storelike for Db {
                     .destroy
                     .expect("Resource was removed but `commit.destroy` was not set!"));
                 let subject: Subject = commit_response.commit.subject.clone();
+                // `remove_resource` records the tombstone; the signed destroy
+                // is the envelope row `record_ops` queued above, which is what
+                // `SYNC_DIFF.removeCommits` carries.
                 self.remove_resource(&subject).await?;
             }
             _ => {}

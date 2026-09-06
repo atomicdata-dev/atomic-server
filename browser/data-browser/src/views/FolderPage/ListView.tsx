@@ -1,7 +1,8 @@
 import {
-  commits,
   core,
   Resource,
+  useCreatedBy,
+  useCreatedAt,
   useResource,
   useString,
   useTitle,
@@ -33,7 +34,7 @@ export function ListView({
                 <TitleHeaderWrapper>Title</TitleHeaderWrapper>
               </th>
               <ClassCell as='th'>Class</ClassCell>
-              {!basic && <AlignRight as='th'>Last Modified</AlignRight>}
+              {!basic && <AlignRight as='th'>Created</AlignRight>}
             </tr>
           </thead>
           <tbody>
@@ -47,7 +48,7 @@ export function ListView({
                 </ClassCell>
                 {!basic && (
                   <AlignRight>
-                    <LastCommit resource={resource} />
+                    <Created resource={resource} />
                   </AlignRight>
                 )}
               </TableRow>
@@ -84,12 +85,13 @@ function Title({ resource }: CellProps): JSX.Element {
   );
 }
 
-function LastCommit({ resource }: CellProps): JSX.Element {
-  const [commit] = useString(resource, commits.properties.lastCommit);
+function Created({ resource }: CellProps): JSX.Element {
+  const createdAt = useCreatedAt(resource);
+  const createdBy = useCreatedBy(resource);
 
   return (
     <LinkWrapper>
-      <CommitDetail short commitSubject={commit} />
+      <CommitDetail short createdAt={createdAt} createdBy={createdBy} />
     </LinkWrapper>
   );
 }

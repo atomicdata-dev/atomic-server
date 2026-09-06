@@ -380,6 +380,12 @@ Options:
 
           [env: ATOMIC_DEVELOPMENT=]
 
+      --envelope-retention <ENVELOPE_RETENTION>
+          Which signed commit envelopes this node keeps per resource: `latest` (the envelope that produced the current state; the default) or `all` (every envelope, so History shows a verified signer per change)
+
+          [env: ATOMIC_ENVELOPE_RETENTION=]
+          [default: latest]
+
       --domain <DOMAIN>
           The origin domain where the app is hosted, without the port and schema values
 

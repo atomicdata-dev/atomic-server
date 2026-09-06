@@ -1,8 +1,9 @@
 # FOSS public host mode — expose HTTP, do not host strangers
 
-> **Status:** Phase 1 + 2 built (2026-08-23). Server-side gating, `/server`
-> advertisement, welcome-screen branch, and the operator guide have landed.
-> Phase 3 (rate limits, Iroh stream refusal) is untouched.
+> **Status:** Phase 1 + 2 built (2026-08-23). OQ5 library path closed
+> 2026-09-05 (`admit_unknown_drive`: `Public` never creates a drive; Owner
+> enrolls only the owner). Phase 3 (rate limits, Iroh stream refusal) is
+> untouched.
 >
 > Three decisions changed during the build; the body below has been corrected
 > where it said otherwise, and [Resolved decisions](#resolved-decisions) records

@@ -28,6 +28,7 @@ pub struct SledStore {
     search_docs: sled::Tree,
     search_doc_tokens: sled::Tree,
     search_trigrams: sled::Tree,
+    envelopes: sled::Tree,
 }
 
 impl SledStore {
@@ -55,6 +56,7 @@ impl SledStore {
         let search_docs = db.open_tree(Tree::SearchDocs)?;
         let search_doc_tokens = db.open_tree(Tree::SearchDocTokens)?;
         let search_trigrams = db.open_tree(Tree::SearchTrigrams)?;
+        let envelopes = db.open_tree(Tree::Envelopes)?;
 
         Ok(SledStore {
             db,
@@ -72,6 +74,7 @@ impl SledStore {
             search_docs,
             search_doc_tokens,
             search_trigrams,
+            envelopes,
         })
     }
 
@@ -96,6 +99,7 @@ impl SledStore {
             Tree::SearchDocs => &self.search_docs,
             Tree::SearchDocTokens => &self.search_doc_tokens,
             Tree::SearchTrigrams => &self.search_trigrams,
+            Tree::Envelopes => &self.envelopes,
         }
     }
 }
@@ -179,6 +183,7 @@ impl KvStore for SledStore {
         let mut batch_search_docs = sled::Batch::default();
         let mut batch_search_doc_tokens = sled::Batch::default();
         let mut batch_search_trigrams = sled::Batch::default();
+        let mut batch_envelopes = sled::Batch::default();
 
         for op in operations {
             let batch = match op.tree {
@@ -196,6 +201,7 @@ impl KvStore for SledStore {
                 Tree::SearchDocs => &mut batch_search_docs,
                 Tree::SearchDocTokens => &mut batch_search_doc_tokens,
                 Tree::SearchTrigrams => &mut batch_search_trigrams,
+                Tree::Envelopes => &mut batch_envelopes,
             };
             match op.method {
                 Method::Insert => {
@@ -263,6 +269,9 @@ impl KvStore for SledStore {
         self.search_trigrams
             .apply_batch(batch_search_trigrams)
             .map_err(|e| format!("Failed to apply search_trigrams batch: {}", e))?;
+        self.envelopes
+            .apply_batch(batch_envelopes)
+            .map_err(|e| format!("Failed to apply envelopes batch: {}", e))?;
 
         Ok(())
     }

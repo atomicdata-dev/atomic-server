@@ -285,7 +285,11 @@ pub trait Storelike: Sized + Send + Sync {
     ) -> AtomicResult<CommitResponse> {
         let applied = commit.validate_and_build_response(opts, self).await?;
 
-        self.add_resource(&applied.commit_resource).await?;
+        // Commits are signed envelopes, not a queryable class. Keep genesis
+        // and rights/parent/destroy; drop ordinary content certificates.
+        if applied.auth_impact().is_critical() {
+            self.add_resource(&applied.commit_resource).await?;
+        }
 
         match (&applied.resource_old, &applied.resource_new) {
             (None, None) => {

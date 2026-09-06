@@ -447,6 +447,8 @@ socket cannot know which commit produced it, and marks its next save as a
 genesis commit, which the responder rejects. A resource with no state answers
 `ERROR` `UNKNOWN` `No state`; an unreadable or missing subject answers
 `ERROR` `UNKNOWN` with the lookup error, on the same `request_id`.
+That `lastCommit` id is a receipt for genesis detection, not a refetchable
+resource.
 
 ## Persisted commits
 
@@ -721,11 +723,19 @@ eviction) is not propagated live at all; the peer's own apply of the parent
 commit cascades there too.
 
 **Bulk, during reconcile.** `SYNC_DIFF.remove` lists subjects the sender
-holds a tombstone for. These are not signed. The receiver applies each one
-only if the sending identity is admitted for that subject's drive, the same
-drive-level write verdict, with the dial-side "trust owned" relaxation. A
-subject whose drive cannot be resolved locally is destroyed without that
-check.
+holds a tombstone for. When the sender still has the signed destroy
+commit on that tombstone, `removeCommits` is a `{ subject: commitJson }`
+map of those envelopes; the receiver applies each as a peer `COMMIT`
+(signature + the signer's rights). The sender attaches envelopes only
+when the session may read the drive, and a receiver refuses a destroy
+it already holds, or one older than the resource's genesis, as a
+replay. Entries without an envelope stay on
+the unsigned path: the receiver applies them only if the sending identity
+is admitted for that subject's drive, the same drive-level write verdict,
+with the dial-side "trust owned" relaxation. A subject whose drive cannot
+be resolved locally is destroyed without that check. Full envelope-on-resource
+storage (`Tree::Envelopes`) is still the commit-retention floor; this is
+destroy-only evidence on the existing tombstone key.
 
 ## Blobs
 
@@ -916,9 +926,9 @@ step when you touch any of them.
 | `lib/src/authentication.rs` | `AuthValues`, signature check, freshness window. |
 | `lib/src/client/ws.rs` | The Rust WebSocket client. |
 | `server/src/handlers/web_sockets.rs` | The Actix WebSocket handler: binary arms, text frames, `require_auth`, heartbeat. |
-| `server/src/commit_monitor.rs` | Subscription registries and commit fan-out. |
+| `server/src/commit_monitor.rs` | Subscription registries, commit fan-out, and `EPHEMERAL` / presence fan-out (folded from `LoroSyncBroadcaster`, 2026-09-05). |
 | `server/src/actor_messages.rs` | Subscription messages and the refusal frame. |
-| `server/src/loro_sync_broadcaster.rs`, `server/src/serve.rs` | `EPHEMERAL` fan-out to WebSocket subscribers and relay to and from Iroh peers. |
+| `server/src/serve.rs` | Relays Iroh `EPHEMERAL` into the commit monitor so local WebSocket subscribers see peer presence. |
 | `browser/lib/src/ws-v2.ts` | Frame encode and decode. |
 | `browser/lib/src/websockets.ts` | The browser client: auth, pending requests, subscriptions, commit over WS, liveness, drive reconcile. |
 | `browser/lib/src/rbsr.ts` | The TypeScript reconcile, byte-identical to `rbsr.rs`. |
@@ -929,9 +939,9 @@ step when you touch any of them.
 Tracked in [`planning/unified-sync.md`](https://github.com/atomicdata-dev/atomic-server/blob/master/planning/unified-sync.md),
 "Remaining work".
 
-- **`SUB` / `UNSUB` are not engine-owned.** The last hand-rolled tags in the
-  server WebSocket handler, which is why an Iroh peer cannot subscribe to
-  anything. A prerequisite for "every peer is a hub".
+- **`SUB` / `UNSUB` are engine-owned.** Parse and `check_read` live in
+  `handle_frame_full`; a hub still registers the connection with the
+  commit monitor because the engine has no actor mailbox.
 - **No Layer-2 provenance on `SYNC_PUSH`.** Entries carry raw Loro bytes with
   no `lastCommit` and no signed envelope, so an import cannot verify or
   record who authored the state it merged.
@@ -942,8 +952,8 @@ Tracked in [`planning/unified-sync.md`](https://github.com/atomicdata-dev/atomic
   (no server option for it yet). Iroh streams have no challenge at all; the
   initiator's proof for a drive is timestamp-bounded only.
 - **Loro sync and presence subscriptions are not re-bound on `AUTH`.** The
-  commit monitor's three maps are; the `LoroSyncBroadcaster` and the
-  presence broadcaster still check identity once, at registration.
+  commit monitor's resource and drive maps are; the Loro-ephemera and
+  presence maps on the same actor still check identity once, at registration.
 
 ## Changed in 2026-09
 

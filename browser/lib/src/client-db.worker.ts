@@ -75,6 +75,7 @@ export type WorkerRequest =
   | { id: number; type: 'exportAllResources' }
   | { id: number; type: 'importAllResources'; jsonArray: string }
   | { id: number; type: 'getLoroSnapshot'; subject: string }
+  | { id: number; type: 'historyAttribution'; subject: string }
   | { id: number; type: 'putBlob'; hash: Uint8Array; data: Uint8Array }
   | { id: number; type: 'getBlob'; hash: Uint8Array }
   | { id: number; type: 'blake3Hash'; data: Uint8Array }
@@ -306,6 +307,12 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
       await ensureInit();
 
       return db!.getLoroSnapshot(msg.subject);
+    }
+
+    case 'historyAttribution': {
+      await ensureInit();
+
+      return (await db!.historyAttribution(msg.subject)) as string;
     }
 
     case 'putBlob': {

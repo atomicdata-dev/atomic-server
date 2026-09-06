@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Agent, JSCryptoProvider, Store } from '@tomic/lib';
+import {
+  Agent,
+  JSCryptoProvider,
+  Store,
+  Resource,
+  core,
+  dataBrowser,
+} from '@tomic/lib';
 import {
   ensureVaultBackup,
   forgetEnrolledVaults,
@@ -105,6 +112,28 @@ afterEach(() => {
 });
 
 describe('ensureVaultBackup', () => {
+  it('shares the drive name and emoji and refreshes them after edits', async () => {
+    const store = await signedInStore();
+    const drive = new Resource(DRIVE);
+    await drive.set(core.properties.name, 'Design', false);
+    await drive.set(dataBrowser.properties.emoji, '🎨', false);
+    store.addResource(drive);
+    const deps = fakeDeps();
+    await ensureVaultBackup(store, DRIVE, deps);
+    expect(deps.setUpVaultForDrive).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        metadata: { name: 'Design', emoji: '🎨' },
+      }),
+    );
+    await drive.set(core.properties.name, 'Studio', false);
+    await ensureVaultBackup(store, DRIVE, deps);
+    expect(deps.setUpVaultForDrive).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        metadata: { name: 'Studio', emoji: '🎨' },
+      }),
+    );
+  });
+
   it('enrols and backs up a signed-in drive', async () => {
     const store = await signedInStore();
     const deps = fakeDeps();

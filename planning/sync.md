@@ -87,7 +87,7 @@ a live update.
 Loro can safely import duplicate updates, but duplicate transport work is still
 wasteful and can trigger redundant UI fetches. The realtime Loro channel already
 does the right thing: `LoroSyncUpdate` carries the sender `Addr`, and
-`LoroSyncBroadcaster` broadcasts to every subscriber except the sender. Persisted
+`CommitMonitor` broadcasts to every subscriber except the sender. Persisted
 commits should use the same source-aware shape.
 
 Do not suppress by agent. A single agent can be open in multiple tabs or devices;

@@ -1,9 +1,9 @@
 import {
   properties,
   useArray,
+  useCreatedBy,
   useResource,
   useString,
-  useSubject,
   useTitle,
 } from '@tomic/react';
 
@@ -39,13 +39,8 @@ interface LastMessageProps {
 
 const Message = ({ subject, alignment }: LastMessageProps): JSX.Element => {
   const messageResource = useResource(subject);
-  const [lastCommit] = useSubject(
-    messageResource,
-    properties.commit.lastCommit,
-  );
-  const lastCommitResource = useResource(lastCommit);
-  const [signer] = useSubject(lastCommitResource, properties.commit.signer);
-  const signerResource = useResource(signer);
+  const createdBy = useCreatedBy(messageResource);
+  const signerResource = useResource(createdBy);
 
   const [signerName] = useTitle(signerResource);
   const [text] = useString(messageResource, properties.description);

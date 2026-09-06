@@ -266,7 +266,7 @@ where
     // resource changes could.
     {
         let store = appstate.store.clone();
-        let broadcaster = appstate.loro_sync_broadcaster.clone();
+        let broadcaster = appstate.commit_monitor.clone();
         let mut rx = store.subscribe_ephemeral();
         actix_web::rt::spawn(async move {
             loop {

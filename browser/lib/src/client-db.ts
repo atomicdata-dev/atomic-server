@@ -25,6 +25,10 @@
  * ```
  */
 
+import {
+  parseHistoryAttribution,
+  type HistoryAttribution,
+} from './history-attribution.js';
 import type {
   Aggregation,
   AggregateOutcome,
@@ -724,6 +728,21 @@ export class ClientDbWorker {
     const r = await this.send({ type: 'getLoroSnapshot', subject });
 
     return (r as Uint8Array | null) ?? null;
+  }
+
+  /** Who signed `subject`'s history, from the envelopes this client applied
+   *  itself (`atomic_lib::envelopes`). Null when the WASM build predates the
+   *  accessor or the worker is unavailable. */
+  async historyAttribution(
+    subject: string,
+  ): Promise<HistoryAttribution | null> {
+    try {
+      const r = await this.send({ type: 'historyAttribution', subject });
+
+      return parseHistoryAttribution(r);
+    } catch {
+      return null;
+    }
   }
 
   async putBlob(hash: Uint8Array, data: Uint8Array): Promise<void> {

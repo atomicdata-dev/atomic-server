@@ -1,6 +1,6 @@
 # Commit retention floor
 
-**Status:** Accepted 2026-09-01 — option C. Hold #1313 until `Tree::Envelopes` exists; sequence #1274 → #1313 → #1254.
+**Status:** Accepted 2026-09-01 — option C. Amended 2026-09-05 (see the end): `Tree::Envelopes` ships inside #1313 itself; #1274 is off the critical path.
 
 > **Decision needed by maintainer**
 >
@@ -223,3 +223,33 @@ is retention policy, and the Loro oplog — not commits — is the history.*
 Unverified: the exact per-commit index-atom count (depends on propvals
 present); whether the browser OPFS DB stores commit rows via
 `materializeCommitLocally` (browser side of F6 needs its own check).
+
+
+## Amendment 2026-09-05
+
+Built in #1313 (`lib/src/envelopes.rs`); this supersedes the *Minimal
+mechanism* and *Sequencing* above where they differ.
+
+- **Key is the same, retention is a knob.** Key
+  `pure_id ‖ 0x00 ‖ createdAt ‖ 0x00 ‖ signature`. `EnvelopeRetention`
+  is `latest` (one row, F6, the default) or `all` (every row, F7). No
+  `recent N`, no per-class schedule: nothing reads a middle setting.
+- **No #1274 gating.** The write sits in `Db::apply_commit`, which every
+  ingest path already funnels through, in the apply transaction. Ingest
+  consolidation is orthogonal and lands on its own schedule.
+- **Binding to the oplog is explicit.** Every commit's Loro change carries
+  a token (browser drain token; Rust builder and `create_did` now too).
+  `attribute_history` maps envelope → tokens → History version, verifies
+  signatures with the apply code, and reports `complete`. The genesis
+  carrier token is credited only to a genesis envelope: F1 is the proof
+  for creation, not whoever later shipped a snapshot.
+- **Destroy evidence folds in.** The tombstone value is a marker again;
+  the destroy envelope is the subject's latest row.
+- **Read paths.** `GET /history-attribution`, WASM
+  `historyAttribution`, `Store.getHistoryAttribution`; History shows
+  Verified / Unverified / Unattributed.
+- **Wire and vault carriage are the next PR**, as a `removeCommits`-style
+  side map and pack v2 (see `auditability-loro-history.md` → *Next*).
+  Until then a replica attributes what it applied itself and asks the
+  hub for the rest.
+- **Sequencing now:** #1313 (with envelopes) → #1274 → #1254.

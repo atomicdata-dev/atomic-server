@@ -165,21 +165,55 @@ pub async fn handle_auth_frame(
     }
 }
 
+/// Side effects a transport must honour after [`handle_frame_full`].
+///
+/// Reply frames always go back on the wire. `subscribe` / `unsubscribe` are
+/// how a hub registers the connection for commit fan-out — the engine owns
+/// the `SUB`/`UNSUB` tags (parse + `check_read`) but has no actor mailbox,
+/// so the server's WebSocket handler is the one that `do_send`s to the
+/// commit monitor. A peer stream that is not a hub ignores them; Iroh live
+/// mode does not speak `SUB`.
+#[derive(Debug, Default, Clone)]
+pub struct HandleOutput {
+    pub frames: Vec<Vec<u8>>,
+    pub subscribe: Option<String>,
+    pub unsubscribe: Option<String>,
+}
+
 /// Process a single v2 binary frame. Returns response frames to send back.
 /// This is the transport-agnostic entry point — used by WebSocket, Iroh, etc.
+///
+/// Transports that can register subscriptions should call
+/// [`handle_frame_full`] instead so a validated `SUB`/`UNSUB` is not dropped.
 pub async fn handle_frame(
     frame: &[u8],
     store: &Db,
     agent: &mut crate::agents::ForAgent,
 ) -> Vec<Vec<u8>> {
+    handle_frame_full(frame, store, agent).await.frames
+}
+
+/// Like [`handle_frame`], plus the `SUB`/`UNSUB` session commands a hub
+/// applies to its commit monitor.
+pub async fn handle_frame_full(
+    frame: &[u8],
+    store: &Db,
+    agent: &mut crate::agents::ForAgent,
+) -> HandleOutput {
     if frame.is_empty() {
-        return vec![];
+        return HandleOutput::default();
     }
 
     let tag = frame[0];
     let payload = &frame[1..];
 
     match tag {
+        protocol::tag::SUB => return handle_sub(payload, store, agent).await,
+        protocol::tag::UNSUB => return handle_unsub(payload),
+        _ => {}
+    }
+
+    let frames = match tag {
         protocol::tag::AUTH => {
             handle_auth_frame(
                 payload,
@@ -223,9 +257,8 @@ pub async fn handle_frame(
                                 .get_base_domain()
                                 .unwrap_or_else(|| "http://localhost".to_string());
                             let subject_resolved = resource.get_subject().resolve(&origin);
-                            // Include `lastCommit` so the recipient can set
-                            // `previousCommit` on its next save. See
-                            // `planning/sync.md` (test coverage gaps, `ws_get`).
+                            // Include `lastCommit` so the recipient can stamp
+                            // `_lastCommit` and not mis-detect genesis on save.
                             let last_commit = resource
                                 .get(crate::urls::LAST_COMMIT)
                                 .ok()
@@ -440,6 +473,72 @@ pub async fn handle_frame(
             tracing::debug!("Unhandled frame tag: 0x{:02x}", tag);
             vec![]
         }
+    };
+
+    HandleOutput {
+        frames,
+        subscribe: None,
+        unsubscribe: None,
+    }
+}
+
+/// `SUB <subject>`: parse, `check_read`, and tell the transport to register.
+/// The wire refusal matches `refuse_subscription` in the server so a client
+/// cannot tell the engine path from the monitor's defence-in-depth re-check.
+async fn handle_sub(payload: &[u8], store: &Db, agent: &crate::agents::ForAgent) -> HandleOutput {
+    let Ok(subject_str) = std::str::from_utf8(payload) else {
+        return HandleOutput {
+            frames: vec![protocol::encode_error(
+                0,
+                protocol::error_code::UNKNOWN,
+                "Invalid SUB frame",
+            )],
+            ..HandleOutput::default()
+        };
+    };
+
+    let subject = crate::Subject::from_raw(subject_str, store.get_base_domain().as_deref());
+
+    let refuse = |reason: &str| HandleOutput {
+        frames: vec![protocol::encode_error(
+            0,
+            protocol::error_code::UNAUTHORIZED_READ,
+            &format!("SUB refused for {subject}: {reason}"),
+        )],
+        ..HandleOutput::default()
+    };
+
+    if !subject.is_local() {
+        tracing::warn!("can't subscribe to external resource: {subject}");
+        return HandleOutput::default();
+    }
+
+    let resource = match store.get_resource(&subject).await {
+        Ok(r) => r,
+        Err(_) => return refuse("not readable"),
+    };
+
+    if let Err(e) = crate::hierarchy::check_read(store, &resource, agent).await {
+        return refuse(&e.to_string());
+    }
+
+    HandleOutput {
+        frames: vec![],
+        subscribe: Some(subject_str.to_string()),
+        unsubscribe: None,
+    }
+}
+
+/// `UNSUB <subject>`: no rights check — cancelling a subscription you never
+/// held is a no-op, and the monitor looks up by the raw key `SUB` registered.
+fn handle_unsub(payload: &[u8]) -> HandleOutput {
+    match std::str::from_utf8(payload) {
+        Ok(subject) => HandleOutput {
+            frames: vec![],
+            subscribe: None,
+            unsubscribe: Some(subject.to_string()),
+        },
+        Err(_) => HandleOutput::default(),
     }
 }
 
@@ -621,14 +720,14 @@ pub async fn ingest_commit(
     let commit_opts = crate::commit::CommitOpts {
         validate_schema: true,
         validate_signature: true,
-        // Timestamp validation bounds replay: without it, a captured signed
-        // destroy commit could be replayed unboundedly later (e.g. after the
-        // subject was legitimately recreated). Peers therefore need
-        // roughly-sane clocks — the same requirement AUTH already imposes.
+        // Rejects commits stamped in the future. This is NOT an age bound —
+        // a bulk reconcile legitimately re-sends old destroy envelopes to a
+        // replica that was offline. Replay of a destroy against a recreated
+        // subject is refused in `Commit::apply_opts` (a destroy commit that
+        // is already stored here, or one older than the current genesis).
         validate_timestamp: true,
         validate_rights: true,
         // https://github.com/atomicdata-dev/atomic-server/issues/412
-        validate_previous_commit: false,
         // Reject commits whose Loro ops are concurrent with stored state
         // (i.e. the client's doc wasn't seeded from the server). Without this,
         // LWW silently drops the client's write. For P2P sync use a path that
@@ -659,10 +758,9 @@ pub async fn ingest_commit(
 /// application. It validates signature, schema, and the signer's rights — the
 /// commit is a self-authorizing certificate, so those checks (not the
 /// connection's AUTH identity) are the authority. `validate_loro_causality` is
-/// off (concurrent peer writes are expected) and `validate_previous_commit` is
-/// off (peers don't share a single linear commit chain), mirroring the Iroh
-/// sync paths. No `source_id`: peer transports don't fan out through the
-/// commit monitor, so there's no echo to suppress.
+/// off (concurrent peer writes are expected). No linear `previousCommit`
+/// chain: peers merge via Loro. No `source_id`: peer transports don't fan
+/// out through the commit monitor, so there's no echo to suppress.
 ///
 /// Deliberately skips the server's domain-ownership gate (`apply_commit_json`
 /// in `server/src/handlers/commit.rs` rejects a commit whose subject belongs
@@ -996,6 +1094,12 @@ pub async fn handle_sync_vv_filtered(
     let mut pull_from: std::collections::HashMap<String, std::collections::HashMap<String, i32>> =
         std::collections::HashMap::new();
     let mut remove: Vec<String> = Vec::new();
+    let mut remove_commits: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    // A destroyed subject has no resource left to `check_read` against, so
+    // the signed destroy envelope is gated on read access to the drive being
+    // synced. Computed once, lazily: most reconciles carry no tombstones.
+    let mut may_read_drive: Option<bool> = None;
     let mut push_entries: Vec<(String, Vec<u8>)> = Vec::new();
 
     for (subject, server_vv) in &server_vvs {
@@ -1085,6 +1189,19 @@ pub async fn handle_sync_vv_filtered(
         if !server_vvs.contains_key(subject) {
             if super::tombstones::is_tombstoned(store, subject) {
                 remove.push(subject.clone());
+                if let Some(json) = super::tombstones::destroy_envelope(store, subject) {
+                    let allowed = match may_read_drive {
+                        Some(v) => v,
+                        None => {
+                            let v = agent_may_read_drive(store, drive, agent).await;
+                            may_read_drive = Some(v);
+                            v
+                        }
+                    };
+                    if allowed {
+                        remove_commits.insert(subject.clone(), json);
+                    }
+                }
             } else {
                 pull.push(subject.clone());
                 pull_from
@@ -1111,6 +1228,7 @@ pub async fn handle_sync_vv_filtered(
         &push_subjects,
         &remove,
         &pull_from,
+        &remove_commits,
     ));
 
     if !push_entries.is_empty() {
@@ -1198,6 +1316,49 @@ impl std::fmt::Display for SyncPushRejected {
     }
 }
 
+/// Whether `agent` may read `drive`. `false` when the drive is not stored
+/// here. Used to gate what a bulk reconcile hands out about a drive's
+/// destroyed subjects (the signed destroy envelope names the signer and
+/// when they acted), since the destroyed resource itself is gone.
+async fn agent_may_read_drive(store: &Db, drive: &str, agent: &crate::agents::ForAgent) -> bool {
+    let drive_subject = crate::Subject::from_raw(drive, store.get_base_domain().as_deref());
+    match store.get_resource(&drive_subject).await {
+        Ok(resource) => crate::hierarchy::check_read(store, &resource, agent)
+            .await
+            .is_ok(),
+        Err(_) => false,
+    }
+}
+
+/// Whether a write to a drive this node has **never stored** may proceed.
+/// Enrolls the drive when the policy wants that.
+///
+/// Closes unified-sync OQ5: `ForAgent::Public` never creates a drive.
+/// An authenticated agent on [`super::policy::OpenPolicy`] still may
+/// (localhost first-sync). [`super::policy::OwnerPolicy`] admits only the
+/// owner and enrolls. An allowlist's bootstrap grace already shows up as
+/// `admit_drive_write == true` and is left alone.
+pub(crate) fn admit_unknown_drive(
+    store: &Db,
+    drive_subject: &str,
+    agent: &crate::agents::ForAgent,
+) -> bool {
+    if matches!(agent, crate::agents::ForAgent::Public) {
+        return false;
+    }
+    let policy = store.sync_policy();
+    if policy.admit_drive_write(drive_subject) {
+        return true;
+    }
+    if policy.may_enroll_drive(drive_subject, agent) {
+        tracing::info!("enrolling new drive {} for {:?}", drive_subject, agent);
+        policy.enroll_drive(drive_subject);
+        true
+    } else {
+        false
+    }
+}
+
 /// Import resources from a SYNC_PUSH message into the local store.
 ///
 /// `for_agent` is the identity the sending peer proved. `trust_owned` is true
@@ -1216,8 +1377,9 @@ pub async fn import_sync_push(
     for_agent: &crate::agents::ForAgent,
     trust_owned: bool,
 ) -> Result<(usize, Vec<Vec<u8>>), SyncPushRejected> {
-    // Check write access to the drive
     let drive_subject = crate::Subject::from_raw(&push.drive, store.get_base_domain().as_deref());
+    let policy = store.sync_policy();
+
     if let Ok(drive_resource) = store.get_resource(&drive_subject).await {
         if !may_accept_drive_write(store, &drive_resource, for_agent, trust_owned).await {
             tracing::warn!(
@@ -1231,30 +1393,10 @@ pub async fn import_sync_push(
                 reason: format!("agent {for_agent} has no write right on the drive"),
             });
         }
-    }
-    // Admission gate. A no-op under the default OpenPolicy (self-hosted / FOSS
-    // left open), so it bites only where a policy was installed: a managed node
-    // admits enrolled drives within quota, an owner-gated node admits the drives
-    // it hosts.
-    let policy = store.sync_policy();
-    let decision = policy.admit_decision(&push.drive);
-
-    if !decision.is_admitted() {
-        // The drive not existing here used to be reason enough to accept it —
-        // "bootstrap case, a new drive is arriving". That is also exactly what
-        // a stranger's first push looks like, so the bootstrap now has to say
-        // who it is for. An open node still admits anyone, which is what keeps
-        // ordinary first-sync working.
-        let is_new_here = store.get_resource(&drive_subject).await.is_err();
-
-        if is_new_here && policy.may_enroll_drive(&push.drive, for_agent) {
-            tracing::info!(
-                "import_sync_push: enrolling new drive {} for {:?}",
-                push.drive,
-                for_agent
-            );
-            policy.enroll_drive(&push.drive);
-        } else {
+        // Existing drive: allowlist/quota still apply. No bootstrap — that
+        // path is only for a drive we have never stored.
+        let decision = policy.admit_decision(&push.drive);
+        if !decision.is_admitted() {
             tracing::warn!(
                 "import_sync_push: drive {} not admitted by sync policy ({:?}, agent {:?})",
                 push.drive,
@@ -1275,6 +1417,21 @@ pub async fn import_sync_push(
                 reason,
             });
         }
+    } else if !admit_unknown_drive(store, &push.drive, for_agent) {
+        tracing::warn!(
+            "import_sync_push: refusing bootstrap of unknown drive {} for {:?}",
+            push.drive,
+            for_agent
+        );
+        let reason = if matches!(for_agent, crate::agents::ForAgent::Public) {
+            "unauthenticated agent cannot create a drive".to_string()
+        } else {
+            policy.not_enrolled_message(&push.drive)
+        };
+        return Err(SyncPushRejected {
+            drive: push.drive.clone(),
+            reason,
+        });
     }
 
     let mut count = 0;
@@ -1503,4 +1660,325 @@ pub async fn collect_readable_snapshots(
         }
     }
     entries
+}
+
+#[cfg(test)]
+mod bootstrap_and_sub_tests {
+    use super::*;
+    use crate::agents::ForAgent;
+    use crate::sync::policy::OwnerPolicy;
+    use crate::sync::protocol::{self, error_code, tag};
+    use std::sync::Arc;
+
+    fn empty_push(drive: &str) -> protocol::DecodedSyncPush {
+        let frame = protocol::encode_sync_push(drive, &[], true);
+        protocol::decode_sync_push(&frame[1..]).unwrap()
+    }
+
+    #[tokio::test]
+    async fn public_cannot_bootstrap_a_missing_drive_even_on_open() {
+        let db = Db::init_temp("oq5_public_open").await.unwrap();
+        let drive = "did:ad:newdrivepublic";
+        let push = empty_push(drive);
+
+        let err = import_sync_push(&push, &db, &ForAgent::Public, false)
+            .await
+            .expect_err("Public must not create a drive on an open node");
+        assert!(
+            err.reason.contains("unauthenticated"),
+            "reason names the cause: {}",
+            err.reason
+        );
+        assert!(
+            db.get_resource(&drive.into()).await.is_err(),
+            "the refused push must not have stored the drive"
+        );
+    }
+
+    #[tokio::test]
+    async fn authenticated_first_sync_on_open_still_admits_a_new_drive() {
+        let db = Db::init_temp("oq5_auth_open").await.unwrap();
+        let (alice, _) = db.setup("Alice").await.unwrap();
+        let drive = "did:ad:newdrivealice";
+        let push = empty_push(drive);
+
+        import_sync_push(
+            &push,
+            &db,
+            &ForAgent::AgentSubject(alice.subject.clone()),
+            false,
+        )
+        .await
+        .expect("an authenticated agent on Open may bootstrap a drive");
+    }
+
+    #[tokio::test]
+    async fn owner_mode_refuses_a_stranger_bootstrapping_a_new_drive() {
+        let db = Db::init_temp("oq5_owner_stranger").await.unwrap();
+        let (owner, _) = db.setup("Owner").await.unwrap();
+        let stranger = db.create_agent(Some("Stranger")).await.unwrap();
+        db.set_sync_policy(Arc::new(OwnerPolicy::new(owner.subject.to_string())));
+
+        let drive = "did:ad:strangerdrive";
+        let push = empty_push(drive);
+        let err = import_sync_push(
+            &push,
+            &db,
+            &ForAgent::AgentSubject(stranger.subject.clone()),
+            false,
+        )
+        .await
+        .expect_err("a stranger must not dump a drive onto an owner-gated node");
+        assert!(
+            err.reason.contains("does not host new Drives"),
+            "the refusal speaks to the visitor: {}",
+            err.reason
+        );
+        assert!(
+            !db.sync_policy().admit_drive_write(drive),
+            "the refused drive must not have been enrolled"
+        );
+    }
+
+    #[tokio::test]
+    async fn owner_mode_enrolls_the_owners_new_drive_from_sync_push() {
+        let db = Db::init_temp("oq5_owner_self").await.unwrap();
+        let (owner, _) = db.setup("Owner").await.unwrap();
+        db.set_sync_policy(Arc::new(OwnerPolicy::new(owner.subject.to_string())));
+
+        let drive = "did:ad:ownerssecond";
+        let push = empty_push(drive);
+        import_sync_push(
+            &push,
+            &db,
+            &ForAgent::AgentSubject(owner.subject.clone()),
+            false,
+        )
+        .await
+        .expect("the owner may bootstrap a second drive");
+        assert!(
+            db.sync_policy().admit_drive_write(drive),
+            "the owner's new drive must be enrolled so later writes land"
+        );
+    }
+
+    #[tokio::test]
+    async fn sub_on_a_public_drive_is_a_session_command_not_an_error() {
+        let db = Db::init_temp("sub_public").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let mut resource = db.get_resource(&drive.as_str().into()).await.unwrap();
+        resource
+            .set_unsafe(
+                crate::urls::READ.into(),
+                crate::Value::ResourceArray(vec![crate::urls::PUBLIC_AGENT.into()]),
+            )
+            .unwrap();
+        db.add_resource_opts(&resource, false, true, true)
+            .await
+            .unwrap();
+
+        let frame = protocol::encode_sub(&drive);
+        let mut agent = ForAgent::Public;
+        let out = handle_frame_full(&frame, &db, &mut agent).await;
+        assert!(
+            out.frames.is_empty(),
+            "a granted SUB has no reply on the wire"
+        );
+        assert_eq!(out.subscribe.as_deref(), Some(drive.as_str()));
+        assert!(out.unsubscribe.is_none());
+    }
+
+    #[tokio::test]
+    async fn sub_without_read_right_is_refused_out_loud() {
+        let db = Db::init_temp("sub_denied").await.unwrap();
+        let (_alice, drive) = db.setup("Alice").await.unwrap();
+        let mallory = db.create_agent(Some("Mallory")).await.unwrap();
+
+        let frame = protocol::encode_sub(&drive);
+        let mut agent = ForAgent::AgentSubject(mallory.subject.clone());
+        let out = handle_frame_full(&frame, &db, &mut agent).await;
+        assert!(out.subscribe.is_none(), "must not ask the hub to register");
+        let err = out
+            .frames
+            .iter()
+            .find(|f| f.first() == Some(&tag::ERROR))
+            .expect("an unauthorized SUB is answered with ERROR");
+        assert_eq!(
+            u16::from_be_bytes([err[3], err[4]]),
+            error_code::UNAUTHORIZED_READ
+        );
+        let msg = String::from_utf8_lossy(&err[5..]);
+        assert!(msg.contains("SUB refused"), "{msg}");
+        assert!(msg.contains(&drive), "{msg}");
+    }
+
+    async fn signed_destroy_json(
+        db: &Db,
+        agent: &crate::agents::Agent,
+        subject: &crate::Subject,
+    ) -> String {
+        let resource = db.get_resource(subject).await.unwrap();
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.destroy(true);
+        let commit = builder.sign(agent, db, &resource).await.unwrap();
+        commit
+            .into_resource(db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap()
+    }
+
+    async fn secret_child(db: &Db, drive: &str) -> String {
+        db.create_resource(
+            crate::urls::CLASS,
+            drive,
+            "Secret Doc",
+            Some(vec![
+                (
+                    crate::urls::DESCRIPTION,
+                    crate::Value::String("top secret".into()),
+                ),
+                (
+                    crate::urls::SHORTNAME,
+                    crate::Value::Slug("secret-doc".into()),
+                ),
+            ]),
+        )
+        .await
+        .unwrap()
+    }
+
+    fn decode_diff(frames: Vec<Vec<u8>>) -> protocol::DecodedSyncDiff {
+        frames
+            .into_iter()
+            .find(|f| f.first() == Some(&tag::SYNC_DIFF))
+            .and_then(|f| protocol::decode_sync_diff(&f[1..]))
+            .expect("reconcile answers with a SYNC_DIFF")
+    }
+
+    /// The destroyed resource is gone, so the only thing left to check the
+    /// envelope against is the drive: a session that may not read the
+    /// drive gets the subject-only `remove[]` entry and no envelope.
+    #[tokio::test]
+    async fn sync_diff_envelope_is_only_handed_to_drive_readers() {
+        let db = Db::init_temp("envelope_read_gate").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let child = secret_child(&db, &drive).await;
+        let subject = crate::Subject::from_raw(&child, None);
+        let json = signed_destroy_json(&db, &alice, &subject).await;
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect("the owner's destroy applies");
+        assert!(super::super::tombstones::destroy_envelope(&db, &child).is_some());
+
+        let mut client_resources = std::collections::HashMap::new();
+        client_resources.insert(child.clone(), Vec::<i32>::new());
+
+        let public = decode_diff(
+            handle_sync_vv_filtered(
+                &drive,
+                "",
+                &[],
+                &client_resources,
+                None,
+                &db,
+                &ForAgent::Public,
+            )
+            .await,
+        );
+        assert_eq!(public.remove, vec![child.clone()]);
+        assert!(
+            public.remove_commits.is_empty(),
+            "an anonymous session must not receive the signed destroy envelope"
+        );
+
+        let owner = decode_diff(
+            handle_sync_vv_filtered(
+                &drive,
+                "",
+                &[],
+                &client_resources,
+                None,
+                &db,
+                &ForAgent::AgentSubject(alice.subject.clone()),
+            )
+            .await,
+        );
+        assert!(
+            owner.remove_commits.contains_key(&child),
+            "a drive reader receives the envelope"
+        );
+    }
+
+    /// A destroy envelope is durable and re-sent by bulk sync, so a stale
+    /// replica can present it again after the subject was legitimately
+    /// recreated. The commit is already stored here: refuse it.
+    #[tokio::test]
+    async fn replayed_destroy_is_refused_after_the_subject_is_recreated() {
+        let db = Db::init_temp("destroy_replay_stored").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let subject = crate::Subject::from_raw(&drive, None);
+        let json = signed_destroy_json(&db, &alice, &subject).await;
+
+        ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect("the first destroy applies");
+        assert!(db.get_resource(&subject).await.is_err());
+
+        // The private drive has a deterministic subject: a repeat genesis
+        // brings back the very same DID (and clears the tombstone).
+        let again = db.ensure_private_drive().await.unwrap();
+        assert_eq!(again, drive, "repeat genesis recreates the same subject");
+        assert!(db.get_resource(&subject).await.is_ok());
+
+        let err = ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect_err("the same envelope must not destroy the recreated drive");
+        assert!(err.to_string().contains("already applied"), "{err}");
+        assert!(
+            db.get_resource(&subject).await.is_ok(),
+            "the recreated drive survives the replay"
+        );
+        assert!(!super::super::tombstones::is_tombstoned(&db, &drive));
+    }
+
+    /// A destroy older than the genesis of the resource it names cannot be
+    /// about this resource: refuse it even when the commit is unknown here.
+    #[tokio::test]
+    async fn destroy_predating_the_genesis_is_refused() {
+        let db = Db::init_temp("destroy_replay_genesis").await.unwrap();
+        let (alice, drive) = db.setup("Alice").await.unwrap();
+        let child = secret_child(&db, &drive).await;
+        let subject = crate::Subject::from_raw(&child, None);
+
+        let mut resource = db.get_resource(&subject).await.unwrap();
+        resource
+            .set_unsafe(
+                crate::urls::CREATED_AT.into(),
+                crate::Value::Timestamp(crate::utils::now() + 60_000),
+            )
+            .unwrap();
+        db.add_resource_opts(&resource, false, true, true)
+            .await
+            .unwrap();
+
+        let json = signed_destroy_json(&db, &alice, &subject).await;
+        let err = ingest_commit_json(&db, &json, &CommitIngestOpts::peer())
+            .await
+            .expect_err("a destroy stamped before the genesis is a replay");
+        assert!(err.to_string().contains("predates"), "{err}");
+        assert!(db.get_resource(&subject).await.is_ok());
+        assert!(!super::super::tombstones::is_tombstoned(&db, &child));
+    }
+
+    #[tokio::test]
+    async fn unsub_is_a_session_command() {
+        let db = Db::init_temp("unsub_cmd").await.unwrap();
+        let frame = protocol::encode_unsub("did:ad:whatever");
+        let mut agent = ForAgent::Public;
+        let out = handle_frame_full(&frame, &db, &mut agent).await;
+        assert!(out.frames.is_empty());
+        assert_eq!(out.unsubscribe.as_deref(), Some("did:ad:whatever"));
+    }
 }

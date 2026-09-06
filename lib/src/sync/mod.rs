@@ -18,9 +18,13 @@ pub mod rbsr;
 /// Pushing a whole drive to a remote server, as a client. Needs the WS client.
 #[cfg(feature = "ws")]
 pub mod replicate;
+#[cfg(feature = "db")]
+pub mod session;
 #[cfg(all(test, feature = "iroh"))]
 mod tests;
 #[cfg(feature = "db")]
 pub mod tombstones;
+#[cfg(feature = "db")]
+pub mod transport;
 #[cfg(feature = "db")]
 pub mod ws_apply;

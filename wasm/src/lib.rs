@@ -391,6 +391,18 @@ impl ClientDb {
         Self::state_snapshot_js(self.db(), subject)
     }
 
+    /// Who signed this resource's history, from the envelopes this client
+    /// kept (`atomic_lib::envelopes::attribute_history`). JSON string with
+    /// `attributions[]` (signer, createdAt, signature, verified, tokens,
+    /// destroy, genesis), `retention` and `complete`.
+    #[wasm_bindgen(js_name = "historyAttribution")]
+    pub async fn history_attribution(&self, subject: &str) -> Result<String, JsError> {
+        let report = atomic_lib::envelopes::attribute_history(self.db(), subject)
+            .await
+            .map_err(to_js_err)?;
+        serde_json::to_string(&report).map_err(to_js_err)
+    }
+
     /// Back-compat alias for browser client-db (`getLoroSnapshot`).
     #[wasm_bindgen(js_name = "getLoroSnapshot")]
     pub fn get_loro_snapshot(&self, subject: &str) -> Result<JsValue, JsError> {

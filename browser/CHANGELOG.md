@@ -4,6 +4,17 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Commits are signed envelopes: `CommitDetail` does not fetch `did:ad:commit:`
+  resources; author and dates come from the resource. History no longer
+  navigates to a commit DID, and the Sync page log no longer links commit ids.
+  Sequential saves no longer set `previousCommit`.
+- History shows who signed each version. `Store.getHistoryAttribution(subject)`
+  merges the server's `GET /history-attribution` with the local ClientDb
+  (`historyAttribution`), and `VersionTitle` labels a version
+  `by <agent> Verified` (signature checked), `Unverified` (envelope present,
+  signature failed) or `by peer … Unattributed` (no envelope covers it).
+  `attributionForVersion`, `mergeHistoryAttributions`, `parseHistoryAttribution`
+  and the `HistoryAttribution` / `Attribution` types are exported from `@tomic/lib`.
 - [#1232](https://github.com/ontola/atomic-server/issues/1232) Unified
   actions: the ⌘K palette shows a capped Actions section for the current
   resource, hotkeys and the shortcuts overlay/page render from the action

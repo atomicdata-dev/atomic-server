@@ -83,6 +83,7 @@ pub enum WsMessage {
         pull: Vec<String>,
         push: Vec<String>,
         remove: Vec<String>,
+        remove_commits: std::collections::HashMap<String, String>,
     },
     /// A `SYNC_PUSH` (0x33) frame: the server is sending us resource state.
     SyncPush {
@@ -614,6 +615,7 @@ fn parse_binary_message(bin: &[u8]) -> Option<WsMessage> {
                 pull: diff.pull,
                 push: diff.push,
                 remove: diff.remove,
+                remove_commits: diff.remove_commits,
             })
         }
         tag::SYNC_PUSH => {

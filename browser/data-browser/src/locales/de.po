@@ -1998,8 +1998,8 @@ msgid "Class"
 msgstr ""
 
 #: src/views/FolderPage/ListView.tsx
-msgid "Last Modified"
-msgstr ""
+msgid "Created"
+msgstr "Erstellt"
 
 #: src/views/Article/ArticlePage.tsx
 msgid "Children"
@@ -2717,10 +2717,6 @@ msgstr ""
 msgid "Restore this version"
 msgstr ""
 
-#: src/routes/History/HistoryDesktopView.tsx
-msgid "Show Commit"
-msgstr ""
-
 #. 0: resource.title
 #. 0: resource.title
 #: src/routes/History/HistoryDesktopView.tsx
@@ -3188,10 +3184,8 @@ msgstr ""
 msgid "Could not save resource"
 msgstr ""
 
-#. 0: version.peer && <> by peer {version.peer.slice(0, 8)}...</>; 1: version.message && <> — {version.message}</>
-#: src/routes/History/VersionTitle.tsx
-msgid "Edited <0/> {0} {1}"
-msgstr ""
+#~ msgid "Edited <0/> {0} {1}"
+#~ msgstr ""
 
 #: src/views/OntologyPage/Property/PropertyLineRead.tsx
 msgid "Property does not exist anymore"
@@ -7261,4 +7255,39 @@ msgstr ""
 
 #: src/components/Vault/LinkProviderPanel.tsx
 msgid "stores it without being able to read it."
+msgstr ""
+
+#: src/routes/History/VersionTitle.tsx
+msgid "Verified"
+msgstr ""
+
+#: src/routes/History/VersionTitle.tsx
+msgid "Unverified"
+msgstr ""
+
+#: src/routes/History/VersionTitle.tsx
+msgid "Signature checked against the signer's key"
+msgstr ""
+
+#: src/routes/History/VersionTitle.tsx
+msgid "Envelope present, but its signature did not verify"
+msgstr ""
+
+#: src/routes/History/VersionTitle.tsx
+msgid "No signed envelope covers this change on this node"
+msgstr ""
+
+#. 0: ' '; 1: signed ? ( <SignedBy attribution={signed} /> ) \\: ( <UnattributedBy peer={version.peer} /> ); 2: version.message && !signed && <> — {version.message}</>
+#: src/routes/History/VersionTitle.tsx
+msgid "Edited <0/>{0} {1} {2}"
+msgstr ""
+
+#. 0: ' '
+#: src/routes/History/VersionTitle.tsx
+msgid "by <0/>{0} <1/>"
+msgstr ""
+
+#. 0: shortPeer; 1: ' '
+#: src/routes/History/VersionTitle.tsx
+msgid "by peer {0}{1} <0>Unattributed</0>"
 msgstr ""

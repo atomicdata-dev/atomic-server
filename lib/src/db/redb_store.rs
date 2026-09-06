@@ -38,6 +38,7 @@ const TABLE_SEARCH_DOC_TOKENS: TableDefinition<&[u8], &[u8]> =
     TableDefinition::new("search_doc_tokens_v1");
 const TABLE_SEARCH_TRIGRAMS: TableDefinition<&[u8], &[u8]> =
     TableDefinition::new("search_trigrams_v1");
+const TABLE_ENVELOPES: TableDefinition<&[u8], &[u8]> = TableDefinition::new("envelopes_v1");
 
 fn table_def(tree: Tree) -> TableDefinition<'static, &'static [u8], &'static [u8]> {
     match tree {
@@ -55,6 +56,7 @@ fn table_def(tree: Tree) -> TableDefinition<'static, &'static [u8], &'static [u8
         Tree::SearchDocs => TABLE_SEARCH_DOCS,
         Tree::SearchDocTokens => TABLE_SEARCH_DOC_TOKENS,
         Tree::SearchTrigrams => TABLE_SEARCH_TRIGRAMS,
+        Tree::Envelopes => TABLE_ENVELOPES,
     }
 }
 
@@ -74,6 +76,7 @@ fn create_all_tables(tx: &redb::WriteTransaction) {
         Tree::SearchDocs,
         Tree::SearchDocTokens,
         Tree::SearchTrigrams,
+        Tree::Envelopes,
     ] {
         let _ = tx.open_table(table_def(tree));
     }

@@ -651,7 +651,6 @@ async fn destroy_resource_and_sync(subject: String) -> Result<(), String> {
     let opts = atomic_lib::commit::CommitOpts {
         validate_signature: true,
         validate_timestamp: false,
-        validate_previous_commit: false,
         validate_rights: false,
         update_index: true,
         ..atomic_lib::commit::CommitOpts::no_validations_no_index()

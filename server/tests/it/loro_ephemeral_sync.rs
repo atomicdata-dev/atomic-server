@@ -3,11 +3,11 @@
 //!
 //! Pins the migration contract introduced in #1173 (Yjs → Loro): the
 //! live-cursor sync moved from y-protocols awareness frames to Loro
-//! ephemeral updates broadcast through `LoroSyncBroadcaster`. The same
+//! ephemeral updates broadcast through `CommitMonitor`. The same
 //! `LORO_SYNC_SUBSCRIBE`-keyed map drives both document sync AND
 //! ephemeral cursor fan-out (`commit_monitor.rs`'s drive subscribers
-//! handle persisted edits; this broadcaster handles real-time-only
-//! presence). A future cleanup that splits the maps without rewiring
+//! handle persisted edits; the Loro maps on the same actor handle
+//! real-time-only presence). A future cleanup that splits the maps without rewiring
 //! the ephemeral handler would silently strand cursors — that's the
 //! regression this test catches.
 //!
@@ -110,7 +110,7 @@ async fn ephemeral_update_broadcasts_to_other_subscribers() -> AtomicResult<()> 
 
     // ----- Sender suppression: Alice should NOT receive her own update -----
     // The broadcaster skips the originating address (`subscriber.addr ==
-    // sender_addr` check in `loro_sync_broadcaster.rs`). A regression that
+    // sender_addr` check in `commit_monitor.rs`). A regression that
     // forgot to skip self would echo every cursor move back to the typer
     // and double-render their own caret.
     let echo = tokio::time::timeout(Duration::from_millis(400), async {

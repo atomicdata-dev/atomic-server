@@ -1,17 +1,18 @@
+import {
+  mergeHistoryAttributions,
+  parseHistoryAttribution,
+  type HistoryAttribution,
+} from './history-attribution.js';
 import { ulid } from 'ulidx';
 import type { Agent } from './agent.js';
 import { canonicalDriveHash } from './canonical-drive-hash.js';
 import {
   removeCookieAuthentication,
   setCookieAuthentication,
+  signRequest,
 } from './authentication.js';
 import { Client, type FileOrFileLike } from './client.js';
-import {
-  CommitBuilder,
-  commitIdOf,
-  commitToJsonADObject,
-  type Commit,
-} from './commit.js';
+import { CommitBuilder, commitIdOf, type Commit } from './commit.js';
 import { datatypeFromUrl, type Datatype } from './datatypes.js';
 import {
   AtomicError,
@@ -1120,7 +1121,7 @@ export class Store {
    *     from this version.
    *  2. If the subject has accumulated local Loro ops (`markDirty` was
    *     called since the last successful drain), export the delta,
-   *     sign ONE commit chained on `resource.lastCommit`, POST. On
+   *     sign ONE commit, POST. On
    *     success: clear dirty, `setLastCommitValue`, advance cursor.
    *
    *  Resource must be loaded in the store; cold drains for unloaded
@@ -1306,8 +1307,8 @@ export class Store {
       resource.restoreSaveCursor(entry.baseVersion);
     }
 
-    const previousCommit = resource.getLastCommitForChain();
-    const isFirstCommit = !previousCommit;
+    const lastCommit = resource.getLastCommitForChain();
+    const isFirstCommit = !lastCommit;
     // Tag this commit's Loro change with a unique token so the oplog keeps
     // a distinct Change per Atomic commit — `getLoroHistory` buckets by it
     // to reconstruct one version per commit. The token only needs to be
@@ -1351,7 +1352,6 @@ export class Store {
 
     const { bytes: delta, versionAfterExport } = exported;
     const builder = new CommitBuilder(subject);
-    if (previousCommit) builder.setPreviousCommit(previousCommit);
     builder.setLoroUpdate(delta);
     const commit = await builder.sign(agent);
 
@@ -3401,6 +3401,50 @@ export class Store {
   }
 
   /**
+   * Who signed `subject`'s history: the verified signer per Loro change
+   * token, from the signed envelopes the connected server kept
+   * (`GET /history-attribution`, read-gated) merged with those this client
+   * applied itself (ClientDb). Null when neither has anything. Never
+   * guesses: a version whose token no envelope carries stays unattributed.
+   */
+  public async getHistoryAttribution(
+    subject: string,
+  ): Promise<HistoryAttribution | null> {
+    const [remote, local] = await Promise.all([
+      this.fetchHistoryAttributionFromServer(subject),
+      this.getClientDb()?.historyAttribution(subject) ?? Promise.resolve(null),
+    ]);
+
+    return mergeHistoryAttributions(remote, local);
+  }
+
+  private async fetchHistoryAttributionFromServer(
+    subject: string,
+  ): Promise<HistoryAttribution | null> {
+    if (!this.serverUrl) return null;
+
+    try {
+      const url = new URL('/history-attribution', this.serverUrl);
+      url.searchParams.set('subject', subject);
+      const agent = this.getAgent();
+      // Sign the URL being fetched: the server rebuilds the signed message
+      // from the request it received, query string included.
+      const headers = agent
+        ? await signRequest(url.toString(), agent, {
+            Accept: 'application/json',
+          })
+        : { Accept: 'application/json' };
+      const res = await fetch(url.toString(), { headers });
+
+      if (!res.ok) return null;
+
+      return parseHistoryAttribution(await res.json());
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Returns the Currently set Agent, returns null if there is none. Make sure
    * to first run `store.setAgent()`.
    */
@@ -4998,7 +5042,7 @@ export class Store {
   }
 
   /** @internal Settle a commit that will never be POSTed (local-only
-   *  drives sign and materialize locally). Transitions the `pending`
+   *  drives sign locally). Transitions the `pending`
    *  entry `logPendingCommit` created so the Sync page doesn't show it
    *  as queued forever. */
   public logLocalOnlyCommitSettled(commit: Commit): void {
@@ -5010,7 +5054,7 @@ export class Store {
 
     if (commit.destroy) {
       parts.push('destroy');
-    } else if (!commit.previousCommit) {
+    } else if (commit.isGenesis) {
       parts.push('created');
     } else {
       parts.push('updated');
@@ -5316,7 +5360,7 @@ export class Store {
   /** Posts a Commit to some endpoint. Returns the Commit created by the server. */
   public async postCommit(commit: Commit, endpoint: string): Promise<Commit> {
     const close = perfSpan('store.postCommit', {
-      genesis: commit.previousCommit === undefined,
+      genesis: !!commit.isGenesis,
     });
 
     try {
@@ -5327,14 +5371,6 @@ export class Store {
           commitId: commitIdOf(created),
         }),
       );
-      // Materialize the just-signed commit as a Resource so subsequent
-      // `useResource(commitSubject)` lookups (chatroom <CommitDetail>,
-      // version views, etc.) hit the local cache instead of round-
-      // tripping back to the server for data we already had in hand.
-      // The local-only save branch already does this; the online happy
-      // path used to skip it, which produced the `GET did:ad:commit:*`
-      // visible in the network log right after posting a chat message.
-      this.materializeCommitLocally(created);
 
       return created;
     } catch (e) {
@@ -5385,32 +5421,6 @@ export class Store {
     } catch {
       return this.getDefaultWebSocket();
     }
-  }
-
-  /**
-   * Cache a freshly-signed commit as a Resource in the local store.
-   * Idempotent: bails if the commit's subject is already present
-   * (e.g. the local-only save path beat us to it).
-   */
-  public materializeCommitLocally(commit: Commit): void {
-    const signature = commit.signature;
-    if (!signature) return;
-    const commitSubject = `did:ad:commit:${signature}`;
-    if (this.resources.has(commitSubject)) return;
-
-    const commitResource = new Resource(commitSubject);
-    commitResource.applyHydratedValues(
-      Object.entries(commitToJsonADObject(commit)) as Iterable<
-        [string, any] // eslint-disable-line @typescript-eslint/no-explicit-any
-      >,
-    );
-    commitResource.loading = false;
-    commitResource.new = false;
-    this.applyIncoming({
-      subject: commitSubject,
-      resource: commitResource,
-      source: 'local-post',
-    });
   }
 
   /**

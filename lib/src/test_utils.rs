@@ -33,6 +33,10 @@ pub async fn populate_collections(store: &impl Storelike) -> crate::errors::Atom
     let result = store.query(&query).await?;
 
     for subject in result.subjects {
+        if subject.as_str() == urls::COMMIT {
+            // Commits are signed envelopes, not a queryable class listing.
+            continue;
+        }
         let mut collection =
             crate::collections::create_collection_resource_for_class(store, subject.as_str())
                 .await?;

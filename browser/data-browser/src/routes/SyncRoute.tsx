@@ -1941,22 +1941,14 @@ function SyncPage() {
                       </Direction>
                       {entry.destroy && <DestroyBadge>destroy</DestroyBadge>}
                     </LogHeaderLeft>
-                    {entry.commitId ? (
-                      <AtomicLink subject={entry.commitId}>
-                        <TimeText
-                          title={new Date(entry.timestamp).toLocaleString()}
-                        >
-                          {formatTimeAgo(new Date(entry.timestamp)) ??
-                            'just now'}
-                        </TimeText>
-                      </AtomicLink>
-                    ) : (
-                      <TimeText
-                        title={new Date(entry.timestamp).toLocaleString()}
-                      >
-                        {formatTimeAgo(new Date(entry.timestamp)) ?? 'just now'}
-                      </TimeText>
-                    )}
+                    {/* `entry.commitId` is a `did:ad:commit:` receipt, not a
+                        fetchable resource (content commits are not stored), so
+                        the timestamp is plain text. */}
+                    <TimeText
+                      title={new Date(entry.timestamp).toLocaleString()}
+                    >
+                      {formatTimeAgo(new Date(entry.timestamp)) ?? 'just now'}
+                    </TimeText>
                   </LogHeader>
 
                   <LogSubjectRow>

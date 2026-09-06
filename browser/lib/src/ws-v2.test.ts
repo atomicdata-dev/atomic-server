@@ -309,6 +309,7 @@ describe('wire vectors shared with lib/src/sync/protocol.rs', () => {
       push: ['did:ad:x'],
       remove: ['did:ad:z'],
       pullFrom: { 'did:ad:y': { p1: 2 } },
+      removeCommits: {},
     });
 
     const push = decodeSyncPush(payload('sync_push_last'));

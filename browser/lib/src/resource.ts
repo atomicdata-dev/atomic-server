@@ -213,8 +213,9 @@ export class Resource<C extends OptionalClass = any> {
   private _loroVersionAtLastSave?: VersionVector;
 
   /**
-   * The subject of the most recently applied commit. This is the source of truth
-   * for the commit chain and is protected from being clobbered by remote merges.
+   * The id of the most recently applied commit (`did:ad:commit:{sig}`).
+   * Stamp for genesis detection and echo-dedup; not a fetchable resource.
+   * Protected from being clobbered by remote merges.
    */
   private _lastCommit: string | undefined;
 
@@ -1143,9 +1144,8 @@ export class Resource<C extends OptionalClass = any> {
     );
   }
 
-  /** The canonical `previousCommit` value for chaining the next sign:
-   *  the in-memory `_lastCommit` (set by `setLastCommitValue` after
-   *  every ack) falls back to the cached property.
+  /** The resource's last applied commit id (`did:ad:commit:{sig}`).
+   *  Stamp for genesis detection and echo-dedup — not a fetchable resource.
    *  @internal store-level drain only — not part of the public API. */
   public getLastCommitForChain(): string | undefined {
     return (
@@ -2135,6 +2135,9 @@ export class Resource<C extends OptionalClass = any> {
       // (`c-<ulid>`), not a human-authored message — don't surface it in the
       // history UI. Left undefined until real commit messages exist.
       message: undefined,
+      // The raw token, for matching this version to the signed envelope
+      // that introduced it (`attributionForVersion`).
+      token: g.step.message,
       propvals: g.propvals,
       containers: g.containers,
     }));
@@ -2305,17 +2308,10 @@ export class Resource<C extends OptionalClass = any> {
     const newCommitBuilder = new CommitBuilder(this.subject);
     newCommitBuilder.setDestroy(true);
 
-    // The server rejects destroy commits without `previousCommit` for
-    // non-genesis resources. If a fetch is in flight, wait for it.
+    // If a fetch is in flight, wait for it so we destroy the current
+    // resource rather than a stale in-memory copy.
     if (this.loading) {
       await this.store.getResource(this.subject).catch(() => undefined);
-    }
-
-    const lastCommit =
-      this._lastCommit ?? this.get(properties.commit.lastCommit)?.toString();
-
-    if (lastCommit) {
-      newCommitBuilder.setPreviousCommit(lastCommit);
     }
 
     if (agent === undefined) {
@@ -2657,9 +2653,7 @@ export class Resource<C extends OptionalClass = any> {
   /**
    * Sign pending changes into a {@link Commit}.
    *
-   * - For DID genesis commits the subject is replaced with `did:ad:<signature>`.
-   * - Locally-queued commits are chained via their signatures so that
-   *   `previousCommit` stays consistent even before pushing.
+   * For DID genesis commits the subject is replaced with `did:ad:<signature>`.
    *
    * @returns The signed {@link Commit}.
    *
@@ -2689,11 +2683,9 @@ export class Resource<C extends OptionalClass = any> {
     this.rebuildCacheFromLoro();
     this.#cacheDirty = false;
 
-    // Chain on the resource's lastCommit (server-acked). Under
+    // Genesis detection uses the lastCommit stamp (server-acked). Under
     // sign-at-drain there's at most one signed-but-unposted commit
-    // per subject (the optional `signedGenesis` in the outbox), and
-    // genesis commits don't have a previousCommit, so we never need
-    // to chain on an unposted local commit.
+    // per subject (the optional `signedGenesis` in the outbox).
     const lastCommit =
       this._lastCommit ?? this.get(properties.commit.lastCommit)?.toString();
     const isFirstCommit = !lastCommit;
@@ -2811,10 +2803,6 @@ export class Resource<C extends OptionalClass = any> {
         : undefined,
     );
 
-    if (lastCommit) {
-      this.#commitBuilder.setPreviousCommit(lastCommit);
-    }
-
     // Export Loro delta — the sole carrier of property changes. Pass the agent
     // again as a fallback: if `writeDatatypeTags` had nothing to commit, this
     // export's commit is the one that creates the genesis change.
@@ -2832,9 +2820,10 @@ export class Resource<C extends OptionalClass = any> {
       this.#commitBuilder.setLoroUpdate(loroDelta);
     }
 
-    // Auto-detect genesis: no previousCommit means this is a new resource.
-    // The server requires is_genesis=true for DID resources without a previous commit.
-    // Only for DID-eligible subjects (_new: or did:ad:) — HTTP URLs use server-assigned subjects.
+    // Auto-detect genesis: no lastCommit stamp means this is a new resource.
+    // The server requires is_genesis=true for DID resources that do not
+    // yet exist. Only for DID-eligible subjects (_new: or did:ad:) —
+    // HTTP URLs use server-assigned subjects.
     // Agents are excluded: their identity is fixed by their public key
     // (did:ad:agent:<pubkey>), not derived from a genesis-commit signature.
     // Marking an agent commit as genesis triggers `delete subject` below,
@@ -2847,7 +2836,7 @@ export class Resource<C extends OptionalClass = any> {
       this.subject.startsWith('_new:') || this.subject.startsWith('did:ad:');
     const isAgent = this.subject.startsWith('did:ad:agent:');
 
-    if (isDIDEligible && !isAgent && !this.#commitBuilder.previousCommit) {
+    if (isDIDEligible && !isAgent && isFirstCommit) {
       this.#commitBuilder.setIsGenesis(true);
     }
 
@@ -3112,7 +3101,7 @@ export class Resource<C extends OptionalClass = any> {
         // `set()` + `save()` with no explicit genesis step. The real
         // `did:ad:<sig>`
         // subject only exists after signing, so sign now: `signChanges`
-        // auto-detects genesis (no previousCommit + DID-eligible), derives
+        // auto-detects genesis (no lastCommit stamp + DID-eligible), derives
         // the DID, and renames this resource in place; we enqueue the
         // signed genesis under the NEW subject. Without this a `_new:`
         // subject would be marked dirty and the drain would POST a commit
@@ -3225,8 +3214,8 @@ export class Resource<C extends OptionalClass = any> {
 
     if (genesis) {
       settled.push(genesis);
-      // The delta sign below chains on `lastCommit` — point it at the
-      // genesis first.
+      // The delta sign below uses lastCommit as the "already exists"
+      // stamp — point it at the genesis first.
       this.setLastCommitValue(`did:ad:commit:${genesis.signature}`);
     }
 
@@ -3249,7 +3238,6 @@ export class Resource<C extends OptionalClass = any> {
     }
 
     for (const commit of settled) {
-      this.store.materializeCommitLocally(commit);
       this.setLastCommitValue(`did:ad:commit:${commit.signature}`);
       this.store.logLocalOnlyCommitSettled(commit);
     }
@@ -3270,8 +3258,6 @@ export class Resource<C extends OptionalClass = any> {
    * envelope) but no incremental signed commits — those are signed
    * fresh from the Loro delta at drain time. So the offline path:
    *
-   *  - Materializes the pre-signed genesis (if present) as a
-   *    `CommitDetail`-renderable resource for the offline audit log.
    *  - Persists this resource atomically (JSON-AD + Loro snapshot) to
    *    clientDb so a reload can hydrate the Loro state before the WS
    *    reconnect drain re-signs from the same `_loroVersionAtLastSave`
@@ -3288,7 +3274,6 @@ export class Resource<C extends OptionalClass = any> {
     )?.signedGenesis;
 
     if (signedGenesis) {
-      this.store.materializeCommitLocally(signedGenesis);
       this.setLastCommitValue(`did:ad:commit:${signedGenesis.signature}`);
     }
 
@@ -3804,6 +3789,12 @@ export interface Version {
   frontiers: any[];
   /** Human-readable commit message, if set */
   message?: string;
+  /**
+   * The Loro change message this version was bucketed by: the drain's
+   * `c-<ulid>` commit token or, at genesis, the creator's agent subject.
+   * Not for display; it is what a signed envelope's `tokens` name.
+   */
+  token?: string;
   /** Materialized property values at this version */
   propvals: Map<string, JSONValue>;
   /** Top-level Loro containers besides `properties` at this version — most

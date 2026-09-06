@@ -3,9 +3,9 @@ import { core, commits, server } from './index.js';
 import { testStore } from './test-store.js';
 
 /**
- * Local-only drives (e.g. the demo workspace): resources save, chain
- * commits, and materialize history entirely client-side — nothing may
- * ever be POSTed or enrolled in the outbox.
+ * Local-only drives (e.g. the demo workspace): resources save and
+ * stamp lastCommit entirely client-side — nothing may ever be POSTed
+ * or enrolled in the outbox.
  */
 describe('Local-only drives', () => {
   it('saves the drive without POSTing or enrolling the outbox', async ({
@@ -27,13 +27,12 @@ describe('Local-only drives', () => {
     expect(store.outbox.size).toBe(0);
     expect(drive.subject.startsWith('did:ad:')).toBe(true);
 
-    // The genesis commit is materialized locally for the history log.
     const lastCommit = String(drive.get(commits.properties.lastCommit));
     expect(lastCommit.startsWith('did:ad:commit:')).toBe(true);
-    expect(store.resources.has(lastCommit)).toBe(true);
+    expect(store.resources.has(lastCommit)).toBe(false);
   });
 
-  it('resolves children as local-only and chains their commits locally', async ({
+  it('resolves children as local-only and stamps lastCommit locally', async ({
     expect,
   }) => {
     const { store, posted } = await testStore();
@@ -62,11 +61,6 @@ describe('Local-only drives', () => {
     const second = String(doc.get(commits.properties.lastCommit));
 
     expect(second).not.toBe(first);
-
-    // The edit's commit chains on the genesis, exactly like the drain
-    // would have chained it.
-    const editCommit = store.resources.get(second);
-    expect(editCommit?.get(commits.properties.previousCommit)).toBe(first);
 
     expect(posted).toHaveLength(0);
     expect(store.outbox.size).toBe(0);

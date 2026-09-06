@@ -89,8 +89,7 @@ async fn basic() {
 
 #[tokio::test]
 /// Check if a resource is properly removed from the DB after a delete command.
-/// Also counts commits.
-async fn destroy_resource_and_check_collection_and_commits() {
+async fn destroy_resource_and_check_collection() {
     let store = Db::init_temp("counter").await.unwrap();
     crate::test_utils::setup_test_env(&store).await.unwrap();
     let for_agent = &ForAgent::Public;
@@ -114,20 +113,6 @@ async fn destroy_resource_and_check_collection_and_commits() {
         "There should be 1 agent in this collection initially (the agent created during init)"
     );
 
-    // We will count the commits, and check if they've incremented later on.
-    let commits_url = "internal:/commits".to_string();
-    let commits_collection_1 = store
-        .get_resource_extended(&commits_url.as_str().into(), false, for_agent)
-        .await
-        .unwrap();
-    let commits_collection_count_1 = commits_collection_1
-        .to_single()
-        .get(crate::urls::COLLECTION_MEMBER_COUNT)
-        .unwrap()
-        .to_int()
-        .unwrap();
-    println!("Commits collection count 1: {}", commits_collection_count_1);
-
     // Create a new agent, check if it is added to the new Agents collection as a Member.
     let mut resource = crate::agents::Agent::new(None)
         .unwrap()
@@ -147,23 +132,6 @@ async fn destroy_resource_and_check_collection_and_commits() {
     assert_eq!(
         agents_collection_count_2, 2,
         "The new Agent resource did not increase the collection member count from 1 to 2."
-    );
-
-    let commits_collection_2 = store
-        .get_resource_extended(&commits_url.as_str().into(), false, for_agent)
-        .await
-        .unwrap();
-    let commits_collection_count_2 = commits_collection_2
-        .to_single()
-        .get(crate::urls::COLLECTION_MEMBER_COUNT)
-        .unwrap()
-        .to_int()
-        .unwrap();
-    println!("Commits collection count 2: {}", commits_collection_count_2);
-    assert_eq!(
-        commits_collection_count_2,
-        commits_collection_count_1 + 1,
-        "The commits collection did not increase after saving the resource."
     );
 
     let clone = _res.resource_new.clone().unwrap();
@@ -200,23 +168,6 @@ async fn destroy_resource_and_check_collection_and_commits() {
     assert_eq!(
         agents_collection_count_3, 1,
         "The collection count did not decrease after destroying the resource."
-    );
-
-    let commits_collection_3 = store
-        .get_resource_extended(&commits_url.as_str().into(), false, for_agent)
-        .await
-        .unwrap();
-    let commits_collection_count_3 = commits_collection_3
-        .to_single()
-        .get(crate::urls::COLLECTION_MEMBER_COUNT)
-        .unwrap()
-        .to_int()
-        .unwrap();
-    println!("Commits collection count 3: {}", commits_collection_count_3);
-    assert_eq!(
-        commits_collection_count_3,
-        commits_collection_count_2 + 1,
-        "The commits collection did not increase after destroying the resource."
     );
 }
 
@@ -392,26 +343,32 @@ async fn get_extended_resource_pagination() {
         .await
         .unwrap();
     crate::test_utils::setup_test_env(&store).await.unwrap();
-    let subject = format!(
-        "{}/commits?current_page=2&page_size=99999",
-        "http://localhost"
-    );
+
+    // Need enough local members that page 2 exists at page_size=1. This used to
+    // paginate `/commits` (every write minted a member). The `/commits`
+    // collection is no longer created; `/agents` has `include_external` and
+    // DID subjects, so extra agents show up. `/classes` does not: class
+    // subjects are `https://atomicdata.dev/…` and `include_external` is false.
+    for _ in 0..5 {
+        let mut agent = crate::agents::Agent::new(None)
+            .unwrap()
+            .to_resource()
+            .unwrap();
+        agent.save_locally(&store).await.unwrap();
+    }
+
     let for_agent = &ForAgent::Public;
+    let too_big = "http://localhost/agents?current_page=2&page_size=99999";
     if store
-        .get_resource_extended(&subject.as_str().into(), false, for_agent)
+        .get_resource_extended(&too_big.into(), false, for_agent)
         .await
         .is_ok()
     {
         panic!("Page 2 should not exist, because page size is set to a high value.")
     }
-    // let subject = "https://atomicdata.dev/classes?current_page=2&page_size=1";
-    let subject_with_page_size = format!("{}&page_size=1", subject);
+    let paged = "http://localhost/agents?current_page=2&page_size=1";
     let resource = store
-        .get_resource_extended(
-            &subject_with_page_size.as_str().into(),
-            false,
-            &ForAgent::Public,
-        )
+        .get_resource_extended(&paged.into(), false, &ForAgent::Public)
         .await
         .unwrap()
         .to_single();
@@ -421,7 +378,7 @@ async fn get_extended_resource_pagination() {
         .to_int()
         .unwrap();
     assert_eq!(cur_page, 2);
-    assert_eq!(resource.get_subject().as_str(), &subject_with_page_size);
+    assert_eq!(resource.get_subject().as_str(), paged);
 }
 
 /// Generate a bunch of resources, query them.
@@ -1384,7 +1341,6 @@ async fn did_loro_only_commit_sled() {
     let opts = CommitOpts {
         validate_signature: true,
         validate_timestamp: false,
-        validate_previous_commit: false,
         validate_loro_causality: false,
         validate_rights: true,
         validate_schema: true,
@@ -1438,7 +1394,6 @@ async fn loro_non_property_container_survives_commit_roundtrip() {
     let opts = CommitOpts {
         validate_signature: true,
         validate_timestamp: false,
-        validate_previous_commit: false,
         validate_loro_causality: true,
         validate_rights: true,
         validate_schema: true,
@@ -1866,7 +1821,6 @@ async fn a_cascade_deleted_child_names_its_drive() {
                 validate_signature: true,
                 validate_timestamp: false,
                 validate_rights: true,
-                validate_previous_commit: false,
                 validate_loro_causality: false,
                 validate_for_agent: Some(agent.subject.to_string()),
                 update_index: true,
@@ -1966,7 +1920,6 @@ async fn find_resource_scoped_to_its_drive() {
         validate_signature: true,
         validate_timestamp: false,
         validate_rights: true,
-        validate_previous_commit: false,
         validate_loro_causality: false,
         validate_for_agent: Some(agent.subject.to_string()),
         update_index: true,
@@ -2459,5 +2412,89 @@ async fn partial_index_for_an_unwatched_filter_is_rebuilt() {
         "an unwatched filter's index is unmaintained; a partial one must be \
          rebuilt rather than believed. Got {} of 6",
         res.count
+    );
+}
+
+#[tokio::test]
+#[timeout(120000)]
+async fn content_commits_are_not_stored() {
+    let store = Db::init_temp("content_commits_are_not_stored")
+        .await
+        .unwrap();
+
+    let mut resource = crate::Resource::new("did:ad:placeholder".into());
+    resource
+        .set(urls::NAME.into(), Value::String("first".into()), &store)
+        .await
+        .unwrap();
+    let genesis = resource.save_as_genesis(&store).await.unwrap();
+    let genesis_commit = genesis.commit_resource.get_subject().clone();
+    let subject = genesis.resource_new.unwrap().get_subject().clone();
+
+    assert!(
+        store.get_resource(&genesis_commit).await.is_ok(),
+        "genesis commits are always retained"
+    );
+
+    let mut resource = store.get_resource(&subject).await.unwrap();
+    resource
+        .set(urls::NAME.into(), Value::String("second".into()), &store)
+        .await
+        .unwrap();
+    let content = resource.save_locally(&store).await.unwrap();
+    let content_commit = content.commit_resource.get_subject().clone();
+    assert_eq!(
+        store
+            .get_resource(&subject)
+            .await
+            .unwrap()
+            .get(urls::NAME)
+            .unwrap()
+            .to_string(),
+        "second",
+        "dropping the commit row must not drop the resource state"
+    );
+    assert!(
+        store.get_resource(&content_commit).await.is_err(),
+        "ordinary content commits are not stored as resources"
+    );
+
+    let mut resource = store.get_resource(&subject).await.unwrap();
+    let writer = store.get_default_agent().unwrap().subject.to_string();
+    resource
+        .set(urls::WRITE.into(), vec![writer].into(), &store)
+        .await
+        .unwrap();
+    let acl = resource.save_locally(&store).await.unwrap();
+    let acl_commit = acl.commit_resource.get_subject().clone();
+    assert!(
+        store.get_resource(&acl_commit).await.is_ok(),
+        "rights-changing commits stay on the must-retain floor"
+    );
+
+    let mut resource = store.get_resource(&subject).await.unwrap();
+    let destroy = resource.destroy(&store).await.unwrap();
+    let destroy_commit = destroy.commit_resource.get_subject().clone();
+    assert!(
+        store.get_resource(&destroy_commit).await.is_ok(),
+        "destroy commits stay on the must-retain floor"
+    );
+
+    // A creation that never set `isGenesis` (Rust `save_locally` on a fresh
+    // subject, an agent's first commit, an HTTP-subject creation) is still
+    // the commit that brought the resource into being, and is retained.
+    let mut unflagged = crate::Resource::new("internal:/unflagged-creation".into());
+    unflagged
+        .set(urls::NAME.into(), Value::String("born".into()), &store)
+        .await
+        .unwrap();
+    let created = unflagged.save_locally(&store).await.unwrap();
+    assert_eq!(created.commit.is_genesis, None, "test premise: no flag");
+    assert!(
+        store
+            .get_resource(created.commit_resource.get_subject())
+            .await
+            .is_ok(),
+        "an unflagged creation commit is retained like a genesis"
     );
 }

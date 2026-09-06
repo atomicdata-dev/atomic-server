@@ -17,7 +17,6 @@ pub mod host_mode;
 mod https;
 pub mod invite_token;
 mod jsonerrors;
-mod loro_sync_broadcaster;
 mod metrics;
 pub mod plugins;
 pub mod routes;

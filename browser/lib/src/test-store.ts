@@ -8,7 +8,7 @@ export interface TestStore {
   store: Store;
   agentDID: string;
   /** Every commit handed to `client.postCommit`, in order. The signed
-   *  envelope the server would receive — assert `previousCommit`,
+   *  envelope the server would receive — assert `isGenesis`,
    *  `loroUpdate`, `subject`, count, etc. against these. */
   posted: Commit[];
   /** `client.postCommit` spy (echoes the commit back with an `id`). */

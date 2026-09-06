@@ -623,15 +623,9 @@ pub async fn create_collection_resource_for_class(
     let mut collection = CollectionBuilder::class_collection(&class.subject, &pluralized, store)?;
 
     collection.sort_by = match class_subject {
-        urls::COMMIT => Some(urls::CREATED_AT.to_string()),
         urls::CLASS | urls::PROPERTY => Some(urls::SHORTNAME.to_string()),
         urls::COLLECTION => Some(urls::COLLECTION_VALUE.to_string()),
         _other => None,
-    };
-
-    collection.sort_desc = match class_subject {
-        urls::COMMIT => true,
-        _other => false,
     };
 
     // Agents use DID subjects which are external, so we need to include external resources

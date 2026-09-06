@@ -345,6 +345,46 @@ impl AtomicLoroDoc {
             .collect())
     }
 
+    /// Messages of the changes this doc holds inside `[start, end)` per peer,
+    /// i.e. the changes an update with that blob range introduced. Reading
+    /// them here, from a doc that already has the update's dependencies,
+    /// is what makes it work for a delta: importing a delta into an empty
+    /// doc leaves it pending (missing deps) and shows no changes at all.
+    pub fn change_messages_in(&self, start: &VersionVector, end: &VersionVector) -> Vec<String> {
+        let mut messages = Vec::new();
+        let frontier_ids: Vec<loro::ID> = self.doc.oplog_frontiers().iter().collect();
+        if frontier_ids.is_empty() {
+            return messages;
+        }
+        let _ = self
+            .doc
+            .travel_change_ancestors(&frontier_ids, &mut |change| {
+                let peer = change.id.peer;
+                let from = start.get(&peer).copied().unwrap_or(0);
+                let to = end.get(&peer).copied().unwrap_or(0);
+                let change_end = change.id.counter + change.len as i32;
+                // Overlap with [from, to): a change is one commit boundary,
+                // so any overlap means this update carried it.
+                if change.id.counter < to && change_end > from {
+                    if let Some(message) = change.message.as_ref() {
+                        let message = message.to_string();
+                        if !messages.contains(&message) {
+                            messages.push(message);
+                        }
+                    }
+                }
+                ControlFlow::Continue(())
+            });
+        messages
+    }
+
+    /// The `[start, end)` version range an update or snapshot blob covers.
+    pub fn update_range(update: &[u8]) -> AtomicResult<(VersionVector, VersionVector)> {
+        let meta = LoroDoc::decode_import_blob_meta(update, false)
+            .map_err(|e| format!("Failed to decode Loro blob meta: {e}"))?;
+        Ok((meta.partial_start_vv, meta.partial_end_vv))
+    }
+
     /// Get the raw oplog version vector.
     pub fn oplog_vv(&self) -> VersionVector {
         self.doc.oplog_vv()
@@ -1998,7 +2038,6 @@ mod test {
             validate_signature: true,
             validate_timestamp: true,
             validate_rights: false,
-            validate_previous_commit: false,
             validate_loro_causality: false,
             update_index: false,
             validate_for_agent: None,
@@ -2043,7 +2082,6 @@ mod test {
             validate_signature: true,
             validate_timestamp: true,
             validate_rights: false,
-            validate_previous_commit: false,
             validate_loro_causality: false,
             update_index: false,
             validate_for_agent: None,

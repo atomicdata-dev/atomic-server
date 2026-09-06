@@ -38,22 +38,20 @@ This means that all Atomic Properties will have to exist on a publicly accessibl
 You can think of Atomic Data more like a (dynamic) SQL database that offers guarantees about its content type, and a Solid Pod more like a document store that takes in all kinds of content.
 Most of the differences have to do with how Atomic Schema aims to make linked data easier to work with, but that is covered in the previous [RDF chapter](./rdf.md).
 
-## Atomic Data standardizes state changes (event sourcing)
+## Atomic Data standardizes signed writes
 
 With Solid, you change a Resource by sending a POST request to the URL that you want to change.
 With Atomic, you change a Resource by sending a signed Commit that contains the requested changes to a Server.
 
-Event sourcing means that all changes are stored (persisted) and used to calculate the current state of things.
-In practice, this means that users get a couple of nice features for free:
+A Commit is a signed envelope wrapping a Loro CRDT update. It authorizes the write; it is not an event-sourced history. Current state and version history live in the Resource's Loro document.
 
-- **Versioning for all items by default**. Storing events means that these events can be _replayed_, which means you get to traverse time / undo / redo.
-- **Edit / audit log for everything**. Events contain information about who made which change at which point in time. Can be useful for finding out why things are the way they are.
-- **Easier to add query options / indexes**. Any system can play-back the events, which means that the events can be used as an API to add new query options / fill new indexes. This is especially useful if you want to add things like full-text search, or some geolocation index.
+In practice, this means:
 
-It also means that, compared to Solid, there is a relatively simple and strict API for changing data.
-Atomic Data has a **uniform write API**.
-All changes to data are done by posting Commits to the `/commits` endpoint of a Server.
-This removes the need to think about differences between all sorts of HTTP methods like POST / PUT / PATCH, and how servers should reply to that.
+- **Versioning for all items by default**. History is the CRDT oplog, not a replay of stored commit resources.
+- **Attributable writes**. Every applied write is signed by an Agent.
+- **Uniform write API**. All changes go through `POST /commit` (or the WebSocket `COMMIT` frame). This removes the need to think about differences between HTTP methods like POST / PUT / PATCH.
+
+All changes to data are done by posting Commits to the `/commit` endpoint of a Server.
 
 _EDIT: as of december 2021, Solid has introduced `.n3 patch` for standardizing state changes. Although this adds a uniform way of describing changes, it still lacks the power of Atomic Commits. It does not specify signatures, mention versioning, or deals with persisting changesets. On top of that, it is quite difficult to read or parse, being `.n3`._
 
@@ -130,7 +128,7 @@ I believe that as of today (february 2022), Atomic-Server has quite a few advant
 - **Lightweight** (8MB download, no runtime dependencies)
 - **HTTPS + HTTP2 support** with Built-in LetsEncrypt handshake.
 - **Browser GUI included** powered by [atomic-data-browser](https://github.com/atomicdata-dev/atomic-data-browser). Features dynamic forms, tables, authentication, theming and more. Easy to use!
-- **Event-sourced versioning** / history powered by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
+- **Versioning** / history from the Loro oplog, with writes authorized by [Atomic Commits](https://docs.atomicdata.dev/commits/intro.html)
 - **Many serialization options**: to JSON, [JSON-AD](https://docs.atomicdata.dev/core/serialization.html#json-ad), and various Linked Data / RDF formats (RDF/XML, N-Triples / Turtle / JSON-LD).
 - **Full-text search** with fuzzy search and various operators, often <3ms responses.
 - **Pagination, sorting and filtering** using [Atomic Collections](https://docs.atomicdata.dev/schema/collections.html)

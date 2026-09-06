@@ -175,13 +175,9 @@ test.describe('offline chatroom', () => {
     }
 
     // Correct order: walk the DOM and collect the FIRST text occurrence of
-    // each expected message in document order. We can't just iterate all
-    // `[about^="did:ad:"]` wrappers — `<CommitDetail>` inside each message
-    // also has an `about=<commit-subject>` attribute, and a related-but-
-    // separate hydration bug fills the commit's propvals with the
-    // committed-resource's data, so a naive walk would count those copies.
-    // Using `getByText(m).first()` gives us the message's own
-    // `<Markdown>` rendering, which sits exactly once per message.
+    // each expected message in document order. Using `getByText(m).first()`
+    // gives us the message's own `<Markdown>` rendering, which sits
+    // exactly once per message.
     const positions: Array<{ text: string; y: number }> = [];
 
     for (const text of MESSAGES) {

@@ -1,4 +1,4 @@
-import { StoreEvents, type Store } from '@tomic/lib';
+import { core, dataBrowser, StoreEvents, type Store } from '@tomic/lib';
 import {
   agentVaultProof,
   getVaultState,
@@ -147,7 +147,10 @@ const defaultDeps: VaultAutoBackupDeps = {
  * is designed never to hold. A reload recovers it by signing the proof message
  * again, which costs one round trip.
  */
-const enrolled = new Map<string, { drivePseudonym: string } & DriveKeyHandle>();
+const enrolled = new Map<
+  string,
+  { drivePseudonym: string; metadata?: string } & DriveKeyHandle
+>();
 
 /** Only in tests. */
 export function forgetEnrolledVaults(): void {
@@ -254,7 +257,22 @@ async function ensureVaultBackupOnce(
 
     let known = enrolled.get(driveSubject);
 
-    if (!known) {
+    // Display metadata is shared with SaaS; read it from the local drive.
+    const drive = store.resources.get(driveSubject);
+    const name = drive?.get(core.properties.name);
+    const emoji = drive?.get(dataBrowser.properties.emoji);
+    const metadata = {
+      name: typeof name === 'string' ? name : undefined,
+      emoji:
+        typeof emoji === 'string'
+          ? emoji
+          : typeof name === 'string'
+            ? ''
+            : undefined,
+    };
+    const metadataKey = JSON.stringify(metadata);
+
+    if (!known || (known.metadata ?? '{}') !== metadataKey) {
       if (!(await deps.hasAccount())) {
         return { status: 'skipped', reason: 'no account session' };
       }
@@ -263,6 +281,7 @@ async function ensureVaultBackupOnce(
       const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
         keys,
         driveSubject,
+        metadata,
         agentSubject: agent.subject,
         // The agent signs a fixed message; its key is never read. That is what
         // keeps non-extractable and hardware-backed keys usable here.
@@ -272,6 +291,7 @@ async function ensureVaultBackupOnce(
         drivePseudonym: enrollment.drive_pseudonym,
         driveKey,
         keyEpoch,
+        metadata: metadataKey,
       };
       enrolled.set(driveSubject, known);
     }

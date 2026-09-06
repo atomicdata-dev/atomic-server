@@ -635,21 +635,27 @@ pub fn encode_sync_ok(drive: &str) -> Vec<u8> {
     buf
 }
 
-/// Encode SYNC_DIFF: [0x32] [drive_len: u16] [drive] [json{pull, push, remove?}]
+/// Encode SYNC_DIFF: [0x32] [drive_len: u16] [drive] [json{pull, push, remove?, removeCommits?}]
 pub fn encode_sync_diff(
     drive: &str,
     pull: &[String],
     push: &[String],
     remove: &[String],
     pull_from: &std::collections::HashMap<String, std::collections::HashMap<String, i32>>,
+    remove_commits: &std::collections::HashMap<String, String>,
 ) -> Vec<u8> {
     let drive_bytes = drive.as_bytes();
-    let diff = serde_json::json!({
+    let mut diff = serde_json::json!({
         "pull": pull,
         "push": push,
         "remove": remove,
         "pullFrom": pull_from,
     });
+    // Keep the golden `sync_diff` vector byte-identical when there is no
+    // signed destroy to attach; older decoders ignore unknown fields anyway.
+    if !remove_commits.is_empty() {
+        diff["removeCommits"] = serde_json::json!(remove_commits);
+    }
     let diff_bytes = serde_json::to_vec(&diff).unwrap_or_default();
 
     let mut buf = Vec::with_capacity(3 + drive_bytes.len() + diff_bytes.len());
@@ -1196,6 +1202,10 @@ pub struct DecodedSyncDiff {
     pub push: Vec<String>,
     /// Subjects the client should delete (destroyed on the server).
     pub remove: Vec<String>,
+    /// Signed destroy commit JSON-AD per `remove` subject, when the sender
+    /// still holds the envelope on the tombstone. Missing entries are the
+    /// unsigned tombstone path (admission-gated).
+    pub remove_commits: std::collections::HashMap<String, String>,
     /// Server oplog VV per `pull` subject — client exports updates since this.
     pub pull_from: std::collections::HashMap<String, std::collections::HashMap<String, i32>>,
 }
@@ -1215,6 +1225,8 @@ pub fn decode_sync_diff(data: &[u8]) -> Option<DecodedSyncDiff> {
         push: Vec<String>,
         #[serde(default)]
         remove: Vec<String>,
+        #[serde(default, rename = "removeCommits")]
+        remove_commits: std::collections::HashMap<String, String>,
         #[serde(default, rename = "pullFrom")]
         pull_from: std::collections::HashMap<String, std::collections::HashMap<String, i32>>,
     }
@@ -1226,6 +1238,7 @@ pub fn decode_sync_diff(data: &[u8]) -> Option<DecodedSyncDiff> {
         pull: parsed.pull,
         push: parsed.push,
         remove: parsed.remove,
+        remove_commits: parsed.remove_commits,
         pull_from: parsed.pull_from,
     })
 }
@@ -1631,6 +1644,34 @@ mod ephemeral_frame_tests {
 
         assert!(decode_ephemeral(&frame[1..]).is_none());
     }
+
+    #[test]
+    fn sync_diff_remove_commits_roundtrip() {
+        let mut pull_from = std::collections::HashMap::new();
+        pull_from.insert(
+            "did:ad:y".to_string(),
+            [("p1".to_string(), 2)].into_iter().collect(),
+        );
+        let mut remove_commits = std::collections::HashMap::new();
+        remove_commits.insert(
+            "did:ad:z".to_string(),
+            r#"{"https://atomicdata.dev/properties/destroy":true}"#.to_string(),
+        );
+        let frame = encode_sync_diff(
+            "did:ad:d",
+            &["did:ad:y".to_string()],
+            &["did:ad:x".to_string()],
+            &["did:ad:z".to_string()],
+            &pull_from,
+            &remove_commits,
+        );
+        let d = decode_sync_diff(&frame[1..]).unwrap();
+        assert_eq!(d.remove, vec!["did:ad:z"]);
+        assert_eq!(
+            d.remove_commits.get("did:ad:z").map(String::as_str),
+            Some(r#"{"https://atomicdata.dev/properties/destroy":true}"#)
+        );
+    }
 }
 
 /// Golden wire frames shared with the TypeScript codec
@@ -1722,6 +1763,7 @@ mod wire_vectors {
                     &["did:ad:x".to_string()],
                     &["did:ad:z".to_string()],
                     &pull_from,
+                    &std::collections::HashMap::new(),
                 ),
             ),
             (

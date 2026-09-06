@@ -80,6 +80,8 @@ pub mod db;
 pub mod discovery;
 #[cfg(feature = "db")]
 pub mod endpoints;
+#[cfg(feature = "db")]
+pub mod envelopes;
 pub mod errors;
 pub mod expression;
 pub mod genesis;

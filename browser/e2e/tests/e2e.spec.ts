@@ -202,12 +202,8 @@ test.describe('data-browser', async () => {
     ).toBeVisible({ timeout: 15_000 });
 
     // The message's CommitDetail row should show the author's name AND the
-    // date. The author name comes from the agent resource's `name` propval
-    // — `devDrive()` sets it to "Dev User" — and only renders if the
-    // commit was persisted server-side and the signer resource is
-    // loadable back. The date comes from the commit's `createdAt`. Both
-    // together are a tight roundtrip check: client signed → server
-    // stored → refetched + rendered by `<CommitDetail>`. Scope to the
+    // date. Both come from the message resource (genesis certificate), not
+    // from fetching a `did:ad:commit:` envelope. Scope to the
     // message element (the styled <div> wrapping the message body +
     // CommitDetail; it carries `about={subject}` in the DOM) by walking
     // up from the message paragraph, so we don't accidentally match
@@ -218,7 +214,7 @@ test.describe('data-browser', async () => {
     await expect(messageLocator).toBeVisible();
     await expect(
       messageLocator,
-      'Message author "Dev User" missing — commit author not stored/retrievable',
+      'Message author "Dev User" missing — genesis createdBy not retrievable',
     ).toContainText('Dev User');
     // The visible label is intentionally relative ("now", "1 minute ago").
     // Assert the semantic timestamp instead so the test proves `createdAt`
@@ -226,7 +222,7 @@ test.describe('data-browser', async () => {
     const year = new Date().getFullYear().toString();
     await expect(
       messageLocator.locator('time'),
-      'Message date missing — commit createdAt not stored/retrievable',
+      'Message date missing — genesis createdAt not retrievable',
     ).toHaveAttribute('datetime', new RegExp(`^${year}-`));
 
     // Regression: author + date must SURVIVE A REFRESH. They are derived from
@@ -821,11 +817,25 @@ test.describe('data-browser', async () => {
       page.getByRole('heading', { name: 'History of Second Title', level: 1 }),
     ).toBeVisible();
 
+    // The current version is signed by this session's agent and the server
+    // kept its envelope (`Tree::Envelopes`, `latest` retention), so History
+    // attributes it as Verified once `/history-attribution` answers.
+    await expect(page.getByTestId('version-attribution')).toHaveText(
+      'Verified',
+      { timeout: 15_000 },
+    );
+
     await selectHistoryVersionShowing(page, 'First Title');
 
     await expect(
       page.getByText('First Title', { exact: true }).first(),
     ).toBeVisible();
+
+    // Under `latest` retention only the newest envelope is kept, so the
+    // older version has no proof and must say so rather than guess.
+    await expect(page.getByTestId('version-attribution')).toHaveText(
+      'Unattributed',
+    );
 
     // Enabled only once the selected version differs from the current one, so
     // wait for that rather than racing the selection above.

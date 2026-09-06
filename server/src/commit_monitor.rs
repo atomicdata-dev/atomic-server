@@ -4,8 +4,9 @@
 
 use crate::{
     actor_messages::{
-        CommitMessage, ExternalChange, RebindAgent, SendFrame, Subscribe, Unsubscribe,
-        UnsubscribeAll,
+        CommitMessage, ExternalChange, LoroEphemeralUpdate, LoroSyncUpdate, PresenceUpdate,
+        RebindAgent, RemotePresenceUpdate, SendFrame, Subscribe, SubscribeLoroSync,
+        SubscribePresence, Unsubscribe, UnsubscribeAll, UnsubscribeLoroSync, UnsubscribePresence,
     },
     handlers::{web_sockets::WebSocketConnection, ws_v2},
     vector_search::VectorSearchState,
@@ -15,7 +16,7 @@ use actix::{
     ActorFutureExt, Addr, ResponseActFuture, WrapFuture,
 };
 use atomic_lib::{agents::ForAgent, Db, DbEvent, Storelike};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -32,6 +33,19 @@ pub struct Subscriber {
 }
 
 type Subscribers = HashMap<Addr<WebSocketConnection>, Subscriber>;
+
+#[derive(Eq, Hash, PartialEq, Clone)]
+struct LoroSubscriber {
+    addr: Addr<WebSocketConnection>,
+    can_write: bool,
+}
+
+/// One connection's latest presence, as replayed to a late joiner.
+#[derive(Clone)]
+struct CachedPresence {
+    agent: String,
+    update: Vec<u8>,
+}
 
 /// The Commit Monitor is an Actor that manages subscriptions for subjects and sends Commits to listeners.
 /// It's also responsible for checking whether the rights are present.
@@ -50,6 +64,11 @@ type Subscribers = HashMap<Addr<WebSocketConnection>, Subscriber>;
 ///   subscribers of its OWN drive — never others (no cross-drive leak).
 ///   Subscribers receive a `SendFrame` carrying the pre-encoded `UPDATE` /
 ///   `DESTROY` wire bytes, encoded once at the fanout site and Arc-shared.
+///
+/// The same actor also owns the non-persisted realtime channel that used
+/// to live on `LoroSyncBroadcaster`: Loro doc/cursor ephemera (keyed by
+/// resource) and drive presence (keyed by drive). One mailbox, one
+/// `UnsubscribeAll` on socket close.
 #[allow(clippy::mutable_key_type)]
 pub struct CommitMonitor {
     /// Maintains a list of all the resources that are being subscribed to, and maps these to websocket connections.
@@ -58,6 +77,15 @@ pub struct CommitMonitor {
     subscriptions: HashMap<atomic_lib::Subject, Subscribers>,
     /// Drive-wide subscriptions: keyed by drive subject string.
     drive_subscriptions: HashMap<String, Subscribers>,
+    /// Real-time Loro doc + cursor subscriptions, keyed by resource subject.
+    /// Not persisted; write access is recorded so only a writer can inject
+    /// a `DOC` update.
+    loro_subscriptions: HashMap<atomic_lib::Subject, HashSet<LoroSubscriber>>,
+    /// Drive-scoped presence: each connection's latest payload, replayed
+    /// to late joiners at subscribe time.
+    #[allow(clippy::mutable_key_type)]
+    presence:
+        HashMap<atomic_lib::Subject, HashMap<Addr<WebSocketConnection>, Option<CachedPresence>>>,
     store: Db,
     vector_search_state: VectorSearchState,
     /// Set by every commit handler that may have queued a vector-index
@@ -326,6 +354,18 @@ impl Handler<UnsubscribeAll> for CommitMonitor {
         }
         self.drive_subscriptions
             .retain(|_, conns| !conns.is_empty());
+
+        for subscribers in self.loro_subscriptions.values_mut() {
+            subscribers.retain(|s| s.addr != msg.addr);
+        }
+        self.loro_subscriptions
+            .retain(|_, subscribers| !subscribers.is_empty());
+
+        for subscribers in self.presence.values_mut() {
+            subscribers.remove(&msg.addr);
+        }
+        self.presence
+            .retain(|_, subscribers| !subscribers.is_empty());
     }
 }
 
@@ -744,6 +784,357 @@ fn encode_commit_frame(store: &Db, msg: &CommitMessage) -> Option<Arc<[u8]>> {
     }
 }
 
+impl Handler<SubscribeLoroSync> for CommitMonitor {
+    type Result = ResponseActFuture<Self, ()>;
+
+    #[allow(clippy::mutable_key_type)]
+    fn handle(&mut self, msg: SubscribeLoroSync, _ctx: &mut Context<Self>) -> Self::Result {
+        let store = self.store.clone();
+        Box::pin(
+            async move {
+                if !msg.subject.is_local() {
+                    tracing::warn!("can't subscribe to external resource: {}", msg.subject);
+                    return None;
+                }
+
+                let resource = match store.get_resource(&msg.subject).await {
+                    Ok(resource) => resource,
+                    Err(e) => {
+                        tracing::debug!(
+                            "LoroSync subscribe failed for {} by {}: {}",
+                            &msg.subject,
+                            msg.agent,
+                            e
+                        );
+                        return None;
+                    }
+                };
+
+                let mut can_write = false;
+
+                match atomic_lib::hierarchy::check_write(
+                    &store,
+                    &resource,
+                    &ForAgent::AgentSubject(msg.agent.clone().into()),
+                )
+                .await
+                {
+                    Ok(_) => {
+                        can_write = true;
+                    }
+                    Err(_) => {
+                        match atomic_lib::hierarchy::check_read(
+                            &store,
+                            &resource,
+                            &ForAgent::AgentSubject(msg.agent.clone().into()),
+                        )
+                        .await
+                        {
+                            Ok(_) => {}
+                            Err(unauthorized_err) => {
+                                tracing::debug!(
+                                    "Not allowed {} to subscribe to LoroSync for {}: {}",
+                                    &msg.agent,
+                                    &msg.subject,
+                                    unauthorized_err
+                                );
+                                crate::actor_messages::refuse_subscription(
+                                    &msg.addr,
+                                    "LORO_SYNC_SUBSCRIBE",
+                                    &msg.subject.to_string(),
+                                    &unauthorized_err.to_string(),
+                                );
+                                return None;
+                            }
+                        }
+                    }
+                }
+                Some((msg.subject.clone(), msg.addr, can_write))
+            }
+            .into_actor(self)
+            .map(|res, actor, _ctx| {
+                if let Some((subject, addr, can_write)) = res {
+                    let set = actor
+                        .loro_subscriptions
+                        .entry(subject.clone())
+                        .or_insert_with(HashSet::new);
+                    set.insert(LoroSubscriber { addr, can_write });
+                    tracing::debug!("LoroSync subscribed to {}", subject);
+                }
+            }),
+        )
+    }
+}
+
+impl Handler<UnsubscribeLoroSync> for CommitMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: UnsubscribeLoroSync, _ctx: &mut Context<Self>) {
+        if let Some(subscribers) = self.loro_subscriptions.get_mut(&msg.subject) {
+            subscribers.retain(|s| s.addr != msg.addr);
+
+            if subscribers.is_empty() {
+                self.loro_subscriptions.remove(&msg.subject);
+            }
+        }
+    }
+}
+
+impl Handler<LoroSyncUpdate> for CommitMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: LoroSyncUpdate, _ctx: &mut Context<Self>) {
+        let Some(subscribers) = self.loro_subscriptions.get(&msg.subject) else {
+            return;
+        };
+
+        // No sender address means a peer relayed this in. There is no local
+        // connection to attribute it to and none to exclude from the fan-out;
+        // the sending node ran its own write check before relaying, and this
+        // one ran another when the frame arrived.
+        let Some(addr) = &msg.addr else {
+            for subscriber in subscribers {
+                subscriber.addr.do_send(msg.clone());
+            }
+
+            return;
+        };
+
+        if !subscribers.iter().any(|s| s.addr == *addr && s.can_write) {
+            tracing::warn!("not allowed to send LoroSync update to {}", msg.subject);
+            return;
+        }
+
+        // Out to peers as well as to local subscribers, so an edit in progress
+        // reaches the other device rather than waiting for a save. Only local
+        // updates get here (the branch above returns early for relayed ones),
+        // so there is no echo to guard against.
+        if let Ok(agent) = self.store.get_default_agent() {
+            atomic_lib::sync::peer::broadcast_ephemeral(
+                atomic_lib::sync::protocol::ephemeral_kind::DOC,
+                msg.subject.as_str(),
+                &agent.subject.to_string(),
+                &msg.update,
+                None,
+            );
+        }
+
+        for subscriber in subscribers {
+            if subscriber.addr == *addr {
+                continue;
+            }
+
+            subscriber.addr.do_send(msg.clone());
+        }
+    }
+}
+
+impl Handler<LoroEphemeralUpdate> for CommitMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: LoroEphemeralUpdate, _ctx: &mut Context<Self>) {
+        // Relay to peers before the local fan-out below, and only for presence
+        // that originated here (`addr` is the websocket it came from; a frame
+        // we relayed IN from a peer has none, and must not be sent back out or
+        // two nodes trade cursors forever).
+        if msg.addr.is_some() {
+            if let Ok(agent) = self.store.get_default_agent() {
+                atomic_lib::sync::peer::broadcast_ephemeral(
+                    atomic_lib::sync::protocol::ephemeral_kind::LORO,
+                    msg.subject.as_str(),
+                    &agent.subject.to_string(),
+                    &msg.update,
+                    None,
+                );
+            }
+        }
+
+        let Some(subscribers) = self.loro_subscriptions.get(&msg.subject) else {
+            return;
+        };
+
+        let sender = msg.addr.as_ref();
+
+        for subscriber in subscribers {
+            if let Some(sender_addr) = sender {
+                if subscriber.addr == *sender_addr {
+                    continue;
+                }
+            }
+            subscriber.addr.do_send(msg.clone());
+        }
+    }
+}
+
+impl Handler<SubscribePresence> for CommitMonitor {
+    type Result = ResponseActFuture<Self, ()>;
+
+    #[allow(clippy::mutable_key_type)]
+    fn handle(&mut self, msg: SubscribePresence, _ctx: &mut Context<Self>) -> Self::Result {
+        let store = self.store.clone();
+        Box::pin(
+            async move {
+                if !msg.drive.is_local() {
+                    tracing::warn!(
+                        "can't subscribe to presence of external drive: {}",
+                        msg.drive
+                    );
+                    return None;
+                }
+
+                let resource = match store.get_resource(&msg.drive).await {
+                    Ok(resource) => resource,
+                    Err(e) => {
+                        tracing::debug!(
+                            "Presence subscribe failed for {} by {}: {}",
+                            &msg.drive,
+                            msg.agent,
+                            e
+                        );
+                        return None;
+                    }
+                };
+
+                if let Err(unauthorized_err) = atomic_lib::hierarchy::check_read(
+                    &store,
+                    &resource,
+                    &ForAgent::AgentSubject(msg.agent.clone().into()),
+                )
+                .await
+                {
+                    tracing::debug!(
+                        "Not allowed {} to subscribe to presence for {}: {}",
+                        &msg.agent,
+                        &msg.drive,
+                        unauthorized_err
+                    );
+                    crate::actor_messages::refuse_subscription(
+                        &msg.addr,
+                        "PRESENCE_SUBSCRIBE",
+                        &msg.drive.to_string(),
+                        &unauthorized_err.to_string(),
+                    );
+                    return None;
+                }
+
+                Some((msg.drive, msg.addr))
+            }
+            .into_actor(self)
+            .map(|res, actor, _ctx| {
+                if let Some((drive, addr)) = res {
+                    let subscribers = actor.presence.entry(drive.clone()).or_default();
+
+                    // Bring the newcomer up to date: replay every other
+                    // connection's cached state. LWW timestamps inside the
+                    // EphemeralStore payloads make duplicate replays
+                    // harmless.
+                    for cached in subscribers
+                        .iter()
+                        .filter(|(peer, _)| **peer != addr)
+                        .filter_map(|(_, state)| state.clone())
+                    {
+                        addr.do_send(PresenceUpdate {
+                            subject: drive.clone(),
+                            agent: cached.agent,
+                            update: cached.update,
+                            addr: None,
+                        });
+                    }
+
+                    subscribers.entry(addr).or_insert(None);
+                    tracing::debug!("Presence subscribed to {}", drive);
+                }
+            }),
+        )
+    }
+}
+
+impl Handler<UnsubscribePresence> for CommitMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: UnsubscribePresence, _ctx: &mut Context<Self>) {
+        if let Some(subscribers) = self.presence.get_mut(&msg.drive) {
+            subscribers.remove(&msg.addr);
+
+            if subscribers.is_empty() {
+                self.presence.remove(&msg.drive);
+            }
+        }
+    }
+}
+
+impl Handler<PresenceUpdate> for CommitMonitor {
+    type Result = ();
+
+    fn handle(&mut self, msg: PresenceUpdate, _ctx: &mut Context<Self>) {
+        let Some(subscribers) = self.presence.get_mut(&msg.subject) else {
+            return;
+        };
+
+        let Some(sender) = msg.addr.as_ref() else {
+            tracing::warn!("no addr in presence update for {}", msg.subject);
+            return;
+        };
+
+        // Only subscribers may broadcast — subscribing is where the drive
+        // read-access check happens, so this is the auth gate.
+        let Some(cached) = subscribers.get_mut(sender) else {
+            tracing::warn!("presence update from non-subscriber for {}", msg.subject);
+            return;
+        };
+        *cached = Some(CachedPresence {
+            agent: msg.agent.clone(),
+            update: msg.update.clone(),
+        });
+
+        // Relay to peers. Only local presence reaches here (the handler above
+        // requires a sender address), so there is no echo to guard against.
+        if let Ok(agent) = self.store.get_default_agent() {
+            atomic_lib::sync::peer::broadcast_ephemeral(
+                atomic_lib::sync::protocol::ephemeral_kind::PRESENCE,
+                msg.subject.as_str(),
+                &agent.subject.to_string(),
+                &msg.update,
+                None,
+            );
+        }
+
+        for subscriber in subscribers.keys() {
+            if subscriber == sender {
+                continue;
+            }
+
+            subscriber.do_send(msg.clone());
+        }
+    }
+}
+
+impl Handler<RemotePresenceUpdate> for CommitMonitor {
+    type Result = ();
+
+    /// Fan a peer's presence out to everyone watching that drive here.
+    ///
+    /// No sender to exclude and no subscriber check: the frame came from
+    /// another node, which applied its own read gate before relaying it, and
+    /// there is no local connection it could be attributed to.
+    fn handle(&mut self, msg: RemotePresenceUpdate, _ctx: &mut Context<Self>) {
+        let Some(subscribers) = self.presence.get(&msg.subject) else {
+            return;
+        };
+
+        let local = PresenceUpdate {
+            subject: msg.subject.clone(),
+            agent: msg.agent,
+            update: msg.update,
+            addr: None,
+        };
+
+        for subscriber in subscribers.keys() {
+            subscriber.do_send(local.clone());
+        }
+    }
+}
+
 /// Spawns a commit monitor actor
 pub fn create_commit_monitor(
     store: Db,
@@ -754,6 +1145,8 @@ pub fn create_commit_monitor(
         CommitMonitor {
             subscriptions: HashMap::new(),
             drive_subscriptions: HashMap::new(),
+            loro_subscriptions: HashMap::new(),
+            presence: HashMap::new(),
             store,
             vector_search_state,
             pending_commit: Arc::new(AtomicBool::new(false)),

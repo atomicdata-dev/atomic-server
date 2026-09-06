@@ -31,6 +31,7 @@ export function HistoryMobileView({
   isCurrentVersion,
   onSelectVersion,
   onVersionAccept,
+  attribution,
 }: HistoryViewProps) {
   const [dialogProps, showDialog, closeDialog] = useDialog();
   const store = useStore();
@@ -90,7 +91,10 @@ export function HistoryMobileView({
           <Column fullHeight>
             {selectedVersion && (
               <>
-                <VersionTitle version={selectedVersion} />
+                <VersionTitle
+                  version={selectedVersion}
+                  attribution={attribution}
+                />
                 <StyledCard>
                   <Tabs tabs={tabs} label='History'>
                     <Card.Content>

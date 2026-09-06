@@ -146,6 +146,8 @@ type DownloadUrl = {
 };
 
 export type VaultEnrollment = {
+  drive_name?: string | null;
+  drive_emoji?: string | null;
   id: string;
   drive_subject: string;
   /** The agent that enrolled it; an account may hold several agents' drives. */
@@ -278,6 +280,7 @@ async function api<T>(
 export async function enrollVault(
   driveSubject: string,
   agentSubject: string,
+  metadata?: { name?: string; emoji?: string },
 ): Promise<VaultEnrollment> {
   const created = await api<{ enrollment: VaultEnrollment }>(
     '/cloud-vault/enroll',
@@ -286,6 +289,8 @@ export async function enrollVault(
       body: JSON.stringify({
         drive_subject: driveSubject,
         agent_subject: agentSubject,
+        drive_name: metadata?.name,
+        drive_emoji: metadata?.emoji,
       }),
     },
   );
@@ -739,13 +744,15 @@ export async function setUpVaultForDrive({
   driveSubject,
   agentSubject,
   agentSecret,
+  metadata,
 }: {
+  metadata?: { name?: string; emoji?: string };
   keys: VaultKeyOps;
   driveSubject: string;
   agentSubject: string;
   agentSecret: Uint8Array;
 }): Promise<{ enrollment: VaultEnrollment } & DriveKeyHandle> {
-  const enrollment = await enrollVault(driveSubject, agentSubject);
+  const enrollment = await enrollVault(driveSubject, agentSubject, metadata);
   const existing = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
 
   if (existing) {

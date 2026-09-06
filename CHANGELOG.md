@@ -5,7 +5,58 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
-## UNRELEASED
+- Commits are signed envelopes, not a queryable event log. Ordinary content
+  commits are not stored as resources after apply (genesis and
+  rights/parent/destroy stay). Loro binaries are not KV-index keys. The
+  `/commits` collection is not created. UI reads author/dates from the
+  resource, not by fetching `did:ad:commit:` rows. A creation commit is
+  retained whether or not the client flagged `isGenesis`. Clients no longer chain
+  `previousCommit`; apply no longer has a previous-commit validation gate.
+  History no longer offers a "Show Commit" link at a discarded envelope.
+- **Signed envelopes live on the resource (`Tree::Envelopes`).** Every
+  signed commit's JSON-AD is kept per resource, keyed by createdAt and
+  signature, in the same transaction as the state it signs. Not a
+  resource, not indexed. `--envelope-retention` / `ATOMIC_ENVELOPE_RETENTION`
+  is `latest` (the envelope that produced the current state; default) or
+  `all` (every envelope: a signed audit log). `GET /history-attribution?subject=`
+  (read-gated) answers who signed which Loro change, verified with the
+  apply code, plus whether every change is covered. Rust builder commits
+  and `create_did` now tag their Loro change like the browser does, so
+  History maps versions to signers. The destroy envelope on the tombstone
+  (added for `SYNC_DIFF.removeCommits`) is now the subject's latest row
+  in this tree. Envelopes do not yet travel in bulk sync or the vault.
+
+- **Missing-drive bootstrap is no longer a free pass (OQ5).** A
+  `SYNC_PUSH` or live write for a drive this node has never stored goes
+  through `admit_unknown_drive`: `Public` never creates one (even on
+  `OpenPolicy`); Owner mode enrolls only the owner; an authenticated
+  first-sync on an open node still works. AUTH-before-`SYNC_PUSH` already
+  closed the unauthenticated wire; this closes the library path.
+- **`SUB` / `UNSUB` are engine-owned.** Parse and `check_read` live in
+  `handle_frame_full`; the WebSocket handler registers the connection
+  with the commit monitor only when the engine admits the subscription.
+  The `0x20` / `0x21` wire is unchanged (anonymous `SUB` on a public
+  share link still works).
+- **One subscription actor.** `LoroSyncBroadcaster` is gone; Loro
+  ephemera and drive presence fan out from `CommitMonitor` (one mailbox,
+  one `UnsubscribeAll` on socket close). Wire and behaviour unchanged.
+- **Bulk `SYNC_DIFF.remove` can carry a signed destroy.** When the sender
+  still holds the destroy commit on the tombstone, `removeCommits` maps
+  that subject to the JSON-AD envelope and the receiver applies it as a
+  peer `COMMIT`. A bad signature does not fall back to the unsigned
+  tombstone path. Senders without the envelope still send a subject-only
+  `remove[]` entry (admission-gated). The envelope is only handed to a
+  session that may read the drive; a signed destroy that is already
+  stored here, or that predates the current resource's genesis, is
+  refused as a replay. The browser applies the envelope as a local-cache
+  write and removes the resource either way. Requiring an envelope on
+  every delete still waits on `Tree::Envelopes`.
+- **`AtomicTransport` / `SyncSession` first slice.** The engine loop is
+  callable over any byte-pipe (`lib/src/sync/transport.rs`,
+  `SyncSession::serve`). Iroh and WebSocket still have their own
+  lifecycles; the outbox port and FRB `open_sync_session` are not this
+  change.
+
 
 ## [v0.41.0-beta.5] - 2026-09-04
 

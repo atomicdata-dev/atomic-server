@@ -1631,13 +1631,34 @@ export class WSClient {
     push: string[];
     remove?: string[];
     pullFrom?: Record<string, Record<string, number>>;
+    removeCommits?: Record<string, string>;
   }) {
+    const clientDb = this.store.getClientDb();
+
     for (const subject of diff.remove ?? []) {
+      const envelope = diff.removeCommits?.[subject];
+
+      // The clientDb applies this as a local-cache write (no signature or
+      // rights check happens in the browser), so a failure here is a local
+      // error, not a refusal. The server already decided the subject is
+      // gone: fall through to the in-memory removal either way, otherwise
+      // the resource stays rendered and is re-listed on every reconcile.
+      if (envelope && clientDb) {
+        try {
+          await clientDb.applyCommit(envelope);
+        } catch (e) {
+          console.warn(
+            '[WS] SYNC_DIFF remove envelope not applied:',
+            subject,
+            e,
+          );
+        }
+      }
+
       this.store.removeResource(subject);
     }
 
     const entries: Array<{ subject: string; loroBytes: Uint8Array }> = [];
-    const clientDb = this.store.getClientDb();
 
     for (const subject of diff.pull) {
       // F1 interim (planning/unified-sync.md): a subject with a pending

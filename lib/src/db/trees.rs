@@ -35,6 +35,12 @@ pub enum Tree {
     SearchDocTokens,
     /// Trigram → term map for 1-edit candidate generation on longer tokens.
     SearchTrigrams,
+    /// Signed commit envelopes kept per resource (the audit floor, F6/F7 in
+    /// `planning/completed/commit-retention-floor-decision.md`). Key:
+    /// `pure_id || 0x00 || createdAt (u64 BE) || 0x00 || signature`, value: the
+    /// commit's JSON-AD exactly as accepted. Not a resource, not indexed, so
+    /// it never shows up in queries or `all_resources`. See `crate::envelopes`.
+    Envelopes,
 }
 
 const RESOURCES: &str = "resources_v3";
@@ -61,6 +67,7 @@ const SEARCH_POSTINGS: &str = "search_postings_v1";
 const SEARCH_DOCS: &str = "search_docs_v1";
 const SEARCH_DOC_TOKENS: &str = "search_doc_tokens_v1";
 const SEARCH_TRIGRAMS: &str = "search_trigrams_v1";
+const ENVELOPES: &str = "envelopes_v1";
 
 impl std::fmt::Display for Tree {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -79,6 +86,7 @@ impl std::fmt::Display for Tree {
             Tree::SearchDocs => f.write_str(SEARCH_DOCS),
             Tree::SearchDocTokens => f.write_str(SEARCH_DOC_TOKENS),
             Tree::SearchTrigrams => f.write_str(SEARCH_TRIGRAMS),
+            Tree::Envelopes => f.write_str(ENVELOPES),
         }
     }
 }
@@ -101,6 +109,7 @@ impl AsRef<[u8]> for Tree {
             Tree::SearchDocs => SEARCH_DOCS.as_bytes(),
             Tree::SearchDocTokens => SEARCH_DOC_TOKENS.as_bytes(),
             Tree::SearchTrigrams => SEARCH_TRIGRAMS.as_bytes(),
+            Tree::Envelopes => ENVELOPES.as_bytes(),
         }
     }
 }

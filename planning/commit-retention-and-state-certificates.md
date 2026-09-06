@@ -12,6 +12,14 @@
 > inherited down the parent chain), capped by node policy — see
 > "Per-resource retention" below.
 >
+> **Shipped since:** ordinary content commits are discarded as resources
+> after apply; the must-retain floor (`AuthImpact::is_critical`) stays. The
+> signed envelope of every commit is kept per resource in `Tree::Envelopes`
+> (`lib/src/envelopes.rs`): the latest one by default, every one under
+> `--envelope-retention all`. History reads who signed which change from it
+> (`/history-attribution`). Remaining: envelopes travel in bulk sync and the
+> vault — [`auditability-loro-history.md`](./auditability-loro-history.md).
+>
 > **Current (2026-06-10 server, 2026-07-10 browser).** DID identity is no
 > longer derived from the genesis *commit* signature. A `did:ad:` subject is
 > the signature of a small inline binary **genesis certificate**

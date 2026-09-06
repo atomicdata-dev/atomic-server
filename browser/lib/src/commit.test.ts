@@ -18,7 +18,7 @@ import { testStore } from './test-store.js';
  * server has acked.
  */
 describe('Resource save flow', () => {
-  it('creates a DID resource and chains commits on sequential saves', async ({
+  it('creates a DID resource and posts sequential saves', async ({
     expect,
   }) => {
     const { store, postCommitSpy } = await testStore();
@@ -35,8 +35,8 @@ describe('Resource save flow', () => {
 
     expect(await doc.save()).toBe('persisted');
 
-    // A remote merge that drops `lastCommit` must not break chaining —
-    // the resource keeps its own commit cursor.
+    // A remote merge that drops `lastCommit` must not break the next
+    // save — the resource keeps its own commit cursor.
     doc.removeUnsafe('https://atomicdata.dev/properties/lastCommit');
 
     await doc.set(
@@ -49,12 +49,15 @@ describe('Resource save flow', () => {
     // Subject is stable across saves.
     expect(doc.subject).toBe(genesisSubject);
 
-    // Two commits, the second chained on the first.
+    // Two commits: genesis then an update. No previousCommit chain.
     expect(postCommitSpy.mock.calls.length).toBe(2);
     const first = postCommitSpy.mock.calls[0][0] as Commit;
     const second = postCommitSpy.mock.calls[1][0] as Commit;
+    expect(first.isGenesis).toBe(true);
+    expect(first.previousCommit).toBeUndefined();
     expect(second.subject).toBe(genesisSubject);
-    expect(second.previousCommit).toContain(first.signature!);
+    expect(second.isGenesis).toBeFalsy();
+    expect(second.previousCommit).toBeUndefined();
   });
 
   it('supports typed property setters via the props proxy', async ({
@@ -193,16 +196,16 @@ describe('Resource save flow', () => {
     );
   });
 
-  it('caches the just-saved commit locally so <CommitDetail> needs no fetch', async ({
+  it('does not cache the just-saved commit as a store resource', async ({
     expect,
   }) => {
     /**
-     * Regression: a chatroom message post used to trigger a
-     * `GET did:ad:commit:<sig>` because the commit wasn't materialized
-     * locally. After `save()`, the commit's DID subject must be present
-     * in `store.resources` with the propvals <CommitDetail> reads.
+     * Commits are signed envelopes, not queryable resources.
+     * After `save()`, the commit DID must not appear in `store.resources`
+     * — UI reads author/date from the resource, not by fetching
+     * `did:ad:commit:…`.
      */
-    const { store, posted, agentDID } = await testStore();
+    const { store, posted } = await testStore();
 
     const msg = await store.newResource({
       isA: 'https://atomicdata.dev/classes/Message',
@@ -213,15 +216,7 @@ describe('Resource save flow', () => {
 
     expect(posted.length).toBe(1);
     const commitDidSubject = `did:ad:commit:${posted[0].signature}`;
-    expect(store.resources.has(commitDidSubject)).toBe(true);
-
-    const commitResource = store.resources.get(commitDidSubject)!;
-    expect(commitResource.get('https://atomicdata.dev/properties/signer')).toBe(
-      agentDID,
-    );
-    expect(
-      commitResource.get('https://atomicdata.dev/properties/createdAt'),
-    ).toBeTypeOf('number');
+    expect(store.resources.has(commitDidSubject)).toBe(false);
   });
 });
 

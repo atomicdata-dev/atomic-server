@@ -17,7 +17,7 @@ However, it does differ in some fundamental ways.
 - Atomic only allows those who control a resource's `subject` URL endpoint to edit the data. This means that you can't add triples about something that you don't control.
 - Atomic has no separate `datatype` field, but it requires that `Properties` (the resources that are shown when you follow a `predicate` value) specify a datatype. However, it is allowed to serialize the datatype explicitly, of course.
 - Atomic has no separate `language` field.
-- Atomic has a native Event (state changes) model ([Atomic Commits](../commits/intro.md)), which enables communication of state changes
+- Atomic has a native signed-write model ([Atomic Commits](../commits/intro.md)), which authorizes Loro CRDT updates
 - Atomic has a native Schema model ([Atomic Schema](../schema/intro.md)), which helps developers to know what data types they can expect (string, integer, link, array)
 - Atomic does not support Named Graphs. These should not be needed, because all statements should be retrievable by fetching the Subject of a resource. However, it _is_ allowed to include other resources in a response.
 
@@ -225,9 +225,9 @@ This is why Atomic Data introduces a `shortname` field in Properties, which forc
 RDF lacks a clear solution for dealing with [ordered data](https://ontola.io/blog/ordered-data-in-rdf/), resulting in confusion when developers have to create lists of content.
 Adding an Array data type as a base data type helps solve this. ([discussion](https://github.com/ontola/atomic-data/issues/4))
 
-### Adding a native state changes standard
+### Adding a native signed-write standard
 
-There is no integrated standard for communicating state changes.
+There is no integrated RDF standard for authorizing writes.
 Although [linked-delta](https://github.com/ontola/linked-delta) and [rdf-delta](https://afs.github.io/rdf-delta/) do exist, they aren't referred to by the RDF spec.
 I think developers need guidance when learning a new system such as RDF, and that's why [Atomic Commits](../commits/intro.md) is included in this book.
 

@@ -692,60 +692,59 @@ async fn admitted_for_drive(
         return verdict;
     }
 
-    // Admission gate first (allowlist/quota/bootstrap grace) — cheap,
-    // in-memory. No-op under the default OpenPolicy (self-hosted / FOSS).
-    let policy = store.sync_policy();
-
-    if !policy.admit_drive_write(drive_subject) {
-        // Same bootstrap question as `import_sync_push`: a drive we do not have
-        // may be a live update for one arriving right now. Whether that is
-        // allowed depends on who is pushing it, which only the policy knows.
-        let drive_subj =
-            crate::Subject::from_raw(drive_subject, store.get_base_domain().as_deref());
-        let is_new_here = store.get_resource(&drive_subj).await.is_err();
-
-        if is_new_here && policy.may_enroll_drive(drive_subject, agent) {
-            policy.enroll_drive(drive_subject);
-        } else {
-            cache.insert(drive_subject.to_string(), false);
-            return false;
-        }
-    }
-
-    // ACL: may this write land? The sending peer's own write access, or —
-    // when we dialed this peer (`trust_owned`) — our own agent's, so a server
-    // relaying our drive back to us is accepted even though it authenticates
-    // as its own agent (see `may_accept_drive_write`). Checked once against the
-    // drive resource itself (rights are inherited by its children, so this
-    // answers "can this write touch anything in this drive"). Mirrors
-    // import_sync_push's bootstrap carve-out: a drive that doesn't exist
-    // locally yet has nothing to check against, so admission alone gates it.
+    // Same split as `import_sync_push`: an existing drive is gated by
+    // allowlist/quota then ACL; a drive we have never stored goes through
+    // `admit_unknown_drive` (OQ5 — Public never creates, Owner enrolls only
+    // the owner, Open still admits an authenticated first-sync).
     let drive_subj = crate::Subject::from_raw(drive_subject, store.get_base_domain().as_deref());
     let verdict = match store.get_resource(&drive_subj).await {
         Ok(drive_resource) => {
-            super::engine::may_accept_drive_write(store, &drive_resource, agent, trust_owned).await
+            if !store.sync_policy().admit_drive_write(drive_subject) {
+                false
+            } else {
+                super::engine::may_accept_drive_write(store, &drive_resource, agent, trust_owned)
+                    .await
+            }
         }
-        Err(_) => true,
+        Err(_) => super::engine::admit_unknown_drive(store, drive_subject, agent),
     };
 
     cache.insert(drive_subject.to_string(), verdict);
     verdict
 }
 
-/// Apply one peer-supplied `SYNC_DIFF.remove[]` entry, gated exactly like a
-/// live `DESTROY` frame: the remove list arrives unauthenticated-by-default
-/// from whatever peer we dialed, so deleting a subject we actually hold
-/// requires the peer's proven identity to pass the same admission + ACL check
-/// as any other write. A subject we don't hold has nothing to check rights
-/// against — applied unconditionally, where the tombstone-write is a real
-/// no-op for a never-seen subject.
+/// Apply one peer-supplied `SYNC_DIFF.remove[]` entry. A signed destroy
+/// envelope (`removeCommits[subject]`) is applied as a peer `COMMIT` — the
+/// signature and the signer's rights are the authority, same as the live
+/// link. An unsigned entry (legacy tombstone, cascade child, sender without
+/// the envelope) still goes through the drive-level admission + ACL check.
 async fn apply_peer_remove(
     store: &Db,
     agent: &ForAgent,
     subject: &str,
     trust_owned: bool,
     drive_cache: &mut std::collections::HashMap<String, bool>,
+    destroy_commit: Option<&str>,
 ) {
+    if let Some(commit_json) = destroy_commit {
+        match super::engine::ingest_commit_json(
+            store,
+            commit_json,
+            &super::engine::CommitIngestOpts::peer(),
+        )
+        .await
+        {
+            Ok(_) => return,
+            Err(e) => {
+                tracing::warn!(
+                    "[sync] rejected signed SYNC_DIFF remove for {}: {e}",
+                    crate::utils::truncate_string(subject, 30)
+                );
+                return;
+            }
+        }
+    }
+
     match super::ws_apply::resolve_destroy_drive(store, subject).await {
         Some(drive_subject) => {
             if admitted_for_drive(store, agent, &drive_subject, trust_owned, drive_cache).await {
@@ -753,8 +752,8 @@ async fn apply_peer_remove(
             } else {
                 tracing::warn!(
                     "[sync] rejected SYNC_DIFF remove for {} from peer: not admitted for drive {}",
-                    &subject[..subject.len().min(30)],
-                    &drive_subject[..drive_subject.len().min(30)]
+                    crate::utils::truncate_string(subject, 30),
+                    crate::utils::truncate_string(&drive_subject, 30)
                 );
             }
         }
@@ -1672,9 +1671,18 @@ pub async fn sync_drive_with_peer_using_outcome(
                     for subject in &diff.remove {
                         // Dial side: we chose this peer, so a remove targeting a
                         // drive we own is honored even when the peer relaying it
-                        // is a different agent (trust_owned=true).
-                        apply_peer_remove(store, &remote_agent, subject, true, &mut drive_cache)
-                            .await;
+                        // is a different agent (trust_owned=true). A signed
+                        // envelope, when present, is applied as a COMMIT instead.
+                        let envelope = diff.remove_commits.get(subject).map(String::as_str);
+                        apply_peer_remove(
+                            store,
+                            &remote_agent,
+                            subject,
+                            true,
+                            &mut drive_cache,
+                            envelope,
+                        )
+                        .await;
                     }
                     pull_subjects = diff.pull.clone();
 
@@ -1719,8 +1727,9 @@ pub async fn sync_drive_with_peer_using_outcome(
                     // relaying it is a different agent (a server holding our
                     // drive authenticates as its own node agent, not ours).
                     // `import_sync_push` still runs the drive-level check + the
-                    // admission gate, with the bootstrap carve-out for a drive
-                    // that doesn't exist locally yet.
+                    // admission gate. A drive that does not exist locally is
+                    // enrolled only when the policy allows it (OQ5); Public
+                    // never creates one.
                     match super::engine::import_sync_push(&push, store, &remote_agent, true).await {
                         Ok((count, blob_requests)) => {
                             total_imported += count;
@@ -2628,6 +2637,59 @@ mod live_write_admission_tests {
         );
     }
 
+    #[tokio::test]
+    async fn missing_drive_is_not_a_free_pass_for_public() {
+        let db = Db::init_temp("live_admission_missing_public")
+            .await
+            .unwrap();
+        let mut cache = HashMap::new();
+        assert!(
+            !admitted_for_drive(&db, &ForAgent::Public, "did:ad:brandnew", false, &mut cache).await,
+            "Public must not live-write a drive this node has never stored"
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_drive_on_owner_mode_admits_only_the_owner() {
+        let db = Db::init_temp("live_admission_missing_owner").await.unwrap();
+        let (owner, _) = db.setup("Owner").await.unwrap();
+        let stranger = db.create_agent(Some("Stranger")).await.unwrap();
+        db.set_sync_policy(std::sync::Arc::new(crate::sync::policy::OwnerPolicy::new(
+            owner.subject.to_string(),
+        )));
+
+        let missing = "did:ad:notonthisnode";
+        let mut cache = HashMap::new();
+        assert!(
+            !admitted_for_drive(
+                &db,
+                &ForAgent::AgentSubject(stranger.subject.clone()),
+                missing,
+                false,
+                &mut cache
+            )
+            .await,
+            "a stranger must not live-write a drive this node has never stored"
+        );
+
+        let mut cache = HashMap::new();
+        assert!(
+            admitted_for_drive(
+                &db,
+                &ForAgent::AgentSubject(owner.subject.clone()),
+                missing,
+                false,
+                &mut cache
+            )
+            .await,
+            "the owner may live-write a drive arriving for the first time"
+        );
+        assert!(
+            db.sync_policy().admit_drive_write(missing),
+            "admitting the owner must enroll the drive"
+        );
+    }
+
     /// The admission gate (allowlist/quota) is checked too, not just the ACL —
     /// even the rightful owner is rejected once their drive isn't admitted
     /// (e.g. a managed node whose allowlist doesn't include this drive).
@@ -2789,7 +2851,6 @@ mod initiator_trust_tests {
         let opts = crate::commit::CommitOpts {
             validate_signature: true,
             validate_timestamp: false,
-            validate_previous_commit: false,
             validate_rights: false,
             update_index: true,
             ..crate::commit::CommitOpts::no_validations_no_index()
@@ -2954,6 +3015,7 @@ mod initiator_trust_tests {
             &child,
             false,
             &mut cache,
+            None,
         )
         .await;
 
@@ -2983,6 +3045,7 @@ mod initiator_trust_tests {
             &child,
             false,
             &mut cache,
+            None,
         )
         .await;
 
@@ -2994,6 +3057,92 @@ mod initiator_trust_tests {
             crate::sync::tombstones::is_tombstoned(&db, &child),
             "the owner's remove[] entry must record a tombstone"
         );
+    }
+
+    /// A signed destroy envelope is applied as a COMMIT: the connection's
+    /// AUTH identity does not authorise the delete, the commit's signer does.
+    /// Mallory's session can relay Alice's destroy and it still lands.
+    #[tokio::test]
+    async fn signed_remove_envelope_applies_even_when_connection_agent_is_a_stranger() {
+        let db = Db::init_temp("initiator_remove_signed").await.unwrap();
+        let alice = crate::agents::Agent::new(Some("Alice")).unwrap();
+        db.set_default_agent(alice.clone());
+        let (_drive, child) = private_drive_with_child(&db, &alice).await;
+        let mallory = db.create_agent(Some("Mallory")).await.unwrap();
+
+        let subject = crate::Subject::from_raw(&child, None);
+        let resource = db.get_resource(&subject).await.unwrap();
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.destroy(true);
+        let commit = builder.sign(&alice, &db, &resource).await.unwrap();
+        let commit_json = commit
+            .into_resource(&db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap();
+
+        let mut cache = HashMap::new();
+        apply_peer_remove(
+            &db,
+            &ForAgent::AgentSubject(mallory.subject.clone()),
+            &child,
+            false,
+            &mut cache,
+            Some(&commit_json),
+        )
+        .await;
+
+        assert!(
+            db.get_resource(&subject).await.is_err(),
+            "a valid destroy envelope must apply regardless of the connection agent"
+        );
+        assert!(crate::sync::tombstones::is_tombstoned(&db, &child));
+        assert!(
+            crate::sync::tombstones::destroy_envelope(&db, &child).is_some(),
+            "the applied destroy must leave its envelope on the tombstone"
+        );
+    }
+
+    /// A tampered envelope must not fall back to the unsigned tombstone path.
+    #[tokio::test]
+    async fn tampered_remove_envelope_does_not_delete() {
+        let db = Db::init_temp("initiator_remove_tampered").await.unwrap();
+        let alice = crate::agents::Agent::new(Some("Alice")).unwrap();
+        db.set_default_agent(alice.clone());
+        let (_drive, child) = private_drive_with_child(&db, &alice).await;
+
+        let subject = crate::Subject::from_raw(&child, None);
+        let resource = db.get_resource(&subject).await.unwrap();
+        let mut builder = crate::commit::CommitBuilder::new(subject.clone());
+        builder.destroy(true);
+        let commit = builder.sign(&alice, &db, &resource).await.unwrap();
+        let commit_json = commit
+            .into_resource(&db)
+            .await
+            .unwrap()
+            .to_json_ad(None)
+            .unwrap();
+        let mut json: serde_json::Value = serde_json::from_str(&commit_json).unwrap();
+        json[crate::urls::SIGNATURE] = serde_json::Value::String("AAAA".into());
+        let tampered = json.to_string();
+
+        let mut cache = HashMap::new();
+        apply_peer_remove(
+            &db,
+            &ForAgent::AgentSubject(alice.subject.clone()),
+            &child,
+            false,
+            &mut cache,
+            Some(&tampered),
+        )
+        .await;
+
+        assert!(
+            db.get_resource(&subject).await.is_ok(),
+            "a tampered destroy envelope must not delete, even from the owner"
+        );
+        assert!(!crate::sync::tombstones::is_tombstoned(&db, &child));
     }
 }
 

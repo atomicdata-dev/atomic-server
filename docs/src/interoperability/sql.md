@@ -6,7 +6,7 @@ Atomic Data has some characteristics that make it similar and different from SQL
 - Atomic Data has a _dynamic_ schema. Any Resource could have different properties, so you can **add new properties** to your data without performing any migrations. However, the properties themselves are still validated (contrary to most NoSQL solutions)
 - Atomic Data uses **HTTP URLs** in its data, which means it's easy to **share and reuse**.
 - Atomic Data separates _reading_ and _writing_, whereas SQL has one language for both.
-- Atomic Data has a standardized way of **storing changes** ([Commits](../commits/intro.md))
+- Atomic Data has a standardized way of **authorizing writes** ([Commits](../commits/intro.md))
 
 ## Tables and Rows vs. Classes and Properties
 

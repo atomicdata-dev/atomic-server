@@ -5,9 +5,10 @@
 
 _url: [https://atomicdata.dev/classes/Commit](https://atomicdata.dev/classes/Commit)_
 
-A Commit is a Resource that describes how a Resource must be updated.
-It can be used for auditing, versioning and feeds.
-It is cryptographically signed by an [Agent](https://atomicdata.dev/classes/Agent).
+A Commit is a signed envelope that authorizes a Loro CRDT update on a Resource.
+It is **not** a queryable event log. Current state and version history live in
+the Resource's Loro document. The commit may be discarded after apply, except
+for the must-retain floor (genesis, rights / parent / destroy).
 
 All state changes in Atomic Data are carried as [Loro CRDT](https://loro.dev) binary updates.
 This means that concurrent edits from multiple clients merge automatically without conflicts.
@@ -23,7 +24,7 @@ The **optional fields** are:
 
 - `loroUpdate` - A [Loro CRDT](https://loro.dev) binary update, encoded as a base64 string. This is the primary way to carry property changes. The server imports this update into the resource's Loro document, materializes the properties, and computes index diffs.
 - `destroy` - If true, the entire Resource will be removed.
-- `previousCommit` - The `did:ad:commit:{signature}` of the last commit applied to this resource. Used for ordering and audit trails.
+- `previousCommit` - Optional audit pointer at an earlier envelope. **Not a causal gate** — concurrent edits merge via Loro. Clients may still send it; servers do not require it.
 - `isGenesis` - If true, this is the first commit for a DID resource. The subject DID is derived from either the self-verifying genesis certificate signature (`did:ad:<sig_of_cert>`) or, in legacy mode, the signature of the genesis commit itself.
 
 ### Loro CRDT updates

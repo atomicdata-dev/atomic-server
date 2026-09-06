@@ -1,9 +1,9 @@
 import {
-  commits,
   dataBrowser,
   useCanWrite,
   useChildren,
-  useString,
+  useCreatedBy,
+  useCreatedAt,
 } from '@tomic/react';
 import { useCallback, type JSX } from 'react';
 import { styled } from 'styled-components';
@@ -20,7 +20,8 @@ import { ArticleDescription } from './ArticleDescription';
 import { useNewResourceUI } from '../../components/forms/NewForm/useNewResourceUI';
 
 export function ArticlePage({ resource }: ResourcePageProps): JSX.Element {
-  const [lastCommit] = useString(resource, commits.properties.lastCommit);
+  const createdBy = useCreatedBy(resource);
+  const createdAt = useCreatedAt(resource);
 
   const canEdit = useCanWrite(resource);
   const { subjects: children } = useChildren(resource.subject);
@@ -40,7 +41,7 @@ export function ArticlePage({ resource }: ResourcePageProps): JSX.Element {
             <Column>
               <HeadingWrapper>
                 <EditableTitle resource={resource} withDecorations />
-                <CommitDetail commitSubject={lastCommit} />
+                <CommitDetail createdAt={createdAt} createdBy={createdBy} />
               </HeadingWrapper>
               <ArticleDescription resource={resource} canEdit={canEdit} />
               <UploadForm parentResource={resource} />

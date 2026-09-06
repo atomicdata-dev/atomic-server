@@ -25,7 +25,7 @@ now live in [`completed/`](./completed/):
 
 - [`runtime-boundary-decision.md`](./completed/runtime-boundary-decision.md) — `AtomicNode` in `lib/src/runtime/` is the binding runtime; no parallel `simple.rs` / `ffi/`.
 - [`authority-unit-decision.md`](./completed/authority-unit-decision.md) — the drive stays the unit of authority; the zone chain is hybrid/additive.
-- [`commit-retention-floor-decision.md`](./completed/commit-retention-floor-decision.md) — envelope-on-resource; #1313 waits for `Tree::Envelopes`.
+- [`commit-retention-floor-decision.md`](./completed/commit-retention-floor-decision.md) — envelope-on-resource; amended 2026-09-05, `Tree::Envelopes` ships in #1313.
 - [`trust-model-decision.md`](./completed/trust-model-decision.md) — the node that owns the URL is trusted with plaintext; anything that only stores is blind.
 - [`schema-routes-decision.md`](./completed/schema-routes-decision.md) — `did:ad:frozen` is the on-ramp, optional schema is the write-path policy.
 
@@ -36,8 +36,8 @@ Remaining work, not "this file exists."
 | Document | Status |
 | --- | --- |
 | [`unified-sync.md`](./unified-sync.md) | **Active.** One sync API over WS or Iroh. Carries the single **Remaining work (2026-09-03)** checklist for every open sync item across these plans. The 2026-07 audit history is in [`completed/unified-sync-audit-2026-07.md`](./completed/unified-sync-audit-2026-07.md). |
-| [`serverless-p2p.md`](./serverless-p2p.md) | **Planned.** Device sync without a hub (written same-agent-first; admission is rights-based since 2026-07-17). AUTH-before-SYNC and the `AUTH.requestedSubject`↔drive binding landed 2026-09-01 (Iroh). Live-link destroys travel as signed `COMMIT` frames since 2026-09-03. P0 remaining: signed bulk `remove[]`, OQ5 bootstrap admission, then `SyncSession` / `AtomicTransport`. |
-| [`foss-public-host-mode.md`](./foss-public-host-mode.md) | **Proposal.** A FOSS node on a public address must not host strangers' workspaces. `HostMode { Open, Owner }`, owner claimed by agent DID. Closes unified-sync OQ5 for Owner. |
+| [`serverless-p2p.md`](./serverless-p2p.md) | **Planned.** Device sync without a hub (written same-agent-first; admission is rights-based since 2026-07-17). AUTH-before-SYNC and the `AUTH.requestedSubject`↔drive binding landed 2026-09-01 (Iroh). Live-link destroys travel as signed `COMMIT` frames since 2026-09-03. P0 remaining: require envelopes on every `remove[]` once `Tree::Envelopes` exists. `AtomicTransport` / `SyncSession::serve` first slice landed 2026-09-05; outbox port and the remaining `sync_drive_with_peer*` collapse are open. |
+| [`foss-public-host-mode.md`](./foss-public-host-mode.md) | **Partial.** Phase 1–2 built; OQ5 library path closed 2026-09-05 (`admit_unknown_drive`: Public never creates, Owner enrolls only the owner). Phase 3 (rate limits, Iroh stream refusal) is untouched. |
 | [`authorization-sync.md`](./authorization-sync.md) | **Draft.** Signed commit authorization, grant-chain evidence, peer-sync trust boundaries. |
 | [`unified-data-layer.md`](./unified-data-layer.md) | **Partial.** Browser/JS: one ingress, one outbox, one subscription model. Atomic writes and the single outbox shipped; the ingress/subscription half and `SaveState` are open. |
 | [`loro-source-of-truth.md`](./loro-source-of-truth.md) | **Partial.** Sparse `datatypes` map + Phase 2a–2c shipped (`Tree::Resources` is a derived cache). Remaining: drop the untagged heuristic, Phase 1.6 `Value` reshape, Flutter undo. |
@@ -60,7 +60,7 @@ Remaining work, not "this file exists."
 | [`index-performance.md`](./index-performance.md) | First tranche shipped. Structural permission-check fix is `zones.md`, not built. |
 | [`disk-storage-and-persistence-optimization.md`](./disk-storage-and-persistence-optimization.md) | **Proposal.** Full-snapshot writes, no auto-compaction, O(file) open fsync. |
 | [`virtual-drive.md`](./virtual-drive.md) | **Shipped** as a local NFS mount in the Tauri desktop app (`desktop/src/vfs.rs`). Still proposal: headless-server mount, FUSE/WinFSP, native cloud-sync APIs, mobile providers. |
-| [`commit-retention-and-state-certificates.md`](./commit-retention-and-state-certificates.md) | **Proposal** (DID wording predates the genesis-cert model, see its *Current* note). Commits stay signed write certificates; retention is node policy. |
+| [`commit-retention-and-state-certificates.md`](./commit-retention-and-state-certificates.md) | **Mostly shipped.** Commits are signed envelopes; content rows dropped; `Tree::Envelopes` keeps the latest (or all) per resource. Remaining: envelope carriage in bulk sync and the vault. |
 | [`p2p-presence.md`](./p2p-presence.md) | **Mostly built.** `EPHEMERAL 0x40` codec, peer send/receive and the server bridge are in (`lib/src/sync/iroh_e2e.rs` `e2e_presence_crosses_the_link_without_being_stored`). Remaining: two-device verification (M12), bandwidth measurement (OQ1). Scoped to your own devices by product choice. |
 | [`reticulum-sync.md`](./reticulum-sync.md) | **Proposal.** Atomic sync protocol over Reticulum. |
 | [`json-schema-code-first.md`](./json-schema-code-first.md) | **Proposal**; `defineSchema` + frozen `did:ad:` schemas in flight in PR #1262 (not on `develop`). Code-first JSON Schema → local DID-backed Class/Property resources. |
@@ -82,7 +82,6 @@ Not top-level plans. Indexed so they do not go missing.
 | Document | Status |
 | --- | --- |
 | [`unify-subscription-primitives.md`](./unify-subscription-primitives.md) | **Done in reduced form (2026-09-04).** One `SUB <subject>` frame; `SUBSCRIBE` and `SUBSCRIBE_QUERY` removed. Design text kept as the record. |
-| [`unify-subscription-actors.md`](./unify-subscription-actors.md) | Planned, not started. Fold LoroSyncBroadcaster into CommitMonitor. |
 | [`unify-resource-representations.md`](./unify-resource-representations.md) | **Mostly shipped.** `Resource#cache` is derived from the Loro doc. Remaining: the `_auxValues` overlay. |
 | [`unify-resource-dirty-signals.md`](./unify-resource-dirty-signals.md) | Planned, not started. Single `getSaveState(subject)` enum. |
 | [`subject-types-end-to-end.md`](./subject-types-end-to-end.md) | Partial. Rust `DidKind` shipped; the browser brand still has no consumer. |
@@ -91,6 +90,7 @@ Not top-level plans. Indexed so they do not go missing.
 | [`main-drive-and-paths.md`](./main-drive-and-paths.md) | Strategy. DID-branch deployment: root drive, legacy URLs, human-readable paths. |
 | [`actions.md`](./actions.md) | **Steps 1–4 shipped.** Registry drives ⌘M, ⌘K (capped prefix match), hotkeys, the shortcuts overlay/page, and simple AI tools. Remaining: MCP projection when a server exists. |
 | [`silent-failures.md`](./silent-failures.md) | Living log of error-handling failures that reported success (2026-08-21). Carries M8 from the pairing field test. |
+| [`auditability-loro-history.md`](./auditability-loro-history.md) | **Building.** `Tree::Envelopes` + `attribute_history` + `/history-attribution` + History Verified badge shipped 2026-09-05. Next: envelopes travel in bulk sync and the vault. |
 
 Closed decisions, as-built records, closed explorations and fixed notes live
 in [`completed/`](./completed/): the five decisions above, the 2026-07 sync

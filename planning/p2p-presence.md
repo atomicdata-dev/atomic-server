@@ -3,7 +3,7 @@
 > **Status:** Mostly built (2026-09-03). The `EPHEMERAL (0x40)` codec
 > (`lib/src/sync/protocol.rs`, `ephemeral_frame_tests`), the peer send/receive
 > path (`broadcast_ephemeral` + the `0x40` arm in `register_live_peer`) and the
-> server bridge (`server/src/loro_sync_broadcaster.rs`) are in, with an Iroh e2e
+> server bridge (`CommitMonitor` presence maps; was `LoroSyncBroadcaster`) are in, with an Iroh e2e
 > (`e2e_presence_crosses_the_link_without_being_stored`) proving presence crosses
 > the link and reaches no store. Open: the two-device verification below (M12 in
 > [`pairing-ux-field-test.md`](./completed/pairing-ux-field-test.md)) and OQ1 bandwidth.
@@ -44,7 +44,7 @@ each other iff each proves the same agent key). So P2P presence here means
 your phone", follow-me across devices), not collaborators in a shared drive.
 
 Multi-user presence already works **over the hub** (the WS
-`LoroSyncBroadcaster` relays between different agents' sessions, gated on drive
+`CommitMonitor` relays between different agents' sessions, gated on drive
 `check_read`). Multi-user presence *over P2P* needs the cross-agent grant model
 that doesn't exist yet ([`authorization-sync.md`](./authorization-sync.md)) and
 is explicitly not part of this plan. The frame designed below is agnostic to
@@ -70,12 +70,12 @@ Neither has any path to Iroh.
    channel: cursor anchors are Loro `Cursor` objects tied to the document oplog
    and move per keystroke.
 
-Server relay: `server/src/loro_sync_broadcaster.rs` — a plain actix actor
-holding only `Addr<WebSocketConnection>` handles. It relays both channels
-opaquely, gates drive presence on `check_read` at subscribe
-(`:241`, `:315-320`), caches each connection's latest `encodeAll()` payload and
-replays it to late joiners (`:268-278`). It is constructed with a `Db` and
-**has no reference to Iroh** (`create_loro_sync_broadcaster`, `:333`).
+Server relay: `server/src/commit_monitor.rs` — the same actor that fans
+commits also holds the Loro-ephemera and drive-presence maps. It relays both
+channels opaquely, gates drive presence on `check_read` at subscribe,
+caches each connection's latest `encodeAll()` payload and
+replays it to late joiners. It is constructed with a `Db` and
+**has no reference to Iroh**; `serve.rs` is the bridge.
 
 ## Why it doesn't cross to peers today
 
@@ -246,8 +246,8 @@ The tag exists and nothing uses it:
 Every working presence path is client-to-server WebSocket:
 the cursor frame (then text `LORO_EPHEMERAL_UPDATE`, now `EPHEMERAL` of
 kind `LORO`) in `lib/src/client/ws.rs` and
-`server/src/handlers/web_sockets.rs`, fanned out by `LoroSyncBroadcaster`
-to the *subscribers of that server* (`loro_sync_broadcaster.rs:190`,
+`server/src/handlers/web_sockets.rs`, fanned out by `CommitMonitor`
+to the *subscribers of that server* (`commit_monitor.rs`,
 "broadcast to all subscribers except the sender").
 
 So presence is per-server. A browser on `atomic.ontola.io` and a desktop app on

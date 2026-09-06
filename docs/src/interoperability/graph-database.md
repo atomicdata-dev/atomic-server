@@ -15,8 +15,8 @@ After that, we'll explore how Atomic Data relates to some graph technologies.
 - **Authorization built-in**. Managing rights in a hierarchy (similar to how tools like Google Drive or filesystems work) enable you to have a high degree of control over read / write rights.
 - **Built-in easy to use GUI**. Managing content on Atomic-Server can be done by anyone, as its GUI is extremely easy to use and has a ton of features.
 - **Dynamic indexing**. Indexes are created by performing Queries, resulting in great performance - without needing to manually configure indexing.
-- **Synchronization over WebSockets**. All changes (called [Commits](../commits/intro.md)) can be synchronized over WebSockets, allowing you to build realtime collaborative tools.
-- **Event-sourced**. All changes are stored and reversible, giving you a full versioned history.
+- **Synchronization over WebSockets**. Signed writes (called [Commits](../commits/intro.md)) can be synchronized over WebSockets, allowing you to build realtime collaborative tools.
+- **CRDT versioning**. History comes from the Loro oplog; commits authorize writes rather than acting as an event log.
 - **Open source**. All code is MIT-licensed.
 
 ## Comparing Atomic Data to Neo4j

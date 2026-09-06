@@ -29,8 +29,7 @@ export interface CommitBuilderI {
   /** If true, the resource must be deleted. https://atomicdata.dev/properties/destroy */
   destroy?: boolean;
   /**
-   * URL of the previous Commit, used by the receiver to make sure that we're
-   * having the same current version.
+   * URL of an earlier envelope, optional audit metadata. Not a causal gate.
    */
   previousCommit?: string;
   /** Whether this is the first commit for a Resource. */
@@ -134,8 +133,7 @@ export class CommitBuilder {
   }
 
   /**
-   * Set the URL of the Commit that was previously (last) applied. The value of
-   * this should probably be the `lastCommit` of the Resource.
+   * Optional audit pointer at an earlier envelope. Not a causal gate.
    */
   public setPreviousCommit(prev: string): CommitBuilder {
     this._previousCommit = prev;

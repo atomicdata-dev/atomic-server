@@ -159,11 +159,11 @@ pub struct Unsubscribe {
     pub subject: String,
 }
 
-/// Sent by `WebSocketConnection::stopped` to every subscription-holding
-/// actor (`CommitMonitor`, `LoroSyncBroadcaster`). Each handler walks
-/// its maps and removes every entry whose `Addr` matches. Without this,
-/// stale entries accumulate over the server's lifetime and every fanout
-/// pass pays for dead `Addr`s.
+/// Sent by `WebSocketConnection::stopped` to the commit monitor. The handler
+/// walks every subscription map (resource, drive, Loro ephemera, presence)
+/// and removes every entry whose `Addr` matches. Without this, stale entries
+/// accumulate over the server's lifetime and every fanout pass pays for
+/// dead `Addr`s.
 #[derive(Message)]
 #[rtype(result = "()")]
 pub struct UnsubscribeAll {

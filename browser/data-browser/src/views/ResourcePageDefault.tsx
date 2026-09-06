@@ -1,10 +1,11 @@
 import {
-  useString,
+  useCreatedBy,
+  useCreatedAt,
+  useCanWrite,
+  dataBrowser,
   core,
   server,
   commits,
-  useCanWrite,
-  dataBrowser,
 } from '@tomic/react';
 import { styled } from 'styled-components';
 import AllProps from '../components/AllProps';
@@ -59,7 +60,8 @@ export const defaultHiddenProps = [
 export function ResourcePageDefault({
   resource,
 }: ResourcePageProps): JSX.Element {
-  const [lastCommit] = useString(resource, commits.properties.lastCommit);
+  const createdBy = useCreatedBy(resource);
+  const createdAt = useCreatedAt(resource);
   const canEdit = useCanWrite(resource);
   const navigate = useNavigateWithTransition();
 
@@ -81,7 +83,7 @@ export function ResourcePageDefault({
           </Row>
           <CompactDetails>
             <ClassDetail resource={resource} />
-            <CommitDetail commitSubject={lastCommit} short />
+            <CommitDetail createdAt={createdAt} createdBy={createdBy} short />
           </CompactDetails>
           <ValueForm
             resource={resource}

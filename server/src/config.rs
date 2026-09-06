@@ -31,6 +31,12 @@ pub struct Opts {
     #[clap(long, env = "ATOMIC_DEVELOPMENT")]
     pub development: bool,
 
+    /// Which signed commit envelopes this node keeps per resource: `latest`
+    /// (the envelope that produced the current state; the default) or `all`
+    /// (every envelope, so History shows a verified signer per change).
+    #[clap(long, default_value = "latest", env = "ATOMIC_ENVELOPE_RETENTION")]
+    pub envelope_retention: String,
+
     /// The origin domain where the app is hosted, without the port and schema values.
     #[clap(long, default_value = "localhost", env = "ATOMIC_DOMAIN")]
     pub domain: String,

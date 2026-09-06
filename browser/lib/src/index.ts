@@ -70,6 +70,12 @@ export * from './loro-loader.js';
 export * from './presence.js';
 export * from './CryptoProvider.js';
 export { ClientDbWorker } from './client-db.js';
+export {
+  attributionForVersion,
+  mergeHistoryAttributions,
+  parseHistoryAttribution,
+} from './history-attribution.js';
+export type { Attribution, HistoryAttribution } from './history-attribution.js';
 export type { ClientDbQueryOpts, ClientDbQueryResult } from './client-db.js';
 export {
   LocalOutbox,

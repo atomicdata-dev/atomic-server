@@ -29,7 +29,7 @@ plans and can be tackled independently.
 |---|---|---|---|---|
 | 1 | [react-compiler-resource-proxy.md](./react-compiler-resource-proxy.md) | Correctness | High | 🔴 **Still open as of 2026-08.** The compiler is now *on* in data-browser (`224bd4816`, 2026-08-19, via `oxc-transform-react` in `vite.config.ts`), and a live instance of the class was hit in the field on 2026-08-16 — [`pairing-ux-field-test.md`](./completed/pairing-ux-field-test.md) M15a, a table not re-rendering after a peer row arrived. The audit of `.props.X` / `.isReady()` / `.loading` reads in render has not started. |
 | 2 | [unify-subscription-primitives.md](./unify-subscription-primitives.md) | Cleanup | Medium | Single `Subscription` shape with `Match::{Subject, Drive, Filter}` |
-| 3 | [unify-subscription-actors.md](./unify-subscription-actors.md) | Cleanup | Medium | Fold LoroSyncBroadcaster's subject-sub into CommitMonitor |
+| 3 | Unify subscription actors | Cleanup | Done 2026-09-05 | Folded `LoroSyncBroadcaster` into `CommitMonitor`; planning doc removed |
 | 5 | [unify-resource-dirty-signals.md](./unify-resource-dirty-signals.md) | Correctness | Medium | Single `getSaveState(subject)` enum |
 | 6 | [unify-resource-representations.md](./unify-resource-representations.md) | Correctness | High | 🟡 Rust `datatypes` map + derived `Tree::Resources` cache shipped. Browser `_cache` dual still open. |
 | 7 | [arc-actor-message-payloads.md](./arc-actor-message-payloads.md) | Performance | Low | ✅ Stretch landed — `SendFrame` + encode-once + `Bytes::from_owner` zero-copy at WS write. `MembershipNotification` already Arc-wrapped. `CommitMessage` Arc-wrap (`atomic_lib` change) deferred. |

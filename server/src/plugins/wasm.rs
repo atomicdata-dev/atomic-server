@@ -848,7 +848,6 @@ impl bindings::atomic::class_extender::host::Host for PluginHostState {
             validate_signature: true,
             validate_timestamp: false,
             validate_rights: true,
-            validate_previous_commit: false,
             validate_loro_causality: false,
             update_index: true,
             validate_for_agent: None,

@@ -22,7 +22,7 @@ This should help you understand how and where you may be able to contribute.
 - **[atomic-cli](https://crates.io/crates/atomic-cli) + [atomic-lib](https://docs.rs/atomic_lib/0.32.1/atomic_lib/)** (2020-07). The CLI functioned as the first platform to explore some of the most core ideas of Atomic Data, such as Properties and fetching. `atomic_lib` is the place where most logic resides. Written in Rust.
 - **[AtomicServer](https://github.com/atomicdata-dev/atomic-server/)** (2020-08). The server (using the same `atomic_lib` as the CLI) should be a fast, lightweight server that must be easy to set-up. Functions as a graph database with no dependencies.
 - **[Collections](schema/collections.md)** (2020-10). Allows users to perform basic queries, filtering, sorting and pagination.
-- **[Commits](commits/intro.md)** (2020-11). Allow keeping track of an event-sourced log of all activities that mutate resources, which in turn allows for versioning and adding new types of indexes later on.
+- **[Commits](commits/intro.md)** (2020-11). Signed write envelopes that authorize a Loro CRDT update. Originally conceived as an event-sourced log; current state and versioning now live in the resource's Loro document.
 - **[JSON-AD](core/json-ad.md)** (2021-02). Instead of the earlier proposed serialization format `.ad3`, we moved to the more familiar `json-ad`.
 - **[Atomic-Data-Browser](https://github.com/atomicdata-dev/atomic-data-browser)** (2021-02). We wanted typescript and react libraries, as well as a nice interactive GUI that works in the browser. It should implement all relevant parts of the specification.
 - **[Endpoints](endpoints.md)** (2021-03). Machine readable API endpoints (think Swagger / OpenAPI spec) for things like versioning, path traversal and more.

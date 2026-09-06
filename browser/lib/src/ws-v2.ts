@@ -501,6 +501,8 @@ export interface DecodedSyncDiff {
   remove: string[];
   /** Server oplog VV per pull subject — export updates since this. */
   pullFrom: Record<string, Record<string, number>>;
+  /** Signed destroy commit JSON-AD per `remove` subject, when present. */
+  removeCommits: Record<string, string>;
 }
 
 export interface DecodedSyncPushEntry {
@@ -624,9 +626,15 @@ export function decodeSyncDiff(data: Uint8Array): DecodedSyncDiff | undefined {
   const json = decoder.decode(data.subarray(off));
 
   try {
-    const { pull, push, remove = [], pullFrom = {} } = JSON.parse(json);
+    const {
+      pull,
+      push,
+      remove = [],
+      pullFrom = {},
+      removeCommits = {},
+    } = JSON.parse(json);
 
-    return { drive, pull, push, remove, pullFrom };
+    return { drive, pull, push, remove, pullFrom, removeCommits };
   } catch {
     return undefined;
   }

@@ -113,10 +113,14 @@ impl SyncPolicy for OpenPolicy {
         true
     }
 
-    /// Anyone. This is what "open" means, and what every node did before host
-    /// mode existed — an upgrade must not change who may write.
-    fn may_enroll_drive(&self, _drive_subject: &str, _agent: &crate::agents::ForAgent) -> bool {
-        true
+    /// Any authenticated agent. This is what "open" means for a localhost
+    /// node — an upgrade must not change who may write — but
+    /// [`crate::agents::ForAgent::Public`] never creates a drive. An
+    /// unauthenticated `SYNC_PUSH` used to bootstrap a stranger's workspace
+    /// onto an open node; AUTH-before-SYNC closed the wire, and this closes
+    /// the library path.
+    fn may_enroll_drive(&self, _drive_subject: &str, agent: &crate::agents::ForAgent) -> bool {
+        !matches!(agent, crate::agents::ForAgent::Public)
     }
 }
 
@@ -404,9 +408,13 @@ mod tests {
     }
 
     #[test]
-    fn an_open_node_takes_a_drive_from_anyone() {
+    fn an_open_node_takes_a_drive_from_anyone_authenticated() {
         assert!(OpenPolicy.may_enroll_drive("did:ad:drive:new", &agent(STRANGER)));
-        assert!(OpenPolicy.may_enroll_drive("did:ad:drive:new", &ForAgent::Public));
+        assert!(OpenPolicy.may_enroll_drive("did:ad:drive:new", &ForAgent::Sudo));
+        assert!(
+            !OpenPolicy.may_enroll_drive("did:ad:drive:new", &ForAgent::Public),
+            "Public never creates a drive, even on an open node"
+        );
     }
 
     #[test]

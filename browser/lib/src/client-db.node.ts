@@ -7,6 +7,10 @@
  * use, keep `ClientDbWorker`.
  */
 
+import {
+  parseHistoryAttribution,
+  type HistoryAttribution,
+} from './history-attribution.js';
 import { readFile } from 'node:fs/promises';
 
 import type { ClientDbQueryOpts, ClientDbQueryResult } from './client-db.js';
@@ -235,6 +239,16 @@ export class NodeClientDb {
     const r = this.requireDb().getLoroSnapshot(subject);
 
     return (r as Uint8Array | null) ?? null;
+  }
+
+  async historyAttribution(
+    subject: string,
+  ): Promise<HistoryAttribution | null> {
+    const db = this.requireDb();
+
+    if (typeof db.historyAttribution !== 'function') return null;
+
+    return parseHistoryAttribution(await db.historyAttribution(subject));
   }
 
   async putBlob(hash: Uint8Array, data: Uint8Array): Promise<void> {

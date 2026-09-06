@@ -1,7 +1,7 @@
 //! Integration test: drive-scoped ephemeral presence (issue #1229).
 //!
 //! Presence updates are opaque Loro EphemeralStore blobs relayed through
-//! `LoroSyncBroadcaster`'s drive-keyed presence map. The contract pinned
+//! `CommitMonitor`'s drive-keyed presence map. The contract pinned
 //! here:
 //!
 //! 1. An update broadcast by one presence subscriber reaches every other

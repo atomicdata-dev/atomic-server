@@ -360,8 +360,7 @@ impl Value {
             // TODO: This results in wrong indexing, as some subjects will be numbers.
             Value::ResourceArray(_v) => self.to_subjects(None).unwrap_or_else(|_| vec![]),
             Value::AtomicUrl(v) => vec![v.to_string()],
-            // TODO We don't index nested resources for now
-            Value::NestedResource(_r) => return None,
+            Value::NestedResource(_) | Value::LoroDoc(_) => return None,
             // This might result in unnecessarily long strings, sometimes. We may want to shorten them later.
             val => vec![val.to_string()],
         };
@@ -631,6 +630,23 @@ mod test {
         Value::new("\"just a string\"", &DataType::LocalizedText).unwrap_err();
         Value::new(r#"{"not a tag!": "x"}"#, &DataType::LocalizedText).unwrap_err();
         Value::new(r#"{"en": 5}"#, &DataType::LocalizedText).unwrap_err();
+    }
+
+    #[test]
+    fn loro_doc_is_not_indexed() {
+        let blob = vec![0u8; 2048];
+        let atom = crate::Atom::new(
+            "did:ad:commit:test".into(),
+            crate::urls::LORO_UPDATE.into(),
+            Value::LoroDoc(blob),
+        );
+        assert!(
+            atom.to_indexable_atoms().is_empty(),
+            "Loro binary payloads must not become KV index keys"
+        );
+        assert!(Value::LoroDoc(vec![1, 2, 3])
+            .to_reference_index_strings()
+            .is_none());
     }
 
     #[test]

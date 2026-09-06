@@ -373,9 +373,14 @@ pub async fn parse_json_ad_commit_resource(
     json.remove(urls::LOCAL_ID);
     let commit_subject = format!("did:ad:commit:{}", signature);
 
-    let resource =
-        parse_json_ad_map_to_resource(json, store, Some(commit_subject), &ParseOpts::default())
-            .await?;
+    // Parse only. `Db::apply_commit` stores the commit resource once the
+    // commit is accepted; persisting it here would leave every rejected
+    // commit behind and make "is this commit already stored" unanswerable.
+    let opts = ParseOpts {
+        save: SaveOpts::DontSave,
+        ..ParseOpts::default()
+    };
+    let resource = parse_json_ad_map_to_resource(json, store, Some(commit_subject), &opts).await?;
 
     Ok(resource)
 }
@@ -854,7 +859,6 @@ async fn parse_json_ad_map_to_resource(
                     validate_signature: true,
                     validate_timestamp: false,
                     validate_rights: parse_opts.for_agent != ForAgent::Sudo,
-                    validate_previous_commit: false,
                     validate_loro_causality: false,
                     validate_for_agent: Some(parse_opts.for_agent.to_string()),
                     update_index: true,
@@ -907,7 +911,6 @@ async fn parse_json_ad_map_to_resource(
                 validate_signature: true,
                 validate_timestamp: false,
                 validate_rights: parse_opts.for_agent != ForAgent::Sudo,
-                validate_previous_commit: false,
                 validate_loro_causality: false,
                 validate_for_agent: Some(parse_opts.for_agent.to_string()),
                 update_index: true,

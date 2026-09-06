@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   agentVaultProof,
+  enrollVault,
   vaultLaneId,
   backupDrive,
   restoreDrive,
@@ -20,6 +21,24 @@ import {
  * when storage rejects a PUT, whether restore replays segments in the right
  * order. Each of those is a data-integrity property, not a plumbing detail.
  */
+
+it('sends name and emoji as optional enrollment metadata', async () => {
+  const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+    new Response(JSON.stringify({ enrollment: { id: '1' } }), {
+      status: 200,
+    }),
+  );
+  await enrollVault('did:ad:drive', 'did:ad:agent:test', {
+    name: 'Design',
+    emoji: '🎨',
+  });
+  expect(JSON.parse(String(fetch.mock.calls[0][1]?.body))).toEqual({
+    drive_subject: 'did:ad:drive',
+    agent_subject: 'did:ad:agent:test',
+    drive_name: 'Design',
+    drive_emoji: '🎨',
+  });
+});
 
 const DEVICE = '03'.repeat(32);
 const PSEUDONYM = 'testpseudonym';

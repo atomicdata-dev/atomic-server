@@ -208,6 +208,10 @@ pub fn config_routes(app: &mut actix_web::web::ServiceConfig) {
     .service(web::resource("/ws").to(handlers::web_sockets::web_socket_handler))
     .service(web::resource("/drive-usage").to(handlers::drive_usage::handle_drive_usage))
     .service(
+        web::resource("/history-attribution")
+            .to(handlers::history_attribution::handle_history_attribution),
+    )
+    .service(
         web::resource("/forget-peer")
             .guard(guard::Method(Method::POST))
             .to(handlers::forget_peer::handle_forget_peer),
