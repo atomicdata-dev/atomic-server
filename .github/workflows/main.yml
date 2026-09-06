@@ -276,6 +276,11 @@ jobs:
           cargo check --all-targets
           cargo clippy --all-targets -- -D warnings
           cargo test --all-targets
+          # The managed node embeds this repo's server crate and is not a
+          # default workspace member, so the root build does not touch it.
+          # Its own CI runs check, clippy and test; the same here.
+          cargo clippy -p atomic-managed-node --all-targets -- -D warnings
+          cargo test -p atomic-managed-node
           if ! git diff --quiet -- Cargo.lock; then
             git diff --stat -- Cargo.lock
             echo "::warning::atomic-saas's Cargo.lock drifted against this commit; run cargo check there and commit Cargo.lock."
