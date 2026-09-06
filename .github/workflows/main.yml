@@ -164,6 +164,115 @@ jobs:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
       DAGGER_CLOUD_TOKEN: ${{ secrets.DAGGER_CLOUD_TOKEN }}
 
+  # Does this commit still build the closed-source control plane?
+  #
+  # atomic-saas depends on `../atomic-server/lib` and `../atomic-server/server`
+  # by path and used to pin the commit it built against, bumping the pin in a
+  # PR of its own after every change here — nineteen times between July and
+  # September 2026. Its CI now builds against develop head instead, so a lib
+  # rename that nobody carried over would surface there, days later. This job
+  # moves that failure to the PR that made it.
+  #
+  # Paired-PR rule: if atomic-saas has a branch named like this one, that is
+  # what gets built (a change that needs both repos lands as two PRs on one
+  # branch name); otherwise main. atomic-saas's CI applies the same rule in
+  # reverse.
+  #
+  # Mancave only. The token can read a private repo, and fork PRs never run
+  # here; PR events are routed to GitHub-hosted by `pick`, which also keeps
+  # this job off them. `clean: false` keeps both target/ dirs warm, the same
+  # measured reason atomic-saas's own CI gives.
+  downstream-saas:
+    name: Downstream (atomic-saas builds against this commit)
+    needs: pick
+    if: >-
+      needs.pick.outputs.host == 'mancave' &&
+      github.event_name != 'pull_request' &&
+      github.event_name != 'pull_request_target'
+    runs-on: ${{ fromJSON(vars.CI_RUNNER || '["self-hosted", "Linux", "X64"]') }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    env:
+      CARGO_TERM_COLOR: always
+      # Nothing here runs the dist in a browser; the embed only needs to exist.
+      SKIP_WASM_BUILD: "1"
+    steps:
+      - name: Checkout atomic-server (this commit)
+        uses: actions/checkout@v4
+        with:
+          path: atomic-server
+          clean: false
+
+      - name: Pick the atomic-saas branch
+        id: saas
+        env:
+          GH_TOKEN: ${{ secrets.ATOMIC_SAAS_DISPATCH_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::ATOMIC_SAAS_DISPATCH_TOKEN is not set; cannot read ontola/atomic-saas."
+            exit 1
+          fi
+          ref=main
+          source="main"
+          if [ "$BRANCH" != "develop" ] && gh api "repos/ontola/atomic-saas/branches/$BRANCH" >/dev/null 2>&1; then
+            ref="$BRANCH"
+            source="paired branch '$BRANCH'"
+          fi
+          sha=$(gh api "repos/ontola/atomic-saas/commits/$ref" -q .sha)
+          echo "atomic-saas $sha ($source)"
+          echo "ref=$sha" >> "$GITHUB_OUTPUT"
+          echo "### Downstream: atomic-saas" >> "$GITHUB_STEP_SUMMARY"
+          echo "Built \`$sha\` ($source) against this commit." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Checkout atomic-saas
+        uses: actions/checkout@v4
+        with:
+          repository: ontola/atomic-saas
+          ref: ${{ steps.saas.outputs.ref }}
+          token: ${{ secrets.ATOMIC_SAAS_DISPATCH_TOKEN }}
+          path: atomic-saas
+          clean: false
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: clippy
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.15.1
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Both frontends are compile-time embeds in atomic-saas (RustEmbed), so
+      # a `cargo check` needs them on disk; contents are irrelevant here.
+      - name: Build the data-browser embed
+        working-directory: atomic-server/browser
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+
+      - name: Build the portal embed
+        working-directory: atomic-saas/portal
+        run: |
+          npm ci
+          npm run build
+
+      - name: cargo check, clippy and test atomic-saas against this commit
+        working-directory: atomic-saas
+        run: |
+          set -euo pipefail
+          cargo check --all-targets --locked
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --all-targets --locked
+
   # Hosted only when pick said Mancave is unavailable (or escape/PR).
   # Deliberately does NOT run when Mancave finished with test failures.
   github:
@@ -186,7 +295,7 @@ jobs:
 
   Main:
     name: Main
-    needs: [pick, mancave, github]
+    needs: [pick, mancave, github, downstream-saas]
     if: always() && needs.pick.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -195,7 +304,14 @@ jobs:
           host="${{ needs.pick.outputs.host }}"
           m="${{ needs.mancave.result }}"
           g="${{ needs.github.result }}"
-          echo "host=$host mancave=$m github=$g"
+          d="${{ needs.downstream-saas.result }}"
+          echo "host=$host mancave=$m github=$g downstream-saas=$d"
+          # The downstream build is skipped on PR events and on hosted runs;
+          # when it ran, it has to have passed.
+          if [ "$d" = "failure" ] || [ "$d" = "cancelled" ]; then
+            echo "atomic-saas no longer builds against this commit — fix it there on a branch with this name, or here."
+            exit 1
+          fi
           if [ "$host" = "mancave" ] && [ "$m" = "success" ]; then
             exit 0
           fi
