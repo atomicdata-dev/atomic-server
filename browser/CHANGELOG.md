@@ -4,6 +4,8 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Fix: automatic Cloud Vault backups failed in the browser with "Cannot convert 1 to a BigInt" — the checkpoint number is a 64-bit integer on the WASM side and must be handed over as a BigInt.
+- Fix: the recovery-code step of onboarding threw `_w_ctx_ is not defined` in the dev build (the i18n extractor emitted the nested-message form for one button label without its callback); the label is a script-scope string now.
 - Cmd+Up (go to parent) works in tables again: ArrowUp no longer matches
   with Ctrl/Cmd held, and the parent action fetches the resource when a
   stub has not yet materialized `parent`.

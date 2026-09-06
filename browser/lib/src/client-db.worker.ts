@@ -350,7 +350,10 @@ async function handleMessage(msg: WorkerRequest): Promise<unknown> {
         msg.drivePseudonym,
         msg.devicePubkey,
         msg.segment,
-        msg.checkpointN,
+        // `checkpoint_n` is a u64 on the Rust side; wasm-bindgen wants a
+        // BigInt for it and throws "Cannot convert 1 to a BigInt" for a
+        // Number, which failed every automatic backup in the browser.
+        BigInt(msg.checkpointN),
         msg.driveHasCheckpoint,
         msg.observedLanes,
       );
