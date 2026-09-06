@@ -1,9 +1,11 @@
 import type {
+  ImportStatus,
   LoroDoc,
   LoroList,
   UndoManager as LoroUndoManager,
   VersionVector,
 } from 'loro-crdt';
+import { ulid } from 'ulidx';
 import { enableLoro, LoroLoader } from './loro-loader.js';
 import { decodeB64, encodeB64 } from './base64.js';
 import { EventManager } from './EventManager.js';
@@ -681,6 +683,9 @@ export class Resource<C extends OptionalClass = any> {
           val instanceof Uint8Array ? val : decodeB64(val as string);
 
         try {
+          // An import seals pending ops without a message; keep the
+          // user's edit under its history token (see `stagedCommitToken`).
+          this.sealPendingEdits();
           this._loroDoc.import(bytes);
           this.rebuildCacheFromLoro();
           this.#cacheDirty = false;
@@ -874,6 +879,10 @@ export class Resource<C extends OptionalClass = any> {
   private loroSetProperty(prop: string, value: JSONValue): void {
     const map = this.getLoroMap();
 
+    if (map) {
+      this.armStagedCommitToken();
+    }
+
     if (!map) {
       // Loro not loaded yet — write to cache as fallback.
       // getLoroDoc() will seed Loro from cache when it initializes.
@@ -1054,6 +1063,54 @@ export class Resource<C extends OptionalClass = any> {
    *
    * @internal store-level drain only — not part of the public API.
    */
+  /**
+   * The Loro change message the next drain export will carry, created on
+   * first use. It exists because a Loro import commits whatever local ops
+   * are still pending, and does so without a message. Since the server
+   * echoes every commit back to its author, an import now routinely lands
+   * while the user is mid-edit; sealed untagged, those ops fall into the
+   * base ('') bucket of `getLoroHistory` and the version they belong to
+   * shows the wrong state (history e2e: both versions read "Second Title").
+   * Sealing them under the token the drain will use keeps one bucket per
+   * Atomic commit.
+   */
+  private _stagedCommitToken?: string;
+
+  private stagedCommitToken(): string {
+    this._stagedCommitToken ??= `c-${ulid().toLowerCase()}`;
+
+    return this._stagedCommitToken;
+  }
+
+  /**
+   * Tell Loro which message the next commit carries, whoever makes it. Not
+   * every commit goes through this class: loro-prosemirror commits the doc
+   * from its plugin `init` and on body edits, and a re-render triggered by a
+   * server response can put that init right between two keystrokes. Arming
+   * the message at write time means a pending edit keeps its history token
+   * no matter who seals it. Loro clears the message after one commit, so
+   * this is re-armed on every write.
+   */
+  private armStagedCommitToken(): void {
+    this._loroDoc?.setNextCommitMessage(this.stagedCommitToken());
+  }
+
+  /**
+   * Commit pending local ops under the staged token. Call it wherever Loro
+   * would otherwise seal them itself without a message: before an import,
+   * before a snapshot export, and where a server response is written into
+   * the doc mid-edit (`applyHydratedValues`).
+   *
+   * @internal store-level persistence only — not part of the public API.
+   */
+  public sealPendingEdits(): void {
+    const doc = this._loroDoc;
+
+    if (!doc || doc.getPendingTxnLength() === 0) return;
+
+    doc.commit({ timestamp: Date.now(), message: this.stagedCommitToken() });
+  }
+
   public exportLoroDeltaForDrain(
     isFirstCommit: boolean,
     commitMessage?: string,
@@ -1089,9 +1146,47 @@ export class Resource<C extends OptionalClass = any> {
    * @internal store-level drain only — not part of the public API.
    */
   public markLoroSavedAt(version: VersionVector): void {
-    if (this._loroDoc) {
+    const doc = this._loroDoc;
+
+    if (!doc) return;
+
+    // `version` was captured at export time, so it is exact for this doc's
+    // own peer: local ops typed during the round-trip must stay past the
+    // cursor. Remote peers are a different matter — the echo of the commit
+    // just acked can land BEFORE the ack and be absorbed into the previous
+    // cursor (`absorbImportedOpsIntoSaveCursor`); replacing the cursor
+    // outright would forget that and re-open the re-commit loop that
+    // method exists to close. Keep whichever is further for every peer
+    // that is not us.
+    const previous = this._loroVersionAtLastSave;
+
+    if (!previous) {
       this._loroVersionAtLastSave = version;
+
+      return;
     }
+
+    const own = doc.peerIdStr;
+    const merged = new Map(version.toJSON());
+    let changed = false;
+
+    for (const [peer, counter] of previous.toJSON()) {
+      if (peer === own) continue;
+
+      if ((merged.get(peer) ?? 0) < counter) {
+        merged.set(peer, counter);
+        changed = true;
+      }
+    }
+
+    if (!changed) {
+      this._loroVersionAtLastSave = version;
+
+      return;
+    }
+
+    const { VersionVector: VersionVectorClass } = LoroLoader.Loro;
+    this._loroVersionAtLastSave = new VersionVectorClass(merged);
   }
 
   /** Base64-encode the current save cursor (last-synced Loro version) for
@@ -1142,6 +1237,51 @@ export class Resource<C extends OptionalClass = any> {
       this._loroDoc.oplogVersion(),
       this._loroVersionAtLastSave,
     );
+  }
+
+  /**
+   * Ops that just arrived from the server are, by definition, already on
+   * the server. Fold them into the save cursor so they never read as
+   * unsaved local work.
+   *
+   * Without this, the echo of this client's own commit — which carries the
+   * `lastCommit` stamp the server wrote under its own peer — lands past the
+   * cursor, `hasOpsPastSaveCursor` reports the resource dirty again, the
+   * drain re-signs a delta holding nothing but the server's stamp, the
+   * server stamps that too, and the client commits every 130 ms forever
+   * (quick-edit e2e: `syncInProgress` never clears). A collaborator's push
+   * landing during the `postCommit` round-trip used to trigger the same
+   * loop, only rarely.
+   *
+   * Ops under this doc's own peer are left alone: those are the local edits
+   * the cursor exists to track, and the import status never reports them
+   * as new anyway.
+   */
+  private absorbImportedOpsIntoSaveCursor(
+    imported: ImportStatus['success'],
+  ): void {
+    const doc = this._loroDoc;
+    const cursor = this._loroVersionAtLastSave;
+
+    if (!doc || !cursor || imported.size === 0) return;
+
+    const own = doc.peerIdStr;
+    const merged = new Map(cursor.toJSON());
+    let changed = false;
+
+    for (const [peer, span] of imported) {
+      if (peer === own) continue;
+
+      if ((merged.get(peer) ?? 0) < span.end) {
+        merged.set(peer, span.end);
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      const { VersionVector: VersionVectorClass } = LoroLoader.Loro;
+      this._loroVersionAtLastSave = new VersionVectorClass(merged);
+    }
   }
 
   /** The resource's last applied commit id (`did:ad:commit:{sig}`).
@@ -1205,10 +1345,14 @@ export class Resource<C extends OptionalClass = any> {
     // from the genesis change's timestamp). Loro orders changes by lamport,
     // not timestamp, so a finer timestamp is safe metadata; readers normalise
     // mixed-unit oplogs via `normalizeLoroChangeTimestampMs`.
+    // Ops a remote import already sealed carry the staged token; use the
+    // same one here so everything in this export forms one bucket.
+    const message = this._stagedCommitToken ?? commitMessage;
     this._loroDoc.commit({
       timestamp: Date.now(),
-      ...(commitMessage ? { message: commitMessage } : {}),
+      ...(message ? { message } : {}),
     });
+    this._stagedCommitToken = undefined;
 
     // If it's the first commit, we must export a full snapshot.
     if (isFirstCommit || !this._loroVersionAtLastSave) {
@@ -1271,6 +1415,11 @@ export class Resource<C extends OptionalClass = any> {
   private static extractLoroSnapshot(
     resource: Resource,
   ): Uint8Array | undefined {
+    // The export seals pending ops untagged; `merge` reaches here with the
+    // live doc while the user is mid-edit (the drain's `applyToStore` after
+    // an ack), so keep that edit under its history token.
+    resource.sealPendingEdits();
+
     return resource._loroDoc
       ? resource._loroDoc.export({ mode: 'snapshot' })
       : Resource.decodeStoredSnapshot(resource._loroSnapshotBytes);
@@ -1462,8 +1611,11 @@ export class Resource<C extends OptionalClass = any> {
             structuredClone(Array.from(resourceB._auxValues.entries())),
           );
         } else {
-          // Import the incoming state — Loro merges via CRDT
+          // Import the incoming state — Loro merges via CRDT. Seal any
+          // pending edit under its history token first: the import would
+          // otherwise commit it bare (see `stagedCommitToken`).
           try {
+            this.sealPendingEdits();
             localDoc.import(incomingSnapshot);
           } catch (e) {
             // Import can fail if the snapshot is from an incompatible version.
@@ -1719,6 +1871,7 @@ export class Resource<C extends OptionalClass = any> {
    *  resource's LoroDoc directly without going through `set()`. */
   public markDirty(): void {
     this._dirty = true;
+    this.armStagedCommitToken();
     this.eventManager.emit(ResourceEvents.LocalChange, '', undefined);
   }
 
@@ -2194,10 +2347,11 @@ export class Resource<C extends OptionalClass = any> {
     // response landing between a keystroke and the next commit boundary
     // would otherwise be flushed by the system-origin commit below —
     // folding the user's edit into a change the outbox is told to ignore,
-    // which loses it silently.
-    if (this._loroDoc && this._loroDoc.getPendingTxnLength() > 0) {
-      this._loroDoc.commit({ timestamp: Date.now() });
-    }
+    // which loses it silently. Sealed under the staged commit token, not
+    // bare: the server answers every save, so this runs mid-edit all the
+    // time, and an untagged change drops the edit out of its history
+    // version (see `stagedCommitToken`).
+    this.sealPendingEdits();
 
     for (const [key, value] of values) {
       this.applyRawValue(key, value);
@@ -3329,6 +3483,8 @@ export class Resource<C extends OptionalClass = any> {
       if (!(v instanceof Uint8Array)) obj[k] = v;
     }
 
+    // The export seals pending ops; keep them under their history token.
+    this.sealPendingEdits();
     const snapshot = this._loroDoc?.export({ mode: 'snapshot' });
 
     // Await the OPFS write — when `save()` resolves the edit MUST survive a
@@ -3523,7 +3679,9 @@ export class Resource<C extends OptionalClass = any> {
         return { complete: true };
       }
 
+      this.sealPendingEdits();
       const status = doc.import(loroUpdate);
+      this.absorbImportedOpsIntoSaveCursor(status.success);
       this.rebuildCacheFromLoro();
       this.#cacheDirty = false;
       this.initLoroSaveCursorIfFresh();

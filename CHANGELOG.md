@@ -5,6 +5,12 @@ By far most changes relate to `atomic-server`, so if not specified, assume the c
 **Changes to JS assets (including the front-end and JS libraries) are not shown here**, but in [`/browser/CHANGELOG`](/browser/CHANGELOG.md).
 See [STATUS.md](server/STATUS.md) to learn more about which features will remain stable.
 
+- Fix: live collaboration stopped for the author of a document after a peer
+  edited it. The server stamps `lastCommit` under its own Loro peer after
+  applying a commit; the fan-out only forwarded the author's own bytes and
+  never echoed to the author, so an edit built on the stored snapshot could
+  not apply there. The `UPDATE` now carries everything the apply added and
+  reaches the author too (`CommitResponse::fanout_delta`).
 - Commits are signed envelopes, not a queryable event log. Ordinary content
   commits are not stored as resources after apply (genesis and
   rights/parent/destroy stay). Loro binaries are not KV-index keys. The
