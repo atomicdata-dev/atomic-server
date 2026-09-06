@@ -254,6 +254,15 @@ impl Resource {
         Ok(doc)
     }
 
+    /// Every op the live doc gained since `since`, or `None` when this
+    /// resource has no materialized doc. Used to fan out a commit together
+    /// with what the server wrote on top of it.
+    pub fn export_updates_since(&self, since: &loro::VersionVector) -> Option<Vec<u8>> {
+        self.loro
+            .as_ref()
+            .map(|doc| doc.export_updates_since(since))
+    }
+
     /// Replace property state from a materialized versioned doc (sync / import).
     pub fn apply_state_doc(&mut self, doc: crate::loro::AtomicLoroDoc) -> AtomicResult<()> {
         let snapshot = doc.export_snapshot();
@@ -1146,6 +1155,7 @@ impl Resource {
             remove_atoms: Vec::new(),
             changed_props: std::collections::HashSet::new(),
             source_id: None,
+            broadcast_update: None,
         }
     }
 

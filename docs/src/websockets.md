@@ -479,12 +479,20 @@ deterministic signing and commit parsing are unaffected by the transport.
 answers `ERROR` with the matching `request_id` and a classified code. HTTP
 `POST /commit` remains the fallback path.
 
-**Echo suppression.** Each WebSocket connection has a per-process id
-(`ws-<n>`). The server threads it through as the commit's `source_id`, stamps
-it on the emitted database events, and the commit monitor skips subscribers
-registered under the same id, so the client never sees its own write return
-as a push. Other connections, including other tabs of the same agent, do
-receive it. An HTTP commit has no source id and reaches everyone.
+**The echo carries the server's stamp.** The `UPDATE` a commit fans out is
+not the commit's own bytes: it is every op the stored doc gained during the
+apply, which is the author's ops plus the `lastCommit` stamp the server
+writes afterwards under its own peer. Anyone who loads the stored snapshot
+builds their next edit on top of that stamp, so a subscriber without it parks
+that edit as pending and every later delta parks behind it. For the same
+reason the author's own connection receives the echo too; the client dedups
+it by commit id and imports it without notifying.
+
+**Echo suppression** applies to non-commit changes only. Each WebSocket
+connection has a per-process id (`ws-<n>`). The server threads it through as
+the change's `source_id`, stamps it on the emitted database events, and the
+commit monitor skips subscribers registered under the same id for external
+changes (sync imports, internal writes). An HTTP commit has no source id.
 
 **The peer `COMMIT` arm differs deliberately** (`engine::handle_frame`, via
 `apply_peer_commit`):
@@ -496,7 +504,7 @@ receive it. An HTTP commit has no source id and reaches everyone.
 | `validate_loro_causality` | on | **off**: concurrent writes between peers are expected |
 | Subject ownership | enforced | **off**: hosting subjects it does not own is what a replica is |
 | `previousCommit` | not validated | not validated |
-| `source_id` echo suppression | yes | none: peers do not fan out through the commit monitor |
+| `source_id` echo suppression | non-commit changes only; a commit's `UPDATE` reaches its author with the server's stamp | none: peers do not fan out through the commit monitor |
 | Live-echo suppression | no | yes, so the live push loop does not bounce the commit back |
 
 Both roles auto-create the signer's agent resource when it is absent and the
@@ -855,7 +863,8 @@ unrecognized text frame is logged and ignored.
 -> COMMIT (0x13) request_id 1
 -> COMMIT (0x13) request_id 2                    (pipelined, same tier)
 <- COMMIT_OK (0x14) 2 [commit_id]                (slim; acks in completion order)
-<- COMMIT_OK (0x14) 1 [commit_id]                (no UPDATE echoed back)
+<- COMMIT_OK (0x14) 1 [commit_id]
+<- UPDATE (0x11) delta | HAS_COMMIT_ID | PUSH    (own commit echoed with the server's stamp; deduped by id)
 <- UPDATE (0x11) delta | HAS_COMMIT_ID | PUSH    (someone else's commit)
 -> GET (0x10)
 <- UPDATE (0x11) SNAPSHOT | HAS_COMMIT_ID

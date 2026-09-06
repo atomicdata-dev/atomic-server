@@ -214,3 +214,338 @@ describe('a delta that cannot apply triggers a catch-up fetch', () => {
     pending?.();
   });
 });
+
+describe("the echo of a client's own commit", () => {
+  const subject = 'did:ad:ownCommitEchoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+
+  /** What the server does with a commit: import it, then stamp `lastCommit`
+   *  under its own peer. The echo it fans out is both. A peer that boots
+   *  from the stored snapshot builds its next edit on top of the stamp. */
+  function serverSide(
+    authorSnapshot: Uint8Array,
+    commitId: string,
+  ): {
+    echo: Uint8Array;
+    peerEdit: Uint8Array;
+  } {
+    const { LoroDoc } = LoroLoader.Loro;
+    const server = new LoroDoc();
+    const before = server.version();
+    server.import(authorSnapshot);
+    server.getMap('properties').set(commits.properties.lastCommit, commitId);
+    server.commit();
+    const echo = server.export({ mode: 'update', from: before } as never);
+
+    const peer = new LoroDoc();
+    peer.import(server.export({ mode: 'snapshot' }));
+    const peerBefore = peer.version();
+    peer.getMap('properties').set(NAME, 'typed by the peer');
+    peer.commit();
+    const peerEdit = peer.export({
+      mode: 'update',
+      from: peerBefore,
+    } as never);
+
+    return { echo, peerEdit };
+  }
+
+  it('is imported, not dropped, so a peer edit built on the stored snapshot applies', async ({
+    expect,
+  }) => {
+    const store = await makeStore();
+    const commitId = 'did:ad:commit:mine';
+
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.getMap('properties').set(NAME, 'mine');
+    authored.commit();
+
+    // The author's resource, already stamped with its own commit id — the
+    // state right after COMMIT_OK.
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    store.resources.get(subject)!.setLastCommitValue(commitId);
+
+    const { echo, peerEdit } = serverSide(
+      authored.export({ mode: 'snapshot' }),
+      commitId,
+    );
+
+    let fetched = 0;
+
+    (
+      store as unknown as { fetchResourceFromServer: () => Promise<unknown> }
+    ).fetchResourceFromServer = async () => {
+      fetched += 1;
+
+      return undefined;
+    };
+
+    expect(
+      store.applyIncoming({
+        subject,
+        loroBytes: echo,
+        commitId,
+        source: 'ws-sub-push',
+      }),
+    ).toBe('deduped');
+
+    expect(
+      store.applyIncoming({
+        subject,
+        loroBytes: peerEdit,
+        commitId: 'did:ad:commit:theirs',
+        source: 'ws-sub-push',
+      }),
+    ).toBe('applied');
+    expect(store.resources.get(subject)!.get(NAME)).toBe('typed by the peer');
+    expect(fetched).toBe(0);
+  });
+
+  it('does not leave the author looking unsaved, which would re-commit forever', async ({
+    expect,
+  }) => {
+    const store = await makeStore();
+    const commitId = 'did:ad:commit:mine';
+
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.getMap('properties').set(NAME, 'mine');
+    authored.commit();
+
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    const resource = store.resources.get(subject)!;
+    resource.setLastCommitValue(commitId);
+    // Hydrated clean: the cursor sits at everything the server has.
+    expect(resource.hasOpsPastSaveCursor()).toBe(false);
+
+    const { echo, peerEdit } = serverSide(
+      authored.export({ mode: 'snapshot' }),
+      commitId,
+    );
+
+    store.applyIncoming({
+      subject,
+      loroBytes: echo,
+      commitId,
+      source: 'ws-sub-push',
+    });
+    expect(
+      resource.hasOpsPastSaveCursor(),
+      "the server's stamp is not local work to sign",
+    ).toBe(false);
+
+    store.applyIncoming({
+      subject,
+      loroBytes: peerEdit,
+      commitId: 'did:ad:commit:theirs',
+      source: 'ws-sub-push',
+    });
+    expect(
+      resource.hasOpsPastSaveCursor(),
+      "a collaborator's edit is not local work to sign either",
+    ).toBe(false);
+    expect(resource.hasUnsavedChanges()).toBe(false);
+
+    // A real local edit still counts.
+    await resource.set(NAME, 'edited here');
+    expect(resource.hasUnsavedChanges()).toBe(true);
+  });
+
+  it('stays absorbed when the echo lands before the ack advances the cursor', async ({
+    expect,
+  }) => {
+    // The drain captures the version at export time and moves the cursor
+    // there once the server acks. Under load the echo of that very commit
+    // arrives first; the ack must not throw its absorbed ops away.
+    const store = await makeStore();
+    const commitId = 'did:ad:commit:mine';
+
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.getMap('properties').set(NAME, 'mine');
+    authored.commit();
+
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    const resource = store.resources.get(subject)!;
+    resource.setLastCommitValue(commitId);
+    const versionAtExport = resource.getLoroDoc()!.oplogVersion();
+
+    const { echo } = serverSide(
+      authored.export({ mode: 'snapshot' }),
+      commitId,
+    );
+    store.applyIncoming({
+      subject,
+      loroBytes: echo,
+      commitId,
+      source: 'ws-sub-push',
+    });
+    expect(resource.hasOpsPastSaveCursor()).toBe(false);
+
+    // The ack, arriving second.
+    resource.markLoroSavedAt(versionAtExport);
+    expect(
+      resource.hasOpsPastSaveCursor(),
+      'the ack must keep the absorbed server ops',
+    ).toBe(false);
+  });
+
+  it('does not strip the history token off an edit that was pending when it landed', async ({
+    expect,
+  }) => {
+    // A Loro import commits pending local ops, without a message. The echo
+    // now lands while the user is still typing, so without care the title
+    // edit is sealed untagged, falls into the base bucket of the history,
+    // and the version that should show "First Title" shows the later state.
+    const store = await makeStore();
+    const commitId = 'did:ad:commit:mine';
+
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.commit();
+
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    const resource = store.resources.get(subject)!;
+    resource.setLastCommitValue(commitId);
+
+    // Pending, not yet drained.
+    await resource.set(NAME, 'First Title');
+
+    const { echo } = serverSide(
+      authored.export({ mode: 'snapshot' }),
+      commitId,
+    );
+    store.applyIncoming({
+      subject,
+      loroBytes: echo,
+      commitId,
+      source: 'ws-sub-push',
+    });
+
+    // The drain comes round.
+    const exported = resource.exportLoroDeltaForDrain(false, 'c-drain');
+    expect(exported).toBeDefined();
+
+    const first = resource
+      .getLoroHistory()
+      .find(v => v.propvals.get(NAME) === 'First Title');
+    expect(first, 'a version must show the first title').toBeDefined();
+    expect(first!.token ?? '').toMatch(/^c-/);
+  });
+
+  it('keeps the token when a server response is written into the doc mid-edit', async ({
+    expect,
+  }) => {
+    // `applyHydratedValues` runs on every acked save. It used to close the
+    // pending edit with a bare commit — the exact shape the history e2e
+    // caught once the author started receiving its own echoes.
+    const store = await makeStore();
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.commit();
+
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    const resource = store.resources.get(subject)!;
+
+    await resource.set(NAME, 'First Title');
+    resource.applyHydratedValues([
+      [commits.properties.lastCommit, 'did:ad:commit:acked'],
+    ]);
+    expect(resource.exportLoroDeltaForDrain(false, 'c-drain')).toBeDefined();
+
+    const first = resource
+      .getLoroHistory()
+      .find(v => v.propvals.get(NAME) === 'First Title');
+    expect(first?.token ?? '').toMatch(/^c-/);
+  });
+  it('keeps the token when third-party code commits the doc mid-edit', async ({
+    expect,
+  }) => {
+    // loro-prosemirror commits the shared doc from its own plugin, with no
+    // message. That is what sealed the title ops untagged in the history
+    // e2e once the echo started re-rendering the page between keystrokes.
+    const store = await makeStore();
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.commit();
+
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    const resource = store.resources.get(subject)!;
+
+    await resource.set(NAME, 'First Title');
+    // Someone else's bare commit.
+    resource.getLoroDoc()!.commit();
+    expect(resource.exportLoroDeltaForDrain(false, 'c-drain')).toBeDefined();
+
+    const first = resource
+      .getLoroHistory()
+      .find(v => v.propvals.get(NAME) === 'First Title');
+    expect(first?.token ?? '').toMatch(/^c-/);
+  });
+});

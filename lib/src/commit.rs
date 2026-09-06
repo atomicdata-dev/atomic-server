@@ -26,9 +26,29 @@ pub struct CommitResponse {
     pub changed_props: HashSet<String>,
     /// Optional transport/source identity for echo suppression.
     pub source_id: Option<String>,
+    /// Every op the stored doc gained while applying this commit: the
+    /// author's own ops plus what the server wrote on top (the `lastCommit`
+    /// stamp, `createdAt` at genesis). This, not `commit.loro_update`, is
+    /// what live subscribers must receive — see [`Self::fanout_delta`].
+    pub broadcast_update: Option<Vec<u8>>,
 }
 
 impl CommitResponse {
+    /// The delta to push to live subscribers.
+    ///
+    /// The server stamps `lastCommit` on the resource after importing the
+    /// author's update. That stamp is a Loro op under the server's own peer,
+    /// and the next edit by anyone who loaded a snapshot depends on it. A
+    /// subscriber that only ever received `commit.loro_update` lacks the
+    /// stamp, parks that edit as pending, and every later delta parks behind
+    /// it: the document quietly stops being live. Falls back to the commit's
+    /// own bytes when the apply did not go through a Loro doc.
+    pub fn fanout_delta(&self) -> Option<&[u8]> {
+        self.broadcast_update
+            .as_deref()
+            .or(self.commit.loro_update.as_deref())
+    }
+
     /// The authorization relevance of this commit — which authority-defining
     /// facts it establishes or mutates. See [`crate::hierarchy::AuthImpact`].
     pub fn auth_impact(&self) -> crate::hierarchy::AuthImpact {
@@ -61,6 +81,10 @@ pub struct CommitApplied {
     /// present (an idempotent replay), so producing no state change is
     /// expected and correct, not a silent LWW loss.
     pub imported_new_ops: bool,
+    /// The doc's version before the commit's `loroUpdate` was imported, so
+    /// the caller can export everything the apply added — including what
+    /// the server writes afterwards — as one delta for live subscribers.
+    pub vv_before: Option<loro::VersionVector>,
 }
 
 #[derive(Clone, Debug)]
@@ -954,6 +978,13 @@ impl Commit {
 
         let destroyed = commit.destroy.unwrap_or(false);
 
+        // Export what the doc gained during this apply — the author's ops and
+        // the stamp above — for the live fan-out (`CommitResponse::fanout_delta`).
+        let broadcast_update = applied
+            .vv_before
+            .as_ref()
+            .and_then(|vv| applied.resource_new.export_updates_since(vv));
+
         Ok(CommitResponse {
             commit,
             add_atoms: applied.add_atoms,
@@ -971,6 +1002,7 @@ impl Commit {
             },
             changed_props: applied.changed_props,
             source_id: opts.source_id.clone(),
+            broadcast_update,
         })
     }
 
@@ -1010,6 +1042,7 @@ impl Commit {
         let mut add_atoms: Vec<Atom> = Vec::new();
         let mut changed_props: HashSet<String> = HashSet::new();
         let mut imported_new_ops = false;
+        let mut vv_before: Option<loro::VersionVector> = None;
 
         if let Some(loro_update_bytes) = &self.loro_update {
             // Seed from the current resource state when no snapshot exists yet so
@@ -1019,12 +1052,13 @@ impl Commit {
             // Whether the import actually advances the oplog tells idempotent
             // replay (every op already present → VV unchanged) apart from a
             // genuine new write. See the causality guard in `apply_commit`.
-            let vv_before = loro_doc.oplog_vv_map();
+            let vv_map_before = loro_doc.oplog_vv_map();
+            vv_before = Some(loro_doc.oplog_vv());
 
             // Import the update and compute the property-level diff for indexing
             let diff = loro_doc
                 .import_update_with_diff(loro_update_bytes, &resource.get_subject().to_string())?;
-            imported_new_ops = loro_doc.oplog_vv_map() != vv_before;
+            imported_new_ops = loro_doc.oplog_vv_map() != vv_map_before;
 
             // Track which properties changed
             for atom in &diff.add_atoms {
@@ -1058,6 +1092,7 @@ impl Commit {
             remove_atoms,
             changed_props,
             imported_new_ops,
+            vv_before,
         })
     }
 
@@ -2180,6 +2215,69 @@ mod test {
         assert_eq!(
             updated.get(crate::urls::DESCRIPTION).unwrap().to_string(),
             "v2"
+        );
+    }
+
+    /// The server stamps `lastCommit` after importing a commit. That stamp is
+    /// an op under the server's own peer, and a peer that boots from the
+    /// stored snapshot builds its next edit on top of it. The author only
+    /// ever gets its own commit echoed back; if that echo is the commit's raw
+    /// bytes, the author lacks the stamp, the peer's edit parks as pending
+    /// and the document stops being live for the author. `fanout_delta` is
+    /// what the echo must carry.
+    #[tokio::test]
+    async fn fanout_delta_lets_the_author_apply_a_peer_edit_built_on_the_stored_snapshot() {
+        let (store, agent) = store_with_known_agent().await;
+        let agent_subject: Subject = format!("did:ad:agent:{}", agent.public_key).into();
+
+        let author = crate::loro::AtomicLoroDoc::new();
+        author
+            .set_property(urls::PUBLIC_KEY, &Value::String(agent.public_key.clone()))
+            .unwrap();
+        author
+            .set_property(urls::IS_A, &Value::ResourceArray(vec![urls::AGENT.into()]))
+            .unwrap();
+
+        let mut builder = CommitBuilder::new(agent_subject.clone());
+        builder.set_loro_update(author.export_snapshot());
+        builder.is_genesis = true;
+        let empty_resource = Resource::new(agent_subject.to_string());
+        let genesis = builder.sign(&agent, &store, &empty_resource).await.unwrap();
+
+        let opts = CommitOpts {
+            validate_signature: true,
+            validate_timestamp: false,
+            validate_rights: false,
+            update_index: true,
+            ..CommitOpts::no_validations_no_index()
+        };
+        let response = store.apply_commit(genesis, &opts).await.unwrap();
+
+        // The echo of the author's own commit, as the live channel fans it out.
+        let echo = response
+            .fanout_delta()
+            .expect("a Loro commit fans out a delta")
+            .to_vec();
+        assert_ne!(
+            Some(echo.as_slice()),
+            response.commit.loro_update.as_deref(),
+            "the fan-out must carry more than the author's own bytes: the server's stamp"
+        );
+        author.import_update(&echo).unwrap();
+
+        // A second peer boots from what the server stored and edits on top.
+        let stored = store.get_resource(&agent_subject).await.unwrap();
+        let peer = stored.build_state_doc().unwrap();
+        let peer_before = peer.oplog_vv();
+        peer.set_property(urls::NAME, &Value::String("typed by the peer".into()))
+            .unwrap();
+        let peer_delta = peer.export_updates_since(&peer_before);
+
+        author.import_update(&peer_delta).unwrap();
+        assert_eq!(
+            author.get_string_property(urls::NAME),
+            Some("typed by the peer".into()),
+            "the author must apply the peer's edit without a catch-up fetch"
         );
     }
 

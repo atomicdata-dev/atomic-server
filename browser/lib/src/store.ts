@@ -1797,7 +1797,12 @@ export class Store {
     const subject = this.normalizeSubject(change.subject);
     const existing = this.resources.get(this.aliases.get(subject) ?? subject);
 
-    // Echo dedup: same commitId as cached lastCommit ⇒ no-op.
+    // Echo dedup: same commitId as cached lastCommit ⇒ no notify. The bytes
+    // are still imported: the echo of this client's own commit carries the
+    // `lastCommit` stamp the server wrote under its own peer, and the next
+    // edit by anyone who loaded the stored snapshot depends on that op.
+    // Without it that edit parks as pending and the document stops being
+    // live for its author. Importing our own ops again is a no-op for Loro.
     if (
       !change.forceNotify &&
       change.commitId &&
@@ -1806,6 +1811,10 @@ export class Store {
       !existing.new &&
       existing.get(commits.properties.lastCommit) === change.commitId
     ) {
+      if (!subject.startsWith('did:ad:commit:')) {
+        existing.importLoroUpdate(change.loroBytes);
+      }
+
       return 'deduped';
     }
 
@@ -2012,6 +2021,9 @@ export class Store {
 
         if (jsonAd) {
           const doc = resource.getLoroDoc?.();
+          // A snapshot export commits pending ops, untagged; keep a
+          // mid-edit persist from stripping the edit's history token.
+          resource.sealPendingEdits();
           const snapshot = doc?.export({ mode: 'snapshot' });
 
           // One local-DB write costs ~9ms, three quarters of it rebuilding

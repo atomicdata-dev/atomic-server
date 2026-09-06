@@ -3280,7 +3280,7 @@ impl Storelike for Db {
         } else {
             DbEvent::Changed {
                 subject,
-                delta: commit_response.commit.loro_update.clone(),
+                delta: commit_response.fanout_delta().map(<[u8]>::to_vec),
                 source_id: commit_response.source_id.clone(),
                 is_new: commit_response.resource_old.is_none(),
                 from_commit: true,

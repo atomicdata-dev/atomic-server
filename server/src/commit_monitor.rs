@@ -23,8 +23,9 @@ use std::sync::Arc;
 /// One connection's registration on a subject, drive or filter.
 #[derive(Debug, Clone)]
 pub struct Subscriber {
-    /// Connection id; a change this connection originated is not echoed back
-    /// to it (see [`skip_same_source`]).
+    /// Connection id. A non-commit change this connection originated is not
+    /// echoed back to it (see [`skip_same_source`]); its own commits are,
+    /// because the echo carries the server's stamp on top of them.
     source_id: String,
     /// The identity the subscription was admitted under, as a subject
     /// string. Kept so [`Handler<RebindAgent>`] can re-evaluate the
@@ -326,12 +327,18 @@ impl Handler<Unsubscribe> for CommitMonitor {
     }
 }
 
-/// True iff a `DbEvent`/`CommitResponse` with `event_source` should NOT be
+/// True iff a non-commit `DbEvent` with `event_source` should NOT be
 /// delivered to a subscriber registered with `subscriber_source`. Same
 /// connection on both sides means the client originated this change and
 /// already has it locally — sending it back is the self-echo we want to
 /// suppress. Missing event source (`None`) means a non-WS origin (HTTP
 /// commit, internal write) and we deliver to everyone.
+///
+/// Commit fan-out deliberately does not use this: the frame carries
+/// `CommitResponse::fanout_delta`, which includes the `lastCommit` stamp the
+/// server wrote under its own peer. The author needs that stamp too — the
+/// next edit by anyone who loaded the stored snapshot depends on it — and the
+/// client dedups the echo by commit id, so it costs one silent import.
 fn skip_same_source(event_source: Option<&str>, subscriber_source: &str) -> bool {
     event_source.is_some_and(|s| s == subscriber_source)
 }
@@ -602,8 +609,6 @@ impl Handler<CommitMessage> for CommitMonitor {
             self.store.get_base_domain().as_deref(),
         );
 
-        let event_source = msg.commit_response.source_id.as_deref();
-
         // Encode the wire frame ONCE up front, wrap in `Arc`. Each
         // subscriber `do_send` then clones only the Arc pointer (O(1))
         // instead of cloning the full `CommitMessage` and re-encoding
@@ -618,10 +623,9 @@ impl Handler<CommitMessage> for CommitMonitor {
                     target_subject,
                     subscribers.len()
                 );
-                for (connection, subscriber) in subscribers {
-                    if skip_same_source(event_source, &subscriber.source_id) {
-                        continue;
-                    }
+                // The author's own connection is included on purpose: see
+                // `skip_same_source`.
+                for connection in subscribers.keys() {
                     connection.do_send(SendFrame {
                         frame: frame.clone(),
                     });
@@ -655,10 +659,7 @@ impl Handler<CommitMessage> for CommitMonitor {
                 if !owner.is_within_drive(&drive_subject) {
                     continue;
                 }
-                for (connection, subscriber) in subscribers {
-                    if skip_same_source(event_source, &subscriber.source_id) {
-                        continue;
-                    }
+                for connection in subscribers.keys() {
                     connection.do_send(SendFrame {
                         frame: frame.clone(),
                     });
@@ -746,7 +747,7 @@ impl Handler<CommitMessage> for CommitMonitor {
 fn encode_commit_frame(store: &Db, msg: &CommitMessage) -> Option<Arc<[u8]>> {
     let commit = &msg.commit_response.commit;
 
-    if let Some(loro_update) = &commit.loro_update {
+    if let Some(loro_update) = msg.commit_response.fanout_delta() {
         // The wire `commit_id` becomes the client's `lastCommit`
         // propval and, on its next commit, its `previousCommit`. The
         // latter is parsed as an AtomicURL by the server's JSON-AD
