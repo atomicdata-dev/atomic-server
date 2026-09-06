@@ -771,6 +771,12 @@ function RecoveryBackupStep({
   /** True after the user copies the recovery code — same "confirm you saved
    * it before continuing" idiom as {@link SecretStep}'s `secretBackedUp`. */
   const [codeSaved, setCodeSaved] = useState(false);
+  // A script-scope string rather than JSX text: as JSX text inside this
+  // ternary, the i18n extractor (wuchale) emitted the nested-message form
+  // without its enclosing callback, and the dev build threw
+  // `_w_ctx_ is not defined` on every onboarding run. See the CI note in
+  // atomic-saas's portal e2e.
+  const confirmSavedLabel = "Yes, I've stored it safely";
 
   if (confirmingSkip) {
     return (
@@ -829,7 +835,7 @@ function RecoveryBackupStep({
             </p>
             <Row key='confirm-row' gap='1rem' wrapItems>
               <ContinueButton onClick={onContinue}>
-                Yes, I&apos;ve stored it safely
+                {confirmSavedLabel}
               </ContinueButton>
             </Row>
           </React.Fragment>
