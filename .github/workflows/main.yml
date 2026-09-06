@@ -265,13 +265,21 @@ jobs:
           npm ci
           npm run build
 
+      # Not `--locked`: this commit may have changed atomic_lib's own
+      # dependencies, which legitimately moves atomic-saas's lockfile. What is
+      # being checked is that the code still builds and passes; a lock update
+      # is reported so the saas side commits it on its next touch.
       - name: cargo check, clippy and test atomic-saas against this commit
         working-directory: atomic-saas
         run: |
           set -euo pipefail
-          cargo check --all-targets --locked
-          cargo clippy --all-targets --locked -- -D warnings
-          cargo test --all-targets --locked
+          cargo check --all-targets
+          cargo clippy --all-targets -- -D warnings
+          cargo test --all-targets
+          if ! git diff --quiet -- Cargo.lock; then
+            git diff --stat -- Cargo.lock
+            echo "::warning::atomic-saas's Cargo.lock drifted against this commit; run cargo check there and commit Cargo.lock."
+          fi
 
   # Hosted only when pick said Mancave is unavailable (or escape/PR).
   # Deliberately does NOT run when Mancave finished with test failures.
