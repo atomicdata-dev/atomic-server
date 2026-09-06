@@ -14,7 +14,7 @@
  * concurrent-write commits with a clear error.
  */
 import { test, expect, Page } from '@playwright/test';
-import { before, editableTitle } from './test-utils';
+import { before, editableTitle, newDrive } from './test-utils';
 
 async function renameDrive(page: Page, text: string) {
   await editableTitle(page).click();
@@ -40,6 +40,9 @@ test.describe('drive rename regression', () => {
   test.beforeEach(before);
 
   test('multi-character rename persists across reload', async ({ page }) => {
+    // `/app/dev-drive` opens the agent's private drive, whose title is locked
+    // (it is derived from the key, not a project). Rename a project drive.
+    await newDrive(page);
     await expect(editableTitle(page)).toBeVisible({ timeout: 15000 });
 
     await renameDrive(page, 'Persistent Drive Name');
@@ -54,6 +57,7 @@ test.describe('drive rename regression', () => {
   test('two sequential renames both persist across reload', async ({
     page,
   }) => {
+    await newDrive(page);
     await expect(editableTitle(page)).toBeVisible({ timeout: 15000 });
 
     await renameDrive(page, 'First Name');

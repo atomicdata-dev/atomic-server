@@ -1320,7 +1320,9 @@ export async function waitForGridMounted(page: Page, timeoutMs = 30_000) {
   // The empty entry row renders before the collection has answered, so a
   // visible row no longer means the data (and the ClientDb queue in front of
   // it) has settled. The grid says so itself: `aria-busy` while loading.
-  await expect(page.locator('[role="grid"][aria-busy="false"]')).toBeVisible({
+  // Treat anything other than `true` as settled — React/omitted `false` both
+  // mean not busy, and `[aria-busy="false"]` misses the omitted case.
+  await expect(page.locator('[role="grid"][aria-busy="true"]')).toHaveCount(0, {
     timeout: timeoutMs,
   });
   await expect(page.locator('[aria-rowindex="2"]')).toBeVisible({

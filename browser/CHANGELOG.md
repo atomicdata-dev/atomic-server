@@ -4,6 +4,12 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Cmd+Up (go to parent) works in tables again: ArrowUp no longer matches
+  with Ctrl/Cmd held, and the parent action fetches the resource when a
+  stub has not yet materialized `parent`.
+- `useCollection` resets `ready` when the query changes, so the table
+  grid's `aria-busy` stays true until the new page lands.
+
 - Commits are signed envelopes: `CommitDetail` does not fetch `did:ad:commit:`
   resources; author and dates come from the resource. History no longer
   navigates to a commit DID, and the Sync page log no longer links commit ids.

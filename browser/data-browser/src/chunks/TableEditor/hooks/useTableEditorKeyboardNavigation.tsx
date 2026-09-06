@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import {
   HandlerContext,
+  handlerMatchesModifier,
   KeyboardHandler,
   TableCommands,
   tableKeyboardHandlers,
@@ -16,12 +17,7 @@ const matchShift = (
 const matchModifier = (
   handler: KeyboardHandler,
   event: React.KeyboardEvent<HTMLDivElement> | KeyboardEvent,
-) =>
-  handler.mod === undefined ||
-  handler.mod ===
-    (navigator.platform.includes(/* @wc-ignore */ 'Mac')
-      ? event.metaKey
-      : event.ctrlKey);
+) => handlerMatchesModifier(handler, event);
 
 const matchCondition = (handler: KeyboardHandler, context: HandlerContext) =>
   handler.condition === undefined || handler.condition(context);

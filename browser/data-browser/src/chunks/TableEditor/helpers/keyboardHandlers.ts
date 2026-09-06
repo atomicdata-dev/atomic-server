@@ -55,10 +55,25 @@ export interface KeyboardHandler {
   preventDefault?: boolean;
   disabledInReadOnly?: boolean;
   shift?: boolean;
+  /**
+   * When true, Ctrl/Cmd must be held. When false or omitted, the handler
+   * only matches *without* Ctrl/Cmd. Omitted used to mean "either", which
+   * made ArrowUp swallow Cmd/Ctrl+ArrowUp (go to parent).
+   */
   mod?: boolean;
   condition?: (context: HandlerContext) => boolean;
 
   handler: (context: HandlerContext) => void;
+}
+
+/** True when the handler's `mod` flag matches the event's Ctrl/Cmd state. */
+export function handlerMatchesModifier(
+  handler: Pick<KeyboardHandler, 'mod'>,
+  event: { metaKey: boolean; ctrlKey: boolean },
+  isMac = typeof navigator !== 'undefined' &&
+    navigator.platform.includes('Mac'),
+): boolean {
+  return (handler.mod ?? false) === (isMac ? event.metaKey : event.ctrlKey);
 }
 
 const getMultiSelectStartPosition = ({

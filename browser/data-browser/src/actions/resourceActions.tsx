@@ -296,9 +296,19 @@ export const resourceActions: ActionDefinition[] = [
     icon: () => <FaTurnUp />,
     shortcut: shortcuts.parent,
     shortcutLabel: () => 'Go to parent',
-    available: ctx => !!getParent(ctx),
-    run: ctx => {
-      const parent = getParent(ctx);
+    // Not just `!!getParent`: a stub after goBack can lack `parent` while
+    // the table is already on screen. Dropping the action there ate Cmd+Up.
+    // Drives have no parent — hide it once we know that's what this is.
+    available: ctx =>
+      !!getParent(ctx) ||
+      !ctx.resource.getClasses().includes(server.classes.drive),
+    run: async ctx => {
+      let parent = getParent(ctx);
+
+      if (!parent) {
+        const resource = await ctx.store.getResource(ctx.subject);
+        parent = resource.get(core.properties.parent) as string | undefined;
+      }
 
       if (parent) {
         ctx.navigate(constructOpenURL(parent));

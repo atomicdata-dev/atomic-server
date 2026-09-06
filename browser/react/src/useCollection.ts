@@ -136,6 +136,29 @@ export function useCollection(
     return col;
   });
   const [ready, setReady] = useState(false);
+  // Reset `ready` during render when the query changes (not in the effect).
+  // The grid renders `aria-busy={!ready}`; keeping the previous collection's
+  // ready=true while the new fetch is in flight made tests (and AT) treat a
+  // still-loading table as settled. Same-render reset also avoids
+  // `react/set-state-in-effect`.
+  const queryIdentity = [
+    queryFilterMemo.property,
+    queryFilterMemo.value,
+    filtersDep,
+    queryFilterMemo.sort_by,
+    String(!!queryFilterMemo.sort_desc),
+    aggregationKey(queryFilterMemo.aggregation),
+    expressionFiltersKey(queryFilterMemo.expression_filters),
+    String(pageSize),
+    server ?? '',
+    String(includeNested),
+  ].join('\0');
+  const [readyFor, setReadyFor] = useState(queryIdentity);
+
+  if (readyFor !== queryIdentity) {
+    setReadyFor(queryIdentity);
+    setReady(false);
+  }
 
   const mapAll = useCallback(
     <T>(func: ({ index, collection }: CollectionItemProps) => T): T[] => {
