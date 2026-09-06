@@ -157,21 +157,56 @@ export type VaultEnrollment = {
   used_bytes: number;
   quota_bytes: number;
   last_backup_at: number | null;
+  /**
+   * The key epoch this drive's uploads must be sealed under. Bumped by a
+   * re-key; the control plane refuses objects declaring any other epoch.
+   *
+   * Optional only for the deploy window in which a control plane predating
+   * epoch tracking is still answering — callers read it as `?? 1`, the epoch
+   * every drive started at.
+   */
+  key_epoch?: number;
 };
 
 export type BackupOutcome =
   | { status: 'nothing-to-do' }
   | {
       status: 'backed-up';
+      /** `'pack'` for an incremental delta, `'checkpoint'` for a fresh anchor. */
+      kind: SegmentKind;
       resources: number;
+      /**
+       * Resources this pass skipped because they had not changed since the last
+       * one. On a healthy incremental pass this is nearly the whole drive.
+       */
+      unchanged: number;
       bytes: number;
       objectKey: string;
     };
+
+export type SegmentKind = 'pack' | 'checkpoint';
 
 export type RestoreOutcome = {
   packsRead: number;
   resourcesRestored: number;
   tombstonesApplied: number;
+  /** Objects the newest checkpoint subsumed, so they were never read. */
+  objectsSkipped: number;
+  /**
+   * Objects that would not open. Non-zero means part of the vault is corrupt or
+   * foreign — everything else still restored, and reporting a clean restore
+   * without mentioning this would be a lie.
+   */
+  objectsUnreadable: number;
+};
+
+/** What a `VaultCheckpointRecord` looks like on the wire. */
+export type VaultCheckpoint = {
+  checkpoint_n: number;
+  /** Device pubkey → last inclusive segment this checkpoint provably holds. */
+  coverage: Record<string, number>;
+  checkpoint_object_id: string;
+  created_at: number;
 };
 
 /**
@@ -189,16 +224,24 @@ export type VaultCapableDb = {
     drivePseudonym: string,
     devicePubkey: string,
     segment: number,
+    checkpointN: number,
+    driveHasCheckpoint: boolean,
+    observedLanes: Record<string, number>,
   ): Promise<{
     objectKey: string;
     sealed: Uint8Array;
+    kind: SegmentKind;
     resources: number;
+    unchanged: number;
     tombstones: number;
+    /** Checkpoints only; published verbatim to the control plane. */
+    coverage: Record<string, number>;
   } | null>;
   vaultImport(
     key: Uint8Array,
     keyEpoch: number,
     drivePseudonym: string,
+    devicePubkey: string,
     objects: { objectKey: string; sealed: Uint8Array }[],
   ): Promise<RestoreOutcome>;
   /** Marks a sealed segment as durably stored. See `backupDrive`. */
@@ -295,6 +338,30 @@ export async function putVaultKeyEnvelope(
 export async function getVaultKeyEnvelope(
   drivePseudonym: string,
 ): Promise<string | null> {
+  const record = await getVaultKeyEnvelopeRecord(drivePseudonym);
+
+  return record?.envelope ?? null;
+}
+
+/** A drive key in hand, and the epoch its envelope wrapped it at. */
+export type DriveKeyHandle = {
+  driveKey: Uint8Array;
+  /**
+   * The drive's key epoch when this key was unwrapped. Compared with the
+   * epoch the drive reports before every upload: a mismatch means someone
+   * re-keyed, and this key must not seal anything new.
+   */
+  keyEpoch: number;
+};
+
+/**
+ * The stored envelope together with the epoch it wraps. `key_epoch` is
+ * optional on the wire only for a control plane predating epoch tracking; it
+ * reads as 1, the epoch every drive started at.
+ */
+export async function getVaultKeyEnvelopeRecord(
+  drivePseudonym: string,
+): Promise<{ envelope: string; keyEpoch: number } | null> {
   const response = await managedFetch(`/cloud-vault/${drivePseudonym}/key`, {
     credentials: 'include',
   });
@@ -308,7 +375,10 @@ export async function getVaultKeyEnvelope(
     );
   }
 
-  const record = (await response.json()) as { envelope?: unknown };
+  const record = (await response.json()) as {
+    envelope?: unknown;
+    key_epoch?: unknown;
+  };
 
   // A present-but-unusable envelope must not read as "no key yet": the caller
   // would mint a second key and overwrite the real one, making every existing
@@ -317,7 +387,10 @@ export async function getVaultKeyEnvelope(
     throw new Error('The stored vault key is malformed.');
   }
 
-  return record.envelope;
+  return {
+    envelope: record.envelope,
+    keyEpoch: typeof record.key_epoch === 'number' ? record.key_epoch : 1,
+  };
 }
 
 /** What `GET /api/cloud-vault/{drive}/state` reports. */
@@ -325,9 +398,30 @@ export type VaultDriveState = {
   enrollment: VaultEnrollment;
   /** Device pubkey → last segment number written to that lane. */
   lanes: Record<string, number>;
+  checkpoints: VaultCheckpoint[];
   pending_uploads: number;
   confirmed_objects: number;
+  /**
+   * Confirmed objects still sealed under an epoch before the drive's current
+   * one. Non-zero after a re-key means that much history is still readable
+   * with the old key, until this client re-seals and drops it.
+   */
+  stale_epoch_objects?: number;
 };
+
+/**
+ * The checkpoint number this device should claim next.
+ *
+ * Taken from the server so two devices do not both mint number 1 over an
+ * anchorless vault. They still can — the read and the publish are not atomic —
+ * and `publish_checkpoint` rejects the loser rather than letting two records
+ * claim different coverage over one set of stored bytes.
+ */
+export function nextCheckpointFor(state: VaultDriveState): number {
+  return (
+    state.checkpoints.reduce((max, c) => Math.max(max, c.checkpoint_n), 0) + 1
+  );
+}
 
 export async function getVaultState(
   drivePseudonym: string,
@@ -363,6 +457,13 @@ export async function listVaultObjects(
  * so a failed upload leaves a reservation that expires rather than usage the
  * user never consumed. Confirming first would make quota drift upward on every
  * dropped connection.
+ *
+ * The pass may produce either an incremental **pack** or a **checkpoint**, and
+ * `vaultExport` decides which — the cadence lives in Rust so every host makes
+ * the same call. A checkpoint takes one extra step: it is *published* after it
+ * is confirmed, which is what tells the control plane it may prune the chain
+ * the anchor now subsumes. Uploading one without publishing it stores bytes
+ * that free nothing.
  */
 export async function backupDrive({
   db,
@@ -372,6 +473,9 @@ export async function backupDrive({
   driveKey,
   keyEpoch = 1,
   segment,
+  checkpointN,
+  driveHasCheckpoint,
+  observedLanes,
 }: {
   db: VaultCapableDb;
   driveSubject: string;
@@ -380,6 +484,9 @@ export async function backupDrive({
   driveKey: Uint8Array;
   keyEpoch?: number;
   segment: number;
+  checkpointN: number;
+  driveHasCheckpoint: boolean;
+  observedLanes: Record<string, number>;
 }): Promise<BackupOutcome> {
   const sealedPack = await db.vaultExport(
     driveSubject,
@@ -388,11 +495,17 @@ export async function backupDrive({
     drivePseudonym,
     devicePubkey,
     segment,
+    checkpointN,
+    driveHasCheckpoint,
+    observedLanes,
   );
 
-  // An untouched drive produces nothing, so an idle device does not upload an
-  // object every tick.
+  // An untouched drive produces nothing. Since incremental cursors landed this
+  // is the ordinary outcome for an idle device rather than a rare one: a pass
+  // whose version vectors all match the lane cursor writes no object at all.
   if (!sealedPack) return { status: 'nothing-to-do' };
+
+  const isCheckpoint = sealedPack.kind === 'checkpoint';
 
   const { uploads } = await api<{ uploads: UploadUrl[] }>(
     `/cloud-vault/${drivePseudonym}/upload-urls`,
@@ -400,13 +513,20 @@ export async function backupDrive({
       method: 'POST',
       body: JSON.stringify({
         objects: [
-          {
-            kind: 'pack',
-            size_bytes: sealedPack.sealed.length,
-            key_epoch: keyEpoch,
-            lane_device_pubkey: devicePubkey,
-            segment,
-          },
+          isCheckpoint
+            ? {
+                kind: 'checkpoint',
+                size_bytes: sealedPack.sealed.length,
+                key_epoch: keyEpoch,
+                checkpoint_n: checkpointN,
+              }
+            : {
+                kind: 'pack',
+                size_bytes: sealedPack.sealed.length,
+                key_epoch: keyEpoch,
+                lane_device_pubkey: devicePubkey,
+                segment,
+              },
         ],
       }),
     },
@@ -464,14 +584,43 @@ export async function backupDrive({
     }),
   });
 
+  // Publishing is what makes a checkpoint an anchor. Until this lands the
+  // control plane has bytes it cannot prune against, so a checkpoint that
+  // uploaded and never published costs storage and frees none.
+  //
+  // A rejection here means another device published this number first. Its
+  // anchor is just as good as ours, so the pass still counts as backed up and
+  // the next one picks the next number.
+  if (isCheckpoint) {
+    try {
+      await api(`/cloud-vault/${drivePseudonym}/checkpoint`, {
+        method: 'POST',
+        body: JSON.stringify({
+          checkpoint_n: checkpointN,
+          coverage: sealedPack.coverage,
+          checkpoint_object_id: upload.object_id,
+        }),
+      });
+    } catch (error) {
+      console.warn(
+        `Vault checkpoint ${checkpointN} was not published; another device likely won the race.`,
+        error,
+      );
+    }
+  }
+
   // Only now is the lane's progress official. Sealing parked it; if the upload
   // above had failed, the next pass would retry against the same view of what
-  // has been backed up rather than one that assumed success.
+  // has been backed up rather than one that assumed success. That matters more
+  // than it did before cursors existed: an advanced cursor whose object never
+  // landed leaves ops no later delta would ever ship again.
   await db.vaultCommitSegment(drivePseudonym, devicePubkey, segment);
 
   return {
     status: 'backed-up',
+    kind: sealedPack.kind,
     resources: sealedPack.resources,
+    unchanged: sealedPack.unchanged,
     bytes: sealedPack.sealed.length,
     objectKey: sealedPack.objectKey,
   };
@@ -491,12 +640,14 @@ export async function backupDrive({
 export async function restoreDrive({
   db,
   drivePseudonym,
+  devicePubkey,
   driveKey,
   keyEpoch = 1,
   onProgress,
 }: {
   db: VaultCapableDb;
   drivePseudonym: string;
+  devicePubkey: string;
   driveKey: Uint8Array;
   keyEpoch?: number;
   onProgress?: (downloaded: number, total: number) => void;
@@ -504,7 +655,13 @@ export async function restoreDrive({
   const objects = await listVaultObjects(drivePseudonym);
 
   if (objects.length === 0) {
-    return { packsRead: 0, resourcesRestored: 0, tombstonesApplied: 0 };
+    return {
+      packsRead: 0,
+      resourcesRestored: 0,
+      tombstonesApplied: 0,
+      objectsSkipped: 0,
+      objectsUnreadable: 0,
+    };
   }
 
   const { downloads } = await api<{ downloads: DownloadUrl[] }>(
@@ -544,7 +701,19 @@ export async function restoreDrive({
 
   // Every lane, not just this device's: each device appends only to its own,
   // so importing one would silently drop the rest of the drive's history.
-  return db.vaultImport(driveKey, keyEpoch, drivePseudonym, fetched);
+  //
+  // The order this list arrives in is not the order it is applied in. The
+  // importer reads the newest checkpoint first, then uses its coverage and
+  // observed maps to decide what to replay and when — see `plan_restore` in
+  // `lib/src/vault/sync.rs`. Passing everything and letting it choose is what
+  // keeps that decision in one place rather than duplicated here in JS.
+  return db.vaultImport(
+    driveKey,
+    keyEpoch,
+    drivePseudonym,
+    devicePubkey,
+    fetched,
+  );
 }
 
 /**
@@ -582,14 +751,15 @@ export async function setUpVaultForDrive({
   driveSubject: string;
   agentSubject: string;
   agentSecret: Uint8Array;
-}): Promise<{ enrollment: VaultEnrollment; driveKey: Uint8Array }> {
+}): Promise<{ enrollment: VaultEnrollment } & DriveKeyHandle> {
   const enrollment = await enrollVault(driveSubject, agentSubject, metadata);
-  const existing = await getVaultKeyEnvelope(enrollment.drive_pseudonym);
+  const existing = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
 
   if (existing) {
     return {
       enrollment,
-      driveKey: keys.vaultUnwrapKey(existing, agentSecret),
+      driveKey: keys.vaultUnwrapKey(existing.envelope, agentSecret),
+      keyEpoch: existing.keyEpoch,
     };
   }
 
@@ -608,14 +778,18 @@ export async function setUpVaultForDrive({
     // own key between our read and our write. Theirs is authoritative: adopting
     // it is the only outcome where both clients can read each other's backups.
     // Ours has sealed nothing yet, so discarding it costs nothing.
-    const winner = await getVaultKeyEnvelope(enrollment.drive_pseudonym);
+    const winner = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
 
     if (!winner) throw new Error('Could not store or recover a vault key.');
 
-    return { enrollment, driveKey: keys.vaultUnwrapKey(winner, agentSecret) };
+    return {
+      enrollment,
+      driveKey: keys.vaultUnwrapKey(winner.envelope, agentSecret),
+      keyEpoch: winner.keyEpoch,
+    };
   }
 
-  return { enrollment, driveKey };
+  return { enrollment, driveKey, keyEpoch: enrollment.key_epoch ?? 1 };
 }
 
 /**
@@ -633,16 +807,19 @@ export async function recoverDriveKey({
   keys: VaultKeyOps;
   drivePseudonym: string;
   agentSecret: Uint8Array;
-}): Promise<Uint8Array> {
-  const envelope = await getVaultKeyEnvelope(drivePseudonym);
+}): Promise<DriveKeyHandle> {
+  const record = await getVaultKeyEnvelopeRecord(drivePseudonym);
 
-  if (!envelope) {
+  if (!record) {
     throw new Error(
       'This drive has no stored vault key, so its backups cannot be decrypted.',
     );
   }
 
-  return keys.vaultUnwrapKey(envelope, agentSecret);
+  return {
+    driveKey: keys.vaultUnwrapKey(record.envelope, agentSecret),
+    keyEpoch: record.keyEpoch,
+  };
 }
 
 /**
@@ -671,7 +848,20 @@ export function runVaultBackup(args: {
   drivePseudonym: string;
   devicePubkey: string;
   driveKey: Uint8Array;
-  keyEpoch?: number;
+  /**
+   * The epoch `driveKey` was unwrapped at. Read as 1 when absent: a drive
+   * that was never re-keyed has only ever had epoch 1.
+   */
+  driveKeyEpoch?: number;
+  /**
+   * Fetch and unwrap the drive's current envelope. Called when the drive
+   * reports an epoch other than `driveKeyEpoch`, which means someone re-keyed
+   * since this key was obtained. Without it a re-keyed drive cannot be backed
+   * up from here: sealing with the old key while declaring the new epoch
+   * would pass the server's check and produce objects the new key cannot
+   * read, which is the exact hole the epoch exists to close.
+   */
+  refreshDriveKey?: () => Promise<DriveKeyHandle>;
 }): Promise<BackupOutcome> {
   const existing = inFlight.get(args.drivePseudonym);
 
@@ -686,9 +876,41 @@ export function runVaultBackup(args: {
       return { status: 'nothing-to-do' } as BackupOutcome;
     }
 
+    // The epoch comes from the state just read, never from the caller. The
+    // key has to match it: a long-lived caller holding the key it started
+    // with is exactly the client that would keep sealing under a key someone
+    // was just removed from.
+    const currentEpoch = state.enrollment.key_epoch ?? 1;
+    let { driveKey } = args;
+    let heldEpoch = args.driveKeyEpoch ?? 1;
+
+    if (heldEpoch !== currentEpoch) {
+      if (!args.refreshDriveKey) {
+        throw new Error(
+          `This drive was re-keyed (epoch ${currentEpoch}, key in hand is epoch ${heldEpoch}); fetch the current key envelope before backing up.`,
+        );
+      }
+
+      ({ driveKey, keyEpoch: heldEpoch } = await args.refreshDriveKey());
+
+      if (heldEpoch !== currentEpoch) {
+        throw new Error(
+          `The stored key envelope wraps epoch ${heldEpoch} but the drive is at epoch ${currentEpoch}; the re-key did not finish, so nothing can be sealed safely.`,
+        );
+      }
+    }
+
     return backupDrive({
       ...args,
+      driveKey,
+      keyEpoch: currentEpoch,
       segment: nextSegmentFor(state, args.devicePubkey),
+      checkpointN: nextCheckpointFor(state),
+      driveHasCheckpoint: state.checkpoints.length > 0,
+      // What the vault held when this pass started. A checkpoint records it so
+      // a restore can tell which segments predate the anchor and must be
+      // replayed before it.
+      observedLanes: state.lanes,
     });
   })().finally(() => {
     inFlight.delete(args.drivePseudonym);

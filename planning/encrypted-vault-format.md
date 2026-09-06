@@ -1,9 +1,13 @@
 # Encrypted vault format (open spec)
 
-> **Status:** v1 implemented in `lib/src/vault/` (2026-08-04). Phase 0 (keys)
-> and Phase 1 (envelope, pack, backup/restore) are in; incremental cursors,
-> checkpoints and compression are Phase 2 and will extend this document without
-> changing what is written here.
+> **Status:** v1 implemented in `lib/src/vault/` (2026-08-04). Phase 2 landed
+> 2026-09-05: incremental per-lane cursors and checkpoints, described below.
+> Compression, blob chunking and per-object signatures remain.
+>
+> Phase 2 changed two things a third-party implementation must know about:
+> **pack format 2** (a lane pack may be a delta, so it is no longer
+> self-sufficient on its own) and **zero-padded checkpoint numbers**. Both are
+> written up in place rather than as an appendix.
 
 This is the **format** half of Cloud Vault. The product plan and the hosted
 control plane are internal to atomic-saas; the format is deliberately not,
@@ -100,9 +104,11 @@ The plaintext inside a `kind = pack` object is MessagePack:
 
 ```rust
 struct Pack {
-    format: u8,            // currently 1
+    format: u8,            // 2; readers must still accept 1
     entries: Vec<PackEntry>,
     tombstones: Vec<String>,  // deleted subjects, pure_id() form
+    coverage: BTreeMap<String, u32>, // checkpoints only; format 2
+    observed: BTreeMap<String, u32>, // checkpoints only; format 2
 }
 
 struct PackEntry {
@@ -110,6 +116,19 @@ struct PackEntry {
     update: Vec<u8>,       // AtomicLoroDoc::export_updates_since output
 }
 ```
+
+**Format 2 means "not necessarily self-sufficient".** A format-1 pack carried
+every resource's whole oplog, so any single one of them restored the drive. A
+format-2 *lane* pack carries only what changed since that lane's cursor. A
+reader that understands only format 1 must refuse these rather than import them,
+because it also skips `Checkpoint` objects by kind before it decodes one — so it
+would import the deltas, skip the anchor they hang off, and report a successful
+restore of a drive missing most of itself. Refusing to parse is the loud
+failure. Readers that do understand format 2 must still accept format 1: vaults
+written before this exist and have to stay restorable.
+
+`coverage` and `observed` are empty on a lane pack and meaningful only on a
+checkpoint; see "Checkpoints" below.
 
 Two invariants carry the design:
 
@@ -141,17 +160,21 @@ the operator sees one object of some size, not a countable per-resource stream.
 ```text
 vault/<drive-pseudonym>/
   lanes/<device-pubkey>/seg-000001.pack   ← append-only per device
-  checkpoints/ckpt-<n>.loro               ← Phase 2
-  indexes/ckpt-<n>.idx                    ← Phase 2
-  blobs/<keyed-hash>/<chunk>              ← Phase 2
+  checkpoints/ckpt-000001.loro            ← self-sufficient anchor
+  indexes/ckpt-000001.idx                 ← not yet written
+  blobs/<keyed-hash>/<chunk>              ← not yet written
 ```
 
 The drive pseudonym is a salted hash of the drive DID, computed by the control
 plane; a self-hosted vault may use any stable string.
 
-**Segment numbers are zero-padded to six digits** so lexical listing order
-matches segment order. Both S3 listing and filesystem traversal sort lexically,
-and `seg-10` sorting before `seg-2` would replay history backwards.
+**Segment and checkpoint numbers are zero-padded to six digits** so lexical
+listing order matches numeric order. Both S3 listing and filesystem traversal
+sort lexically, and `seg-10` sorting before `seg-2` would replay history
+backwards. The padding matters as much for checkpoints: `checkpoints/` sorts
+before `lanes/`, so a listing hands a restore every checkpoint before any
+segment, and `ckpt-10` ahead of `ckpt-2` would make it anchor on a stale view
+of the drive.
 
 **Each device appends only to its own lane.** No shared manifest, no
 compare-and-swap, no merge-retry path. Concurrent backup from several devices
@@ -159,29 +182,96 @@ is correct by construction because Loro deduplicates ops by `(peerId, counter)`:
 importing the same pack twice, or importing overlapping lanes in any order,
 converges on the same state.
 
+## Incremental export
+
+A pass exports only what moved. Each device keeps, in its own local `Db` and
+never in the vault, a **cursor**: subject → the Loro version vector this lane
+has already shipped. A resource whose current version vector still equals its
+cursor contributes nothing, and the check is a read of the stored blob's header
+rather than a rebuild of the CRDT document, so an unchanged drive costs a header
+read per resource and produces no object at all.
+
+Measured on a native release build (`lib/tests/vault_incremental_cost.rs`):
+
+| resources | full export | idle pass | one-resource edit |
+| --- | --- | --- | --- |
+| 100 | 137 KB / 19 ms | 0 B / 3 ms | 383 B / 4 ms |
+| 500 | 675 KB / 113 ms | 0 B / 21 ms | 380 B / 25 ms |
+| 2,000 | 2.69 MB / 508 ms | 0 B / 89 ms | 383 B / 93 ms |
+
+Bytes per pass are flat in drive size; wall clock is still linear in it, at
+roughly 45 µs per resource, because the walk visits every subject to read its
+version vector.
+
+Cursors are **local, never uploaded** — the metadata invariant is that no stored
+object is O(resources). A device with no cursor (a fresh install, or one
+upgrading from a format-1 vault) exports everything, which is always safe
+because a full export is a superset of any delta. It is never safe to invent a
+cursor for history that was never recorded as shipped.
+
+## Checkpoints
+
+A checkpoint is a pack sealed under `kind = 2` holding every resource's whole
+oplog. It restores the drive on its own, and it is what lets the storage
+operator delete the delta chain before it.
+
+It carries two maps, and the split between them is load-bearing:
+
+| Field | Claim | Used for |
+| --- | --- | --- |
+| `coverage` | "I provably hold every op in these lanes up to this segment" | Deleting. The control plane prunes covered segments. |
+| `observed` | "These lanes were this long when I published" | Ordering. Decides which segments predate the anchor. |
+
+A publisher may only claim coverage for lanes it can show it holds: its own,
+which it wrote, and any it has imported. A lane it has merely seen listed is not
+covered, however likely it is that the publisher synced those ops through a
+node. The cost of being wrong is deleting the only copy of some history, so the
+claim is deliberately conservative — with the consequence that a lane belonging
+to a device that is gone for good is never pruned until some device restores
+from it.
+
+Checkpoint numbers are allocated by the client as `max(existing) + 1`. Two
+devices over an anchorless vault will pick the same one; the control plane
+rejects the second publication rather than letting two records claim different
+coverage over one set of stored bytes, and the loser retries at the next number.
+
 ## Restore
 
 ```rust
-import_vault_batch(store, key, vault, prefix)
+import_vault_batch(store, key, vault, prefix, lane)
 ```
 
-Reads every object under `prefix` in sorted order, opens it, decodes the pack,
-and merges each entry into the store. Restore **merges rather than overwrites**,
-so running it over a partially-synced device converges instead of clobbering
-local edits.
+Reads the objects under `prefix`, opens them, decodes each pack, and merges each
+entry into the store. Restore **merges rather than overwrites**, so running it
+over a partially-synced device converges instead of clobbering local edits.
+
+**Order is planned, not taken from the listing.** With no checkpoint present the
+plan is "everything, in key order" — what a format-1 vault needs. With one, the
+newest checkpoint is opened first (for its maps, not to apply it first) and the
+timeline splits in three:
+
+1. Segments at or below the anchor's `observed` mark that it does not `cover`.
+2. The anchor.
+3. Segments above the observed mark, and every segment of a lane the anchor
+   never saw.
+
+Segments the anchor covers are skipped entirely — they are also what the
+operator deletes, so a restore must not need them.
+
+Applying the anchor first instead would let an old segment from group 1 put back
+a resource the anchor recorded as deleted. Applying it last would let it delete
+a resource created after it. Loro makes the *updates* commute; tombstones are
+applied by this code, so this code has to order them.
 
 Restore imports with validation disabled. It replays history that was already
 valid when written, and re-imposing today's required-property rules on old data
 would make a schema change retroactively unrestorable — precisely when a backup
 matters most.
 
-## What v1 does not do yet
+## What this does not do yet
 
-- **Incremental cursors.** Export currently walks a drive and exports each
-  resource's full oplog. The format does not change when cursors land: only the
-  version vector passed to `export_updates_since` does.
-- **Checkpoints, indexes, blob chunking** — Phase 2. The `kind` byte already
-  reserves their values.
+- **Indexes and blob chunking.** The `kind` byte already reserves their values;
+  nothing writes them.
 - **Per-object signatures.** Integrity today comes from the AEAD tag, which
   proves the object was sealed by someone holding the drive key. Signing
   objects with the agent key is a planned addition for provenance across
@@ -200,6 +290,13 @@ be readable as claims about the format:
 - `sealed_packs_do_not_reveal_subjects` / `ciphertext_does_not_contain_the_plaintext`.
 - `importing_the_same_pack_twice_is_idempotent`.
 - `tampering_with_the_header_breaks_decryption`.
+- `an_unchanged_drive_costs_nothing` / `one_edit_costs_one_edit` — the
+  incremental claim, as bytes rather than as prose.
+- `a_delta_chain_restores_the_drive` and
+  `a_broken_delta_chain_loses_the_edits_in_the_missing_link` — the chain works,
+  and what it costs when a link is missing. The second is why coverage exists.
+- `the_newest_checkpoint_alone_restores_the_drive` — the self-sufficiency claim,
+  moved from segments to checkpoints where Phase 2 put it.
 
 Run them with `cargo test --features db-redb vault::`. No server, bucket or
 network required — which is the point: a restore path that needs the vendor's

@@ -14,7 +14,10 @@ use atomic_lib::{
     vault::keys::{argon2id_derive_key, Argon2Params},
     vault::secret_envelope::{NewWrapper, SecretEnvelope, Unlock},
     vault::store::{MemoryVaultStore, VaultObjectStore},
-    vault::sync::{commit_lane_state, drive_prefix, export_vault_delta, import_vault_batch},
+    vault::sync::{
+        commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch,
+        CheckpointPolicy, SegmentKind,
+    },
     Db, Resource, Subject, Value,
 };
 use wasm_bindgen::prelude::*;
@@ -816,8 +819,18 @@ struct VaultExportResult {
     /// the server returns from `upload-urls`; this one is computed from the
     /// same rules and exists so a mismatch is visible rather than silent.
     object_key: String,
+    /// `"pack"` or `"checkpoint"`. Decides which object JS asks the control
+    /// plane for an upload URL for, and whether it must publish the checkpoint
+    /// afterwards.
+    kind: &'static str,
     resources: usize,
+    /// Resources skipped because their version vector still matched this lane's
+    /// cursor — the measure of what the incremental pass saved.
+    unchanged: usize,
     tombstones: usize,
+    /// Checkpoints only: lanes this object provably subsumes. JS publishes this
+    /// verbatim; the control plane prunes against it.
+    coverage: std::collections::BTreeMap<String, u32>,
 }
 
 /// Add `sealed` to a serialised {@link VaultExportResult} as a `Uint8Array`.
@@ -846,6 +859,12 @@ struct VaultImportResult {
     packs_read: usize,
     resources_restored: usize,
     tombstones_applied: usize,
+    /// Objects the newest checkpoint already subsumed, so they were not read.
+    objects_skipped: usize,
+    /// Objects that would not open. Non-zero means part of the vault is corrupt
+    /// or foreign; the rest still restored, and the UI must say so rather than
+    /// report a clean restore.
+    objects_unreadable: usize,
 }
 
 /// The message an agent signs to derive its vault key-encryption key.
@@ -953,14 +972,28 @@ fn drive_key(key_bytes: &[u8], epoch: u32) -> Result<DriveVaultKey, JsError> {
 
 #[wasm_bindgen]
 impl ClientDb {
-    /// Seal this drive's history into one vault object.
+    /// Seal one pass of this drive's history into one vault object.
     ///
-    /// Returns `null` when the drive has nothing to back up, so a caller can
-    /// skip the upload instead of storing an empty object every tick.
+    /// Usually a **delta pack** carrying only what changed since this lane's
+    /// cursor. Periodically a **checkpoint**: every resource's whole oplog,
+    /// self-sufficient, and the thing that lets the control plane delete the
+    /// chain before it. The caller does not choose — the cadence lives in Rust
+    /// so every host decides identically — but it must read `kind` to know
+    /// which object it is uploading.
+    ///
+    /// Returns `null` when the drive has nothing to back up, which since the
+    /// cursors landed is the *normal* outcome for an idle device rather than a
+    /// rare one.
+    ///
+    /// `observed_lanes` is the control plane's `{device: newest segment}` map
+    /// from `GET /state`. A checkpoint records it so a restore can tell which
+    /// segments predate the anchor; pass an empty object when it is unavailable
+    /// and the anchor simply orders every segment after itself.
     ///
     /// The returned bytes are already encrypted: the control plane and the
     /// bucket only ever see ciphertext.
     #[wasm_bindgen(js_name = "vaultExport")]
+    #[allow(clippy::too_many_arguments)]
     pub async fn vault_export(
         &self,
         drive_subject: &str,
@@ -969,12 +1002,22 @@ impl ClientDb {
         drive_pseudonym: &str,
         device_pubkey: &str,
         segment: u32,
+        checkpoint_n: u64,
+        drive_has_checkpoint: bool,
+        observed_lanes: JsValue,
     ) -> Result<JsValue, JsError> {
         let key = drive_key(key_bytes, key_epoch)?;
         let subject = Subject::from_raw(drive_subject, self.db().get_base_domain().as_deref());
         let staging = MemoryVaultStore::new();
 
-        let summary = export_vault_delta(
+        let observed: std::collections::BTreeMap<String, u32> =
+            if observed_lanes.is_undefined() || observed_lanes.is_null() {
+                Default::default()
+            } else {
+                serde_wasm_bindgen::from_value(observed_lanes).map_err(to_js_err)?
+            };
+
+        let summary = export_vault_segment(
             self.db(),
             &subject,
             &key,
@@ -982,6 +1025,10 @@ impl ClientDb {
             drive_pseudonym,
             device_pubkey,
             segment,
+            checkpoint_n,
+            drive_has_checkpoint,
+            &observed,
+            CheckpointPolicy::default(),
         )
         .await
         .map_err(to_js_err)?;
@@ -993,8 +1040,14 @@ impl ClientDb {
         let sealed = staging.get(&summary.object_key).map_err(to_js_err)?;
         let result = serde_wasm_bindgen::to_value(&VaultExportResult {
             object_key: summary.object_key,
+            kind: match summary.kind {
+                SegmentKind::Pack => "pack",
+                SegmentKind::Checkpoint => "checkpoint",
+            },
             resources: summary.resources,
+            unchanged: summary.unchanged,
             tombstones: summary.tombstones,
+            coverage: summary.coverage,
         })
         .map_err(to_js_err)?;
 
@@ -1037,6 +1090,7 @@ impl ClientDb {
         key_bytes: &[u8],
         key_epoch: u32,
         drive_pseudonym: &str,
+        device_pubkey: &str,
         objects: JsValue,
     ) -> Result<JsValue, JsError> {
         let key = drive_key(key_bytes, key_epoch)?;
@@ -1050,14 +1104,22 @@ impl ClientDb {
                 .map_err(to_js_err)?;
         }
 
-        let summary = import_vault_batch(self.db(), &key, &staging, &drive_prefix(drive_pseudonym))
-            .await
-            .map_err(to_js_err)?;
+        let summary = import_vault_batch(
+            self.db(),
+            &key,
+            &staging,
+            &drive_prefix(drive_pseudonym),
+            Some((drive_pseudonym, device_pubkey)),
+        )
+        .await
+        .map_err(to_js_err)?;
 
         serde_wasm_bindgen::to_value(&VaultImportResult {
             packs_read: summary.packs_read,
             resources_restored: summary.resources_restored,
             tombstones_applied: summary.tombstones_applied,
+            objects_skipped: summary.objects_skipped,
+            objects_unreadable: summary.objects_unreadable,
         })
         .map_err(to_js_err)
     }

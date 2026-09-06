@@ -206,7 +206,10 @@ mod vault_ipc {
   pub use atomic_lib::vault::{
     dek::DriveVaultKey,
     store::{MemoryVaultStore, VaultObjectStore},
-    sync::{commit_lane_state, drive_prefix, export_vault_delta, import_vault_batch},
+    sync::{
+      commit_lane_state, drive_prefix, export_vault_segment, import_vault_batch, CheckpointPolicy,
+      SegmentKind,
+    },
   };
   pub use base64::engine::general_purpose::STANDARD;
   use base64::Engine as _;
@@ -225,8 +228,25 @@ mod vault_ipc {
     pub object_key: String,
     /// base64
     pub sealed: String,
+    /// `"pack"` or `"checkpoint"` — decides which object the control plane is
+    /// asked for an upload URL for, and whether the caller must publish the
+    /// checkpoint afterwards.
+    pub kind: &'static str,
     pub resources: usize,
+    /// Resources skipped because their version vector still matched the lane
+    /// cursor. The measure of how much an incremental pass saved.
+    pub unchanged: usize,
     pub tombstones: usize,
+    /// Checkpoints only: the lanes this object provably subsumes, which is what
+    /// `POST /checkpoint` publishes and what pruning acts on.
+    pub coverage: std::collections::BTreeMap<String, u32>,
+  }
+
+  pub fn kind_name(kind: SegmentKind) -> &'static str {
+    match kind {
+      SegmentKind::Pack => "pack",
+      SegmentKind::Checkpoint => "checkpoint",
+    }
   }
 
   #[derive(serde::Serialize)]
@@ -235,6 +255,11 @@ mod vault_ipc {
     pub packs_read: usize,
     pub resources_restored: usize,
     pub tombstones_applied: usize,
+    /// Objects the newest checkpoint already subsumed, so they were never read.
+    pub objects_skipped: usize,
+    /// Objects that would not open. Non-zero means part of the vault is corrupt
+    /// or foreign; everything else still restored.
+    pub objects_unreadable: usize,
   }
 
   pub fn decode_key(key_b64: &str, epoch: u32) -> Result<DriveVaultKey, String> {
@@ -258,7 +283,7 @@ mod vault_ipc {
 
   /// Run vault work on a thread of its own.
   ///
-  /// `export_vault_delta` and `import_vault_batch` borrow a `&dyn
+  /// `export_vault_segment` and `import_vault_batch` borrow a `&dyn
   /// VaultObjectStore` across their awaits, so their futures are not `Send` and
   /// cannot live in a Tauri command's future directly. Giving them a
   /// current-thread runtime keeps that constraint where it belongs instead of
@@ -297,6 +322,7 @@ mod vault_ipc {
 /// `None` when the drive has not changed since the last segment, so a periodic
 /// backup skips the upload instead of storing an empty object every tick.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 async fn vault_export(
   drive_subject: String,
   key: String,
@@ -304,6 +330,9 @@ async fn vault_export(
   drive_pseudonym: String,
   device_pubkey: String,
   segment: u32,
+  checkpoint_n: u64,
+  drive_has_checkpoint: bool,
+  observed_lanes: std::collections::BTreeMap<String, u32>,
   node: tauri::State<'_, std::sync::Arc<EmbeddedNode>>,
 ) -> Result<Option<vault_ipc::VaultExportOut>, String> {
   let store = vault_ipc::store_of(&node)?;
@@ -317,7 +346,7 @@ async fn vault_export(
     let subject = atomic_lib::Subject::from_raw(&drive_subject, store.get_base_domain().as_deref());
     let staging = vault_ipc::MemoryVaultStore::new();
 
-    let summary = vault_ipc::block_on(vault_ipc::export_vault_delta(
+    let summary = vault_ipc::block_on(vault_ipc::export_vault_segment(
       &store,
       &subject,
       &key,
@@ -325,6 +354,10 @@ async fn vault_export(
       &drive_pseudonym,
       &device_pubkey,
       segment,
+      checkpoint_n,
+      drive_has_checkpoint,
+      &observed_lanes,
+      vault_ipc::CheckpointPolicy::default(),
     ))?
     .map_err(|e| format!("Could not seal this drive: {e}"))?;
 
@@ -339,8 +372,11 @@ async fn vault_export(
     Ok(Some(vault_ipc::VaultExportOut {
       sealed: STANDARD.encode(&sealed),
       object_key: summary.object_key,
+      kind: vault_ipc::kind_name(summary.kind),
       resources: summary.resources,
+      unchanged: summary.unchanged,
       tombstones: summary.tombstones,
+      coverage: summary.coverage,
     }))
   })
   .await
@@ -374,6 +410,7 @@ async fn vault_import(
   key: String,
   key_epoch: u32,
   drive_pseudonym: String,
+  device_pubkey: String,
   objects: Vec<vault_ipc::VaultObjectIn>,
   node: tauri::State<'_, std::sync::Arc<EmbeddedNode>>,
 ) -> Result<vault_ipc::VaultImportOut, String> {
@@ -403,6 +440,7 @@ async fn vault_import(
       &key,
       &staging,
       &vault_ipc::drive_prefix(&drive_pseudonym),
+      Some((&drive_pseudonym, &device_pubkey)),
     ))?
     .map_err(|e| format!("Could not restore from the vault: {e}"))?;
 
@@ -410,6 +448,8 @@ async fn vault_import(
       packs_read: summary.packs_read,
       resources_restored: summary.resources_restored,
       tombstones_applied: summary.tombstones_applied,
+      objects_skipped: summary.objects_skipped,
+      objects_unreadable: summary.objects_unreadable,
     })
   })
   .await

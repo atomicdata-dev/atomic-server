@@ -15,7 +15,7 @@
 // agent's key already is. See `desktop/src/lib.rs`.
 import { decodeB64, encodeB64 } from '@tomic/lib';
 import { invoke } from '@tauri-apps/api/core';
-import type { RestoreOutcome, VaultCapableDb } from './vault';
+import type { RestoreOutcome, SegmentKind, VaultCapableDb } from './vault';
 
 /**
  * Bytes cross the IPC boundary base64-encoded rather than as arrays.
@@ -36,12 +36,18 @@ export const nodeVault: VaultCapableDb = {
     drivePseudonym,
     devicePubkey,
     segment,
+    checkpointN,
+    driveHasCheckpoint,
+    observedLanes,
   ) {
     const result = await invoke<
       | (Omit<SealedObject, 'objectKey'> & {
           objectKey: string;
+          kind: SegmentKind;
           resources: number;
+          unchanged: number;
           tombstones: number;
+          coverage: Record<string, number>;
         })
       | null
     >('vault_export', {
@@ -51,17 +57,23 @@ export const nodeVault: VaultCapableDb = {
       drivePseudonym,
       devicePubkey,
       segment,
+      checkpointN,
+      driveHasCheckpoint,
+      observedLanes,
     });
 
-    // Null is a real answer, not a failure: the drive has not changed since the
-    // last segment, so there is nothing to upload.
+    // Null is a real answer, not a failure: nothing has changed since this
+    // lane's cursor, so there is nothing to upload.
     if (!result) return null;
 
     return {
       objectKey: result.objectKey,
       sealed: decodeB64(result.sealed),
+      kind: result.kind,
       resources: result.resources,
+      unchanged: result.unchanged,
       tombstones: result.tombstones,
+      coverage: result.coverage,
     };
   },
 
@@ -69,14 +81,17 @@ export const nodeVault: VaultCapableDb = {
     key,
     keyEpoch,
     drivePseudonym,
+    devicePubkey,
     objects,
   ): Promise<RestoreOutcome> {
     return invoke<RestoreOutcome>('vault_import', {
       key: encodeB64(key),
       keyEpoch,
       drivePseudonym,
-      // Order matters and is the caller's: a later segment's deletion has to be
-      // applied after the earlier pack that created the resource.
+      devicePubkey,
+      // The importer plans its own order from the newest checkpoint's coverage
+      // and observed maps, so this list is what the vault holds rather than a
+      // sequence to apply verbatim. See `plan_restore` in the Rust side.
       objects: objects.map(
         (o): SealedObject => ({
           objectKey: o.objectKey,

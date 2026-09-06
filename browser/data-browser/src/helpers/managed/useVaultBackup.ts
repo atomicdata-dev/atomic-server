@@ -8,6 +8,7 @@ import {
   restoreDrive,
   runVaultBackup,
   setUpVaultForDrive,
+  type DriveKeyHandle,
   type RestoreOutcome,
   type VaultCapableDb,
   type VaultDriveState,
@@ -111,7 +112,7 @@ export function useVaultBackup({
 
   // Kept in a ref rather than state: it is not rendered, and putting a key in
   // state would put it in React DevTools for anyone with the page open.
-  const driveKey = useRef<Uint8Array | null>(null);
+  const driveKey = useRef<DriveKeyHandle | null>(null);
 
   const ready = Boolean(
     db &&
@@ -197,7 +198,7 @@ export function useVaultBackup({
 
   /** Make sure we hold the drive key, fetching and unwrapping if needed. */
   const ensureKey = useCallback(
-    async (drivePseudonym: string): Promise<Uint8Array> => {
+    async (drivePseudonym: string): Promise<DriveKeyHandle> => {
       if (driveKey.current) return driveKey.current;
 
       const recovered = await recoverDriveKey({
@@ -210,6 +211,16 @@ export function useVaultBackup({
       return recovered;
     },
     [keys, signer, proofMessage],
+  );
+
+  /** Drop the cached key and fetch the drive's current envelope. */
+  const refreshKey = useCallback(
+    async (drivePseudonym: string): Promise<DriveKeyHandle> => {
+      driveKey.current = null;
+
+      return ensureKey(drivePseudonym);
+    },
+    [ensureKey],
   );
 
   /** Run an action with a single busy flag and a readable error. */
@@ -233,13 +244,17 @@ export function useVaultBackup({
 
   const enable = useCallback(async () => {
     await run(async () => {
-      const { enrollment, driveKey: key } = await setUpVaultForDrive({
+      const {
+        enrollment,
+        driveKey: key,
+        keyEpoch,
+      } = await setUpVaultForDrive({
         keys: keys!,
         driveSubject: driveSubject!,
         agentSubject: agentSubject!,
         agentSecret: await agentVaultProof(signer!, proofMessage!),
       });
-      driveKey.current = key;
+      driveKey.current = { driveKey: key, keyEpoch };
       // Turning it on by hand lifts an earlier opt-out, so automatic backups
       // resume as well.
       setVaultOptOut(driveSubject!, false);
@@ -251,11 +266,14 @@ export function useVaultBackup({
         drivePseudonym: enrollment.drive_pseudonym,
         devicePubkey: devicePubkey!,
         driveKey: key,
+        driveKeyEpoch: keyEpoch,
+        refreshDriveKey: () => refreshKey(enrollment.drive_pseudonym),
       });
       await refresh();
     });
   }, [
     run,
+    refreshKey,
     keys,
     driveSubject,
     agentSubject,
@@ -289,11 +307,22 @@ export function useVaultBackup({
         driveSubject: driveSubject!,
         drivePseudonym: status.enrollment.drive_pseudonym,
         devicePubkey: devicePubkey!,
-        driveKey: key,
+        driveKey: key.driveKey,
+        driveKeyEpoch: key.keyEpoch,
+        refreshDriveKey: () => refreshKey(status.enrollment.drive_pseudonym),
       });
       await refresh();
     });
-  }, [run, status, ensureKey, db, driveSubject, devicePubkey, refresh]);
+  }, [
+    run,
+    status,
+    ensureKey,
+    refreshKey,
+    db,
+    driveSubject,
+    devicePubkey,
+    refresh,
+  ]);
 
   const restore = useCallback(async () => {
     if (status.state !== 'on') return null;
@@ -306,7 +335,12 @@ export function useVaultBackup({
         return await restoreDrive({
           db: db!,
           drivePseudonym: status.enrollment.drive_pseudonym,
-          driveKey: key,
+          // This device's lane, so the import can record which *other* lanes it
+          // now provably holds. That is what lets a checkpoint published from
+          // here later claim coverage for them — the only way a lane belonging
+          // to a device that is gone ever becomes prunable.
+          devicePubkey: devicePubkey!,
+          driveKey: key.driveKey,
           onProgress: (done, total) =>
             setRestoreProgress(total === 0 ? 1 : done / total),
         });
@@ -314,7 +348,7 @@ export function useVaultBackup({
         setRestoreProgress(null);
       }
     });
-  }, [run, status, ensureKey, db]);
+  }, [run, status, ensureKey, db, devicePubkey]);
 
   return {
     status,

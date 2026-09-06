@@ -782,9 +782,15 @@ export class ClientDbWorker {
   /**
    * Seal this drive's history into one Cloud Vault object.
    *
-   * Resolves to `null` when the drive has not changed since the last segment,
-   * so a periodic backup skips the upload rather than storing an empty object
-   * every tick.
+   * Resolves to `null` when nothing has changed since this lane's cursor, so a
+   * periodic backup skips the upload rather than storing an object every tick.
+   * Since incremental cursors landed that is the ordinary outcome for an idle
+   * device rather than a rare one.
+   *
+   * `kind` says whether this pass produced an incremental `'pack'` or a
+   * self-sufficient `'checkpoint'`. The cadence is decided in Rust so every
+   * host agrees, but the caller must read it: a checkpoint uploads under a
+   * different object kind and has to be published afterwards.
    *
    * The bytes come back already encrypted — the caller uploads ciphertext and
    * never sees drive contents. See `helpers/managed/vault.ts` for the
@@ -797,11 +803,17 @@ export class ClientDbWorker {
     drivePseudonym: string,
     devicePubkey: string,
     segment: number,
+    checkpointN: number,
+    driveHasCheckpoint: boolean,
+    observedLanes: Record<string, number>,
   ): Promise<{
     objectKey: string;
     sealed: Uint8Array;
+    kind: 'pack' | 'checkpoint';
     resources: number;
+    unchanged: number;
     tombstones: number;
+    coverage: Record<string, number>;
   } | null> {
     const r = await this.send({
       type: 'vaultExport',
@@ -811,38 +823,51 @@ export class ClientDbWorker {
       drivePseudonym,
       devicePubkey,
       segment,
+      checkpointN,
+      driveHasCheckpoint,
+      observedLanes,
     });
 
     return (r ?? null) as {
       objectKey: string;
       sealed: Uint8Array;
+      kind: 'pack' | 'checkpoint';
       resources: number;
+      unchanged: number;
       tombstones: number;
+      coverage: Record<string, number>;
     } | null;
   }
 
   /**
    * Merge downloaded Cloud Vault objects into this store.
    *
-   * Objects must be ordered by key: a later segment's deletion has to be
-   * applied after the earlier pack that created the resource, or the delete is
-   * undone. `restoreDrive` in `helpers/managed/vault.ts` preserves that order.
+   * Pass everything the vault holds. The importer plans its own order from the
+   * newest checkpoint's coverage and observed maps — a checkpoint's tombstone
+   * has to win over an older segment that still holds the resource, and a
+   * segment written *after* the checkpoint has to win over the checkpoint. That
+   * decision lives in `plan_restore` (`lib/src/vault/sync.rs`) rather than
+   * being duplicated in every host's JS.
    */
   async vaultImport(
     key: Uint8Array,
     keyEpoch: number,
     drivePseudonym: string,
+    devicePubkey: string,
     objects: { objectKey: string; sealed: Uint8Array }[],
   ): Promise<{
     packsRead: number;
     resourcesRestored: number;
     tombstonesApplied: number;
+    objectsSkipped: number;
+    objectsUnreadable: number;
   }> {
     const r = await this.send({
       type: 'vaultImport',
       key,
       keyEpoch,
       drivePseudonym,
+      devicePubkey,
       objects,
     });
 
@@ -850,6 +875,8 @@ export class ClientDbWorker {
       packsRead: number;
       resourcesRestored: number;
       tombstonesApplied: number;
+      objectsSkipped: number;
+      objectsUnreadable: number;
     };
   }
 

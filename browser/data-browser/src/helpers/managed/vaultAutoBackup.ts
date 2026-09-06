@@ -9,6 +9,7 @@ import {
   setUpVaultForDrive,
   vaultLaneId,
   type BackupOutcome,
+  type DriveKeyHandle,
   type RestoreOutcome,
   type VaultCapableDb,
   type VaultKeyOps,
@@ -148,7 +149,7 @@ const defaultDeps: VaultAutoBackupDeps = {
  */
 const enrolled = new Map<
   string,
-  { drivePseudonym: string; driveKey: Uint8Array; metadata?: string }
+  { drivePseudonym: string; metadata?: string } & DriveKeyHandle
 >();
 
 /** Only in tests. */
@@ -277,7 +278,7 @@ async function ensureVaultBackupOnce(
       }
 
       const keys = await deps.loadKeys();
-      const { enrollment, driveKey } = await deps.setUpVaultForDrive({
+      const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
         keys,
         driveSubject,
         metadata,
@@ -289,17 +290,36 @@ async function ensureVaultBackupOnce(
       known = {
         drivePseudonym: enrollment.drive_pseudonym,
         driveKey,
+        keyEpoch,
         metadata: metadataKey,
       };
       enrolled.set(driveSubject, known);
     }
 
+    const held = known;
     const outcome = await deps.runVaultBackup({
       db,
       driveSubject,
-      drivePseudonym: known.drivePseudonym,
+      drivePseudonym: held.drivePseudonym,
       devicePubkey: lane,
-      driveKey: known.driveKey,
+      driveKey: held.driveKey,
+      driveKeyEpoch: held.keyEpoch,
+      // The drive was re-keyed since this key was cached: fetch the current
+      // envelope, and remember it so the next tick does not refetch.
+      refreshDriveKey: async () => {
+        const keys = await deps.loadKeys();
+        const fresh = await deps.recoverDriveKey({
+          keys,
+          drivePseudonym: held.drivePseudonym,
+          agentSecret: await agentVaultProof(agent, keys.proofMessage),
+        });
+        enrolled.set(driveSubject, {
+          drivePseudonym: held.drivePseudonym,
+          ...fresh,
+        });
+
+        return fresh;
+      },
     });
     notifyVaultChanged(driveSubject);
 
@@ -379,8 +399,18 @@ export async function restoreFromVault(
       return { status: 'no-backup', reason: 'the vault is empty' };
     }
 
+    // This device's lane. A restore records which other lanes it imported, so a
+    // checkpoint published from here later can claim coverage for them — the
+    // only route by which a lane belonging to a device that is gone for good
+    // ever becomes prunable.
+    const lane = await deps.laneId();
+
+    if (!lane) {
+      return { status: 'no-backup', reason: 'this device has no identity yet' };
+    }
+
     const keys = await deps.loadKeys();
-    const driveKey = await deps.recoverDriveKey({
+    const { driveKey, keyEpoch } = await deps.recoverDriveKey({
       keys,
       drivePseudonym: enrollment.drive_pseudonym,
       agentSecret: await agentVaultProof(agent, keys.proofMessage),
@@ -388,6 +418,7 @@ export async function restoreFromVault(
     const outcome = await deps.restoreDrive({
       db,
       drivePseudonym: enrollment.drive_pseudonym,
+      devicePubkey: lane,
       driveKey,
     });
 
@@ -396,6 +427,7 @@ export async function restoreFromVault(
     enrolled.set(driveSubject, {
       drivePseudonym: enrollment.drive_pseudonym,
       driveKey,
+      keyEpoch,
     });
     notifyVaultChanged(driveSubject);
 
