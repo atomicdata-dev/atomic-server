@@ -4,6 +4,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 
 ## UNRELEASED
 
+- Right-clicking a resource (sidebar link, table cell, kanban card) opens the same searchable action menu as Cmd+M: the filter input is focused, typing narrows the actions, Enter runs one.
 - Fix: `Store.applyIncoming` imports the echo of this client's own commit before deduping it, so the server's `lastCommit` stamp lands locally and a collaborator's next edit applies instead of triggering a catch-up fetch that remounted the editor.
 - Fix: an own commit's echo is recognised by signature (registered at sign time), not only by the `lastCommit` the ack stamps, so an echo that lands before the ack no longer re-renders the page mid-edit (the tag picker in the tables e2e closed under load).
 - Fix: ops that arrive from the server are folded into the Loro save cursor as they are imported, and an ack keeps them there. Without this the echo made the resource look dirty again after every save and the client re-committed an empty delta every 130 ms until reload.
