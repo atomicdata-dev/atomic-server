@@ -612,6 +612,10 @@ export function MenuItem({
       ref={ref}
       onClick={onClick}
       selected={selected}
+      // The keyboard selection is visible state, but in a searchable menu
+      // focus stays in the filter input, so nothing else in the DOM says
+      // which item Enter will run. Tests and assistive tooling read this.
+      data-selected={selected ? 'true' : undefined}
       title={helper}
       disabled={disabled}
       role='menuitem'
