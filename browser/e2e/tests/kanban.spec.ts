@@ -325,9 +325,14 @@ test.describe('kanban', () => {
     await cardIn(todo, 'KB nav').click({ button: 'right' });
     await expect(page.getByRole('menu')).toBeVisible();
 
+    // The right-click menu is searchable, so focus stays in its filter input
+    // and the keyboard selection is the item marked `data-selected`.
     const activeId = () =>
       page.evaluate(
-        () => document.activeElement?.getAttribute('data-testid') ?? null,
+        () =>
+          document
+            .querySelector('[role="menuitem"][data-selected="true"]')
+            ?.getAttribute('data-testid') ?? null,
       );
 
     await page.keyboard.press('ArrowDown');

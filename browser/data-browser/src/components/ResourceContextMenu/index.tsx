@@ -77,12 +77,20 @@ export interface ResourceContextMenuProps {
    * invisible auto-opening one unless an explicit `trigger` is given.
    */
   anchorPoint?: { x: number; y: number };
+  /**
+   * Render a filter input at the top so the user can type to narrow the
+   * actions and run one with Enter. Defaults to on for the main menu
+   * (navbar kebab / cmd+m) and for right-click menus, off for the small
+   * embedded ones (`simple`, custom triggers).
+   */
+  searchable?: boolean;
 }
 
 /**
  * Dropdown menu that opens a bunch of actions for some resource. Items come
- * from the central action registry; the main menu (navbar kebab / cmd+m) is
- * searchable, right-click menus are plain.
+ * from the central action registry. The main menu (navbar kebab / cmd+m) and
+ * the right-click menu on any resource (sidebar link, table cell, kanban
+ * card) share the same searchable list: right-click, type, Enter.
  */
 export function ResourceContextMenu({
   subject,
@@ -95,6 +103,7 @@ export function ResourceContextMenu({
   bindActive,
   onAfterDelete,
   anchorPoint,
+  searchable,
 }: ResourceContextMenuProps) {
   const [confirmingAction, setConfirmingAction] = useState<ActionDefinition>();
   const [showCodeUsageDialog, setShowCodeUsageDialog] = useState(false);
@@ -233,7 +242,7 @@ export function ResourceContextMenu({
         items={filteredItems}
         Trigger={triggerComp}
         isMainMenu={isMainMenu}
-        searchable={isMainMenu}
+        searchable={searchable ?? (!!isMainMenu || anchorPoint !== undefined)}
         bindActive={handleBindActive}
         anchorPoint={anchorPoint}
       />
