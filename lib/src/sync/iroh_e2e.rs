@@ -407,8 +407,14 @@ async fn e2e_canvas_folder_assignment_syncs() {
     );
 }
 
-/// New `did:ad:` resources (genesis commits) reach B via a follow-up bulk sync.
-/// Edits to existing resources may arrive live; genesis creation often needs nudge/resync.
+/// New `did:ad:` resources (genesis commits) reach B live while the link is
+/// up, and via a follow-up bulk sync otherwise.
+///
+/// The live delta used to be the commit's own bytes, which a peer could not
+/// always apply for a genesis, so this test once asserted that B did NOT have
+/// the canvas until a resync. `CommitResponse::fanout_delta` now carries
+/// everything the apply added and B usually has it before anyone asks for a
+/// resync; the bulk path is the fallback, not the rule.
 #[tokio::test]
 async fn e2e_new_resource_after_bulk_resync() {
     let pair = setup_pair("e2e_new_res").await;
@@ -436,16 +442,21 @@ async fn e2e_new_resource_after_bulk_resync() {
         .await
         .unwrap();
 
-    assert!(
+    let live_ok = wait_until(std::time::Duration::from_secs(3), || async {
         pair.db_b
             .get_resource(&new_canvas.as_str().into())
             .await
-            .is_err(),
-        "B should not have the canvas before resync"
-    );
+            .is_ok()
+    })
+    .await;
 
-    let imported = sync_b_from_a(&pair).await;
-    assert!(imported > 0, "second bulk sync should import new canvas");
+    if !live_ok {
+        let imported = sync_b_from_a(&pair).await;
+        assert!(
+            imported > 0,
+            "bulk resync must import the canvas when live delivery did not"
+        );
+    }
 
     let on_b = pair
         .db_b
