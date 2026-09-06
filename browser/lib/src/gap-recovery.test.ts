@@ -548,4 +548,51 @@ describe("the echo of a client's own commit", () => {
       .find(v => v.propvals.get(NAME) === 'First Title');
     expect(first?.token ?? '').toMatch(/^c-/);
   });
+  it('is recognised by signature when it lands before the ack', async ({
+    expect,
+  }) => {
+    // Under load the echo of an own commit arrives before COMMIT_OK, so
+    // `lastCommit` is not stamped yet. The signature was registered at sign
+    // time; the echo must import silently, not notify.
+    const store = await makeStore();
+    const { LoroDoc } = LoroLoader.Loro;
+    const authored = new LoroDoc();
+    authored
+      .getMap('properties')
+      .set(core.properties.isA, [core.classes.class]);
+    authored.commit();
+
+    const r = new Resource(subject);
+    r.setStore(store);
+    r.loading = true;
+    store.applyIncoming({
+      subject,
+      loroBytes: authored.export({ mode: 'snapshot' }),
+      source: 'ws-pending-get',
+      replaceLoroDocsFromRemote: true,
+    });
+    const resource = store.resources.get(subject)!;
+    resource.appliedCommitSignatures.add('sigAAA');
+
+    let notified = 0;
+    const off = store.subscribe(subject, () => {
+      notified += 1;
+    });
+
+    const { echo } = serverSide(
+      authored.export({ mode: 'snapshot' }),
+      'did:ad:commit:sigAAA',
+    );
+    const outcome = store.applyIncoming({
+      subject,
+      loroBytes: echo,
+      commitId: 'did:ad:commit:sigAAA',
+      source: 'ws-sub-push',
+    });
+    off();
+
+    expect(outcome).toBe('deduped');
+    expect(notified).toBe(0);
+    expect(resource.hasOpsPastSaveCursor()).toBe(false);
+  });
 });

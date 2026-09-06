@@ -1226,10 +1226,16 @@ export async function waitForClientDbFlush(
 }
 
 /**
- * Wait until nothing local is still waiting to reach the server.
+ * Wait until nothing local is still waiting to reach the server, and what
+ * reached it is also on disk here.
  *
  * Covers the outbox, in-flight `save()`s, and UI debounce timers
- * (`startScheduledSave`). `0` means a reload will not drop an edit.
+ * (`startScheduledSave`), then the ClientDb flush. `pendingDirtyCount === 0`
+ * alone means the server has the edit; the OPFS write that mirrors it is
+ * queued on a worker that a navigation destroys ("ClientDb worker
+ * destroyed" in CI logs), and a folder page loaded from OPFS then lacks the
+ * child that was just made. On a loaded runner the gap between ack and
+ * write is what made `folder @smoke` flap.
  */
 export async function waitForSynced(page: Page, timeoutMs = 30_000) {
   try {
@@ -1242,6 +1248,7 @@ export async function waitForSynced(page: Page, timeoutMs = 30_000) {
       undefined,
       { timeout: timeoutMs },
     );
+    await waitForClientDbFlush(page);
   } catch (cause) {
     const diag = await page
       .evaluate(() => {

@@ -5,6 +5,7 @@ This changelog covers all five packages, as they are (for now) updated as a whol
 ## UNRELEASED
 
 - Fix: `Store.applyIncoming` imports the echo of this client's own commit before deduping it, so the server's `lastCommit` stamp lands locally and a collaborator's next edit applies instead of triggering a catch-up fetch that remounted the editor.
+- Fix: an own commit's echo is recognised by signature (registered at sign time), not only by the `lastCommit` the ack stamps, so an echo that lands before the ack no longer re-renders the page mid-edit (the tag picker in the tables e2e closed under load).
 - Fix: ops that arrive from the server are folded into the Loro save cursor as they are imported, and an ack keeps them there. Without this the echo made the resource look dirty again after every save and the client re-committed an empty delta every 130 ms until reload.
 - Fix: a pending edit that Loro has to seal early (an import, a snapshot export, a server response written into the doc) is committed under the token the next drain will use, so it stays in its own History version instead of collapsing into the base one.
 - Fix: automatic Cloud Vault backups failed in the browser with "Cannot convert 1 to a BigInt" — the checkpoint number is a 64-bit integer on the WASM side and must be handed over as a BigInt.

@@ -1166,6 +1166,15 @@ export class Store {
 
     if (entry.signedGenesis) {
       const genesis = entry.signedGenesis;
+
+      // Ours, from before the POST: the echo can land before the ack and
+      // must be recognised either way (see `applyIncoming`).
+      if (genesis.signature) {
+        this.resources
+          .get(subject)
+          ?.appliedCommitSignatures.add(genesis.signature);
+      }
+
       const created = await this.postCommit(genesis, endpoint);
       const commitId = commitIdOf(created);
       const resource = this.resources.get(subject);
@@ -1355,12 +1364,16 @@ export class Store {
     builder.setLoroUpdate(delta);
     const commit = await builder.sign(agent);
 
-    const created = await this.postCommit(commit, endpoint);
-    const commitId = commitIdOf(created);
-
+    // Registered before the POST, not after the ack: the server echoes the
+    // commit to this connection too, and under load that echo lands before
+    // `COMMIT_OK`. `applyIncoming` recognises it by signature and imports it
+    // without a notify, so an own save never re-renders the page mid-edit.
     if (commit.signature) {
       resource.appliedCommitSignatures.add(commit.signature);
     }
+
+    const created = await this.postCommit(commit, endpoint);
+    const commitId = commitIdOf(created);
 
     if (commitId) {
       resource.setLastCommitValue(commitId);
@@ -1797,20 +1810,29 @@ export class Store {
     const subject = this.normalizeSubject(change.subject);
     const existing = this.resources.get(this.aliases.get(subject) ?? subject);
 
-    // Echo dedup: same commitId as cached lastCommit ⇒ no notify. The bytes
-    // are still imported: the echo of this client's own commit carries the
-    // `lastCommit` stamp the server wrote under its own peer, and the next
-    // edit by anyone who loaded the stored snapshot depends on that op.
-    // Without it that edit parks as pending and the document stops being
-    // live for its author. Importing our own ops again is a no-op for Loro.
-    if (
-      !change.forceNotify &&
-      change.commitId &&
-      existing &&
-      !existing.loading &&
-      !existing.new &&
-      existing.get(commits.properties.lastCommit) === change.commitId
-    ) {
+    // Echo dedup ⇒ no notify. Two ways to recognise our own commit: the
+    // cached `lastCommit` matches (the ack already landed), or the id's
+    // signature is one this client signed (`appliedCommitSignatures`, added
+    // before the POST — the echo can arrive before the ack). The bytes are
+    // still imported: the echo carries the `lastCommit` stamp the server
+    // wrote under its own peer, and the next edit by anyone who loaded the
+    // stored snapshot depends on that op. Without it that edit parks as
+    // pending and the document stops being live for its author. Importing
+    // our own ops again is a no-op for Loro.
+    //
+    // Not notifying matters as much as importing: a notify re-renders the
+    // page, and an own save's echo lands right as the user opens the next
+    // cell's picker (tables e2e "create and fill" on a loaded runner).
+    const ownSignature = change.commitId?.startsWith('did:ad:commit:')
+      ? change.commitId.slice('did:ad:commit:'.length)
+      : undefined;
+    const isOwnCommit =
+      !!existing &&
+      !!change.commitId &&
+      (existing.get(commits.properties.lastCommit) === change.commitId ||
+        (!!ownSignature && existing.appliedCommitSignatures.has(ownSignature)));
+
+    if (!change.forceNotify && existing && !existing.loading && isOwnCommit) {
       if (!subject.startsWith('did:ad:commit:')) {
         existing.importLoroUpdate(change.loroBytes);
       }
