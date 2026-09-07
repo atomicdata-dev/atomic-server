@@ -5030,6 +5030,8 @@ msgid "Your workspace hasn’t opened here yet. It may still be settling — reo
 msgstr "Your workspace hasn’t opened here yet. It may still be settling — reopen this page in a moment. If it stays empty, check that the other device holds your data."
 
 #. 0: PRODUCT_NAME
+#. 0: PRODUCT_NAME
+#: src/routes/SyncRoute.tsx
 #: src/routes/SyncRoute.tsx
 msgid "No {0} portal is configured for this server."
 msgstr "No {0} portal is configured for this server."
@@ -7380,13 +7382,11 @@ msgstr "Storage and hosting"
 msgid "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
 msgstr "Local stays on your devices. Vault is encrypted backup. Server hosts a readable copy. Remote is another connected server."
 
-#: src/routes/SyncRoute.tsx
-msgid "Hosting needs a Server plan. After payment, return here to finish setup."
-msgstr "Hosting needs a Server plan. After payment, return here to finish setup."
+#~ msgid "Hosting needs a Server plan. After payment, return here to finish setup."
+#~ msgstr "Hosting needs a Server plan. After payment, return here to finish setup."
 
-#: src/routes/SyncRoute.tsx
-msgid "Choose Server plan"
-msgstr "Choose Server plan"
+#~ msgid "Choose Server plan"
+#~ msgstr "Choose Server plan"
 
 #: src/routes/SyncRoute.tsx
 msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
