@@ -261,6 +261,7 @@ describe('createManagedSyncEnrollment with an agent', () => {
       agentSubject: agent.subject!,
       agent,
       genesisCert: 'AQID',
+      hostingConsentVersion: 1,
     });
 
     expect(managedFetch).toHaveBeenCalledTimes(2);
@@ -272,6 +273,7 @@ describe('createManagedSyncEnrollment with an agent', () => {
 
     expect(managedFetch.mock.calls[1][0]).toBe('/sync-enrollments');
     const body = bodyOf(managedFetch.mock.calls[1]);
+    expect(body.hosting_consent_version).toBe(1);
     const proof = body.proof as Record<string, unknown>;
     expect(proof.nonce).toBe('nonce-1');
     expect(proof.genesis_cert).toBe('AQID');

@@ -171,7 +171,13 @@ export async function evaluateServerReconciliation(
   );
 
   const withOrigin = enrollments.filter(
-    e => e.status !== 'Disabled' && e.http_origin,
+    // A placement is not a hosted copy. Keep the source until the node
+    // reports data, including after an interrupted setup.
+    e =>
+      e.status !== 'Disabled' &&
+      e.status !== /* @wc-ignore */ 'Pending' &&
+      e.resource_count !== 0 &&
+      e.http_origin,
   );
 
   // Match by the drive currently in view; with no drive in view yet, only

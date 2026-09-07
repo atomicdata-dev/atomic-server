@@ -49,7 +49,7 @@ These components help with rendering resources in different contexts.
 
 - `src/components/Dialog/index.tsx` - Dialog with title/content/action slots. Always use this instead of building your own dialog from scratch. Use in conjunction with `useDialog`
 - `src/components/ConfirmationDialog.tsx` - Standard confirm/cancel dialog built on `Dialog`, `useDialog`, and `Button`.
-- `src/components/Dropdown/index.tsx` - Menu dropdown with portal rendering, keyboard navigation, dividers, shortcut hints, and dialog-tree awareness.
+- `src/components/Dropdown/index.tsx` - Menu dropdown with portal rendering, keyboard navigation, dividers, shortcut hints, optional `suffix` metadata, and dialog-tree awareness.
 - `src/components/Popover.tsx` - Radix popover wrapper with optional modal behavior, arrow, control locking, and dialog-tree integration.
 - `src/components/CustomPopover.tsx` - Lighter popover pattern using local positioning and `usePopover`.
 

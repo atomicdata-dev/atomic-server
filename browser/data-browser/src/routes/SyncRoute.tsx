@@ -38,6 +38,7 @@ import {
   FaKey,
 } from 'react-icons/fa6';
 import { Button } from '../components/Button';
+import { ConfirmationDialog } from '../components/ConfirmationDialog';
 import { VaultPanel } from '../components/Vault/VaultPanel';
 import { LinkProviderPanel } from '../components/Vault/LinkProviderPanel';
 import { isDeviceLinked } from '../helpers/managed/deviceLink';
@@ -103,6 +104,12 @@ import { serverURLStorage } from '../helpers/serverURLStorage';
 
 export const SyncRoute = createRoute({
   path: pathNames.sync,
+  validateSearch: (search): { drive?: string } => ({
+    drive:
+      typeof search.drive === 'string' && search.drive.startsWith('did:ad:')
+        ? search.drive
+        : undefined,
+  }),
   component: () => <SyncPage />,
   getParentRoute: () => appRoute,
 });
@@ -543,7 +550,19 @@ function SyncPage() {
     () => localStorage.getItem('ws-debug') === '1',
   );
   const [clientDbOn, setClientDbOn] = useState(() => isClientDbEnabled());
-  const { setServer, baseURL } = useSettings();
+  const { setServer, setDrive, baseURL } = useSettings();
+  const { drive: requestedDrive } = SyncRoute.useSearch();
+  const [confirmCloud, setConfirmCloud] = useState(false);
+  const [hostedCopy, setHostedCopy] = useState<{
+    drive: string;
+    origin: string;
+  } | null>(null);
+  const hostedCopyOrigin =
+    hostedCopy && hostedCopy.drive === status.drive ? hostedCopy.origin : null;
+  useEffect(() => {
+    if (requestedDrive && requestedDrive !== store.getDrive())
+      setDrive(requestedDrive);
+  }, [requestedDrive, setDrive, store]);
   const [knownServers, setKnownServers] = useState<string[]>(() =>
     serverURLStorage.getKnownServers(),
   );
@@ -968,16 +987,10 @@ function SyncPage() {
     }
   });
 
-  // Offer Cloud Server only for a drive that lives on this device (a
-  // local-only drive, or the embedded node with no remote server) and isn't
-  // already enrolled. A drive already homed on a remote server is a migration,
-  // not a backup — out of scope for this action.
-  const deviceLocalDrive =
-    !!status.drive && (localOnlyDrive || !showServerConn);
+  // The source server copies remote drives in full; enrollment alone is not sync.
   const showCloudBackup =
     isCloudSyncAvailable(managedInfo) &&
-    cloudEnrolled === false &&
-    deviceLocalDrive &&
+    cloudEnrolled !== null &&
     !driveMissing;
 
   /**
@@ -1002,10 +1015,6 @@ function SyncPage() {
       return 'This device doesn’t have this workspace yet. Pair the device that does, and you can host it from here.';
     }
 
-    if (cloudEnrolled === true) {
-      return `Already set up for this workspace. This app is reading from ${serverHostname ?? 'another server'} instead.`;
-    }
-
     if (!isCloudSyncAvailable(managedInfo)) {
       return `${serverHostname ?? 'This server'} doesn’t offer hosting, so it can’t be switched on from here.`;
     }
@@ -1014,8 +1023,8 @@ function SyncPage() {
       return 'Checking whether this workspace is hosted…';
     }
 
-    if (!deviceLocalDrive) {
-      return `This workspace already lives on ${serverHostname ?? 'another server'}. Moving it here is a migration, not a backup.`;
+    if (!status.drive.startsWith('did:ad:')) {
+      return 'This drive uses a legacy server address. Cloud Server requires a portable DID drive.';
     }
 
     return null;
@@ -1121,6 +1130,13 @@ function SyncPage() {
         agentSubject,
         setServer,
         managedInfo,
+        hostingConsentAccepted: true,
+        sourceServer:
+          !localOnlyDrive &&
+          status.serverUrl &&
+          !isOriginWithoutNode(status.serverUrl)
+            ? status.serverUrl
+            : undefined,
       };
       let result = await enableCloudSyncForDrive(args);
 
@@ -1139,7 +1155,7 @@ function SyncPage() {
         const signedIn = await ensureManagedSession(result.portalUrl);
 
         if (!signedIn) {
-          toast(`Sign-in wasn’t completed — nothing was backed up.`);
+          toast(`Sign-in wasn’t completed — hosting setup was cancelled.`);
 
           return;
         }
@@ -1147,14 +1163,20 @@ function SyncPage() {
         result = await enableCloudSyncForDrive(args);
 
         if (!result.ok) {
-          toast.error(`Could not enable ${PRODUCT_NAME} backup.`);
+          toast.error(`Could not set up Cloud Server.`);
 
           return;
         }
       }
 
       setCloudEnrolled(true);
-      toast.success(`Backing up this workspace to ${PRODUCT_NAME}…`);
+      if (result.replicated)
+        setHostedCopy({ drive, origin: result.httpOrigin });
+      toast.success(
+        result.replicated
+          ? 'Cloud Server received this workspace. Your source server is still connected.'
+          : 'Connected to Cloud Server. Syncing this workspace…',
+      );
     } catch (e) {
       store.notifyError(e as Error);
     } finally {
@@ -1478,24 +1500,46 @@ function SyncPage() {
                     one of ours, but the reader scans this column to find out
                     what they have, and the header above already says whose
                     services these are. */}
-                <CardIcon>
+                <CardIcon $tone={hostedCopyOrigin ? 'provider' : 'neutral'}>
                   <FaCloud />
                 </CardIcon>
                 <ConnBody>
-                  <ConnTitle>Cloud Server</ConnTitle>
+                  <ConnTitle>
+                    {hostedCopyOrigin ? 'Cloud Server is on' : 'Cloud Server'}
+                  </ConnTitle>
                   <ConnSub>
                     A hosted workspace on {PRODUCT_NAME}: shareable links,
                     search across everything, API access, and no waiting on
                     another device to be awake. Unlike Cloud Vault, our servers
                     process what you put here.
                   </ConnSub>
+                  {hostedCopyOrigin && (
+                    <ConnMeta>
+                      This workspace has been copied to Cloud Server. You’re
+                      still using the source server.
+                    </ConnMeta>
+                  )}
                   {cloudServerBlocked && (
                     <ConnMeta>{cloudServerBlocked}</ConnMeta>
                   )}
                   <ConnActions>
+                    {hostedCopyOrigin && (
+                      <Button onClick={() => switchToServer(hostedCopyOrigin)}>
+                        Use Cloud Server
+                      </Button>
+                    )}
                     {!cloudServerBlocked && (
-                      <Button onClick={backupToCloud} disabled={cloudBusy}>
-                        {cloudBusy ? 'Setting up…' : 'Set up Cloud Server'}
+                      <Button
+                        onClick={() => setConfirmCloud(true)}
+                        disabled={cloudBusy}
+                      >
+                        {cloudBusy
+                          ? 'Setting up…'
+                          : hostedCopyOrigin
+                            ? 'Sync again'
+                            : cloudEnrolled
+                              ? 'Finish Cloud Server setup'
+                              : 'Set up Cloud Server'}
                       </Button>
                     )}
                     {/* This tier costs money and reads our copy of your data,
@@ -1520,6 +1564,36 @@ function SyncPage() {
             )}
           </ProviderCard>
         )}
+
+        <ConfirmationDialog
+          title='Set up Cloud Server'
+          confirmLabel='Agree and enable Cloud Server'
+          show={confirmCloud}
+          bindShow={setConfirmCloud}
+          onConfirm={() => void backupToCloud()}
+        >
+          <p>
+            Keep this workspace available when your devices are offline, with
+            shareable links, search, and API access.
+          </p>
+          <p>
+            <strong>Local:</strong> data stays on your devices unless you
+            connect a service or share it.
+          </p>
+          <p>
+            <strong>Cloud Vault:</strong> an encrypted backup that the provider
+            cannot read. It does not host your workspace.
+          </p>
+          <p>
+            <strong>Cloud Server:</strong> you agree to us storing and
+            processing a readable copy of this drive to provide hosting. Your
+            sharing permissions still control other users’ access.
+          </p>
+          <p>
+            Existing content stays in this drive. Hosting currently requires an
+            invitation for this drive.
+          </p>
+        </ConfirmationDialog>
 
         {/* Signed in, but this device holds none of the account's data — it's
             still on whatever device created it. Pairing is the way across, so

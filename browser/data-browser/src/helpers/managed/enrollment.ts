@@ -236,6 +236,7 @@ export async function createManagedSyncEnrollment({
   agentSubject,
   agent,
   genesisCert,
+  hostingConsentVersion,
 }: {
   driveSubject: string;
   agentSubject: string;
@@ -243,6 +244,7 @@ export async function createManagedSyncEnrollment({
   agent?: Agent;
   /** The drive's `genesis` propval, for a drive that is not the agent's personal drive. */
   genesisCert?: string;
+  hostingConsentVersion?: number;
 }): Promise<ManagedSyncEnrollmentResult> {
   // Identity convergence happens silently at app boot (IdentityReconcileGate);
   // by the time we enroll, the active agent is the account's agent. Enrolling
@@ -268,6 +270,7 @@ export async function createManagedSyncEnrollment({
     body: JSON.stringify({
       drive_subject: driveSubject,
       agent_subject: agentSubject,
+      hosting_consent_version: hostingConsentVersion,
       ...(proof ? { proof } : {}),
     }),
   });

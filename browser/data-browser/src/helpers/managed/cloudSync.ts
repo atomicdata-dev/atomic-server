@@ -1,4 +1,4 @@
-// Turning on hosted sync for a drive the user already has locally — the
+// Turning on hosted sync for a local or server-hosted drive —
 // the Cloud Server action on the /sync page. This is the bridge between
 // the open-core connection layer (connect a server, promote a local drive) and
 // the SaaS control plane (account + per-drive enrollment that assigns a node).
@@ -14,15 +14,15 @@
 //      picks an available node and returns its `http_origin`; only after the
 //      enrollment exists will that node ACCEPT the drive's pushed commits
 //      (open nodes admit anything; a managed node checks the enrollment first).
-//   3. Point the app at that node and, if the drive was local-only, promote it
-//      so the sync engine actually pushes it up.
+//   3. A remote drive is copied by its source server, with verified receipt.
+//      A local-only drive connects to the assigned node before promotion.
 
 import { getManagedAccount } from './session';
 import { createManagedSyncEnrollment, genesisCertOf } from './enrollment';
 import { getManagedEnrollments } from './enrollmentApi';
 import type { ManagedInfo } from '../managedServer';
 import { isRunningInTauri } from '../tauri';
-import type { Store } from '@tomic/react';
+import { signRequest, type Store } from '@tomic/react';
 
 /**
  * Where to send a user to create a hosted-sync account, or null when no portal
@@ -155,7 +155,7 @@ export async function ensureManagedSession(
 }
 
 export type EnableCloudSyncResult =
-  | { ok: true; httpOrigin: string | null }
+  | { ok: true; httpOrigin: string; replicated: boolean }
   | { ok: false; reason: 'no-account'; portalUrl: string | null };
 
 /**
@@ -170,8 +170,15 @@ export async function enableCloudSyncForDrive(params: {
   agentSubject: string;
   setServer: (url: string) => void;
   managedInfo?: ManagedInfo | null;
+  /** Server holding the complete drive, when this is not a local-only drive. */
+  sourceServer?: string;
+  hostingConsentAccepted?: boolean;
 }): Promise<EnableCloudSyncResult> {
   const { store, drive, agentSubject, setServer, managedInfo } = params;
+
+  if (params.hostingConsentAccepted !== true) {
+    throw new Error('Agree to Cloud Server hosting before continuing.');
+  }
 
   const account = await getManagedAccount().catch(() => null);
 
@@ -206,31 +213,64 @@ export async function enableCloudSyncForDrive(params: {
     agentSubject,
     agent: agent?.subject === agentSubject ? agent : undefined,
     genesisCert,
+    hostingConsentVersion: 1,
   });
 
-  const httpOrigin = enrollment.http_origin ?? null;
+  const httpOrigin = enrollment.http_origin;
 
-  if (httpOrigin) {
-    // Point the app at the assigned node. A local-only drive then needs an
-    // explicit promote (it was excluded from sync); a drive already on this
-    // node's origin resyncs through the normal reconnect.
-    setServer(httpOrigin);
-
-    if (wasLocalOnly || agentWasLocalOnly) {
-      if (!(await store.waitForServerConnected(20_000))) {
-        throw new Error('Timed out connecting to the Cloud Server node.');
-      }
-
-      await promoteLocalOnly();
-    }
-  } else if (
-    (wasLocalOnly || agentWasLocalOnly) &&
-    store.getSyncStatus().serverConnected
-  ) {
-    // No origin came back (older control plane) — best effort against whatever
-    // node is currently connected.
-    await promoteLocalOnly();
+  if (!httpOrigin) {
+    throw new Error(
+      'Cloud Server did not return a server address. Retry setup shortly.',
+    );
   }
+
+  // A browser may only have a partial cache. Have the source server push its
+  // complete drive and verify the remote hash before reporting success.
+  // Keep reading from the source, which also retains the replication target.
+  if (
+    !wasLocalOnly &&
+    params.sourceServer &&
+    new URL(params.sourceServer).origin !== new URL(httpOrigin).origin
+  ) {
+    if (!agent || agent.subject !== agentSubject) {
+      throw new Error(
+        'Sign in with the identity that owns this drive to set up hosting.',
+      );
+    }
+
+    const url = new URL('/replicate-drive', params.sourceServer).toString();
+    const headers = await signRequest(url, agent, {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ drive, target: httpOrigin }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Could not replicate this drive to Cloud Server (HTTP ${response.status}). Your source server is still connected. Retry setup after checking that it supports replication and can reach the cloud server.`,
+      );
+    }
+
+    return { ok: true, httpOrigin, replicated: true };
+  }
+
+  // React's setting update is asynchronous. Reset the store connection now,
+  // or the wait below may see the old server as connected and push there.
+  store.setServerUrl(httpOrigin);
+  setServer(httpOrigin);
+
+  if (!(await store.waitForServerConnected(20_000))) {
+    throw new Error(
+      'Timed out connecting to the Cloud Server node. Retry setup.',
+    );
+  }
+
+  await promoteLocalOnly();
 
   async function promoteLocalOnly() {
     // Agent first: the drive's commits are signed by it, and a node that can
@@ -239,5 +279,5 @@ export async function enableCloudSyncForDrive(params: {
     if (wasLocalOnly) await store.promoteLocalDrive(drive);
   }
 
-  return { ok: true, httpOrigin };
+  return { ok: true, httpOrigin, replicated: false };
 }
