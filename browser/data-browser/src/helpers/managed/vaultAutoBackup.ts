@@ -321,6 +321,7 @@ async function ensureVaultBackupOnce(
       }
       signal.throwIfAborted();
       const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
+        signal,
         keys,
         driveSubject,
         metadata,

@@ -282,10 +282,12 @@ export async function enrollVault(
   driveSubject: string,
   agentSubject: string,
   metadata?: { name?: string; emoji?: string },
+  signal?: AbortSignal,
 ): Promise<VaultEnrollment> {
   const created = await api<{ enrollment: VaultEnrollment }>(
     '/cloud-vault/enroll',
     {
+      signal,
       method: 'POST',
       body: JSON.stringify({
         drive_subject: driveSubject,
@@ -321,9 +323,10 @@ export async function disableVault(drivePseudonym: string): Promise<void> {
 export async function putVaultKeyEnvelope(
   drivePseudonym: string,
   envelope: string,
-  { replace = false }: { replace?: boolean } = {},
+  { replace = false, signal }: { replace?: boolean; signal?: AbortSignal } = {},
 ): Promise<void> {
   await api(`/cloud-vault/${drivePseudonym}/key`, {
+    signal,
     method: 'PUT',
     body: JSON.stringify({ envelope, replace }),
   });
@@ -362,8 +365,11 @@ export type DriveKeyHandle = {
  */
 export async function getVaultKeyEnvelopeRecord(
   drivePseudonym: string,
+  signal?: AbortSignal,
 ): Promise<{ envelope: string; keyEpoch: number } | null> {
+  signal?.throwIfAborted();
   const response = await managedFetch(`/cloud-vault/${drivePseudonym}/key`, {
+    signal,
     credentials: 'include',
   });
 
@@ -802,16 +808,28 @@ export async function setUpVaultForDrive({
   agentSubject,
   agentSecret,
   metadata,
+  signal,
 }: {
+  signal?: AbortSignal;
   metadata?: { name?: string; emoji?: string };
   keys: VaultKeyOps;
   driveSubject: string;
   agentSubject: string;
   agentSecret: Uint8Array;
 }): Promise<{ enrollment: VaultEnrollment } & DriveKeyHandle> {
-  const enrollment = await enrollVault(driveSubject, agentSubject, metadata);
-  const existing = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
+  signal?.throwIfAborted();
+  const enrollment = await enrollVault(
+    driveSubject,
+    agentSubject,
+    metadata,
+    signal,
+  );
+  const existing = await getVaultKeyEnvelopeRecord(
+    enrollment.drive_pseudonym,
+    signal,
+  );
 
+  signal?.throwIfAborted();
   if (existing) {
     return {
       enrollment,
@@ -829,13 +847,18 @@ export async function setUpVaultForDrive({
     await putVaultKeyEnvelope(
       enrollment.drive_pseudonym,
       keys.vaultWrapKey(driveKey, agentSecret),
+      { signal },
     );
   } catch {
+    signal?.throwIfAborted();
     // Create-only, so this means another client won the race and stored its
     // own key between our read and our write. Theirs is authoritative: adopting
     // it is the only outcome where both clients can read each other's backups.
     // Ours has sealed nothing yet, so discarding it costs nothing.
-    const winner = await getVaultKeyEnvelopeRecord(enrollment.drive_pseudonym);
+    const winner = await getVaultKeyEnvelopeRecord(
+      enrollment.drive_pseudonym,
+      signal,
+    );
 
     if (!winner) throw new Error('Could not store or recover a vault key.');
 

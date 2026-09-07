@@ -118,3 +118,28 @@ A fresh browser walkthrough exercised the drive switcher, its Storage and hostin
 entry, Sync, and sidebar Feedback with no warning/error diagnostics. Screenshots
 were inspected. With Sentry disabled locally, feedback correctly disables sending
 and shows the support email; this does not verify production email delivery.
+
+### Latest release gate (2026-09-07)
+
+The completed full browser run reported **179 passed, 9 failed, 6 skipped**;
+the portal run reported **47 passed, 1 failed**. These are not green release
+results. Follow-up fixes cover startup polls before `window.store` exists,
+waiting for the portal magic-link exchange before navigating away, the plugin
+permissions heading's translated icon markup, and cancellation of Vault setup
+requests on sign-out. The cancellation regression fails before the fix and passes
+after it; 70 Vault/auto-backup unit tests and three account-switching E2E repeats
+pass. Affected browser cases are being rerun with strict diagnostics enabled.
+
+CI also exposed a missing patched-dependency directory in cached pnpm installs.
+The server Dagger pipeline now copies `browser/patches` into each manifest-only
+install layer. Both branches have been pushed; staging and production have not
+been deployed by this verification pass. Production remains held.
+
+Follow-up result: 16 affected browser tests passed, then the remaining cold-device
+Vault restore passed after correcting its setup. The server still holds the old
+drive, so recovery opens that drive; the test uses local-only mode to keep its
+canary off the server, proves it is absent on the fresh device, then restores it
+using Sync's Vault action. This avoids injected connection-failure noise while
+still proving Vault supplied the missing data. Together the focused reruns cover
+all nine failures from the full run, but are not a single clean full-suite run.
+The queued CI checks remain a deployment gate.

@@ -2268,9 +2268,8 @@ msgstr "Ouvrir le site"
 msgid "Loading AI"
 msgstr "Chargement de l'IA"
 
-#: src/views/Plugin/AssignRights.tsx
-msgid "<0/> Assign Rights"
-msgstr "<0/> Attribuer des droits"
+#~ msgid "<0/> Assign Rights"
+#~ msgstr "<0/> Attribuer des droits"
 
 #: src/views/Plugin/AssignRights.tsx
 msgid "Pick a resource"
@@ -7564,3 +7563,7 @@ msgstr ""
 #: src/components/SideBar/ResourceSideBar/ResourceSideBar.tsx
 msgid "Resource with error"
 msgstr "Ressource avec erreur"
+
+#: src/views/Plugin/AssignRights.tsx
+msgid "Assign Rights"
+msgstr "Attribuer des droits"

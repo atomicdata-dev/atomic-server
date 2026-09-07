@@ -139,7 +139,7 @@ test.describe('offline create → online sync → disable localDB', () => {
     await page
       .waitForFunction(
         () => {
-          if (!window.store.getSyncStatus().serverConnected) {
+          if (!window.store?.getSyncStatus().serverConnected) {
             return false;
           }
 

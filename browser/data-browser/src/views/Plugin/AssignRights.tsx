@@ -72,7 +72,7 @@ export const AssignRights: React.FC<AssignRightsProps> = ({
       <h3>
         <Row gap='0.5ch'>
           <FaShield />
-          Assign Rights
+          <span>Assign Rights</span>
         </Row>
       </h3>
       <StyledTableList disabled={disabled}>

@@ -753,6 +753,30 @@ describe('key management', () => {
    * The failure this guards against is unrecoverable: a second key would leave
    * every object written under the first permanently unreadable.
    */
+  it('does not fetch a key if sign-out cancels enrollment', async () => {
+    const controller = new AbortController();
+    const calls = mockFetch(url => {
+      if (url.endsWith('/enroll')) {
+        controller.abort();
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ enrollment: { drive_pseudonym: PSEUDONYM } }),
+        };
+      }
+      return { ok: true, status: 204 };
+    });
+
+    await expect(setUpVaultForDrive({
+      keys: fakeKeys(),
+      driveSubject: 'did:ad:drive',
+      agentSubject: 'did:ad:agent:x',
+      agentSecret: AGENT_SECRET,
+      signal: controller.signal,
+    })).rejects.toThrow();
+    expect(calls.map(call => call.url)).toHaveLength(1);
+  });
+
   it('reuses an existing key rather than minting a second one', async () => {
     const keys = fakeKeys();
     const stored = keys.vaultWrapKey(new Uint8Array(32).fill(99), AGENT_SECRET);

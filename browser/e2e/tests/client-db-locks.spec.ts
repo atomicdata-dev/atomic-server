@@ -17,9 +17,9 @@ async function expectClientDbReady(page: Page): Promise<void> {
     .poll(
       () =>
         page.evaluate(() => {
-          const s = window.store.getSyncStatus();
+          const s = window.store?.getSyncStatus();
 
-          return { ready: s.clientDbReady, error: s.clientDbError ?? null };
+          return { ready: s?.clientDbReady ?? false, error: s?.clientDbError ?? null };
         }),
       { timeout: 15000 },
     )
