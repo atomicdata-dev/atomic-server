@@ -411,3 +411,11 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   back to the selected drive, then explicit consent, replication and an
   authenticated read from the real managed node. Plan purchase alone creates
   no enrollment. Real Stripe-hosted test-card checkout remains a deployment check.
+
+## OpenAPI importer
+
+| Layer | Coverage |
+|---|---|
+| glue | `server/tests/it/import_oad.rs`: real CLI, local HTTP API + overlay, persistence, repeated updates, drive owner grants, origin mismatch, and API failure exit status. |
+| engine | Pagination, ontology derivation, and OAuth tests live upstream in reflector-rs / syncables-rs; not rerun by this workspace. |
+| flow | CLI only; interactive OAuth and live third-party APIs are not covered here. |

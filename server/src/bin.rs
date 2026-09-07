@@ -94,6 +94,16 @@ async fn main_wrapped() -> errors::AtomicServerResult<()> {
             println!("Successfully imported {:?} to store.", import_opts.file);
             Ok(())
         }
+        Some(config::Command::ImportOad) => {
+            atomic_server_lib::import_oad::run(
+                &config.store_path,
+                &config.uploads_path,
+                &config.get_origin(),
+            )
+            .await
+            .map_err(|e| format!("OAD import failed: {e:#}"))?;
+            Ok(())
+        }
         Some(config::Command::ShowConfig) => {
             println!("{:#?}", config);
             Ok(())

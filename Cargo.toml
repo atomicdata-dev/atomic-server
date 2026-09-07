@@ -49,3 +49,7 @@ debug = false
 
 [workspace.metadata.bin]
 wasm-pack = { version = "0.15.0" }
+
+# Reflector must use the same Storelike types and database implementation as the server.
+[patch."https://github.com/ontola/atomic-server"]
+atomic_lib = { path = "lib" }

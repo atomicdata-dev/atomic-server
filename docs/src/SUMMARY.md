@@ -19,6 +19,7 @@
     - [Creating Plugins](plugins/creating-plugins.md)
     - [Custom Views](plugins/custom-views.md)
   - [API](atomicserver/API.md)
+  - [Importing an API with OpenAPI](atomicserver/oad-import.md)
   - [Creating a JSON-AD file](create-json-ad.md)
   - [FAQ & troubleshooting](atomicserver/faq.md)
 - [Clients / SDKs](tooling.md)

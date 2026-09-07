@@ -236,6 +236,9 @@ pub enum Command {
     /// Import a JSON-AD file or stream to the store. By default creates Commits for all changes, maintaining version history. Use --force to allow importing other types of files.
     #[clap(name = "import", trailing_var_arg = true)]
     Import(ImportOpts),
+    /// Import an OpenAPI document + overlays using Reflector environment configuration. Stop the server first.
+    #[clap(name = "import-oad")]
+    ImportOad,
     /// Creates a `.env` file in your current directory that shows various options that you can set.
     #[clap(name = "generate-dotenv")]
     CreateDotEnv,

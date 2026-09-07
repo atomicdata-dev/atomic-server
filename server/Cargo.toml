@@ -33,6 +33,8 @@ static-files = "0.3.1"
 walkdir = "2"
 
 [dependencies]
+reflector-rs = { git = "https://github.com/localthought/reflector-rs", rev = "4aef40d6eb76be0cf23c5994c7b2c764255db37e" }
+syncables = { git = "https://github.com/localthought/syncables-rs", rev = "9197f14deec88e612910606a2aeafc5d846a5033" }
 async-trait = "0.1.89"
 actix = "0.13.5"
 actix-cors = "0.7.1"
