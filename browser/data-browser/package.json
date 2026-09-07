@@ -100,7 +100,8 @@
     "workbox-window": "^7.4.1",
     "wuchale": "^0.25.6",
     "yjs": "^13.6.30",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "@tomic/ng-bridge-react": "link:../../../atomic-ng-bridge/packages/ui"
   },
   "devDependencies": {
     "@tanstack/router-devtools": "^1.167.0",

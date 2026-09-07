@@ -240,6 +240,9 @@ importers:
       '@tomic/lib':
         specifier: workspace:*
         version: link:../lib
+      '@tomic/ng-bridge-react':
+        specifier: link:../../../atomic-ng-bridge/packages/ui
+        version: link:../../../atomic-ng-bridge/packages/ui
       '@tomic/plugin':
         specifier: workspace:*
         version: link:../plugin

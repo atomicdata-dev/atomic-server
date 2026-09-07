@@ -205,6 +205,7 @@ bootstrap(store);
 // user explicitly opted out via the Sync page toggle.
 import { initClientDb } from './helpers/initClientDb';
 import { isClientDbEnabled } from './helpers/clientDbMode';
+import { NgBridgeBadge } from '@tomic/ng-bridge-react';
 
 if (isClientDbEnabled()) {
   initClientDb(store);
@@ -264,6 +265,10 @@ function App(): JSX.Element {
     <StoreContext.Provider value={store}>
       <PerformanceProfiler id='app'>
         <RouterProvider router={router}></RouterProvider>
+        {/* Mirrors a local-only drive into NextGraph. Renders nothing, and
+            loads nothing, unless enabled with `?ngbridge=1`. All NextGraph code
+            lives in @tomic/ng-bridge-react and its siblings, never here. */}
+        <NgBridgeBadge store={store} />
       </PerformanceProfiler>
     </StoreContext.Provider>
   );
