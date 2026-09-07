@@ -8,6 +8,7 @@ import {
   signRequest,
 } from './authentication.js';
 import { AtomicError, ErrorType } from './error.js';
+import { pageRequestSignal } from './page-request-signal.js';
 // Import directly from the modules to avoid a circular dep through `./index.js`
 // — under some bundlers the re-exported binding lands as `undefined` at runtime
 // (TypeError: serializeDeterministically is not a function), which surfaces in
@@ -72,6 +73,7 @@ export interface ParseOpts {
 
 /** Contains one or more Resources */
 interface HTTPResourceResult {
+  cancelled?: boolean;
   resource: Resource;
   createdResources: Resource[];
 }
@@ -201,6 +203,7 @@ export class Client {
     opts: FetchResourceOptions = {},
   ): Promise<HTTPResourceResult> {
     const { signInfo, from, body: bodyReq, method, serverURL } = opts;
+    const signal = pageRequestSignal();
     let createdResources: Resource[] = [];
     const parser = new JSONADParser();
     let resource = new Resource(subject);
@@ -274,6 +277,7 @@ export class Client {
           headers: requestHeaders,
           method: method ?? 'GET',
           body: bodyReq,
+          signal,
         });
       } catch (e) {
         throw new AtomicError(
@@ -322,6 +326,7 @@ export class Client {
         throw new AtomicError(body);
       }
     } catch (e) {
+      if (signal?.aborted) return { resource, createdResources: [], cancelled: true };
       resource.setError(e);
       createdResources = [resource];
       console.error(subject, e);

@@ -251,17 +251,24 @@ export function useCollection(
   invalidateRef.current = invalidateCollection;
 
   useEffect(() => {
-    const col = collectionRef.current;
-    if (!col) return;
+    let disposed = false;
+    // Lazy resource materialization can emit an update while another component
+    // renders. Apply collection updates after that render, never from inside it.
+    const applyChange = (subject: string, resource?: Resource) => {
+      queueMicrotask(() => {
+        const col = collectionRef.current;
+        if (disposed || !col) return;
+        const result = col.applyResourceChange(subject, resource);
 
+        if (result === 'membership-stale') {
+          invalidateRef.current();
+        } else if (result === 'member-removed' || result === 'member-added') {
+          setCollection(proxyCollection(col));
+        }
+      });
+    };
     const onResourceChange = (resource: Resource) => {
-      const result = col.applyResourceChange(resource.subject, resource);
-
-      if (result === 'membership-stale') {
-        invalidateRef.current();
-      } else if (result === 'member-removed' || result === 'member-added') {
-        setCollection(proxyCollection(col));
-      }
+      applyChange(resource.subject, resource);
     };
 
     const unsubUpdated = store.on(
@@ -283,14 +290,11 @@ export function useCollection(
     );
 
     const unsubRemoved = store.on(StoreEvents.ResourceRemoved, subject => {
-      const result = col.applyResourceChange(subject, undefined);
-
-      if (result === 'member-removed') {
-        setCollection(proxyCollection(col));
-      }
+      applyChange(subject);
     });
 
     return () => {
+      disposed = true;
       unsubUpdated();
       unsubCreated();
       unsubRemoved();

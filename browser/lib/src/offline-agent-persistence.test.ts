@@ -33,6 +33,7 @@ describe('Offline Agent Persistence', () => {
       initError: undefined,
       waitForReady: async () => true,
       waitForInit: async () => undefined,
+      flush: async () => undefined,
       putResourceWithSnapshot: async (
         subject: string,
         jsonAd: string,

@@ -275,6 +275,7 @@ describe('offline persistence', () => {
       isReady: true,
       isInitialized: true,
       initError: undefined,
+      flush: async () => undefined,
       putResourceWithSnapshot: vi.fn(
         async (subject: string, json: string, snapshot?: Uint8Array) => {
           dbState.set(subject, { json, snapshot });
