@@ -150,6 +150,11 @@ export class NodeClientDb {
     return { jsonAd: jsonAd ?? null, snapshot: snapshot ?? null };
   }
 
+  /** Match the worker persistence barrier for headless Store clients. */
+  async flush(): Promise<void> {
+    this.requireDb().flush();
+  }
+
   async putResource(jsonAd: string): Promise<void> {
     await this.requireDb().putResource(jsonAd);
   }
