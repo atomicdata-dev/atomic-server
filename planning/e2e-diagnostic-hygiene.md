@@ -143,3 +143,12 @@ using Sync's Vault action. This avoids injected connection-failure noise while
 still proving Vault supplied the missing data. Together the focused reruns cover
 all nine failures from the full run, but are not a single clean full-suite run.
 The queued CI checks remain a deployment gate.
+
+### CI lint follow-up
+
+The complete browser workspace `pnpm run lint` now passes, including formatting.
+Fixed statement spacing, shadowed test variables and the database-handoff mock's
+`any` type; no lint rules were disabled. Existing non-failing warnings remain.
+Validation after cleanup: 381 library tests, nine diagnostic-fixture self-tests,
+the database-handoff regression and the app typecheck pass. Generated local
+`dist-hosted` output was moved outside the source tree before linting.

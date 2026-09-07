@@ -648,13 +648,18 @@ export async function enableAIForTesting(page: Page) {
   await page.route('https://mcp.exa.ai/mcp', async route => {
     if (route.request().method() !== 'POST') {
       await route.fulfill({ status: 204 });
+
       return;
     }
+
     const request = route.request().postDataJSON();
+
     if (request.id === undefined) {
       await route.fulfill({ status: 202, body: '' });
+
       return;
     }
+
     const result =
       request.method === 'initialize'
         ? {

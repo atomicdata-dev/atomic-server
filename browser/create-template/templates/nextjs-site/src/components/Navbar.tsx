@@ -16,6 +16,7 @@ async function snapshotMenu(subject: string): Promise<MenuItemSnapshot> {
   const linked = item.props.linksTo
     ? await store.getResource(item.props.linksTo)
     : undefined;
+
   return {
     subject,
     title: item.title,
@@ -38,6 +39,7 @@ const Navbar = async () => {
   const menu = await Promise.all(
     (site.props.menuItems ?? []).map(snapshotMenu),
   );
+
   return (
     <Container>
       <nav className={styles.nav}>

@@ -33,6 +33,7 @@ export async function getManagedAccount(): Promise<ManagedAccount | null> {
   }
 
   const account = (await response.json()) as ManagedAccount;
+
   return generation === sessionGeneration ? account : null;
 }
 
@@ -41,6 +42,7 @@ const logoutListeners = new Set<() => void>();
 /** Stop account-scoped work before invalidating its credentials. */
 export function onManagedLogout(listener: () => void): () => void {
   logoutListeners.add(listener);
+
   return () => {
     logoutListeners.delete(listener);
   };
@@ -55,6 +57,7 @@ export async function logoutManagedSession(): Promise<void> {
   sessionGeneration++;
   pendingLogouts++;
   for (const listener of logoutListeners) listener();
+
   try {
     await managedFetch(`/logout`, {
       method: 'POST',

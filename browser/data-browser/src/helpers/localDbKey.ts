@@ -218,6 +218,7 @@ export async function getOrCreateSessionDbKey(
   let dbKey!: Uint8Array;
   await update<Uint8Array>(SESSION_KEY_PREFIX + fingerprint, current => {
     dbKey = current ?? generateDbKey();
+
     return dbKey;
   });
 

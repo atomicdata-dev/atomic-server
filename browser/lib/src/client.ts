@@ -326,7 +326,8 @@ export class Client {
         throw new AtomicError(body);
       }
     } catch (e) {
-      if (signal?.aborted) return { resource, createdResources: [], cancelled: true };
+      if (signal?.aborted)
+        return { resource, createdResources: [], cancelled: true };
       resource.setError(e);
       createdResources = [resource];
       console.error(subject, e);

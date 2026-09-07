@@ -1,7 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import type { Store } from '@tomic/lib';
 
-const state = vi.hoisted(() => ({ workers: [] as any[] }));
+const state = vi.hoisted(() => ({
+  workers: [] as {
+    ready: PromiseWithResolvers<void>;
+    barrier: PromiseWithResolvers<void>;
+  }[],
+}));
 vi.mock('@tomic/lib', () => ({
   StoreEvents: { AgentChanged: 'agent' },
   perfSpan: () => () => {},
@@ -9,13 +14,25 @@ vi.mock('@tomic/lib', () => ({
     ready = Promise.withResolvers<void>();
     barrier = Promise.withResolvers<void>();
     initError = undefined;
-    constructor() { state.workers.push(this); }
-    init() { return this.ready.promise; }
+    constructor() {
+      state.workers.push(this);
+    }
+    init() {
+      return this.ready.promise;
+    }
     setSeedPromise() {}
-    waitForReady() { return this.ready.promise.then(() => true); }
-    flush() { return this.barrier.promise; }
-    allSubjects() { return Promise.resolve([]); }
-    putResources() { return Promise.resolve(); }
+    waitForReady() {
+      return this.ready.promise.then(() => true);
+    }
+    flush() {
+      return this.barrier.promise;
+    }
+    allSubjects() {
+      return Promise.resolve([]);
+    }
+    putResources() {
+      return Promise.resolve();
+    }
     destroy() {}
   },
 }));
@@ -34,10 +51,19 @@ it('an anonymous worker finishing initialization cannot reattach after sign-in',
   let listener: (next: { subject: string } | undefined) => void = () => {};
   let attached: unknown;
   const store = {
-    expectClientDb() {}, getAgent: () => agent,
-    on: (_: string, callback: typeof listener) => { listener = callback; return () => {}; },
-    getServerUrl: () => 'http://localhost', resources: new Map(),
-    setClientDb: vi.fn((db: unknown) => { attached = db; }), notifyError: vi.fn(),
+    expectClientDb() {},
+    getAgent: () => agent,
+    on: (_: string, callback: typeof listener) => {
+      listener = callback;
+
+      return () => {};
+    },
+    getServerUrl: () => 'http://localhost',
+    resources: new Map(),
+    setClientDb: vi.fn((db: unknown) => {
+      attached = db;
+    }),
+    notifyError: vi.fn(),
   };
   const { initClientDb } = await import('./initClientDb');
   initClientDb(store as unknown as Store);

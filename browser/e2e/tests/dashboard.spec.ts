@@ -293,7 +293,9 @@ test.describe('dashboards', () => {
     await page.getByTestId('new-dashboard-name').fill('Overview');
     await page.getByTestId('new-dashboard-create').click();
 
-    await expect(page.getByRole('textbox', { name: 'Set a title' })).toHaveValue('Overview', {
+    await expect(
+      page.getByRole('textbox', { name: 'Set a title' }),
+    ).toHaveValue('Overview', {
       timeout: 15_000,
     });
 

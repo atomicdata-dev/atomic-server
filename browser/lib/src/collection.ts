@@ -592,6 +592,7 @@ export class Collection {
       (matches || currentlyMember)
     ) {
       if (this._assemblingPage || resource?.new) return 'unchanged';
+
       return 'membership-stale';
     }
 

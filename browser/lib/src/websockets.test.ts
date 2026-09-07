@@ -121,7 +121,9 @@ describe('WSClient handshake', () => {
     vi.useRealTimers();
   });
 
-  it('a replaced socket cannot mark the new connection offline on its late close', async ({ expect }) => {
+  it('a replaced socket cannot mark the new connection offline on its late close', async ({
+    expect,
+  }) => {
     const { client, socket, store } = await connectedClient();
     // Match the primary origin checked by reportConnected.
     vi.spyOn(store, 'getServerUrl').mockReturnValue('https://example.com');
@@ -141,7 +143,9 @@ describe('WSClient handshake', () => {
     vi.spyOn(client, 'authenticate').mockResolvedValue(undefined);
     const result = client.fetch('did:ad:missing');
     const rejected = expect(result).rejects.toMatchObject({ type: errorType });
-    await vi.waitFor(() => expect(framesWithTag(socket, Tag.GET)).toHaveLength(1));
+    await vi.waitFor(() =>
+      expect(framesWithTag(socket, Tag.GET)).toHaveLength(1),
+    );
     const frame = framesWithTag(socket, Tag.GET)[0];
     const requestId = new DataView(frame.buffer, frame.byteOffset).getUint16(1);
     socket.receive(encodeError(requestId, ErrorCode.UNKNOWN, message));
@@ -248,6 +252,7 @@ describe('WSClient drive sync probe', () => {
     const { client, socket, store } = await connectedClient();
     vi.spyOn(store, 'computeDriveSyncState').mockImplementation(async () => {
       store.setAgent(undefined);
+
       return {
         drive: 'did:ad:drive',
         driveHash: 'hash',
@@ -287,6 +292,7 @@ describe('WSClient drive sync probe', () => {
     };
     vi.spyOn(internal, 'rbsrFingerprints').mockImplementation(async () => {
       store.setAgent(undefined);
+
       return ['ff'.repeat(32)];
     });
     const items = vi.spyOn(internal, 'rbsrItems').mockResolvedValue([]);
@@ -597,7 +603,6 @@ describe('WSClient SYNC_DIFF and the outbox', () => {
           getLoroDoc: () => ({ subject }),
         }) as unknown as ReturnType<typeof store.resources.get>,
     );
-    const { Resource } = await import('./resource.js');
     vi.spyOn(Resource, 'exportLoroBytesForSync').mockImplementation(
       (doc: unknown) => {
         exported.push((doc as { subject: string }).subject);

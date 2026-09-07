@@ -19,6 +19,7 @@ test('diagnostics records an explicitly expected warning', async ({
 for (const kind of ['warning', 'error', 'pageerror'] as const) {
   test(`diagnostics rejects an unexpected ${kind}`, async ({ page }) => {
     test.fail(true, 'The diagnostic fixture must reject this synthetic signal');
+
     if (kind === 'pageerror') {
       const error = page.waitForEvent('pageerror');
       await page.evaluate(() => {
@@ -29,8 +30,8 @@ for (const kind of ['warning', 'error', 'pageerror'] as const) {
       await error;
     } else {
       await page.evaluate(
-        kind =>
-          console[kind === 'warning' ? 'warn' : 'error'](
+        signalKind =>
+          console[signalKind === 'warning' ? 'warn' : 'error'](
             'Synthetic unexpected diagnostic',
           ),
         kind,

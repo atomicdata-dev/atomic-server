@@ -213,12 +213,15 @@ describe('forks', () => {
     const fork = await forkResource(store, original, drive.subject);
     expect(fork.getLoroDoc()!.getMap('doc').get('intro')).toBe('shared intro');
     expect(fork.get(forks.properties.forkVersion)).toBeTruthy();
-    const genesis = posted.find(commit => commit.subject === fork.subject && commit.isGenesis)!;
+    const genesis = posted.find(
+      commit => commit.subject === fork.subject && commit.isGenesis,
+    )!;
     const firstState = new Resource(fork.subject);
     firstState.setStore(store);
     firstState.importLoroUpdate(genesis.loroUpdate!);
-    expect(firstState.getLoroDoc()!.getMap('doc').get('intro')).toBe('shared intro');
-
+    expect(firstState.getLoroDoc()!.getMap('doc').get('intro')).toBe(
+      'shared intro',
+    );
 
     // Concurrent body edits: the fork adds one key, the original another.
     fork.getLoroDoc()!.getMap('doc').set('fromFork', 'DRAFT');

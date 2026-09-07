@@ -263,11 +263,13 @@ async function ensureVaultBackupOnce(
   });
   const offLogout = onManagedLogout(stop);
   if (typeof window !== 'undefined') window.addEventListener('pagehide', stop);
+
   try {
     // Cached keys do not imply that the account session is still valid.
     if (!(await deps.hasAccount())) {
       return { status: 'skipped', reason: 'no account session' };
     }
+
     signal.throwIfAborted();
     const db = await deps.db(store);
     signal.throwIfAborted();
@@ -304,21 +306,26 @@ async function ensureVaultBackupOnce(
           reason: 'account identity needs reconciliation',
         };
       }
+
       signal.throwIfAborted();
+
       if (deps.canEnroll && !(await deps.canEnroll(driveSubject, signal))) {
         return {
           status: 'skipped',
           reason: 'drive backup belongs to another account',
         };
       }
+
       const keys = await deps.loadKeys();
       const proof = await agentVaultProof(agent, keys.proofMessage);
+
       if (store.getAgent()?.subject !== agent.subject) {
         return {
           status: 'skipped',
           reason: 'identity changed during backup setup',
         };
       }
+
       signal.throwIfAborted();
       const { enrollment, driveKey, keyEpoch } = await deps.setUpVaultForDrive({
         signal,
@@ -345,6 +352,7 @@ async function ensureVaultBackupOnce(
         reason: 'identity changed during backup setup',
       };
     }
+
     signal.throwIfAborted();
     const held = known;
     const outcome = await deps.runVaultBackup({
@@ -380,12 +388,14 @@ async function ensureVaultBackupOnce(
     // A stale key or enrollment must not be reused after a failure; the next
     // attempt re-derives both from the control plane.
     enrolled.delete(driveSubject);
+
     if (signal.aborted) {
       return {
         status: 'skipped',
         reason: 'backup cancelled by account change',
       };
     }
+
     console.warn('[cloud-vault] backup failed', error);
 
     return {

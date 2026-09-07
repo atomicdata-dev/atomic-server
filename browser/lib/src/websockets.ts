@@ -357,6 +357,7 @@ export class WSClient {
       ws.addEventListener('message', this.handleMessage);
       ws.addEventListener('error', () => {
         if (this._closed) return;
+
         if (!opened) {
           console.warn('[WS] Connection failed');
         }
@@ -371,6 +372,7 @@ export class WSClient {
         // Explicit close already tears down this client synchronously. Its
         // later event must not overwrite a replacement socket's live state.
         if (this._closed) return;
+
         // Surface CloseEvent metadata so an unexplained reconnect loop
         // names its own cause: code 1000=normal, 1001=going away,
         // 1006=abnormal (no close frame seen — usually network drop or
@@ -1331,6 +1333,7 @@ export class WSClient {
     // Onboarding can name a key-derived home whose data has not arrived yet.
     // A prior read already established that this server cannot subscribe it.
     if (isNotFound(knownError) || isUnauthorized(knownError)) return;
+
     if (drive && this.store.isLiveSyncedDrive(drive)) {
       this.sendBinary(encodeSub(drive));
       this._subscribedDrive = drive;
@@ -1447,6 +1450,7 @@ export class WSClient {
         this.authenticatedWith !== this.store.getAgent()?.subject
       )
         return;
+
       if (drive && this.store.isLiveSyncedDrive(drive)) {
         await this.startVVSync(drive);
       }
@@ -1559,6 +1563,7 @@ export class WSClient {
     this._pendingSyncState.delete(drive);
 
     if (!syncState || !current()) return;
+
     const requireCurrent = () => {
       if (!current()) throw new Error('Sync identity or drive changed');
     };
@@ -1568,10 +1573,12 @@ export class WSClient {
       const remote: RemoteRange = {
         fingerprint: async (lo, hi) => {
           requireCurrent();
+
           return (await this.rbsrFingerprints(drive, [[lo, hi ?? null]]))[0];
         },
         items: (lo, hi) => {
           requireCurrent();
+
           return this.rbsrItems(drive, lo, hi);
         },
       };

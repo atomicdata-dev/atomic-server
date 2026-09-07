@@ -171,15 +171,22 @@ async function renameLocally(page: Page, title: string) {
   // reproduced (see "backups and pending writes" in
   // planning/CLOUD_VAULT_ARCHITECTURE.md) and the failure it was written for
   // turned out to be the restore-flush race, fixed in the worker.
-  await expect.poll(() => page.evaluate(async () => {
-    const subject = document.querySelector('main[about]')?.getAttribute('about');
-    if (!subject) return undefined;
-    const db = window.store.getClientDb();
-    const saved = await db?.getResource(subject);
-    if (!saved) return undefined;
-    await db?.flush();
-    return JSON.parse(saved)['https://atomicdata.dev/properties/name'];
-  })).toBe(title);
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const subject = document
+          .querySelector('main[about]')
+          ?.getAttribute('about');
+        if (!subject) return undefined;
+        const db = window.store.getClientDb();
+        const saved = await db?.getResource(subject);
+        if (!saved) return undefined;
+        await db?.flush();
+
+        return JSON.parse(saved)['https://atomicdata.dev/properties/name'];
+      }),
+    )
+    .toBe(title);
   await page.reload();
   await expect(sidebarEntry).toBeVisible({ timeout: 30_000 });
 }
@@ -355,7 +362,9 @@ test.describe('Cloud Vault backup and restore', () => {
       await fresh.waitForURL(/\/app\/show\?subject=/, { timeout: 90_000 });
       await expect(fresh.getByRole('button', { name: canary })).toBeHidden();
       await openSync(fresh);
-      await expect(fresh.getByTestId('vault-restore')).toBeEnabled({ timeout: 30_000 });
+      await expect(fresh.getByTestId('vault-restore')).toBeEnabled({
+        timeout: 30_000,
+      });
       await fresh.getByTestId('vault-restore').click();
       await expect(
         fresh.getByRole('button', { name: canary }).first(),

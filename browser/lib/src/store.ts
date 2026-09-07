@@ -1050,6 +1050,7 @@ export class Store {
           );
         },
       });
+
       // Children may call syncDirtyResources themselves. Start them only after
       // the parent's drain has completed, never from inside its drain callback.
       for (const parent of [...this.batchedResources.keys()]) {
@@ -1794,6 +1795,7 @@ export class Store {
           `[Store] failed to recover missing state for ${subject}:`,
           error,
         );
+
         if (!this.resources.get(subject)?.get(core.properties.isA)) {
           this.failResource(
             subject,
@@ -1827,6 +1829,7 @@ export class Store {
         change.resource.error = undefined;
         change.resource.loading = false;
       }
+
       const alias =
         change.subject !== change.resource.subject ? change.subject : undefined;
       this.addResource(change.resource, {
@@ -5752,11 +5755,13 @@ export class Store {
   ): { resource: Resource } {
     let r: Resource;
     this.snapshotReadDepth++;
+
     try {
       r = this.getResourceLoading(subject, opts);
     } finally {
       this.snapshotReadDepth--;
     }
+
     const key = this.normalizeSubject(r.subject);
     let snap = this.snapshots.get(key);
 
@@ -5818,8 +5823,10 @@ export class Store {
     // readers must not receive a state update inside that render.
     if (this.snapshotReadDepth > 0) {
       queueMicrotask(() => void this.notify(resource));
+
       return;
     }
+
     // Bump snapshot tuple identity so `useSyncExternalStore` consumers
     // re-render. The Resource itself is mutated in place, but a fresh
     // outer `{resource}` object is `!== ` the previous one, which is

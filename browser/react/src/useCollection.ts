@@ -252,6 +252,7 @@ export function useCollection(
 
   useEffect(() => {
     let disposed = false;
+
     // Lazy resource materialization can emit an update while another component
     // renders. Apply collection updates after that render, never from inside it.
     const applyChange = (subject: string, resource?: Resource) => {
@@ -267,6 +268,7 @@ export function useCollection(
         }
       });
     };
+
     const onResourceChange = (resource: Resource) => {
       applyChange(resource.subject, resource);
     };

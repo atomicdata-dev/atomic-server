@@ -70,7 +70,7 @@ function fakeClientDb(subject: string, jsonAd: string, snapshot: Uint8Array) {
     waitForInit: async () => undefined,
     exportAllResources: async () => '[]',
     flush: async () => undefined,
-      putResourceWithSnapshot: async () => undefined,
+    putResourceWithSnapshot: async () => undefined,
     getResourceWithSnapshot: async (s: string) =>
       s === subject ? { jsonAd, snapshot } : { jsonAd: null, snapshot: null },
   };

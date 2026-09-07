@@ -3245,7 +3245,6 @@ export class Resource<C extends OptionalClass = any> {
             this.subject.startsWith('did:ad:') &&
             !this.subject.startsWith('did:ad:agent:')))
       ) {
-
         // Genesis path for resources NOT created via `store.newResource` —
         // the new-resource form / `NewInstanceButton`, which mint a
         // transient `_new:` subject via `store.createSubject()` and then
@@ -3451,9 +3450,11 @@ export class Resource<C extends OptionalClass = any> {
     // A save must not resolve in that gap without writing its snapshot.
     const identity = this.store.getAgent()?.subject;
     await this.store.waitForClientDb(10_000);
+
     if (this.store.getAgent()?.subject !== identity) {
       throw new Error('Identity changed before local persistence');
     }
+
     const clientDb = this.store.getClientDb();
     if (!clientDb || clientDb.unsupportedEnvironment) return;
 

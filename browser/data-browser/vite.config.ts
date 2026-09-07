@@ -92,6 +92,7 @@ export default defineConfig(({ mode }) => {
     process.env.VITE_ATOMIC_SERVER_URL ??
     env.VITE_ATOMIC_SERVER_URL ??
     'http://localhost:9883';
+
   return {
     define: {
       __APP_VERSION__: JSON.stringify(appVersion),

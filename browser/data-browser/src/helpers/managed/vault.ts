@@ -443,6 +443,7 @@ export async function canEnrollVault(
       body: JSON.stringify({ drive_subject: driveSubject }),
     },
   );
+
   return result.can_enroll;
 }
 
@@ -589,6 +590,7 @@ export async function backupDrive({
         'Vault backup could not reserve a fresh object after 8 collisions.',
       );
     }
+
     return backupDrive({
       db,
       signal,
@@ -830,6 +832,7 @@ export async function setUpVaultForDrive({
   );
 
   signal?.throwIfAborted();
+
   if (existing) {
     return {
       enrollment,

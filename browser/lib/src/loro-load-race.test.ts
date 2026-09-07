@@ -29,7 +29,9 @@ beforeAll(async () => {
 });
 
 describe('importLoroUpdate — snapshot arriving before Loro is ready', () => {
-  it('does not notify subscribers synchronously from lazy snapshot materialization', async ({ expect }) => {
+  it('does not notify subscribers synchronously from lazy snapshot materialization', async ({
+    expect,
+  }) => {
     const unloaded = vi.spyOn(LoroLoader, 'isLoaded').mockReturnValue(false);
     const resource = new Resource('did:ad:lazy-read');
     resource.importLoroUpdate(snapshotBytes);

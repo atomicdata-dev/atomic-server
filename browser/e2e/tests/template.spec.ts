@@ -43,12 +43,16 @@ async function applyWebsiteTemplate(page: Page) {
   await dialog.getByRole('button', { name: 'Apply template' }).click();
   await expect(dialog).toBeHidden({ timeout: TEMPLATE_IMPORT_TIMEOUT });
   await expect(
-    page.getByRole('main').getByRole('heading', { name: 'website', level: 1, exact: true }),
+    page
+      .getByRole('main')
+      .getByRole('heading', { name: 'website', level: 1, exact: true }),
   ).toBeVisible({ timeout: TEMPLATE_IMPORT_TIMEOUT });
-  await expect.poll(async () =>
-    (await page.locator('.react-flow').boundingBox())?.width ?? 0,
-    { timeout: TEMPLATE_IMPORT_TIMEOUT },
-  ).toBeGreaterThan(100);
+  await expect
+    .poll(
+      async () => (await page.locator('.react-flow').boundingBox())?.width ?? 0,
+      { timeout: TEMPLATE_IMPORT_TIMEOUT },
+    )
+    .toBeGreaterThan(100);
 }
 
 const pathToPackage = (

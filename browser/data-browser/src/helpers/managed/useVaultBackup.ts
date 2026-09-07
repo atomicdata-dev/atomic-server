@@ -140,8 +140,10 @@ export function useVaultBackup({
     try {
       if (!(await getManagedAccount())) {
         setStatus({ state: 'off' });
+
         return;
       }
+
       const drives = await listVaultDrives();
       const enrollment = drives.find(d => d.drive_subject === driveSubject);
 

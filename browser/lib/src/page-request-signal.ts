@@ -4,6 +4,7 @@ let controller: AbortController | undefined;
 
 export function pageRequestSignal(): AbortSignal | undefined {
   if (typeof window === 'undefined' || !window.addEventListener) return;
+
   if (owner !== window) {
     owner = window;
     controller = new AbortController();
@@ -13,5 +14,6 @@ export function pageRequestSignal(): AbortSignal | undefined {
       if (!event.persisted) current.abort();
     });
   }
+
   return controller?.signal;
 }

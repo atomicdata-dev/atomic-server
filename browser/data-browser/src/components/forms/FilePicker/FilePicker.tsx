@@ -74,11 +74,14 @@ export function FilePicker({
         upload([selectedFile]).then(async ([subject]) => {
           if (!subject) {
             setError('Could not prepare file. Select it again to retry.');
+
             return;
           }
+
           await setValue(subject);
           setError(undefined);
         });
+
         return;
       }
     } else {

@@ -137,6 +137,7 @@ async function startForIdentity(
   if (currentWorker) {
     const previous = currentWorker;
     currentWorker = undefined;
+
     // Finish queued writes and fsync before releasing this identity's OPFS
     // lock. Abrupt termination rejected writes and could discard recent edits.
     try {

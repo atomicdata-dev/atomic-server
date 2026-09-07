@@ -12,11 +12,13 @@ describe('shared editor link parser', () => {
       'mailto:hello@example.com',
       'tel:31201234567',
     ]);
+
     for (let i = 0; i < 3; i++) {
       Reflect.apply(Link.config.onCreate!, {}, []);
       Reflect.apply(Link.config.onDestroy!, {}, []);
       expect(find(text).map(link => link.href)).toEqual(expected);
     }
+
     expect(warning).not.toHaveBeenCalled();
     warning.mockRestore();
   });

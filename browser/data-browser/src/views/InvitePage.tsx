@@ -181,16 +181,19 @@ function InvitePage({ resource }: ResourcePageProps): JSX.Element {
           let target = store.resources.get(destination);
           const visited = new Set<string>();
           let hostDrive: string | undefined;
+
           while (
             target?.isReady() &&
             !target.error &&
             !visited.has(target.subject)
           ) {
             visited.add(target.subject);
+
             if (target.hasClasses(server.classes.drive)) {
               hostDrive = target.subject;
               break;
             }
+
             const parent = target.get(core.properties.parent);
             target =
               typeof parent === 'string'

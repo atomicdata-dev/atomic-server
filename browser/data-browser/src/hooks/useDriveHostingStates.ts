@@ -37,8 +37,10 @@ export function useDriveHostingStates() {
         if (request !== generation.current) return;
         setServices({ servers: [], vaults: [], agent });
         setUnavailable(false);
+
         return;
       }
+
       const [response, vaults] = await Promise.all([
         managedFetch('/sync-enrollments', {}),
         listVaultDrives(),

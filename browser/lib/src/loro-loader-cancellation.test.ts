@@ -11,11 +11,19 @@ describe('WASM initialization during navigation', () => {
     const page = Object.assign(new EventTarget(), { document: {} });
     vi.stubGlobal('window', page);
     let reject!: (error: Error) => void;
-    const init = vi.fn(() => new Promise((_resolve, fail) => { reject = fail; }));
+    const init = vi.fn(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        }),
+    );
     vi.doMock('loro-crdt/web', () => ({ default: init }));
     const { LoroLoader } = await import('./loro-loader.js');
     const loading = LoroLoader.initializeLoro();
-    const result = loading.then(() => 'finished', () => 'failed');
+    const result = loading.then(
+      () => 'finished',
+      () => 'failed',
+    );
     await vi.waitFor(() => expect(init).toHaveBeenCalled());
     if (discarded) page.dispatchEvent(new Event('pagehide'));
     reject(new TypeError('Response body loading was aborted'));

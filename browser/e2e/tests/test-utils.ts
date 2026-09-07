@@ -309,6 +309,7 @@ export async function installCommitWatcher(page: Page) {
               false,
             );
             const entry = requests.get(id);
+
             if (entry) {
               (
                 window as unknown as { __atomicCommitLog: ObservedCommit[] }
@@ -317,6 +318,7 @@ export async function installCommitWatcher(page: Page) {
             }
           });
         }
+
         if (data instanceof ArrayBuffer || ArrayBuffer.isView(data)) {
           const buf =
             data instanceof ArrayBuffer
