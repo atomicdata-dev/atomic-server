@@ -28,7 +28,7 @@ export function initSentry(): void {
 
   const runtime = window.__ATOMIC_SENTRY__;
   const dsn =
-    runtime?.dsn || (import.meta.env.VITE_SENTRY_DSN as string | undefined);
+    runtime?.dsn ?? (import.meta.env.VITE_SENTRY_DSN as string | undefined);
 
   if (!dsn) return;
 
@@ -42,8 +42,8 @@ export function initSentry(): void {
     environment,
     release: `atomic-data-browser@${__APP_VERSION__}+${__GIT_COMMIT__}`,
     sendDefaultPii: false,
-    // Errors only: no performance tracing or session replay, to stay well
-    // within the free tier's quota and to keep the payload free of user data.
+    // No performance tracing or session replay. Explicit feedback is sent
+    // only when the user submits the sidebar form.
     tracesSampleRate: 0,
   });
 }

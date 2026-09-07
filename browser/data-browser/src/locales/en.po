@@ -5028,6 +5028,7 @@ msgstr "Try again"
 msgid "Open workspace"
 msgstr "Open workspace"
 
+#: src/components/SideBar/FeedbackMenuItem.tsx
 #: src/components/pairing/PairingFlowProvider.tsx
 msgid "Close"
 msgstr "Close"
@@ -7456,3 +7457,36 @@ msgstr "Choose Server plan"
 #: src/routes/SyncRoute.tsx
 msgid "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
 msgstr "Existing content stays in this drive. Hosting requires a Server plan or an invitation for this drive."
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Feedback"
+msgstr "Feedback"
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Send feedback"
+msgstr "Send feedback"
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Sending feedback"
+msgstr "Sending feedback"
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Thank you. Your feedback has been received."
+msgstr "Thank you. Your feedback has been received."
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Feedback could not be sent. Your text is still here. Try again or email"
+msgstr "Feedback could not be sent. Your text is still here. Try again or email"
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Report a bug or suggest an improvement. Your message and optional email go to the Atomic team through Sentry. Please leave out private workspace content."
+msgstr "Report a bug or suggest an improvement. Your message and optional email go to the Atomic team through Sentry. Please leave out private workspace content."
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Feedback <0/>"
+msgstr "Feedback <0/>"
+
+#: src/components/SideBar/FeedbackMenuItem.tsx
+msgid "Email for a reply (optional) <0/>"
+msgstr "Email for a reply (optional) <0/>"

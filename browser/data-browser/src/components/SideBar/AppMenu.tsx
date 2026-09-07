@@ -11,6 +11,7 @@ import {
   useCurrentAgent,
   useResource,
 } from '@tomic/react';
+import { FeedbackMenuItem } from './FeedbackMenuItem';
 import { SyncMenuItem } from './SyncMenuItem';
 import { ResourceGlyph } from '../ResourceGlyph';
 import { DemoExitMenuItem } from '../DemoExitButton';
@@ -87,6 +88,7 @@ export function AppMenu({ onItemClick }: AppMenuProps): JSX.Element {
         onClick={onItemClick}
       />
       <SyncMenuItem onClick={onItemClick} />
+      <FeedbackMenuItem />
       <SideBarMenuItem
         icon={<FaInfo />}
         label='About'

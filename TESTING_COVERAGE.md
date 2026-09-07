@@ -411,3 +411,10 @@ Cloud Vault display metadata: `vaultAutoBackup.test.ts` verifies name/emoji enro
   back to the selected drive, then explicit consent, replication and an
   authenticated read from the real managed node. Plan purchase alone creates
   no enrollment. Real Stripe-hosted test-card checkout remains a deployment check.
+
+## Error reporting and feedback
+
+- `browser/data-browser/src/helpers/feedback.test.ts`: unavailable reporting, failed delivery, blank input and successful submission.
+- `browser/data-browser/src/helpers/sentry.test.ts`: runtime disable override, environment and build attribution.
+- `browser/e2e/tests/feedback.spec.ts`: sidebar form, failed Sentry transport, retained input and successful retry; uses a fake Sentry project with intercepted transport.
+- Real Sentry evidence and remaining production gates: `planning/sentry-feedback-readiness.md`.
